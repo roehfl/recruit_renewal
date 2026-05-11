@@ -174,8 +174,8 @@ onMounted(() => {
   padding: 32px 24px 60px;
 }
 .board-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--app-bg-surface);
+  border: 1px solid var(--app-border-default);
   border-top: 3px solid var(--app-primary-hover-color);
   box-shadow: 0 8px 24px rgba(31, 41, 55, 0.06);
 }
@@ -184,24 +184,24 @@ onMounted(() => {
   align-items: flex-end;
   justify-content: space-between;
   padding: 22px 24px 16px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--app-border-default);
 }
 .board-header h2 {
   margin: 0;
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.04em;
-  color: #1f2937;
+  color: var(--app-text-primary);
 }
 .board-header p {
   margin: 8px 0 0;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--app-text-secondary);
 }
 .board-count {
   font-size: 13px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--app-text-secondary);
 }
 .board-count strong {
   color: var(--theme-primary-dark);
@@ -210,7 +210,7 @@ onMounted(() => {
   display: flex;
   padding: 16px 24px;
   background: #fbfcfa;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--app-border-default);
 }
 
 .board-search :deep(.ant-select-selector),
@@ -250,7 +250,7 @@ onMounted(() => {
   padding: 0;
   border: 0;
   background: transparent;
-  color: #1f2937;
+  color: var(--app-text-primary);
   font-size: 14px;
   font-weight: 400;
   cursor: pointer;
@@ -279,7 +279,7 @@ onMounted(() => {
     .ant-select-item-option-selected:not(.ant-select-item-option-disabled)
 ) {
   background-color: #f4f8f0 !important;
-  color: #536d2f !important;
+  color: var(--app-color-primary-olive-dark) !important;
   font-weight: 700;
 }
 
@@ -291,12 +291,12 @@ onMounted(() => {
 
 .notice-detail-header {
   padding-bottom: 16px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--app-border-default);
 }
 
 .notice-detail-header h3 {
   margin: 0;
-  color: #1f2937;
+  color: var(--app-text-primary);
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.04em;
@@ -305,14 +305,14 @@ onMounted(() => {
 .notice-detail-header span {
   display: block;
   margin-top: 8px;
-  color: #6b7280;
+  color: var(--app-text-secondary);
   font-size: 13px;
 }
 
 .notice-detail-content {
   min-height: 240px;
   padding: 24px 0 8px;
-  color: #374151;
+  color: var(--app-text-secondary);
   font-size: 14px;
   line-height: 1.8;
 }

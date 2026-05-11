@@ -205,7 +205,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
 .header-top {
   height: 72px;
   border-bottom: 1px solid var(--app-border-color);
-  background: #fff;
+  background: var(--app-bg-surface);
 }
 
 .top-inner {
@@ -247,7 +247,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
 .logo-stack .brand-logo-main {
   font-size: 26px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--app-text-primary);
   line-height: 1;
   letter-spacing: -0.045em;
 }
@@ -343,7 +343,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
   height: 30px;
   border-radius: 50%;
   background: #d1d5db;
-  color: #fff;
+  color: var(--app-bg-surface);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -370,7 +370,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
 
 .header-bottom {
   height: 58px;
-  background: #fff;
+  background: var(--app-bg-surface);
 }
 
 .bottom-inner {
@@ -474,7 +474,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
   padding: 12px 0;
   flex-direction: column;
 
-  background: #fff;
+  background: var(--app-bg-surface);
   border: 1px solid var(--app-border-color);
   border-radius: 4px;
   box-shadow: 0 8px 20px rgb(15 71 38 / 10%);
@@ -485,7 +485,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
   height: 34px;
   padding: 0 16px;
   border: 0;
-  background: #fff;
+  background: var(--app-bg-surface);
   color: var(--app-sub-text-color);
   font-size: 13px;
   text-align: left;
@@ -508,7 +508,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
   left: 0;
   right: 0;
   z-index: 90;
-  background: #fff;
+  background: var(--app-bg-surface);
   border-top: 1px solid var(--app-border-color);
   border-bottom: 1px solid var(--app-border-color);
   box-shadow: 0 12px 24px rgb(15 71 38 / 8%);
@@ -662,7 +662,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
   .ant-dropdown-menu {
     min-width: 168px;
     padding: 8px 0;
-    background: #fff;
+    background: var(--app-bg-surface);
     border: 1px solid var(--app-border-color);
     border-radius: 6px;
     box-shadow: 0 8px 20px rgb(15 71 38 / 10%);

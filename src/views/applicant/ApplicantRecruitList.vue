@@ -145,9 +145,9 @@ const goRecruitList = async (): Promise<void> => {
 <style scoped>
 .recruit-card {
   width: 100%;
-  border: 1px solid #d6dbe0;
+  border: 1px solid var(--app-border-soft);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--app-bg-surface);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
 }
 
@@ -160,7 +160,7 @@ const goRecruitList = async (): Promise<void> => {
 
 .section-title {
   margin: 0;
-  color: #222;
+  color: var(--app-text-primary);
   font-size: 22px;
   font-weight: 700;
   line-height: 1.35;
@@ -168,7 +168,7 @@ const goRecruitList = async (): Promise<void> => {
 
 .section-desc {
   margin: 6px 0 0;
-  color: #777;
+  color: var(--app-text-secondary);
   font-size: 14px;
   line-height: 1.45;
 }
@@ -189,14 +189,14 @@ const goRecruitList = async (): Promise<void> => {
   min-width: 96px;
   padding: 9px 18px;
   border-radius: 8px;
-  color: #333;
+  color: var(--app-text-primary);
   font-size: 15px;
   text-align: center;
 }
 
 :deep(.ant-tabs-tab-active .ant-tabs-tab-btn) {
   background: var(--app-primary-subtle-color);
-  color: #222;
+  color: var(--app-text-primary);
   font-weight: 700;
 }
 
@@ -213,14 +213,14 @@ const goRecruitList = async (): Promise<void> => {
   width: 100%;
   padding: 10px 0;
   border: 0;
-  border-bottom: 1px solid #eeeeee;
+  border-bottom: 1px solid var(--app-border-subtle);
   background: transparent;
   text-align: left;
   cursor: pointer;
 }
 
 .recruit-item:hover .recruit-title {
-  color: #9b8120;
+  color: var(--app-color-warning);
   text-decoration: underline;
 }
 
@@ -241,7 +241,7 @@ const goRecruitList = async (): Promise<void> => {
 }
 
 .status-tag.OPEN {
-  color: #138a5b;
+  color: var(--app-color-success);
 }
 
 /* .status-tag.SOON {
@@ -249,11 +249,11 @@ const goRecruitList = async (): Promise<void> => {
 } */
 
 .status-tag.CLOSED {
-  color: #999999;
+  color: var(--app-text-muted);
 }
 
 .dday {
-  color: #9b8120;
+  color: var(--app-color-warning);
   font-size: 13px;
   font-weight: 700;
 }
@@ -261,7 +261,7 @@ const goRecruitList = async (): Promise<void> => {
 .recruit-title {
   display: block;
   overflow: hidden;
-  color: #222;
+  color: var(--app-text-primary);
   font-size: 15px;
   font-weight: 600;
   line-height: 1.35;
@@ -272,7 +272,7 @@ const goRecruitList = async (): Promise<void> => {
 
 .recruit-period {
   margin-top: 3px;
-  color: #888;
+  color: var(--app-text-muted);
   font-size: 12px;
   line-height: 1.4;
 }
