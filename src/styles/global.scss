@@ -1,0 +1,90 @@
+@use './variables.scss';
+
+@font-face {
+  font-family: 'Pretendard';
+  src: url('@/assets/fonts/Pretendard-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pretendard';
+  src: url('@/assets/fonts/Pretendard-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pretendard';
+  src: url('@/assets/fonts/Pretendard-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pretendard';
+  src: url('@/assets/fonts/Pretendard-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+}
+
+body {
+  margin: 0;
+  color: var(--app-text-color);
+  background: var(--app-bg-color);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.page-title {
+  margin: 0 0 20px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--app-text-color);
+}
+
+.page-description {
+  margin: 0 0 24px;
+  font-size: 14px;
+  color: var(--app-sub-text-color);
+}
+
+.content-card {
+  background: var(--app-content-bg-color);
+  border: 1px solid var(--app-border-color);
+  border-radius: var(--app-border-radius);
+  box-shadow: var(--app-card-shadow);
+}
+
+.search-box {
+  padding: 20px;
+  margin-bottom: 16px;
+  background: var(--app-content-bg-color);
+  border: 1px solid var(--app-border-color);
+  border-radius: var(--app-border-radius);
+}

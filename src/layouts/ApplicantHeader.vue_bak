@@ -1,0 +1,513 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
+import { MenuOutlined, CloseOutlined, RightOutlined } from '@ant-design/icons-vue'
+
+import logoImage from '@/assets/images/logo.png'
+
+interface SubMenuItem {
+  id: number
+  name: string
+  path: string
+}
+
+interface MainMenuItem {
+  id: number
+  name: string
+  path: string
+  children?: SubMenuItem[]
+}
+
+const router = useRouter()
+
+const menuOpen = ref(false)
+
+const mainMenus: MainMenuItem[] = [
+  {
+    id: 1,
+    name: '채용정보',
+    path: '/applicant/recruits',
+    children: [
+      { id: 101, name: '채용공고', path: '/applicant/recruits' },
+      { id: 102, name: '상시채용', path: '/applicant/recruits/always' },
+      { id: 103, name: '마감된 공고', path: '/applicant/recruits/closed' },
+    ],
+  },
+  {
+    id: 2,
+    name: '지원안내',
+    path: '/applicant/guide',
+    children: [
+      { id: 201, name: '지원 절차', path: '/applicant/guide/process' },
+      { id: 202, name: '자주 묻는 질문', path: '/applicant/guide/faq' },
+    ],
+  },
+  {
+    id: 3,
+    name: '인재상',
+    path: '/applicant/talent',
+    children: [
+      { id: 301, name: '신영 인재상', path: '/applicant/talent' },
+      { id: 302, name: '직무 소개', path: '/applicant/jobs' },
+    ],
+  },
+  {
+    id: 4,
+    name: '회사소개',
+    path: '/applicant/company',
+    children: [
+      { id: 401, name: '회사 개요', path: '/applicant/company' },
+      { id: 402, name: '복리후생', path: '/applicant/company/benefits' },
+    ],
+  },
+  {
+    id: 5,
+    name: '나의 지원',
+    path: '/applicant/applications/my',
+    children: [
+      { id: 501, name: '지원서 확인', path: '/applicant/applications/my' },
+      { id: 502, name: '전형 결과 확인', path: '/applicant/results' },
+    ],
+  },
+]
+
+const toggleMenu = () => {
+  menuOpen.value = !menuOpen.value
+}
+
+const goMenu = (path: string) => {
+  menuOpen.value = false
+  router.push(path)
+}
+</script>
+
+<template>
+  <header class="applicant-header">
+    <!-- 상단 헤더 -->
+    <div class="header-top">
+      <div class="header-inner top-inner">
+        <RouterLink to="/applicant" class="logo-area">
+          <img :src="logoImage" alt="신영증권 채용" />
+        </RouterLink>
+
+        <div class="top-actions">
+          <RouterLink to="/login" class="top-link"> 로그인 </RouterLink>
+
+          <span class="top-divider" />
+
+          <RouterLink to="/signup" class="top-link"> 회원가입 </RouterLink>
+        </div>
+      </div>
+    </div>
+
+    <!-- 하단 메뉴 -->
+    <div class="header-bottom">
+      <div class="header-inner bottom-inner">
+        <a-button
+          type="text"
+          class="hamburger-button"
+          :aria-label="menuOpen ? '전체 메뉴 닫기' : '전체 메뉴 열기'"
+          @click="toggleMenu"
+        >
+          <CloseOutlined v-if="menuOpen" />
+          <MenuOutlined v-else />
+        </a-button>
+
+        <nav class="main-nav">
+          <div v-for="menu in mainMenus" :key="menu.id" class="main-menu-wrapper">
+            <RouterLink :to="menu.path" class="main-menu-item">
+              {{ menu.name }}
+            </RouterLink>
+
+            <!-- 햄버거 전체메뉴가 열려 있을 때는 hover 소메뉴를 숨김 -->
+            <div v-if="menu.children?.length && !menuOpen" class="sub-menu-panel">
+              <button
+                v-for="child in menu.children"
+                :key="child.id"
+                type="button"
+                class="sub-menu-item"
+                @click="goMenu(child.path)"
+              >
+                {{ child.name }}
+              </button>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+
+    <!-- Header 바로 아래 전체 메뉴 상세 -->
+    <transition name="mega-menu">
+      <div v-if="menuOpen" class="mega-menu">
+        <div class="header-inner mega-menu-inner">
+          <div v-for="menu in mainMenus" :key="menu.id" class="mega-menu-column">
+            <button type="button" class="mega-menu-title" @click="goMenu(menu.path)">
+              <span>{{ menu.name }}</span>
+              <RightOutlined />
+            </button>
+
+            <ul v-if="menu.children?.length" class="mega-sub-menu">
+              <li v-for="child in menu.children" :key="child.id">
+                <button type="button" @click="goMenu(child.path)">
+                  {{ child.name }}
+                </button>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </transition>
+  </header>
+</template>
+
+<style scoped lang="scss">
+.applicant-header {
+  position: relative;
+  z-index: 100;
+  width: 100%;
+  background: var(--app-content-bg-color);
+  border-bottom: 1px solid var(--app-border-color);
+}
+
+.header-inner {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.header-top {
+  height: 72px;
+  border-bottom: 1px solid var(--app-border-color);
+  background: #fff;
+}
+
+.top-inner {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo-area {
+  display: flex;
+  align-items: center;
+
+  img {
+    width: 8%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+  }
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--app-text-color);
+}
+
+.top-link {
+  color: var(--app-text-color);
+  transition: color 0.15s ease;
+
+  &:hover {
+    color: var(--app-primary-color);
+  }
+}
+
+.top-divider {
+  width: 1px;
+  height: 12px;
+  background: var(--app-border-dark-color);
+}
+
+.header-bottom {
+  height: 58px;
+  background: #fff;
+}
+
+.bottom-inner {
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.hamburger-button {
+  width: 44px;
+  height: 44px;
+  margin-right: 58px;
+  border-radius: 8px;
+  color: var(--app-text-color);
+  font-size: 21px;
+
+  &:hover,
+  &:focus,
+  &:active {
+    color: var(--app-primary-color);
+    background: transparent !important;
+  }
+}
+
+.main-nav {
+  display: flex;
+  align-items: center;
+  gap: 38px;
+  height: 100%;
+}
+
+.main-menu-wrapper {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+
+  &:hover {
+    .main-menu-item {
+      color: var(--app-primary-color);
+    }
+
+    .main-menu-item::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 3px;
+      border-radius: 999px;
+      background: var(--app-primary-color);
+    }
+
+    .sub-menu-panel {
+      display: flex;
+    }
+  }
+}
+
+.main-menu-item {
+  position: relative;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  color: var(--app-text-color);
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+
+  &:hover {
+    color: var(--app-primary-color);
+  }
+
+  &.router-link-active {
+    color: var(--app-primary-color);
+  }
+
+  &.router-link-active::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--app-primary-color);
+  }
+}
+
+/* 대메뉴 hover 시 표시되는 소메뉴 */
+.sub-menu-panel {
+  display: none;
+  position: absolute;
+  top: 58px;
+  left: -16px;
+  z-index: 220;
+
+  min-width: 148px;
+  padding: 12px 0;
+  flex-direction: column;
+
+  background: #fff;
+  border: 1px solid var(--app-border-color);
+  border-radius: 4px;
+  box-shadow: 0 8px 20px rgb(15 71 38 / 10%);
+}
+
+.sub-menu-item {
+  width: 100%;
+  height: 34px;
+  padding: 0 16px;
+  border: 0;
+  background: #fff;
+  color: var(--app-sub-text-color);
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+
+  &:hover {
+    color: var(--app-primary-color);
+    background: var(--app-primary-subtle-color);
+  }
+}
+
+/* Header 아래 노출되는 전체 메뉴 */
+.mega-menu {
+  position: absolute;
+  top: 130px;
+  left: 0;
+  right: 0;
+  z-index: 90;
+  background: #fff;
+  border-top: 1px solid var(--app-border-color);
+  border-bottom: 1px solid var(--app-border-color);
+  box-shadow: 0 12px 24px rgb(15 71 38 / 8%);
+}
+
+.mega-menu-inner {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  padding-top: 28px;
+  padding-bottom: 32px;
+}
+
+.mega-menu-column {
+  min-height: 180px;
+  padding: 0 28px;
+  border-right: 1px solid var(--app-divider-color);
+
+  &:last-child {
+    border-right: 0;
+  }
+}
+
+.mega-menu-title {
+  width: 100%;
+  padding: 0 0 18px;
+  border: 0;
+  background: transparent;
+  color: var(--app-text-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 17px;
+  font-weight: 800;
+  cursor: pointer;
+  text-align: left;
+
+  &:hover {
+    color: var(--app-primary-color);
+  }
+
+  :deep(.anticon) {
+    font-size: 12px;
+  }
+}
+
+.mega-sub-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  li + li {
+    margin-top: 10px;
+  }
+
+  button {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--app-sub-text-color);
+    font-size: 14px;
+    line-height: 1.5;
+    text-align: left;
+    cursor: pointer;
+    transition: color 0.15s ease;
+
+    &:hover {
+      color: var(--app-primary-color);
+    }
+  }
+}
+
+/* 전체 메뉴 열림/닫힘 애니메이션 */
+.mega-menu-enter-active,
+.mega-menu-leave-active {
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.mega-menu-enter-from,
+.mega-menu-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.mega-menu-enter-to,
+.mega-menu-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .header-top {
+    height: 64px;
+  }
+
+  .logo-area img {
+    width: 120px;
+  }
+
+  .header-bottom {
+    height: 52px;
+  }
+
+  .hamburger-button {
+    margin-right: 46px;
+  }
+
+  .main-nav {
+    gap: 22px;
+    overflow-x: auto;
+  }
+
+  .main-menu-item {
+    height: 52px;
+    font-size: 15px;
+  }
+
+  .sub-menu-panel {
+    top: 52px;
+    left: -12px;
+  }
+
+  .mega-menu {
+    top: 116px;
+  }
+
+  .mega-menu-inner {
+    grid-template-columns: 1fr;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .mega-menu-column {
+    min-height: auto;
+    padding: 16px 24px;
+    border-right: 0;
+    border-bottom: 1px solid var(--app-divider-color);
+
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
+}
+</style>
