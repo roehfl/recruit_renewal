@@ -1,0 +1,34 @@
+<script setup lang="ts">
+import { h, ref } from 'vue'
+import { message, notification } from 'ant-design-vue'
+import { SearchOutlined, PlusOutlined, EditOutlined } from '@ant-design/icons-vue'
+import type { TableColumnsType } from 'ant-design-vue'
+
+interface TableRow { key: string; title: string; dept: string; status: '진행중'|'마감'|'예정'; createdAt: string }
+const formState = ref({ name: '', type: undefined as string | undefined, radio: 'Y', check: ['A'], memo: '' })
+const searchState = ref({ keyword: '', status: undefined as string | undefined })
+const modalOpen = ref(false)
+const drawerOpen = ref(false)
+const loading = ref(false)
+const rows = ref<TableRow[]>([
+  { key: '1', title: '2026 상반기 신입 채용', dept: '인사팀', status: '진행중', createdAt: '2026-05-01' },
+  { key: '2', title: '백엔드 경력 채용', dept: '플랫폼팀', status: '예정', createdAt: '2026-05-08' },
+  { key: '3', title: '디자이너 채용', dept: '디자인팀', status: '마감', createdAt: '2026-04-15' },
+])
+const columns: TableColumnsType<TableRow> = [
+  { title: '공고명', dataIndex: 'title', key: 'title' },
+  { title: '부서', dataIndex: 'dept', key: 'dept', width: 140 },
+  { title: '상태', dataIndex: 'status', key: 'status', width: 120, customRender: ({ record }) => h('span', { class: `status-tag ${record.status}` }, record.status) },
+  { title: '등록일', dataIndex: 'createdAt', key: 'createdAt', width: 140 },
+  { title: '액션', key: 'action', width: 120, customRender: () => h('a', { class: 'action-link' }, '상세 보기') },
+]
+const onResetForm = () => { formState.value = { name: '', type: undefined, radio: 'Y', check: ['A'], memo: '' } }
+const onSearchReset = () => { searchState.value = { keyword: '', status: undefined } }
+const openMessage = () => message.success('메시지 샘플입니다.')
+const openNotification = () => notification.info({ message: '알림 샘플', description: 'Notification 컴포넌트 예시입니다.' })
+const triggerLoading = () => { loading.value = true; setTimeout(() => (loading.value = false), 800) }
+</script>
+<template><div class="sample-page"><a-space direction="vertical" :size="16" style="width:100%"><a-card><div class="page-header"><div><h1>Ant Design Vue 샘플</h1><p>개발자가 화면 개발 시 참고할 수 있는 컴포넌트 예시</p></div><a-space><a-button type="primary"><PlusOutlined /> 신규</a-button><a-button><EditOutlined /> 수정</a-button><a-button type="dashed">임시 저장</a-button></a-space></div></a-card><a-card title="Button 샘플"><a-space wrap><a-button type="primary">Primary</a-button><a-button>Default</a-button><a-button type="dashed">Dashed</a-button><a-button type="text">Text</a-button><a-button type="link">Link</a-button><a-button danger>Danger</a-button><a-button disabled>Disabled</a-button><a-button type="primary" shape="circle"><SearchOutlined /></a-button></a-space></a-card><a-card title="Form 샘플"><a-form layout="vertical"><a-row :gutter="16"><a-col :span="8"><a-form-item label="이름"><a-input v-model:value="formState.name" /></a-form-item></a-col><a-col :span="8"><a-form-item label="구분"><a-select v-model:value="formState.type" :options="[{label:'신입',value:'신입'},{label:'경력',value:'경력'}]" /></a-form-item></a-col><a-col :span="8"><a-form-item label="일자"><a-date-picker style="width:100%" /></a-form-item></a-col></a-row><a-form-item label="사용 여부"><a-radio-group v-model:value="formState.radio"><a-radio value="Y">사용</a-radio><a-radio value="N">미사용</a-radio></a-radio-group></a-form-item><a-form-item label="태그"><a-checkbox-group v-model:value="formState.check" :options="[{label:'필수',value:'A'},{label:'우대',value:'B'}]" /></a-form-item><a-form-item label="설명"><a-textarea v-model:value="formState.memo" :rows="3" /></a-form-item><a-alert message="검증 메시지 예시: 이름은 필수 입력 항목입니다." type="warning" show-icon /><div class="actions"><a-space><a-button type="primary">등록</a-button><a-button @click="onResetForm">초기화</a-button></a-space></div></a-form></a-card><a-card title="Search Form + Table 샘플"><a-form layout="inline" class="search-form"><a-form-item label="키워드"><a-input v-model:value="searchState.keyword" placeholder="공고명" /></a-form-item><a-form-item label="상태"><a-select v-model:value="searchState.status" style="width:140px" :options="[{label:'진행중',value:'진행중'},{label:'예정',value:'예정'},{label:'마감',value:'마감'}]" /></a-form-item><a-form-item><a-space><a-button type="primary">조회</a-button><a-button @click="onSearchReset">초기화</a-button></a-space></a-form-item></a-form><a-table :columns="columns" :data-source="rows" :pagination="{ pageSize: 5 }" /></a-card><a-card title="Detail View 샘플"><a-descriptions bordered :column="2"><a-descriptions-item label="공고명">2026 상반기 신입 채용</a-descriptions-item><a-descriptions-item label="상태"><a-tag color="green">진행중</a-tag></a-descriptions-item><a-descriptions-item label="등록일">2026-05-01</a-descriptions-item><a-descriptions-item label="담당 부서">인사팀</a-descriptions-item><a-descriptions-item label="첨부파일" :span="2">채용공고문.pdf / 지원서양식.xlsx</a-descriptions-item></a-descriptions></a-card><a-card title="Modal / Drawer 샘플"><a-space><a-button type="primary" @click="modalOpen = true">Modal 열기</a-button><a-button @click="drawerOpen = true">Drawer 열기</a-button></a-space></a-card><a-card title="Feedback / Navigation 샘플"><a-space direction="vertical" style="width:100%"><a-alert message="안내 메시지" description="Alert 컴포넌트 예시입니다." type="info" show-icon /><a-space><a-button @click="openMessage">message</a-button><a-button @click="openNotification">notification</a-button><a-button @click="triggerLoading">loading</a-button></a-space><a-spin :spinning="loading"><a-empty description="데이터 없음" /></a-spin><a-breadcrumb><a-breadcrumb-item>홈</a-breadcrumb-item><a-breadcrumb-item>샘플</a-breadcrumb-item><a-breadcrumb-item>Ant Design Vue</a-breadcrumb-item></a-breadcrumb><a-tabs :items="[{key:'1',label:'기본 정보'},{key:'2',label:'상세 정보'},{key:'3',label:'이력'}]" /><a-steps :current="1" :items="[{title:'작성'},{title:'검토'},{title:'완료'}]" /></a-space></a-card></a-space><a-modal v-model:open="modalOpen" title="샘플 모달" @ok="modalOpen = false" @cancel="modalOpen = false"><p>확인/취소 액션 동작 예시입니다.</p></a-modal><a-drawer v-model:open="drawerOpen" title="샘플 드로어" width="420" @close="drawerOpen = false"><p>Drawer 내용 샘플입니다.</p><a-space><a-button type="primary" @click="drawerOpen = false">확인</a-button><a-button @click="drawerOpen = false">취소</a-button></a-space></a-drawer></div></template>
+<style scoped>
+.sample-page{max-width:1180px;margin:0 auto;padding:32px 24px 60px}.page-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.page-header h1{margin:0;color:var(--app-text-primary);font-size:28px}.page-header p{margin:8px 0 0;color:var(--app-text-secondary)}.actions{margin-top:16px}.search-form{margin-bottom:16px}.status-tag.진행중{color:var(--app-color-success);font-weight:700}.status-tag.마감{color:var(--app-text-secondary);font-weight:700}.status-tag.예정{color:var(--app-color-warning);font-weight:700}.action-link{color:var(--app-color-primary)}
+</style>
