@@ -62,7 +62,7 @@ const isLink = (item: MenuItem, index: number): boolean => {
   /* border-bottom: 1px solid var(--app-border-color); */
   border-radius: 0;
 
-  color: #374151;
+  color: var(--app-text-secondary);
   font-size: 14px;
   font-weight: 500;
   letter-spacing: -0.02em;
@@ -72,17 +72,17 @@ const isLink = (item: MenuItem, index: number): boolean => {
 }
 
 .breadcrumb-link {
-  color: #6b7280;
+  color: var(--app-text-secondary);
   text-decoration: none;
   transition: color 0.15s ease;
 }
 
 .breadcrumb-link:hover {
-  color: #536d2f;
+  color: var(--app-color-primary-olive-dark);
 }
 
 .breadcrumb-current {
-  color: #536d2f;
+  color: var(--app-color-primary-olive-dark);
   font-weight: 700;
 }
 

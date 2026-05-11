@@ -99,9 +99,9 @@ const goNoticeList = async (): Promise<void> => {
 
 <style scoped>
 .notice-card {
-  border: 1px solid #d6dbe0;
+  border: 1px solid var(--app-border-soft);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--app-bg-surface);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.035);
 }
 
@@ -118,7 +118,7 @@ const goNoticeList = async (): Promise<void> => {
 
 .notice-title {
   margin: 0;
-  color: #222;
+  color: var(--app-text-primary);
   font-size: 18px;
   font-weight: 700;
 }
@@ -129,7 +129,7 @@ const goNoticeList = async (): Promise<void> => {
   gap: 4px;
   border: 0;
   background: transparent;
-  color: #777;
+  color: var(--app-text-secondary);
   font-size: 13px;
   cursor: pointer;
 }
@@ -168,7 +168,7 @@ const goNoticeList = async (): Promise<void> => {
 
 .notice-text {
   overflow: hidden;
-  color: #333;
+  color: var(--app-text-primary);
   font-size: 14px;
   font-weight: 500;
   text-overflow: ellipsis;
@@ -177,7 +177,7 @@ const goNoticeList = async (): Promise<void> => {
 
 .notice-date {
   flex-shrink: 0;
-  color: #888;
+  color: var(--app-text-muted);
   font-size: 12px;
 }
 
@@ -186,7 +186,7 @@ const goNoticeList = async (): Promise<void> => {
   border-radius: 4px;
   background: #e8f6ef;
   padding: 2px 5px;
-  color: #138a5b;
+  color: var(--app-color-success);
   font-size: 10px;
   font-weight: 700;
 }

@@ -73,7 +73,7 @@ const goPage = async (url: string): Promise<void> => {
   width: 100%;
   /* border: 1px solid var(--app-divider-color);
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--app-bg-surface);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
   padding: 24px; */
 }
@@ -84,7 +84,7 @@ const goPage = async (url: string): Promise<void> => {
 
 .section-title {
   margin: 0;
-  color: #222;
+  color: var(--app-text-primary);
   font-size: 22px;
   font-weight: 700;
   line-height: 1.35;
@@ -92,7 +92,7 @@ const goPage = async (url: string): Promise<void> => {
 
 .section-desc {
   margin: 6px 0 0;
-  color: #777;
+  color: var(--app-text-secondary);
   font-size: 14px;
   line-height: 1.45;
 }
@@ -107,7 +107,7 @@ const goPage = async (url: string): Promise<void> => {
   position: relative;
   overflow: hidden;
   min-height: 150px;
-  border: 1px solid #d6dbe0;
+  border: 1px solid var(--app-border-soft);
   border-top: 4px solid #2f6f55;
   border-radius: 8px;
   background: var(--app-content-bg-color);
@@ -122,7 +122,7 @@ const goPage = async (url: string): Promise<void> => {
 
 .quick-link-card:hover {
   transform: translateY(-4px);
-  border-color: #9b8120;
+  border-color: var(--app-color-warning);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
 }
 
@@ -142,7 +142,7 @@ const goPage = async (url: string): Promise<void> => {
 
 .card-title {
   margin: 0;
-  color: #222;
+  color: var(--app-text-primary);
   font-size: 20px;
   font-weight: 700;
   line-height: 1.35;
@@ -150,7 +150,7 @@ const goPage = async (url: string): Promise<void> => {
 
 .card-desc {
   margin: 12px 0 0;
-  color: #222;
+  color: var(--app-text-primary);
   font-size: 14px;
   line-height: 1.55;
   word-break: keep-all;
