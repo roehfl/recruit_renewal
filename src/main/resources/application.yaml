@@ -1,0 +1,35 @@
+server:
+  port: 8000
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui
+    operations-sorter: method
+    tags-sorter: alpha
+spring:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  application:
+    name: recruit
+  servlet:
+    multipart:
+      enabled: false
+  Jackson:
+    deserialization:
+      fail-on-unknown-properties: false
+#  datasource:
+#    username: ENC()
+#    password: ENC()
+#    url: ENC()
+#    driver-class-name: org.mariadb.jdbc.Driver
+  datasource:
+    username: sa
+    password:
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;
+    driver-class-name: org.h2.Driver
+crypto:
+  aes:
+    key: ${AES_SECRET_KEY}
