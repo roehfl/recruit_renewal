@@ -100,7 +100,11 @@ class JobPostingServiceTest {
     void 목록_상세_조회_확인() {
         Long id = jobPostingService.create(createRequest());
 
+<<<<<<< codex/verify-codex-cloud-build-and-test-setup-job4wm
+        assertThat(jobPostingService.getJobPostings(0, 10).content()).isNotEmpty();
+=======
         assertThat(jobPostingService.getJobPostings()).isNotEmpty();
+>>>>>>> main
         JobPostingDetailResponse detail = jobPostingService.getJobPosting(id);
         assertThat(detail.id()).isEqualTo(id);
         assertThat(detail.applicationFormConfig().useEducation()).isTrue();

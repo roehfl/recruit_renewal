@@ -259,3 +259,62 @@ Codex가 작업을 완료하면 다음 형식으로 보고한다.
 ```
 
 테스트를 실행하지 못했으면 실행하지 못한 이유를 명확히 남긴다.
+
+## Implementation Documentation Rules
+
+Every implementation task must update documentation together with code.
+
+When a phase is implemented, create or update a phase-specific implementation document under:
+
+- docs/codex/implementation/
+
+File naming convention:
+
+- phase-01a-job-posting.md
+- phase-01b-job-posting-review-fix.md
+- phase-02-stage.md
+
+Also update:
+
+- docs/codex/07-implementation-history.md
+
+The implementation document must include:
+
+1. Phase summary
+2. Implemented scope
+3. Changed files
+4. New classes
+5. Modified classes
+6. Class-by-class explanation
+7. API list
+8. Entity relationship summary
+9. Business rules
+10. Test coverage
+11. Known limitations
+12. Next phase considerations
+
+Class-by-class explanation must include:
+
+- package
+- class name
+- class type
+  - Entity
+  - Repository
+  - Service
+  - Controller
+  - Request DTO
+  - Response DTO
+  - Enum
+  - Exception
+  - Test
+- responsibility
+- key fields or methods
+- related classes
+- important implementation notes
+
+Do not document unrelated existing classes unless they were modified or are directly required to understand the new implementation.
+
+Do not generate vague documentation.
+Document actual implemented code only.
+
+If implementation and documentation disagree, fix the documentation before reporting completion.

@@ -10,10 +10,19 @@ import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.dto.request.JobPostingUpdateRequest;
 import com.shinyoung.recruit.dto.response.JobPostingDetailResponse;
 import com.shinyoung.recruit.dto.response.JobPostingListResponse;
+<<<<<<< codex/verify-codex-cloud-build-and-test-setup-job4wm
+import com.shinyoung.recruit.dto.response.PageResponse;
+=======
+>>>>>>> main
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.exception.InvalidJobPostingException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
 import lombok.RequiredArgsConstructor;
+<<<<<<< codex/verify-codex-cloud-build-and-test-setup-job4wm
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+=======
+>>>>>>> main
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,10 +36,16 @@ public class JobPostingService {
 
     private final JobPostingRepository jobPostingRepository;
 
+<<<<<<< codex/verify-codex-cloud-build-and-test-setup-job4wm
+    public PageResponse<JobPostingListResponse> getJobPostings(int page, int size) {
+        Page<JobPosting> result = jobPostingRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(page, size));
+        return PageResponse.from(result.map(JobPostingListResponse::from));
+=======
     public List<JobPostingListResponse> getJobPostings() {
         return jobPostingRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(JobPostingListResponse::from)
                 .toList();
+>>>>>>> main
     }
 
     public JobPostingDetailResponse getJobPosting(Long id) {

@@ -5,13 +5,20 @@ import com.shinyoung.recruit.dto.request.JobPostingUpdateRequest;
 import com.shinyoung.recruit.dto.response.ApiResponse;
 import com.shinyoung.recruit.dto.response.JobPostingDetailResponse;
 import com.shinyoung.recruit.dto.response.JobPostingListResponse;
+<<<<<<< codex/verify-codex-cloud-build-and-test-setup-job4wm
+import com.shinyoung.recruit.dto.response.PageResponse;
+=======
+>>>>>>> main
 import com.shinyoung.recruit.service.JobPostingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+<<<<<<< codex/verify-codex-cloud-build-and-test-setup-job4wm
+=======
 import java.util.List;
+>>>>>>> main
 
 @RestController
 @RequiredArgsConstructor
@@ -21,8 +28,16 @@ public class JobPostingController {
     private final JobPostingService jobPostingService;
 
     @GetMapping
+<<<<<<< codex/verify-codex-cloud-build-and-test-setup-job4wm
+    public ResponseEntity<ApiResponse<PageResponse<JobPostingListResponse>>> getJobPostings(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(jobPostingService.getJobPostings(page, size)));
+=======
     public ResponseEntity<ApiResponse<List<JobPostingListResponse>>> getJobPostings() {
         return ResponseEntity.ok(ApiResponse.success(jobPostingService.getJobPostings()));
+>>>>>>> main
     }
 
     @GetMapping("/{id}")
