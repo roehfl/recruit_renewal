@@ -143,9 +143,7 @@
   - `GET /admin/job-postings`
   - `GET /admin/job-postings/{id}`
   - `POST /admin/job-postings`
-  - `PUT/PATCH /admin/job-postings/{id}`
-  - `POST /admin/job-postings/{id}/publish`
-  - `POST /admin/job-postings/{id}/close`
+  - `POST /admin/job-postings/{id}`
 - 테스트 대상
   - Repository(`@DataJpaTest`): 상태/기간 조회
   - Service: 상태 전이 검증
@@ -164,7 +162,7 @@
   - `domain.entity/repository`, `StageService`, `StageAdminController`, DTO
 - API 후보
   - `GET /admin/stages/{stageId}/results`
-  - `PUT /admin/stages/{stageId}/results`
+  - `POST /admin/stages/{stageId}/results`
 - 테스트 대상
   - 단계별 결과 저장/조회/예외 케이스
 - 주의사항
@@ -183,7 +181,7 @@
 - API 후보
   - `POST /applications`
   - `GET /applications/{id}`
-  - `PUT /applications/{id}/draft`
+  - `POST /applications/{id}/draft`
   - `POST /applications/{id}/submit`
 - 테스트 대상
   - 임시저장 상태 전이, 제출 시 필수항목 검증
@@ -218,7 +216,7 @@
   - `GET /admin/interviews`
   - `POST /admin/interviews`
   - `POST /admin/interviews/{id}/participants`
-  - `PUT /admin/interviews/{id}/evaluations`
+  - `POST /admin/interviews/{id}/evaluations`
 - 테스트 대상
   - 배정 충돌, 일정 중복, 평가 권한 검증
 - 주의사항
@@ -248,7 +246,7 @@
 1. 패키지 구조 유지
    - `domain.entity`, `domain.repository`, `service`, `controller`, `dto.request/response` 유지
 2. 응답 규격 유지
-   - `ResponseEntity<ApiResponse<T>>`, 목록은 `PageResponse<T>`
+   - `ResponseEntity<ApiResponse<T>>`, 목록은 `ResponseEntity<ApiResponse<PageResponse<T>>>`
 3. Entity 원칙
    - `BaseEntity` 상속, `Long id + IDENTITY`, enum은 `STRING`
 4. 트랜잭션 원칙
@@ -294,4 +292,3 @@
    - 도메인 저장 단계에서 retention metadata를 함께 둘지
 6. LDAP/권한 매핑 확장
    - 부서명 기반 단순 매핑 외 예외 규칙 필요 여부
-
