@@ -1,43 +1,32 @@
-# Phase 01a - JobPosting Vertical Slice
+# Phase 01a - JobPosting Admin Management
 
-## 1. Phase summary
+## Phase 이름
 
-Phase 01a implements the first admin vertical slice for recruitment posting management. It introduces a minimal but working domain/API/test set for JobPosting lifecycle handling (create, update, publish, close) without expanding into Application/Stage/Interview/Message domains.
+Phase 01a: 관리자 채용공고 관리
 
-## 2. Implemented scope
+## 구현 목적
 
-- Domain entities
-  - `JobPosting`
-  - `JobPosition`
-  - `ApplicationFormConfig`
-- Enum
-  - `JobPostingStatus` (`DRAFT`, `PUBLISHED`, `CLOSED`)
-- Repository
-  - `JobPostingRepository`
-- Service
-  - `JobPostingService`
-- Controller
-  - `JobPostingController`
-- DTO
-  - Request: `JobPostingCreateRequest`, `JobPostingUpdateRequest`, `JobPositionRequest`, `ApplicationFormConfigRequest`
-  - Response: `JobPostingListResponse`, `JobPostingDetailResponse`, `JobPositionResponse`, `ApplicationFormConfigResponse`
-- Exception
-  - `JobPostingNotFoundException`
-  - `InvalidJobPostingException`
-- Test
-  - `JobPostingServiceTest`
+관리자가 채용공고를 생성, 조회, 수정, 게시, 마감할 수 있는 첫 번째 JobPosting vertical slice를 구현한다. 이 단계는 `JobPosting`, `JobPosition`, `ApplicationFormConfig`만 다루며 `Application`, `Stage`, `Interview`, `Message`, `CommonCode` 도메인은 추가하지 않는다.
 
-## 3. Changed files
+## 구현 범위
+
+- 관리자 채용공고 목록/상세 조회
+- 관리자 채용공고 생성/일반 수정
+- 별도 command API를 통한 게시/마감 상태 전이
+- 채용공고, 모집분야, 지원서 항목 설정 엔티티와 저장소
+- 관리자용 요청/응답 DTO
+- JobPosting 전용 예외와 공통 예외 매핑
+- 관리자 서비스 테스트
+
+## 변경 파일 목록
 
 - `src/main/java/com/shinyoung/recruit/controller/JobPostingController.java`
 - `src/main/java/com/shinyoung/recruit/domain/entity/JobPosting.java`
 - `src/main/java/com/shinyoung/recruit/domain/entity/JobPosition.java`
 - `src/main/java/com/shinyoung/recruit/domain/entity/ApplicationFormConfig.java`
 - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingRepository.java`
-- `src/main/java/com/shinyoung/recruit/service/JobPostingService.java`
 - `src/main/java/com/shinyoung/recruit/enumeration/JobPostingStatus.java`
-- `src/main/java/com/shinyoung/recruit/exception/JobPostingNotFoundException.java`
-- `src/main/java/com/shinyoung/recruit/exception/InvalidJobPostingException.java`
+- `src/main/java/com/shinyoung/recruit/service/JobPostingService.java`
 - `src/main/java/com/shinyoung/recruit/dto/request/JobPostingCreateRequest.java`
 - `src/main/java/com/shinyoung/recruit/dto/request/JobPostingUpdateRequest.java`
 - `src/main/java/com/shinyoung/recruit/dto/request/JobPositionRequest.java`
@@ -46,230 +35,138 @@ Phase 01a implements the first admin vertical slice for recruitment posting mana
 - `src/main/java/com/shinyoung/recruit/dto/response/JobPostingDetailResponse.java`
 - `src/main/java/com/shinyoung/recruit/dto/response/JobPositionResponse.java`
 - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormConfigResponse.java`
-- `src/test/java/com/shinyoung/recruit/service/JobPostingServiceTest.java`
+- `src/main/java/com/shinyoung/recruit/dto/response/PageResponse.java`
+- `src/main/java/com/shinyoung/recruit/exception/JobPostingNotFoundException.java`
+- `src/main/java/com/shinyoung/recruit/exception/InvalidJobPostingException.java`
 - `src/main/java/com/shinyoung/recruit/exception/GlobalExceptionHandler.java`
+- `src/test/java/com/shinyoung/recruit/service/JobPostingServiceTest.java`
 
-## 4. New classes
+## 신규 클래스 목록
 
-All files listed above were newly added in Phase 01a.
+- `JobPosting`
+- `JobPosition`
+- `ApplicationFormConfig`
+- `JobPostingRepository`
+- `JobPostingStatus`
+- `JobPostingService`
+- `JobPostingController`
+- `JobPostingCreateRequest`
+- `JobPostingUpdateRequest`
+- `JobPositionRequest`
+- `ApplicationFormConfigRequest`
+- `JobPostingListResponse`
+- `JobPostingDetailResponse`
+- `JobPositionResponse`
+- `ApplicationFormConfigResponse`
+- `JobPostingNotFoundException`
+- `InvalidJobPostingException`
+- `JobPostingServiceTest`
 
-## 5. Modified classes
+## 수정 클래스 목록
 
-- `JobPostingService` (list response changed to PageResponse with paging parameters)
-- `JobPostingController` (list endpoint now accepts page/size and returns PageResponse)
-- `JobPostingRepository` (paging query method added)
-- `JobPostingServiceTest` (list assertion updated for paging response)
+- `PageResponse`
+- `GlobalExceptionHandler`
+- `JobPostingRepository`
+- `JobPostingService`
+- `JobPostingController`
+- `JobPostingServiceTest`
 
-## 6. Class-by-class explanation
+## 클래스별 설명
 
-### 6.1 `com.shinyoung.recruit.domain.entity.JobPosting`
-- class type: Entity
-- responsibility: Root aggregate for recruitment posting metadata and lifecycle status.
-- key fields or methods:
-  - fields: `title`, `contentHtml`, `receptionStartDateTime`, `receptionEndDateTime`, `status`, `publishedAt`, `closedAt`
-  - methods: `create`, `updateBasicInfo`, `replaceJobPositions`, `updateApplicationFormConfig`, `publish`, `close`
-- related classes: `JobPosition`, `ApplicationFormConfig`, `JobPostingStatus`
-- implementation notes:
-  - status defaults to `DRAFT` at creation.
-  - status update is intentionally separated into command methods (`publish`, `close`).
+| 구분 | 패키지 | 클래스 | 역할 | 주요 필드/메서드 | 연관 클래스 | 비고 |
+|---|---|---|---|---|---|---|
+| Entity | `com.shinyoung.recruit.domain.entity` | `JobPosting` | 채용공고 aggregate root | `title`, `contentHtml`, `receptionStartDateTime`, `receptionEndDateTime`, `status`, `publishedAt`, `closedAt`, `create`, `updateBasicInfo`, `replaceJobPositions`, `updateApplicationFormConfig`, `publish`, `close` | `JobPosition`, `ApplicationFormConfig`, `JobPostingStatus` | 생성 시 `DRAFT`; 상태 변경은 별도 메서드로만 수행 |
+| Entity | `com.shinyoung.recruit.domain.entity` | `JobPosition` | 공고별 모집분야 | `jobPosting`, `positionName`, `headcount`, `sortOrder`, `create`, `assignJobPosting` | `JobPosting` | `JobPosting`과 N:1, LAZY |
+| Entity | `com.shinyoung.recruit.domain.entity` | `ApplicationFormConfig` | 공고별 지원서 항목 사용 설정 | `useEducation`, `useCareer`, `useCertificate`, `useLanguage`, `useMilitary`, `useAward`, `useGapPeriod`, `create`, `assignJobPosting` | `JobPosting` | `JobPosting`과 1:1, `job_posting_id` unique |
+| Repository | `com.shinyoung.recruit.domain.repository` | `JobPostingRepository` | JobPosting 저장/조회 | `findAllByOrderByCreatedAtDesc(Pageable)`, `findDetailById(Long)` | `JobPosting` | pageable 목록에는 collection fetch 없음; 상세 전용 조회에만 `@EntityGraph` 사용 |
+| Enum | `com.shinyoung.recruit.enumeration` | `JobPostingStatus` | 공고 상태 값 | `DRAFT`, `PUBLISHED`, `CLOSED` | `JobPosting`, `JobPostingService` | 엔티티에서는 `EnumType.STRING` 저장 |
+| Service | `com.shinyoung.recruit.service` | `JobPostingService` | 관리자 공고 조회/생성/수정/게시/마감 유스케이스 | `getJobPostings`, `getJobPosting`, `create`, `update`, `publish`, `close`, `validatePageRequest` | `JobPostingRepository`, 관리자 DTO, `Clock` | `publish`/`close`는 `LocalDateTime.now(clock)` 사용 |
+| Controller | `com.shinyoung.recruit.controller` | `JobPostingController` | 관리자 REST API entrypoint | `getJobPostings`, `getJobPosting`, `create`, `update`, `publish`, `close` | `JobPostingService`, `ApiResponse`, `PageResponse` | 일반 수정은 `POST /admin/job-postings/{id}` |
+| Request DTO | `com.shinyoung.recruit.dto.request` | `JobPostingCreateRequest` | 공고 생성 요청 | `title`, `contentHtml`, `receptionStartDateTime`, `receptionEndDateTime`, `jobPositions`, `applicationFormConfig` | `JobPositionRequest`, `ApplicationFormConfigRequest` | status 필드 없음; `jobPositions`는 `@NotEmpty` |
+| Request DTO | `com.shinyoung.recruit.dto.request` | `JobPostingUpdateRequest` | 공고 일반 수정 요청 | `title`, `contentHtml`, `receptionStartDateTime`, `receptionEndDateTime`, `jobPositions`, `applicationFormConfig` | `JobPositionRequest`, `ApplicationFormConfigRequest` | status 필드 없음 |
+| Request DTO | `com.shinyoung.recruit.dto.request` | `JobPositionRequest` | 모집분야 요청 | `positionName`, `headcount`, `sortOrder` | `JobPostingCreateRequest`, `JobPostingUpdateRequest` | `sortOrder`는 `@NotNull @Min(0)` |
+| Request DTO | `com.shinyoung.recruit.dto.request` | `ApplicationFormConfigRequest` | 지원서 항목 설정 요청 | `useEducation`, `useCareer`, `useCertificate`, `useLanguage`, `useMilitary`, `useAward`, `useGapPeriod` | 생성/수정 요청 DTO | boolean flag 범위 |
+| Response DTO | `com.shinyoung.recruit.dto.response` | `JobPostingListResponse` | 관리자 목록 응답 | `id`, `title`, reception period, `status`, `publishedAt`, `closedAt`, `from` | `JobPosting` | `PageResponse<JobPostingListResponse>`로 반환 |
+| Response DTO | `com.shinyoung.recruit.dto.response` | `JobPostingDetailResponse` | 관리자 상세 응답 | 공고 본문, 상태, 모집분야 목록, 지원서 항목 설정, `from` | `JobPosting`, `JobPositionResponse`, `ApplicationFormConfigResponse` | 모집분야는 `sortOrder` 기준 정렬 |
+| Response DTO | `com.shinyoung.recruit.dto.response` | `JobPositionResponse` | 관리자 모집분야 응답 | `id`, `positionName`, `headcount`, `sortOrder`, `from` | `JobPosition` | 관리자 DTO |
+| Response DTO | `com.shinyoung.recruit.dto.response` | `ApplicationFormConfigResponse` | 관리자 지원서 항목 설정 응답 | 7개 `use*` flag, `from` | `ApplicationFormConfig` | 관리자 DTO |
+| Response DTO | `com.shinyoung.recruit.dto.response` | `PageResponse` | 페이징 응답 공통 모델 | `content`, `page`, `size`, `totalElements`, `totalPages`, `last`, `from` | Spring Data `Page` | 관리자 목록에서 사용 |
+| Exception | `com.shinyoung.recruit.exception` | `JobPostingNotFoundException` | 공고 없음 예외 | 생성자 | `JobPostingService`, `GlobalExceptionHandler` | 404로 매핑 |
+| Exception | `com.shinyoung.recruit.exception` | `InvalidJobPostingException` | 공고 비즈니스 규칙 위반 예외 | 생성자 | `JobPostingService`, `GlobalExceptionHandler` | 400으로 매핑 |
+| Exception | `com.shinyoung.recruit.exception` | `GlobalExceptionHandler` | JobPosting 예외를 HTTP 응답으로 변환 | `handleJobPostingNotFound`, `handleInvalidJobPosting` | `ApiResponse` | 기존 응답 규격 유지 |
+| Test | `com.shinyoung.recruit.service` | `JobPostingServiceTest` | 관리자 서비스 규칙 검증 | 생성/수정 검증, 상태 전이, 목록/상세, Clock, page/size 테스트 | `JobPostingService`, `JobPostingRepository` | 고정 `Clock`으로 시간 의존 테스트 안정화 |
 
-### 6.2 `com.shinyoung.recruit.domain.entity.JobPosition`
-- class type: Entity
-- responsibility: Represents each position row under a job posting.
-- key fields or methods:
-  - fields: `jobPosting`, `positionName`, `headcount`, `sortOrder`
-  - methods: `create`, `assignJobPosting`
-- related classes: `JobPosting`
-- implementation notes:
-  - many-to-one lazy relationship to `JobPosting`.
+## API 목록
 
-### 6.3 `com.shinyoung.recruit.domain.entity.ApplicationFormConfig`
-- class type: Entity
-- responsibility: Posting-level configuration flags for application form sections.
-- key fields or methods:
-  - fields: `useEducation`, `useCareer`, `useCertificate`, `useLanguage`, `useMilitary`, `useAward`, `useGapPeriod`
-  - methods: `create`, `assignJobPosting`
-- related classes: `JobPosting`
-- implementation notes:
-  - one-to-one relationship using unique `job_posting_id`.
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/admin/job-postings?page={page}&size={size}` | 관리자 채용공고 목록 조회 |
+| GET | `/admin/job-postings/{id}` | 관리자 채용공고 상세 조회 |
+| POST | `/admin/job-postings` | 관리자 채용공고 생성 |
+| POST | `/admin/job-postings/{id}` | 관리자 채용공고 일반 수정 |
+| POST | `/admin/job-postings/{id}/publish` | 관리자 채용공고 게시 |
+| POST | `/admin/job-postings/{id}/close` | 관리자 채용공고 마감 |
 
-### 6.4 `com.shinyoung.recruit.domain.repository.JobPostingRepository`
-- class type: Repository
-- responsibility: Persistence entry for JobPosting aggregate.
-- key fields or methods:
-  - `findAllByOrderByCreatedAtDesc()` with `@EntityGraph(jobPositions, applicationFormConfig)`
-- related classes: `JobPosting`
-- implementation notes:
-  - reduces lazy loading issues for list retrieval.
-
-### 6.5 `com.shinyoung.recruit.service.JobPostingService`
-- class type: Service
-- responsibility: Handles use-cases and business validation for posting lifecycle.
-- key fields or methods:
-  - commands: `create`, `update`, `publish`, `close`
-  - queries: `getJobPostings`, `getJobPosting`
-  - validations: title required, reception period valid, at least one position
-- related classes: `JobPostingRepository`, all request/response DTOs, custom exceptions
-- implementation notes:
-  - `@Transactional(readOnly = true)` class-level, command methods override with `@Transactional`.
-  - closed posting update is blocked.
-
-### 6.6 `com.shinyoung.recruit.controller.JobPostingController`
-- class type: Controller
-- responsibility: Admin REST API entrypoint for posting operations.
-- key fields or methods:
-  - endpoints: list/detail/create/update/publish/close
-- related classes: `JobPostingService`, `ApiResponse`
-- implementation notes:
-  - update API uses `POST /admin/job-postings/{id}` per policy.
-
-### 6.7 Request DTOs
-
-#### `com.shinyoung.recruit.dto.request.JobPostingCreateRequest`
-- class type: Request DTO
-- responsibility: Accept posting create payload excluding status.
-- key fields or methods: title/contentHtml/reception period/positions/form config
-- related classes: `JobPositionRequest`, `ApplicationFormConfigRequest`
-- notes: `@NotEmpty` on positions.
-
-#### `com.shinyoung.recruit.dto.request.JobPostingUpdateRequest`
-- class type: Request DTO
-- responsibility: Accept posting update payload excluding status.
-- key fields or methods: same as create DTO.
-- related classes: `JobPositionRequest`, `ApplicationFormConfigRequest`
-- notes: used by `POST /admin/job-postings/{id}`.
-
-#### `com.shinyoung.recruit.dto.request.JobPositionRequest`
-- class type: Request DTO
-- responsibility: Position row input validation.
-- key fields or methods: `positionName`, `headcount`, `sortOrder`
-- related classes: `JobPostingCreateRequest`, `JobPostingUpdateRequest`
-- notes: headcount >= 1, sortOrder >= 0.
-
-#### `com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest`
-- class type: Request DTO
-- responsibility: Form config flags payload.
-- key fields or methods: seven `use*` boolean flags.
-- related classes: create/update request DTOs
-- notes: minimal flag-only scope in Phase 01a.
-
-### 6.8 Response DTOs
-
-#### `com.shinyoung.recruit.dto.response.JobPostingListResponse`
-- class type: Response DTO
-- responsibility: List projection of posting summary.
-- key fields or methods: includes status/publishedAt/closedAt
-- related classes: `JobPosting`
-- notes: static `from` mapper.
-
-#### `com.shinyoung.recruit.dto.response.JobPostingDetailResponse`
-- class type: Response DTO
-- responsibility: Detail projection with nested positions and form config.
-- key fields or methods: nested `jobPositions`, `applicationFormConfig`
-- related classes: `JobPositionResponse`, `ApplicationFormConfigResponse`
-- notes: positions sorted by `sortOrder` in mapper.
-
-#### `com.shinyoung.recruit.dto.response.JobPositionResponse`
-- class type: Response DTO
-- responsibility: Position detail output model.
-- key fields or methods: id/name/headcount/sortOrder
-- related classes: `JobPosition`
-- notes: static `from` mapper.
-
-#### `com.shinyoung.recruit.dto.response.ApplicationFormConfigResponse`
-- class type: Response DTO
-- responsibility: Output model for form section flags.
-- key fields or methods: seven `use*` flags
-- related classes: `ApplicationFormConfig`
-- notes: static `from` mapper.
-
-### 6.9 `com.shinyoung.recruit.enumeration.JobPostingStatus`
-- class type: Enum
-- responsibility: Posting lifecycle state machine values.
-- key fields or methods: `DRAFT`, `PUBLISHED`, `CLOSED`
-- related classes: `JobPosting`, `JobPostingService`
-- notes: persisted with `EnumType.STRING` in entity.
-
-### 6.10 Exceptions
-
-#### `com.shinyoung.recruit.exception.JobPostingNotFoundException`
-- class type: Exception
-- responsibility: Not-found condition for posting id lookups.
-- key fields or methods: constructor(message)
-- related classes: `JobPostingService`
-- notes: used by detail/update/publish/close lookup path.
-
-#### `com.shinyoung.recruit.exception.InvalidJobPostingException`
-- class type: Exception
-- responsibility: Business rule violation for posting operations.
-- key fields or methods: constructor(message)
-- related classes: `JobPostingService`
-- notes: used in period/position/status transition validations.
-
-### 6.11 `com.shinyoung.recruit.exception.GlobalExceptionHandler`
-- class type: Exception
-- responsibility: Map domain exceptions to HTTP response codes and ApiResponse failure body.
-- key fields or methods: `handleJobPostingNotFound`, `handleInvalidJobPosting`
-- related classes: `JobPostingNotFoundException`, `InvalidJobPostingException`, `ApiResponse`
-- notes: returns 404 for not found, 400 for invalid request/business rule.
-
-### 6.12 `com.shinyoung.recruit.service.JobPostingServiceTest`
-- class type: Test
-- responsibility: Verify service business rules and lifecycle transitions.
-- key fields or methods: tests for create validation, publish/close transitions, not-found, list/detail
-- related classes: `JobPostingService`, DTOs, exceptions
-- notes: `@SpringBootTest` + `@Transactional`.
-
-## 7. API list
-
-- `GET /admin/job-postings?page={page}&size={size}`
-- `GET /admin/job-postings/{id}`
-- `POST /admin/job-postings`
-- `POST /admin/job-postings/{id}`
-- `POST /admin/job-postings/{id}/publish`
-- `POST /admin/job-postings/{id}/close`
-
-## 8. Entity relationship summary
+## Entity 관계 요약
 
 - `JobPosting` 1 : N `JobPosition`
 - `JobPosting` 1 : 1 `ApplicationFormConfig`
-- All three entities are introduced only for posting-phase scope and do not depend on `Application`, `Stage`, `Interview`, `Message` in this phase.
+- `JobPosition.jobPosting`은 LAZY N:1 관계다.
+- `ApplicationFormConfig.jobPosting`은 LAZY 1:1 관계이며 `job_posting_id`가 unique다.
+- `JobPosting` 저장/수정 시 모집분야와 지원서 항목 설정은 cascade/orphanRemoval 정책으로 aggregate 내부에서 관리된다.
 
-## 9. Business rules
+## 주요 비즈니스 규칙
 
-1. Posting title must not be blank.
-2. `receptionEndDateTime` must be after `receptionStartDateTime`.
-3. Create/update requires at least one job position.
-4. New posting status is always `DRAFT`.
-5. Publish requires valid period + at least one position.
-6. `CLOSED -> PUBLISHED` transition is not allowed.
-7. Close is allowed only from `PUBLISHED`.
-8. Closed posting is not editable in general update API.
+1. 공고 제목과 본문은 공백일 수 없다.
+2. 접수 종료일시는 접수 시작일시보다 이후여야 한다.
+3. 모집분야는 최소 1개 이상 필요하다.
+4. 지원서 항목 설정은 생성/수정 요청에 항상 포함되어야 한다.
+5. 신규 공고는 항상 `DRAFT` 상태로 생성된다.
+6. 일반 수정 API는 status를 받거나 변경하지 않는다.
+7. 일반 수정은 `CLOSED` 상태에서 차단된다.
+8. `DRAFT -> PUBLISHED` 전환은 가능하다.
+9. `PUBLISHED -> CLOSED` 전환은 가능하다.
+10. `CLOSED -> PUBLISHED` 재전환은 차단된다.
+11. `publish`/`close` 시각은 주입된 `Clock` 기준으로 저장한다.
+12. 관리자 목록 `page`는 0 이상, `size`는 1 이상 100 이하만 허용한다.
+13. 관리자 pageable 목록 조회에서는 collection 관계를 fetch하지 않는다.
+14. 관리자 상세 조회에만 `@EntityGraph`로 `jobPositions`, `applicationFormConfig`를 함께 조회한다.
+15. PUT API는 사용하지 않는다.
 
-## 10. Test coverage
+## 테스트 목록
 
-Covered by `JobPostingServiceTest`:
-- create success
-- invalid date period failure
-- empty positions failure
-- draft to published success
-- closed to published blocked
-- published to closed success
-- not-found detail failure
-- list/detail retrieval verification
-- empty positions update failure
+- `JobPosting_생성_성공`
+- `접수종료일시가_시작보다_빠르면_생성실패`
+- `모집분야_없이_생성불가`
+- `DRAFT에서_PUBLISHED_전환_성공`
+- `CLOSED_상태에서_PUBLISHED_재전환_불가`
+- `PUBLISHED에서_CLOSED_전환_성공`
+- `게시와_마감_시간은_Clock_기준으로_저장된다`
+- `존재하지않는_공고_조회시_예외`
+- `목록_상세_조회_확인`
+- `관리자_목록_페이지_요청값이_잘못되면_예외`
+- `모집분야_없이_수정불가`
 
-## 11. Known limitations
+## 실행한 테스트 명령
 
-1. No dedicated global exception-to-HTTP mapping for new exceptions yet.
-2. No role-based authorization rule specific to posting APIs yet.
-3. Advanced filtering on list API is not implemented yet (paging only).
-4. No audit log/notification side effects on publish/close yet.
-5. No required-field validation matrix for form config (flag-only scope).
+```powershell
+$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat clean test
+```
 
-## 12. Next phase considerations
+## 테스트 결과
 
-1. Add global exception handler mappings for posting exceptions.
-2. Add list paging/filter and admin permission constraints.
-3. Introduce `Stage` integration after posting lifecycle stabilizes.
-4. Expand form config semantics from `use*` flags to required validation rules when Application domain is introduced.
+- 결과: 성공
+- 실행 결과: `BUILD SUCCESSFUL`
+- 전체 테스트: 41개 통과
+
+## 남은 이슈
+
+- 관리자 API 세부 권한 정책은 아직 적용하지 않았다.
+- 관리자 목록 검색/필터 조건은 아직 없다.
+- 게시/마감 시 감사 로그나 알림 발송 같은 부가 효과는 아직 없다.
+
+## 다음 Phase 전 확인 사항
+
+- Stage를 `JobPosting` 하위 흐름으로 둘지 확정한다.
+- 공고 생성 시 기본 전형단계를 자동 생성할지 별도 Stage 관리 API에서 생성할지 결정한다.
+- Application 도메인 도입 시 `ApplicationFormConfig` flag가 실제 입력 필수 여부로 어떻게 연결되는지 정의한다.
