@@ -11,9 +11,15 @@ import com.shinyoung.recruit.exception.JobPostingNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,6 +28,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
 @Transactional
 class JobPostingServiceTest {
+
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            Instant.parse("2026-06-01T10:00:00Z"),
+            ZoneId.of("UTC")
+    );
 
     @Autowired
     private JobPostingService jobPostingService;
@@ -92,6 +103,20 @@ class JobPostingServiceTest {
     }
 
     @Test
+    void 게시와_마감_시간은_Clock_기준으로_저장된다() {
+        Long id = jobPostingService.create(createRequest());
+
+        jobPostingService.publish(id);
+        JobPostingDetailResponse published = jobPostingService.getJobPosting(id);
+
+        jobPostingService.close(id);
+        JobPostingDetailResponse closed = jobPostingService.getJobPosting(id);
+
+        assertThat(published.publishedAt()).isEqualTo(LocalDateTime.of(2026, 6, 1, 10, 0));
+        assertThat(closed.closedAt()).isEqualTo(LocalDateTime.of(2026, 6, 1, 10, 0));
+    }
+
+    @Test
     void 존재하지않는_공고_조회시_예외() {
         assertThatThrownBy(() -> jobPostingService.getJobPosting(99999L)).isInstanceOf(JobPostingNotFoundException.class);
     }
@@ -100,14 +125,18 @@ class JobPostingServiceTest {
     void 목록_상세_조회_확인() {
         Long id = jobPostingService.create(createRequest());
 
-<<<<<<< codex/verify-codex-cloud-build-and-test-setup-job4wm
         assertThat(jobPostingService.getJobPostings(0, 10).content()).isNotEmpty();
-=======
-        assertThat(jobPostingService.getJobPostings()).isNotEmpty();
->>>>>>> main
         JobPostingDetailResponse detail = jobPostingService.getJobPosting(id);
         assertThat(detail.id()).isEqualTo(id);
         assertThat(detail.applicationFormConfig().useEducation()).isTrue();
+    }
+
+    @Test
+    void 관리자_목록_페이지_요청값이_잘못되면_예외() {
+        assertThatThrownBy(() -> jobPostingService.getJobPostings(-1, 10))
+                .isInstanceOf(InvalidJobPostingException.class);
+        assertThatThrownBy(() -> jobPostingService.getJobPostings(0, 101))
+                .isInstanceOf(InvalidJobPostingException.class);
     }
 
     @Test
@@ -134,5 +163,15 @@ class JobPostingServiceTest {
                 List.of(new JobPositionRequest("백엔드", 2, 1)),
                 new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
         );
+    }
+
+    @TestConfiguration
+    static class FixedClockConfig {
+
+        @Bean
+        @Primary
+        Clock fixedClock() {
+            return FIXED_CLOCK;
+        }
     }
 }

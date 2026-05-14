@@ -10,22 +10,17 @@ import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.dto.request.JobPostingUpdateRequest;
 import com.shinyoung.recruit.dto.response.JobPostingDetailResponse;
 import com.shinyoung.recruit.dto.response.JobPostingListResponse;
-<<<<<<< codex/verify-codex-cloud-build-and-test-setup-job4wm
 import com.shinyoung.recruit.dto.response.PageResponse;
-=======
->>>>>>> main
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.exception.InvalidJobPostingException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
 import lombok.RequiredArgsConstructor;
-<<<<<<< codex/verify-codex-cloud-build-and-test-setup-job4wm
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-=======
->>>>>>> main
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -35,21 +30,16 @@ import java.util.List;
 public class JobPostingService {
 
     private final JobPostingRepository jobPostingRepository;
+    private final Clock clock;
 
-<<<<<<< codex/verify-codex-cloud-build-and-test-setup-job4wm
     public PageResponse<JobPostingListResponse> getJobPostings(int page, int size) {
+        validatePageRequest(page, size);
         Page<JobPosting> result = jobPostingRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(page, size));
         return PageResponse.from(result.map(JobPostingListResponse::from));
-=======
-    public List<JobPostingListResponse> getJobPostings() {
-        return jobPostingRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(JobPostingListResponse::from)
-                .toList();
->>>>>>> main
     }
 
     public JobPostingDetailResponse getJobPosting(Long id) {
-        JobPosting jobPosting = findJobPosting(id);
+        JobPosting jobPosting = findJobPostingDetail(id);
         return JobPostingDetailResponse.from(jobPosting);
     }
 
@@ -105,7 +95,7 @@ public class JobPostingService {
         validateReceptionPeriod(jobPosting.getReceptionStartDateTime(), jobPosting.getReceptionEndDateTime());
         validateJobPositions(jobPosting.getJobPositions());
 
-        jobPosting.publish(LocalDateTime.now());
+        jobPosting.publish(LocalDateTime.now(clock));
         return jobPosting.getId();
     }
 
@@ -117,13 +107,27 @@ public class JobPostingService {
             throw new InvalidJobPostingException("게시 상태의 공고만 마감할 수 있습니다.");
         }
 
-        jobPosting.close(LocalDateTime.now());
+        jobPosting.close(LocalDateTime.now(clock));
         return jobPosting.getId();
     }
 
     private JobPosting findJobPosting(Long id) {
         return jobPostingRepository.findById(id)
                 .orElseThrow(() -> new JobPostingNotFoundException("채용공고를 찾을 수 없습니다. id=" + id));
+    }
+
+    private JobPosting findJobPostingDetail(Long id) {
+        return jobPostingRepository.findDetailById(id)
+                .orElseThrow(() -> new JobPostingNotFoundException("채용공고를 찾을 수 없습니다. id=" + id));
+    }
+
+    private void validatePageRequest(int page, int size) {
+        if (page < 0) {
+            throw new InvalidJobPostingException("페이지 번호는 0 이상이어야 합니다.");
+        }
+        if (size < 1 || size > 100) {
+            throw new InvalidJobPostingException("페이지 크기는 1 이상 100 이하이어야 합니다.");
+        }
     }
 
     private void validateRequest(String title, LocalDateTime start, LocalDateTime end, List<JobPositionRequest> jobPositions) {
