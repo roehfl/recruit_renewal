@@ -413,6 +413,7 @@ Phase 03a-1 구현 결정:
 - 중복 지원 차단은 Application의 핵심 정책이고, Stage reorder와 달리 순서 교환 중간 충돌 같은 문제가 없다.
 - `WITHDRAWN` 이후 재지원도 현재 정책상 차단하므로 unique 제약과 충돌하지 않는다.
 - 나중에 철회 후 재지원을 허용하기로 정책이 바뀌면 이 unique 제약은 재검토한다.
+- 동시 생성 요청에서는 두 요청이 Service 중복 검증을 모두 통과한 뒤 DB unique 제약에서 하나가 실패할 수 있다. Controller/API가 붙는 Phase 03a-3 또는 운영 안정화 단계에서 `DataIntegrityViolationException`을 `InvalidJobApplicationException` 성격의 실패 응답으로 변환할지 검토한다.
 
 ### application_number 여부
 
@@ -549,6 +550,7 @@ Phase 03a에서는 `ApplicationFormConfig`를 깊게 검증하지 않는다.
 - `updateDraft`
 - `submit`
 - `withdraw`
+- `JobApplication` Entity에 `submit(now)`와 `withdraw(now)` 같은 의미 있는 상태 변경 메서드 추가
 - `Clock` 주입으로 `submittedAt`, `withdrawnAt` 안정화
 - 상태 전이 검증
 - 접수기간 검증
@@ -605,6 +607,8 @@ Phase 03a에서는 `ApplicationFormConfig`를 깊게 검증하지 않는다.
 - `WITHDRAWN` 이후 재지원 허용 여부
 - 철회 가능 기간: 접수기간 이후에도 철회 가능한지
 - 현재 로그인 Applicant 식별을 `CustomUserDetails.userId`로 풀지, 별도 조회 helper로 풀지
+- 인증 연동 이후 Applicant 미존재를 400, 404, 인증/인가 예외 중 무엇으로 매핑할지
+- DB unique 충돌을 Controller/API 응답에서 별도 Application 비즈니스 예외로 변환할지
 
 ### Codex 기본값으로 둘 수 있는 것
 

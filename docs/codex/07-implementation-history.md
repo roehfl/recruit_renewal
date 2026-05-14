@@ -186,3 +186,38 @@
 - Key decisions: Use `JobApplication` as the recommended Java class name while keeping Application as the API/document term; split Phase 03 into applicant basic flow, admin read APIs, detail sections, and later StageResult.
 - Review update: Fixed Phase 03a-1 decisions for `applicant_id + job_posting_id` unique, `JobPositionRepository` lookup, and applicant name snapshot source.
 - Notes: Documentation-only design work; no Java code or new domain classes were added.
+
+## Phase 03a-1 - Application Basic Create/Read
+
+- 작업일: 2026-05-14
+- 목적: 지원자 Application 루트의 기본 생성/조회 기반을 추가했다.
+- 핵심 구현:
+  - `JobApplication` Entity와 `JobApplicationStatus` enum 추가
+  - `JobApplicationRepository`, `JobPositionRepository` 추가
+  - `JobApplicationService.create`, `getApplication`, `getMyApplicationByJobPosting` 추가
+  - `applicant_id + job_posting_id` DB unique 제약과 Service 중복 검증 추가
+  - PUBLISHED/접수기간/모집분야 소속/ApplicationFormConfig 존재 검증 추가
+  - 지원자명, 공고명, 모집분야명 snapshot 저장
+- 주요 클래스:
+  - `JobApplication`
+  - `JobApplicationStatus`
+  - `JobApplicationRepository`
+  - `JobPositionRepository`
+  - `ApplicationCreateRequest`
+  - `ApplicationDetailResponse`
+  - `JobApplicationService`
+  - `JobApplicationNotFoundException`
+  - `InvalidJobApplicationException`
+  - `JobApplicationServiceTest`
+- API:
+  - 없음. 이번 Phase에서는 Controller를 만들지 않았다.
+- 테스트 결과:
+  - `JobApplicationServiceTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - `ApplicationController`, `updateDraft`, `submit`, `withdraw`는 후속 Phase로 분리
+  - 현재 로그인 Applicant 식별 방식은 Controller 도입 전 확정 필요
+  - 철회 후 재지원 허용 시 unique 제약 재검토 필요
+  - 동시 unique 충돌 예외 변환과 Applicant not-found 응답 정책은 Controller/API 단계에서 재검토
+- 다음 작업:
+  - Phase 03a-2에서 updateDraft/submit/withdraw command 구현 여부 검토
