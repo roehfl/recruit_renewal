@@ -690,3 +690,12 @@ Phase 02a-1 구현 결과를 확인한 뒤 Phase 02a-2: Stage reorder/status com
 - 삭제는 DELETE가 아니라 POST command API로 구현한다.
 - reorder 구현 전 DB unique 제약 여부를 다시 검토한다.
 ```
+
+## 12. Phase 02a-3 Documentation Note
+
+- Phase 02a-3에서는 신규 도메인이나 신규 API를 만들지 않고 `StageControllerTest`를 보강해 관리자 Stage API 계약을 검증했다.
+- 검증 범위는 Stage CRUD API, reorder/status/delete command API, validation/error 응답, PUT/DELETE HTTP method 미지원 정책이다.
+- Stage 공개 노출 API는 아직 구현하지 않는다.
+- JobPosting publish 조건에 Stage 최소 1개 검증은 아직 추가하지 않는다.
+- StageResult는 Application 도메인 구현 이후로 계속 보류한다.
+- 다음 구현은 StageResult가 아니라 Application 기본 흐름을 우선 검토하는 것을 추천한다.

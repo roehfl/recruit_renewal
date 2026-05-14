@@ -146,3 +146,35 @@
   - Application/StageResult 도입 후 진행 중 Stage 수정/삭제 정책 재검토 필요
 - 다음 작업:
   - Phase 02a-3 Controller/API 테스트 보강 또는 Application 기본 흐름 구현 결정
+
+## Phase 02a-3 - Stage Controller API Test
+
+- 작업일: 2026-05-14
+- 목적: Phase 02a Stage 관리자 API의 path, method, 응답 포맷을 Controller 테스트로 고정했다.
+- 핵심 구현:
+  - `StageControllerTest`에 CRUD API 성공 응답 검증 추가
+  - reorder/start/announce/close/delete command API 성공 응답 검증 추가
+  - validation 실패, Stage 미존재, 잘못된 상태 command 실패 응답 검증 추가
+  - PUT 및 DELETE HTTP method 미지원 정책 검증 추가
+  - Phase 02a-3 구현 문서 생성 및 Phase 02 설계/구현 문서 정합성 보완
+- 주요 클래스:
+  - `StageControllerTest`
+- API:
+  - `GET /admin/job-postings/{jobPostingId}/stages`
+  - `GET /admin/job-postings/{jobPostingId}/stages/{stageId}`
+  - `POST /admin/job-postings/{jobPostingId}/stages`
+  - `POST /admin/job-postings/{jobPostingId}/stages/{stageId}`
+  - `POST /admin/job-postings/{jobPostingId}/stages/reorder`
+  - `POST /admin/job-postings/{jobPostingId}/stages/{stageId}/start`
+  - `POST /admin/job-postings/{jobPostingId}/stages/{stageId}/announce`
+  - `POST /admin/job-postings/{jobPostingId}/stages/{stageId}/close`
+  - `POST /admin/job-postings/{jobPostingId}/stages/{stageId}/delete`
+- 테스트 결과:
+  - `StageControllerTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - Stage 공개 노출 API는 아직 구현하지 않았다.
+  - JobPosting publish 조건에 Stage 최소 1개 검증은 아직 추가하지 않았다.
+  - StageResult는 Application 도메인 이후로 보류한다.
+- 다음 작업:
+  - Application 기본 흐름 구현을 우선 검토한다.

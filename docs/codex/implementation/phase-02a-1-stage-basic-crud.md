@@ -190,3 +190,10 @@ $env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat clean test
 - `DRAFT` JobPosting에서는 start/announce/close를 차단한다.
 - `CLOSED` JobPosting에서는 모든 Stage 변경 command를 차단한다.
 - delete는 POST command API로 구현했다.
+
+## Phase 02a-3 정합성 메모
+
+- Phase 02a-1 문서의 구현 범위는 Stage 기본 CRUD 시점을 기준으로 유지한다.
+- Phase 02a-2에서 reorder/status/delete command가 추가되었고, Phase 02a-3에서 Controller/API 계약 테스트가 보강되었다.
+- Phase 02a-3 기준 `StageControllerTest`는 CRUD API 성공 응답, command API 성공 응답, validation/error 응답, PUT/DELETE HTTP method 미지원 정책을 검증한다.
+- Stage 공개 노출 API, JobPosting publish Stage 최소 1개 검증, StageResult 구현은 아직 포함하지 않는다.

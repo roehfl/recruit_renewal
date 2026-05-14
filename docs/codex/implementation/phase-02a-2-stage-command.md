@@ -215,3 +215,10 @@ $env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat clean test
 - Stage 공개 노출 여부를 결정한다.
 - Application 기본 흐름을 먼저 구현할지, Stage Controller 테스트 보강을 먼저 할지 결정한다.
 - Stage 최소 1개를 JobPosting publish 조건으로 추가할지 별도 보완 Phase에서 검토한다.
+
+## Phase 02a-3 연계 메모
+
+- Phase 02a-3에서 `StageControllerTest`를 보강해 Phase 02a-2 command API의 path, method, 성공 응답, 실패 응답 포맷을 검증했다.
+- command API는 모두 POST로 유지되며, DELETE HTTP method는 사용하지 않는다.
+- `POST /admin/job-postings/{jobPostingId}/stages/{stageId}/delete` delete command 정책은 유지된다.
+- Stage 공개 노출 API, JobPosting publish Stage 최소 1개 검증, StageResult 구현은 이번 범위에 포함하지 않았다.
