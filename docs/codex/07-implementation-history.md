@@ -178,3 +178,11 @@
   - StageResult는 Application 도메인 이후로 보류한다.
 - 다음 작업:
   - Application 기본 흐름 구현을 우선 검토한다.
+
+## 2026-05-14 - Phase 03 Application Design
+
+- Document: `docs/codex/design/phase-03-application-design.md`
+- Scope: Designed the applicant Application basic flow as the foundation for later StageResult implementation.
+- Key decisions: Use `JobApplication` as the recommended Java class name while keeping Application as the API/document term; split Phase 03 into applicant basic flow, admin read APIs, detail sections, and later StageResult.
+- Review update: Fixed Phase 03a-1 decisions for `applicant_id + job_posting_id` unique, `JobPositionRepository` lookup, and applicant name snapshot source.
+- Notes: Documentation-only design work; no Java code or new domain classes were added.
