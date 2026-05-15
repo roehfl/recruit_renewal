@@ -1,0 +1,104 @@
+package com.shinyoung.recruit.domain.entity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
+
+@Entity
+@Table(
+        name = "application_language",
+        indexes = {
+                @Index(name = "idx_application_language_application", columnList = "job_application_id"),
+                @Index(name = "idx_application_language_sort", columnList = "job_application_id,sort_order")
+        }
+)
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class ApplicationLanguage extends BaseEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "job_application_id", nullable = false)
+    private JobApplication jobApplication;
+
+    @Column(nullable = false)
+    private String languageName;
+
+    @Column(nullable = false)
+    private String testName;
+
+    private String score;
+
+    private String grade;
+
+    @Column(nullable = false)
+    private LocalDate examDate;
+
+    private LocalDate expiredDate;
+
+    private String issuingOrganization;
+
+    @Column(nullable = false)
+    private Integer sortOrder;
+
+    private ApplicationLanguage(
+            JobApplication jobApplication,
+            String languageName,
+            String testName,
+            String score,
+            String grade,
+            LocalDate examDate,
+            LocalDate expiredDate,
+            String issuingOrganization,
+            Integer sortOrder
+    ) {
+        this.jobApplication = jobApplication;
+        this.languageName = languageName;
+        this.testName = testName;
+        this.score = score;
+        this.grade = grade;
+        this.examDate = examDate;
+        this.expiredDate = expiredDate;
+        this.issuingOrganization = issuingOrganization;
+        this.sortOrder = sortOrder;
+    }
+
+    public static ApplicationLanguage create(
+            JobApplication jobApplication,
+            String languageName,
+            String testName,
+            String score,
+            String grade,
+            LocalDate examDate,
+            LocalDate expiredDate,
+            String issuingOrganization,
+            Integer sortOrder
+    ) {
+        return new ApplicationLanguage(
+                jobApplication,
+                languageName,
+                testName,
+                score,
+                grade,
+                examDate,
+                expiredDate,
+                issuingOrganization,
+                sortOrder
+        );
+    }
+}

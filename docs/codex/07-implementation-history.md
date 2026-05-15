@@ -1,5 +1,82 @@
 # 07. Implementation History
 
+## Phase 03c-3 - Application Certificate + Language
+
+- 작업일: 2026-05-15
+- 목적: `JobApplication` 하위 상세 섹션 중 자격사항과 어학사항을 지원자가 조회/replace 저장할 수 있게 구현했다.
+- 핵심 구현:
+  - `ApplicationCertificate`, `ApplicationLanguage` Entity 추가
+  - `ApplicationCertificateRepository`, `ApplicationLanguageRepository` 추가
+  - `ApplicationCertificateService`, `ApplicationLanguageService`에서 본인 지원서, DRAFT 상태, PUBLISHED 공고, 접수기간, `useCertificate`/`useLanguage` 검증 구현
+  - Certificate/Language row는 applicationId 기준 명시 삭제 후 새 row 저장
+  - Certificate 취득일/만료일, Language 응시일/만료일 교차 검증 구현
+  - `ApplicationCertificateController`, `ApplicationLanguageController`로 지원자 자격/어학 조회/저장 API 추가
+- 주요 클래스:
+  - `ApplicationCertificate`
+  - `ApplicationLanguage`
+  - `ApplicationCertificateService`
+  - `ApplicationLanguageService`
+  - `ApplicationCertificateController`
+  - `ApplicationLanguageController`
+  - `CertificateReplaceRequest`, `CertificateRequest`, `LanguageReplaceRequest`, `LanguageRequest`
+  - `CertificateResponse`, `LanguageResponse`
+  - `ApplicationCertificateServiceTest`, `ApplicationCertificateControllerTest`
+  - `ApplicationLanguageServiceTest`, `ApplicationLanguageControllerTest`
+- API:
+  - `GET /applications/{applicationId}/certificates`
+  - `POST /applications/{applicationId}/certificates`
+  - `GET /applications/{applicationId}/languages`
+  - `POST /applications/{applicationId}/languages`
+- 테스트 결과:
+  - `ApplicationCertificateServiceTest`, `ApplicationCertificateControllerTest`, `ApplicationLanguageServiceTest`, `ApplicationLanguageControllerTest` 성공
+  - `ApplicationEducationServiceTest`, `ApplicationEducationControllerTest`, `ApplicationCareerServiceTest`, `ApplicationCareerControllerTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - submit 시 Certificate/Language 최소 row 필수 여부는 Phase 03c-7에서 결정한다.
+  - Language의 score/grade 필수 여부는 DRAFT 저장에서는 강제하지 않았고 submit validator에서 재검토한다.
+  - 관리자 상세 응답에 Certificate/Language 섹션은 아직 포함하지 않았다.
+  - 자격번호 관리자 마스킹/암호화 정책은 관리자 상세 섹션 확장 시 결정한다.
+  - Education/Career/Certificate/Language의 접근/상태/접수기간/config enabled 검증이 반복되므로 Military 구현 후 최소 공통 helper 추출을 검토한다.
+  - Certificate/Language 자유 입력 문자열 길이 제한은 운영 DB schema 기준 확정 후 보완한다.
+- 다음 작업:
+  - Military vertical slice를 구현하거나, 상세 섹션 공통 접근/수정 정책 helper를 최소 범위로 추출할지 검토한다.
+
+## Phase 03c-2 - Application Career
+
+- 작업일: 2026-05-15
+- 목적: `JobApplication` 하위 상세 섹션 중 경력사항을 지원자가 조회/replace 저장할 수 있게 구현했다.
+- 핵심 구현:
+  - `ApplicationCareerProfile`, `ApplicationCareer` Entity 추가
+  - `CareerType`, `EmploymentType` enum 추가
+  - `ApplicationCareerProfileRepository`, `ApplicationCareerRepository` 추가
+  - `ApplicationCareerService`에서 본인 지원서, DRAFT 상태, PUBLISHED 공고, 접수기간, `useCareer` 검증 구현
+  - Career profile은 upsert하고, Career row는 applicationId 기준 명시 삭제 후 새 row 저장
+  - 리뷰 보완으로 `currentlyEmployed=true`이면 `endDate`를 금지하고, Service 직접 호출에서도 담당업무/퇴사사유 2000자 제한을 검증
+  - `ApplicationCareerController`로 지원자 경력 조회/저장 API 추가
+- 주요 클래스:
+  - `ApplicationCareerProfile`
+  - `ApplicationCareer`
+  - `ApplicationCareerService`
+  - `ApplicationCareerController`
+  - `CareerReplaceRequest`, `CareerRequest`
+  - `CareerResponse`, `CareerItemResponse`
+  - `ApplicationCareerServiceTest`, `ApplicationCareerControllerTest`
+- API:
+  - `GET /applications/{applicationId}/careers`
+  - `POST /applications/{applicationId}/careers`
+- 테스트 결과:
+  - `ApplicationCareerServiceTest` 성공
+  - `ApplicationCareerControllerTest` 성공
+  - `ApplicationEducationServiceTest` 성공
+  - `ApplicationEducationControllerTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - submit 시 `CareerType.NOT_SELECTED` 실패 여부와 `EXPERIENCED` 최소 1개 필수 검증은 Phase 03c-7에서 연결한다.
+  - 관리자 상세 응답에 Career 섹션은 아직 포함하지 않았다.
+  - 다음 상세 섹션에서 검증 반복이 커지면 최소 공통 helper 추출을 검토한다.
+- 다음 작업:
+  - Certificate + Language 또는 Military vertical slice를 구현한다.
+
 ## Phase 03c-1 - Application Education
 
 - 작업일: 2026-05-15

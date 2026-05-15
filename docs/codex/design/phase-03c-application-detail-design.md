@@ -1,5 +1,33 @@
 # Phase 03c Application Detail Design
 
+## Phase 03c-3 Implementation Note
+
+- Phase 03c-3에서 Certificate + Language vertical slice를 구현했다.
+- 구현 클래스는 `ApplicationCertificate`, `ApplicationLanguage`, `ApplicationCertificateService`, `ApplicationLanguageService`, `ApplicationCertificateController`, `ApplicationLanguageController`이다.
+- 지원자 API는 `GET /applications/{applicationId}/certificates`, `POST /applications/{applicationId}/certificates`, `GET /applications/{applicationId}/languages`, `POST /applications/{applicationId}/languages`이다.
+- replace 저장은 기존 Certificate/Language row를 `applicationId` 기준 명시 삭제하고 새 row를 저장하는 방식으로 확정했다.
+- 저장은 `DRAFT` 지원서에서만 가능하며, `SUBMITTED`/`WITHDRAWN`은 조회만 가능하다.
+- Certificate 저장은 `ApplicationFormConfig.useCertificate=true`, Language 저장은 `ApplicationFormConfig.useLanguage=true`일 때만 가능하다.
+- Certificate는 `expiredDate`가 있으면 `acquiredDate <= expiredDate`, Language는 `expiredDate`가 있으면 `examDate <= expiredDate`를 검증한다.
+- Language의 `score`, `grade`는 DRAFT 저장에서는 둘 다 비어 있어도 허용하며, submit 필수 여부는 Phase 03c-7에서 재검토한다.
+- 이번 Phase에서 Military, Award, GapPeriod, Attachment, StageResult, 관리자 상세 섹션 API는 구현하지 않았다.
+- Education/Career/Certificate/Language에서 지원서 접근/수정 가능 여부/config enabled 검증이 반복되고 있으므로, Military 구현 후 `ApplicationSectionAccessService` 같은 최소 공통 helper 추출을 검토한다.
+- helper 후보 범위는 본인 지원서 조회, 상세 섹션 쓰기 가능 검증, 섹션 enabled 검증 정도로 제한한다.
+- Certificate/Language의 일부 자유 입력 문자열 길이 제한은 아직 구현하지 않았고, 운영 DB schema 기준 확정 후 `@Column(length = ...)` 또는 DTO `@Size`를 검토한다.
+
+## Phase 03c-2 Implementation Note
+
+- Phase 03c-2에서 Career vertical slice를 구현했다.
+- 구현 클래스는 `ApplicationCareerProfile`, `ApplicationCareer`, `ApplicationCareerService`, `ApplicationCareerController`이다.
+- `CareerType`은 `NOT_SELECTED`, `NEWCOMER`, `EXPERIENCED`, `NOT_APPLICABLE`을 사용한다.
+- `EmploymentType`은 `FULL_TIME`, `CONTRACT`, `INTERN`, `FREELANCE`, `PART_TIME`, `ETC`를 사용한다.
+- `ApplicationCareerProfile`은 `JobApplication`별 경력 선택 상태를 나타내는 단건 record이고, `ApplicationCareer`는 경력 row 목록이다.
+- replace 저장은 profile upsert 후 기존 Career row를 `applicationId` 기준 명시 삭제하고 새 Career row를 저장하는 방식으로 확정했다.
+- `CareerType.EXPERIENCED`가 아닌 경우 Career row가 있으면 실패한다.
+- `CareerType.EXPERIENCED`는 DRAFT 저장에서 빈 목록을 허용하며, submit 시 최소 1개 필수 여부는 Phase 03c-7에서 검증한다.
+- 저장은 `ApplicationFormConfig.useCareer=true`일 때만 가능하다.
+- 이번 Phase에서 Certificate, Language, Military, Award, GapPeriod, Attachment, StageResult는 구현하지 않았다.
+
 ## Phase 03c-1 Implementation Note
 
 - Phase 03c-1에서 Education + EducationSemesterGrade vertical slice를 구현했다.
@@ -98,7 +126,7 @@ Phase 03c-0의 목적은 Phase 03a/03b에서 구현된 `JobApplication` 루트�
 | Flag | 화면 노출 | 임시저장 | 최종제출 검증 | 관리자 상세 포함 | 빈 목록 허용 |
 |---|---|---|---|---|---|
 | `useEducation` | true면 노출 | true일 때만 저장 허용 | 최소 1개 권장 | true면 포함 | DRAFT는 허용, submit은 불가 권장 |
-| `useCareer` | true면 노출 | true일 때만 저장 허용 | 경력/신입 구분 도입 전에는 선택 | true면 포함 | 허용 |
+| `useCareer` | true면 노출 | true일 때만 저장 허용 | `CareerType.NOT_SELECTED` 실패 후보, `EXPERIENCED`는 Career row 최소 1개 후보 | true면 포함 | DRAFT는 허용, submit 정책은 Phase 03c-7에서 확정 |
 | `useCertificate` | true면 노출 | true일 때만 저장 허용 | 기본 선택 | true면 포함 | 허용 |
 | `useLanguage` | true면 노출 | true일 때만 저장 허용 | 기본 선택 | true면 포함 | 허용 |
 | `useMilitary` | true면 노출 | true일 때만 저장 허용 | `ApplicationMilitary` 1건 필수 | true면 포함 | DRAFT는 허용, submit은 불가 |
@@ -117,9 +145,9 @@ Phase 03c-0의 목적은 Phase 03a/03b에서 구현된 `JobApplication` 루트�
 
 - `useMilitary=true`이면 submit 시 `ApplicationMilitary` 1건을 필수로 둔다.
 - 병역 필수 여부는 성별로 추론하지 않는다. 지원자가 `militarySubjectType`으로 대상, 비대상, 복무완료, 면제, 해당없음 중 하나를 명시하는 구조를 추천한다.
-- Career는 `useCareer=true`여도 현재 구조만으로는 "미입력", "해당 없음", "실수 누락"을 구분할 수 없다.
-- Career 최소 1개 검증은 지원 유형 또는 `careerApplicable` 도입 전까지 보류한다.
-- 후속 Career 구현 Phase에서는 `careerApplicable`, `hasCareer`, `careerType` 중 하나를 도입할지 별도 결정해야 한다.
+- Career는 Phase 03c-2에서 `CareerType`을 도입해 "미선택", "신입/경력 없음", "경력 있음", "해당 없음"을 구분한다.
+- `CareerType.NOT_SELECTED`는 DRAFT 저장에서는 허용하지만, submit validator에서는 실패시키는 방향을 후보로 둔다.
+- `CareerType.EXPERIENCED`는 DRAFT 저장에서 Career row 빈 목록을 허용하지만, submit validator에서는 최소 1개 필수 검증을 후보로 둔다.
 
 ## 5. Section Entity Candidates
 
@@ -127,9 +155,10 @@ Phase 03c-0의 목적은 Phase 03a/03b에서 구현된 `JobApplication` 루트�
 |---|---|---|---|---|---|---|---|---|---|---|
 | Education | `ApplicationEducation` | `application_education` | N:1 `JobApplication` | `educationLevel`, `schoolName`, `majorName`, `degreeName`, `admissionDate`, `graduationDate`, `graduationStatus`, `dayNightType`, `campusType`, `transfer`, `countryCode`, `sortOrder` | `educationLevel`, `schoolName`, `graduationStatus`, `sortOrder` | `sortOrder ASC, id ASC` | 기본 미사용 | 학교/전공은 개인정보 성격. 기본 암호화는 보류, 관리자 표시 주의 | 포함 | 1 |
 | EducationSemesterGrade | `ApplicationEducationSemesterGrade` | `application_education_semester_grade` | N:1 `ApplicationEducation` | `schoolYear`, `semester`, `earnedCredits`, `gradePoint`, `maxGradePoint`, `majorGradePoint`, `majorMaxGradePoint` | `schoolYear`, `semester`, `gradePoint`, `maxGradePoint` | `schoolYear ASC, semester ASC, id ASC` | 기본 미사용 | 성적 민감정보. 관리자 상세에서 필요 시에만 표시 | 포함 | 1 |
-| Career | `ApplicationCareer` | `application_career` | N:1 `JobApplication` | `companyName`, `departmentName`, `positionTitle`, `employmentType`, `startDate`, `endDate`, `currentlyEmployed`, `responsibilities`, `resignationReason`, `sortOrder` | `companyName`, `startDate`, `currentlyEmployed`, `sortOrder` | `startDate DESC, id ASC` 또는 `sortOrder ASC` | 기본 미사용 | 경력 정보는 개인정보. 담당업무/퇴사사유 노출 주의 | 포함 | 2 |
-| Certificate | `ApplicationCertificate` | `application_certificate` | N:1 `JobApplication` | `certificateName`, `issuingOrganization`, `acquiredDate`, `certificateNumber`, `expiredDate`, `scoreOrGrade`, `sortOrder` | `certificateName`, `issuingOrganization`, `acquiredDate`, `sortOrder` | `acquiredDate DESC, id ASC` 또는 `sortOrder ASC` | 기본 미사용 | 자격번호는 마스킹 또는 암호화 검토 | 포함 | 3 |
-| Language | `ApplicationLanguage` | `application_language` | N:1 `JobApplication` | `languageName`, `testName`, `score`, `grade`, `examDate`, `expiredDate`, `issuingOrganization`, `sortOrder` | `languageName`, `testName`, `examDate`, `sortOrder` | `examDate DESC, id ASC` 또는 `sortOrder ASC` | 기본 미사용 | 점수/등급은 민감도가 낮으나 관리자 노출 범위 제한 | 포함 | 3 |
+| CareerProfile | `ApplicationCareerProfile` | `application_career_profile` | 1:1 `JobApplication` | `careerType` | `careerType` | 단건 | 기본 미사용 | 경력 선택 상태 | 포함 | 2 |
+| Career | `ApplicationCareer` | `application_career` | N:1 `JobApplication` | `companyName`, `departmentName`, `positionTitle`, `employmentType`, `startDate`, `endDate`, `currentlyEmployed`, `responsibilities`, `resignationReason`, `sortOrder` | `companyName`, `startDate`, `currentlyEmployed`, `sortOrder` | `sortOrder ASC, id ASC` | 기본 미사용 | 경력 정보는 개인정보. 담당업무/퇴사사유 노출 주의 | 포함 | 2 |
+| Certificate | `ApplicationCertificate` | `application_certificate` | N:1 `JobApplication` | `certificateName`, `issuingOrganization`, `acquiredDate`, `certificateNumber`, `expiredDate`, `scoreOrGrade`, `sortOrder` | `certificateName`, `issuingOrganization`, `acquiredDate`, `sortOrder` | `sortOrder ASC, id ASC` | 기본 미사용 | 자격번호는 마스킹 또는 암호화 검토 | 포함 | 구현 완료 |
+| Language | `ApplicationLanguage` | `application_language` | N:1 `JobApplication` | `languageName`, `testName`, `score`, `grade`, `examDate`, `expiredDate`, `issuingOrganization`, `sortOrder` | `languageName`, `testName`, `examDate`, `sortOrder` | `sortOrder ASC, id ASC` | 기본 미사용 | 점수/등급은 민감도가 낮으나 관리자 노출 범위 제한 | 포함 | 구현 완료 |
 | Military | `ApplicationMilitary` | `application_military` | 0..1 `JobApplication` | `militarySubjectType`, `serviceType`, `militaryBranch`, `rank`, `serviceStartDate`, `serviceEndDate`, `exemptionReason` | `militarySubjectType` | 단건 | 기본 미사용 | 면제 사유는 민감정보. 암호화/마스킹 우선 검토 | 포함 | 4 |
 | Award | `ApplicationAward` | `application_award` | N:1 `JobApplication` | `awardName`, `awardingOrganization`, `awardDate`, `description`, `sortOrder` | `awardName`, `awardingOrganization`, `awardDate`, `sortOrder` | `awardDate DESC, id ASC` 또는 `sortOrder ASC` | 기본 미사용 | 설명에 개인정보가 들어갈 수 있어 주의 | 포함 | 5 |
 | GapPeriod | `ApplicationGapPeriod` | `application_gap_period` | N:1 `JobApplication` | `startDate`, `endDate`, `gapType`, `reason`, `description`, `sortOrder` | `startDate`, `endDate`, `gapType`, `reason`, `sortOrder` | `startDate ASC, id ASC` | 기본 미사용 | 사유/설명은 민감정보 가능. 관리자 노출 주의 | 포함 | 5 |
@@ -154,17 +183,23 @@ Phase 03c-0의 목적은 Phase 03a/03b에서 구현된 `JobApplication` 루트�
 
 - 경력기간은 `startDate`, `endDate`, `currentlyEmployed`로 계산한다.
 - Phase 03c 초기 구현에서는 기간 월수를 저장하지 않는다.
-- `currentlyEmployed=true`이면 `endDate`는 null 허용을 검토한다.
+- Phase 03c-2 보완으로 `currentlyEmployed=true`이면 `endDate`는 null이어야 하고, `currentlyEmployed=false`이면 `endDate`는 필수로 확정했다.
+- `responsibilities`, `resignationReason`은 Service 직접 호출에서도 2000자 이하로 검증한다.
 
 #### Certificate
 
 - 자격번호는 관리자 응답에서 기본 마스킹을 권장한다.
 - 자격번호 검색이 필요하면 평문 검색이 아니라 hash 필드를 별도로 검토한다.
+- Phase 03c-3 구현에서는 `expiredDate`가 있으면 `acquiredDate <= expiredDate`를 검증한다.
+- `ApplicationFormConfig.useCertificate=false`이면 저장을 차단한다.
 
 #### Language
 
 - 점수와 등급은 시험별로 둘 중 하나만 필요한 경우가 있으므로 둘 다 nullable 후보로 둔다.
 - 시험명/응시일은 제출 검증의 기본 필수 후보로 둔다.
+- Phase 03c-3 구현에서는 `expiredDate`가 있으면 `examDate <= expiredDate`를 검증한다.
+- `score`, `grade`는 DRAFT 저장에서는 둘 다 비어 있어도 허용하고, submit 필수 여부는 Phase 03c-7에서 재검토한다.
+- `ApplicationFormConfig.useLanguage=false`이면 저장을 차단한다.
 
 #### Military
 
@@ -353,7 +388,7 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 | Section | Config enabled 시 submit 검증 추천 |
 |---|---|
 | Education | 최소 1개 필요. 대학교 이상이면 성적 입력 필요 여부는 공고 정책 확정 후 적용 |
-| Career | 신입/경력 구분 값이 없으므로 최소 1개를 바로 강제하지 않는다. 후속으로 `careerApplicable` 또는 지원 유형 값을 도입한 뒤 검증 |
+| Career | `CareerType.NOT_SELECTED`는 실패 후보. `CareerType.EXPERIENCED`이면 Career row 최소 1개 필요 후보. `NEWCOMER`, `NOT_APPLICABLE`은 row 없이 통과 후보 |
 | Certificate | 기본 선택. 필수 여부 flag가 별도로 생기기 전까지 최소 1개 강제하지 않음 |
 | Language | 기본 선택. 필수 여부 flag가 별도로 생기기 전까지 최소 1개 강제하지 않음 |
 | Military | `ApplicationMilitary` 1건 필수. 성별로 추론하지 않고 `militarySubjectType`으로 대상/비대상/복무완료/면제/해당없음 값을 명시 |
@@ -429,8 +464,8 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 | Phase | 구현 범위 | 미구현 범위 | 테스트 방향 |
 |---|---|---|---|
 | Phase 03c-1 | Education + EducationSemesterGrade vertical slice 구현 완료 | 다른 섹션, submit 통합 검증 전체 | 학력 저장/조회/replace, 성적 정렬/검증, `useEducation`, DRAFT 상태, 타인 지원서 차단 |
-| Phase 03c-2 | Career | 다른 섹션 | 경력 기간 검증, 재직중 endDate 정책, `useCareer`, careerApplicable 보류 정책 |
-| Phase 03c-3 | Certificate + Language | 다른 섹션 | 취득일/응시일/만료일 검증, 정렬, config 연동 |
+| Phase 03c-2 | Career vertical slice 구현 완료 | 다른 섹션, submit 통합 검증 전체 | 경력 선택 상태, 경력 기간 검증, 재직중 endDate 정책, `useCareer`, DRAFT 상태, 타인 지원서 차단 |
+| Phase 03c-3 | Certificate + Language vertical slice 구현 완료 | 다른 섹션, submit 통합 검증 전체 | 취득일/응시일/만료일 검증, 정렬, config 연동 |
 | Phase 03c-4 | Military | Award, GapPeriod, Attachment | 단건 병역 upsert, `useMilitary=true` submit 필수 1건 정책, 민감정보 응답 정책 |
 | Phase 03c-5 | Award + GapPeriod | Attachment, submit 통합 검증 전체 | 수상/공백기간 기간 검증, 정렬, config 연동 |
 | Phase 03c-6 | Attachment metadata | 실제 파일 업로드/다운로드 저장소 연동 | metadata 저장/조회, 저장 경로 비노출, attachmentType 검증 |
@@ -441,7 +476,7 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 
 - 자기소개서/질문답변 도메인
 - 상세 섹션별 required flag 세분화
-- 신입/경력 지원 유형 또는 `careerApplicable` 정책
+- Career submit 정책: `NOT_SELECTED` 실패 여부와 `EXPERIENCED` 최소 1개 필수 여부
 - 최종제출 후 수정요청/반려/reopen 정책
 - 첨부파일 실제 업로드/저장소/다운로드/바이러스 검사
 - 상세 섹션 개인정보 암호화 대상 최종 확정
@@ -451,18 +486,17 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 
 ## 14. Recommended Next Phase
 
-다음 구현은 Phase 03c-1: Education + EducationSemesterGrade vertical slice로 진행하는 것을 추천한다.
+다음 구현은 Phase 03c-4: Military vertical slice로 진행하는 것을 추천한다.
 
 추천 범위:
 
-- `ApplicationEducation`
-- `ApplicationEducationSemesterGrade`
-- `EducationLevel`, `GraduationStatus` 등 학력에 필요한 enum
-- 학력/성적 저장, 조회, replace API
-- `useEducation` 연동
+- `ApplicationMilitary` 단건 upsert
+- `useMilitary=true` 저장 허용 정책
+- submit 시 `ApplicationMilitary` 1건 필수 정책 기반 설계 검증
+- 지원자 조회/replace API
+- `ApplicationFormConfig.useMilitary` 연동
 - `DRAFT` 상태에서만 수정 가능
 - 타인 지원서 접근 차단
-- Education replace 시 기존 SemesterGrade 선삭제 후 Education 삭제
 - 필요한 경우에만 최소 공통 helper 도입
 
-별도 Phase 03c-1을 공통 helper만 만드는 작업으로 두는 것은 추천하지 않는다. 실제 섹션 없이 추상화부터 만들면 과해질 수 있으므로, Education vertical slice 안에서 반복되는 검증을 확인하며 최소 helper를 뽑는 편이 안전하다.
+별도 공통 helper만 만드는 작업은 아직 추천하지 않는다. Military 구현까지 완료한 뒤 본인 지원서, DRAFT, PUBLISHED, 접수기간, config enabled 검증 반복을 기준으로 `ApplicationSectionAccessService` 같은 최소 helper 추출을 검토한다.

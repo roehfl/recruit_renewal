@@ -1,5 +1,31 @@
 # Phase 03 Application Design
 
+## Phase 03c-3 구현 반영 메모
+
+- Phase 03c-3에서 `JobApplication` 하위 자격사항/어학사항 vertical slice를 구현했다.
+- 추가 도메인은 `ApplicationCertificate`, `ApplicationLanguage`이며, `JobApplication`에는 Certificate/Language 컬렉션을 추가하지 않았다.
+- 자격 저장은 `ApplicationFormConfig.useCertificate=true`, 어학 저장은 `ApplicationFormConfig.useLanguage=true`일 때만 허용한다.
+- 저장은 본인 지원서, `DRAFT` 상태, `JobPosting.status=PUBLISHED`, 접수기간 내 조건을 모두 만족해야 한다.
+- replace 저장은 기존 Certificate/Language row를 `applicationId` 기준 명시 삭제한 뒤 새 row를 저장한다.
+- Certificate는 `expiredDate`가 있으면 `acquiredDate <= expiredDate`, Language는 `expiredDate`가 있으면 `examDate <= expiredDate`를 검증한다.
+- Language의 `score`, `grade`는 DRAFT 저장에서는 둘 다 비어 있어도 허용하고, submit 필수 여부는 Phase 03c-7에서 재검토한다.
+- API는 `GET /applications/{applicationId}/certificates`, `POST /applications/{applicationId}/certificates`, `GET /applications/{applicationId}/languages`, `POST /applications/{applicationId}/languages`이다.
+- submit 시 Certificate/Language 최소 row 필수 여부와 관리자 상세 섹션 응답은 아직 연결하지 않았다.
+- Education/Career/Certificate/Language에서 지원서 소유자, DRAFT 수정 가능, PUBLISHED 공고, 접수기간, config enabled 검증이 반복되고 있다. Military 구현 후 `ApplicationSectionAccessService` 같은 최소 helper 추출을 검토한다.
+- Certificate/Language의 일부 자유 입력 문자열 길이 제한은 아직 두지 않았고, 운영 DB schema 확정 시 `@Column(length = ...)` 또는 DTO `@Size`를 검토한다.
+
+## Phase 03c-2 구현 반영 메모
+
+- Phase 03c-2에서 `JobApplication` 하위 경력사항 vertical slice를 구현했다.
+- 추가 도메인은 `ApplicationCareerProfile`, `ApplicationCareer`이며, `JobApplication`에는 Career 컬렉션이나 단건 필드를 추가하지 않았다.
+- `CareerType`은 `NOT_SELECTED`, `NEWCOMER`, `EXPERIENCED`, `NOT_APPLICABLE`로 구성한다.
+- `ApplicationCareerProfile`은 지원서별 경력 선택 상태를 저장하는 단건 record이고, `ApplicationCareer`는 `EXPERIENCED`일 때 사용하는 경력 row 목록이다.
+- 저장은 본인 지원서, `DRAFT` 상태, `JobPosting.status=PUBLISHED`, 접수기간 내, `ApplicationFormConfig.useCareer=true` 조건을 모두 만족해야 한다.
+- replace 저장은 profile을 upsert하고 기존 Career row를 `applicationId` 기준 명시 삭제한 뒤 새 Career row를 저장한다.
+- `EXPERIENCED`가 아닌 `CareerType`은 Career row를 허용하지 않는다. `EXPERIENCED`는 DRAFT 저장에서 빈 목록도 허용한다.
+- submit 시 `CareerType.NOT_SELECTED` 실패 여부와 `EXPERIENCED` 최소 1개 검증은 아직 연결하지 않았고, Phase 03c-7 `ApplicationSubmitValidator`에서 처리한다.
+- API는 `GET /applications/{applicationId}/careers`, `POST /applications/{applicationId}/careers`이다.
+
 ## Phase 03c-1 구현 반영 메모
 
 - Phase 03c-1에서 `JobApplication` 하위 학력/성적 vertical slice를 구현했다.
