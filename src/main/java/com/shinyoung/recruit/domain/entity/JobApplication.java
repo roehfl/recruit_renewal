@@ -108,4 +108,19 @@ public class JobApplication extends BaseEntity {
                 jobPositionNameSnapshot
         );
     }
+
+    public void updateDraft(JobPosition jobPosition, String jobPositionNameSnapshot) {
+        this.jobPosition = jobPosition;
+        this.jobPositionNameSnapshot = jobPositionNameSnapshot;
+    }
+
+    public void submit(LocalDateTime submittedAt) {
+        this.status = JobApplicationStatus.SUBMITTED;
+        this.submittedAt = submittedAt;
+    }
+
+    public void withdraw(LocalDateTime withdrawnAt) {
+        this.status = JobApplicationStatus.WITHDRAWN;
+        this.withdrawnAt = withdrawnAt;
+    }
 }

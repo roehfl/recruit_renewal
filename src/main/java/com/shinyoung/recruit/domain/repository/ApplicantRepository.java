@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface ApplicantRepository extends JpaRepository<Applicant, Long> {
     Optional<Applicant> findApplicantByCiHash(String ciHash);
+
+    Optional<Applicant> findByLoginId(String loginId);
 }

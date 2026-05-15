@@ -1,5 +1,25 @@
 # Phase 03 Application Design
 
+## Phase 03a-3 구현 반영 메모
+
+- Phase 03a-3에서 `ApplicationController`가 추가되어 지원자 Application 생성/조회/수정/제출/철회 HTTP API가 연결되었다.
+- `GET /applications/me` 목록 API는 이번 Phase에서 구현하지 않고 별도 Phase로 유지했다.
+- 현재 `CustomUserDetails`에는 `userId/applicantId`가 없으므로 `CurrentApplicantService`가 `userType=Applicant`를 확인하고 `loginId`로 `ApplicantRepository.findByLoginId`를 조회한다.
+- `CustomUserDetails.USER_TYPE_APPLICANT/USER_TYPE_EMPLOYEE` 상수를 추가해 문자열 비교를 한 곳에 모았고, `getUsername() == loginId` 전제는 `CustomUserDetailsTest`로 고정했다.
+- 미로그인 401, Employee/Admin 403, 실제 SecurityFilterChain/CSRF 검증은 아직 별도 보안 보강 Phase로 남긴다.
+- SecurityConfig는 변경하지 않았다.
+- 관리자 Application API, StageResult, 상세 섹션 도메인은 계속 보류 상태다.
+
+## Phase 03a-2 구현 반영 메모
+
+- Phase 03a-2는 Controller 없이 `JobApplicationService` command만 구현한다.
+- 구현된 command는 `updateDraft`, `submit`, `withdraw`이다.
+- `updateDraft`는 DRAFT 상태에서 모집분야 변경만 허용한다.
+- `submit`은 `DRAFT -> SUBMITTED`, `withdraw`는 `SUBMITTED -> WITHDRAWN`만 허용한다.
+- 세 command 모두 `PUBLISHED` JobPosting과 접수기간 내 조건을 요구한다.
+- `submittedAt`, `withdrawnAt`은 주입된 `Clock` 기준으로 저장한다.
+- 상세 섹션 필수값 검증과 HTTP API 계약은 후속 Phase로 유지한다.
+
 ## 1. Summary
 
 Phase 03의 목적은 지원자가 공개된 채용공고에 대해 지원서를 생성하고, 임시저장하고, 최종제출하고, 필요 시 철회할 수 있는 최소 루트 모델을 설계하는 것이다. 이 설계는 Phase 02에서 보류한 `StageResult`를 정합성 있게 구현하기 위한 선행 기반이다.
@@ -564,10 +584,10 @@ Phase 03a에서는 `ApplicationFormConfig`를 깊게 검증하지 않는다.
 - `POST /applications/{applicationId}`
 - `POST /applications/{applicationId}/submit`
 - `POST /applications/{applicationId}/withdraw`
-- `GET /applications/me`: `PageResponse<MyApplicationResponse>` 권장
 - `GET /job-postings/{jobPostingId}/application`
 - MockMvc 기반 API 계약 테스트
 - Phase 03a 구현 문서 작성
+- `GET /applications/me` 목록 API는 Phase 03a-3에서 구현하지 않았고, `PageResponse<MyApplicationResponse>` 형태의 별도 Phase 후보로 유지한다.
 
 ### Phase 03b: 관리자 Application 목록/상세 조회
 
@@ -625,9 +645,9 @@ Phase 03a에서는 `ApplicationFormConfig`를 깊게 검증하지 않는다.
 - 관리자 Application API는 Phase 03b로 분리
 - StageResult는 Phase 03d 또는 Application 이후 별도 Phase로 보류
 
-## 12. Recommended Next Codex Prompt
+## 12. Archived Phase 03a-1 Codex Prompt
 
-아래는 Phase 03a-1 구현을 요청할 때 사용할 수 있는 지시문 초안이다.
+아래 지시문은 Phase 03a-1 구현 당시 사용하기 위한 보관용 초안이다. Phase 03a-3 이후 현재 구현 지시문이 아니며, `ApplicationController`와 command 구현 금지 문구는 Phase 03a-1 범위 제한을 뜻한다.
 
 ```text
 AGENTS.md와 docs/codex/*.md를 먼저 읽어라.

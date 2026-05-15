@@ -1,5 +1,70 @@
 # 07. Implementation History
 
+## Phase 03a-3 - Application API
+
+- 작업일: 2026-05-15
+- 목적: Phase 03a-1/03a-2에서 구현한 지원자 Application 생성/조회/수정/제출/철회 Service 흐름을 HTTP API로 연결했다.
+- 핵심 구현:
+  - `ApplicationController` 추가
+  - `CurrentApplicantService` 추가
+  - `ApplicantRepository.findByLoginId` 추가
+  - `CustomUserDetails` userType 상수 추가 및 `getUsername() == loginId` 테스트 고정
+  - 지원자 Application 생성, 상세 조회, DRAFT 수정, 제출, 철회 API 추가
+  - 공고별 내 지원서 조회 API 추가
+  - `ApplicationControllerTest`로 path, method, `ApiResponse` 포맷, validation/error 응답, 타인 command 차단 고정
+- 주요 클래스:
+  - `ApplicationController`
+  - `CurrentApplicantService`
+  - `ApplicantRepository`
+  - `CustomUserDetails`
+  - `ApplicationControllerTest`
+  - `CustomUserDetailsTest`
+- API:
+  - `POST /applications`
+  - `GET /applications/{applicationId}`
+  - `POST /applications/{applicationId}`
+  - `POST /applications/{applicationId}/submit`
+  - `POST /applications/{applicationId}/withdraw`
+  - `GET /job-postings/{jobPostingId}/application`
+- 테스트 결과:
+  - `ApplicationControllerTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - `CustomUserDetails`에 `applicantId`가 없어 `loginId` 조회 helper를 사용한다.
+  - 인증/인가 실패 응답의 `401/403` 정교화는 보안 정책 확정 후 보완한다.
+  - 실제 SecurityFilterChain, CSRF, 미로그인/권한 실패 통합 테스트는 별도 보안 Phase에서 보완한다.
+  - `GET /applications/me` 목록 API는 별도 Phase로 분리했다.
+- 다음 작업:
+  - 관리자 Application 목록/상세 조회 또는 Application 상세 섹션 구현 범위를 결정한다.
+
+## Phase 03a-2 - Application Commands
+
+- 작업일: 2026-05-15
+- 목적: Phase 03a-1의 `JobApplication` 루트에 임시저장 수정, 최종제출, 철회 command를 추가했다.
+- 핵심 구현:
+  - `JobApplication.updateDraft`, `submit`, `withdraw` 추가
+  - `ApplicationUpdateRequest` 추가
+  - `JobApplicationService.updateDraft`, `submit`, `withdraw` 추가
+  - `PUBLISHED` 공고와 접수기간 내 조건을 command 공통 검증으로 적용
+  - DRAFT 수정, DRAFT -> SUBMITTED, SUBMITTED -> WITHDRAWN 상태 전이 검증
+  - Service 테스트에 updateDraft/submit/withdraw 성공 및 실패 케이스 추가
+- 주요 클래스:
+  - `JobApplication`
+  - `ApplicationUpdateRequest`
+  - `JobApplicationService`
+  - `JobApplicationServiceTest`
+- API:
+  - 없음. `ApplicationController`는 Phase 03a-3으로 분리했다.
+- 테스트 결과:
+  - `JobApplicationServiceTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - Application HTTP API와 MockMvc 계약 테스트는 아직 없다.
+  - 상세 섹션 필수값 검증은 후속 Phase에서 구현한다.
+  - 동시 unique 충돌 예외 변환은 Controller/API 단계에서 재검토한다.
+- 다음 작업:
+  - Phase 03a-3에서 ApplicationController/API/Test 구현을 진행한다.
+
 ## 2026-05-13 - Phase 01a JobPosting Vertical Slice
 
 - Document: `docs/codex/implementation/phase-01a-job-posting.md`

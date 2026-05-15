@@ -9,7 +9,9 @@ import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPositionRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
+import com.shinyoung.recruit.dto.request.ApplicationUpdateRequest;
 import com.shinyoung.recruit.dto.response.ApplicationDetailResponse;
+import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
@@ -36,7 +38,7 @@ public class JobApplicationService {
     public Long create(Long applicantId, ApplicationCreateRequest request) {
         Applicant applicant = findApplicant(applicantId);
         JobPosting jobPosting = findJobPosting(request.jobPostingId());
-        validateCreatableJobPosting(jobPosting);
+        validatePublishedAndAccepting(jobPosting);
         validateApplicationFormConfig(jobPosting);
         validateNotDuplicated(applicantId, jobPosting.getId());
 
@@ -54,8 +56,7 @@ public class JobApplicationService {
     }
 
     public ApplicationDetailResponse getApplication(Long applicantId, Long applicationId) {
-        JobApplication application = jobApplicationRepository.findByIdAndApplicantId(applicationId, applicantId)
-                .orElseThrow(() -> new JobApplicationNotFoundException("지원서를 찾을 수 없습니다. id=" + applicationId));
+        JobApplication application = findApplication(applicantId, applicationId);
         return ApplicationDetailResponse.from(application);
     }
 
@@ -63,6 +64,46 @@ public class JobApplicationService {
         JobApplication application = jobApplicationRepository.findByApplicantIdAndJobPostingId(applicantId, jobPostingId)
                 .orElseThrow(() -> new JobApplicationNotFoundException("지원서를 찾을 수 없습니다. jobPostingId=" + jobPostingId));
         return ApplicationDetailResponse.from(application);
+    }
+
+    @Transactional
+    public Long updateDraft(Long applicantId, Long applicationId, ApplicationUpdateRequest request) {
+        JobApplication application = findApplication(applicantId, applicationId);
+        validatePublishedAndAccepting(application.getJobPosting());
+        validateDraftForUpdate(application);
+
+        JobPosition jobPosition = findJobPosition(request.jobPositionId(), application.getJobPosting().getId());
+        application.updateDraft(jobPosition, jobPosition.getPositionName());
+
+        return application.getId();
+    }
+
+    @Transactional
+    public Long submit(Long applicantId, Long applicationId) {
+        JobApplication application = findApplication(applicantId, applicationId);
+        validatePublishedAndAccepting(application.getJobPosting());
+        validateDraftForSubmit(application);
+        validateApplicationFormConfig(application.getJobPosting());
+        validateSelectedJobPosition(application);
+        // Detailed required-section validation belongs to later Application section phases.
+        application.submit(LocalDateTime.now(clock));
+
+        return application.getId();
+    }
+
+    @Transactional
+    public Long withdraw(Long applicantId, Long applicationId) {
+        JobApplication application = findApplication(applicantId, applicationId);
+        validatePublishedAndAccepting(application.getJobPosting());
+        validateSubmittedForWithdraw(application);
+        application.withdraw(LocalDateTime.now(clock));
+
+        return application.getId();
+    }
+
+    private JobApplication findApplication(Long applicantId, Long applicationId) {
+        return jobApplicationRepository.findByIdAndApplicantId(applicationId, applicantId)
+                .orElseThrow(() -> new JobApplicationNotFoundException("지원서를 찾을 수 없습니다. id=" + applicationId));
     }
 
     private Applicant findApplicant(Long applicantId) {
@@ -80,20 +121,46 @@ public class JobApplicationService {
                 .orElseThrow(() -> new InvalidJobApplicationException("모집분야를 찾을 수 없습니다. jobPositionId=" + jobPositionId));
     }
 
-    private void validateCreatableJobPosting(JobPosting jobPosting) {
+    private void validatePublishedAndAccepting(JobPosting jobPosting) {
         if (jobPosting.getStatus() != JobPostingStatus.PUBLISHED) {
-            throw new InvalidJobApplicationException("게시 중인 채용공고에만 지원할 수 있습니다.");
+            throw new InvalidJobApplicationException("게시 중인 채용공고에만 지원서를 처리할 수 있습니다.");
         }
 
         LocalDateTime now = LocalDateTime.now(clock);
         if (now.isBefore(jobPosting.getReceptionStartDateTime()) || now.isAfter(jobPosting.getReceptionEndDateTime())) {
-            throw new InvalidJobApplicationException("접수기간 내에만 지원서를 생성할 수 있습니다.");
+            throw new InvalidJobApplicationException("접수기간 내에만 지원서를 처리할 수 있습니다.");
+        }
+    }
+
+    private void validateDraftForUpdate(JobApplication application) {
+        if (application.getStatus() != JobApplicationStatus.DRAFT) {
+            throw new InvalidJobApplicationException("임시저장 상태의 지원서만 수정할 수 있습니다.");
+        }
+    }
+
+    private void validateDraftForSubmit(JobApplication application) {
+        if (application.getStatus() != JobApplicationStatus.DRAFT) {
+            throw new InvalidJobApplicationException("임시저장 상태의 지원서만 제출할 수 있습니다.");
+        }
+    }
+
+    private void validateSubmittedForWithdraw(JobApplication application) {
+        if (application.getStatus() != JobApplicationStatus.SUBMITTED) {
+            throw new InvalidJobApplicationException("제출된 지원서만 철회할 수 있습니다.");
         }
     }
 
     private void validateApplicationFormConfig(JobPosting jobPosting) {
         if (jobPosting.getApplicationFormConfig() == null) {
             throw new InvalidJobApplicationException("지원서 항목 설정이 없는 채용공고에는 지원할 수 없습니다.");
+        }
+    }
+
+    private void validateSelectedJobPosition(JobApplication application) {
+        Long jobPositionId = application.getJobPosition().getId();
+        Long jobPostingId = application.getJobPosting().getId();
+        if (jobPositionRepository.findByIdAndJobPostingId(jobPositionId, jobPostingId).isEmpty()) {
+            throw new InvalidJobApplicationException("지원서의 모집분야가 채용공고에 속하지 않습니다.");
         }
     }
 

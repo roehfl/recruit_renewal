@@ -13,6 +13,8 @@ import java.util.Collection;
 
 public class CustomUserDetails implements UserDetails {
 
+    public static final String USER_TYPE_APPLICANT = "Applicant";
+    public static final String USER_TYPE_EMPLOYEE = "Employee";
 
     private String loginId;
     @Getter
@@ -35,9 +37,9 @@ public class CustomUserDetails implements UserDetails {
         customUserDetails.deptName = "";
         if(user instanceof Applicant a) {
             customUserDetails.password = a.getPassword();
-            customUserDetails.userType = "Applicant";
+            customUserDetails.userType = USER_TYPE_APPLICANT;
         } else {
-            customUserDetails.userType = "Employee";
+            customUserDetails.userType = USER_TYPE_EMPLOYEE;
         }
         customUserDetails.name = user.getName();
         return customUserDetails;
@@ -50,7 +52,7 @@ public class CustomUserDetails implements UserDetails {
         customUserDetails.authorities = authorities;
         customUserDetails.password = null;
         customUserDetails.name = name;
-        customUserDetails.userType = "Employee";
+        customUserDetails.userType = USER_TYPE_EMPLOYEE;
         return customUserDetails;
     }
 

@@ -1,5 +1,12 @@
 # Phase 03a-1 - Application Basic Create/Read
 
+## Phase 03a-2 반영 메모
+
+- Phase 03a-2에서 `updateDraft`, `submit`, `withdraw` command가 `JobApplicationService`에 추가되었다.
+- `JobApplication`에는 `updateDraft`, `submit`, `withdraw` 상태 변경 메서드가 추가되었다.
+- `ApplicationController`와 HTTP API는 아직 없으며 Phase 03a-3 범위로 유지한다.
+- 상세 섹션 필수값 검증, StageResult, 관리자 Application API는 아직 구현하지 않았다.
+
 ## Phase 이름
 
 Phase 03a-1: 지원자 Application 기본 생성/조회 기반
