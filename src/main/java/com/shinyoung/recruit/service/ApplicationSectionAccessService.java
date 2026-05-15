@@ -74,4 +74,18 @@ public class ApplicationSectionAccessService {
             throw new InvalidJobApplicationException("Military section is not enabled for this job posting.");
         }
     }
+
+    public void validateAwardEnabled(JobApplication application) {
+        ApplicationFormConfig config = application.getJobPosting().getApplicationFormConfig();
+        if (config == null || !config.isUseAward()) {
+            throw new InvalidJobApplicationException("Award section is not enabled for this job posting.");
+        }
+    }
+
+    public void validateGapPeriodEnabled(JobApplication application) {
+        ApplicationFormConfig config = application.getJobPosting().getApplicationFormConfig();
+        if (config == null || !config.isUseGapPeriod()) {
+            throw new InvalidJobApplicationException("Gap period section is not enabled for this job posting.");
+        }
+    }
 }

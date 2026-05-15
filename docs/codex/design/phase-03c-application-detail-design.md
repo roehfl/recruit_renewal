@@ -1,5 +1,19 @@
 # Phase 03c Application Detail Design
 
+## Phase 03c-5 Implementation Note
+
+- Phase 03c-5에서 Award + GapPeriod vertical slice를 구현했다.
+- 구현 클래스는 `ApplicationAward`, `ApplicationGapPeriod`, `ApplicationAwardService`, `ApplicationGapPeriodService`, `ApplicationAwardController`, `ApplicationGapPeriodController`이다.
+- `GapType`은 `EDUCATION`, `CAREER`, `OTHER`로 시작했다.
+- 지원자 API는 `GET /applications/{applicationId}/awards`, `POST /applications/{applicationId}/awards`, `GET /applications/{applicationId}/gap-periods`, `POST /applications/{applicationId}/gap-periods`이다.
+- replace 저장은 기존 Award/GapPeriod row를 `applicationId` 기준 명시 삭제하고 새 row를 저장하는 방식이다.
+- 저장은 `DRAFT`, `JobPosting.status=PUBLISHED`, 접수기간 내에서만 가능하다.
+- Award 저장은 `ApplicationFormConfig.useAward=true`, GapPeriod 저장은 `ApplicationFormConfig.useGapPeriod=true`일 때만 가능하다.
+- GapPeriod는 `startDate <= endDate`를 검증하며, overlap 검증은 후속 정책 확정 전까지 강제하지 않는다.
+- description은 DTO와 Service 직접 호출 모두에서 2000자 이하로 검증한다.
+- `ApplicationSectionAccessService`는 `validateAwardEnabled`, `validateGapPeriodEnabled`까지 확장되었다.
+- 이번 Phase에서 Attachment, StageResult, 관리자 상세 섹션 API, submit 통합 검증은 구현하지 않았다.
+
 ## Phase 03c-4R Implementation Note
 
 - Phase 03c-4R에서 상세 섹션 공통 접근/수정 가능 검증 helper `ApplicationSectionAccessService`를 추가했다.
@@ -183,8 +197,8 @@ Phase 03c-0의 목적은 Phase 03a/03b에서 구현된 `JobApplication` 루트�
 | Certificate | `ApplicationCertificate` | `application_certificate` | N:1 `JobApplication` | `certificateName`, `issuingOrganization`, `acquiredDate`, `certificateNumber`, `expiredDate`, `scoreOrGrade`, `sortOrder` | `certificateName`, `issuingOrganization`, `acquiredDate`, `sortOrder` | `sortOrder ASC, id ASC` | 기본 미사용 | 자격번호는 마스킹 또는 암호화 검토 | 포함 | 구현 완료 |
 | Language | `ApplicationLanguage` | `application_language` | N:1 `JobApplication` | `languageName`, `testName`, `score`, `grade`, `examDate`, `expiredDate`, `issuingOrganization`, `sortOrder` | `languageName`, `testName`, `examDate`, `sortOrder` | `sortOrder ASC, id ASC` | 기본 미사용 | 점수/등급은 민감도가 낮으나 관리자 노출 범위 제한 | 포함 | 구현 완료 |
 | Military | `ApplicationMilitary` | `application_military` | 0..1 `JobApplication` | `militarySubjectType`, `serviceType`, `militaryBranch`, `rank`, `serviceStartDate`, `serviceEndDate`, `exemptionReason` | `militarySubjectType` | 단건 | 기본 미사용 | 면제 사유는 민감정보. 암호화/마스킹 우선 검토 | 포함 | 구현 완료 |
-| Award | `ApplicationAward` | `application_award` | N:1 `JobApplication` | `awardName`, `awardingOrganization`, `awardDate`, `description`, `sortOrder` | `awardName`, `awardingOrganization`, `awardDate`, `sortOrder` | `awardDate DESC, id ASC` 또는 `sortOrder ASC` | 기본 미사용 | 설명에 개인정보가 들어갈 수 있어 주의 | 포함 | 5 |
-| GapPeriod | `ApplicationGapPeriod` | `application_gap_period` | N:1 `JobApplication` | `startDate`, `endDate`, `gapType`, `reason`, `description`, `sortOrder` | `startDate`, `endDate`, `gapType`, `reason`, `sortOrder` | `startDate ASC, id ASC` | 기본 미사용 | 사유/설명은 민감정보 가능. 관리자 노출 주의 | 포함 | 5 |
+| Award | `ApplicationAward` | `application_award` | N:1 `JobApplication` | `awardName`, `awardingOrganization`, `awardDate`, `description`, `sortOrder` | `awardName`, `awardingOrganization`, `awardDate`, `sortOrder` | `sortOrder ASC, id ASC` | 기본 미사용 | 설명에 개인정보가 들어갈 수 있어 주의 | 포함 | 구현 완료 |
+| GapPeriod | `ApplicationGapPeriod` | `application_gap_period` | N:1 `JobApplication` | `startDate`, `endDate`, `gapType`, `reason`, `description`, `sortOrder` | `startDate`, `endDate`, `gapType`, `reason`, `sortOrder` | `sortOrder ASC, id ASC` | 기본 미사용 | 사유/설명은 민감정보 가능. 관리자 노출 주의 | 포함 | 구현 완료 |
 | Attachment | `ApplicationAttachment` | `application_attachment` | N:1 `JobApplication` | `originalFileName`, `storedFileName`, `storagePath`, `contentType`, `fileSize`, `attachmentType`, `sectionType`, `sectionRecordId`, `sortOrder` | `originalFileName`, `storedFileName`, `storagePath`, `contentType`, `fileSize`, `attachmentType` | `attachmentType ASC, sortOrder ASC, id ASC` | 기본 미사용 | 파일명/경로는 민감정보. 원본 파일명 마스킹, 저장 경로 직접 노출 금지 | 제한 포함 | 6 |
 
 ### Section Notes
@@ -491,7 +505,7 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 | Phase 03c-3 | Certificate + Language vertical slice 구현 완료 | 다른 섹션, submit 통합 검증 전체 | 취득일/응시일/만료일 검증, 정렬, config 연동 |
 | Phase 03c-4 | Military vertical slice 구현 완료 | Award, GapPeriod, Attachment | 단건 병역 upsert, `useMilitary=true` submit 필수 1건 정책, 민감정보 응답 정책 |
 | Phase 03c-4R | 상세 섹션 공통 접근/수정 가능 helper 구현 완료 | SectionType enum 일반화, submit validator | 본인 지원서 조회, DRAFT/PUBLISHED/접수기간, config enabled 검증 |
-| Phase 03c-5 | Award + GapPeriod | Attachment, submit 통합 검증 전체 | 수상/공백기간 기간 검증, 정렬, config 연동 |
+| Phase 03c-5 | Award + GapPeriod vertical slice 구현 완료 | Attachment, submit 통합 검증 전체 | 수상/공백기간 기간 검증, 정렬, config 연동 |
 | Phase 03c-6 | Attachment metadata | 실제 파일 업로드/다운로드 저장소 연동 | metadata 저장/조회, 저장 경로 비노출, attachmentType 검증 |
 | Phase 03c-7 | `ApplicationSubmitValidator` 통합 | 관리자 aggregate 상세 | `submit()`에서 config 기반 섹션 필수 검증 실패/성공 |
 | Phase 03c-8 | 관리자 상세 섹션 조회 API 확장 | StageResult | 관리자 섹션별 조회, 마스킹, 권한 보완 TODO |
@@ -510,6 +524,4 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 
 ## 14. Recommended Next Phase
 
-다음 기능 구현은 Phase 03c-5: Award + GapPeriod vertical slice를 추천한다. Award/GapPeriod는 다건 replace 구조라 Certificate/Language와 유사하고, Attachment와 실제 파일 업로드보다 구현 리스크가 낮다.
-
-Phase 03c-5 구현 시에는 Phase 03c-4R에서 추가한 `ApplicationSectionAccessService`를 재사용한다.
+다음 기능 구현은 Phase 03c-6: Attachment metadata vertical slice를 추천한다. 일반 상세 섹션은 Education, Career, Certificate, Language, Military, Award, GapPeriod까지 구현되었으므로 `ApplicationSubmitValidator`로 바로 갈 수도 있지만, Attachment metadata가 아직 비어 있으면 submit 검증 범위가 다시 흔들릴 수 있다. 실제 파일 업로드/다운로드 저장소 연동은 분리하고, 우선 `JobApplication` 하위 첨부 metadata 저장/조회와 저장 경로 비노출 정책을 고정한 뒤 Phase 03c-7에서 submit validator를 통합하는 것이 안전하다.

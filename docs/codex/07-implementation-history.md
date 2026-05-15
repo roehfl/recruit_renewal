@@ -1,5 +1,45 @@
 # 07. Implementation History
 
+## Phase 03c-5 - Application Award + GapPeriod
+
+- 작업일: 2026-05-15
+- 목적: `JobApplication` 하위 수상/포상사항과 공백기간을 지원자가 조회/replace 저장할 수 있게 구현했다.
+- 핵심 구현:
+  - `GapType` enum 추가
+  - `ApplicationAward`, `ApplicationGapPeriod` Entity 추가
+  - `ApplicationAwardRepository`, `ApplicationGapPeriodRepository` 추가
+  - `ApplicationSectionAccessService`에 `validateAwardEnabled`, `validateGapPeriodEnabled` 추가
+  - `ApplicationAwardService`, `ApplicationGapPeriodService`에서 본인 지원서, DRAFT 상태, PUBLISHED 공고, 접수기간, `useAward`/`useGapPeriod` 검증 구현
+  - Award/GapPeriod row는 applicationId 기준 명시 삭제 후 새 row 저장
+  - GapPeriod `startDate <= endDate`, description 2000자 제한, sortOrder 중복 검증 구현
+  - `ApplicationAwardController`, `ApplicationGapPeriodController`로 지원자 수상/공백기간 조회/저장 API 추가
+- 주요 클래스:
+  - `GapType`
+  - `ApplicationAward`
+  - `ApplicationGapPeriod`
+  - `ApplicationAwardService`
+  - `ApplicationGapPeriodService`
+  - `ApplicationAwardController`
+  - `ApplicationGapPeriodController`
+  - `AwardReplaceRequest`, `AwardRequest`, `GapPeriodReplaceRequest`, `GapPeriodRequest`
+  - `AwardResponse`, `GapPeriodResponse`
+  - `ApplicationAwardServiceTest`, `ApplicationAwardControllerTest`
+  - `ApplicationGapPeriodServiceTest`, `ApplicationGapPeriodControllerTest`
+- API:
+  - `GET /applications/{applicationId}/awards`
+  - `POST /applications/{applicationId}/awards`
+  - `GET /applications/{applicationId}/gap-periods`
+  - `POST /applications/{applicationId}/gap-periods`
+- 테스트 결과:
+  - `ApplicationAwardServiceTest`, `ApplicationAwardControllerTest`, `ApplicationGapPeriodServiceTest`, `ApplicationGapPeriodControllerTest` 성공
+  - Education/Career/Certificate/Language/Military 상세 섹션 회귀 테스트 성공
+  - `./gradlew.bat clean test` 성공
+- 남은 이슈:
+  - `ApplicationSubmitValidator`는 아직 구현하지 않았다.
+  - GapPeriod overlap 검증은 정책 확정 전까지 보류한다.
+  - 관리자 상세 섹션 API와 수상/공백기간 마스킹 정책은 후속 Phase에서 확정한다.
+- 다음 작업: Phase 03c-6 Attachment metadata vertical slice를 검토한다.
+
 ## Phase 03c-4R - Application Section Access Helper
 
 - 작업일: 2026-05-15

@@ -19,18 +19,22 @@ Education, Career, Certificate, Language, Military 상세 섹션 Service에 반�
   - `validateCertificateEnabled(JobApplication application)`
   - `validateLanguageEnabled(JobApplication application)`
   - `validateMilitaryEnabled(JobApplication application)`
+  - `validateAwardEnabled(JobApplication application)`
+  - `validateGapPeriodEnabled(JobApplication application)`
 - 기존 상세 섹션 Service에서 중복 검증 제거
 - 기존 API path, DTO, 저장 정책, 응답 정책은 유지
 
 ## 미구현 범위
 
-- Award, GapPeriod, Attachment
+- Attachment
 - StageResult
 - `ApplicationSubmitValidator`
 - `SectionType` enum 기반 일반화
 - 관리자 상세 섹션 API
 - SecurityConfig 권한 정책 변경
 - `PUT`, HTTP `DELETE`
+
+> 참고: Phase 03c-4R 작성 당시에는 Award, GapPeriod, Attachment 기능 자체가 미구현이었다. 이후 Phase 03c-5에서 Award/GapPeriod vertical slice가 구현되었고, 이 문서는 현재 상태 기준으로 미구현 범위를 Attachment 중심으로 정리한다.
 
 ## 변경 파일 목록
 
@@ -71,7 +75,7 @@ Education, Career, Certificate, Language, Military 상세 섹션 Service에 반�
 
 | 구분 | 패키지 | 클래스 | 역할 | 주요 필드/메서드 | 연관 클래스 | 비고 |
 |---|---|---|---|---|---|---|
-| Service | `com.shinyoung.recruit.service` | `ApplicationSectionAccessService` | 상세 섹션 공통 접근/쓰기 검증 helper | `findOwnedApplication`, `validateWritable`, `validateEducationEnabled`, `validateCareerEnabled`, `validateCertificateEnabled`, `validateLanguageEnabled`, `validateMilitaryEnabled` | `JobApplicationRepository`, `JobApplication`, `ApplicationFormConfig` | `SectionType` enum 없이 명시 메서드로 시작 |
+| Service | `com.shinyoung.recruit.service` | `ApplicationSectionAccessService` | 상세 섹션 공통 접근/쓰기 검증 helper | `findOwnedApplication`, `validateWritable`, `validateEducationEnabled`, `validateCareerEnabled`, `validateCertificateEnabled`, `validateLanguageEnabled`, `validateMilitaryEnabled`, `validateAwardEnabled`, `validateGapPeriodEnabled` | `JobApplicationRepository`, `JobApplication`, `ApplicationFormConfig` | `SectionType` enum 없이 명시 메서드로 시작 |
 | Service | `com.shinyoung.recruit.service` | `ApplicationEducationService` | Education 조회/replace 저장 | `sectionAccessService` 사용 | `ApplicationSectionAccessService` | 저장/검증 정책은 유지 |
 | Service | `com.shinyoung.recruit.service` | `ApplicationCareerService` | Career 조회/replace 저장 | `sectionAccessService` 사용 | `ApplicationSectionAccessService` | 저장/검증 정책은 유지 |
 | Service | `com.shinyoung.recruit.service` | `ApplicationCertificateService` | Certificate 조회/replace 저장 | `sectionAccessService` 사용 | `ApplicationSectionAccessService` | 저장/검증 정책은 유지 |
@@ -94,6 +98,10 @@ Education, Career, Certificate, Language, Military 상세 섹션 Service에 반�
 - `POST /applications/{applicationId}/languages`
 - `GET /applications/{applicationId}/military`
 - `POST /applications/{applicationId}/military`
+- `GET /applications/{applicationId}/awards`
+- `POST /applications/{applicationId}/awards`
+- `GET /applications/{applicationId}/gap-periods`
+- `POST /applications/{applicationId}/gap-periods`
 
 ## Entity 관계 요약
 
@@ -143,8 +151,8 @@ $env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat clean test
 - `validateWritable`의 실패 메시지는 공통 메시지로 통일했다. API 계약은 예외 타입과 HTTP status 중심으로 유지한다.
 - `ApplicationSubmitValidator`는 아직 구현하지 않았다.
 - submit 시 병역 필수 정책은 Phase 03c-7에서 구현해야 한다.
-- Award/GapPeriod 구현 시 이번 helper를 재사용한다.
+- Award/GapPeriod 구현에서 이번 helper를 재사용했고, `validateAwardEnabled`, `validateGapPeriodEnabled`를 추가했다.
 
 ## 다음 Phase 추천
 
-Phase 03c-5에서 Award + GapPeriod vertical slice를 구현하는 것을 추천한다.
+Phase 03c-6에서 Attachment metadata vertical slice를 구현하는 것을 추천한다. 일반 상세 섹션은 Education, Career, Certificate, Language, Military, Award, GapPeriod까지 구현되었으므로 submit validator로 바로 갈 수도 있지만, 첨부 metadata를 먼저 고정한 뒤 Phase 03c-7에서 `ApplicationSubmitValidator`를 통합하는 순서가 더 자연스럽다.

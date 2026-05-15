@@ -1,5 +1,18 @@
 # Phase 03 Application Design
 
+## Phase 03c-5 구현 반영 메모
+
+- Phase 03c-5에서 `JobApplication` 하위 수상/포상사항과 공백기간 vertical slice를 구현했다.
+- 추가 도메인은 `ApplicationAward`, `ApplicationGapPeriod`이며, `JobApplication`에는 Award/GapPeriod 컬렉션을 추가하지 않았다.
+- `GapType`은 `EDUCATION`, `CAREER`, `OTHER`로 시작한다.
+- 지원자 API는 `GET /applications/{applicationId}/awards`, `POST /applications/{applicationId}/awards`, `GET /applications/{applicationId}/gap-periods`, `POST /applications/{applicationId}/gap-periods`이다.
+- 저장은 본인 지원서, `DRAFT`, `JobPosting.status=PUBLISHED`, 접수기간 내 조건을 모두 만족해야 한다.
+- Award 저장은 `ApplicationFormConfig.useAward=true`, GapPeriod 저장은 `ApplicationFormConfig.useGapPeriod=true`일 때만 가능하다.
+- replace 저장은 기존 row를 `applicationId` 기준 명시 삭제한 뒤 새 row를 저장한다.
+- GapPeriod는 `startDate <= endDate`를 검증하며, overlap 검증은 아직 하지 않는다.
+- `ApplicationSectionAccessService`는 `validateAwardEnabled`, `validateGapPeriodEnabled`까지 확장되었다.
+- submit 통합 검증과 관리자 상세 섹션 API는 아직 연결하지 않았다.
+
 ## Phase 03c-4R 구현 반영 메모
 
 - Phase 03c-4R에서 상세 섹션 공통 접근/수정 가능 검증 helper `ApplicationSectionAccessService`를 추가했다.
