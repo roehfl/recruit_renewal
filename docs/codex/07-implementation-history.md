@@ -1,5 +1,41 @@
 # 07. Implementation History
 
+## Phase 03b-1 - Admin Application Read
+
+- 작업일: 2026-05-15
+- 목적: Phase 03a에서 생성된 `JobApplication` 루트를 관리자 화면에서 목록/상세로 조회할 수 있는 최소 API를 구현했다.
+- 핵심 구현:
+  - `AdminApplicationController` 추가
+  - 관리자 전체/공고별 Application 목록 조회 API 추가
+  - 관리자 Application 상세 조회 API 추가
+  - 관리자 전용 `AdminApplicationSummaryResponse`, `AdminApplicationDetailResponse` 추가
+  - `JobApplicationRepository` 관리자 조회 쿼리와 to-one `@EntityGraph` 추가
+  - `JobApplicationService` 관리자 조회, status 파싱, page/size 검증 추가
+  - 리뷰 반영으로 `AdminApplicationSearchCondition`을 `dto.condition`으로 이동
+  - status 필터를 `trim + uppercase` 기준으로 정규화
+  - `JobApplicationServiceTest`, `AdminApplicationControllerTest` 보강
+- 주요 클래스:
+  - `AdminApplicationController`
+  - `AdminApplicationSearchCondition`
+  - `AdminApplicationSummaryResponse`
+  - `AdminApplicationDetailResponse`
+  - `JobApplicationRepository`
+  - `JobApplicationService`
+  - `AdminApplicationControllerTest`
+- API:
+  - `GET /admin/applications`
+  - `GET /admin/applications/{applicationId}`
+  - `GET /admin/job-postings/{jobPostingId}/applications`
+- 테스트 결과:
+  - `JobApplicationServiceTest` 성공
+  - `AdminApplicationControllerTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - 실제 관리자 권한 검증은 SecurityConfig에 추가하지 않았다. 운영 전 `/admin/applications/**`는 `ROLE_ADMIN` 또는 채용담당자 권한으로 보호해야 한다.
+  - 관리자 응답은 Application 루트 정보만 포함하며 상세 섹션/StageResult는 아직 없다.
+- 다음 작업:
+  - 관리자 목록 추가 필터 또는 Application 상세 섹션 구현 범위를 결정한다.
+
 ## Phase 03a-3 - Application API
 
 - 작업일: 2026-05-15

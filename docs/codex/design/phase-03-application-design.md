@@ -1,5 +1,19 @@
 # Phase 03 Application Design
 
+## Phase 03b-1 구현 반영 메모
+
+- Phase 03b-1에서 관리자 Application 루트 목록/상세 조회 API를 구현했다.
+- 추가 API는 `GET /admin/applications`, `GET /admin/applications/{applicationId}`, `GET /admin/job-postings/{jobPostingId}/applications`이다.
+- 관리자 응답 DTO는 지원자용 `ApplicationDetailResponse`를 재사용하지 않고 `AdminApplicationSummaryResponse`, `AdminApplicationDetailResponse`로 분리했다.
+- 목록 조회는 `jobPostingId`, `jobPositionId`, `status` 필터와 `page`, `size` 페이징을 지원한다.
+- `size` 최대값은 100이며 기본 정렬은 `createdAt DESC, id DESC`이다.
+- 관리자 목록/상세 조회는 `Applicant`, `JobPosting`, `JobPosition` to-one 연관만 `@EntityGraph`로 조회하며 collection fetch는 사용하지 않는다.
+- 관리자 조회 조건 객체 `AdminApplicationSearchCondition`은 Controller request DTO가 아니므로 `dto.condition`에 둔다.
+- 관리자 status 필터는 앞뒤 공백을 제거하고 대소문자를 구분하지 않도록 정규화한다.
+- 응답에는 Application 루트 snapshot과 상태/시각 정보만 포함하고, CI, ciHash, password, phoneNumber, address, email, 암호화 원문 개인정보는 포함하지 않는다.
+- 관리자 수정/삭제 command, StageResult, 상세 섹션 도메인은 계속 보류 상태다.
+- 실제 관리자 권한 검증은 아직 SecurityConfig에 추가하지 않았으며, 운영 전 `/admin/applications/**`를 관리자 또는 채용담당자 권한으로 보호해야 한다.
+
 ## Phase 03a-3 구현 반영 메모
 
 - Phase 03a-3에서 `ApplicationController`가 추가되어 지원자 Application 생성/조회/수정/제출/철회 HTTP API가 연결되었다.

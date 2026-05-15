@@ -14,7 +14,10 @@ import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.ApplicationUpdateRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
+import com.shinyoung.recruit.dto.response.AdminApplicationDetailResponse;
+import com.shinyoung.recruit.dto.response.AdminApplicationSummaryResponse;
 import com.shinyoung.recruit.dto.response.ApplicationDetailResponse;
+import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
@@ -625,6 +628,153 @@ class JobApplicationServiceTest {
 
         assertThatThrownBy(() -> jobApplicationService.withdraw(closedApplicant.getId(), closedApplicationId))
                 .isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
+    void admin_get_applications_success() {
+        Applicant firstApplicant = createApplicant("admin-list-first", "Admin List First");
+        Applicant secondApplicant = createApplicant("admin-list-second", "Admin List Second");
+        Long jobPostingId = createPublishedJobPosting("Admin List Posting");
+        Long firstApplicationId = jobApplicationService.create(
+                firstApplicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
+        );
+        Long secondApplicationId = jobApplicationService.create(
+                secondApplicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
+        );
+
+        PageResponse<AdminApplicationSummaryResponse> response = jobApplicationService.getApplicationsForAdmin(
+                null,
+                null,
+                null,
+                0,
+                20
+        );
+
+        assertThat(response.content()).extracting(AdminApplicationSummaryResponse::applicationId)
+                .contains(firstApplicationId, secondApplicationId);
+        assertThat(response.totalElements()).isGreaterThanOrEqualTo(2);
+    }
+
+    @Test
+    void admin_get_applications_filters_by_status_job_posting_and_position() {
+        Applicant draftApplicant = createApplicant("admin-filter-draft", "Admin Filter Draft");
+        Applicant submittedApplicant = createApplicant("admin-filter-submitted", "Admin Filter Submitted");
+        Long jobPostingId = createPublishedJobPosting("Admin Filter Posting");
+        List<Long> jobPositionIds = jobPositionIds(jobPostingId);
+        Long draftApplicationId = jobApplicationService.create(
+                draftApplicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, jobPositionIds.get(0))
+        );
+        Long submittedApplicationId = jobApplicationService.create(
+                submittedApplicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, jobPositionIds.get(1))
+        );
+        jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
+
+        PageResponse<AdminApplicationSummaryResponse> statusResponse = jobApplicationService.getApplicationsForAdmin(
+                null,
+                null,
+                " submitted ",
+                0,
+                20
+        );
+        PageResponse<AdminApplicationSummaryResponse> postingResponse = jobApplicationService.getApplicationsForAdmin(
+                jobPostingId,
+                null,
+                null,
+                0,
+                20
+        );
+        PageResponse<AdminApplicationSummaryResponse> positionResponse = jobApplicationService.getApplicationsForAdmin(
+                null,
+                jobPositionIds.get(0),
+                null,
+                0,
+                20
+        );
+
+        assertThat(statusResponse.content()).extracting(AdminApplicationSummaryResponse::applicationId)
+                .contains(submittedApplicationId)
+                .doesNotContain(draftApplicationId);
+        assertThat(postingResponse.content()).extracting(AdminApplicationSummaryResponse::applicationId)
+                .contains(draftApplicationId, submittedApplicationId);
+        assertThat(positionResponse.content()).extracting(AdminApplicationSummaryResponse::applicationId)
+                .contains(draftApplicationId)
+                .doesNotContain(submittedApplicationId);
+    }
+
+    @Test
+    void admin_get_applications_by_job_posting_success() {
+        Applicant firstApplicant = createApplicant("admin-posting-first", "Admin Posting First");
+        Applicant secondApplicant = createApplicant("admin-posting-second", "Admin Posting Second");
+        Applicant otherApplicant = createApplicant("admin-posting-other", "Admin Posting Other");
+        Long jobPostingId = createPublishedJobPosting("Admin Posting Applications");
+        Long otherJobPostingId = createPublishedJobPosting("Admin Posting Other");
+        Long firstApplicationId = jobApplicationService.create(
+                firstApplicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
+        );
+        Long secondApplicationId = jobApplicationService.create(
+                secondApplicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
+        );
+        Long otherApplicationId = jobApplicationService.create(
+                otherApplicant.getId(),
+                new ApplicationCreateRequest(otherJobPostingId, firstJobPositionId(otherJobPostingId))
+        );
+
+        PageResponse<AdminApplicationSummaryResponse> response = jobApplicationService.getApplicationsByJobPostingForAdmin(
+                jobPostingId,
+                null,
+                null,
+                0,
+                20
+        );
+
+        assertThat(response.content()).extracting(AdminApplicationSummaryResponse::applicationId)
+                .contains(firstApplicationId, secondApplicationId)
+                .doesNotContain(otherApplicationId);
+    }
+
+    @Test
+    void admin_get_application_detail_success_and_not_found() {
+        Applicant applicant = createApplicant("admin-detail", "Admin Detail");
+        Long jobPostingId = createPublishedJobPosting("Admin Detail Posting");
+        Long applicationId = jobApplicationService.create(
+                applicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
+        );
+
+        AdminApplicationDetailResponse detail = jobApplicationService.getApplicationForAdmin(applicationId);
+
+        assertThat(detail.applicationId()).isEqualTo(applicationId);
+        assertThat(detail.applicantId()).isEqualTo(applicant.getId());
+        assertThat(detail.applicantNameSnapshot()).isEqualTo("Admin Detail");
+        assertThat(detail.jobPostingTitleSnapshot()).isEqualTo("Admin Detail Posting");
+        assertThatThrownBy(() -> jobApplicationService.getApplicationForAdmin(99999L))
+                .isInstanceOf(JobApplicationNotFoundException.class);
+    }
+
+    @Test
+    void admin_get_applications_fails_when_paging_or_status_is_invalid() {
+        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(null, null, null, -1, 20))
+                .isInstanceOf(InvalidJobApplicationException.class);
+        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(null, null, null, 0, 0))
+                .isInstanceOf(InvalidJobApplicationException.class);
+        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(null, null, null, 0, 101))
+                .isInstanceOf(InvalidJobApplicationException.class);
+        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(null, null, "UNKNOWN", 0, 20))
+                .isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
+    void admin_get_applications_by_job_posting_fails_when_job_posting_does_not_exist() {
+        assertThatThrownBy(() -> jobApplicationService.getApplicationsByJobPostingForAdmin(99999L, null, null, 0, 20))
+                .isInstanceOf(JobPostingNotFoundException.class);
+        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(99999L, null, null, 0, 20))
+                .isInstanceOf(JobPostingNotFoundException.class);
     }
 
     private Applicant createApplicant(String loginId, String applicantName) {

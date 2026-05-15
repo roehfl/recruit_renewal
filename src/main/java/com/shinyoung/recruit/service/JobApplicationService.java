@@ -8,25 +8,34 @@ import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPositionRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.dto.condition.AdminApplicationSearchCondition;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationUpdateRequest;
+import com.shinyoung.recruit.dto.response.AdminApplicationDetailResponse;
+import com.shinyoung.recruit.dto.response.AdminApplicationSummaryResponse;
 import com.shinyoung.recruit.dto.response.ApplicationDetailResponse;
+import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class JobApplicationService {
+
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final JobApplicationRepository jobApplicationRepository;
     private final ApplicantRepository applicantRepository;
@@ -101,6 +110,60 @@ public class JobApplicationService {
         return application.getId();
     }
 
+    public PageResponse<AdminApplicationSummaryResponse> getApplicationsForAdmin(
+            Long jobPostingId,
+            Long jobPositionId,
+            String status,
+            int page,
+            int size
+    ) {
+        validatePageRequest(page, size);
+        if (jobPostingId != null) {
+            validateJobPostingExists(jobPostingId);
+        }
+        AdminApplicationSearchCondition condition = new AdminApplicationSearchCondition(
+                jobPostingId,
+                jobPositionId,
+                parseStatus(status)
+        );
+
+        return PageResponse.from(jobApplicationRepository.searchForAdmin(
+                condition.jobPostingId(),
+                condition.jobPositionId(),
+                condition.status(),
+                createPageRequest(page, size)
+        ).map(AdminApplicationSummaryResponse::from));
+    }
+
+    public AdminApplicationDetailResponse getApplicationForAdmin(Long applicationId) {
+        JobApplication application = jobApplicationRepository.findAdminDetailById(applicationId)
+                .orElseThrow(() -> new JobApplicationNotFoundException("지원서를 찾을 수 없습니다. id=" + applicationId));
+        return AdminApplicationDetailResponse.from(application);
+    }
+
+    public PageResponse<AdminApplicationSummaryResponse> getApplicationsByJobPostingForAdmin(
+            Long jobPostingId,
+            Long jobPositionId,
+            String status,
+            int page,
+            int size
+    ) {
+        validatePageRequest(page, size);
+        validateJobPostingExists(jobPostingId);
+        AdminApplicationSearchCondition condition = new AdminApplicationSearchCondition(
+                jobPostingId,
+                jobPositionId,
+                parseStatus(status)
+        );
+
+        return PageResponse.from(jobApplicationRepository.searchByJobPostingForAdmin(
+                condition.jobPostingId(),
+                condition.jobPositionId(),
+                condition.status(),
+                createPageRequest(page, size)
+        ).map(AdminApplicationSummaryResponse::from));
+    }
+
     private JobApplication findApplication(Long applicantId, Long applicationId) {
         return jobApplicationRepository.findByIdAndApplicantId(applicationId, applicantId)
                 .orElseThrow(() -> new JobApplicationNotFoundException("지원서를 찾을 수 없습니다. id=" + applicationId));
@@ -167,6 +230,44 @@ public class JobApplicationService {
     private void validateNotDuplicated(Long applicantId, Long jobPostingId) {
         if (jobApplicationRepository.existsByApplicantIdAndJobPostingId(applicantId, jobPostingId)) {
             throw new InvalidJobApplicationException("이미 해당 채용공고에 지원서가 존재합니다.");
+        }
+    }
+
+    private JobApplicationStatus parseStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+
+        try {
+            return JobApplicationStatus.valueOf(status.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new InvalidJobApplicationException("지원서 상태 값이 올바르지 않습니다. status=" + status);
+        }
+    }
+
+    private PageRequest createPageRequest(int page, int size) {
+        return PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"))
+        );
+    }
+
+    private void validatePageRequest(int page, int size) {
+        if (page < 0) {
+            throw new InvalidJobApplicationException("page는 0 이상이어야 합니다.");
+        }
+        if (size <= 0) {
+            throw new InvalidJobApplicationException("size는 1 이상이어야 합니다.");
+        }
+        if (size > MAX_PAGE_SIZE) {
+            throw new InvalidJobApplicationException("size는 100 이하이어야 합니다.");
+        }
+    }
+
+    private void validateJobPostingExists(Long jobPostingId) {
+        if (!jobPostingRepository.existsById(jobPostingId)) {
+            throw new JobPostingNotFoundException("채용공고를 찾을 수 없습니다. id=" + jobPostingId);
         }
     }
 
