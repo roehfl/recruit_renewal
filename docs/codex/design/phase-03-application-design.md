@@ -1,5 +1,29 @@
 # Phase 03 Application Design
 
+## Phase 03c-4R 구현 반영 메모
+
+- Phase 03c-4R에서 상세 섹션 공통 접근/수정 가능 검증 helper `ApplicationSectionAccessService`를 추가했다.
+- helper 범위는 `findOwnedApplication`, `validateWritable`, `validateEducationEnabled`, `validateCareerEnabled`, `validateCertificateEnabled`, `validateLanguageEnabled`, `validateMilitaryEnabled`로 제한했다.
+- `SectionType` enum 기반 일반화는 도입하지 않았다.
+- Education, Career, Certificate, Language, Military Service는 본인 지원서 조회, DRAFT/PUBLISHED/접수기간, config enabled 검증을 helper에 위임한다.
+- 기존 상세 섹션 API path, 저장 정책, 응답 DTO, submit validator 보류 정책은 변경하지 않았다.
+- 다음 Award + GapPeriod 구현은 이 helper를 재사용하는 방향으로 진행한다.
+
+## Phase 03c-4 구현 반영 메모
+
+- Phase 03c-4에서 `JobApplication` 하위 병역사항 vertical slice를 구현했다.
+- 추가 도메인은 `ApplicationMilitary`이며, `JobApplication`에는 Military 필드를 추가하지 않았다.
+- 병역은 다건 목록이 아니라 `job_application_id` unique를 가진 단건 record로 구현했다.
+- 병역 저장은 `ApplicationFormConfig.useMilitary=true`일 때만 허용한다.
+- 지원자 API는 `GET /applications/{applicationId}/military`, `POST /applications/{applicationId}/military`이다.
+- 조회는 본인 지원서라면 `DRAFT`, `SUBMITTED`, `WITHDRAWN` 모두 허용하며, 아직 저장 전이면 `data=null`로 응답한다.
+- 저장은 `DRAFT`, `JobPosting.status=PUBLISHED`, 접수기간 내에서만 허용한다.
+- `MilitarySubjectType`은 `SUBJECT`, `NOT_SUBJECT`, `COMPLETED`, `EXEMPTED`, `NOT_APPLICABLE`로 시작한다.
+- `SUBJECT`, `NOT_SUBJECT`, `NOT_APPLICABLE`은 상세 병역 필드를 허용하지 않는다.
+- `COMPLETED`는 복무 상세 필드를 허용하되 면제 사유는 허용하지 않고, `EXEMPTED`는 면제 사유를 허용하되 복무 상세 필드는 허용하지 않는다.
+- submit 통합 검증은 아직 연결하지 않았고, `useMilitary=true`이면 `ApplicationMilitary` 1건 필수 검증은 Phase 03c-7에서 구현한다.
+- Education/Career/Certificate/Language/Military에서 반복되던 지원서 소유자, DRAFT 수정 가능, PUBLISHED 공고, 접수기간, config enabled 검증은 Phase 03c-4R에서 `ApplicationSectionAccessService`로 최소 추출했다.
+
 ## Phase 03c-3 구현 반영 메모
 
 - Phase 03c-3에서 `JobApplication` 하위 자격사항/어학사항 vertical slice를 구현했다.

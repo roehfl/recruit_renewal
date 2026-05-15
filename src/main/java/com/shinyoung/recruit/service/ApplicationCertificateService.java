@@ -1,23 +1,16 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.ApplicationCertificate;
-import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
-import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.dto.request.CertificateReplaceRequest;
 import com.shinyoung.recruit.dto.request.CertificateRequest;
 import com.shinyoung.recruit.dto.response.CertificateResponse;
-import com.shinyoung.recruit.enumeration.JobApplicationStatus;
-import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
-import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Clock;
-import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -26,13 +19,12 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ApplicationCertificateService {
 
-    private final JobApplicationRepository jobApplicationRepository;
+    private final ApplicationSectionAccessService sectionAccessService;
     private final ApplicationCertificateRepository certificateRepository;
-    private final Clock clock;
 
     @Transactional(readOnly = true)
     public List<CertificateResponse> getCertificates(Long applicantId, Long applicationId) {
-        findApplication(applicantId, applicationId);
+        sectionAccessService.findOwnedApplication(applicantId, applicationId);
         return getCertificateResponses(applicationId);
     }
 
@@ -42,8 +34,9 @@ public class ApplicationCertificateService {
             Long applicationId,
             CertificateReplaceRequest request
     ) {
-        JobApplication application = findApplication(applicantId, applicationId);
-        validateCertificateWritable(application);
+        JobApplication application = sectionAccessService.findOwnedApplication(applicantId, applicationId);
+        sectionAccessService.validateWritable(application);
+        sectionAccessService.validateCertificateEnabled(application);
         validateRequest(request);
 
         certificateRepository.deleteByJobApplicationId(applicationId);
@@ -53,31 +46,6 @@ public class ApplicationCertificateService {
         certificateRepository.saveAll(certificates);
 
         return getCertificateResponses(applicationId);
-    }
-
-    private JobApplication findApplication(Long applicantId, Long applicationId) {
-        return jobApplicationRepository.findByIdAndApplicantId(applicationId, applicantId)
-                .orElseThrow(() -> new JobApplicationNotFoundException("Application was not found."));
-    }
-
-    private void validateCertificateWritable(JobApplication application) {
-        if (application.getStatus() != JobApplicationStatus.DRAFT) {
-            throw new InvalidJobApplicationException("Certificate can be modified only in DRAFT status.");
-        }
-        if (application.getJobPosting().getStatus() != JobPostingStatus.PUBLISHED) {
-            throw new InvalidJobApplicationException("Certificate can be modified only for a published job posting.");
-        }
-
-        LocalDateTime now = LocalDateTime.now(clock);
-        if (now.isBefore(application.getJobPosting().getReceptionStartDateTime())
-                || now.isAfter(application.getJobPosting().getReceptionEndDateTime())) {
-            throw new InvalidJobApplicationException("Certificate can be modified only during the reception period.");
-        }
-
-        ApplicationFormConfig config = application.getJobPosting().getApplicationFormConfig();
-        if (config == null || !config.isUseCertificate()) {
-            throw new InvalidJobApplicationException("Certificate section is not enabled for this job posting.");
-        }
     }
 
     private void validateRequest(CertificateReplaceRequest request) {

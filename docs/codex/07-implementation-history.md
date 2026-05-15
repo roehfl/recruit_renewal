@@ -1,5 +1,66 @@
 # 07. Implementation History
 
+## Phase 03c-4R - Application Section Access Helper
+
+- 작업일: 2026-05-15
+- 목적: Education, Career, Certificate, Language, Military 상세 섹션 Service에 반복되던 지원서 접근/쓰기 가능/config enabled 검증을 최소 helper로 추출했다.
+- 핵심 구현:
+  - `ApplicationSectionAccessService` 추가
+  - `findOwnedApplication`, `validateWritable`, 섹션별 `validateXxxEnabled` 메서드 구현
+  - `ApplicationEducationService`, `ApplicationCareerService`, `ApplicationCertificateService`, `ApplicationLanguageService`, `ApplicationMilitaryService`에서 중복 검증 제거
+  - `SectionType` enum 기반 일반화는 도입하지 않고 명시 메서드로 유지
+- 주요 클래스:
+  - `ApplicationSectionAccessService`
+  - `ApplicationEducationService`
+  - `ApplicationCareerService`
+  - `ApplicationCertificateService`
+  - `ApplicationLanguageService`
+  - `ApplicationMilitaryService`
+- API:
+  - 신규 API 없음
+- 테스트 결과:
+  - Education/Career/Certificate/Language/Military 상세 섹션 Service/Controller 회귀 테스트 성공
+  - `./gradlew.bat clean test` 성공
+- 남은 이슈:
+  - `ApplicationSubmitValidator`는 아직 구현하지 않았다.
+  - 병역 submit 필수 정책은 Phase 03c-7에서 연결한다.
+- 다음 작업: Phase 03c-5 Award + GapPeriod vertical slice에서 helper를 재사용한다.
+
+## Phase 03c-4 - Application Military
+
+- 작업일: 2026-05-15
+- 목적: `JobApplication` 하위 병역사항 단건 record를 지원자 본인이 조회하고 `DRAFT` 상태에서 저장할 수 있게 구현했다.
+- 핵심 구현:
+  - `ApplicationMilitary` Entity 추가
+  - `MilitarySubjectType`, `MilitaryServiceType`, `MilitaryBranch`, `MilitaryRank` enum 추가
+  - `ApplicationMilitaryRepository` 추가
+  - `ApplicationMilitaryService`에서 본인 지원서, DRAFT 상태, PUBLISHED 공고, 접수기간, `useMilitary` 검증 구현
+  - 병역 record는 `job_application_id` unique 단건 upsert 구조로 구현
+  - 병역 유형별 허용 필드 검증 구현
+  - `ApplicationMilitaryController`로 지원자 병역 조회/저장 API 추가
+- 주요 클래스:
+  - `ApplicationMilitary`
+  - `MilitarySubjectType`, `MilitaryServiceType`, `MilitaryBranch`, `MilitaryRank`
+  - `ApplicationMilitaryRepository`
+  - `MilitarySaveRequest`, `MilitaryResponse`
+  - `ApplicationMilitaryService`
+  - `ApplicationMilitaryController`
+  - `ApplicationMilitaryServiceTest`
+  - `ApplicationMilitaryControllerTest`
+- API:
+  - `GET /applications/{applicationId}/military`
+  - `POST /applications/{applicationId}/military`
+- 테스트 결과:
+  - `ApplicationMilitaryServiceTest`, `ApplicationMilitaryControllerTest` 성공
+  - Education/Career/Certificate/Language 상세 섹션 회귀 테스트 성공
+  - `./gradlew.bat clean test` 성공
+- 남은 이슈:
+  - submit 시 `useMilitary=true`이면 `ApplicationMilitary` 1건 필수 검증을 Phase 03c-7에서 연결한다.
+  - `COMPLETED` 복무기간 필수, `EXEMPTED` 면제 사유 필수 여부는 submit validator에서 확정한다.
+  - 면제 사유의 관리자 응답 마스킹/암호화 정책은 관리자 상세 섹션 Phase에서 확정한다.
+  - 상세 섹션 공통 접근/수정 가능 검증이 반복되므로 다음 섹션 전 최소 helper 추출을 검토한다.
+- 다음 작업: `ApplicationSectionAccessService` 같은 최소 helper 추출 후 Phase 03c-5 Award + GapPeriod vertical slice를 진행한다.
+
 ## Phase 03c-3 - Application Certificate + Language
 
 - 작업일: 2026-05-15

@@ -2,27 +2,20 @@ package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.ApplicationEducation;
 import com.shinyoung.recruit.domain.entity.ApplicationEducationSemesterGrade;
-import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationSemesterGradeRepository;
-import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.dto.request.EducationReplaceRequest;
 import com.shinyoung.recruit.dto.request.EducationRequest;
 import com.shinyoung.recruit.dto.request.SemesterGradeRequest;
 import com.shinyoung.recruit.dto.response.EducationResponse;
 import com.shinyoung.recruit.enumeration.EducationLevel;
-import com.shinyoung.recruit.enumeration.JobApplicationStatus;
-import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
-import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.Clock;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -34,21 +27,21 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ApplicationEducationService {
 
-    private final JobApplicationRepository jobApplicationRepository;
+    private final ApplicationSectionAccessService sectionAccessService;
     private final ApplicationEducationRepository educationRepository;
     private final ApplicationEducationSemesterGradeRepository semesterGradeRepository;
-    private final Clock clock;
 
     @Transactional(readOnly = true)
     public List<EducationResponse> getEducations(Long applicantId, Long applicationId) {
-        findApplication(applicantId, applicationId);
+        sectionAccessService.findOwnedApplication(applicantId, applicationId);
         return getEducationResponses(applicationId);
     }
 
     @Transactional
     public List<EducationResponse> replaceEducations(Long applicantId, Long applicationId, EducationReplaceRequest request) {
-        JobApplication application = findApplication(applicantId, applicationId);
-        validateEducationWritable(application);
+        JobApplication application = sectionAccessService.findOwnedApplication(applicantId, applicationId);
+        sectionAccessService.validateWritable(application);
+        sectionAccessService.validateEducationEnabled(application);
         validateRequest(request);
 
         List<ApplicationEducation> existingEducations = educationRepository.findByJobApplicationId(applicationId);
@@ -69,31 +62,6 @@ public class ApplicationEducationService {
         }
 
         return getEducationResponses(applicationId);
-    }
-
-    private JobApplication findApplication(Long applicantId, Long applicationId) {
-        return jobApplicationRepository.findByIdAndApplicantId(applicationId, applicantId)
-                .orElseThrow(() -> new JobApplicationNotFoundException("Application was not found."));
-    }
-
-    private void validateEducationWritable(JobApplication application) {
-        if (application.getStatus() != JobApplicationStatus.DRAFT) {
-            throw new InvalidJobApplicationException("Education can be modified only in DRAFT status.");
-        }
-        if (application.getJobPosting().getStatus() != JobPostingStatus.PUBLISHED) {
-            throw new InvalidJobApplicationException("Education can be modified only for a published job posting.");
-        }
-
-        LocalDateTime now = LocalDateTime.now(clock);
-        if (now.isBefore(application.getJobPosting().getReceptionStartDateTime())
-                || now.isAfter(application.getJobPosting().getReceptionEndDateTime())) {
-            throw new InvalidJobApplicationException("Education can be modified only during the reception period.");
-        }
-
-        ApplicationFormConfig config = application.getJobPosting().getApplicationFormConfig();
-        if (config == null || !config.isUseEducation()) {
-            throw new InvalidJobApplicationException("Education section is not enabled for this job posting.");
-        }
     }
 
     private void validateRequest(EducationReplaceRequest request) {

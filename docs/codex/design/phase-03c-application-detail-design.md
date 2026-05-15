@@ -1,5 +1,28 @@
 # Phase 03c Application Detail Design
 
+## Phase 03c-4R Implementation Note
+
+- Phase 03c-4R에서 상세 섹션 공통 접근/수정 가능 검증 helper `ApplicationSectionAccessService`를 추가했다.
+- helper는 `findOwnedApplication`, `validateWritable`, `validateEducationEnabled`, `validateCareerEnabled`, `validateCertificateEnabled`, `validateLanguageEnabled`, `validateMilitaryEnabled`만 담당한다.
+- `SectionType` enum이나 submit validator까지 일반화하지 않았다.
+- Education/Career/Certificate/Language/Military Service는 공통 검증을 helper에 위임하고, 각 섹션 고유 request 검증과 저장 로직만 유지한다.
+- 신규 API나 Entity 관계 변경은 없다.
+
+## Phase 03c-4 Implementation Note
+
+- Phase 03c-4에서 Military vertical slice를 구현했다.
+- 구현 클래스는 `ApplicationMilitary`, `ApplicationMilitaryService`, `ApplicationMilitaryController`, `ApplicationMilitaryRepository`, `MilitarySaveRequest`, `MilitaryResponse`이다.
+- 병역 관련 enum은 `MilitarySubjectType`, `MilitaryServiceType`, `MilitaryBranch`, `MilitaryRank`로 시작했다.
+- `ApplicationMilitary`는 `JobApplication`과 1:1 단건 record이며, `JobApplication`에는 Military 필드를 추가하지 않았다.
+- 저장은 upsert 방식이며, 기존 record가 있으면 update하고 없으면 create한다.
+- `GET /applications/{applicationId}/military`는 저장 전이면 `data=null`로 응답한다.
+- `POST /applications/{applicationId}/military`는 `DRAFT`, `JobPosting.status=PUBLISHED`, 접수기간 내, `useMilitary=true`에서만 가능하다.
+- `SUBJECT`, `NOT_SUBJECT`, `NOT_APPLICABLE`은 상세 병역 필드를 허용하지 않는다.
+- `COMPLETED`는 복무 상세 필드를 허용하되 `exemptionReason`은 허용하지 않는다.
+- `EXEMPTED`는 `exemptionReason`을 허용하되 복무 상세 필드는 허용하지 않는다.
+- submit 통합 검증은 아직 연결하지 않았고, `useMilitary=true`이면 `ApplicationMilitary` 1건 필수 정책은 Phase 03c-7에서 구현한다.
+- Education/Career/Certificate/Language/Military의 접근/상태/접수기간/config enabled 검증 반복은 Phase 03c-4R에서 `ApplicationSectionAccessService`로 최소 추출했다.
+
 ## Phase 03c-3 Implementation Note
 
 - Phase 03c-3에서 Certificate + Language vertical slice를 구현했다.
@@ -159,7 +182,7 @@ Phase 03c-0의 목적은 Phase 03a/03b에서 구현된 `JobApplication` 루트�
 | Career | `ApplicationCareer` | `application_career` | N:1 `JobApplication` | `companyName`, `departmentName`, `positionTitle`, `employmentType`, `startDate`, `endDate`, `currentlyEmployed`, `responsibilities`, `resignationReason`, `sortOrder` | `companyName`, `startDate`, `currentlyEmployed`, `sortOrder` | `sortOrder ASC, id ASC` | 기본 미사용 | 경력 정보는 개인정보. 담당업무/퇴사사유 노출 주의 | 포함 | 2 |
 | Certificate | `ApplicationCertificate` | `application_certificate` | N:1 `JobApplication` | `certificateName`, `issuingOrganization`, `acquiredDate`, `certificateNumber`, `expiredDate`, `scoreOrGrade`, `sortOrder` | `certificateName`, `issuingOrganization`, `acquiredDate`, `sortOrder` | `sortOrder ASC, id ASC` | 기본 미사용 | 자격번호는 마스킹 또는 암호화 검토 | 포함 | 구현 완료 |
 | Language | `ApplicationLanguage` | `application_language` | N:1 `JobApplication` | `languageName`, `testName`, `score`, `grade`, `examDate`, `expiredDate`, `issuingOrganization`, `sortOrder` | `languageName`, `testName`, `examDate`, `sortOrder` | `sortOrder ASC, id ASC` | 기본 미사용 | 점수/등급은 민감도가 낮으나 관리자 노출 범위 제한 | 포함 | 구현 완료 |
-| Military | `ApplicationMilitary` | `application_military` | 0..1 `JobApplication` | `militarySubjectType`, `serviceType`, `militaryBranch`, `rank`, `serviceStartDate`, `serviceEndDate`, `exemptionReason` | `militarySubjectType` | 단건 | 기본 미사용 | 면제 사유는 민감정보. 암호화/마스킹 우선 검토 | 포함 | 4 |
+| Military | `ApplicationMilitary` | `application_military` | 0..1 `JobApplication` | `militarySubjectType`, `serviceType`, `militaryBranch`, `rank`, `serviceStartDate`, `serviceEndDate`, `exemptionReason` | `militarySubjectType` | 단건 | 기본 미사용 | 면제 사유는 민감정보. 암호화/마스킹 우선 검토 | 포함 | 구현 완료 |
 | Award | `ApplicationAward` | `application_award` | N:1 `JobApplication` | `awardName`, `awardingOrganization`, `awardDate`, `description`, `sortOrder` | `awardName`, `awardingOrganization`, `awardDate`, `sortOrder` | `awardDate DESC, id ASC` 또는 `sortOrder ASC` | 기본 미사용 | 설명에 개인정보가 들어갈 수 있어 주의 | 포함 | 5 |
 | GapPeriod | `ApplicationGapPeriod` | `application_gap_period` | N:1 `JobApplication` | `startDate`, `endDate`, `gapType`, `reason`, `description`, `sortOrder` | `startDate`, `endDate`, `gapType`, `reason`, `sortOrder` | `startDate ASC, id ASC` | 기본 미사용 | 사유/설명은 민감정보 가능. 관리자 노출 주의 | 포함 | 5 |
 | Attachment | `ApplicationAttachment` | `application_attachment` | N:1 `JobApplication` | `originalFileName`, `storedFileName`, `storagePath`, `contentType`, `fileSize`, `attachmentType`, `sectionType`, `sectionRecordId`, `sortOrder` | `originalFileName`, `storedFileName`, `storagePath`, `contentType`, `fileSize`, `attachmentType` | `attachmentType ASC, sortOrder ASC, id ASC` | 기본 미사용 | 파일명/경로는 민감정보. 원본 파일명 마스킹, 저장 경로 직접 노출 금지 | 제한 포함 | 6 |
@@ -466,7 +489,8 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 | Phase 03c-1 | Education + EducationSemesterGrade vertical slice 구현 완료 | 다른 섹션, submit 통합 검증 전체 | 학력 저장/조회/replace, 성적 정렬/검증, `useEducation`, DRAFT 상태, 타인 지원서 차단 |
 | Phase 03c-2 | Career vertical slice 구현 완료 | 다른 섹션, submit 통합 검증 전체 | 경력 선택 상태, 경력 기간 검증, 재직중 endDate 정책, `useCareer`, DRAFT 상태, 타인 지원서 차단 |
 | Phase 03c-3 | Certificate + Language vertical slice 구현 완료 | 다른 섹션, submit 통합 검증 전체 | 취득일/응시일/만료일 검증, 정렬, config 연동 |
-| Phase 03c-4 | Military | Award, GapPeriod, Attachment | 단건 병역 upsert, `useMilitary=true` submit 필수 1건 정책, 민감정보 응답 정책 |
+| Phase 03c-4 | Military vertical slice 구현 완료 | Award, GapPeriod, Attachment | 단건 병역 upsert, `useMilitary=true` submit 필수 1건 정책, 민감정보 응답 정책 |
+| Phase 03c-4R | 상세 섹션 공통 접근/수정 가능 helper 구현 완료 | SectionType enum 일반화, submit validator | 본인 지원서 조회, DRAFT/PUBLISHED/접수기간, config enabled 검증 |
 | Phase 03c-5 | Award + GapPeriod | Attachment, submit 통합 검증 전체 | 수상/공백기간 기간 검증, 정렬, config 연동 |
 | Phase 03c-6 | Attachment metadata | 실제 파일 업로드/다운로드 저장소 연동 | metadata 저장/조회, 저장 경로 비노출, attachmentType 검증 |
 | Phase 03c-7 | `ApplicationSubmitValidator` 통합 | 관리자 aggregate 상세 | `submit()`에서 config 기반 섹션 필수 검증 실패/성공 |
@@ -486,17 +510,6 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 
 ## 14. Recommended Next Phase
 
-다음 구현은 Phase 03c-4: Military vertical slice로 진행하는 것을 추천한다.
+다음 기능 구현은 Phase 03c-5: Award + GapPeriod vertical slice를 추천한다. Award/GapPeriod는 다건 replace 구조라 Certificate/Language와 유사하고, Attachment와 실제 파일 업로드보다 구현 리스크가 낮다.
 
-추천 범위:
-
-- `ApplicationMilitary` 단건 upsert
-- `useMilitary=true` 저장 허용 정책
-- submit 시 `ApplicationMilitary` 1건 필수 정책 기반 설계 검증
-- 지원자 조회/replace API
-- `ApplicationFormConfig.useMilitary` 연동
-- `DRAFT` 상태에서만 수정 가능
-- 타인 지원서 접근 차단
-- 필요한 경우에만 최소 공통 helper 도입
-
-별도 공통 helper만 만드는 작업은 아직 추천하지 않는다. Military 구현까지 완료한 뒤 본인 지원서, DRAFT, PUBLISHED, 접수기간, config enabled 검증 반복을 기준으로 `ApplicationSectionAccessService` 같은 최소 helper 추출을 검토한다.
+Phase 03c-5 구현 시에는 Phase 03c-4R에서 추가한 `ApplicationSectionAccessService`를 재사용한다.
