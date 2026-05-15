@@ -1,5 +1,65 @@
 # 07. Implementation History
 
+## Phase 03c-1 - Application Education
+
+- 작업일: 2026-05-15
+- 목적: `JobApplication` 하위 상세 섹션 중 학력사항과 학기별 성적을 지원자가 조회/replace 저장할 수 있게 구현했다.
+- 핵심 구현:
+  - `ApplicationEducation`, `ApplicationEducationSemesterGrade` Entity 추가
+  - 학력/성적 enum `EducationLevel`, `GraduationStatus`, `DayNightType`, `CampusType` 추가
+  - `ApplicationEducationRepository`, `ApplicationEducationSemesterGradeRepository` 추가
+  - `ApplicationEducationService`에서 본인 지원서, DRAFT 상태, PUBLISHED 공고, 접수기간, `useEducation` 검증 구현
+  - replace 저장 시 기존 SemesterGrade 선삭제 후 Education 삭제, 새 Education/SemesterGrade 저장
+  - 입학일/졸업일이 모두 있으면 입학일이 졸업일보다 늦지 않도록 검증
+  - `ApplicationEducationController`로 지원자 학력 조회/저장 API 추가
+  - invalid enum 요청을 `ApiResponse.fail`로 반환하도록 `HttpMessageNotReadableException` 처리 추가
+- 주요 클래스:
+  - `ApplicationEducation`
+  - `ApplicationEducationSemesterGrade`
+  - `ApplicationEducationService`
+  - `ApplicationEducationController`
+  - `EducationReplaceRequest`, `EducationRequest`, `SemesterGradeRequest`
+  - `EducationResponse`, `SemesterGradeResponse`
+  - `ApplicationEducationServiceTest`, `ApplicationEducationControllerTest`
+- API:
+  - `GET /applications/{applicationId}/educations`
+  - `POST /applications/{applicationId}/educations`
+- 테스트 결과:
+  - `ApplicationEducationServiceTest` 성공
+  - `ApplicationEducationControllerTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - submit 시 Education 최소 1개 필수 검증은 Phase 03c-7에서 연결한다.
+  - 관리자 상세 섹션 API는 아직 없다.
+  - 학교명/전공/성적의 관리자 노출/마스킹 정책은 관리자 상세 확장 시 재검토한다.
+  - 성적/학점 `BigDecimal` precision/scale 명시는 운영 DB schema 정책 확정 후 검토한다.
+  - 다음 섹션에서 접근/상태/접수기간/config enabled 검증이 반복되면 최소 공통 helper 추출을 검토한다.
+- 다음 작업:
+  - Career 구현 전 `careerApplicable`, `hasCareer`, `careerType` 중 어떤 정책을 둘지 결정한다.
+
+## Phase 03c-0 - Application Detail Design
+
+- 작업일: 2026-05-15
+- 목적: `JobApplication` 루트에 연결될 지원서 상세 섹션 도메인을 실제 구현 전 설계했다.
+- 핵심 설계:
+  - 기본 개인정보 원천은 `Applicant`/`User` 계층에 두고, 지원서에는 필요한 최소 snapshot만 둔다.
+  - 학력, 학기별 성적, 경력, 자격, 어학, 병역, 수상, 공백기간, 첨부파일 metadata를 `JobApplication` 하위 상세 섹션 후보로 정리했다.
+  - `ApplicationFormConfig.useXxx` flag는 화면 노출, 저장 허용, submit validation 분기 기준으로 사용한다.
+  - 상세 섹션 수정은 `DRAFT` 상태에서만 허용하고, `SUBMITTED`/`WITHDRAWN`은 조회만 허용한다.
+  - submit 상세 검증은 후속 Phase에서 `ApplicationSubmitValidator`와 섹션별 validator로 분리한다.
+- 문서:
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- 테스트 결과: 문서 설계 작업이므로 테스트는 실행하지 않음.
+- 남은 이슈: 상세 섹션별 required flag 세분화, 신입/경력 구분 정책, 병역 필수 정책, 첨부파일 저장소/권한 정책은 구현 전 확정 필요.
+- 리뷰 반영:
+  - replace 저장 절차를 명시 삭제 후 신규 저장 방식으로 구체화했다.
+  - Education replace 시 기존 SemesterGrade 선삭제 정책을 추가했다.
+  - `useMilitary=true`이면 submit 시 `ApplicationMilitary` 1건 필수로 정리했다.
+  - 상세 섹션 code 값은 Java enum으로 시작하는 방향을 명시했다.
+  - Career 최소 1개 검증은 `careerApplicable` 또는 지원 유형 도입 전까지 보류로 정리했다.
+- 다음 작업: Phase 03c-1에서 Education + SemesterGrade vertical slice를 구현하고, 필요한 최소 공통 helper만 함께 도입한다.
+
 ## Phase 03b-1 - Admin Application Read
 
 - 작업일: 2026-05-15

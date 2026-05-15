@@ -1,5 +1,35 @@
 # Phase 03 Application Design
 
+## Phase 03c-1 구현 반영 메모
+
+- Phase 03c-1에서 `JobApplication` 하위 학력/성적 vertical slice를 구현했다.
+- 추가 도메인은 `ApplicationEducation`, `ApplicationEducationSemesterGrade`이며, `JobApplication`에는 상세 섹션 컬렉션을 추가하지 않았다.
+- 학력/성적 저장은 `POST /applications/{applicationId}/educations` replace 방식으로 제공한다.
+- 조회는 `GET /applications/{applicationId}/educations`로 제공한다.
+- 저장은 본인 지원서, `DRAFT` 상태, `JobPosting.status=PUBLISHED`, 접수기간 내, `ApplicationFormConfig.useEducation=true` 조건을 모두 만족해야 한다.
+- replace 저장은 기존 SemesterGrade를 먼저 삭제한 뒤 기존 Education을 삭제하고 새 요청 목록을 저장한다.
+- `EducationLevel.HIGH_SCHOOL`에는 SemesterGrade 입력을 허용하지 않는다.
+- `admissionDate`와 `graduationDate`가 모두 있으면 입학일이 졸업일보다 늦을 수 없다.
+- submit 시 Education 최소 1개 필수 검증은 아직 연결하지 않았고, Phase 03c-7 `ApplicationSubmitValidator`에서 처리한다.
+- 잘못된 enum 값 바인딩은 `HttpMessageNotReadableException` 공통 처리로 `ApiResponse.fail` 400 응답을 반환한다.
+- 성적/학점 `BigDecimal` precision/scale 지정과 상세 섹션 공통 검증 helper 추출은 다음 섹션 구현 전 다시 검토한다.
+
+## Phase 03c-0 설계 반영 메모
+
+- Phase 03c-0에서 `JobApplication` 하위 상세 섹션 도메인 설계 문서 `docs/codex/design/phase-03c-application-detail-design.md`를 추가했다.
+- 상세 섹션은 기본적으로 `JobApplication` 하위 application-specific record로 둔다.
+- 이름, 휴대폰번호, 주소, CI 같은 기본 개인정보의 원천은 `Applicant`/`User` 계층에 두고, `JobApplication`에는 필요한 최소 snapshot만 둔다.
+- 학력, 학기별 성적, 경력, 자격, 어학, 병역, 수상, 공백기간, 첨부파일 metadata를 Phase 03c 상세 섹션 후보로 정리했다.
+- `ApplicationFormConfig.useXxx=false`이면 지원자 화면 노출과 저장을 차단하고, 최종제출 필수 검증 대상에서도 제외하는 방향을 추천한다.
+- 상세 섹션 수정은 `DRAFT` 상태에서만 허용하고, `SUBMITTED`/`WITHDRAWN`은 조회만 허용하는 정책을 추천한다.
+- 최종제출 상세 검증은 후속 Phase에서 `ApplicationSubmitValidator`와 섹션별 validator로 분리해 `JobApplicationService.submit()`에 연결한다.
+- 관리자 상세 조회는 현재 루트 정보 응답을 유지하고, 상세 섹션은 섹션별 lazy 조회 API로 확장하는 방식을 추천한다.
+- 리뷰 반영으로 replace 저장은 기존 row 명시 삭제 후 새 row `saveAll`을 하나의 transaction에서 처리하는 정책으로 구체화했다.
+- Education replace 시에는 기존 SemesterGrade를 먼저 삭제한 뒤 Education을 삭제해야 한다.
+- Phase 03c 초기 상세 섹션 code 값은 Java enum으로 시작하고, CommonCode 전환은 후속 Phase에서 검토한다.
+- `useMilitary=true`이면 submit 시 `ApplicationMilitary` 1건을 필수로 두는 방향으로 정리했다.
+- 다음 구현은 공통 helper만 별도 구현하기보다 Education + SemesterGrade vertical slice 안에서 최소 helper를 함께 도입하는 방향을 추천한다.
+
 ## Phase 03b-1 구현 반영 메모
 
 - Phase 03b-1에서 관리자 Application 루트 목록/상세 조회 API를 구현했다.
