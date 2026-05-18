@@ -3,6 +3,7 @@ package com.shinyoung.recruit.controller;
 import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
+import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
 import com.shinyoung.recruit.domain.entity.ApplicationAward;
 import com.shinyoung.recruit.domain.entity.ApplicationCareer;
 import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
@@ -15,8 +16,10 @@ import com.shinyoung.recruit.domain.entity.ApplicationMilitary;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
+import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
@@ -28,6 +31,7 @@ import com.shinyoung.recruit.domain.repository.ApplicationLanguageRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationMilitaryRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
@@ -45,6 +49,8 @@ import com.shinyoung.recruit.enumeration.MilitaryBranch;
 import com.shinyoung.recruit.enumeration.MilitaryRank;
 import com.shinyoung.recruit.enumeration.MilitaryServiceType;
 import com.shinyoung.recruit.enumeration.MilitarySubjectType;
+import com.shinyoung.recruit.enumeration.QuestionAnswerType;
+import com.shinyoung.recruit.enumeration.QuestionCategory;
 import com.shinyoung.recruit.service.JobApplicationService;
 import com.shinyoung.recruit.service.JobPostingService;
 import org.junit.jupiter.api.BeforeEach;
@@ -134,6 +140,12 @@ class AdminApplicationSectionControllerTest {
     @Autowired
     private ApplicationAttachmentRepository attachmentRepository;
 
+    @Autowired
+    private JobPostingQuestionRepository jobPostingQuestionRepository;
+
+    @Autowired
+    private ApplicationAnswerRepository applicationAnswerRepository;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -193,6 +205,12 @@ class AdminApplicationSectionControllerTest {
                 .andExpect(jsonPath("$.data[0].originalFileName").value("resume.pdf"))
                 .andExpect(jsonPath("$.data[0].storedFileName").doesNotExist())
                 .andExpect(jsonPath("$.data[0].storagePath").doesNotExist());
+
+        mockMvc.perform(get("/admin/applications/{applicationId}/answers", application.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].questionText").value("Self introduction"))
+                .andExpect(jsonPath("$.data[0].answerText").value("answer text"));
     }
 
     @Test
@@ -218,6 +236,29 @@ class AdminApplicationSectionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data").isEmpty());
+
+        mockMvc.perform(get("/admin/applications/{applicationId}/answers", application.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    void admin_answers_return_unanswered_rows_and_not_found_response() throws Exception {
+        JobApplication application = createApplication("admin-section-api-answer");
+        JobPostingQuestion question = question(application.getJobPosting(), "Unanswered Question", 0, true);
+
+        mockMvc.perform(get("/admin/applications/{applicationId}/answers", application.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].questionId").value(question.getId()))
+                .andExpect(jsonPath("$.data[0].answerId").doesNotExist())
+                .andExpect(jsonPath("$.data[0].answerText").doesNotExist());
+
+        mockMvc.perform(get("/admin/applications/{applicationId}/answers", 99999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
     }
 
     @Test
@@ -238,7 +279,8 @@ class AdminApplicationSectionControllerTest {
                 "/admin/applications/1/military",
                 "/admin/applications/1/awards",
                 "/admin/applications/1/gap-periods",
-                "/admin/applications/1/attachments"
+                "/admin/applications/1/attachments",
+                "/admin/applications/1/answers"
         };
 
         for (String path : paths) {
@@ -353,6 +395,8 @@ class AdminApplicationSectionControllerTest {
                 1024L,
                 0
         ));
+        JobPostingQuestion question = question(application.getJobPosting(), "Self introduction", 0, true);
+        applicationAnswerRepository.save(ApplicationAnswer.create(application, question, "answer text"));
     }
 
     private JobApplication createApplication(String loginId) {
@@ -399,6 +443,25 @@ class AdminApplicationSectionControllerTest {
                 .map(JobPosition::getId)
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private JobPostingQuestion question(
+            JobPosting jobPosting,
+            String questionText,
+            Integer sortOrder,
+            Boolean required
+    ) {
+        return jobPostingQuestionRepository.save(JobPostingQuestion.createDirect(
+                jobPosting,
+                questionText,
+                "Helper",
+                QuestionCategory.SELF_INTRODUCTION,
+                QuestionAnswerType.LONG_TEXT,
+                required,
+                null,
+                3000,
+                sortOrder
+        ));
     }
 
     @TestConfiguration

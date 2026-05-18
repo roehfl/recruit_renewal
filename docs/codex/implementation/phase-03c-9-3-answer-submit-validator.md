@@ -162,6 +162,7 @@ The existing submit API has stricter validation:
 - Active-question-external answer rows are ignored rather than cleaned up.
 - No answer revision/history policy exists yet.
 - No choice, file, or Attachment-linked question answer is implemented.
+- Future refactoring candidate: `SHORT_TEXT_MAX_LENGTH` and `LONG_TEXT_MAX_LENGTH` are also likely duplicated in `ApplicationAnswerService`. If answer types expand, extract shared rules into a small `QuestionAnswerPolicy` or equivalent policy class. This was intentionally not changed in Phase 03c-9-3 because the phase scope was narrow and explicit.
 
 ## Next Phase Considerations
 

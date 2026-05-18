@@ -1,5 +1,17 @@
 # Phase 03c-9 Question/Answer Domain Design
 
+## Phase 03c-9-4 Implementation Reflection
+
+- Phase 03c-9-4 implemented `GET /admin/applications/{applicationId}/answers`.
+- The implementation reuses the existing `AdminApplicationSectionController` and `AdminApplicationSectionService`.
+- The response DTO is `AdminApplicationAnswerResponse`.
+- Admin answer rows follow active `JobPostingQuestion` order: `sortOrder ASC, id ASC`.
+- Answer snapshot metadata is preferred when an answer exists; current active question metadata is used as fallback.
+- `answerText` is returned only for the admin detail lazy API and must not be included in admin list/statistics/root detail responses by default.
+- Inactive question answers and active-question-external orphan answers remain excluded until revision/history policy is decided.
+- Answer original-text authorization, masking, and read audit logging remain security-phase TODOs.
+- Future refactoring candidate: extract duplicated answer type length limits into `QuestionAnswerPolicy` when answer types expand.
+
 ## Phase 03c-9-3 Implementation Reflection
 
 - Phase 03c-9-3 connected question/answer final-submit validation to `ApplicationSubmitValidator`.
@@ -11,7 +23,7 @@
 - `minLength` is intentionally not enforced yet.
 - Inactive questions and answer rows outside the active question set are ignored by submit validation to avoid conflicting with future revision/history policies.
 - No `ApplicationAnswer` entity/API, applicant answer save policy, question configuration API, admin answer API, option domain, file answer type, Attachment linkage, or `QuestionSet` change was made.
-- Next implementation recommendation is Phase 03c-9-4: admin answer lazy read API.
+- Phase 03c-9-4 has completed the admin answer lazy read API. Next work should focus on answer text authorization/audit/masking policy or StageResult sequencing.
 
 ## Phase 03c-9-2 Implementation Reflection
 
@@ -30,7 +42,7 @@
 - 설계 추천안 중 `QuestionTemplate` + `JobPostingQuestion` 관리자 질문 구성 API가 Phase 03c-9-1에서 구현되었다.
 - 구현된 범위는 전역 질문 템플릿 관리, 공고별 질문 생성/수정/정렬/비활성화, 템플릿 기반 snapshot 생성, 직접 작성 질문 생성이다.
 - Phase 03c-9-1 시점에는 `ApplicationAnswer`, 지원자 질문/답변 API, submit validator 질문답변 연동, 관리자 답변 조회 API가 보류되었고, 그중 `ApplicationAnswer`와 지원자 질문/답변 API는 Phase 03c-9-2에서 구현되었다.
-- Phase 03c-9-3 has completed. The next implementation recommendation is Phase 03c-9-4: admin answer lazy read API.
+- Phase 03c-9-3 and Phase 03c-9-4 have completed. The next recommendation is answer original-text authorization/audit/masking policy or StageResult sequencing.
 
 ## Phase 이름
 
@@ -47,7 +59,7 @@ Phase 03c-9: Application Question/Answer Domain Design
 - Phase 03a에서 `JobApplication` 루트 생성, 조회, 임시저장, 제출, 철회 흐름이 구현되었다.
 - Phase 03b-1에서 관리자 Application 루트 목록/상세 조회 API가 구현되었다.
 - Phase 03c-1부터 Phase 03c-6까지 학력, 경력, 자격, 어학, 병역, 수상, 공백기간, 첨부 metadata 지원자 섹션 API가 구현되었다.
-Phase 03c-9-3 has implemented the `ApplicationSubmitValidator` question/answer integration described below.
+Phase 03c-9-3 implemented the `ApplicationSubmitValidator` question/answer integration, and Phase 03c-9-4 implemented admin answer lazy read.
 - Phase 03c-8에서 관리자 상세 섹션 read-only lazy 조회 API가 구현되었다.
 - 자기소개서/질문답변 도메인은 전역 템플릿, 공고별 질문 구성, 지원자 답변 저장까지 구현되었고, submit validator 질문답변 연동과 관리자 답변 조회는 아직 구현하지 않았다. StageResult, 파일 업로드/다운로드, 관리자 상세 aggregate API도 아직 구현하지 않았다.
 
@@ -296,7 +308,7 @@ Phase 03c-8의 관리자 상세 섹션 lazy 조회 API와 같은 방향으로 �
 | Phase 03c-9-4 | 관리자 답변 lazy 조회 API | `GET /admin/applications/{applicationId}/answers`, 관리자 응답 DTO, 민감정보 문서화 | 권한별 원문 열람/감사 로그 |
 | Phase 03c-9-5 | 확장 정책 정리 | 선택형 답변, 파일 질문, QuestionSet/revision 필요성 재검토 | 실제 파일 업로드/다운로드 |
 
-Phase 03c-9-3 has completed active required `JobPostingQuestion` answer blank/maxLength validation in `ApplicationSubmitValidator`. The next implementation recommendation is Phase 03c-9-4: implement the admin answer lazy read API.
+Phase 03c-9-4 has completed the admin answer lazy read API. The next recommendation is answer original-text authorization, masking, read audit logging, export policy, or StageResult sequencing.
 
 ## 보류 항목
 
@@ -336,6 +348,6 @@ Phase 03c-9-3 has completed active required `JobPostingQuestion` answer blank/ma
 
 ## 다음 구현 추천 Phase
 
-Phase 03c-9-3 has completed required/blank/maxLength answer validation in `ApplicationSubmitValidator`.
+Phase 03c-9-4 has completed the admin answer lazy read API (`GET /admin/applications/{applicationId}/answers`).
 
-The next implementation recommendation is Phase 03c-9-4: implement the admin answer lazy read API (`GET /admin/applications/{applicationId}/answers`). After that, consider answer read audit logging, answer masking/authorization policy, and StageResult integration order.
+The next implementation recommendation is to settle answer original-text authorization, masking, read audit logging, and export inclusion policy before broadening admin/report surfaces. After that, continue with StageResult integration order.

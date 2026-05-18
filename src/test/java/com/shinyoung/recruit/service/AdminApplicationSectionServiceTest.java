@@ -3,6 +3,7 @@ package com.shinyoung.recruit.service;
 import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
+import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
 import com.shinyoung.recruit.domain.entity.ApplicationAward;
 import com.shinyoung.recruit.domain.entity.ApplicationCareer;
 import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
@@ -15,8 +16,10 @@ import com.shinyoung.recruit.domain.entity.ApplicationMilitary;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
+import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
@@ -28,11 +31,13 @@ import com.shinyoung.recruit.domain.repository.ApplicationLanguageRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationMilitaryRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.dto.response.AdminAttachmentResponse;
+import com.shinyoung.recruit.dto.response.AdminApplicationAnswerResponse;
 import com.shinyoung.recruit.dto.response.AdminAwardResponse;
 import com.shinyoung.recruit.dto.response.AdminCareerResponse;
 import com.shinyoung.recruit.dto.response.AdminCertificateResponse;
@@ -54,6 +59,8 @@ import com.shinyoung.recruit.enumeration.MilitaryBranch;
 import com.shinyoung.recruit.enumeration.MilitaryRank;
 import com.shinyoung.recruit.enumeration.MilitaryServiceType;
 import com.shinyoung.recruit.enumeration.MilitarySubjectType;
+import com.shinyoung.recruit.enumeration.QuestionAnswerType;
+import com.shinyoung.recruit.enumeration.QuestionCategory;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -132,6 +139,12 @@ class AdminApplicationSectionServiceTest {
     @Autowired
     private ApplicationAttachmentRepository attachmentRepository;
 
+    @Autowired
+    private JobPostingQuestionRepository jobPostingQuestionRepository;
+
+    @Autowired
+    private ApplicationAnswerRepository applicationAnswerRepository;
+
     @Test
     void get_educations_returns_sorted_educations_and_semester_grades() {
         JobApplication application = createApplication("admin-section-education");
@@ -177,6 +190,7 @@ class AdminApplicationSectionServiceTest {
         assertThat(adminApplicationSectionService.getAwards(application.getId())).isEmpty();
         assertThat(adminApplicationSectionService.getGapPeriods(application.getId())).isEmpty();
         assertThat(adminApplicationSectionService.getAttachments(application.getId())).isEmpty();
+        assertThat(adminApplicationSectionService.getAnswers(application.getId())).isEmpty();
         assertThat(adminApplicationSectionService.getMilitary(application.getId())).isNull();
         assertThat(adminApplicationSectionService.getCareers(application.getId()).careerType()).isEqualTo(CareerType.NOT_SELECTED);
         assertThat(adminApplicationSectionService.getCareers(application.getId()).careers()).isEmpty();
@@ -282,10 +296,82 @@ class AdminApplicationSectionServiceTest {
     }
 
     @Test
+    void get_answers_returns_active_questions_with_saved_answer_snapshot() {
+        JobApplication application = createApplication("admin-section-answer");
+        JobPostingQuestion question = question(application.getJobPosting(), "Original Question", 0, true);
+        ApplicationAnswer answer = applicationAnswerRepository.save(ApplicationAnswer.create(
+                application,
+                question,
+                "original answer"
+        ));
+        question.update(
+                "Changed Question",
+                "Changed helper",
+                QuestionCategory.GENERAL,
+                QuestionAnswerType.SHORT_TEXT,
+                false,
+                null,
+                500,
+                9
+        );
+
+        List<AdminApplicationAnswerResponse> responses = adminApplicationSectionService.getAnswers(application.getId());
+
+        assertThat(responses).hasSize(1);
+        AdminApplicationAnswerResponse response = responses.get(0);
+        assertThat(response.questionId()).isEqualTo(question.getId());
+        assertThat(response.questionText()).isEqualTo("Original Question");
+        assertThat(response.category()).isEqualTo(QuestionCategory.JOB_SPECIFIC);
+        assertThat(response.answerType()).isEqualTo(QuestionAnswerType.LONG_TEXT);
+        assertThat(response.required()).isTrue();
+        assertThat(response.maxLength()).isEqualTo(3000);
+        assertThat(response.sortOrder()).isEqualTo(0);
+        assertThat(response.answerId()).isEqualTo(answer.getId());
+        assertThat(response.answerText()).isEqualTo("original answer");
+        assertThat(response.answerUpdatedAt()).isNotNull();
+    }
+
+    @Test
+    void get_answers_returns_unanswered_active_questions_with_null_answer_fields() {
+        JobApplication application = createApplication("admin-section-answer-empty");
+        JobPostingQuestion second = question(application.getJobPosting(), "Second Question", 1, false);
+        JobPostingQuestion first = question(application.getJobPosting(), "First Question", 0, true);
+
+        List<AdminApplicationAnswerResponse> responses = adminApplicationSectionService.getAnswers(application.getId());
+
+        assertThat(responses).extracting(AdminApplicationAnswerResponse::questionId)
+                .containsExactly(first.getId(), second.getId());
+        assertThat(responses.get(0).answerId()).isNull();
+        assertThat(responses.get(0).answerText()).isNull();
+        assertThat(responses.get(0).answerUpdatedAt()).isNull();
+    }
+
+    @Test
+    void get_answers_excludes_inactive_and_foreign_question_answers() {
+        JobApplication application = createApplication("admin-section-answer-filter");
+        JobPostingQuestion active = question(application.getJobPosting(), "Active Question", 0, false);
+        JobPostingQuestion inactive = question(application.getJobPosting(), "Inactive Question", 1, true);
+        inactive.deactivate();
+        applicationAnswerRepository.save(ApplicationAnswer.create(application, inactive, "inactive answer"));
+
+        JobApplication otherApplication = createApplication("admin-section-answer-other");
+        JobPostingQuestion foreign = question(otherApplication.getJobPosting(), "Foreign Question", 0, true);
+        applicationAnswerRepository.save(ApplicationAnswer.create(application, foreign, "foreign answer"));
+
+        List<AdminApplicationAnswerResponse> responses = adminApplicationSectionService.getAnswers(application.getId());
+
+        assertThat(responses).extracting(AdminApplicationAnswerResponse::questionId)
+                .containsExactly(active.getId());
+        assertThat(responses.get(0).answerText()).isNull();
+    }
+
+    @Test
     void get_sections_fails_when_application_does_not_exist() {
         assertThatThrownBy(() -> adminApplicationSectionService.getEducations(99999L))
                 .isInstanceOf(JobApplicationNotFoundException.class);
         assertThatThrownBy(() -> adminApplicationSectionService.getAttachments(99999L))
+                .isInstanceOf(JobApplicationNotFoundException.class);
+        assertThatThrownBy(() -> adminApplicationSectionService.getAnswers(99999L))
                 .isInstanceOf(JobApplicationNotFoundException.class);
     }
 
@@ -294,6 +380,9 @@ class AdminApplicationSectionServiceTest {
         JobApplication draft = createApplication("admin-section-draft");
         JobApplication submitted = createApplication("admin-section-submitted");
         JobApplication withdrawn = createApplication("admin-section-withdrawn");
+        JobPostingQuestion draftQuestion = question(draft.getJobPosting(), "Draft Question", 0, false);
+        JobPostingQuestion submittedQuestion = question(submitted.getJobPosting(), "Submitted Question", 0, false);
+        JobPostingQuestion withdrawnQuestion = question(withdrawn.getJobPosting(), "Withdrawn Question", 0, false);
         jobApplicationService.submit(submitted.getApplicant().getId(), submitted.getId());
         jobApplicationService.submit(withdrawn.getApplicant().getId(), withdrawn.getId());
         jobApplicationService.withdraw(withdrawn.getApplicant().getId(), withdrawn.getId());
@@ -302,6 +391,15 @@ class AdminApplicationSectionServiceTest {
         assertThat(adminApplicationSectionService.getAttachments(draft.getId())).isEmpty();
         assertThat(adminApplicationSectionService.getAttachments(submitted.getId())).isEmpty();
         assertThat(adminApplicationSectionService.getAttachments(withdrawn.getId())).isEmpty();
+        assertThat(adminApplicationSectionService.getAnswers(draft.getId()))
+                .extracting(AdminApplicationAnswerResponse::questionId)
+                .containsExactly(draftQuestion.getId());
+        assertThat(adminApplicationSectionService.getAnswers(submitted.getId()))
+                .extracting(AdminApplicationAnswerResponse::questionId)
+                .containsExactly(submittedQuestion.getId());
+        assertThat(adminApplicationSectionService.getAnswers(withdrawn.getId()))
+                .extracting(AdminApplicationAnswerResponse::questionId)
+                .containsExactly(withdrawnQuestion.getId());
     }
 
     private JobApplication createApplication(String loginId) {
@@ -439,6 +537,25 @@ class AdminApplicationSectionServiceTest {
                 1024L,
                 sortOrder
         );
+    }
+
+    private JobPostingQuestion question(
+            JobPosting jobPosting,
+            String questionText,
+            Integer sortOrder,
+            Boolean required
+    ) {
+        return jobPostingQuestionRepository.save(JobPostingQuestion.createDirect(
+                jobPosting,
+                questionText,
+                "Helper",
+                QuestionCategory.JOB_SPECIFIC,
+                QuestionAnswerType.LONG_TEXT,
+                required,
+                null,
+                3000,
+                sortOrder
+        ));
     }
 
     @TestConfiguration

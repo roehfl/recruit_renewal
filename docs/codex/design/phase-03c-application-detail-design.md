@@ -1,5 +1,16 @@
 # Phase 03c Application Detail Design
 
+## Phase 03c-9-4 Implementation Note
+
+- Phase 03c-9-4 extended the Phase 03c-8 admin lazy section pattern with `GET /admin/applications/{applicationId}/answers`.
+- The admin answer API is read-only and belongs to the application detail screen, not admin list/search/statistics.
+- Rows are based on active `JobPostingQuestion` records for the application posting.
+- If a row has an `ApplicationAnswer`, answer snapshot metadata is preferred and `answerText` is returned as original text.
+- If a row has no answer, `answerId`, `answerText`, and `answerUpdatedAt` are null.
+- DRAFT, SUBMITTED, and WITHDRAWN applications are all readable by application id.
+- Inactive question answers and orphan answers outside the active question set are excluded in this phase.
+- Answer original-text authorization, masking, and audit logs remain security-phase TODOs.
+
 ## Phase 03c-9-3 Implementation Note
 
 - Phase 03c-9-3 connected active `JobPostingQuestion` answer validation to `ApplicationSubmitValidator`.
@@ -9,7 +20,7 @@
 - Inactive questions and answer rows outside the active question set are not submit validation targets in this phase.
 - `minLength` remains a stored question policy field, but submit validation does not enforce it yet.
 - Applicant answer save APIs, admin section APIs, question configuration APIs, and detail section entity structures were not changed.
-- Next implementation recommendation is Phase 03c-9-4: admin answer lazy read API. Before StageResult, confirm the final Application detail/report read scope for question answers.
+- Phase 03c-9-4 later added the admin answer lazy read API. Remaining follow-up work is answer original-text authorization, masking, read audit logging, export policy, or StageResult sequencing.
 
 ## Phase 03c-9-2 Implementation Note
 
@@ -608,7 +619,7 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 
 ## 13. Deferred Items
 
-- Question/answer remaining work: add admin answer lazy read API after Phase 03c-9-3 submit validator integration.
+- Question/answer remaining work: define answer original-text authorization, masking, read audit logging, export policy, and revision/history handling for inactive/orphan answers.
 - 상세 섹션별 required flag 세분화
 - Career submit 정책: `NOT_SELECTED` 실패 여부와 `EXPERIENCED` 최소 1개 필수 여부
 - 최종제출 후 수정요청/반려/reopen 정책
@@ -620,6 +631,6 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 
 ## 14. Recommended Next Phase
 
-Phase 03c-9-3 has completed active required `JobPostingQuestion` answer blank/maxLength validation in `ApplicationSubmitValidator`. The next implementation recommendation is Phase 03c-9-4: admin answer lazy read API (`GET /admin/applications/{applicationId}/answers`). Before StageResult implementation, confirm whether Application detail read models and reports include question/answer content.
+Phase 03c-9-4 has completed the admin answer lazy read API (`GET /admin/applications/{applicationId}/answers`). Before StageResult implementation, confirm answer original-text authorization, masking, read audit logging, export policy, and whether Application detail/report read models include question/answer content.
 
 

@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface JobApplicationRepository extends JpaRepository<JobApplication, Long> {
@@ -18,6 +19,9 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
     Optional<JobApplication> findByApplicantIdAndJobPostingId(Long applicantId, Long jobPostingId);
 
     boolean existsByApplicantIdAndJobPostingId(Long applicantId, Long jobPostingId);
+
+    @EntityGraph(attributePaths = {"applicant", "jobPosting", "jobPosition"})
+    List<JobApplication> findByJobPostingId(Long jobPostingId);
 
     @EntityGraph(attributePaths = {"applicant", "jobPosting", "jobPosition"})
     @Query("""

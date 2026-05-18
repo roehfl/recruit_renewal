@@ -1,8 +1,12 @@
 package com.shinyoung.recruit.service;
 
+import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
 import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationEducation;
 import com.shinyoung.recruit.domain.entity.ApplicationEducationSemesterGrade;
+import com.shinyoung.recruit.domain.entity.JobApplication;
+import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
+import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
@@ -14,6 +18,8 @@ import com.shinyoung.recruit.domain.repository.ApplicationGapPeriodRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationLanguageRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationMilitaryRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
+import com.shinyoung.recruit.dto.response.AdminApplicationAnswerResponse;
 import com.shinyoung.recruit.dto.response.AdminAttachmentResponse;
 import com.shinyoung.recruit.dto.response.AdminAwardResponse;
 import com.shinyoung.recruit.dto.response.AdminCareerItemResponse;
@@ -49,6 +55,8 @@ public class AdminApplicationSectionService {
     private final ApplicationAwardRepository awardRepository;
     private final ApplicationGapPeriodRepository gapPeriodRepository;
     private final ApplicationAttachmentRepository attachmentRepository;
+    private final JobPostingQuestionRepository jobPostingQuestionRepository;
+    private final ApplicationAnswerRepository applicationAnswerRepository;
 
     public List<AdminEducationResponse> getEducations(Long applicationId) {
         validateApplicationExists(applicationId);
@@ -135,10 +143,40 @@ public class AdminApplicationSectionService {
                 .toList();
     }
 
+    public List<AdminApplicationAnswerResponse> getAnswers(Long applicationId) {
+        JobApplication application = findApplication(applicationId);
+        List<JobPostingQuestion> questions = jobPostingQuestionRepository
+                .findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(application.getJobPosting().getId());
+        if (questions.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, ApplicationAnswer> answersByQuestionId = applicationAnswerRepository.findByJobApplicationId(applicationId)
+                .stream()
+                .filter(answer -> answer.getJobPostingQuestion() != null)
+                .collect(Collectors.toMap(
+                        answer -> answer.getJobPostingQuestion().getId(),
+                        answer -> answer,
+                        (first, ignored) -> first
+                ));
+
+        return questions.stream()
+                .map(question -> AdminApplicationAnswerResponse.of(
+                        question,
+                        answersByQuestionId.get(question.getId())
+                ))
+                .toList();
+    }
+
     private void validateApplicationExists(Long applicationId) {
         if (!jobApplicationRepository.existsById(applicationId)) {
             throw new JobApplicationNotFoundException("지원서를 찾을 수 없습니다. id=" + applicationId);
         }
+    }
+
+    private JobApplication findApplication(Long applicationId) {
+        return jobApplicationRepository.findById(applicationId)
+                .orElseThrow(() -> new JobApplicationNotFoundException("지원서를 찾을 수 없습니다. id=" + applicationId));
     }
 
     private String maskCertificateNumber(String value) {

@@ -37,6 +37,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler(InvalidStageResultException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidStageResult(InvalidStageResultException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(QuestionTemplateNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleQuestionTemplateNotFound(QuestionTemplateNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

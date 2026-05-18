@@ -1,6 +1,7 @@
 package com.shinyoung.recruit.controller;
 
 import com.shinyoung.recruit.dto.response.AdminAttachmentResponse;
+import com.shinyoung.recruit.dto.response.AdminApplicationAnswerResponse;
 import com.shinyoung.recruit.dto.response.AdminAwardResponse;
 import com.shinyoung.recruit.dto.response.AdminCareerResponse;
 import com.shinyoung.recruit.dto.response.AdminCertificateResponse;
@@ -78,5 +79,12 @@ public class AdminApplicationSectionController {
             @PathVariable Long applicationId
     ) {
         return ResponseEntity.ok(ApiResponse.success(adminApplicationSectionService.getAttachments(applicationId)));
+    }
+
+    @GetMapping("/admin/applications/{applicationId}/answers")
+    public ResponseEntity<ApiResponse<List<AdminApplicationAnswerResponse>>> getAnswers(
+            @PathVariable Long applicationId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(adminApplicationSectionService.getAnswers(applicationId)));
     }
 }

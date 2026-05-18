@@ -1,5 +1,71 @@
 # 07. Implementation History
 
+## Phase 03d-0 - StageResult Domain Design
+
+- 작업일: 2026-05-18
+- 목적: Phase 02에서 보류했던 `StageResult`를 `Stage + JobApplication` 기준 전형 결과 record로 구현하기 전에 도메인 관계, 상태 정책, 생성 방식, API 후보를 정리했다.
+- 작업 성격: 설계 문서 전용
+- 생성 문서:
+  - `docs/codex/design/phase-03d-stage-result-design.md`
+  - `docs/codex/reports/phase-03d-stage-result-design.html`
+- 갱신 문서:
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/design/phase-02-stage-design.md`
+  - `docs/codex/07-implementation-history.md`
+- 주요 설계 결정:
+  - `StageResult`는 `Stage + JobApplication` 기준 N:M 연결 결과 record로 본다.
+  - 관계는 `StageResult -> Stage`, `StageResult -> JobApplication` N:1 단방향을 추천한다.
+  - `Stage`와 `JobApplication`에는 `StageResult` 컬렉션을 추가하지 않는 방향을 추천한다.
+  - cascade/orphanRemoval은 사용하지 않는다.
+  - `stage_id + job_application_id` unique 후보를 추천한다.
+  - result status 후보는 `PENDING`, `PASSED`, `FAILED`, `ABSENT`, `WITHDRAWN`, `HOLD`로 정리했다.
+  - 초기 생성 방식은 명시적 initialize command로 `SUBMITTED` 지원서의 누락된 `PENDING` 결과를 생성하는 방식을 추천한다.
+- API 후보:
+  - `GET /admin/stages/{stageId}/results`
+  - `POST /admin/stages/{stageId}/results/initialize`
+  - `POST /admin/stages/{stageId}/results/{resultId}`
+  - `POST /admin/stages/{stageId}/results/bulk`
+  - `GET /admin/applications/{applicationId}/stage-results`
+- 미구현/보류:
+  - Java 코드, Entity, Repository, Service, Controller, DTO, Test, DB schema, SecurityConfig 변경 없음
+  - 기존 Stage/Application/AdminApplicationSection/QuestionAnswer API 변경 없음
+  - correction history, applicant-facing result read, message/notification integration, interview/evaluation score aggregation, fine-grained security/audit logging은 후속 Phase로 보류
+- 검증:
+  - 문서 전용 Phase이므로 테스트는 실행하지 않았다.
+  - HTML report는 외부 CDN/JS/CSS 없이 self-contained로 작성한다.
+- 다음 작업:
+  - Phase 03d-1: StageResult Entity + initialize/list admin API
+
+## Phase 03c-9-4 - Admin Application Answer Lazy Read API
+
+- 작업일: 2026-05-18
+- 목적: 관리자 지원서 상세 화면에서 자기소개서/질문답변 영역을 lazy 방식으로 조회할 수 있도록 `GET /admin/applications/{applicationId}/answers` API를 추가했다.
+- 구현 범위:
+  - `AdminApplicationAnswerResponse` DTO 추가
+  - `AdminApplicationSectionService.getAnswers` 추가
+  - `AdminApplicationSectionController.getAnswers` 추가
+  - active `JobPostingQuestion` 기준 row 생성
+  - `ApplicationAnswer`가 있으면 answer id/text/updatedAt merge
+  - 답변이 없는 active 질문도 null answer field로 반환
+  - 답변 존재 시 question metadata는 answer snapshot 우선, current question fallback
+  - inactive question answer와 active 질문 외 orphan answer는 응답 제외
+- API:
+  - `GET /admin/applications/{applicationId}/answers`
+- 테스트 결과:
+  - `AdminApplicationSectionServiceTest` 성공
+  - `AdminApplicationSectionControllerTest` 성공
+  - DRAFT/SUBMITTED/WITHDRAWN 상태 조회는 active question row가 실제 반환되는 방식으로 보강
+  - `ApplicationAnswerServiceTest`, `ApplicationAnswerControllerTest` 성공
+  - `ApplicationSubmitValidatorTest`, `JobApplicationServiceTest`, `ApplicationControllerTest` 성공
+  - `./gradlew.bat clean test --no-daemon` 성공
+- 보류:
+  - 관리자 목록/검색/통계/root detail 응답에 `answerText` 추가 금지
+  - answer 원문 열람 권한, 마스킹, 감사 로그는 다음 단계 전 우선순위 높게 검토
+  - inactive/orphan answer 표시 및 revision/history 정책
+  - 선택형 option, 파일형 답변, Attachment 연동, StageResult
+- 리뷰 기록:
+  - `SHORT_TEXT_MAX_LENGTH`, `LONG_TEXT_MAX_LENGTH`는 `ApplicationAnswerService`와 submit validator 쪽에 중복될 수 있다. 답변 타입이 늘어나는 시점에 `QuestionAnswerPolicy` 같은 공통 정책 클래스로 추출하는 리팩토링을 검토한다.
+
 ## Phase 03c-9-3 - ApplicationSubmitValidator Question/Answer Integration
 
 - 작업일: 2026-05-18
@@ -35,7 +101,7 @@
   - 선택형 답변 option, 파일형 답변, Attachment 연동, QuestionSet
   - `minLength` submit 강제
   - active 질문 외 answer row 정합성 검증
-- 다음 작업: Phase 03c-9-4에서 관리자 답변 lazy read API를 구현한다.
+- 후속 반영: Phase 03c-9-4에서 관리자 답변 lazy read API를 구현했다.
 
 ## Phase 03c-9-2 - ApplicationAnswer + Applicant Question/Answer API
 
@@ -840,3 +906,43 @@
   - 동시 unique 충돌 예외 변환과 Applicant not-found 응답 정책은 Controller/API 단계에서 재검토
 - 다음 작업:
   - Phase 03a-2에서 updateDraft/submit/withdraw command 구현 여부 검토
+## 2026-05-18 - Phase 03d-1 StageResult Initialize/List Admin API
+
+- Scope: Implemented the first StageResult vertical slice.
+- Implemented:
+  - `StageResultStatus`
+  - `StageResult`
+  - `StageResultRepository`
+  - `StageResultService`
+  - `StageResultController`
+  - `AdminStageResultResponse`
+  - `StageResultInitializeResponse`
+  - `InvalidStageResultException`
+- APIs:
+  - `GET /admin/stages/{stageId}/results`
+  - `POST /admin/stages/{stageId}/results/initialize`
+- Business rules:
+  - initialize is allowed only for `READY` and `IN_PROGRESS` stages.
+  - `RESULT_ANNOUNCED` and `CLOSED` stages reject initialize.
+  - only `SUBMITTED` applications in the Stage's JobPosting receive missing `PENDING` rows.
+  - `DRAFT` and `WITHDRAWN` applications are skipped.
+  - re-running initialize is idempotent.
+  - `StageResult` validates that Stage and JobApplication belong to the same JobPosting.
+  - no StageResult collections were added to `Stage` or `JobApplication`.
+- Tests:
+  - `StageResultServiceTest`: success
+  - `StageResultControllerTest`: success
+  - `StageServiceTest` + `StageControllerTest`: success
+  - `JobApplicationServiceTest` + `ApplicationControllerTest`: success
+  - `./gradlew.bat clean test --no-daemon`: success
+- Documentation:
+  - `docs/codex/implementation/phase-03d-1-stage-result-initialize-list.md`
+  - `docs/codex/reports/phase-03d-1-stage-result-initialize-list.html`
+- Deferred:
+  - result update/bulk update
+  - correction history
+  - applicant-facing result read
+  - admin application stage-result timeline
+  - Stage announce pending-result guard
+  - security, authorization, audit logging
+- Next recommended phase: Phase 03d-2 StageResult update commands and announcement integration policy.

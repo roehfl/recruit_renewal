@@ -1,5 +1,20 @@
 # Phase 02 Stage Design
 
+## Phase 03d-0 StageResult Design Note
+
+- Phase 02 deferred `StageResult` until the Application domain existed.
+- Phase 03d-0 revisits that deferred scope now that `JobApplication` and application detail/question-answer domains are implemented.
+- `StageResult` is designed as a `Stage + JobApplication` result record with a recommended `stage_id + job_application_id` unique constraint.
+- `StageResult` should reference `Stage` and `JobApplication` by N:1 unidirectional relationships.
+- `Stage` should not own a `StageResult` collection in the initial implementation.
+- Stage status policy recommendation:
+  - `READY`: initialize possible.
+  - `IN_PROGRESS`: result input/update possible.
+  - `RESULT_ANNOUNCED`: read-only except future correction command.
+  - `CLOSED`: read-only.
+- The first implementation candidate is `POST /admin/stages/{stageId}/results/initialize` plus `GET /admin/stages/{stageId}/results`.
+- This design-only phase did not change the existing Stage APIs.
+
 ## 1. Summary
 
 Phase 02의 목적은 Phase 01에서 구현된 `JobPosting` 하위에 전형단계(`Stage`) 관리 모델을 추가해, 이후 지원서(`Application`), 전형결과(`StageResult`), 면접(`Interview`) 기능이 연결될 수 있는 기준 축을 만드는 것이다.
@@ -152,6 +167,8 @@ Stage 정렬 기준:
 
 ## 4.2 StageResult 설계 방향
 
+Phase 03d-0에서 StageResult 최신 설계를 별도 문서로 확정했다. 아래 Phase 02 후보는 Stage 구현 당시의 보류 메모이며, 구현 기준은 `docs/codex/design/phase-03d-stage-result-design.md`를 따른다.
+
 `StageResult`는 특정 `Application`이 특정 `Stage`에서 받은 결과다.
 
 StageResult 필드 후보:
@@ -238,6 +255,8 @@ cascade/orphanRemoval:
 - 삭제는 `StageService`에서 정책 검증 후 명시적으로 처리한다.
 
 ## 5.2 StageResult Entity 후보
+
+Phase 03d-0 기준 최신 후보는 `Application` 대신 현재 구현된 `JobApplication`을 참조한다. 관계는 `StageResult -> Stage`, `StageResult -> JobApplication` N:1 단방향이고, unique 후보는 `stage_id + job_application_id`이다.
 
 테이블 후보: `stage_result`
 
@@ -699,3 +718,14 @@ Phase 02a-1 구현 결과를 확인한 뒤 Phase 02a-2: Stage reorder/status com
 - JobPosting publish 조건에 Stage 최소 1개 검증은 아직 추가하지 않는다.
 - StageResult는 Application 도메인 구현 이후로 계속 보류한다.
 - 다음 구현은 StageResult가 아니라 Application 기본 흐름을 우선 검토하는 것을 추천한다.
+## Phase 03d-1 StageResult Implementation Note
+
+- Phase 02 deferred StageResult until Application existed.
+- Phase 03d-1 now implements the first StageResult vertical slice.
+- `StageResult` is stored as a separate row for one `Stage + JobApplication` pair.
+- `Stage` still does not own a StageResult collection.
+- Initialize is allowed only when Stage is `READY` or `IN_PROGRESS`.
+- `RESULT_ANNOUNCED` and `CLOSED` stages reject initialize.
+- `GET /admin/stages/{stageId}/results` lists existing result rows.
+- `POST /admin/stages/{stageId}/results/initialize` creates missing `PENDING` rows for `SUBMITTED` applications.
+- Result update, pending-result announce guard, correction history, and applicant-facing result read remain deferred.
