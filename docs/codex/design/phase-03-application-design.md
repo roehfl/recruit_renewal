@@ -1,5 +1,16 @@
 # Phase 03 Application Design
 
+## Phase 03c-9-1 구현 반영 메모
+
+- Phase 03c-9-1에서 자기소개서/질문답변 도메인의 첫 구현 단계로 `QuestionTemplate`과 `JobPostingQuestion` 관리자 API를 추가했다.
+- `QuestionTemplate`은 전역 질문 은행이며, `JobPostingQuestion`은 특정 `JobPosting`에 배치된 질문 snapshot record이다.
+- `QuestionCategory`는 `SELF_INTRODUCTION`, `GENERAL`, `JOB_SPECIFIC`, `ETC`로 시작하고, `QuestionAnswerType`은 `SHORT_TEXT`, `LONG_TEXT`만 구현했다.
+- `JobPostingQuestion.questionTemplate`은 nullable 참조이며, 템플릿 기반 생성 시 템플릿 값을 기본 복사하되 요청 override를 최종 snapshot에 반영한다.
+- 공고별 질문 구성 변경은 `JobPosting.status=DRAFT`에서만 허용한다. `PUBLISHED`/`CLOSED` 이후에는 생성, 수정, 정렬, 비활성화 command를 차단한다.
+- 질문 삭제는 HTTP DELETE나 물리 삭제가 아니라 `POST /admin/job-postings/{jobPostingId}/questions/{questionId}/delete` command로 `active=false` 처리한다.
+- 지원자 답변 저장, `ApplicationAnswer`, `ApplicationSubmitValidator` 질문답변 연동, 관리자 답변 조회 API는 구현하지 않았다.
+- 다음 구현 추천은 Phase 03c-9-2: 지원자 질문 목록/답변 replace 저장 API와 `ApplicationAnswer` 구현이다.
+
 ## Phase 03c-9 설계 반영 메모
 
 - Phase 03c-9에서 `JobApplication` 하위 자기소개서/질문답변 도메인을 구현하기 전 설계를 정리했다.

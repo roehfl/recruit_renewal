@@ -1,5 +1,59 @@
 # 07. Implementation History
 
+## Phase 03c-9-1 - QuestionTemplate + JobPostingQuestion Admin API
+
+- 작업일: 2026-05-18
+- 목적: 자기소개서/질문답변 도메인의 첫 구현 단계로 전역 질문 템플릿과 공고별 질문 구성 관리자 API를 추가했다.
+- 구현 범위:
+  - `QuestionCategory`, `QuestionAnswerType` enum 추가
+  - `QuestionTemplate`, `JobPostingQuestion` Entity 추가
+  - `QuestionTemplateRepository`, `JobPostingQuestionRepository` 추가
+  - `QuestionTemplateService`, `JobPostingQuestionService` 추가
+  - `QuestionTemplateController`, `JobPostingQuestionController` 추가
+  - 질문 템플릿 생성/조회/수정/비활성화, 공고별 질문 생성/조회/수정/정렬/비활성화 API 구현
+  - 템플릿 기반 질문 생성 시 템플릿 값을 복사하고 요청 override를 최종 snapshot에 반영
+  - 공고 질문 구성 변경은 `JobPosting.status=DRAFT`에서만 허용
+  - 질문 삭제는 HTTP DELETE가 아니라 POST command로 `active=false` soft delete 처리
+- 주요 클래스:
+  - `QuestionTemplate`
+  - `JobPostingQuestion`
+  - `QuestionTemplateService`
+  - `JobPostingQuestionService`
+  - `QuestionTemplateController`
+  - `JobPostingQuestionController`
+  - `QuestionTemplateServiceTest`
+  - `QuestionTemplateControllerTest`
+  - `JobPostingQuestionServiceTest`
+  - `JobPostingQuestionControllerTest`
+- API:
+  - `GET /admin/question-templates`
+  - `GET /admin/question-templates/{templateId}`
+  - `POST /admin/question-templates`
+  - `POST /admin/question-templates/{templateId}`
+  - `POST /admin/question-templates/{templateId}/deactivate`
+  - `GET /admin/job-postings/{jobPostingId}/questions`
+  - `POST /admin/job-postings/{jobPostingId}/questions`
+  - `POST /admin/job-postings/{jobPostingId}/questions/{questionId}`
+  - `POST /admin/job-postings/{jobPostingId}/questions/reorder`
+  - `POST /admin/job-postings/{jobPostingId}/questions/{questionId}/delete`
+- 테스트 결과:
+  - `QuestionTemplateServiceTest` 성공
+  - `QuestionTemplateControllerTest` 성공
+  - `JobPostingQuestionServiceTest` 성공
+  - `JobPostingQuestionControllerTest` 성공
+  - `JobPostingServiceTest` 성공
+  - `JobPostingControllerTest` 성공
+  - `ApplicationSubmitValidatorTest` 성공
+  - `AdminApplicationSectionControllerTest` 성공
+  - `./gradlew.bat clean test` 성공
+- 미구현/보류:
+  - `ApplicationAnswer`
+  - 지원자 질문 목록/답변 저장 API
+  - 질문답변 submit validator 연동
+  - 관리자 답변 조회 API
+  - `QuestionSet`, 선택형 option, 파일형 답변, Attachment 연동
+- 다음 작업: Phase 03c-9-2에서 `ApplicationAnswer`와 지원자 질문 목록/답변 replace 저장 API를 구현한다.
+
 ## Phase 03c-9 - Application Question/Answer Domain Design
 
 - 작업일: 2026-05-18

@@ -1,5 +1,14 @@
 # Phase 03c Application Detail Design
 
+## Phase 03c-9-1 Implementation Note
+
+- Phase 03c-9-1에서 `QuestionTemplate` + `JobPostingQuestion` 관리자 질문 구성 API를 구현했다.
+- 추가 API는 `GET/POST /admin/question-templates`, `GET/POST /admin/question-templates/{templateId}`, `POST /admin/question-templates/{templateId}/deactivate`, `GET/POST /admin/job-postings/{jobPostingId}/questions`, `POST /admin/job-postings/{jobPostingId}/questions/{questionId}`, `POST /admin/job-postings/{jobPostingId}/questions/reorder`, `POST /admin/job-postings/{jobPostingId}/questions/{questionId}/delete`이다.
+- `QuestionTemplate`은 전역 질문 은행, `JobPostingQuestion`은 공고별 질문 snapshot record로 두며 `JobPosting`/`QuestionTemplate`에는 역방향 컬렉션을 추가하지 않았다.
+- `JobPosting.status=DRAFT`에서만 질문 생성/수정/정렬/비활성화를 허용하고, 게시 이후 질문 변경은 후속 revision/reopen 정책 전까지 금지한다.
+- `active=false` soft delete만 구현했고 HTTP DELETE, PUT, 물리 삭제는 추가하지 않았다.
+- 지원자 답변 저장, `ApplicationAnswer`, submit validator 질문답변 연동, 관리자 답변 조회는 후속 Phase로 보류했다.
+
 ## Phase 03c-9 Design Note
 
 - Phase 03c-9에서 자기소개서/질문답변 도메인 설계를 정리했다.
@@ -569,7 +578,8 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 | Phase 03c-7 | `ApplicationSubmitValidator` 통합 | 관리자 aggregate 상세 | `submit()`에서 config 기반 섹션 필수 검증 실패/성공 |
 | Phase 03c-8 | 관리자 상세 섹션 조회 API 확장 | StageResult | 관리자 섹션별 조회, 마스킹, 권한 보완 TODO |
 | Phase 03c-9 | 질문답변 도메인 설계 완료 | Java 구현, DB schema, API 구현 | `QuestionTemplate` + `JobPostingQuestion` + `ApplicationAnswer` 추천 구조, submit 연동 방향, 관리자 답변 조회 후보 |
-| Phase 03c-9-1 | 질문 템플릿/공고 질문 구성 구현 후보 | 지원자 답변 저장, submit 연동 | 관리자 질문 구성 API와 템플릿 API |
+| Phase 03c-9-1 | 질문 템플릿/공고 질문 구성 구현 완료 | 지원자 답변 저장, submit 연동 | 관리자 질문 구성 API와 템플릿 API |
+| Phase 03c-9-2 | 지원자 질문 목록/답변 저장 구현 후보 | 관리자 답변 조회, submit 연동 | `ApplicationAnswer`, 지원자 질문/답변 API |
 
 ## 13. Deferred Items
 
@@ -585,4 +595,4 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 
 ## 14. Recommended Next Phase
 
-Phase 03c-9에서 자기소개서/질문답변 도메인 설계가 완료되었으므로 다음 구현은 Phase 03c-9-1: `QuestionTemplate` + `JobPostingQuestion` 관리자 질문 구성 API를 추천한다. 질문 구성 기준이 먼저 있어야 지원자 답변 저장, submit validator 필수 답변 검증, 관리자 답변 lazy 조회를 안정적으로 이어갈 수 있다. StageResult 전에는 Application 상세 조회 범위와 질문답변 포함 여부를 다시 확인하고, 실제 파일 업로드/다운로드 저장소 연동은 별도 파일 Phase로 분리한다.
+Phase 03c-9-1에서 `QuestionTemplate` + `JobPostingQuestion` 관리자 질문 구성 API가 완료되었으므로 다음 구현은 Phase 03c-9-2: `ApplicationAnswer`와 지원자 질문 목록/답변 replace 저장 API를 추천한다. 이후 Phase 03c-9-3에서 `ApplicationSubmitValidator`에 required/blank/maxLength 답변 검증을 연결하고, Phase 03c-9-4에서 관리자 답변 lazy 조회 API를 확장한다. StageResult 전에는 Application 상세 조회 범위와 질문답변 포함 여부를 다시 확인하고, 실제 파일 업로드/다운로드 저장소 연동은 별도 파일 Phase로 분리한다.

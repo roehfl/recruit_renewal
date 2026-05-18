@@ -1,5 +1,12 @@
 # Phase 03c-9 Question/Answer Domain Design
 
+## Phase 03c-9-1 구현 반영
+
+- 설계 추천안 중 `QuestionTemplate` + `JobPostingQuestion` 관리자 질문 구성 API가 Phase 03c-9-1에서 구현되었다.
+- 구현된 범위는 전역 질문 템플릿 관리, 공고별 질문 생성/수정/정렬/비활성화, 템플릿 기반 snapshot 생성, 직접 작성 질문 생성이다.
+- `ApplicationAnswer`, 지원자 질문/답변 API, submit validator 질문답변 연동, 관리자 답변 조회 API는 아직 구현하지 않았다.
+- 다음 구현 추천은 Phase 03c-9-2: `ApplicationAnswer` + 지원자 질문 목록/답변 replace 저장 API이다.
+
 ## Phase 이름
 
 Phase 03c-9: Application Question/Answer Domain Design
@@ -258,13 +265,13 @@ Phase 03c-8의 관리자 상세 섹션 lazy 조회 API와 같은 방향으로 �
 
 | Phase | 목적 | 구현 범위 | 보류 |
 |---|---|---|---|
-| Phase 03c-9-1 | 질문 템플릿과 공고 질문 구성 기반 | `QuestionTemplate`, `JobPostingQuestion`, 관리자 질문 구성 API, 템플릿 API, 테스트 | 지원자 답변 저장, submit 연동 |
+| Phase 03c-9-1 | 질문 템플릿과 공고 질문 구성 기반 | `QuestionTemplate`, `JobPostingQuestion`, 관리자 질문 구성 API, 템플릿 API, 테스트 구현 완료 | 지원자 답변 저장, submit 연동 |
 | Phase 03c-9-2 | 지원자 질문/답변 작성 API | `ApplicationAnswer`, `GET /applications/{applicationId}/questions`, `POST /applications/{applicationId}/answers`, DRAFT 저장 검증 | 관리자 답변 조회, submit 연동 |
 | Phase 03c-9-3 | 질문답변 submit validator 연동 | required/blank/maxLength 검증을 `ApplicationSubmitValidator`에 연결 | 선택형 질문, 파일 답변 |
 | Phase 03c-9-4 | 관리자 답변 lazy 조회 API | `GET /admin/applications/{applicationId}/answers`, 관리자 응답 DTO, 민감정보 문서화 | 권한별 원문 열람/감사 로그 |
 | Phase 03c-9-5 | 확장 정책 정리 | 선택형 답변, 파일 질문, QuestionSet/revision 필요성 재검토 | 실제 파일 업로드/다운로드 |
 
-다음 구현 추천은 Phase 03c-9-1이다. `QuestionTemplate`과 `JobPostingQuestion`을 먼저 구현해야 지원자 답변 저장과 submit 검증 기준이 안정된다.
+Phase 03c-9-1이 완료되었으므로 다음 구현 추천은 Phase 03c-9-2이다. `ApplicationAnswer`와 지원자 질문/답변 저장 API가 있어야 submit 검증 기준과 관리자 답변 조회를 안정적으로 이어갈 수 있다.
 
 ## 보류 항목
 
@@ -304,4 +311,4 @@ Phase 03c-8의 관리자 상세 섹션 lazy 조회 API와 같은 방향으로 �
 
 ## 다음 구현 추천 Phase
 
-다음 구현은 Phase 03c-9-1: QuestionTemplate + JobPostingQuestion 관리자 질문 구성 API를 추천한다. 질문 구성 기준이 먼저 있어야 지원자 답변 저장, submit validator 필수 답변 검증, 관리자 답변 조회를 안정적으로 이어갈 수 있다.
+다음 구현은 Phase 03c-9-2: ApplicationAnswer + 지원자 질문 목록/답변 replace 저장 API를 추천한다. 그 다음 Phase에서 submit validator 필수 답변 검증과 관리자 답변 조회를 순차적으로 연결한다.

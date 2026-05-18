@@ -37,6 +37,30 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler(QuestionTemplateNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleQuestionTemplateNotFound(QuestionTemplateNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidQuestionTemplateException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidQuestionTemplate(InvalidQuestionTemplateException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
+    @ExceptionHandler(JobPostingQuestionNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleJobPostingQuestionNotFound(JobPostingQuestionNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidJobPostingQuestionException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidJobPostingQuestion(InvalidJobPostingQuestionException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(JobApplicationNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleJobApplicationNotFound(JobApplicationNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
