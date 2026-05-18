@@ -1,5 +1,56 @@
 # Phase 03 Application Design
 
+## Phase 03c-9 설계 반영 메모
+
+- Phase 03c-9에서 `JobApplication` 하위 자기소개서/질문답변 도메인을 구현하기 전 설계를 정리했다.
+- 추천 구조는 `QuestionTemplate` + `JobPostingQuestion` + `ApplicationAnswer`이다.
+- `QuestionTemplate`은 전역 질문 은행이며, `JobPostingQuestion`은 특정 공고에 실제 배치된 질문 snapshot record로 둔다.
+- `JobPostingQuestion.questionTemplate`은 nullable로 두어 템플릿 기반 질문과 직접 작성 질문을 모두 지원한다.
+- `ApplicationAnswer`는 지원서별 답변 record이며, `job_application_id + job_posting_question_id` unique 후보를 둔다.
+- 자기소개서는 별도 Entity가 아니라 `QuestionCategory.SELF_INTRODUCTION` 카테고리의 질문답변으로 다룬다.
+- 초기 답변 타입은 `SHORT_TEXT`, `LONG_TEXT` 중심으로 시작하고 선택형/파일형 답변은 후속 Phase로 보류한다.
+- 공고 질문 구성은 `JobPosting.status=DRAFT`에서만 수정 허용하고, `PUBLISHED` 이후 수정은 revision/reopen 정책 확정 전까지 금지하는 방향을 추천한다.
+- 지원자 답변 저장은 `DRAFT` 상태에서만 허용하며, required 미입력은 DRAFT 저장에서는 허용하되 submit 시 `ApplicationSubmitValidator`에서 실패시키는 방향으로 설계했다.
+- 관리자 답변 조회는 Phase 03c-8 lazy section API 흐름에 맞춰 `GET /admin/applications/{applicationId}/answers` 후보로 둔다.
+- 이번 Phase는 설계 문서 작업만 수행했고 Java 코드, DB schema, 기존 API, `ApplicationSubmitValidator`, 관리자 상세 섹션 API는 변경하지 않았다.
+- 다음 구현 추천은 Phase 03c-9-1: `QuestionTemplate` + `JobPostingQuestion` 관리자 질문 구성 API이다.
+
+## Phase 03c-8 구현 반영 메모
+
+- Phase 03c-8에서 Phase 03b-1의 관리자 Application 루트 목록/상세 조회 구조를 유지한 채, 상세 섹션별 lazy read-only API를 추가했다.
+- 추가 API는 `GET /admin/applications/{applicationId}/educations`, `/careers`, `/certificates`, `/languages`, `/military`, `/awards`, `/gap-periods`, `/attachments`이다.
+- `/admin/applications/{applicationId}` 루트 상세 응답 구조는 변경하지 않았고, `/admin/applications/{applicationId}/details` 같은 aggregate API도 만들지 않았다.
+- 관리자 상세 섹션 조회는 `AdminApplicationSectionService`가 담당하며, 지원자용 상세 섹션 저장 Service를 재사용하지 않는다.
+- 관리자 조회는 `applicationId` 존재 여부만 확인하며, 지원자 소유자 검증, DRAFT/PUBLISHED/접수기간 검증, submit validator 검증을 적용하지 않는다.
+- 관리자 응답 DTO는 지원자용 DTO를 재사용하지 않고 `AdminEducationResponse`, `AdminCareerResponse`, `AdminCertificateResponse`, `AdminMilitaryResponse` 등으로 분리했다.
+- 자격번호는 `certificateNumberMasked`, 병역 면제 사유는 `exemptionReasonMasked`만 응답하고 원문 필드는 노출하지 않는다.
+- Attachment 관리자 응답도 지원자 응답과 동일하게 `storedFileName`, `storagePath`, 다운로드 URL을 노출하지 않는다.
+- 이번 Phase에서는 관리자 수정/삭제 command, 파일 업로드/다운로드, StageResult, 자기소개서/질문답변, 보안 권한 세분화는 구현하지 않았다.
+
+## Phase 03c-7 구현 반영 메모
+
+- Phase 03c-7에서 `ApplicationSubmitValidator`를 추가하고 `JobApplicationService.submit()`에 연결했다.
+- 기존 submit 검증인 본인 지원서 조회, `DRAFT`, PUBLISHED 공고, 접수기간, `ApplicationFormConfig` 존재, 모집분야 소속 검증은 유지한다.
+- submit 상태 변경 직전에 validator를 호출하며, 실패하면 `InvalidJobApplicationException`으로 400 응답 정책을 유지하고 `submittedAt`은 세팅하지 않는다.
+- `useEducation=true`이면 `ApplicationEducation` 최소 1건을 요구한다.
+- `useCareer=true`이면 `ApplicationCareerProfile`과 유효한 `CareerType`을 요구한다. `EXPERIENCED`는 Career row 최소 1건이 필요하고, `NEWCOMER`/`NOT_APPLICABLE`은 Career row가 있으면 실패한다.
+- `useMilitary=true`이면 `ApplicationMilitary` 1건을 요구한다. `COMPLETED`는 복무기간, `EXEMPTED`는 면제 사유를 최종제출 시점에 요구한다.
+- Certificate, Language, Award, GapPeriod는 현재 선택 섹션으로 보고 최소 row를 강제하지 않는다.
+- Attachment는 `ApplicationFormConfig` flag가 없어 이번 Phase에서 제출 필수 검증을 하지 않는다.
+- 신규 API는 없고 `POST /applications/{applicationId}/submit` 내부 검증만 강화했다.
+- 관리자 상세 섹션 API, StageResult, 자기소개서/질문답변, 파일 업로드/다운로드는 구현하지 않았다.
+
+## Phase 03c-6 구현 반영 메모
+
+- Phase 03c-6에서 `JobApplication` 하위 첨부파일 metadata vertical slice를 구현했다.
+- 추가 도메인은 `ApplicationAttachment`이며, `JobApplication`에는 Attachment 컬렉션을 추가하지 않았다.
+- 첨부 유형은 `AttachmentType`, 귀속 섹션 힌트는 `ApplicationSectionType` enum으로 시작한다.
+- 지원자 API는 `GET /applications/{applicationId}/attachments`, `POST /applications/{applicationId}/attachments`이다.
+- 실제 multipart 파일 업로드, 다운로드, 저장소 연동은 구현하지 않았다.
+- `storedFileName`, `storagePath`는 내부 관리 필드로 저장하되 응답에는 노출하지 않는다.
+- Attachment는 현재 `ApplicationFormConfig`에 flag가 없으므로 `DRAFT`, PUBLISHED 공고, 접수기간 내 조건만 검증한다.
+- submit 통합 검증과 관리자 상세 섹션 API는 아직 연결하지 않았다.
+
 ## Phase 03c-5 구현 반영 메모
 
 - Phase 03c-5에서 `JobApplication` 하위 수상/포상사항과 공백기간 vertical slice를 구현했다.

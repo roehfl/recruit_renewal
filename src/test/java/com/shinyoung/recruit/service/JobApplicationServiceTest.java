@@ -529,6 +529,22 @@ class JobApplicationServiceTest {
     }
 
     @Test
+    void submit_fails_when_required_detail_section_is_missing_and_keeps_draft() {
+        assertSubmitValidationFailureKeepsDraft(
+                "applicant-submit-no-education",
+                new ApplicationFormConfigRequest(true, false, false, false, false, false, false)
+        );
+        assertSubmitValidationFailureKeepsDraft(
+                "applicant-submit-no-career",
+                new ApplicationFormConfigRequest(false, true, false, false, false, false, false)
+        );
+        assertSubmitValidationFailureKeepsDraft(
+                "applicant-submit-no-military",
+                new ApplicationFormConfigRequest(false, false, false, false, true, false, false)
+        );
+    }
+
+    @Test
     void withdraw_submitted_application_success() {
         Applicant applicant = createApplicant("applicant-withdraw", "Applicant AB");
         Long jobPostingId = createPublishedJobPosting();
@@ -815,7 +831,33 @@ class JobApplicationServiceTest {
         return jobPostingId;
     }
 
+    private Long createPublishedJobPosting(String title, ApplicationFormConfigRequest formConfig) {
+        Long jobPostingId = jobPostingService.create(createJobPostingRequest(
+                title,
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 30, 18, 0),
+                formConfig
+        ));
+        jobPostingService.publish(jobPostingId);
+        assertThat(jobPostingRepository.findById(jobPostingId).orElseThrow().getStatus()).isEqualTo(JobPostingStatus.PUBLISHED);
+        return jobPostingId;
+    }
+
     private JobPostingCreateRequest createJobPostingRequest(String title, LocalDateTime start, LocalDateTime end) {
+        return createJobPostingRequest(
+                title,
+                start,
+                end,
+                new ApplicationFormConfigRequest(false, false, false, false, false, false, false)
+        );
+    }
+
+    private JobPostingCreateRequest createJobPostingRequest(
+            String title,
+            LocalDateTime start,
+            LocalDateTime end,
+            ApplicationFormConfigRequest formConfig
+    ) {
         return new JobPostingCreateRequest(
                 title,
                 "<p>content</p>",
@@ -825,8 +867,24 @@ class JobApplicationServiceTest {
                         new JobPositionRequest("Backend", 2, 0),
                         new JobPositionRequest("Frontend", 1, 1)
                 ),
-                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+                formConfig
         );
+    }
+
+    private void assertSubmitValidationFailureKeepsDraft(String loginId, ApplicationFormConfigRequest formConfig) {
+        Applicant applicant = createApplicant(loginId, loginId);
+        Long jobPostingId = createPublishedJobPosting("Submit Validation " + loginId, formConfig);
+        Long applicationId = jobApplicationService.create(
+                applicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
+        );
+
+        assertThatThrownBy(() -> jobApplicationService.submit(applicant.getId(), applicationId))
+                .isInstanceOf(InvalidJobApplicationException.class);
+
+        JobApplication application = jobApplicationRepository.findById(applicationId).orElseThrow();
+        assertThat(application.getStatus()).isEqualTo(JobApplicationStatus.DRAFT);
+        assertThat(application.getSubmittedAt()).isNull();
     }
 
     private Long firstJobPositionId(Long jobPostingId) {

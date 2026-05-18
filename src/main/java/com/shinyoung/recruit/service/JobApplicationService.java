@@ -41,6 +41,7 @@ public class JobApplicationService {
     private final ApplicantRepository applicantRepository;
     private final JobPostingRepository jobPostingRepository;
     private final JobPositionRepository jobPositionRepository;
+    private final ApplicationSubmitValidator applicationSubmitValidator;
     private final Clock clock;
 
     @Transactional
@@ -94,7 +95,7 @@ public class JobApplicationService {
         validateDraftForSubmit(application);
         validateApplicationFormConfig(application.getJobPosting());
         validateSelectedJobPosition(application);
-        // Detailed required-section validation belongs to later Application section phases.
+        applicationSubmitValidator.validate(application);
         application.submit(LocalDateTime.now(clock));
 
         return application.getId();

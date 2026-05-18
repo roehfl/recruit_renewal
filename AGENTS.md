@@ -318,3 +318,72 @@ Do not generate vague documentation.
 Document actual implemented code only.
 
 If implementation and documentation disagree, fix the documentation before reporting completion.
+
+## Documentation Output Rule
+
+For every implementation or design phase, maintain two documentation outputs.
+
+1. Codex reference document
+   - Format: Markdown
+   - Location:
+     - `docs/codex/design/`
+     - `docs/codex/implementation/`
+   - Purpose:
+     - Source of truth for Codex and future implementation phases.
+     - Keep the existing markdown style and level of detail.
+   - Must include:
+     - Phase name
+     - Purpose
+     - Scope
+     - Out-of-scope items
+     - Changed files
+     - API list
+     - Entity/DTO/Service/Controller summary
+     - Validation and business rules
+     - Test commands
+     - Test results
+     - Remaining issues
+     - Next phase recommendation
+
+2. Human-readable status report
+   - Format: single self-contained HTML file
+   - Location:
+     - `docs/codex/reports/`
+   - File name:
+     - Same phase slug as the markdown file.
+     - Example:
+       - `docs/codex/implementation/phase-03c-6-application-attachment-metadata.md`
+       - `docs/codex/reports/phase-03c-6-application-attachment-metadata.html`
+   - Purpose:
+     - Visual phase result/status page for human readers.
+   - Requirements:
+     - Must be generated from the corresponding markdown content.
+     - Must not replace the markdown document.
+     - Must be self-contained: inline CSS, no external CDN, no external JS.
+     - Use a structured layout with sections, cards, tables, badges, and summary blocks.
+     - Clearly separate:
+       - Completed scope
+       - Not implemented scope
+       - API list
+       - Changed files
+       - Domain/Entity structure
+       - Validation rules
+       - Test results
+       - Remaining issues
+       - Next phase
+     - Use status badges:
+       - Completed: blue or green
+       - Pending: gray or orange
+       - Out of scope: red or muted red
+       - Warning/open issue: amber
+     - Do not expose secrets, credentials, internal storage paths, or sensitive personal data.
+     - If the markdown says that a field must not be exposed, the HTML must not present it as an exposed API response field.
+
+When a phase is completed, update both files:
+- The markdown file for Codex continuity.
+- The HTML report for human-readable project status.
+
+For human-readable HTML reports, follow:
+- `docs/codex/templates/human-report-template.md`
+
+If only one of the two is updated, the task is incomplete.

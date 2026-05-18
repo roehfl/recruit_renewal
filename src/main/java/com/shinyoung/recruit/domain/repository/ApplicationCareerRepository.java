@@ -11,5 +11,7 @@ public interface ApplicationCareerRepository extends JpaRepository<ApplicationCa
 
     List<ApplicationCareer> findByJobApplicationId(Long applicationId);
 
+    boolean existsByJobApplicationId(Long applicationId);
+
     void deleteByJobApplicationId(Long applicationId);
 }

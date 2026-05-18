@@ -1,0 +1,37 @@
+package com.shinyoung.recruit.dto.response;
+
+import com.shinyoung.recruit.domain.entity.ApplicationCareer;
+import com.shinyoung.recruit.enumeration.EmploymentType;
+
+import java.time.LocalDate;
+
+public record AdminCareerItemResponse(
+        Long careerId,
+        String companyName,
+        String departmentName,
+        String positionTitle,
+        EmploymentType employmentType,
+        LocalDate startDate,
+        LocalDate endDate,
+        Boolean currentlyEmployed,
+        String responsibilities,
+        String resignationReason,
+        Integer sortOrder
+) {
+
+    public static AdminCareerItemResponse from(ApplicationCareer career) {
+        return new AdminCareerItemResponse(
+                career.getId(),
+                career.getCompanyName(),
+                career.getDepartmentName(),
+                career.getPositionTitle(),
+                career.getEmploymentType(),
+                career.getStartDate(),
+                career.getEndDate(),
+                career.getCurrentlyEmployed(),
+                career.getResponsibilities(),
+                career.getResignationReason(),
+                career.getSortOrder()
+        );
+    }
+}

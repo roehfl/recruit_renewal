@@ -238,7 +238,7 @@ class AdminApplicationControllerTest {
                         new JobPositionRequest("Backend", 2, 0),
                         new JobPositionRequest("Frontend", 1, 1)
                 ),
-                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+                new ApplicationFormConfigRequest(false, false, false, false, false, false, false)
         ));
         jobPostingService.publish(jobPostingId);
         return jobPostingId;

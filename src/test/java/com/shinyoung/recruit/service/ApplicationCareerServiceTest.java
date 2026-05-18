@@ -363,7 +363,7 @@ class ApplicationCareerServiceTest {
     @Test
     void replace_fails_when_application_is_not_draft() {
         Applicant submittedApplicant = createApplicant("career-submitted", "Career Submitted");
-        Long submittedApplicationId = createApplication(submittedApplicant, createPublishedJobPosting(true));
+        Long submittedApplicationId = createApplication(submittedApplicant, createPublishedJobPosting(false));
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
@@ -373,7 +373,7 @@ class ApplicationCareerServiceTest {
         )).isInstanceOf(InvalidJobApplicationException.class);
 
         Applicant withdrawnApplicant = createApplicant("career-withdrawn", "Career Withdrawn");
-        Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting(true));
+        Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting(false));
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);
 
@@ -463,7 +463,7 @@ class ApplicationCareerServiceTest {
                         new JobPositionRequest("Backend", 2, 0),
                         new JobPositionRequest("Frontend", 1, 1)
                 ),
-                new ApplicationFormConfigRequest(true, useCareer, true, true, true, true, true)
+                new ApplicationFormConfigRequest(false, useCareer, false, false, false, false, false)
         ));
         jobPostingService.publish(jobPostingId);
         return jobPostingId;

@@ -301,7 +301,7 @@ class ApplicationCertificateServiceTest {
                         new JobPositionRequest("Backend", 2, 0),
                         new JobPositionRequest("Frontend", 1, 1)
                 ),
-                new ApplicationFormConfigRequest(true, true, useCertificate, true, true, true, true)
+                new ApplicationFormConfigRequest(false, false, useCertificate, false, false, false, false)
         ));
         jobPostingService.publish(jobPostingId);
         return jobPostingId;

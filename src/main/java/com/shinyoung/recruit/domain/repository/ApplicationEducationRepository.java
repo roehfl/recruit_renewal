@@ -11,5 +11,7 @@ public interface ApplicationEducationRepository extends JpaRepository<Applicatio
 
     List<ApplicationEducation> findByJobApplicationId(Long applicationId);
 
+    boolean existsByJobApplicationId(Long applicationId);
+
     void deleteByJobApplicationId(Long applicationId);
 }

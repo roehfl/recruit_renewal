@@ -171,7 +171,7 @@ class ApplicationMilitaryServiceTest {
     @Test
     void save_fails_when_application_is_not_draft() {
         Applicant submittedApplicant = createApplicant("military-submitted", "Military Submitted");
-        Long submittedApplicationId = createApplication(submittedApplicant, createPublishedJobPosting(true));
+        Long submittedApplicationId = createApplication(submittedApplicant, createPublishedJobPosting(false));
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
         assertThatThrownBy(() -> applicationMilitaryService.saveMilitary(
@@ -181,7 +181,7 @@ class ApplicationMilitaryServiceTest {
         )).isInstanceOf(InvalidJobApplicationException.class);
 
         Applicant withdrawnApplicant = createApplicant("military-withdrawn", "Military Withdrawn");
-        Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting(true));
+        Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting(false));
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);
 
@@ -358,7 +358,7 @@ class ApplicationMilitaryServiceTest {
                         new JobPositionRequest("Backend", 2, 0),
                         new JobPositionRequest("Frontend", 1, 1)
                 ),
-                new ApplicationFormConfigRequest(true, true, true, true, useMilitary, true, true)
+                new ApplicationFormConfigRequest(false, false, false, false, useMilitary, false, false)
         ));
         jobPostingService.publish(jobPostingId);
         return jobPostingId;

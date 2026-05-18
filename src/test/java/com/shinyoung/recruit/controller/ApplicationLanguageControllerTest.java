@@ -225,7 +225,7 @@ class ApplicationLanguageControllerTest {
                         new JobPositionRequest("Backend", 2, 0),
                         new JobPositionRequest("Frontend", 1, 1)
                 ),
-                new ApplicationFormConfigRequest(true, true, true, useLanguage, true, true, true)
+                new ApplicationFormConfigRequest(false, false, false, useLanguage, false, false, false)
         ));
         jobPostingService.publish(jobPostingId);
         return jobPostingId;

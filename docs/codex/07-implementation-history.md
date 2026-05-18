@@ -1,5 +1,150 @@
 # 07. Implementation History
 
+## Phase 03c-9 - Application Question/Answer Domain Design
+
+- 작업일: 2026-05-18
+- 목적: `JobApplication` 하위 자기소개서/질문답변 도메인을 구현하기 전에 공고별 질문 구성, 질문 템플릿, 지원서별 답변 저장, 제출 시 필수 답변 검증, 관리자 상세 답변 조회 확장 방향을 설계했다.
+- 핵심 설계:
+  - 추천 구조는 `QuestionTemplate` + `JobPostingQuestion` + `ApplicationAnswer`로 확정했다.
+  - `QuestionTemplate`은 전역 질문 은행으로 두고, `JobPostingQuestion`은 공고별 실제 질문 snapshot record로 둔다.
+  - `JobPostingQuestion.questionTemplate`은 nullable로 두어 템플릿 기반 질문과 직접 작성 질문을 모두 지원한다.
+  - `ApplicationAnswer`는 지원서별 답변 record이며 `job_application_id + job_posting_question_id` unique 후보를 둔다.
+  - 자기소개서는 별도 Entity가 아니라 `QuestionCategory.SELF_INTRODUCTION` 카테고리로 일반 질문답변 구조에 포함한다.
+  - 초기 답변 타입은 `SHORT_TEXT`, `LONG_TEXT`로 시작하고 선택형/파일형 답변은 후속 Phase로 보류한다.
+  - 공고 질문 구성은 `JobPosting.status=DRAFT`에서만 수정 허용하고, `PUBLISHED` 이후 변경은 revision/reopen 정책 전까지 금지하는 방향을 추천한다.
+  - 지원자 답변 저장은 `DRAFT` 상태에서만 허용하며, required 미입력은 DRAFT 저장에서는 허용하고 submit 시 실패시키는 방향으로 설계했다.
+  - 관리자 답변 조회는 Phase 03c-8 lazy section API 흐름에 맞춰 `GET /admin/applications/{applicationId}/answers` 후보로 둔다.
+- 문서:
+  - `docs/codex/design/phase-03c-9-question-answer-design.md`
+  - `docs/codex/reports/phase-03c-9-question-answer-design.html`
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+- 테스트 결과: 설계 문서 작업이므로 테스트는 실행하지 않음. Java 코드, 테스트 코드, 설정 파일, DB schema는 변경하지 않음.
+- 보정 사항:
+  - `docs/codex/design/phase-03c-application-detail-design.md`의 다음 Phase 추천을 Phase 03c-9 설계 완료 이후 구현 흐름으로 갱신했다.
+  - `docs/codex/reports/phase-03c-8-admin-application-section-read.html`의 깨진 PowerShell `AES_SECRET_KEY` 마스킹 표기를 `$env:AES_SECRET_KEY='***'; .\gradlew.bat ...` 형태로 보정했다.
+- 남은 이슈:
+  - `QuestionSet` 도입, 질문 revision/reopen 정책, 선택형 답변 option 도메인, 파일형 답변과 Attachment 연결 방식은 보류했다.
+  - 답변 원문 열람 권한과 감사 로그는 보안 Phase에서 별도 설계한다.
+- 다음 작업: Phase 03c-9-1에서 `QuestionTemplate` + `JobPostingQuestion` 관리자 질문 구성 API를 구현한다.
+
+## Phase 03c-8 - Admin Application Detail Section Read API
+
+- 작업일: 2026-05-18
+- 목적: 관리자 Application 루트 상세 조회는 유지하면서, 학력/경력/자격/어학/병역/수상/공백기간/첨부 metadata를 섹션별 lazy read-only API로 조회할 수 있게 확장했다.
+- 핵심 구현:
+  - `AdminApplicationSectionController` 추가
+  - `AdminApplicationSectionService` 추가
+  - 관리자 전용 상세 섹션 응답 DTO 10종 추가
+  - 지원자 상세 섹션 Service 재사용 없이 Repository 기반 read-only 조회 구현
+  - 목록형 섹션 빈 배열, `military` 저장 전 `data=null`, `careers` profile 없음 시 `NOT_SELECTED + []` 정책 적용
+  - 자격번호는 `certificateNumberMasked`, 병역 면제 사유는 `exemptionReasonMasked`만 응답
+  - Attachment 응답에서 `storedFileName`, `storagePath`, 다운로드 URL 비노출 유지
+  - 관리자 조회는 DRAFT/SUBMITTED/WITHDRAWN 상태와 공고 상태/접수기간에 무관하게 허용
+- 주요 클래스:
+  - `AdminApplicationSectionController`
+  - `AdminApplicationSectionService`
+  - `AdminEducationResponse`, `AdminSemesterGradeResponse`
+  - `AdminCareerResponse`, `AdminCareerItemResponse`
+  - `AdminCertificateResponse`, `AdminLanguageResponse`, `AdminMilitaryResponse`
+  - `AdminAwardResponse`, `AdminGapPeriodResponse`, `AdminAttachmentResponse`
+  - `AdminApplicationSectionServiceTest`
+  - `AdminApplicationSectionControllerTest`
+- API:
+  - `GET /admin/applications/{applicationId}/educations`
+  - `GET /admin/applications/{applicationId}/careers`
+  - `GET /admin/applications/{applicationId}/certificates`
+  - `GET /admin/applications/{applicationId}/languages`
+  - `GET /admin/applications/{applicationId}/military`
+  - `GET /admin/applications/{applicationId}/awards`
+  - `GET /admin/applications/{applicationId}/gap-periods`
+  - `GET /admin/applications/{applicationId}/attachments`
+- 테스트 결과:
+  - `AdminApplicationSectionServiceTest` 성공
+  - `AdminApplicationSectionControllerTest` 성공
+  - 기존 관리자 Application 루트 조회 테스트 성공
+  - Application submit validator 및 지원자 Application API 회귀 테스트 성공
+  - Education/Career/Certificate/Language/Military/Award/GapPeriod/Attachment 상세 섹션 회귀 테스트 성공
+  - `./gradlew.bat clean test` 성공
+- 남은 이슈:
+  - 실제 관리자 권한 세분화는 SecurityConfig 보안 Phase에서 처리한다.
+  - 자격번호/면제 사유 원문 열람 권한, 감사 로그, 다운로드 권한은 후속 보안/파일 Phase에서 검토한다.
+  - 관리자 상세 aggregate 단일 API는 아직 구현하지 않았다.
+- 다음 작업: 자기소개서/질문답변 도메인 또는 StageResult 전 Application 상세 조회 범위를 검토한다.
+
+## Phase 03c-7 - Application Submit Validator
+
+- 작업일: 2026-05-18
+- 목적: `JobApplicationService.submit()`에 `ApplicationFormConfig` 기반 상세 섹션 최종제출 검증을 연결했다.
+- 핵심 구현:
+  - `ApplicationSubmitValidator` 신규 추가
+  - `JobApplicationService.submit()`에서 기존 submit 가능 검증 이후, 상태 변경 직전에 validator 호출
+  - `ApplicationEducationRepository.existsByJobApplicationId` 추가
+  - `ApplicationCareerRepository.existsByJobApplicationId` 추가
+  - `useEducation=true`이면 Education 최소 1건 필수 검증
+  - `useCareer=true`이면 CareerProfile 필수, `NOT_SELECTED` 실패, `EXPERIENCED` Career row 필수, `NEWCOMER`/`NOT_APPLICABLE` Career row 방어 실패 검증
+  - `useMilitary=true`이면 Military record 필수, `COMPLETED` 복무기간 필수, `EXEMPTED` 면제 사유 필수 검증
+  - Certificate, Language, Award, GapPeriod, Attachment는 이번 Phase에서 선택 섹션으로 유지
+  - 기존 상세 섹션 저장 API path/method, Entity 구조, replace 저장 정책은 변경하지 않음
+- 주요 클래스:
+  - `ApplicationSubmitValidator`
+  - `ApplicationSubmitValidatorTest`
+  - `JobApplicationService`
+  - `ApplicationEducationRepository`
+  - `ApplicationCareerRepository`
+- API:
+  - 신규 API 없음
+  - `POST /applications/{applicationId}/submit` 내부 검증 강화
+- 테스트 결과:
+  - `ApplicationSubmitValidatorTest` 성공
+  - `JobApplicationServiceTest` 성공
+  - `ApplicationControllerTest` 성공
+  - Education/Career/Certificate/Language/Military/Award/GapPeriod/Attachment 상세 섹션 회귀 테스트 성공
+  - `./gradlew.bat clean test` 성공
+- 남은 이슈:
+  - Attachment 제출 필수 정책은 `ApplicationFormConfig` 확장 또는 별도 policy 도입 후 검토한다.
+  - Certificate/Language/Award/GapPeriod의 세부 required flag가 생기면 submit validator에 연결한다.
+  - 관리자 상세 섹션 API, StageResult, 자기소개서/질문답변은 후속 Phase로 유지한다.
+- 다음 작업: 관리자 상세 섹션 조회 API 또는 자기소개서/질문답변 도메인 범위를 검토한다.
+
+## Phase 03c-6 - Application Attachment Metadata
+
+- 작업일: 2026-05-15
+- 목적: `JobApplication` 하위 첨부파일 metadata를 지원자가 조회/replace 저장할 수 있게 구현했다.
+- 핵심 구현:
+  - `AttachmentType`, `ApplicationSectionType` enum 추가
+  - `ApplicationAttachment` Entity 추가
+  - `ApplicationAttachmentRepository` 추가
+  - `ApplicationAttachmentService`에서 본인 지원서, DRAFT 상태, PUBLISHED 공고, 접수기간 검증을 재사용해 첨부 metadata replace 저장 구현
+  - Attachment는 현재 `ApplicationFormConfig` flag 없이 저장 가능하도록 처리
+  - `sectionType=APPLICATION`이면 `sectionRecordId` 금지, 그 외 sectionType은 null 허용 및 값이 있으면 1 이상 검증
+  - `storedFileName`, `storagePath`는 저장하되 지원자 응답에서 제외
+  - `ApplicationAttachmentController`로 지원자 첨부 metadata 조회/저장 API 추가
+- 주요 클래스:
+  - `AttachmentType`
+  - `ApplicationSectionType`
+  - `ApplicationAttachment`
+  - `ApplicationAttachmentRepository`
+  - `AttachmentReplaceRequest`, `AttachmentRequest`
+  - `AttachmentResponse`
+  - `ApplicationAttachmentService`
+  - `ApplicationAttachmentController`
+  - `ApplicationAttachmentServiceTest`
+  - `ApplicationAttachmentControllerTest`
+- API:
+  - `GET /applications/{applicationId}/attachments`
+  - `POST /applications/{applicationId}/attachments`
+- 테스트 결과:
+  - `ApplicationAttachmentServiceTest` 성공
+  - `ApplicationAttachmentControllerTest` 성공
+  - Education/Career/Certificate/Language/Military/Award/GapPeriod 상세 섹션 회귀 테스트 성공
+  - `./gradlew.bat clean test` 성공
+- 남은 이슈:
+  - 실제 multipart 업로드/다운로드/저장소 연동은 구현하지 않았다.
+  - `sectionRecordId` 실제 상세 섹션 row 존재성 검증은 후속 정책 확정 후 보완한다.
+  - Attachment submit 필수 정책은 Phase 03c-7에서 검토한다.
+- 다음 작업: Phase 03c-7 `ApplicationSubmitValidator` 통합을 검토한다.
+
 ## Phase 03c-5 - Application Award + GapPeriod
 
 - 작업일: 2026-05-15

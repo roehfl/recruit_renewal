@@ -84,7 +84,7 @@ class ApplicationMilitaryControllerTest {
     @Test
     void get_military_returns_null_data_before_save() throws Exception {
         Applicant applicant = createApplicant("military-api-get", "Military Api Get");
-        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
+        Long applicationId = createApplication(applicant, createPublishedJobPosting(false));
         authenticate(applicant);
 
         mockMvc.perform(get("/applications/{applicationId}/military", applicationId))
@@ -226,7 +226,7 @@ class ApplicationMilitaryControllerTest {
     @Test
     void submitted_application_save_returns_api_response() throws Exception {
         Applicant applicant = createApplicant("military-api-submitted", "Military Api Submitted");
-        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
+        Long applicationId = createApplication(applicant, createPublishedJobPosting(false));
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
@@ -291,7 +291,7 @@ class ApplicationMilitaryControllerTest {
                         new JobPositionRequest("Backend", 2, 0),
                         new JobPositionRequest("Frontend", 1, 1)
                 ),
-                new ApplicationFormConfigRequest(true, true, true, true, useMilitary, true, true)
+                new ApplicationFormConfigRequest(false, false, false, false, useMilitary, false, false)
         ));
         jobPostingService.publish(jobPostingId);
         return jobPostingId;

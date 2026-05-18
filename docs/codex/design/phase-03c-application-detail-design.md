@@ -1,5 +1,59 @@
 # Phase 03c Application Detail Design
 
+## Phase 03c-9 Design Note
+
+- Phase 03c-9에서 자기소개서/질문답변 도메인 설계를 정리했다.
+- 추천 구조는 `QuestionTemplate` + `JobPostingQuestion` + `ApplicationAnswer`이다.
+- 자기소개서는 별도 Entity가 아니라 `QuestionCategory.SELF_INTRODUCTION` 카테고리의 질문답변으로 일반화한다.
+- `JobPostingQuestion`은 공고별 실제 질문 record이며 템플릿 참조는 nullable로 둔다. 질문 문구, 도움말, category, answerType, required, maxLength, sortOrder는 공고 배치 시점 snapshot으로 자체 보유한다.
+- `ApplicationAnswer`는 지원서별 답변 record이며 `questionTextSnapshot`, `answerTypeSnapshot`, `requiredSnapshot`, `maxLengthSnapshot`, `sortOrderSnapshot` 후보를 가진다.
+- 초기 답변 타입은 `SHORT_TEXT`, `LONG_TEXT`로 시작하고, 선택형/파일형 답변은 후속 Phase로 보류한다.
+- 공고 질문 구성은 `JobPosting.status=DRAFT`에서만 수정 허용하고, 게시 이후 질문 변경은 revision/reopen 정책 전까지 금지하는 방향을 추천한다.
+- 지원자 답변은 `DRAFT` 상태에서만 저장 가능하며, required 미입력은 DRAFT 저장에서는 허용하되 submit 시 실패시키는 방향을 추천한다.
+- 관리자 답변 조회는 Phase 03c-8의 lazy API 흐름에 맞춰 `GET /admin/applications/{applicationId}/answers` 후보로 둔다.
+- 이번 Phase는 설계 문서 작업만 수행했고 상세 섹션 Entity/API, `ApplicationSubmitValidator`, 관리자 상세 섹션 API는 변경하지 않았다.
+
+## Phase 03c-8 Implementation Note
+
+- Phase 03c-8에서 관리자 상세 섹션별 read-only lazy 조회 API를 구현했다.
+- 관리자 API는 `GET /admin/applications/{applicationId}/educations`, `/careers`, `/certificates`, `/languages`, `/military`, `/awards`, `/gap-periods`, `/attachments`만 추가했다.
+- 지원자 상세 섹션 API path/method, 저장 정책, replace 저장 방식, Entity 구조는 변경하지 않았다.
+- 관리자 조회용 `AdminApplicationSectionService`를 별도로 두어 지원자 소유자 검증과 DRAFT 저장 정책이 섞인 지원자 Service를 재사용하지 않았다.
+- 목록형 섹션은 빈 배열을 반환하고, `military`는 저장 전 `data=null`, `careers`는 profile이 없으면 `careerType=NOT_SELECTED`, `careers=[]`를 반환한다.
+- Education은 `sortOrder ASC, id ASC`, SemesterGrade는 `schoolYear ASC, semester ASC, id ASC`로 조회한다. Career/Certificate/Language/Award/GapPeriod/Attachment는 `sortOrder ASC, id ASC`로 조회한다.
+- Certificate 관리자 응답은 `certificateNumber` 원문 대신 `certificateNumberMasked`만 제공한다.
+- Military 관리자 응답은 `exemptionReason` 원문 대신 `exemptionReasonMasked`만 제공한다.
+- Attachment 관리자 응답은 `storedFileName`, `storagePath`, 다운로드 URL을 제공하지 않는다.
+- GapPeriod의 `reason`, `description`과 Award의 `description`은 관리자 상세 섹션 조회 목적상 포함하되, 관리자 목록 응답에는 포함하지 않는 정책을 유지한다.
+- 관리자 aggregate 상세 API, 관리자 수정/삭제 command, 파일 업로드/다운로드, StageResult, 자기소개서/질문답변은 이번 Phase에서 구현하지 않았다.
+
+## Phase 03c-7 Implementation Note
+
+- Phase 03c-7에서 `ApplicationSubmitValidator`를 구현해 `JobApplicationService.submit()`에 연결했다.
+- Validator는 상태 전이를 수행하지 않고 `ApplicationFormConfig` 기반 상세 섹션 제출 가능 여부만 검증한다.
+- Education은 `useEducation=true`일 때 `ApplicationEducation` 최소 1건을 요구한다.
+- Career는 `useCareer=true`일 때 profile 필수, `NOT_SELECTED` 제출 실패, `EXPERIENCED` Career row 최소 1건, `NEWCOMER`/`NOT_APPLICABLE` Career row 없음 정책을 적용한다.
+- Military는 `useMilitary=true`일 때 record 필수, `militarySubjectType` 필수, `COMPLETED` 복무기간 필수, `EXEMPTED` 면제 사유 필수 정책을 적용한다.
+- Certificate, Language, Award, GapPeriod는 현재 선택 섹션으로 보고 최소 row를 강제하지 않는다.
+- Attachment는 현재 `ApplicationFormConfig` flag가 없어 submit 필수 검증에서 제외한다.
+- 기존 상세 섹션 저장 API path/method, Entity 구조, replace 저장 정책은 변경하지 않았다.
+- 관리자 상세 섹션 API, StageResult, 자기소개서/질문답변, 실제 파일 업로드/다운로드는 구현하지 않았다.
+
+## Phase 03c-6 Implementation Note
+
+- Phase 03c-6에서 Attachment metadata vertical slice를 구현했다.
+- 구현 클래스는 `ApplicationAttachment`, `ApplicationAttachmentService`, `ApplicationAttachmentController`, `ApplicationAttachmentRepository`, `AttachmentReplaceRequest`, `AttachmentRequest`, `AttachmentResponse`이다.
+- `AttachmentType`은 `RESUME`, `TRANSCRIPT`, `GRADUATION_CERTIFICATE`, `CAREER_CERTIFICATE`, `CERTIFICATE_PROOF`, `LANGUAGE_SCORE_REPORT`, `PORTFOLIO`, `ETC`로 시작한다.
+- `ApplicationSectionType`은 `APPLICATION`, `EDUCATION`, `CAREER`, `CERTIFICATE`, `LANGUAGE`, `MILITARY`, `AWARD`, `GAP_PERIOD`, `ETC`로 시작한다.
+- 지원자 API는 `GET /applications/{applicationId}/attachments`, `POST /applications/{applicationId}/attachments`이다.
+- replace 저장은 기존 Attachment row를 `applicationId` 기준 명시 삭제하고 새 metadata row를 저장하는 방식이다.
+- Attachment 목록 정렬은 구현 기준으로 `sortOrder ASC, id ASC`이다.
+- `storedFileName`, `storagePath`는 내부 관리 필드이며 `AttachmentResponse`에 포함하지 않는다.
+- 실제 multipart 파일 업로드, 다운로드, 저장소 연동, 파일 삭제 API는 구현하지 않았다.
+- Attachment는 현재 `ApplicationFormConfig` flag 없이 저장 가능하며, `DRAFT`, PUBLISHED 공고, 접수기간 내 조건만 검증한다.
+- `sectionType=APPLICATION`이면 `sectionRecordId`는 null이어야 하고, 그 외 sectionType은 DRAFT 저장에서 `sectionRecordId` null을 허용한다. 값이 있으면 1 이상이어야 한다.
+- submit 통합 검증과 관리자 상세 섹션 API는 아직 연결하지 않았다.
+
 ## Phase 03c-5 Implementation Note
 
 - Phase 03c-5에서 Award + GapPeriod vertical slice를 구현했다.
@@ -199,7 +253,7 @@ Phase 03c-0의 목적은 Phase 03a/03b에서 구현된 `JobApplication` 루트�
 | Military | `ApplicationMilitary` | `application_military` | 0..1 `JobApplication` | `militarySubjectType`, `serviceType`, `militaryBranch`, `rank`, `serviceStartDate`, `serviceEndDate`, `exemptionReason` | `militarySubjectType` | 단건 | 기본 미사용 | 면제 사유는 민감정보. 암호화/마스킹 우선 검토 | 포함 | 구현 완료 |
 | Award | `ApplicationAward` | `application_award` | N:1 `JobApplication` | `awardName`, `awardingOrganization`, `awardDate`, `description`, `sortOrder` | `awardName`, `awardingOrganization`, `awardDate`, `sortOrder` | `sortOrder ASC, id ASC` | 기본 미사용 | 설명에 개인정보가 들어갈 수 있어 주의 | 포함 | 구현 완료 |
 | GapPeriod | `ApplicationGapPeriod` | `application_gap_period` | N:1 `JobApplication` | `startDate`, `endDate`, `gapType`, `reason`, `description`, `sortOrder` | `startDate`, `endDate`, `gapType`, `reason`, `sortOrder` | `sortOrder ASC, id ASC` | 기본 미사용 | 사유/설명은 민감정보 가능. 관리자 노출 주의 | 포함 | 구현 완료 |
-| Attachment | `ApplicationAttachment` | `application_attachment` | N:1 `JobApplication` | `originalFileName`, `storedFileName`, `storagePath`, `contentType`, `fileSize`, `attachmentType`, `sectionType`, `sectionRecordId`, `sortOrder` | `originalFileName`, `storedFileName`, `storagePath`, `contentType`, `fileSize`, `attachmentType` | `attachmentType ASC, sortOrder ASC, id ASC` | 기본 미사용 | 파일명/경로는 민감정보. 원본 파일명 마스킹, 저장 경로 직접 노출 금지 | 제한 포함 | 6 |
+| Attachment | `ApplicationAttachment` | `application_attachment` | N:1 `JobApplication` | `originalFileName`, `storedFileName`, `storagePath`, `contentType`, `fileSize`, `attachmentType`, `sectionType`, `sectionRecordId`, `sortOrder` | `originalFileName`, `storedFileName`, `storagePath`, `contentType`, `fileSize`, `attachmentType`, `sectionType`, `sortOrder` | `sortOrder ASC, id ASC` | 기본 미사용 | `storedFileName`, `storagePath`는 내부 관리 필드로 응답 제외. 원본 파일명 마스킹은 관리자 상세 Phase에서 재검토 | 제한 포함 | 구현 완료 |
 
 ### Section Notes
 
@@ -256,7 +310,12 @@ Phase 03c-0의 목적은 Phase 03a/03b에서 구현된 `JobApplication` 루트�
 #### Attachment
 
 - 첨부파일은 `JobApplication` 소속 metadata로 시작한다.
-- 특정 섹션에 붙는 파일이 필요하면 `sectionType`, `sectionRecordId` 또는 별도 join 정책을 후속 검토한다.
+- 특정 섹션에 붙는 파일 힌트는 `sectionType`, `sectionRecordId`로 저장한다.
+- `sectionType=APPLICATION`이면 `sectionRecordId`는 null이어야 한다.
+- `sectionType!=APPLICATION`이면 DRAFT 저장에서는 `sectionRecordId` null을 허용한다. 값이 있으면 1 이상이어야 한다.
+- `sectionRecordId`가 실제 섹션 row에 존재하는지 검증은 파일 업로드/관리자 상세/섹션별 첨부 정책 확정 후 보완한다.
+- `storedFileName`, `storagePath`는 내부 관리 필드로 저장하되 지원자 응답에는 노출하지 않는다.
+- 현재 `ApplicationFormConfig`에 attachment flag가 없으므로 Attachment는 config enabled 검증을 하지 않는다.
 - 실제 파일 업로드, 저장소, 바이러스 검사, 다운로드 권한은 별도 Phase로 분리한다.
 
 ### Enum and Code Policy
@@ -506,13 +565,15 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 | Phase 03c-4 | Military vertical slice 구현 완료 | Award, GapPeriod, Attachment | 단건 병역 upsert, `useMilitary=true` submit 필수 1건 정책, 민감정보 응답 정책 |
 | Phase 03c-4R | 상세 섹션 공통 접근/수정 가능 helper 구현 완료 | SectionType enum 일반화, submit validator | 본인 지원서 조회, DRAFT/PUBLISHED/접수기간, config enabled 검증 |
 | Phase 03c-5 | Award + GapPeriod vertical slice 구현 완료 | Attachment, submit 통합 검증 전체 | 수상/공백기간 기간 검증, 정렬, config 연동 |
-| Phase 03c-6 | Attachment metadata | 실제 파일 업로드/다운로드 저장소 연동 | metadata 저장/조회, 저장 경로 비노출, attachmentType 검증 |
+| Phase 03c-6 | Attachment metadata 구현 완료 | 실제 파일 업로드/다운로드 저장소 연동 | metadata 저장/조회, 저장 경로 비노출, attachmentType 검증 |
 | Phase 03c-7 | `ApplicationSubmitValidator` 통합 | 관리자 aggregate 상세 | `submit()`에서 config 기반 섹션 필수 검증 실패/성공 |
 | Phase 03c-8 | 관리자 상세 섹션 조회 API 확장 | StageResult | 관리자 섹션별 조회, 마스킹, 권한 보완 TODO |
+| Phase 03c-9 | 질문답변 도메인 설계 완료 | Java 구현, DB schema, API 구현 | `QuestionTemplate` + `JobPostingQuestion` + `ApplicationAnswer` 추천 구조, submit 연동 방향, 관리자 답변 조회 후보 |
+| Phase 03c-9-1 | 질문 템플릿/공고 질문 구성 구현 후보 | 지원자 답변 저장, submit 연동 | 관리자 질문 구성 API와 템플릿 API |
 
 ## 13. Deferred Items
 
-- 자기소개서/질문답변 도메인
+- 자기소개서/질문답변 도메인 Java 구현
 - 상세 섹션별 required flag 세분화
 - Career submit 정책: `NOT_SELECTED` 실패 여부와 `EXPERIENCED` 최소 1개 필수 여부
 - 최종제출 후 수정요청/반려/reopen 정책
@@ -524,4 +585,4 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 
 ## 14. Recommended Next Phase
 
-다음 기능 구현은 Phase 03c-6: Attachment metadata vertical slice를 추천한다. 일반 상세 섹션은 Education, Career, Certificate, Language, Military, Award, GapPeriod까지 구현되었으므로 `ApplicationSubmitValidator`로 바로 갈 수도 있지만, Attachment metadata가 아직 비어 있으면 submit 검증 범위가 다시 흔들릴 수 있다. 실제 파일 업로드/다운로드 저장소 연동은 분리하고, 우선 `JobApplication` 하위 첨부 metadata 저장/조회와 저장 경로 비노출 정책을 고정한 뒤 Phase 03c-7에서 submit validator를 통합하는 것이 안전하다.
+Phase 03c-9에서 자기소개서/질문답변 도메인 설계가 완료되었으므로 다음 구현은 Phase 03c-9-1: `QuestionTemplate` + `JobPostingQuestion` 관리자 질문 구성 API를 추천한다. 질문 구성 기준이 먼저 있어야 지원자 답변 저장, submit validator 필수 답변 검증, 관리자 답변 lazy 조회를 안정적으로 이어갈 수 있다. StageResult 전에는 Application 상세 조회 범위와 질문답변 포함 여부를 다시 확인하고, 실제 파일 업로드/다운로드 저장소 연동은 별도 파일 Phase로 분리한다.

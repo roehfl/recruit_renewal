@@ -204,7 +204,7 @@ class ApplicationEducationServiceTest {
     @Test
     void replace_fails_when_application_is_not_draft() {
         Applicant submittedApplicant = createApplicant("education-submitted", "Education Submitted");
-        Long submittedPostingId = createPublishedJobPosting(true);
+        Long submittedPostingId = createPublishedJobPosting(false);
         Long submittedApplicationId = createApplication(submittedApplicant, submittedPostingId);
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
@@ -215,7 +215,7 @@ class ApplicationEducationServiceTest {
         )).isInstanceOf(InvalidJobApplicationException.class);
 
         Applicant withdrawnApplicant = createApplicant("education-withdrawn", "Education Withdrawn");
-        Long withdrawnPostingId = createPublishedJobPosting(true);
+        Long withdrawnPostingId = createPublishedJobPosting(false);
         Long withdrawnApplicationId = createApplication(withdrawnApplicant, withdrawnPostingId);
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);
@@ -424,7 +424,7 @@ class ApplicationEducationServiceTest {
                         new JobPositionRequest("Backend", 2, 0),
                         new JobPositionRequest("Frontend", 1, 1)
                 ),
-                new ApplicationFormConfigRequest(useEducation, true, true, true, true, true, true)
+                new ApplicationFormConfigRequest(useEducation, false, false, false, false, false, false)
         ));
         jobPostingService.publish(jobPostingId);
         return jobPostingId;

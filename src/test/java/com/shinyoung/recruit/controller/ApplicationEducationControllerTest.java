@@ -88,7 +88,7 @@ class ApplicationEducationControllerTest {
     @Test
     void get_educations_returns_api_response() throws Exception {
         Applicant applicant = createApplicant("education-api-get", "Education Api Get");
-        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
+        Long applicationId = createApplication(applicant, createPublishedJobPosting(false));
         authenticate(applicant);
 
         mockMvc.perform(get("/applications/{applicationId}/educations", applicationId))
@@ -195,7 +195,7 @@ class ApplicationEducationControllerTest {
     @Test
     void submitted_application_replace_returns_api_response() throws Exception {
         Applicant applicant = createApplicant("education-api-submitted", "Education Api Submitted");
-        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
+        Long applicationId = createApplication(applicant, createPublishedJobPosting(false));
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
@@ -256,7 +256,7 @@ class ApplicationEducationControllerTest {
                         new JobPositionRequest("Backend", 2, 0),
                         new JobPositionRequest("Frontend", 1, 1)
                 ),
-                new ApplicationFormConfigRequest(useEducation, true, true, true, true, true, true)
+                new ApplicationFormConfigRequest(useEducation, false, false, false, false, false, false)
         ));
         jobPostingService.publish(jobPostingId);
         return jobPostingId;

@@ -269,6 +269,27 @@ class ApplicationControllerTest {
     }
 
     @Test
+    void submit_detail_validation_failure_returns_api_response() throws Exception {
+        Applicant applicant = createApplicant("api-submit-detail-validation", "Api Submit Detail Validation");
+        Long jobPostingId = createPublishedJobPosting(new ApplicationFormConfigRequest(
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+        ));
+        Long applicationId = createApplication(applicant, jobPostingId);
+        authenticate(applicant);
+
+        mockMvc.perform(post("/applications/{applicationId}/submit", applicationId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
     void submit_other_applicants_application_is_hidden() throws Exception {
         Applicant owner = createApplicant("api-submit-owner", "Api Submit Owner");
         Applicant other = createApplicant("api-submit-other", "Api Submit Other");
@@ -405,6 +426,18 @@ class ApplicationControllerTest {
     }
 
     private Long createPublishedJobPosting() {
+        return createPublishedJobPosting(new ApplicationFormConfigRequest(
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+        ));
+    }
+
+    private Long createPublishedJobPosting(ApplicationFormConfigRequest formConfig) {
         Long jobPostingId = jobPostingService.create(new JobPostingCreateRequest(
                 "2026 recruitment",
                 "<p>content</p>",
@@ -414,7 +447,7 @@ class ApplicationControllerTest {
                         new JobPositionRequest("Backend", 2, 0),
                         new JobPositionRequest("Frontend", 1, 1)
                 ),
-                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+                formConfig
         ));
         jobPostingService.publish(jobPostingId);
         return jobPostingId;
