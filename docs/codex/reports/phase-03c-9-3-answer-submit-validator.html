@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03c-9-3 Answer Submit Validator Report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1d2733;
+      --muted: #617083;
+      --line: #d9e1ea;
+      --panel: #ffffff;
+      --bg: #f4f7fb;
+      --ok: #127a3a;
+      --warn: #9a5b00;
+      --hold: #5b5f6b;
+      --blue: #1b5fb8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, "Malgun Gothic", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.55;
+    }
+    header {
+      padding: 36px 40px 28px;
+      background: #172235;
+      color: #fff;
+    }
+    header p { margin: 8px 0 0; color: #d6e0ec; max-width: 980px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 48px; }
+    h1 { margin: 0; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 0 0 14px; font-size: 20px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    .grid { display: grid; gap: 16px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-right: 6px;
+      border: 1px solid transparent;
+    }
+    .ok { color: var(--ok); background: #e9f7ee; border-color: #b7dfc4; }
+    .warn { color: var(--warn); background: #fff4dd; border-color: #f0cf91; }
+    .hold { color: var(--hold); background: #eef1f5; border-color: #d7dde5; }
+    .info { color: var(--blue); background: #eaf2ff; border-color: #bfd6fb; }
+    table { width: 100%; border-collapse: collapse; background: var(--panel); }
+    th, td { border: 1px solid var(--line); padding: 10px 12px; vertical-align: top; text-align: left; }
+    th { background: #eef3f9; font-weight: 700; }
+    code { font-family: Consolas, "Courier New", monospace; font-size: .94em; background: #eef3f9; padding: 1px 4px; border-radius: 4px; }
+    ul { margin: 8px 0 0 18px; padding: 0; }
+    li { margin: 4px 0; }
+    section { margin-top: 18px; }
+    .note { color: var(--muted); font-size: 14px; }
+    .callout { border-left: 4px solid var(--blue); padding-left: 14px; }
+    @media (max-width: 840px) {
+      header { padding: 28px 22px; }
+      main { padding: 20px 14px 36px; }
+      .grid.two, .grid.three { grid-template-columns: 1fr; }
+      table { font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Phase 03c-9-3: ApplicationSubmitValidator Question/Answer Integration</h1>
+    <p>Final submit now validates active required job posting questions against applicant answers while keeping DRAFT answer save and existing APIs unchanged.</p>
+  </header>
+
+  <main>
+    <section class="grid three">
+      <div class="card">
+        <span class="badge ok">Implemented</span>
+        <h2>Scope</h2>
+        <p>Question/answer validation was added to <code>ApplicationSubmitValidator</code>.</p>
+      </div>
+      <div class="card">
+        <span class="badge hold">No New API</span>
+        <h2>API Surface</h2>
+        <p>No path or method was added. Existing submit validation became stricter.</p>
+      </div>
+      <div class="card">
+        <span class="badge ok">Verified</span>
+        <h2>Tests</h2>
+        <p>Focused regression tests and <code>clean test --no-daemon</code> completed successfully.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Changed Files</h2>
+      <table>
+        <thead><tr><th>File</th><th>Change</th></tr></thead>
+        <tbody>
+          <tr><td><code>ApplicationSubmitValidator.java</code></td><td>Added active question lookup, answer lookup, required/blank/maxLength/type-limit validation.</td></tr>
+          <tr><td><code>ApplicationSubmitValidatorTest.java</code></td><td>Added unit tests for required, optional, inactive, foreign answer, maxLength, and type limit policies.</td></tr>
+          <tr><td><code>JobApplicationServiceTest.java</code></td><td>Added submit success/failure integration tests for required answers.</td></tr>
+          <tr><td><code>ApplicationControllerTest.java</code></td><td>Added submit API 400 response test for missing required answer.</td></tr>
+          <tr><td><code>ApplicationAnswerServiceTest.java</code></td><td>Adjusted submitted/withdrawn fixture questions to keep answer API regression intent clear.</td></tr>
+          <tr><td><code>ApplicationAnswerControllerTest.java</code></td><td>Adjusted submitted fixture question to optional for non-writable API test.</td></tr>
+          <tr><td><code>docs/codex/**</code></td><td>Added implementation document, updated design/history, and generated this report.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid two">
+      <div class="card">
+        <span class="badge ok">Submit Rule</span>
+        <h2>Required Questions</h2>
+        <ul>
+          <li>Active <code>required=true</code> question with no answer row fails.</li>
+          <li>Null <code>answerText</code> fails.</li>
+          <li>Blank <code>answerText</code> fails.</li>
+          <li>Failure uses existing <code>InvalidJobApplicationException</code>.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <span class="badge info">Preserved</span>
+        <h2>Optional Questions</h2>
+        <ul>
+          <li><code>required=false</code> questions may be unanswered.</li>
+          <li>Null or blank optional answers pass submit.</li>
+          <li>Length limits still apply to non-null answers.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Validation Policy Table</h2>
+      <table>
+        <thead><tr><th>Condition</th><th>Result</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>No active questions</td><td><span class="badge ok">Pass</span></td><td>Questionless postings can still be submitted.</td></tr>
+          <tr><td>Required active question missing answer</td><td><span class="badge warn">Fail</span></td><td>Blocks final submit only.</td></tr>
+          <tr><td>Required active question null/blank answer</td><td><span class="badge warn">Fail</span></td><td>Uses <code>String.isBlank()</code> behavior.</td></tr>
+          <tr><td>Optional question missing/blank answer</td><td><span class="badge ok">Pass</span></td><td>Optional remains optional.</td></tr>
+          <tr><td>Answer exceeds question maxLength</td><td><span class="badge warn">Fail</span></td><td>Revalidated at submit.</td></tr>
+          <tr><td><code>SHORT_TEXT</code> exceeds 500</td><td><span class="badge warn">Fail</span></td><td>Defensive hard limit.</td></tr>
+          <tr><td><code>LONG_TEXT</code> exceeds 5000</td><td><span class="badge warn">Fail</span></td><td>Defensive hard limit.</td></tr>
+          <tr><td>Inactive question</td><td><span class="badge hold">Ignored</span></td><td>Revision/history policy is deferred.</td></tr>
+          <tr><td>Answer outside active question set</td><td><span class="badge hold">Ignored</span></td><td>Not treated as submit failure in this phase.</td></tr>
+          <tr><td><code>minLength</code></td><td><span class="badge hold">Deferred</span></td><td>Stored but not enforced yet.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid two">
+      <div class="card callout">
+        <h2>Submit Flow</h2>
+        <ol>
+          <li>Find applicant-owned application.</li>
+          <li>Run existing DRAFT, posting status, reception period, and form config checks.</li>
+          <li>Run <code>ApplicationSubmitValidator.validate(application)</code>.</li>
+          <li>Only after validation passes, set submitted state and time.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h2>Not Implemented</h2>
+        <ul>
+          <li>Admin answer lazy read API</li>
+          <li>Applicant answer-only GET API</li>
+          <li>Choice/file answer domains</li>
+          <li>Attachment linkage</li>
+          <li>QuestionSet</li>
+          <li>StageResult</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Test Results</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td><code>$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.service.ApplicationSubmitValidatorTest</code></td><td><span class="badge ok">Success</span></td></tr>
+          <tr><td><code>$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.service.JobApplicationServiceTest --tests com.shinyoung.recruit.controller.ApplicationControllerTest --tests com.shinyoung.recruit.service.ApplicationAnswerServiceTest --tests com.shinyoung.recruit.controller.ApplicationAnswerControllerTest --tests com.shinyoung.recruit.service.QuestionTemplateServiceTest --tests com.shinyoung.recruit.controller.QuestionTemplateControllerTest --tests com.shinyoung.recruit.service.JobPostingQuestionServiceTest --tests com.shinyoung.recruit.controller.JobPostingQuestionControllerTest</code></td><td><span class="badge ok">Success</span></td></tr>
+          <tr><td><code>$env:AES_SECRET_KEY='***'; .\gradlew.bat clean test --no-daemon</code></td><td><span class="badge ok">Success</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Next Phase</h2>
+      <p>Recommended next phase: <strong>Phase 03c-9-4 Admin Answer Lazy Read API</strong>, adding <code>GET /admin/applications/{applicationId}/answers</code> with read-only answer DTOs and documented privacy/audit follow-up policies.</p>
+      <p class="note">This report is self-contained and does not replace the source markdown implementation document.</p>
+    </section>
+  </main>
+</body>
+</html>

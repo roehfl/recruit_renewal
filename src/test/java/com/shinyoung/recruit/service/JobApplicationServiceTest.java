@@ -10,16 +10,22 @@ import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPositionRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
+import com.shinyoung.recruit.dto.request.ApplicationAnswerReplaceRequest;
+import com.shinyoung.recruit.dto.request.ApplicationAnswerRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.ApplicationUpdateRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
+import com.shinyoung.recruit.dto.request.JobPostingQuestionCreateRequest;
+import com.shinyoung.recruit.dto.response.JobPostingQuestionResponse;
 import com.shinyoung.recruit.dto.response.AdminApplicationDetailResponse;
 import com.shinyoung.recruit.dto.response.AdminApplicationSummaryResponse;
 import com.shinyoung.recruit.dto.response.ApplicationDetailResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
+import com.shinyoung.recruit.enumeration.QuestionAnswerType;
+import com.shinyoung.recruit.enumeration.QuestionCategory;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
@@ -58,6 +64,12 @@ class JobApplicationServiceTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingQuestionService jobPostingQuestionService;
+
+    @Autowired
+    private ApplicationAnswerService applicationAnswerService;
 
     @Autowired
     private ApplicantRepository applicantRepository;
@@ -545,6 +557,48 @@ class JobApplicationServiceTest {
     }
 
     @Test
+    void submit_succeeds_when_required_question_answer_exists() {
+        Applicant applicant = createApplicant("applicant-submit-answer-ok", "Applicant Answer Ok");
+        Long jobPostingId = createDraftJobPosting();
+        JobPostingQuestionResponse question = createQuestion(jobPostingId, true, QuestionAnswerType.LONG_TEXT, 1000);
+        jobPostingService.publish(jobPostingId);
+        Long applicationId = jobApplicationService.create(
+                applicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
+        );
+        applicationAnswerService.replaceAnswers(
+                applicant.getId(),
+                applicationId,
+                new ApplicationAnswerReplaceRequest(List.of(new ApplicationAnswerRequest(question.questionId(), "submitted answer")))
+        );
+
+        Long submittedId = jobApplicationService.submit(applicant.getId(), applicationId);
+
+        JobApplication application = jobApplicationRepository.findById(submittedId).orElseThrow();
+        assertThat(application.getStatus()).isEqualTo(JobApplicationStatus.SUBMITTED);
+        assertThat(application.getSubmittedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void submit_fails_when_required_question_answer_is_missing_and_keeps_draft() {
+        Applicant applicant = createApplicant("applicant-submit-answer-missing", "Applicant Answer Missing");
+        Long jobPostingId = createDraftJobPosting();
+        createQuestion(jobPostingId, true, QuestionAnswerType.LONG_TEXT, 1000);
+        jobPostingService.publish(jobPostingId);
+        Long applicationId = jobApplicationService.create(
+                applicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
+        );
+
+        assertThatThrownBy(() -> jobApplicationService.submit(applicant.getId(), applicationId))
+                .isInstanceOf(InvalidJobApplicationException.class);
+
+        JobApplication application = jobApplicationRepository.findById(applicationId).orElseThrow();
+        assertThat(application.getStatus()).isEqualTo(JobApplicationStatus.DRAFT);
+        assertThat(application.getSubmittedAt()).isNull();
+    }
+
+    @Test
     void withdraw_submitted_application_success() {
         Applicant applicant = createApplicant("applicant-withdraw", "Applicant AB");
         Long jobPostingId = createPublishedJobPosting();
@@ -885,6 +939,25 @@ class JobApplicationServiceTest {
         JobApplication application = jobApplicationRepository.findById(applicationId).orElseThrow();
         assertThat(application.getStatus()).isEqualTo(JobApplicationStatus.DRAFT);
         assertThat(application.getSubmittedAt()).isNull();
+    }
+
+    private JobPostingQuestionResponse createQuestion(
+            Long jobPostingId,
+            boolean required,
+            QuestionAnswerType answerType,
+            int maxLength
+    ) {
+        return jobPostingQuestionService.createQuestion(jobPostingId, new JobPostingQuestionCreateRequest(
+                null,
+                "Submit question",
+                "Submit helper",
+                QuestionCategory.JOB_SPECIFIC,
+                answerType,
+                required,
+                null,
+                maxLength,
+                0
+        ));
     }
 
     private Long firstJobPositionId(Long jobPostingId) {

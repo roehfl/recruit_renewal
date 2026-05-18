@@ -112,7 +112,7 @@ class ApplicationAnswerServiceTest {
     @Test
     void get_questions_allowed_for_draft_submitted_and_withdrawn() {
         Long jobPostingId = createJobPosting();
-        createQuestion(jobPostingId, 0, QuestionAnswerType.LONG_TEXT, 3000, true);
+        createQuestion(jobPostingId, 0, QuestionAnswerType.LONG_TEXT, 3000, false);
         publish(jobPostingId);
 
         Applicant draftApplicant = createApplicant("answer-status-draft", "Answer Status Draft");
@@ -240,7 +240,7 @@ class ApplicationAnswerServiceTest {
     void replace_fails_when_application_is_not_writable() {
         Applicant submittedApplicant = createApplicant("answer-submitted", "Answer Submitted");
         Long submittedPostingId = createJobPosting();
-        JobPostingQuestionResponse submittedQuestion = createQuestion(submittedPostingId, 0, QuestionAnswerType.LONG_TEXT, 3000, true);
+        JobPostingQuestionResponse submittedQuestion = createQuestion(submittedPostingId, 0, QuestionAnswerType.LONG_TEXT, 3000, false);
         publish(submittedPostingId);
         Long submittedApplicationId = createApplication(submittedApplicant, submittedPostingId);
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
@@ -253,7 +253,7 @@ class ApplicationAnswerServiceTest {
 
         Applicant withdrawnApplicant = createApplicant("answer-withdrawn", "Answer Withdrawn");
         Long withdrawnPostingId = createJobPosting();
-        JobPostingQuestionResponse withdrawnQuestion = createQuestion(withdrawnPostingId, 0, QuestionAnswerType.LONG_TEXT, 3000, true);
+        JobPostingQuestionResponse withdrawnQuestion = createQuestion(withdrawnPostingId, 0, QuestionAnswerType.LONG_TEXT, 3000, false);
         publish(withdrawnPostingId);
         Long withdrawnApplicationId = createApplication(withdrawnApplicant, withdrawnPostingId);
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);

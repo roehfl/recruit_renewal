@@ -1,5 +1,16 @@
 # Phase 03c Application Detail Design
 
+## Phase 03c-9-3 Implementation Note
+
+- Phase 03c-9-3 connected active `JobPostingQuestion` answer validation to `ApplicationSubmitValidator`.
+- Final submit now fails when a required active question has no `ApplicationAnswer`, a null answer, or a blank answer.
+- Final submit also rechecks answer length against `JobPostingQuestion.maxLength` and the answer type hard limit (`SHORT_TEXT` 500, `LONG_TEXT` 5000).
+- Optional questions remain optional at submit, and blank optional answers are allowed unless they exceed length limits.
+- Inactive questions and answer rows outside the active question set are not submit validation targets in this phase.
+- `minLength` remains a stored question policy field, but submit validation does not enforce it yet.
+- Applicant answer save APIs, admin section APIs, question configuration APIs, and detail section entity structures were not changed.
+- Next implementation recommendation is Phase 03c-9-4: admin answer lazy read API. Before StageResult, confirm the final Application detail/report read scope for question answers.
+
 ## Phase 03c-9-2 Implementation Note
 
 - Phase 03c-9-2 implemented `ApplicationAnswer` and applicant question/answer APIs.
@@ -10,8 +21,8 @@
 - `JobApplication` and `JobPostingQuestion` still do not have answer collections; cascade/orphanRemoval was not added.
 - Applicant question list returns active posting questions only, with current answer data when present.
 - Applicant answer save uses replace semantics: delete all existing answers for the application, then save requested rows with question snapshots.
-- DRAFT save permits null/blank answers, including required questions. Required/blank validation is deferred to submit validator integration.
-- Admin answer read API and `ApplicationSubmitValidator` question/answer integration remain out of scope for this phase.
+- DRAFT save permits null/blank answers, including required questions. Required/blank validation is handled by Phase 03c-9-3 submit validator integration.
+- Admin answer read API remains out of scope for this phase.
 
 ## Phase 03c-9-1 Implementation Note
 
@@ -592,11 +603,12 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 | Phase 03c-8 | 관리자 상세 섹션 조회 API 확장 | StageResult | 관리자 섹션별 조회, 마스킹, 권한 보완 TODO |
 | Phase 03c-9 | 질문답변 도메인 설계 완료 | Java 구현, DB schema, API 구현 | `QuestionTemplate` + `JobPostingQuestion` + `ApplicationAnswer` 추천 구조, submit 연동 방향, 관리자 답변 조회 후보 |
 | Phase 03c-9-1 | 질문 템플릿/공고 질문 구성 구현 완료 | 지원자 답변 저장, submit 연동 | 관리자 질문 구성 API와 템플릿 API |
-| Phase 03c-9-2 | 지원자 질문 목록/답변 저장 구현 후보 | 관리자 답변 조회, submit 연동 | `ApplicationAnswer`, 지원자 질문/답변 API |
+| Phase 03c-9-2 | 지원자 질문 목록/답변 저장 구현 완료 | 관리자 답변 조회, submit 연동 | `ApplicationAnswer`, 지원자 질문/답변 API |
+| Phase 03c-9-3 | 질문답변 submit validator 연동 완료 | 관리자 답변 조회 | active required 질문의 누락/blank/maxLength 검증 |
 
 ## 13. Deferred Items
 
-- Question/answer remaining work: connect answer required/blank/maxLength validation to `ApplicationSubmitValidator`, then add admin answer lazy read API.
+- Question/answer remaining work: add admin answer lazy read API after Phase 03c-9-3 submit validator integration.
 - 상세 섹션별 required flag 세분화
 - Career submit 정책: `NOT_SELECTED` 실패 여부와 `EXPERIENCED` 최소 1개 필수 여부
 - 최종제출 후 수정요청/반려/reopen 정책
@@ -608,6 +620,6 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 
 ## 14. Recommended Next Phase
 
-Phase 03c-9-2 has completed the applicant `ApplicationAnswer` and question/answer APIs. The next implementation recommendation is Phase 03c-9-3: connect active required `JobPostingQuestion` answer blank/maxLength validation to `ApplicationSubmitValidator`. After that, implement the admin answer lazy read API. Before StageResult implementation, confirm whether Application detail read models and reports include question/answer content.
+Phase 03c-9-3 has completed active required `JobPostingQuestion` answer blank/maxLength validation in `ApplicationSubmitValidator`. The next implementation recommendation is Phase 03c-9-4: admin answer lazy read API (`GET /admin/applications/{applicationId}/answers`). Before StageResult implementation, confirm whether Application detail read models and reports include question/answer content.
 
 

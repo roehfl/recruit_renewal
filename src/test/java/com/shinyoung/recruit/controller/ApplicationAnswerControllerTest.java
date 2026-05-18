@@ -336,7 +336,7 @@ class ApplicationAnswerControllerTest {
                 "Helper " + sortOrder,
                 QuestionCategory.JOB_SPECIFIC,
                 QuestionAnswerType.LONG_TEXT,
-                true,
+                false,
                 null,
                 3000,
                 sortOrder

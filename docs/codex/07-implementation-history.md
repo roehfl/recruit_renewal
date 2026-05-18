@@ -1,5 +1,42 @@
 # 07. Implementation History
 
+## Phase 03c-9-3 - ApplicationSubmitValidator Question/Answer Integration
+
+- 작업일: 2026-05-18
+- 목적: 최종제출 시 active `JobPostingQuestion` 기준으로 지원자 답변 누락, blank, 길이 초과를 검증하도록 `ApplicationSubmitValidator`에 질문답변 검증을 연결했다.
+- 구현 범위:
+  - `ApplicationSubmitValidator`에 `JobPostingQuestionRepository`, `ApplicationAnswerRepository` 의존성 추가
+  - active 질문 목록 조회 후 required 질문의 answer row/null/blank 검증
+  - optional 질문은 미답변/blank 허용
+  - `JobPostingQuestion.maxLength` 및 answerType 상한(`SHORT_TEXT` 500, `LONG_TEXT` 5000) 재검증
+  - inactive 질문과 active 질문 외 answer row는 검증 대상에서 제외
+  - validator 실패 시 기존 `InvalidJobApplicationException` 400 정책 유지
+  - validator 실패 시 submit 상태 전이가 일어나지 않도록 기존 `JobApplicationService.submit()` 흐름 유지
+- 주요 수정 클래스:
+  - `ApplicationSubmitValidator`
+  - `ApplicationSubmitValidatorTest`
+  - `JobApplicationServiceTest`
+  - `ApplicationControllerTest`
+  - `ApplicationAnswerServiceTest`
+  - `ApplicationAnswerControllerTest`
+- API:
+  - 신규 API 없음
+  - 기존 `POST /applications/{applicationId}/submit`의 제출 검증만 보강
+- 테스트 결과:
+  - `ApplicationSubmitValidatorTest` 성공
+  - `JobApplicationServiceTest`, `ApplicationControllerTest` 성공
+  - `ApplicationAnswerServiceTest`, `ApplicationAnswerControllerTest` 성공
+  - `QuestionTemplateServiceTest`, `QuestionTemplateControllerTest` 성공
+  - `JobPostingQuestionServiceTest`, `JobPostingQuestionControllerTest` 성공
+  - `./gradlew.bat clean test --no-daemon` 성공
+- 미구현/보류:
+  - 관리자 답변 조회 API `GET /admin/applications/{applicationId}/answers`
+  - `GET /applications/{applicationId}/answers`
+  - 선택형 답변 option, 파일형 답변, Attachment 연동, QuestionSet
+  - `minLength` submit 강제
+  - active 질문 외 answer row 정합성 검증
+- 다음 작업: Phase 03c-9-4에서 관리자 답변 lazy read API를 구현한다.
+
 ## Phase 03c-9-2 - ApplicationAnswer + Applicant Question/Answer API
 
 - 작업일: 2026-05-18

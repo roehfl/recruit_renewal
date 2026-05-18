@@ -9,11 +9,15 @@ import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
+import com.shinyoung.recruit.dto.request.JobPostingQuestionCreateRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
+import com.shinyoung.recruit.enumeration.QuestionAnswerType;
+import com.shinyoung.recruit.enumeration.QuestionCategory;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.JobApplicationService;
 import com.shinyoung.recruit.service.JobPostingService;
+import com.shinyoung.recruit.service.JobPostingQuestionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -65,6 +69,9 @@ class ApplicationControllerTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingQuestionService jobPostingQuestionService;
 
     @Autowired
     private JobApplicationService jobApplicationService;
@@ -290,6 +297,29 @@ class ApplicationControllerTest {
     }
 
     @Test
+    void submit_required_question_answer_missing_returns_api_response() throws Exception {
+        Applicant applicant = createApplicant("api-submit-answer-missing", "Api Submit Answer Missing");
+        Long jobPostingId = createDraftJobPosting(new ApplicationFormConfigRequest(
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+        ));
+        createQuestion(jobPostingId, true, QuestionAnswerType.LONG_TEXT, 1000);
+        jobPostingService.publish(jobPostingId);
+        Long applicationId = createApplication(applicant, jobPostingId);
+        authenticate(applicant);
+
+        mockMvc.perform(post("/applications/{applicationId}/submit", applicationId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
     void submit_other_applicants_application_is_hidden() throws Exception {
         Applicant owner = createApplicant("api-submit-owner", "Api Submit Owner");
         Applicant other = createApplicant("api-submit-other", "Api Submit Other");
@@ -438,7 +468,13 @@ class ApplicationControllerTest {
     }
 
     private Long createPublishedJobPosting(ApplicationFormConfigRequest formConfig) {
-        Long jobPostingId = jobPostingService.create(new JobPostingCreateRequest(
+        Long jobPostingId = createDraftJobPosting(formConfig);
+        jobPostingService.publish(jobPostingId);
+        return jobPostingId;
+    }
+
+    private Long createDraftJobPosting(ApplicationFormConfigRequest formConfig) {
+        return jobPostingService.create(new JobPostingCreateRequest(
                 "2026 recruitment",
                 "<p>content</p>",
                 LocalDateTime.of(2026, 6, 1, 9, 0),
@@ -449,8 +485,25 @@ class ApplicationControllerTest {
                 ),
                 formConfig
         ));
-        jobPostingService.publish(jobPostingId);
-        return jobPostingId;
+    }
+
+    private void createQuestion(
+            Long jobPostingId,
+            boolean required,
+            QuestionAnswerType answerType,
+            int maxLength
+    ) {
+        jobPostingQuestionService.createQuestion(jobPostingId, new JobPostingQuestionCreateRequest(
+                null,
+                "Submit question",
+                "Submit helper",
+                QuestionCategory.JOB_SPECIFIC,
+                answerType,
+                required,
+                null,
+                maxLength,
+                0
+        ));
     }
 
     private Long firstJobPositionId(Long jobPostingId) {

@@ -1,5 +1,18 @@
 # Phase 03 Application Design
 
+## Phase 03c-9-3 Implementation Note
+
+- Phase 03c-9-3 connected question/answer final-submit validation to `ApplicationSubmitValidator`.
+- Submit now checks active `JobPostingQuestion` rows for the application's `JobPosting`.
+- `required=true` active questions require a matching `ApplicationAnswer` row with non-null, non-blank `answerText`.
+- Existing optional question behavior is preserved: `required=false` questions may be unanswered or blank at submit.
+- Answer length is revalidated at submit against `JobPostingQuestion.maxLength`; when maxLength is unavailable, the answer type default is used.
+- Answer type hard limits are enforced defensively: `SHORT_TEXT <= 500`, `LONG_TEXT <= 5000`.
+- `minLength` is still stored but not enforced by submit validation in this phase.
+- Inactive questions and answers outside the active question set are ignored by submit validation.
+- No applicant answer API, admin answer API, question configuration API, `ApplicationAnswer` entity structure, or existing detail section API was changed.
+- Next implementation recommendation is Phase 03c-9-4: admin answer lazy read API (`GET /admin/applications/{applicationId}/answers`).
+
 ## Phase 03c-9-2 Implementation Note
 
 - Phase 03c-9-2 added `ApplicationAnswer` as the applicant-side answer record under `JobApplication`.
@@ -9,9 +22,9 @@
 - The question list is based on active `JobPostingQuestion` rows for the application's `JobPosting`, sorted by `sortOrder ASC, id ASC`.
 - Answer replace save is allowed only while the application is writable through the existing detail-section policy: applicant ownership, `DRAFT`, `JobPosting.status=PUBLISHED`, and reception period.
 - Saved answers snapshot `JobPostingQuestion` fields at answer save time: question text, category, answer type, required flag, min/max length, and sort order.
-- Required blank-answer validation remains deferred to the next submit validator phase. DRAFT save allows null/blank answers but blocks length violations.
-- No admin answer read API, `ApplicationSubmitValidator` answer integration, choice option domain, file answer type, or Attachment linkage was added.
-- Next implementation recommendation is Phase 03c-9-3: connect required/blank/maxLength answer validation to `ApplicationSubmitValidator`.
+- Required blank-answer validation is now handled by Phase 03c-9-3 submit validator integration. DRAFT save still allows null/blank answers but blocks length violations.
+- No admin answer read API, choice option domain, file answer type, or Attachment linkage was added.
+- Next implementation recommendation is Phase 03c-9-4: admin answer lazy read API.
 
 ## Phase 03c-9-1 구현 반영 메모
 
@@ -22,7 +35,7 @@
 - 공고별 질문 구성 변경은 `JobPosting.status=DRAFT`에서만 허용한다. `PUBLISHED`/`CLOSED` 이후에는 생성, 수정, 정렬, 비활성화 command를 차단한다.
 - 질문 삭제는 HTTP DELETE나 물리 삭제가 아니라 `POST /admin/job-postings/{jobPostingId}/questions/{questionId}/delete` command로 `active=false` 처리한다.
 - 지원자 답변 저장, `ApplicationAnswer`, `ApplicationSubmitValidator` 질문답변 연동, 관리자 답변 조회 API는 구현하지 않았다.
-- 다음 구현 추천은 Phase 03c-9-2: 지원자 질문 목록/답변 replace 저장 API와 `ApplicationAnswer` 구현이다.
+- Phase 03c-9-2 and Phase 03c-9-3 are now complete. The current next implementation recommendation is Phase 03c-9-4: admin answer lazy read API.
 
 ## Phase 03c-9 설계 반영 메모
 
@@ -37,7 +50,7 @@
 - 지원자 답변 저장은 `DRAFT` 상태에서만 허용하며, required 미입력은 DRAFT 저장에서는 허용하되 submit 시 `ApplicationSubmitValidator`에서 실패시키는 방향으로 설계했다.
 - 관리자 답변 조회는 Phase 03c-8 lazy section API 흐름에 맞춰 `GET /admin/applications/{applicationId}/answers` 후보로 둔다.
 - 이번 Phase는 설계 문서 작업만 수행했고 Java 코드, DB schema, 기존 API, `ApplicationSubmitValidator`, 관리자 상세 섹션 API는 변경하지 않았다.
-- 다음 구현 추천은 Phase 03c-9-1: `QuestionTemplate` + `JobPostingQuestion` 관리자 질문 구성 API이다.
+- Phase 03c-9-1, Phase 03c-9-2, and Phase 03c-9-3 are now complete. The current next implementation recommendation is Phase 03c-9-4: admin answer lazy read API.
 
 ## Phase 03c-8 구현 반영 메모
 
