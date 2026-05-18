@@ -77,6 +77,25 @@ public class StageResult extends BaseEntity {
         return new StageResult(stage, jobApplication);
     }
 
+    public void updateResult(
+            StageResultStatus resultStatus,
+            BigDecimal score,
+            String comment,
+            LocalDateTime decidedAt,
+            String decidedBy
+    ) {
+        validateResultStatus(resultStatus);
+        validateComment(comment);
+        if (decidedAt == null) {
+            throw new InvalidStageResultException("DecidedAt is required.");
+        }
+        this.resultStatus = resultStatus;
+        this.score = score;
+        this.comment = comment;
+        this.decidedAt = decidedAt;
+        this.decidedBy = decidedBy;
+    }
+
     private static void validateSameJobPosting(Stage stage, JobApplication jobApplication) {
         if (stage == null) {
             throw new InvalidStageResultException("Stage is required.");
@@ -89,6 +108,21 @@ public class StageResult extends BaseEntity {
         if (stageJobPostingId == null || applicationJobPostingId == null
                 || !Objects.equals(stageJobPostingId, applicationJobPostingId)) {
             throw new InvalidStageResultException("Stage and JobApplication must belong to the same JobPosting.");
+        }
+    }
+
+    private static void validateResultStatus(StageResultStatus resultStatus) {
+        if (resultStatus == null) {
+            throw new InvalidStageResultException("StageResult status is required.");
+        }
+        if (resultStatus == StageResultStatus.PENDING) {
+            throw new InvalidStageResultException("StageResult cannot be changed back to PENDING.");
+        }
+    }
+
+    private static void validateComment(String comment) {
+        if (comment != null && comment.length() > 2000) {
+            throw new InvalidStageResultException("StageResult comment must be 2000 characters or less.");
         }
     }
 }

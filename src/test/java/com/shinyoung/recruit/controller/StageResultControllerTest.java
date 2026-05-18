@@ -6,12 +6,14 @@ import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.domain.repository.StageRepository;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.dto.request.StageCreateRequest;
 import com.shinyoung.recruit.enumeration.StageType;
+import com.shinyoung.recruit.enumeration.StageStatus;
 import com.shinyoung.recruit.service.JobApplicationService;
 import com.shinyoung.recruit.service.JobPostingService;
 import com.shinyoung.recruit.service.StageService;
@@ -23,6 +25,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.MediaType;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +41,7 @@ import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -71,6 +76,9 @@ class StageResultControllerTest {
 
     @Autowired
     private JobPostingRepository jobPostingRepository;
+
+    @Autowired
+    private StageRepository stageRepository;
 
     private MockMvc mockMvc;
 
@@ -115,6 +123,113 @@ class StageResultControllerTest {
     }
 
     @Test
+    void update_result_returns_api_response() throws Exception {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-api-update", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        stageService.start(jobPostingId, stageId);
+        Long resultId = initializeAndFirstResultId(stageId);
+
+        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "resultStatus": "PASSED",
+                                  "score": 91.5,
+                                  "comment": "passed"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.data.stageResultId").value(resultId))
+                .andExpect(jsonPath("$.data.resultStatus").value("PASSED"))
+                .andExpect(jsonPath("$.data.score").value(91.5))
+                .andExpect(jsonPath("$.data.comment").value("passed"))
+                .andExpect(jsonPath("$.data.decidedAt").exists());
+    }
+
+    @Test
+    void bulk_update_returns_api_response() throws Exception {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-api-bulk-1", jobPostingId);
+        createSubmittedApplication("stage-result-api-bulk-2", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        stageService.start(jobPostingId, stageId);
+        List<Long> resultIds = initializeResultIds(stageId);
+
+        mockMvc.perform(post("/admin/stages/{stageId}/results/bulk", stageId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "results": [
+                                    {
+                                      "stageResultId": %d,
+                                      "resultStatus": "PASSED",
+                                      "score": 90,
+                                      "comment": "pass"
+                                    },
+                                    {
+                                      "stageResultId": %d,
+                                      "resultStatus": "FAILED",
+                                      "score": null,
+                                      "comment": null
+                                    }
+                                  ]
+                                }
+                                """.formatted(resultIds.get(0), resultIds.get(1))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.data.stageId").value(stageId))
+                .andExpect(jsonPath("$.data.updatedCount").value(2))
+                .andExpect(jsonPath("$.data.results[0].resultStatus").value("PASSED"))
+                .andExpect(jsonPath("$.data.results[1].resultStatus").value("FAILED"));
+    }
+
+    @Test
+    void update_validation_failure_returns_api_response() throws Exception {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-api-invalid", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        stageService.start(jobPostingId, stageId);
+        Long resultId = initializeAndFirstResultId(stageId);
+
+        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "resultStatus": null,
+                                  "score": null,
+                                  "comment": null
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void result_not_found_returns_api_response() throws Exception {
+        Long jobPostingId = createJobPosting();
+        Long stageId = createStage(jobPostingId);
+        stageService.start(jobPostingId, stageId);
+
+        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", stageId, 99999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "resultStatus": "PASSED",
+                                  "score": null,
+                                  "comment": null
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
     void stage_not_found_returns_api_response() throws Exception {
         mockMvc.perform(get("/admin/stages/{stageId}/results", 99999L))
                 .andExpect(status().isNotFound())
@@ -126,8 +241,7 @@ class StageResultControllerTest {
     void initialize_fails_when_stage_is_result_announced_or_closed() throws Exception {
         Long announcedPostingId = createJobPosting();
         Long announcedStageId = createStage(announcedPostingId);
-        stageService.start(announcedPostingId, announcedStageId);
-        stageService.announce(announcedPostingId, announcedStageId);
+        setStageStatus(announcedStageId, StageStatus.RESULT_ANNOUNCED);
 
         mockMvc.perform(post("/admin/stages/{stageId}/results/initialize", announcedStageId))
                 .andExpect(status().isBadRequest())
@@ -136,9 +250,7 @@ class StageResultControllerTest {
 
         Long closedPostingId = createJobPosting();
         Long closedStageId = createStage(closedPostingId);
-        stageService.start(closedPostingId, closedStageId);
-        stageService.announce(closedPostingId, closedStageId);
-        stageService.close(closedPostingId, closedStageId);
+        setStageStatus(closedStageId, StageStatus.CLOSED);
 
         mockMvc.perform(post("/admin/stages/{stageId}/results/initialize", closedStageId))
                 .andExpect(status().isBadRequest())
@@ -152,8 +264,8 @@ class StageResultControllerTest {
                 .andExpect(status().isMethodNotAllowed());
         mockMvc.perform(delete("/admin/stages/{stageId}/results", 1L))
                 .andExpect(status().isMethodNotAllowed());
-        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", 1L, 1L))
-                .andExpect(status().isNotFound());
+        mockMvc.perform(patch("/admin/stages/{stageId}/results/{resultId}", 1L, 1L))
+                .andExpect(status().isMethodNotAllowed());
     }
 
     private Long createJobPosting() {
@@ -192,6 +304,17 @@ class StageResultControllerTest {
         return applicationId;
     }
 
+    private Long initializeAndFirstResultId(Long stageId) {
+        return initializeResultIds(stageId).get(0);
+    }
+
+    private List<Long> initializeResultIds(Long stageId) {
+        stageResultService.initialize(stageId);
+        return stageResultService.getResults(stageId).stream()
+                .map(response -> response.stageResultId())
+                .toList();
+    }
+
     private Applicant createApplicant(String loginId) {
         String ci = loginId + "-ci";
         Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
@@ -210,6 +333,10 @@ class StageResultControllerTest {
                 .map(JobPosition::getId)
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private void setStageStatus(Long stageId, StageStatus stageStatus) {
+        ReflectionTestUtils.setField(stageRepository.findById(stageId).orElseThrow(), "status", stageStatus);
     }
 
     @TestConfiguration

@@ -4,6 +4,7 @@ import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.Stage;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.domain.repository.StageRepository;
+import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.dto.request.StageCreateRequest;
 import com.shinyoung.recruit.dto.request.StageOrderRequest;
 import com.shinyoung.recruit.dto.request.StageReorderRequest;
@@ -11,6 +12,7 @@ import com.shinyoung.recruit.dto.request.StageUpdateRequest;
 import com.shinyoung.recruit.dto.response.StageDetailResponse;
 import com.shinyoung.recruit.dto.response.StageListResponse;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
+import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageStatus;
 import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.exception.InvalidStageException;
@@ -33,6 +35,7 @@ public class StageService {
 
     private final StageRepository stageRepository;
     private final JobPostingRepository jobPostingRepository;
+    private final StageResultRepository stageResultRepository;
 
     public List<StageListResponse> getStages(Long jobPostingId) {
         ensureJobPostingExists(jobPostingId);
@@ -132,6 +135,7 @@ public class StageService {
 
         Stage stage = findStage(jobPostingId, stageId);
         validateStageStatus(stage, StageStatus.IN_PROGRESS, "Only IN_PROGRESS stage can be announced.");
+        validateStageResultsReadyForAnnounce(stageId);
         stage.announce();
         return stage.getId();
     }
@@ -195,6 +199,15 @@ public class StageService {
     private void validateStageStatus(Stage stage, StageStatus expectedStatus, String message) {
         if (stage.getStatus() != expectedStatus) {
             throw new InvalidStageException(message);
+        }
+    }
+
+    private void validateStageResultsReadyForAnnounce(Long stageId) {
+        if (stageResultRepository.countByStageId(stageId) == 0) {
+            throw new InvalidStageException("StageResult must be initialized before announce.");
+        }
+        if (stageResultRepository.existsByStageIdAndResultStatus(stageId, StageResultStatus.PENDING)) {
+            throw new InvalidStageException("StageResult has pending results.");
         }
     }
 

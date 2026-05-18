@@ -17,11 +17,17 @@ import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.dto.request.StageCreateRequest;
+import com.shinyoung.recruit.dto.request.StageResultBulkUpdateItemRequest;
+import com.shinyoung.recruit.dto.request.StageResultBulkUpdateRequest;
+import com.shinyoung.recruit.dto.request.StageResultUpdateRequest;
 import com.shinyoung.recruit.dto.response.AdminStageResultResponse;
+import com.shinyoung.recruit.dto.response.StageResultBulkUpdateResponse;
 import com.shinyoung.recruit.dto.response.StageResultInitializeResponse;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
+import com.shinyoung.recruit.enumeration.StageStatus;
 import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.exception.InvalidStageResultException;
+import com.shinyoung.recruit.exception.StageResultNotFoundException;
 import com.shinyoung.recruit.exception.StageNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,8 +35,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -115,17 +123,14 @@ class StageResultServiceTest {
     void initialize_fails_when_stage_is_result_announced_or_closed() {
         Long announcedPostingId = createJobPosting();
         Long announcedStageId = createStage(announcedPostingId);
-        stageService.start(announcedPostingId, announcedStageId);
-        stageService.announce(announcedPostingId, announcedStageId);
+        setStageStatus(announcedStageId, StageStatus.RESULT_ANNOUNCED);
 
         assertThatThrownBy(() -> stageResultService.initialize(announcedStageId))
                 .isInstanceOf(InvalidStageResultException.class);
 
         Long closedPostingId = createJobPosting();
         Long closedStageId = createStage(closedPostingId);
-        stageService.start(closedPostingId, closedStageId);
-        stageService.announce(closedPostingId, closedStageId);
-        stageService.close(closedPostingId, closedStageId);
+        setStageStatus(closedStageId, StageStatus.CLOSED);
 
         assertThatThrownBy(() -> stageResultService.initialize(closedStageId))
                 .isInstanceOf(InvalidStageResultException.class);
@@ -199,6 +204,193 @@ class StageResultServiceTest {
                 .isInstanceOf(InvalidStageResultException.class);
     }
 
+    @Test
+    void update_result_success_when_stage_is_in_progress() {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-update", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        stageService.start(jobPostingId, stageId);
+        Long resultId = initializeAndFirstResultId(stageId);
+
+        AdminStageResultResponse response = stageResultService.updateResult(
+                stageId,
+                resultId,
+                new StageResultUpdateRequest(StageResultStatus.PASSED, new BigDecimal("95.5"), "passed")
+        );
+        StageResult saved = stageResultRepository.findById(resultId).orElseThrow();
+
+        assertThat(response.resultStatus()).isEqualTo(StageResultStatus.PASSED);
+        assertThat(response.score()).isEqualByComparingTo("95.5");
+        assertThat(response.comment()).isEqualTo("passed");
+        assertThat(response.decidedAt()).isNotNull();
+        assertThat(saved.getDecidedAt()).isNotNull();
+        assertThat(saved.getDecidedBy()).isEqualTo("SYSTEM");
+    }
+
+    @Test
+    void update_result_fails_when_stage_is_not_in_progress() {
+        Long readyPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-ready-update", readyPostingId);
+        Long readyStageId = createStage(readyPostingId);
+        Long readyResultId = initializeAndFirstResultId(readyStageId);
+
+        assertThatThrownBy(() -> stageResultService.updateResult(
+                readyStageId,
+                readyResultId,
+                new StageResultUpdateRequest(StageResultStatus.PASSED, null, null)
+        )).isInstanceOf(InvalidStageResultException.class);
+
+        Long announcedPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-announced-update", announcedPostingId);
+        Long announcedStageId = createStage(announcedPostingId);
+        Long announcedResultId = initializeAndFirstResultId(announcedStageId);
+        setStageStatus(announcedStageId, StageStatus.RESULT_ANNOUNCED);
+
+        assertThatThrownBy(() -> stageResultService.updateResult(
+                announcedStageId,
+                announcedResultId,
+                new StageResultUpdateRequest(StageResultStatus.PASSED, null, null)
+        )).isInstanceOf(InvalidStageResultException.class);
+
+        Long closedPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-closed-update", closedPostingId);
+        Long closedStageId = createStage(closedPostingId);
+        Long closedResultId = initializeAndFirstResultId(closedStageId);
+        setStageStatus(closedStageId, StageStatus.CLOSED);
+
+        assertThatThrownBy(() -> stageResultService.updateResult(
+                closedStageId,
+                closedResultId,
+                new StageResultUpdateRequest(StageResultStatus.PASSED, null, null)
+        )).isInstanceOf(InvalidStageResultException.class);
+    }
+
+    @Test
+    void update_result_fails_when_result_does_not_belong_to_stage() {
+        Long firstPostingId = createJobPosting();
+        Long secondPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-mismatch-update-1", firstPostingId);
+        createSubmittedApplication("stage-result-mismatch-update-2", secondPostingId);
+        Long firstStageId = createStage(firstPostingId);
+        Long secondStageId = createStage(secondPostingId);
+        stageService.start(firstPostingId, firstStageId);
+        Long otherResultId = initializeAndFirstResultId(secondStageId);
+
+        assertThatThrownBy(() -> stageResultService.updateResult(
+                firstStageId,
+                otherResultId,
+                new StageResultUpdateRequest(StageResultStatus.PASSED, null, null)
+        )).isInstanceOf(StageResultNotFoundException.class);
+    }
+
+    @Test
+    void update_result_fails_when_status_is_pending_or_comment_is_too_long() {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-invalid-update", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        stageService.start(jobPostingId, stageId);
+        Long resultId = initializeAndFirstResultId(stageId);
+
+        assertThatThrownBy(() -> stageResultService.updateResult(
+                stageId,
+                resultId,
+                new StageResultUpdateRequest(StageResultStatus.PENDING, null, null)
+        )).isInstanceOf(InvalidStageResultException.class);
+        assertThatThrownBy(() -> stageResultService.updateResult(
+                stageId,
+                resultId,
+                new StageResultUpdateRequest(StageResultStatus.PASSED, null, "a".repeat(2001))
+        )).isInstanceOf(InvalidStageResultException.class);
+    }
+
+    @Test
+    void update_result_allows_nullable_score_and_comment() {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-null-update", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        stageService.start(jobPostingId, stageId);
+        Long resultId = initializeAndFirstResultId(stageId);
+
+        AdminStageResultResponse response = stageResultService.updateResult(
+                stageId,
+                resultId,
+                new StageResultUpdateRequest(StageResultStatus.HOLD, null, null)
+        );
+
+        assertThat(response.score()).isNull();
+        assertThat(response.comment()).isNull();
+        assertThat(response.resultStatus()).isEqualTo(StageResultStatus.HOLD);
+    }
+
+    @Test
+    void bulk_update_success() {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-bulk-1", jobPostingId);
+        createSubmittedApplication("stage-result-bulk-2", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        stageService.start(jobPostingId, stageId);
+        List<Long> resultIds = initializeResultIds(stageId);
+
+        StageResultBulkUpdateResponse response = stageResultService.bulkUpdateResults(
+                stageId,
+                new StageResultBulkUpdateRequest(List.of(
+                        new StageResultBulkUpdateItemRequest(resultIds.get(0), StageResultStatus.PASSED, BigDecimal.ONE, "one"),
+                        new StageResultBulkUpdateItemRequest(resultIds.get(1), StageResultStatus.FAILED, null, null)
+                ))
+        );
+
+        assertThat(response.updatedCount()).isEqualTo(2);
+        assertThat(response.results()).extracting(AdminStageResultResponse::resultStatus)
+                .containsExactly(StageResultStatus.PASSED, StageResultStatus.FAILED);
+        assertThat(stageResultRepository.findByStageId(stageId))
+                .extracting(StageResult::getResultStatus)
+                .containsExactlyInAnyOrder(StageResultStatus.PASSED, StageResultStatus.FAILED);
+    }
+
+    @Test
+    void bulk_update_fails_for_duplicate_empty_or_other_stage_result() {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-bulk-invalid-1", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        stageService.start(jobPostingId, stageId);
+        Long resultId = initializeAndFirstResultId(stageId);
+
+        assertThatThrownBy(() -> stageResultService.bulkUpdateResults(stageId, new StageResultBulkUpdateRequest(List.of())))
+                .isInstanceOf(InvalidStageResultException.class);
+        assertThatThrownBy(() -> stageResultService.bulkUpdateResults(stageId, new StageResultBulkUpdateRequest(List.of(
+                new StageResultBulkUpdateItemRequest(resultId, StageResultStatus.PASSED, null, null),
+                new StageResultBulkUpdateItemRequest(resultId, StageResultStatus.FAILED, null, null)
+        )))).isInstanceOf(InvalidStageResultException.class);
+
+        Long otherJobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-bulk-invalid-2", otherJobPostingId);
+        Long otherStageId = createStage(otherJobPostingId);
+        Long otherResultId = initializeAndFirstResultId(otherStageId);
+
+        assertThatThrownBy(() -> stageResultService.bulkUpdateResults(stageId, new StageResultBulkUpdateRequest(List.of(
+                new StageResultBulkUpdateItemRequest(otherResultId, StageResultStatus.PASSED, null, null)
+        )))).isInstanceOf(StageResultNotFoundException.class);
+    }
+
+    @Test
+    void bulk_update_rolls_back_when_any_item_is_invalid() {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-bulk-rollback-1", jobPostingId);
+        createSubmittedApplication("stage-result-bulk-rollback-2", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        stageService.start(jobPostingId, stageId);
+        List<Long> resultIds = initializeResultIds(stageId);
+
+        assertThatThrownBy(() -> stageResultService.bulkUpdateResults(stageId, new StageResultBulkUpdateRequest(List.of(
+                new StageResultBulkUpdateItemRequest(resultIds.get(0), StageResultStatus.PASSED, null, null),
+                new StageResultBulkUpdateItemRequest(resultIds.get(1), StageResultStatus.PENDING, null, null)
+        )))).isInstanceOf(InvalidStageResultException.class);
+
+        assertThat(stageResultRepository.findByStageId(stageId))
+                .extracting(StageResult::getResultStatus)
+                .containsOnly(StageResultStatus.PENDING);
+    }
+
     private Long createJobPosting() {
         Long jobPostingId = jobPostingService.create(new JobPostingCreateRequest(
                 "2026 StageResult recruitment",
@@ -245,6 +437,22 @@ class StageResultServiceTest {
         );
         jobApplicationService.submit(applicant.getId(), applicationId);
         return applicationId;
+    }
+
+    private Long initializeAndFirstResultId(Long stageId) {
+        return initializeResultIds(stageId).get(0);
+    }
+
+    private List<Long> initializeResultIds(Long stageId) {
+        stageResultService.initialize(stageId);
+        return stageResultRepository.findByStageIdForAdminList(stageId).stream()
+                .map(StageResult::getId)
+                .toList();
+    }
+
+    private void setStageStatus(Long stageId, StageStatus stageStatus) {
+        Stage stage = stageRepository.findById(stageId).orElseThrow();
+        ReflectionTestUtils.setField(stage, "status", stageStatus);
     }
 
     private Applicant createApplicant(String loginId) {

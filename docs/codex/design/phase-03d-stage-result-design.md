@@ -433,6 +433,30 @@ Still deferred:
 - Stage announce integration that blocks announcement while `PENDING` rows remain
 - security, authorization, and audit logging
 
+## Phase 03d-2 Implementation Note
+
+Phase 03d-2 implemented StageResult result input commands and Stage announce guard.
+
+Implemented:
+
+- `POST /admin/stages/{stageId}/results/{resultId}`
+- `POST /admin/stages/{stageId}/results/bulk`
+- single result update using existing StageResult rows only
+- all-or-nothing bulk update
+- update allowed only while Stage is `IN_PROGRESS`
+- `PENDING` rollback rejected
+- nullable score/comment with comment length limit
+- temporary `decidedBy = "SYSTEM"`
+- Stage announce guard that rejects announcement when no StageResult row exists or any `PENDING` row remains
+
+Still deferred:
+
+- correction history
+- result correction after `RESULT_ANNOUNCED`
+- applicant-facing result read
+- admin application stage-result timeline
+- real admin identity, authorization, and audit logging
+
 ## Deferred Items
 
 - Java code implementation.

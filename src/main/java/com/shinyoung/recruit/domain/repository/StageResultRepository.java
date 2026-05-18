@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface StageResultRepository extends JpaRepository<StageResult, Long> {
 
@@ -16,6 +17,12 @@ public interface StageResultRepository extends JpaRepository<StageResult, Long> 
     List<StageResult> findByStageId(Long stageId);
 
     List<StageResult> findByStageIdAndJobApplicationIdIn(Long stageId, Collection<Long> jobApplicationIds);
+
+    Optional<StageResult> findByIdAndStageId(Long id, Long stageId);
+
+    List<StageResult> findByStageIdAndIdIn(Long stageId, Collection<Long> ids);
+
+    boolean existsByStageIdAndResultStatus(Long stageId, StageResultStatus status);
 
     long countByStageId(Long stageId);
 

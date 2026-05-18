@@ -729,3 +729,14 @@ Phase 02a-1 구현 결과를 확인한 뒤 Phase 02a-2: Stage reorder/status com
 - `GET /admin/stages/{stageId}/results` lists existing result rows.
 - `POST /admin/stages/{stageId}/results/initialize` creates missing `PENDING` rows for `SUBMITTED` applications.
 - Result update, pending-result announce guard, correction history, and applicant-facing result read remain deferred.
+
+## Phase 03d-2 StageResult Update and Announce Guard Note
+
+- Phase 03d-2 added StageResult result input commands.
+- Admins can update one result through `POST /admin/stages/{stageId}/results/{resultId}`.
+- Admins can update multiple results through `POST /admin/stages/{stageId}/results/bulk`.
+- General result update is allowed only for `IN_PROGRESS` stages.
+- `READY`, `RESULT_ANNOUNCED`, and `CLOSED` stages reject general result update.
+- `StageService.announce()` now requires at least one StageResult row and rejects announcement while any `PENDING` row remains.
+- Stage start/close policies remain unchanged.
+- Correction history, actual admin identity, applicant-facing result read, and audit logging remain deferred.

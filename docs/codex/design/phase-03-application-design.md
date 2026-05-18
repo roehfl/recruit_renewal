@@ -986,3 +986,15 @@ AGENTS.md와 docs/codex/*.md를 먼저 읽어라.
 - `DRAFT` and `WITHDRAWN` applications are excluded from new StageResult creation.
 - StageResult does not add collections to `Stage` or `JobApplication`.
 - Result update, bulk update, applicant-facing result read, and correction/audit policies remain deferred to Phase 03d-2 or later.
+
+## Phase 03d-2 StageResult Update and Announce Guard Note
+
+- Phase 03d-2 implemented admin StageResult result input commands.
+- Added:
+  - `POST /admin/stages/{stageId}/results/{resultId}`
+  - `POST /admin/stages/{stageId}/results/bulk`
+- Updates modify existing StageResult rows only; missing result rows are still created only by initialize.
+- General updates are allowed only when Stage is `IN_PROGRESS`.
+- `PENDING` rollback is rejected.
+- Stage announce now fails when StageResult rows are missing or any result remains `PENDING`.
+- Applicant-facing result read and admin application stage-result timeline remain deferred.

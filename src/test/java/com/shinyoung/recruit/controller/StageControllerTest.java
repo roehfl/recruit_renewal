@@ -1,11 +1,23 @@
 package com.shinyoung.recruit.controller;
 
+import com.shinyoung.recruit.common.hash.HashUtil;
+import com.shinyoung.recruit.domain.entity.Applicant;
+import com.shinyoung.recruit.domain.entity.JobPosition;
+import com.shinyoung.recruit.domain.entity.JobPosting;
+import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.dto.request.StageCreateRequest;
+import com.shinyoung.recruit.dto.request.StageResultUpdateRequest;
+import com.shinyoung.recruit.dto.response.AdminStageResultResponse;
+import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
+import com.shinyoung.recruit.service.JobApplicationService;
 import com.shinyoung.recruit.service.JobPostingService;
+import com.shinyoung.recruit.service.StageResultService;
 import com.shinyoung.recruit.service.StageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -38,7 +51,19 @@ class StageControllerTest {
     private JobPostingService jobPostingService;
 
     @Autowired
+    private JobApplicationService jobApplicationService;
+
+    @Autowired
     private StageService stageService;
+
+    @Autowired
+    private StageResultService stageResultService;
+
+    @Autowired
+    private ApplicantRepository applicantRepository;
+
+    @Autowired
+    private JobPostingRepository jobPostingRepository;
 
     private MockMvc mockMvc;
 
@@ -152,6 +177,7 @@ class StageControllerTest {
         Long stageId = createStage(jobPostingId, 0, false);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
+        prepareDecidedStageResult(jobPostingId, stageId, "controller-announce");
 
         mockMvc.perform(post("/admin/job-postings/{jobPostingId}/stages/{stageId}/announce", jobPostingId, stageId))
                 .andExpect(status().isOk())
@@ -166,6 +192,7 @@ class StageControllerTest {
         Long stageId = createStage(jobPostingId, 0, false);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
+        prepareDecidedStageResult(jobPostingId, stageId, "controller-close");
         stageService.announce(jobPostingId, stageId);
 
         mockMvc.perform(post("/admin/job-postings/{jobPostingId}/stages/{stageId}/close", jobPostingId, stageId))
@@ -264,11 +291,53 @@ class StageControllerTest {
         return jobPostingService.create(new JobPostingCreateRequest(
                 "2026 recruitment",
                 "<p>content</p>",
-                LocalDateTime.of(2026, 6, 1, 9, 0),
-                LocalDateTime.of(2026, 6, 30, 18, 0),
+                LocalDateTime.of(2026, 5, 1, 9, 0),
+                LocalDateTime.of(2026, 5, 30, 18, 0),
                 List.of(new JobPositionRequest("Backend", 2, 1)),
-                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+                new ApplicationFormConfigRequest(false, false, false, false, false, false, false)
         ));
+    }
+
+    private void prepareDecidedStageResult(Long jobPostingId, Long stageId, String suffix) {
+        createSubmittedApplication("stage-" + suffix, jobPostingId);
+        stageResultService.initialize(stageId);
+        for (AdminStageResultResponse result : stageResultService.getResults(stageId)) {
+            stageResultService.updateResult(
+                    stageId,
+                    result.stageResultId(),
+                    new StageResultUpdateRequest(StageResultStatus.PASSED, null, null)
+            );
+        }
+    }
+
+    private Long createSubmittedApplication(String loginId, Long jobPostingId) {
+        Applicant applicant = createApplicant(loginId);
+        Long applicationId = jobApplicationService.create(
+                applicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
+        );
+        jobApplicationService.submit(applicant.getId(), applicationId);
+        return applicationId;
+    }
+
+    private Applicant createApplicant(String loginId) {
+        String ci = loginId + "-ci";
+        Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
+        applicant.setLoginId(loginId);
+        applicant.setName("User " + loginId);
+        applicant.setUserName("Applicant " + loginId);
+        applicant.setPassword("encoded-password");
+        applicant.setPhoneNumber("01000000000");
+        return applicantRepository.save(applicant);
+    }
+
+    private Long firstJobPositionId(Long jobPostingId) {
+        JobPosting jobPosting = jobPostingRepository.findDetailById(jobPostingId).orElseThrow();
+        return jobPosting.getJobPositions().stream()
+                .sorted(Comparator.comparing(JobPosition::getSortOrder).thenComparing(JobPosition::getId))
+                .map(JobPosition::getId)
+                .findFirst()
+                .orElseThrow();
     }
 
     private Long createStage(Long jobPostingId, int stageOrder, boolean finalStage) {

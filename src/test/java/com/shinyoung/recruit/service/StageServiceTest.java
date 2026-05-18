@@ -1,16 +1,26 @@
 package com.shinyoung.recruit.service;
 
+import com.shinyoung.recruit.common.hash.HashUtil;
+import com.shinyoung.recruit.domain.entity.Applicant;
+import com.shinyoung.recruit.domain.entity.JobPosition;
+import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.Stage;
+import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.domain.repository.StageRepository;
+import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.dto.request.StageCreateRequest;
 import com.shinyoung.recruit.dto.request.StageOrderRequest;
 import com.shinyoung.recruit.dto.request.StageReorderRequest;
+import com.shinyoung.recruit.dto.request.StageResultUpdateRequest;
 import com.shinyoung.recruit.dto.request.StageUpdateRequest;
+import com.shinyoung.recruit.dto.response.AdminStageResultResponse;
 import com.shinyoung.recruit.dto.response.StageDetailResponse;
 import com.shinyoung.recruit.dto.response.StageListResponse;
+import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageStatus;
 import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.exception.InvalidStageException;
@@ -23,6 +33,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,6 +48,18 @@ class StageServiceTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobApplicationService jobApplicationService;
+
+    @Autowired
+    private StageResultService stageResultService;
+
+    @Autowired
+    private ApplicantRepository applicantRepository;
+
+    @Autowired
+    private JobPostingRepository jobPostingRepository;
 
     @Autowired
     private StageRepository stageRepository;
@@ -402,12 +425,37 @@ class StageServiceTest {
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
+        prepareDecidedStageResult(jobPostingId, stageId, "announce-success");
 
         stageService.announce(jobPostingId, stageId);
 
         StageDetailResponse detail = stageService.getStage(jobPostingId, stageId);
         assertThat(detail.status()).isEqualTo(StageStatus.RESULT_ANNOUNCED);
         assertThat(detail.resultAnnouncementDateTime()).isEqualTo(LocalDateTime.of(2026, 7, 1, 10, 0));
+    }
+
+    @Test
+    void announce_fails_when_stage_result_is_missing() {
+        Long jobPostingId = createJobPosting();
+        Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        jobPostingService.publish(jobPostingId);
+        stageService.start(jobPostingId, stageId);
+
+        assertThatThrownBy(() -> stageService.announce(jobPostingId, stageId))
+                .isInstanceOf(InvalidStageException.class);
+    }
+
+    @Test
+    void announce_fails_when_stage_result_has_pending() {
+        Long jobPostingId = createJobPosting();
+        Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        jobPostingService.publish(jobPostingId);
+        stageService.start(jobPostingId, stageId);
+        createSubmittedApplication("announce-pending", jobPostingId);
+        stageResultService.initialize(stageId);
+
+        assertThatThrownBy(() -> stageService.announce(jobPostingId, stageId))
+                .isInstanceOf(InvalidStageException.class);
     }
 
     @Test
@@ -426,6 +474,7 @@ class StageServiceTest {
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
+        prepareDecidedStageResult(jobPostingId, stageId, "close-success");
         stageService.announce(jobPostingId, stageId);
 
         stageService.close(jobPostingId, stageId);
@@ -450,6 +499,7 @@ class StageServiceTest {
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
+        prepareDecidedStageResult(jobPostingId, stageId, "closed-transition");
         stageService.announce(jobPostingId, stageId);
         stageService.close(jobPostingId, stageId);
 
@@ -509,6 +559,7 @@ class StageServiceTest {
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
+        prepareDecidedStageResult(jobPostingId, stageId, "delete-announced");
         stageService.announce(jobPostingId, stageId);
 
         assertThatThrownBy(() -> stageService.delete(jobPostingId, stageId))
@@ -521,6 +572,7 @@ class StageServiceTest {
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
+        prepareDecidedStageResult(jobPostingId, stageId, "delete-closed");
         stageService.announce(jobPostingId, stageId);
         stageService.close(jobPostingId, stageId);
 
@@ -550,11 +602,53 @@ class StageServiceTest {
         return jobPostingService.create(new JobPostingCreateRequest(
                 "2026 recruitment",
                 "<p>content</p>",
-                LocalDateTime.of(2026, 6, 1, 9, 0),
-                LocalDateTime.of(2026, 6, 30, 18, 0),
+                LocalDateTime.of(2026, 5, 1, 9, 0),
+                LocalDateTime.of(2026, 5, 30, 18, 0),
                 List.of(new JobPositionRequest("Backend", 2, 1)),
-                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+                new ApplicationFormConfigRequest(false, false, false, false, false, false, false)
         ));
+    }
+
+    private void prepareDecidedStageResult(Long jobPostingId, Long stageId, String suffix) {
+        createSubmittedApplication("stage-" + suffix, jobPostingId);
+        stageResultService.initialize(stageId);
+        for (AdminStageResultResponse result : stageResultService.getResults(stageId)) {
+            stageResultService.updateResult(
+                    stageId,
+                    result.stageResultId(),
+                    new StageResultUpdateRequest(StageResultStatus.PASSED, null, null)
+            );
+        }
+    }
+
+    private Long createSubmittedApplication(String loginId, Long jobPostingId) {
+        Applicant applicant = createApplicant(loginId);
+        Long applicationId = jobApplicationService.create(
+                applicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
+        );
+        jobApplicationService.submit(applicant.getId(), applicationId);
+        return applicationId;
+    }
+
+    private Applicant createApplicant(String loginId) {
+        String ci = loginId + "-ci";
+        Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
+        applicant.setLoginId(loginId);
+        applicant.setName("User " + loginId);
+        applicant.setUserName("Applicant " + loginId);
+        applicant.setPassword("encoded-password");
+        applicant.setPhoneNumber("01000000000");
+        return applicantRepository.save(applicant);
+    }
+
+    private Long firstJobPositionId(Long jobPostingId) {
+        JobPosting jobPosting = jobPostingRepository.findDetailById(jobPostingId).orElseThrow();
+        return jobPosting.getJobPositions().stream()
+                .sorted(Comparator.comparing(JobPosition::getSortOrder).thenComparing(JobPosition::getId))
+                .map(JobPosition::getId)
+                .findFirst()
+                .orElseThrow();
     }
 
     private StageCreateRequest createStageRequest(int stageOrder, boolean finalStage) {

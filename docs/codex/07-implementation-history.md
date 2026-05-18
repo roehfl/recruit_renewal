@@ -906,6 +906,53 @@
   - 동시 unique 충돌 예외 변환과 Applicant not-found 응답 정책은 Controller/API 단계에서 재검토
 - 다음 작업:
   - Phase 03a-2에서 updateDraft/submit/withdraw command 구현 여부 검토
+## 2026-05-18 - Phase 03d-2 StageResult Update Commands + Announce Pending Guard
+
+- Scope: Implemented admin StageResult result input commands and Stage announce pending guard.
+- Implemented:
+  - `StageResult.updateResult(...)`
+  - `StageResultUpdateRequest`
+  - `StageResultBulkUpdateRequest`
+  - `StageResultBulkUpdateItemRequest`
+  - `StageResultBulkUpdateResponse`
+  - `StageResultNotFoundException`
+  - `StageResultService.updateResult(...)`
+  - `StageResultService.bulkUpdateResults(...)`
+  - `StageResultController` update and bulk POST endpoints
+  - Stage announce guard in `StageService.announce(...)`
+- APIs:
+  - `POST /admin/stages/{stageId}/results/{resultId}`
+  - `POST /admin/stages/{stageId}/results/bulk`
+- Business rules:
+  - StageResult update is allowed only when Stage is `IN_PROGRESS`.
+  - `READY`, `RESULT_ANNOUNCED`, and `CLOSED` stages reject general result updates.
+  - updates operate only on existing StageResult rows.
+  - `PENDING` rollback is rejected.
+  - bulk update is all-or-nothing.
+  - duplicate bulk result ids fail.
+  - result id/stage mismatch is hidden as 404.
+  - `decidedAt` is set by the service.
+  - `decidedBy` is temporarily stored as `"SYSTEM"`.
+  - Stage announce fails if no StageResult row exists.
+  - Stage announce fails if any `PENDING` StageResult remains.
+- Tests:
+  - `StageResultServiceTest`: success
+  - `StageResultControllerTest`: success
+  - `StageServiceTest`: success
+  - `StageControllerTest`: success
+  - `JobApplicationServiceTest` + `ApplicationControllerTest`: success
+  - `./gradlew.bat clean test --no-daemon`: success
+- Documentation:
+  - `docs/codex/implementation/phase-03d-2-stage-result-update-announce-guard.md`
+  - `docs/codex/reports/phase-03d-2-stage-result-update-announce-guard.html`
+- Deferred:
+  - correction history
+  - post-announcement correction command
+  - applicant-facing result read
+  - admin application stage-result timeline
+  - actual admin identity and audit logging
+- Next recommended phase: Phase 03d-3 admin application stage-result lazy timeline API or applicant-facing result read design.
+
 ## 2026-05-18 - Phase 03d-1 StageResult Initialize/List Admin API
 
 - Scope: Implemented the first StageResult vertical slice.
