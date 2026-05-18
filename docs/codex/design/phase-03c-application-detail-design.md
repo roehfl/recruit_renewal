@@ -1,5 +1,18 @@
 # Phase 03c Application Detail Design
 
+## Phase 03c-9-2 Implementation Note
+
+- Phase 03c-9-2 implemented `ApplicationAnswer` and applicant question/answer APIs.
+- Added applicant APIs:
+  - `GET /applications/{applicationId}/questions`
+  - `POST /applications/{applicationId}/answers`
+- `ApplicationAnswer` is a `JobApplication` child answer record and references one active `JobPostingQuestion` at save time.
+- `JobApplication` and `JobPostingQuestion` still do not have answer collections; cascade/orphanRemoval was not added.
+- Applicant question list returns active posting questions only, with current answer data when present.
+- Applicant answer save uses replace semantics: delete all existing answers for the application, then save requested rows with question snapshots.
+- DRAFT save permits null/blank answers, including required questions. Required/blank validation is deferred to submit validator integration.
+- Admin answer read API and `ApplicationSubmitValidator` question/answer integration remain out of scope for this phase.
+
 ## Phase 03c-9-1 Implementation Note
 
 - Phase 03c-9-1에서 `QuestionTemplate` + `JobPostingQuestion` 관리자 질문 구성 API를 구현했다.
@@ -583,7 +596,7 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 
 ## 13. Deferred Items
 
-- 자기소개서/질문답변 도메인 Java 구현
+- Question/answer remaining work: connect answer required/blank/maxLength validation to `ApplicationSubmitValidator`, then add admin answer lazy read API.
 - 상세 섹션별 required flag 세분화
 - Career submit 정책: `NOT_SELECTED` 실패 여부와 `EXPERIENCED` 최소 1개 필수 여부
 - 최종제출 후 수정요청/반려/reopen 정책
@@ -595,4 +608,6 @@ Phase 03a-2의 `JobApplicationService.submit()`은 현재 상세 섹션 필수�
 
 ## 14. Recommended Next Phase
 
-Phase 03c-9-1에서 `QuestionTemplate` + `JobPostingQuestion` 관리자 질문 구성 API가 완료되었으므로 다음 구현은 Phase 03c-9-2: `ApplicationAnswer`와 지원자 질문 목록/답변 replace 저장 API를 추천한다. 이후 Phase 03c-9-3에서 `ApplicationSubmitValidator`에 required/blank/maxLength 답변 검증을 연결하고, Phase 03c-9-4에서 관리자 답변 lazy 조회 API를 확장한다. StageResult 전에는 Application 상세 조회 범위와 질문답변 포함 여부를 다시 확인하고, 실제 파일 업로드/다운로드 저장소 연동은 별도 파일 Phase로 분리한다.
+Phase 03c-9-2 has completed the applicant `ApplicationAnswer` and question/answer APIs. The next implementation recommendation is Phase 03c-9-3: connect active required `JobPostingQuestion` answer blank/maxLength validation to `ApplicationSubmitValidator`. After that, implement the admin answer lazy read API. Before StageResult implementation, confirm whether Application detail read models and reports include question/answer content.
+
+

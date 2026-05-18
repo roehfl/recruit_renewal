@@ -61,6 +61,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler(InvalidApplicationAnswerException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidApplicationAnswer(InvalidApplicationAnswerException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(JobApplicationNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleJobApplicationNotFound(JobApplicationNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

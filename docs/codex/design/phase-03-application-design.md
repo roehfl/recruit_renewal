@@ -1,5 +1,18 @@
 # Phase 03 Application Design
 
+## Phase 03c-9-2 Implementation Note
+
+- Phase 03c-9-2 added `ApplicationAnswer` as the applicant-side answer record under `JobApplication`.
+- Applicant APIs were added:
+  - `GET /applications/{applicationId}/questions`
+  - `POST /applications/{applicationId}/answers`
+- The question list is based on active `JobPostingQuestion` rows for the application's `JobPosting`, sorted by `sortOrder ASC, id ASC`.
+- Answer replace save is allowed only while the application is writable through the existing detail-section policy: applicant ownership, `DRAFT`, `JobPosting.status=PUBLISHED`, and reception period.
+- Saved answers snapshot `JobPostingQuestion` fields at answer save time: question text, category, answer type, required flag, min/max length, and sort order.
+- Required blank-answer validation remains deferred to the next submit validator phase. DRAFT save allows null/blank answers but blocks length violations.
+- No admin answer read API, `ApplicationSubmitValidator` answer integration, choice option domain, file answer type, or Attachment linkage was added.
+- Next implementation recommendation is Phase 03c-9-3: connect required/blank/maxLength answer validation to `ApplicationSubmitValidator`.
+
 ## Phase 03c-9-1 구현 반영 메모
 
 - Phase 03c-9-1에서 자기소개서/질문답변 도메인의 첫 구현 단계로 `QuestionTemplate`과 `JobPostingQuestion` 관리자 API를 추가했다.

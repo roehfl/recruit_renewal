@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03c-9-2 ApplicationAnswer Report</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --ink: #1f2937;
+      --muted: #6b7280;
+      --line: #d9e0ea;
+      --green: #0f766e;
+      --blue: #2563eb;
+      --amber: #b45309;
+      --red: #b91c1c;
+      --soft-green: #dff7ef;
+      --soft-blue: #e5efff;
+      --soft-amber: #fff4d6;
+      --soft-red: #fde7e7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, "Noto Sans KR", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.55;
+    }
+    header {
+      background: #111827;
+      color: #fff;
+      padding: 34px 42px;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 22px 56px;
+    }
+    h1, h2, h3 { margin: 0; }
+    h1 { font-size: 30px; }
+    h2 { font-size: 21px; margin-bottom: 14px; }
+    h3 { font-size: 16px; margin-bottom: 8px; }
+    p { margin: 0 0 10px; }
+    code {
+      background: #eef2f7;
+      border: 1px solid #d8dee8;
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+    }
+    .subtitle {
+      color: #cbd5e1;
+      margin-top: 8px;
+      max-width: 880px;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .done { color: var(--green); background: var(--soft-green); }
+    .info { color: var(--blue); background: var(--soft-blue); }
+    .warn { color: var(--amber); background: var(--soft-amber); }
+    .out { color: var(--red); background: var(--soft-red); }
+    .section {
+      margin-top: 22px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 22px;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      background: #fbfcff;
+    }
+    ul {
+      margin: 8px 0 0;
+      padding-left: 18px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      margin-top: 10px;
+      background: #fff;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f0f4fa;
+      font-weight: 700;
+    }
+    .callout {
+      border-left: 4px solid var(--blue);
+      background: #f7fbff;
+      padding: 12px 14px;
+      border-radius: 6px;
+      margin-top: 12px;
+    }
+    .warning {
+      border-left-color: var(--amber);
+      background: #fffaf0;
+    }
+    @media (max-width: 860px) {
+      header { padding: 28px 22px; }
+      .grid, .grid.two { grid-template-columns: 1fr; }
+      table { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Recruit Backend - Phase 03c-9-2</h1>
+    <p class="subtitle">ApplicationAnswer + Applicant Question/Answer API</p>
+    <div class="meta">
+      <span class="badge done">Completed</span>
+      <span class="badge info">Generated 2026-05-18</span>
+      <span class="badge info">Self-contained HTML</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="section">
+      <h2>Executive Summary</h2>
+      <p>Phase 03c-9-2 adds applicant-side question and answer support. Applicants can read active questions for their own application and replace-save answers while the application is writable.</p>
+      <p>The implementation adds `ApplicationAnswer` with snapshot fields, read/replace service logic, HTTP APIs, tests, and documentation. Full `clean test` passed.</p>
+      <div class="callout">
+        This phase does not modify `ApplicationSubmitValidator`; required answer validation is intentionally deferred to Phase 03c-9-3.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Scope</h2>
+      <div class="grid">
+        <div class="card">
+          <h3><span class="badge done">Implemented</span></h3>
+          <ul>
+            <li>`ApplicationAnswer` entity and repository</li>
+            <li>Applicant question list API</li>
+            <li>Applicant answer replace API</li>
+            <li>Question snapshot storage</li>
+            <li>DRAFT writable policy reuse</li>
+            <li>Service and controller tests</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="badge out">Not Implemented</span></h3>
+          <ul>
+            <li>Submit validator answer integration</li>
+            <li>Admin answer read API</li>
+            <li>`GET /applications/{applicationId}/answers`</li>
+            <li>PUT, HTTP DELETE, individual answer delete</li>
+            <li>StageResult</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="badge warn">Deferred</span></h3>
+          <ul>
+            <li>Choice options</li>
+            <li>File answer type</li>
+            <li>Attachment linkage</li>
+            <li>Question revision/reopen policy</li>
+            <li>Answer access audit logs</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Architecture And Domain</h2>
+      <div class="grid two">
+        <div class="card">
+          <h3>Relationship Summary</h3>
+          <ul>
+            <li>`ApplicationAnswer` N:1 `JobApplication`</li>
+            <li>`ApplicationAnswer` N:1 `JobPostingQuestion`</li>
+            <li>No answer collection on `JobApplication`</li>
+            <li>No answer collection on `JobPostingQuestion`</li>
+            <li>No cascade or orphanRemoval added</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Snapshot Policy</h3>
+          <ul>
+            <li>`questionTextSnapshot`</li>
+            <li>`categorySnapshot`</li>
+            <li>`answerTypeSnapshot`</li>
+            <li>`requiredSnapshot`</li>
+            <li>`minLengthSnapshot`, `maxLengthSnapshot`</li>
+            <li>`sortOrderSnapshot`</li>
+          </ul>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>Class</th><th>Type</th><th>Responsibility</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>`ApplicationAnswer`</td><td>Entity</td><td>Stores one applicant answer and question snapshot.</td></tr>
+          <tr><td>`ApplicationAnswerRepository`</td><td>Repository</td><td>Queries, deletes, and persists answers by application/question.</td></tr>
+          <tr><td>`ApplicationAnswerService`</td><td>Service</td><td>Owns applicant question read and answer replace rules.</td></tr>
+          <tr><td>`ApplicationAnswerController`</td><td>Controller</td><td>Exposes applicant GET questions and POST answers APIs.</td></tr>
+          <tr><td>`ApplicationQuestionResponse`</td><td>Response DTO</td><td>Returns question policy plus current answer fields.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>API List</h2>
+      <table>
+        <thead>
+          <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GET</td>
+            <td><code>/applications/{applicationId}/questions</code></td>
+            <td>Read active posting questions with current applicant answers.</td>
+            <td>None</td>
+            <td><code>ApiResponse&lt;List&lt;ApplicationQuestionResponse&gt;&gt;</code></td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td><code>/applications/{applicationId}/answers</code></td>
+            <td>Replace-save applicant answers.</td>
+            <td><code>ApplicationAnswerReplaceRequest</code></td>
+            <td><code>ApiResponse&lt;List&lt;ApplicationQuestionResponse&gt;&gt;</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>DTO Policy</h2>
+      <table>
+        <thead>
+          <tr><th>DTO</th><th>Fields</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>`ApplicationAnswerReplaceRequest`</td><td>`answers`</td><td>Null is invalid, empty list is allowed.</td></tr>
+          <tr><td>`ApplicationAnswerRequest`</td><td>`questionId`, `answerText`</td><td>`questionId` required. `answerText` nullable, max 5000.</td></tr>
+          <tr><td>`ApplicationQuestionResponse`</td><td>`questionId`, `questionText`, `helperText`, `category`, `answerType`, `required`, `minLength`, `maxLength`, `sortOrder`, `answerId`, `answerText`, `updatedAt`</td><td>GET and POST return the same shape.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Validation And Policy</h2>
+      <table>
+        <thead>
+          <tr><th>Area</th><th>Policy</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Read</td><td>DRAFT, SUBMITTED, and WITHDRAWN are readable by the owner.</td></tr>
+          <tr><td>Write</td><td>Only DRAFT application, PUBLISHED job posting, and active reception period.</td></tr>
+          <tr><td>Question source</td><td>Only active `JobPostingQuestion` rows for the application's job posting.</td></tr>
+          <tr><td>Replace save</td><td>Delete all existing answers for the application, then save requested rows.</td></tr>
+          <tr><td>Blank answer</td><td>Allowed during DRAFT save, even for required questions.</td></tr>
+          <tr><td>Length</td><td>Question maxLength, SHORT_TEXT 500, LONG_TEXT 5000 are enforced.</td></tr>
+          <tr><td>Submit validation</td><td>Deferred to Phase 03c-9-3.</td></tr>
+        </tbody>
+      </table>
+      <div class="callout warning">
+        Required question blanks are intentionally accepted at DRAFT save. Final submission must validate them in the next phase.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Test Results</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Result</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>.\gradlew.bat test --tests com.shinyoung.recruit.service.ApplicationAnswerServiceTest</code></td><td><span class="badge done">Success</span></td></tr>
+          <tr><td><code>.\gradlew.bat test --tests com.shinyoung.recruit.controller.ApplicationAnswerControllerTest</code></td><td><span class="badge done">Success</span></td></tr>
+          <tr><td><code>.\gradlew.bat test --tests com.shinyoung.recruit.service.QuestionTemplateServiceTest</code></td><td><span class="badge done">Success</span></td></tr>
+          <tr><td><code>.\gradlew.bat test --tests com.shinyoung.recruit.controller.QuestionTemplateControllerTest</code></td><td><span class="badge done">Success</span></td></tr>
+          <tr><td><code>.\gradlew.bat test --tests com.shinyoung.recruit.service.JobPostingQuestionServiceTest</code></td><td><span class="badge done">Success</span></td></tr>
+          <tr><td><code>.\gradlew.bat test --tests com.shinyoung.recruit.controller.JobPostingQuestionControllerTest</code></td><td><span class="badge done">Success</span></td></tr>
+          <tr><td><code>.\gradlew.bat test --tests com.shinyoung.recruit.service.ApplicationSubmitValidatorTest</code></td><td><span class="badge done">Success</span></td></tr>
+          <tr><td><code>.\gradlew.bat test --tests com.shinyoung.recruit.controller.ApplicationControllerTest</code></td><td><span class="badge done">Success</span></td></tr>
+          <tr><td><code>.\gradlew.bat clean test</code></td><td><span class="badge done">Success</span></td></tr>
+        </tbody>
+      </table>
+      <p>Commands were run with an AES key set in the local PowerShell environment. Secrets are intentionally not printed in this report.</p>
+    </section>
+
+    <section class="section">
+      <h2>Remaining Issues</h2>
+      <ul>
+        <li>Submit validator answer integration is still pending.</li>
+        <li>Admin answer lazy read API is still pending.</li>
+        <li>Inactive question historical answers are hidden from applicant `GET /questions` in this phase.</li>
+        <li>No question revision/reopen policy exists for published job postings.</li>
+        <li>No answer access audit log or original-text masking policy exists yet.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Next Phase Recommendation</h2>
+      <p>Proceed with Phase 03c-9-3: connect active required `JobPostingQuestion` answer checks to `ApplicationSubmitValidator`, including blank answer and maxLength revalidation at final submit time.</p>
+    </section>
+  </main>
+</body>
+</html>

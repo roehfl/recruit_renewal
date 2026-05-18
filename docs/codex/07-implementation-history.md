@@ -1,5 +1,49 @@
 # 07. Implementation History
 
+## Phase 03c-9-2 - ApplicationAnswer + Applicant Question/Answer API
+
+- 작업일: 2026-05-18
+- 목적: 지원자가 본인 지원서의 공고 질문 목록과 현재 답변을 조회하고, DRAFT 상태에서 답변을 replace 저장할 수 있도록 `ApplicationAnswer` 기반 applicant API를 추가했다.
+- 구현 범위:
+  - `ApplicationAnswer` Entity 추가
+  - `ApplicationAnswerRepository` 추가
+  - `ApplicationAnswerRequest`, `ApplicationAnswerReplaceRequest`, `ApplicationQuestionResponse` 추가
+  - `ApplicationAnswerService`, `ApplicationAnswerController` 추가
+  - `InvalidApplicationAnswerException` 추가 및 `GlobalExceptionHandler` 400 매핑
+  - `GET /applications/{applicationId}/questions` 구현
+  - `POST /applications/{applicationId}/answers` 구현
+  - active `JobPostingQuestion` 목록 기준 질문 조회와 현재 답변 merge 구현
+  - 답변 replace 저장 시 applicationId 기준 기존 답변 삭제 후 새 답변 저장
+  - 답변 저장 시 질문 문구/category/answerType/required/minLength/maxLength/sortOrder snapshot 보존
+  - DRAFT 저장 시 null/blank 답변 허용, maxLength/SHORT_TEXT/LONG_TEXT 길이 초과 차단
+- 주요 클래스:
+  - `ApplicationAnswer`
+  - `ApplicationAnswerRepository`
+  - `ApplicationAnswerService`
+  - `ApplicationAnswerController`
+  - `ApplicationQuestionResponse`
+  - `ApplicationAnswerServiceTest`
+  - `ApplicationAnswerControllerTest`
+- API:
+  - `GET /applications/{applicationId}/questions`
+  - `POST /applications/{applicationId}/answers`
+- 테스트 결과:
+  - `ApplicationAnswerServiceTest` 성공
+  - `ApplicationAnswerControllerTest` 성공
+  - `QuestionTemplateServiceTest` 성공
+  - `QuestionTemplateControllerTest` 성공
+  - `JobPostingQuestionServiceTest` 성공
+  - `JobPostingQuestionControllerTest` 성공
+  - `ApplicationSubmitValidatorTest` 성공
+  - `ApplicationControllerTest` 성공
+  - `./gradlew.bat clean test` 성공
+- 미구현/보류:
+  - `ApplicationSubmitValidator` 질문답변 필수 검증 연동
+  - 관리자 답변 조회 API `GET /admin/applications/{applicationId}/answers`
+  - 지원자 답변 전용 조회 API `GET /applications/{applicationId}/answers`
+  - 선택형 option, 파일형 답변, Attachment 연동, QuestionSet, StageResult
+- 다음 작업: Phase 03c-9-3에서 active required `JobPostingQuestion` 기준 answer blank/maxLength 검증을 `ApplicationSubmitValidator`에 연결한다.
+
 ## Phase 03c-9-1 - QuestionTemplate + JobPostingQuestion Admin API
 
 - 작업일: 2026-05-18

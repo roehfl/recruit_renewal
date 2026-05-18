@@ -1,11 +1,23 @@
 # Phase 03c-9 Question/Answer Domain Design
 
+## Phase 03c-9-2 Implementation Reflection
+
+- Phase 03c-9-2 implemented `ApplicationAnswer`, `ApplicationAnswerRepository`, applicant answer request/response DTOs, `ApplicationAnswerService`, and `ApplicationAnswerController`.
+- Added applicant APIs:
+  - `GET /applications/{applicationId}/questions`
+  - `POST /applications/{applicationId}/answers`
+- `GET /applications/{applicationId}/questions` returns active `JobPostingQuestion` rows only and merges the applicant's current `ApplicationAnswer` when present.
+- `POST /applications/{applicationId}/answers` replaces all answers for the application and stores `JobPostingQuestion` snapshot fields on every saved answer.
+- DRAFT save allows null/blank answer text and required question blanks; length violations are blocked during DRAFT save.
+- `ApplicationSubmitValidator` question/answer integration, admin answer lazy read API, choice option domain, file answer type, and Attachment linkage remain deferred.
+- Next implementation recommendation is Phase 03c-9-3: required/blank/maxLength answer validation in `ApplicationSubmitValidator`.
+
 ## Phase 03c-9-1 구현 반영
 
 - 설계 추천안 중 `QuestionTemplate` + `JobPostingQuestion` 관리자 질문 구성 API가 Phase 03c-9-1에서 구현되었다.
 - 구현된 범위는 전역 질문 템플릿 관리, 공고별 질문 생성/수정/정렬/비활성화, 템플릿 기반 snapshot 생성, 직접 작성 질문 생성이다.
-- `ApplicationAnswer`, 지원자 질문/답변 API, submit validator 질문답변 연동, 관리자 답변 조회 API는 아직 구현하지 않았다.
-- 다음 구현 추천은 Phase 03c-9-2: `ApplicationAnswer` + 지원자 질문 목록/답변 replace 저장 API이다.
+- Phase 03c-9-1 시점에는 `ApplicationAnswer`, 지원자 질문/답변 API, submit validator 질문답변 연동, 관리자 답변 조회 API가 보류되었고, 그중 `ApplicationAnswer`와 지원자 질문/답변 API는 Phase 03c-9-2에서 구현되었다.
+- Phase 03c-9-2 has completed. The next implementation recommendation is Phase 03c-9-3: connect active required `JobPostingQuestion` answer blank/maxLength validation to `ApplicationSubmitValidator`.
 
 ## Phase 이름
 
@@ -24,7 +36,7 @@ Phase 03c-9: Application Question/Answer Domain Design
 - Phase 03c-1부터 Phase 03c-6까지 학력, 경력, 자격, 어학, 병역, 수상, 공백기간, 첨부 metadata 지원자 섹션 API가 구현되었다.
 - Phase 03c-7에서 `ApplicationSubmitValidator`가 `JobApplicationService.submit()`에 연결되어 상세 섹션 필수 검증을 수행한다.
 - Phase 03c-8에서 관리자 상세 섹션 read-only lazy 조회 API가 구현되었다.
-- 자기소개서/질문답변 도메인, StageResult, 파일 업로드/다운로드, 관리자 상세 aggregate API는 아직 구현하지 않았다.
+- 자기소개서/질문답변 도메인은 전역 템플릿, 공고별 질문 구성, 지원자 답변 저장까지 구현되었고, submit validator 질문답변 연동과 관리자 답변 조회는 아직 구현하지 않았다. StageResult, 파일 업로드/다운로드, 관리자 상세 aggregate API도 아직 구현하지 않았다.
 
 ## 전체 구조 비교
 
@@ -271,7 +283,7 @@ Phase 03c-8의 관리자 상세 섹션 lazy 조회 API와 같은 방향으로 �
 | Phase 03c-9-4 | 관리자 답변 lazy 조회 API | `GET /admin/applications/{applicationId}/answers`, 관리자 응답 DTO, 민감정보 문서화 | 권한별 원문 열람/감사 로그 |
 | Phase 03c-9-5 | 확장 정책 정리 | 선택형 답변, 파일 질문, QuestionSet/revision 필요성 재검토 | 실제 파일 업로드/다운로드 |
 
-Phase 03c-9-1이 완료되었으므로 다음 구현 추천은 Phase 03c-9-2이다. `ApplicationAnswer`와 지원자 질문/답변 저장 API가 있어야 submit 검증 기준과 관리자 답변 조회를 안정적으로 이어갈 수 있다.
+Phase 03c-9-2 has completed `ApplicationAnswer` and applicant question/answer APIs. The next implementation recommendation is Phase 03c-9-3: connect active required `JobPostingQuestion` answer blank/maxLength validation to `ApplicationSubmitValidator`. After that, implement the admin answer lazy read API.
 
 ## 보류 항목
 
@@ -311,4 +323,6 @@ Phase 03c-9-1이 완료되었으므로 다음 구현 추천은 Phase 03c-9-2이�
 
 ## 다음 구현 추천 Phase
 
-다음 구현은 Phase 03c-9-2: ApplicationAnswer + 지원자 질문 목록/답변 replace 저장 API를 추천한다. 그 다음 Phase에서 submit validator 필수 답변 검증과 관리자 답변 조회를 순차적으로 연결한다.
+Phase 03c-9-2 has completed `ApplicationAnswer`, `GET /applications/{applicationId}/questions`, and `POST /applications/{applicationId}/answers`.
+
+The next implementation recommendation is Phase 03c-9-3: connect active required `JobPostingQuestion` answer blank/maxLength validation to `ApplicationSubmitValidator`. After that, implement the admin answer lazy read API.
