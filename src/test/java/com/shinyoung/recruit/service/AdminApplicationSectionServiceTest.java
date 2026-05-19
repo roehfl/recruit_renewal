@@ -17,6 +17,8 @@ import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
+import com.shinyoung.recruit.domain.entity.Stage;
+import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
@@ -32,12 +34,15 @@ import com.shinyoung.recruit.domain.repository.ApplicationMilitaryRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
+import com.shinyoung.recruit.domain.repository.StageRepository;
+import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.dto.response.AdminAttachmentResponse;
 import com.shinyoung.recruit.dto.response.AdminApplicationAnswerResponse;
+import com.shinyoung.recruit.dto.response.AdminApplicationStageResultResponse;
 import com.shinyoung.recruit.dto.response.AdminAwardResponse;
 import com.shinyoung.recruit.dto.response.AdminCareerResponse;
 import com.shinyoung.recruit.dto.response.AdminCertificateResponse;
@@ -61,6 +66,8 @@ import com.shinyoung.recruit.enumeration.MilitaryServiceType;
 import com.shinyoung.recruit.enumeration.MilitarySubjectType;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
 import com.shinyoung.recruit.enumeration.QuestionCategory;
+import com.shinyoung.recruit.enumeration.StageResultStatus;
+import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,6 +78,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.lang.reflect.RecordComponent;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -144,6 +152,12 @@ class AdminApplicationSectionServiceTest {
 
     @Autowired
     private ApplicationAnswerRepository applicationAnswerRepository;
+
+    @Autowired
+    private StageRepository stageRepository;
+
+    @Autowired
+    private StageResultRepository stageResultRepository;
 
     @Test
     void get_educations_returns_sorted_educations_and_semester_grades() {
@@ -366,12 +380,66 @@ class AdminApplicationSectionServiceTest {
     }
 
     @Test
+    void get_stage_results_returns_stage_timeline_with_result_merge() {
+        JobApplication application = createApplication("admin-section-stage-result");
+        Stage later = stageRepository.save(stage(application.getJobPosting(), "Final Interview", 2, true));
+        Stage earlier = stageRepository.save(stage(application.getJobPosting(), "Document Screening", 1, false));
+        StageResult result = stageResultRepository.save(StageResult.initialize(later, application));
+        result.updateResult(
+                StageResultStatus.PASSED,
+                new BigDecimal("95.5"),
+                "passed",
+                LocalDateTime.of(2026, 7, 1, 10, 30),
+                "SYSTEM"
+        );
+
+        List<AdminApplicationStageResultResponse> responses = adminApplicationSectionService.getStageResults(application.getId());
+
+        assertThat(responses).extracting(AdminApplicationStageResultResponse::stageId)
+                .containsExactly(earlier.getId(), later.getId());
+        assertThat(responses.get(0).stageResultId()).isNull();
+        assertThat(responses.get(0).resultStatus()).isNull();
+        assertThat(responses.get(0).score()).isNull();
+        assertThat(responses.get(0).comment()).isNull();
+        assertThat(responses.get(0).decidedAt()).isNull();
+        assertThat(responses.get(1).stageResultId()).isEqualTo(result.getId());
+        assertThat(responses.get(1).resultStatus()).isEqualTo(StageResultStatus.PASSED);
+        assertThat(responses.get(1).score()).isEqualByComparingTo("95.5");
+        assertThat(responses.get(1).comment()).isEqualTo("passed");
+        assertThat(responses.get(1).decidedAt()).isEqualTo(LocalDateTime.of(2026, 7, 1, 10, 30));
+    }
+
+    @Test
+    void get_stage_results_excludes_other_job_posting_results() {
+        JobApplication application = createApplication("admin-section-stage-result-own");
+        Stage ownStage = stageRepository.save(stage(application.getJobPosting(), "Own Stage", 1, true));
+        JobApplication otherApplication = createApplication("admin-section-stage-result-other");
+        Stage otherStage = stageRepository.save(stage(otherApplication.getJobPosting(), "Other Stage", 1, true));
+        stageResultRepository.save(StageResult.initialize(otherStage, otherApplication));
+
+        List<AdminApplicationStageResultResponse> responses = adminApplicationSectionService.getStageResults(application.getId());
+
+        assertThat(responses).extracting(AdminApplicationStageResultResponse::stageId)
+                .containsExactly(ownStage.getId());
+        assertThat(responses.get(0).stageResultId()).isNull();
+    }
+
+    @Test
+    void get_stage_results_does_not_expose_decided_by() {
+        assertThat(AdminApplicationStageResultResponse.class.getRecordComponents())
+                .extracting(RecordComponent::getName)
+                .doesNotContain("decidedBy");
+    }
+
+    @Test
     void get_sections_fails_when_application_does_not_exist() {
         assertThatThrownBy(() -> adminApplicationSectionService.getEducations(99999L))
                 .isInstanceOf(JobApplicationNotFoundException.class);
         assertThatThrownBy(() -> adminApplicationSectionService.getAttachments(99999L))
                 .isInstanceOf(JobApplicationNotFoundException.class);
         assertThatThrownBy(() -> adminApplicationSectionService.getAnswers(99999L))
+                .isInstanceOf(JobApplicationNotFoundException.class);
+        assertThatThrownBy(() -> adminApplicationSectionService.getStageResults(99999L))
                 .isInstanceOf(JobApplicationNotFoundException.class);
     }
 
@@ -383,6 +451,9 @@ class AdminApplicationSectionServiceTest {
         JobPostingQuestion draftQuestion = question(draft.getJobPosting(), "Draft Question", 0, false);
         JobPostingQuestion submittedQuestion = question(submitted.getJobPosting(), "Submitted Question", 0, false);
         JobPostingQuestion withdrawnQuestion = question(withdrawn.getJobPosting(), "Withdrawn Question", 0, false);
+        Stage draftStage = stageRepository.save(stage(draft.getJobPosting(), "Draft Stage", 1, true));
+        Stage submittedStage = stageRepository.save(stage(submitted.getJobPosting(), "Submitted Stage", 1, true));
+        Stage withdrawnStage = stageRepository.save(stage(withdrawn.getJobPosting(), "Withdrawn Stage", 1, true));
         jobApplicationService.submit(submitted.getApplicant().getId(), submitted.getId());
         jobApplicationService.submit(withdrawn.getApplicant().getId(), withdrawn.getId());
         jobApplicationService.withdraw(withdrawn.getApplicant().getId(), withdrawn.getId());
@@ -400,6 +471,15 @@ class AdminApplicationSectionServiceTest {
         assertThat(adminApplicationSectionService.getAnswers(withdrawn.getId()))
                 .extracting(AdminApplicationAnswerResponse::questionId)
                 .containsExactly(withdrawnQuestion.getId());
+        assertThat(adminApplicationSectionService.getStageResults(draft.getId()))
+                .extracting(AdminApplicationStageResultResponse::stageId)
+                .containsExactly(draftStage.getId());
+        assertThat(adminApplicationSectionService.getStageResults(submitted.getId()))
+                .extracting(AdminApplicationStageResultResponse::stageId)
+                .containsExactly(submittedStage.getId());
+        assertThat(adminApplicationSectionService.getStageResults(withdrawn.getId()))
+                .extracting(AdminApplicationStageResultResponse::stageId)
+                .containsExactly(withdrawnStage.getId());
     }
 
     private JobApplication createApplication(String loginId) {
@@ -556,6 +636,17 @@ class AdminApplicationSectionServiceTest {
                 3000,
                 sortOrder
         ));
+    }
+
+    private Stage stage(JobPosting jobPosting, String stageName, Integer stageOrder, boolean finalStage) {
+        return Stage.create(
+                jobPosting,
+                stageName,
+                StageType.DOCUMENT,
+                stageOrder,
+                LocalDateTime.of(2026, 7, 1, 10, 0).plusDays(stageOrder),
+                finalStage
+        );
     }
 
     @TestConfiguration

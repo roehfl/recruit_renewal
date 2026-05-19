@@ -2,6 +2,7 @@ package com.shinyoung.recruit.domain.repository;
 
 import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
+import com.shinyoung.recruit.enumeration.StageStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -39,4 +40,36 @@ public interface StageResultRepository extends JpaRepository<StageResult, Long> 
             order by application.submittedAt desc, application.id desc
             """)
     List<StageResult> findByStageIdForAdminList(@Param("stageId") Long stageId);
+
+    @Query("""
+            select result
+            from StageResult result
+            join fetch result.stage stage
+            where result.jobApplication.id = :jobApplicationId
+              and stage.id in :stageIds
+            """)
+    List<StageResult> findByJobApplicationIdAndStageIdInForTimeline(
+            @Param("jobApplicationId") Long jobApplicationId,
+            @Param("stageIds") Collection<Long> stageIds
+    );
+
+    default List<StageResult> findVisibleByJobApplicationIdForApplicant(Long jobApplicationId) {
+        return findVisibleByJobApplicationIdForApplicant(
+                jobApplicationId,
+                List.of(StageStatus.RESULT_ANNOUNCED, StageStatus.CLOSED)
+        );
+    }
+
+    @Query("""
+            select result
+            from StageResult result
+            join fetch result.stage stage
+            where result.jobApplication.id = :jobApplicationId
+              and stage.status in :visibleStatuses
+            order by stage.stageOrder asc, stage.id asc
+            """)
+    List<StageResult> findVisibleByJobApplicationIdForApplicant(
+            @Param("jobApplicationId") Long jobApplicationId,
+            @Param("visibleStatuses") Collection<StageStatus> visibleStatuses
+    );
 }

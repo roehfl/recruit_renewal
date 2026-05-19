@@ -6,6 +6,8 @@ import com.shinyoung.recruit.domain.entity.ApplicationEducation;
 import com.shinyoung.recruit.domain.entity.ApplicationEducationSemesterGrade;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
+import com.shinyoung.recruit.domain.entity.Stage;
+import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
@@ -19,7 +21,10 @@ import com.shinyoung.recruit.domain.repository.ApplicationLanguageRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationMilitaryRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
+import com.shinyoung.recruit.domain.repository.StageRepository;
+import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.dto.response.AdminApplicationAnswerResponse;
+import com.shinyoung.recruit.dto.response.AdminApplicationStageResultResponse;
 import com.shinyoung.recruit.dto.response.AdminAttachmentResponse;
 import com.shinyoung.recruit.dto.response.AdminAwardResponse;
 import com.shinyoung.recruit.dto.response.AdminCareerItemResponse;
@@ -57,6 +62,8 @@ public class AdminApplicationSectionService {
     private final ApplicationAttachmentRepository attachmentRepository;
     private final JobPostingQuestionRepository jobPostingQuestionRepository;
     private final ApplicationAnswerRepository applicationAnswerRepository;
+    private final StageRepository stageRepository;
+    private final StageResultRepository stageResultRepository;
 
     public List<AdminEducationResponse> getEducations(Long applicationId) {
         validateApplicationExists(applicationId);
@@ -164,6 +171,33 @@ public class AdminApplicationSectionService {
                 .map(question -> AdminApplicationAnswerResponse.of(
                         question,
                         answersByQuestionId.get(question.getId())
+                ))
+                .toList();
+    }
+
+    public List<AdminApplicationStageResultResponse> getStageResults(Long applicationId) {
+        JobApplication application = findApplication(applicationId);
+        List<Stage> stages = stageRepository.findByJobPostingIdOrderByStageOrderAscIdAsc(application.getJobPosting().getId());
+        if (stages.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> stageIds = stages.stream()
+                .map(Stage::getId)
+                .toList();
+        Map<Long, StageResult> stageResultsByStageId = stageResultRepository
+                .findByJobApplicationIdAndStageIdInForTimeline(applicationId, stageIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        result -> result.getStage().getId(),
+                        result -> result,
+                        (first, ignored) -> first
+                ));
+
+        return stages.stream()
+                .map(stage -> AdminApplicationStageResultResponse.of(
+                        stage,
+                        stageResultsByStageId.get(stage.getId())
                 ))
                 .toList();
     }

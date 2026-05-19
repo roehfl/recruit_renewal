@@ -2,6 +2,7 @@ package com.shinyoung.recruit.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.ldap.core.support.BaseLdapPathContextSource;
 import org.springframework.ldap.core.support.LdapContextSource;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -56,9 +57,13 @@ public class SecurityConfig {
         http.cors(cors -> corsConfigurationSource());
         http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED));
         http.authorizeHttpRequests(authorizeRequests -> authorizeRequests
-//                .requestMatchers("/auth/**", "/swagger-ui/**", "/api-docs/**", "/h2-console/**", "/menu/tree").permitAll()
-//                .anyRequest().authenticated());
-        .anyRequest().permitAll());
+                .requestMatchers("/auth/login", "/auth/logout").permitAll()
+                .requestMatchers("/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**", "/h2-console/**", "/menu/tree").permitAll()
+                .requestMatchers(HttpMethod.GET, "/job-postings/{jobPostingId}/application").hasAuthority("ROLE_APPLICANT")
+                .requestMatchers(HttpMethod.GET, "/job-postings/**").permitAll()
+                .requestMatchers("/admin/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_RECRUIT_ADMIN")
+                .requestMatchers("/applications/**").hasAuthority("ROLE_APPLICANT")
+                .anyRequest().permitAll());
         http.authenticationManager(authenticationManager);
 
 //        http.formLogin(form -> form

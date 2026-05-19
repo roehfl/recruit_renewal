@@ -1,5 +1,305 @@
 # 07. Implementation History
 
+## Phase 03e-3 - URL Authorization Hardening
+
+- Date: 2026-05-19
+- Goal: protect admin and applicant API families with Spring Security URL authorization while keeping the current session-based authentication structure.
+- Implemented:
+  - Verified `DeptRoleMapping.roleName` uses full authority names such as `ROLE_ADMIN`.
+  - Used `hasAnyAuthority("ROLE_ADMIN", "ROLE_RECRUIT_ADMIN")` for `/admin/**`.
+  - Used `hasAuthority("ROLE_APPLICANT")` for `/applications/**`.
+  - Protected `GET /job-postings/{jobPostingId}/application` as an applicant-owned endpoint.
+  - Preserved public access for `/auth/login`, `/auth/logout`, Swagger/OpenAPI, H2 console, `/menu/tree`, and public `GET /job-postings/**`.
+  - Kept `anyRequest().permitAll()` as a conservative fallback for unclassified APIs.
+  - Added `spring-security-test` for MockMvc security tests.
+  - Updated StageResult, ApplicationStageResult, and Stage controller tests to run through Spring Security filters.
+- APIs affected:
+  - `/admin/**`
+  - `/applications/**`
+  - `GET /job-postings/{jobPostingId}/application`
+  - `GET /job-postings/**`
+- Tests:
+  - `StageResultControllerTest`: success
+  - `ApplicationStageResultControllerTest`: success
+  - `StageControllerTest`: success
+  - `StageResultServiceTest` + `StageResultCorrectionServiceTest`: success
+  - `.\gradlew.bat clean test --no-daemon`: success
+- Documentation:
+  - `docs/codex/implementation/phase-03e-3-url-authorization-hardening.md`
+  - `docs/codex/reports/phase-03e-3-url-authorization-hardening.html`
+  - `docs/codex/design/phase-03e-admin-auth-hardening-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Deferred:
+  - 401/403 JSON `ApiResponse.fail` handlers
+  - `AuthenticationEntryPoint`
+  - `AccessDeniedHandler`
+  - `CurrentAdminService`
+  - `AdminStageResultResponse.decidedBy`
+  - Employee FK or audit actor entity
+  - Replacing fallback `permitAll` after remaining API classification
+- Next recommended phase:
+  - Phase 03e-4 security exception response hardening.
+
+## Phase 03e-2 - StageResult Actor Propagation
+
+- Date: 2026-05-19
+- Goal: replace temporary StageResult `"SYSTEM"` actor values with the authenticated employee login id for admin result commands.
+- Implemented:
+  - Added `CurrentEmployeeService`.
+  - `CurrentEmployeeService` validates null principal, employee user type, and blank username.
+  - Actor value is `CustomUserDetails.getUsername()`.
+  - `StageResultService.updateResult(...)` now requires an actor.
+  - `StageResultService.bulkUpdateResults(...)` now requires an actor.
+  - `StageResultCorrectionService.correctResult(...)` now requires an actor.
+  - Single and bulk update save `StageResult.decidedBy = actor`.
+  - Correction saves latest `StageResult.decidedBy = actor`.
+  - Correction history saves `StageResultCorrectionHistory.correctedBy = actor`.
+  - `StageResultController` resolves actor from `@AuthenticationPrincipal CustomUserDetails` for update, bulk update, and correction endpoints.
+  - Applicant result-read tests verify actor fields are not exposed.
+- APIs affected:
+  - `POST /admin/stages/{stageId}/results/{resultId}`
+  - `POST /admin/stages/{stageId}/results/bulk`
+  - `POST /admin/stages/{stageId}/results/{resultId}/correct`
+- APIs unchanged:
+  - `GET /admin/stages/{stageId}/results`
+  - `POST /admin/stages/{stageId}/results/initialize`
+  - `GET /admin/stages/{stageId}/results/{resultId}/histories`
+  - `GET /applications/{applicationId}/stage-results`
+- Tests:
+  - `CurrentEmployeeServiceTest`: success
+  - `StageResultServiceTest` + `StageResultCorrectionServiceTest`: success
+  - `StageResultControllerTest`: success
+  - `ApplicationStageResultServiceTest` + `ApplicationStageResultControllerTest`: success
+  - `.\gradlew.bat clean test --no-daemon`: success
+- Documentation:
+  - `docs/codex/implementation/phase-03e-2-stage-result-actor-propagation.md`
+  - `docs/codex/reports/phase-03e-2-stage-result-actor-propagation.html`
+  - `docs/codex/design/phase-03e-admin-auth-hardening-design.md`
+  - `docs/codex/design/phase-03d-stage-result-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Deferred:
+  - `SecurityConfig` changes
+  - URL authorization for `/admin/**` and `/applications/**`
+  - 401/403 JSON security handlers
+  - `CurrentAdminService`
+  - `AdminStageResultResponse.decidedBy`
+  - Employee FK or audit actor entity
+  - LDAP configuration changes
+- Note:
+  - The first full `clean test` attempt timed out and left Gradle report files locked. After `.\gradlew.bat --stop`, the same full command passed.
+- Next recommended phase:
+  - Phase 03e-3 URL authorization hardening.
+
+## Phase 03e-1 - Admin/Auth Hardening Design
+
+- 작업일: 2026-05-19
+- 작업 성격: 설계 문서 전용
+- 목적: 현재 개발 편의 중심의 인증/인가 구조를 운영 전환 전에 정리하기 위해 `/admin/**` 보호, applicant/admin 접근 분리, StageResult actor 전파, 401/403 응답 정책을 설계했다.
+- 생성 문서:
+  - `docs/codex/design/phase-03e-admin-auth-hardening-design.md`
+  - `docs/codex/reports/phase-03e-admin-auth-hardening-design.html`
+- 갱신 문서:
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/design/phase-03d-stage-result-design.md`
+  - `docs/codex/07-implementation-history.md`
+- 현재 보안/권한 문제 요약:
+  - `SecurityConfig`가 현재 `anyRequest().permitAll()` 상태라 `/admin/**`와 `/applications/**`가 URL authorization으로 보호되지 않는다.
+  - applicant 쪽은 `CurrentApplicantService`가 있지만 employee/admin current-user resolver는 아직 없다.
+  - `StageResultService.updateResult`는 `decidedBy = "SYSTEM"`을 사용한다.
+  - `StageResultCorrectionService.correctResult`는 `correctedBy = "SYSTEM"`과 `decidedBy = "SYSTEM"`을 사용한다.
+  - Spring Security 인증/인가 실패가 controller 진입 전 발생할 경우 `GlobalExceptionHandler`만으로는 `ApiResponse.fail` 응답을 보장할 수 없다.
+- 추천 정책 요약:
+  - `/admin/**`는 인증된 employee/admin 권한만 허용한다.
+  - applicant가 `/admin/**`에 접근하면 403으로 응답한다.
+  - 미로그인 사용자가 보호 API에 접근하면 401로 응답한다.
+  - `/applications/**`는 `ROLE_APPLICANT`만 허용한다.
+  - employee/admin은 applicant API 대신 admin API를 사용한다.
+  - 지원서 소유권 검증은 SecurityConfig가 아니라 service 계층에서 계속 유지한다.
+  - 다른 지원자의 지원서 접근은 기존처럼 404 숨김 정책을 유지한다.
+  - 401/403은 Spring Security `AuthenticationEntryPoint`, `AccessDeniedHandler`에서 JSON `ApiResponse.fail`로 처리한다.
+- StageResult identity 설계:
+  - Phase 03e-2에서 `CurrentEmployeeService` 또는 `CurrentAdminService`를 추가한다.
+  - Controller에서 `@AuthenticationPrincipal CustomUserDetails`를 받아 actor를 추출한다.
+  - StageResult service method에 `actor` 또는 `adminLoginId`를 전달한다.
+  - 초기 actor 값은 `CustomUserDetails.getUsername()` 기반 문자열을 추천한다.
+  - 추후 Employee FK 또는 AuditActor로 확장 가능하게 설계한다.
+  - applicant response에는 `decidedBy`, `correctedBy`, correction history를 계속 노출하지 않는다.
+- Phase 분리:
+  - Phase 03e-1: 설계 문서만 작성
+  - Phase 03e-2: current admin identity resolver + StageResult `decidedBy`/`correctedBy` 적용
+  - Phase 03e-3: `SecurityConfig`에서 `/admin/**`, `/applications/**` 접근 제어 적용
+  - Phase 03e-4: 401/403 `ApiResponse.fail` 처리와 테스트 보강
+- 검증:
+  - 문서 전용 작업이므로 Gradle 테스트는 실행하지 않았다.
+  - Java source, test source, `SecurityConfig`, build, YAML, DB schema 변경 없음.
+- 다음 작업:
+  - Phase 03e-2에서 employee/admin identity resolver와 StageResult actor propagation 구현
+
+## Phase 03d-5 - Result Correction History
+
+- 작업일: 2026-05-19
+- 목적: 발표 후 `StageResult` 변경을 일반 update API가 아니라 별도 correction command로 처리하고, 변경 전후 값을 append-only history로 보존한다.
+- 구현 범위:
+  - `StageResultCorrectionHistory` Entity 추가
+  - `StageResultCorrectionHistoryRepository` 추가
+  - `StageResultCorrectionRequest` DTO 추가
+  - `StageResultCorrectionHistoryResponse` DTO 추가
+  - `StageResultCorrectionService` 추가
+  - `StageResultController`에 correction/history endpoint 추가
+  - `POST /admin/stages/{stageId}/results/{resultId}/correct` 추가
+  - `GET /admin/stages/{stageId}/results/{resultId}/histories` 추가
+  - `resultId + stageId` 기준 StageResult 조회
+  - `Stage.status == RESULT_ANNOUNCED || CLOSED`일 때만 correction 허용
+  - `READY`, `IN_PROGRESS` correction 차단
+  - correction reason 필수화
+  - 최신 `StageResult` row를 정정 결과로 갱신
+  - 이전/신규 `status`, `score`, `comment`, `decidedAt` snapshot 이력 저장
+  - correction history는 `correctedAt DESC, id DESC` 순서로 조회
+  - `correctedBy`, `decidedBy`는 Phase 03d-2 정책과 동일하게 임시 `SYSTEM` 사용
+- API:
+  - `POST /admin/stages/{stageId}/results/{resultId}/correct`
+  - `GET /admin/stages/{stageId}/results/{resultId}/histories`
+- 정책:
+  - 일반 `StageResultService.updateResult`는 기존처럼 `IN_PROGRESS` 전형에서만 허용
+  - 발표 후 변경은 correction command로만 허용
+  - correction은 중복 `StageResult` row를 만들지 않음
+  - `StageResult`에는 history collection을 추가하지 않음
+  - cascade/orphanRemoval 사용하지 않음
+  - 지원자 API는 정정 후 최신 결과만 보여주고 history는 노출하지 않음
+- 테스트 결과:
+  - `StageResultCorrectionServiceTest` + `StageResultControllerTest`: 성공
+  - `ApplicationStageResultServiceTest` + `ApplicationStageResultControllerTest`: 성공
+  - `StageResultServiceTest` + `StageServiceTest`: 성공
+  - `./gradlew.bat clean test --no-daemon`: 성공
+- 문서:
+  - `docs/codex/implementation/phase-03d-5-result-correction-history.md`
+  - `docs/codex/reports/phase-03d-5-result-correction-history.html`
+  - `docs/codex/design/phase-03d-stage-result-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- 보류:
+  - 실제 관리자 identity 기반 `correctedBy`, `decidedBy`
+  - SecurityConfig 변경
+  - 정정 알림/message 발송
+  - 별도 audit log
+  - interview/evaluation aggregation
+  - 명시적 migration script
+- 다음 작업:
+  - 관리자 identity 연결, 정정 알림 정책, 권한/audit 강화
+
+## Phase 03d-4 - Applicant StageResult Read API
+
+- 작업일: 2026-05-19
+- 목적: 지원자가 본인 지원서의 발표 완료된 전형 결과만 조회할 수 있도록 read-only API를 추가했다.
+- 구현 범위:
+  - `ApplicantStageResultResponse` DTO 추가
+  - `ApplicationStageResultService` 추가
+  - `ApplicationStageResultController` 추가
+  - `StageResultRepository.findVisibleByJobApplicationIdForApplicant` 추가
+  - `GET /applications/{applicationId}/stage-results` 추가
+  - `applicationId + applicantId` 기반 소유자 검증
+  - `DRAFT` 지원서 결과 조회 차단
+  - `SUBMITTED`, `WITHDRAWN` 지원서 결과 조회 허용
+  - `Stage.status == RESULT_ANNOUNCED || CLOSED` 결과만 노출
+  - `READY`, `IN_PROGRESS` stage row 미노출
+  - Stage 기준 null row 미생성
+  - read-time StageResult 생성/upsert 금지
+  - `resultAnnouncementDateTime`은 표시용으로만 응답
+  - `score`, `comment`, `decidedBy`, `stageResultId` 응답 제외
+- API:
+  - `GET /applications/{applicationId}/stage-results`
+- 테스트 결과:
+  - `ApplicationStageResultServiceTest` + `ApplicationStageResultControllerTest`: 성공
+  - `StageResultServiceTest` + `StageResultControllerTest` + `StageServiceTest` + `StageControllerTest`: 성공
+  - `./gradlew.bat clean test --no-daemon`: 성공
+- 문서:
+  - `docs/codex/implementation/phase-03d-4-applicant-stage-result-read.md`
+  - `docs/codex/reports/phase-03d-4-applicant-stage-result-read.html`
+  - `docs/codex/design/phase-03d-stage-result-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- 보류:
+  - Phase 03d-5 correction/history
+  - `StageResultCorrectionHistory`
+  - correction API
+  - DB schema 변경
+  - SecurityConfig 변경
+  - 메시지/알림 발송
+  - 예약 발표 guard
+  - read audit logging
+- 다음 작업:
+  - Phase 03d-5 result correction history 설계 기반 구현
+
+## Phase 03d-4/03d-5 - Result Read and Correction Design
+
+- 작업일: 2026-05-19
+- 목적: Phase 03d-3 이후 남은 applicant-facing 결과 조회와 발표 후 결과 정정 이력을 하나의 구현으로 섞지 않고, Phase 03d-4와 Phase 03d-5로 분리 설계했다.
+- 작업 성격: 설계 문서 전용
+- 생성 문서:
+  - `docs/codex/design/phase-03d-4-5-result-read-correction-design.md`
+  - `docs/codex/reports/phase-03d-4-5-result-read-correction-design.html`
+- 갱신 문서:
+  - `docs/codex/design/phase-03d-stage-result-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/07-implementation-history.md`
+- 주요 설계 결정:
+  - Phase 03d-4는 `GET /applications/{applicationId}/stage-results` 지원자 본인 결과 조회로 분리한다.
+  - 지원자 결과 조회는 본인 지원서만 허용하고 `DRAFT`는 조회 대상에서 제외한다.
+  - `SUBMITTED`와 `WITHDRAWN`은 조회 가능하되, 노출 대상 Stage는 `RESULT_ANNOUNCED` 또는 `CLOSED`로 제한한다.
+  - `READY`와 `IN_PROGRESS` 단계는 발표 전 row로도 지원자에게 노출하지 않는다.
+  - 지원자 응답은 `stageName`, `stageType`, `stageOrder`, `resultStatus`, `resultAnnouncementDateTime`, `decidedAt` 중심으로 제한한다.
+  - 지원자 응답에는 `score`, `comment`, `decidedBy`, correction history를 노출하지 않는다.
+  - Phase 03d-5는 발표 후 결과 변경을 별도 correction command로 분리하고, correction reason을 필수로 둔다.
+  - 정정 이력 Entity 후보명은 `StageResultCorrectionHistory`로 정리했다.
+  - 지원자 API는 정정 후 최신 결과만 보여주고 정정 이력은 관리자 API에만 노출한다.
+- API 후보:
+  - `GET /applications/{applicationId}/stage-results`
+  - `POST /admin/stages/{stageId}/results/{resultId}/correct`
+  - `GET /admin/stages/{stageId}/results/{resultId}/histories`
+- 미구현/보류:
+  - Java 코드, Entity, Repository, Service, Controller, DTO, Test, DB schema, SecurityConfig 변경 없음
+  - 메시지/알림 발송, 예약 발표 복합 guard, read audit logging, 면접/평가 집계는 보류
+- 검증:
+  - 문서 전용 Phase이므로 Gradle 테스트는 실행하지 않았다.
+  - 문서 정합성만 확인했다.
+- 다음 작업:
+  - Phase 03d-4 applicant-facing result read 구현
+  - 이후 Phase 03d-5 result correction history 구현
+
+## Phase 03d-3 - Admin Application StageResult Timeline Lazy API
+
+- 작업일: 2026-05-19
+- 목적: 관리자 지원서 상세 화면에서 전형 단계별 결과 이력을 lazy 방식으로 조회할 수 있도록 `GET /admin/applications/{applicationId}/stage-results` API를 추가했다.
+- 구현 범위:
+  - `AdminApplicationStageResultResponse` DTO 추가
+  - `AdminApplicationSectionService.getStageResults` 추가
+  - `AdminApplicationSectionController.getStageResults` 추가
+  - `StageResultRepository.findByJobApplicationIdAndStageIdInForTimeline` 추가
+  - application의 `JobPosting`에 속한 Stage 목록 기준 row 생성
+  - StageResult가 있으면 result 정보 merge
+  - StageResult가 없으면 result field null
+  - `stageOrder ASC, id ASC` 정렬
+  - 다른 공고 StageResult merge 방지
+  - `decidedBy` 응답 제외
+- API:
+  - `GET /admin/applications/{applicationId}/stage-results`
+- 테스트 결과:
+  - `AdminApplicationSectionServiceTest` + `AdminApplicationSectionControllerTest`: 성공
+  - `StageResultServiceTest` + `StageResultControllerTest` + `StageServiceTest` + `StageControllerTest`: 성공
+  - `./gradlew.bat clean test --no-daemon`: 성공
+- 문서:
+  - `docs/codex/implementation/phase-03d-3-admin-application-stage-result-timeline.md`
+  - `docs/codex/reports/phase-03d-3-admin-application-stage-result-timeline.html`
+  - `docs/codex/design/phase-03d-stage-result-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- 보류:
+  - applicant-facing result read
+  - result correction/history
+  - message/notification
+  - SecurityConfig 변경
+  - admin root detail 응답에 stageResults 포함
+  - 관리자 상세 section read audit logging
+- 다음 작업:
+  - applicant-facing 결과 조회 발표 정책 또는 결과 정정 이력 설계/구현 검토
+
 ## Phase 03d-0 - StageResult Domain Design
 
 - 작업일: 2026-05-18

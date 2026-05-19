@@ -1,5 +1,109 @@
 # Phase 03 Application Design
 
+## Phase 03e-2 StageResult Actor Propagation Implementation Note
+
+- Phase 03e-2 added `CurrentEmployeeService` for admin-side StageResult command actor resolution.
+- The resolver accepts `CustomUserDetails`, requires `userType == Employee`, and returns `getUsername()` as the actor.
+- Null principals, applicant principals, and blank usernames fail with `InvalidStageResultException`.
+- No Employee DB lookup, Employee FK, `CurrentAdminService`, or `SecurityConfig` change was added.
+- Admin StageResult update, bulk update, and correction commands now receive an actor from the controller.
+- `StageResult.decidedBy` and `StageResultCorrectionHistory.correctedBy` now store the employee login id instead of `"SYSTEM"`.
+- Applicant result read remains unchanged.
+- `ApplicantStageResultResponse` still exposes only stage/result display fields and does not expose `decidedBy`, `correctedBy`, score, comment, or correction history.
+- Next recommendation: Phase 03e-3 should enforce URL authorization for `/admin/**` and `/applications/**`.
+
+## Phase 03e-1 Admin/Auth Hardening Design Note
+
+- Phase 03e-1 is a design-only phase for production-oriented authentication and authorization hardening.
+- No Java source, test source, `SecurityConfig`, build, YAML, or schema file is changed in this phase.
+- Current issue: `SecurityConfig` still permits all requests, so `/admin/**` and `/applications/**` rely mainly on controller/service checks during development.
+- Recommended applicant API policy:
+  - `/applications/**` requires authentication.
+  - `/applications/**` allows only `ROLE_APPLICANT`.
+  - Employee/admin users receive 403 on applicant APIs.
+  - Service-level applicant ownership checks remain mandatory.
+  - Access to another applicant's application continues to use the existing 404 hiding policy.
+- Recommended admin API policy:
+  - `/admin/**` requires authenticated employee/admin authority.
+  - Applicant users receive 403.
+  - Unauthenticated users receive 401.
+  - Actual `DeptRoleMapping.roleName` values must be confirmed before choosing `hasRole` or `hasAuthority`.
+- Current-user resolver recommendation:
+  - Keep `CurrentApplicantService`.
+  - Add `CurrentEmployeeService` in Phase 03e-2.
+  - Add `CurrentAdminService` only if admin authority checks need a dedicated abstraction.
+- Security exception policy:
+  - authentication failure: `401 + ApiResponse.fail`
+  - authorization failure: `403 + ApiResponse.fail`
+  - use Spring Security `AuthenticationEntryPoint` and `AccessDeniedHandler`, not only `GlobalExceptionHandler`.
+- Recommended implementation split:
+  - Phase 03e-2: current employee/admin identity resolver and StageResult actor propagation.
+  - Phase 03e-3: `/admin/**` and `/applications/**` URL authorization.
+  - Phase 03e-4: JSON 401/403 response handlers and tests.
+- Reference:
+  - `docs/codex/design/phase-03e-admin-auth-hardening-design.md`
+  - `docs/codex/reports/phase-03e-admin-auth-hardening-design.html`
+
+## Phase 03d-5 Result Correction History Implementation Note
+
+- Phase 03d-5 added admin-only post-announcement StageResult correction.
+- Added APIs:
+  - `POST /admin/stages/{stageId}/results/{resultId}/correct`
+  - `GET /admin/stages/{stageId}/results/{resultId}/histories`
+- Added `StageResultCorrectionHistory` as an append-only history entity.
+- The correction service finds a result by `resultId + stageId`; a mismatch is treated as `StageResultNotFoundException`.
+- Correction is allowed only after announcement: `Stage.status` must be `RESULT_ANNOUNCED` or `CLOSED`.
+- `READY` and `IN_PROGRESS` stages cannot use correction; `IN_PROGRESS` still uses the existing general result update API.
+- Correction updates the latest `StageResult` row and stores previous/new snapshots for status, score, comment, and decidedAt.
+- Correction reason is mandatory and limited to 1000 characters.
+- `correctedBy` and `decidedBy` still use `SYSTEM` until the real admin identity source is connected.
+- Applicant-facing result read remains unchanged and exposes only the latest corrected result.
+- Applicant responses do not expose correction history, score, comment, or decidedBy.
+- Message/notification, SecurityConfig changes, fine-grained authorization, and interview/evaluation aggregation remain deferred.
+
+## Phase 03d-4 Applicant StageResult Read Implementation Note
+
+- Phase 03d-4 added applicant-facing result read API: `GET /applications/{applicationId}/stage-results`.
+- The controller uses the existing applicant API pattern through `CurrentApplicantService`.
+- The service receives `applicantId` and `applicationId` and loads `JobApplication` by both values.
+- Other applicant's application remains hidden through the existing not-found policy.
+- `DRAFT` applications fail because they are not submitted result targets.
+- `SUBMITTED` and `WITHDRAWN` applications can read visible results.
+- Visible results are existing `StageResult` rows whose `Stage.status` is `RESULT_ANNOUNCED` or `CLOSED`.
+- `READY` and `IN_PROGRESS` stages are not returned, including "announcement pending" rows.
+- Missing StageResult rows are not synthesized as null rows.
+- The response DTO is `ApplicantStageResultResponse`; `AdminApplicationStageResultResponse` is not reused.
+- Applicant response excludes `stageResultId`, `score`, `comment`, `decidedBy`, audit fields, and correction history.
+- `resultAnnouncementDateTime` is returned as display data only; scheduled release guard is not implemented.
+- Phase 03d-5 correction/history remains deferred.
+
+## Phase 03d-4/03d-5 Result Read and Correction Design Note
+
+- Phase 03d-4 and Phase 03d-5 were split as design-only follow-up work after the admin StageResult timeline.
+- Phase 03d-4 candidate API is `GET /applications/{applicationId}/stage-results`.
+- Applicant result read must validate applicant ownership and must not reuse `AdminApplicationStageResultResponse`.
+- `DRAFT` applications are not applicant result-read targets.
+- `SUBMITTED` and `WITHDRAWN` applications can read visible results.
+- Applicant-visible stages are limited to `Stage.status == RESULT_ANNOUNCED || CLOSED`.
+- `READY` and `IN_PROGRESS` stages are not returned to applicants, even as "announcement pending" rows.
+- Applicant response is limited to stage display fields and latest result status/time data.
+- Applicant response must not expose `score`, `comment`, `decidedBy`, or correction history.
+- Phase 03d-5 candidate APIs are `POST /admin/stages/{stageId}/results/{resultId}/correct` and `GET /admin/stages/{stageId}/results/{resultId}/histories`.
+- Result correction requires a reason and should persist append-only `StageResultCorrectionHistory`.
+- Applicant-facing result read shows only the latest corrected result.
+- Reference design: `docs/codex/design/phase-03d-4-5-result-read-correction-design.md`.
+
+## Phase 03d-3 Admin Application StageResult Timeline Note
+
+- Phase 03d-3 added the admin application detail lazy API: `GET /admin/applications/{applicationId}/stage-results`.
+- The API is attached to the existing `AdminApplicationSectionController` and does not change the admin application root detail response.
+- Timeline rows are based on the application's `JobPosting` stages, sorted by `stageOrder ASC, id ASC`.
+- Existing `StageResult` data is merged by `Stage.id`; stages without result rows still appear with null result fields.
+- `DRAFT`, `SUBMITTED`, and `WITHDRAWN` applications are all readable in this admin path.
+- `decidedBy` is not exposed.
+- `comment` is admin-visible only and must not be reused in applicant-facing result responses by default.
+- Applicant-facing result read, result correction/history, message/notification, and read audit logging remain deferred.
+
 ## Phase 03d-0 StageResult Design Note
 
 - Phase 03d-0 designed `StageResult` after `JobApplication`, application detail sections, and question/answer read flows became available.
@@ -832,7 +936,9 @@ Phase 03a에서는 `ApplicationFormConfig`를 깊게 검증하지 않는다.
 - `StageResultStatus`
 - `Application + Stage` unique
 - 관리자 전형결과 조회/저장
-- 지원자 결과 조회
+- 관리자 지원서 상세 전형결과 timeline 조회
+- 지원자 결과 조회는 Phase 03d-4에서 별도 applicant DTO와 visibility guard로 구현 완료
+- 발표 후 결과 정정은 Phase 03d-5에서 correction command와 history로 구현
 - Stage 상태와 결과 발표 정책 연동
 
 ## 11. Risks and Open Questions
@@ -998,3 +1104,13 @@ AGENTS.md와 docs/codex/*.md를 먼저 읽어라.
 - `PENDING` rollback is rejected.
 - Stage announce now fails when StageResult rows are missing or any result remains `PENDING`.
 - Applicant-facing result read and admin application stage-result timeline remain deferred.
+
+## Phase 03e-3 Application URL Authorization Note
+
+- Phase 03e-3 protected applicant-owned Application APIs at URL level.
+- `/applications/**` now requires `ROLE_APPLICANT`.
+- `GET /job-postings/{jobPostingId}/application` also requires `ROLE_APPLICANT` because it returns the current applicant's application for a posting.
+- Public job posting reads under `GET /job-postings/**` remain public.
+- Employee/admin principals must use admin APIs instead of applicant APIs.
+- Applicant resource ownership remains a service-level rule and continues to hide other applicants' resources as 404.
+- 401/403 JSON `ApiResponse.fail` response handling is deferred to Phase 03e-4.

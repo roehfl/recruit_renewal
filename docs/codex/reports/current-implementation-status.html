@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recruit Backend Implementation Status</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f4f7fb; line-height: 1.55; }
+    header { background: #142f47; color: #fff; padding: 34px 42px; }
+    main { max-width: 1200px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 22px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d8e1eb; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e7edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #edf2f7; padding: 2px 5px; border-radius: 4px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .partial { background: #fff0c2; color: #765300; }
+    .pending { background: #f3e7cc; color: #7a4b00; }
+    .blocked { background: #f4d7da; color: #842029; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d8e1eb; border-radius: 8px; padding: 16px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .section { margin-top: 24px; }
+    .small { font-size: 13px; color: #526173; }
+    @media (max-width: 860px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>Shinyoung Recruit Backend</div>
+  <h1>현재 구현 현황 및 남은 작업</h1>
+  <span class="badge done">Status Snapshot</span>
+  <span class="badge muted">Generated: 2026-05-19</span>
+</header>
+
+<main>
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>현재 백엔드는 채용 공고, 전형 단계, 지원서 작성/제출, 지원서 상세 섹션, 질문/답변, 전형 결과 관리의 주요 vertical slice가 구현된 상태입니다.</p>
+      <p>최근 작업 기준으로 StageResult는 관리자 초기화/조회/수정/일괄수정, 관리자 지원서 상세 timeline, 지원자 결과 조회, 발표 후 정정 이력까지 구현되어 있습니다.</p>
+      <p>운영 전 남은 핵심 축은 인증/인가 hardening, 실제 관리자 identity 전파, 메시지/알림, 면접/평가, 엑셀/PDF/통계/파기 기능입니다.</p>
+    </div>
+    <div class="card">
+      <h2>전체 상태</h2>
+      <p><span class="badge done">Core CRUD Implemented</span></p>
+      <p><span class="badge done">StageResult 03d Complete</span></p>
+      <p><span class="badge partial">Security Hardening Designed</span></p>
+      <p><span class="badge pending">Interview/Message/Export Pending</span></p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>구현 완료 범위</h2>
+    <table>
+      <tr><th>영역</th><th>상태</th><th>구현된 주요 내용</th><th>대표 API/산출물</th></tr>
+      <tr>
+        <td>공통 기반</td>
+        <td><span class="badge done">완료</span></td>
+        <td>Spring Boot 기반, 공통 응답 <code>ApiResponse</code>, 예외 처리, JPA Auditing, 암호화/해시 유틸 기반</td>
+        <td><code>GlobalExceptionHandler</code>, <code>BaseEntity</code></td>
+      </tr>
+      <tr>
+        <td>인증 기본 흐름</td>
+        <td><span class="badge partial">부분 완료</span></td>
+        <td>세션 기반 로그인 구조, 지원자 DB 인증, 임직원 LDAP 인증/JIT 후보, <code>CustomUserDetails</code>, 지원자 current resolver</td>
+        <td><code>/auth/login</code>, <code>CurrentApplicantService</code></td>
+      </tr>
+      <tr>
+        <td>메뉴/공지</td>
+        <td><span class="badge done">완료</span></td>
+        <td>메뉴 tree/detail/breadcrumb, 공지 목록/상세/등록 기본 API</td>
+        <td><code>/menu/**</code>, <code>/board/notices</code></td>
+      </tr>
+      <tr>
+        <td>채용 공고</td>
+        <td><span class="badge done">완료</span></td>
+        <td>관리자 공고 CRUD, 게시/마감, 모집 분야, 지원서 설정, 지원자 공개 공고 조회</td>
+        <td><code>/admin/job-postings</code>, <code>/job-postings</code></td>
+      </tr>
+      <tr>
+        <td>전형 단계</td>
+        <td><span class="badge done">완료</span></td>
+        <td>전형 단계 CRUD, 순서 변경, 시작/발표/마감 상태 전이, 발표 전 StageResult pending guard</td>
+        <td><code>/admin/job-postings/{jobPostingId}/stages</code></td>
+      </tr>
+      <tr>
+        <td>지원서 루트</td>
+        <td><span class="badge done">완료</span></td>
+        <td>지원서 생성, 임시저장 수정, 최종 제출, 철회, 내 지원서/관리자 목록/상세 조회</td>
+        <td><code>/applications</code>, <code>/admin/applications</code></td>
+      </tr>
+      <tr>
+        <td>지원서 상세 섹션</td>
+        <td><span class="badge done">완료</span></td>
+        <td>학력, 경력, 자격, 어학, 병역, 수상, 공백기간, 첨부파일 metadata 저장/조회와 관리자 lazy read</td>
+        <td><code>/applications/{id}/educations</code> 등</td>
+      </tr>
+      <tr>
+        <td>질문/답변</td>
+        <td><span class="badge done">완료</span></td>
+        <td>질문 템플릿, 공고별 질문, 지원자 답변 저장/조회, 제출 시 필수 답변 검증, 관리자 답변 lazy read</td>
+        <td><code>/admin/job-postings/{id}/questions</code>, <code>/applications/{id}/answers</code></td>
+      </tr>
+      <tr>
+        <td>전형 결과</td>
+        <td><span class="badge done">완료</span></td>
+        <td>StageResult entity, 관리자 initialize/list/update/bulk, 지원서 상세 timeline, 지원자 발표 결과 조회, 발표 후 정정 이력</td>
+        <td><code>/admin/stages/{stageId}/results</code>, <code>/applications/{id}/stage-results</code></td>
+      </tr>
+      <tr>
+        <td>Auth hardening 설계</td>
+        <td><span class="badge done">설계 완료</span></td>
+        <td>관리자/지원자 API 보호 정책, current employee/admin resolver 후보, StageResult actor 전파, 401/403 응답 정책 설계</td>
+        <td><code>phase-03e-admin-auth-hardening-design.md</code></td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>StageResult 상세 현황</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>관리자 결과 관리</h3>
+        <ul class="list">
+          <li>전형별 결과 초기화</li>
+          <li>전형별 결과 목록 조회</li>
+          <li>단건 결과 update</li>
+          <li>일괄 결과 update</li>
+          <li>발표 전 pending 결과 guard</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>지원서/지원자 조회</h3>
+        <ul class="list">
+          <li>관리자 지원서 상세 전형결과 timeline</li>
+          <li>지원자 본인 결과 조회</li>
+          <li><code>RESULT_ANNOUNCED</code>, <code>CLOSED</code>만 지원자 노출</li>
+          <li>지원자 응답에서 score/comment/decidedBy/history 제외</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>정정 이력</h3>
+        <ul class="list">
+          <li>발표 후 별도 correction command</li>
+          <li>정정 reason 필수</li>
+          <li>최신 StageResult 갱신</li>
+          <li>previous/new snapshot append-only 저장</li>
+          <li>관리자 history API 제공</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>남아있는 주요 작업</h2>
+    <table>
+      <tr><th>우선순위</th><th>영역</th><th>남은 작업</th><th>권장 다음 단계</th></tr>
+      <tr>
+        <td>1</td>
+        <td>보안/권한</td>
+        <td><code>SecurityConfig</code>의 개발용 <code>permitAll</code> 제거, <code>/admin/**</code>와 <code>/applications/**</code> 접근 제어, 401/403 JSON 응답</td>
+        <td>Phase 03e-2, 03e-3, 03e-4 순서로 구현</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>관리자 identity</td>
+        <td>StageResult update/correction의 <code>SYSTEM</code> actor를 실제 임직원/admin loginId 또는 audit actor로 교체</td>
+        <td><code>CurrentEmployeeService</code> 또는 <code>CurrentAdminService</code> 추가</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>LDAP/운영 설정</td>
+        <td>운영 profile 기준 LDAP property 외부화, role mapping 값 확인, public endpoint allowlist 확정</td>
+        <td>보안 hardening 구현 전 설정 정책 확정</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>면접/평가</td>
+        <td>면접 일정/조, 면접 참여자, 면접관 평가, 평가 결과와 StageResult 연동</td>
+        <td>Interview vertical slice 설계/구현</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>메시지/알림</td>
+        <td>합격/불합격 안내, 정정 알림, SMS/Email/알림톡 발송 이력</td>
+        <td>MessageBatch/MessageSendLog 구현</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>파일 실물 처리</td>
+        <td>현재 첨부파일은 metadata 중심이며, 실제 multipart 업로드/다운로드/저장소 연동은 남음</td>
+        <td>Attachment storage phase 분리</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td>엑셀/PDF/통계</td>
+        <td>지원자 목록/전형결과 엑셀, 지원서 PDF, 지원율/합격률 통계</td>
+        <td>core CRUD 안정화 후 별도 reporting/export phase</td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td>개인정보 파기/감사</td>
+        <td>지원자 개인정보 파기 정책, 접근 감사 로그, 민감정보 masking/권한 세분화</td>
+        <td>보안 hardening 이후 audit/privacy phase</td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>권장 로드맵</h2>
+    <div class="two">
+      <div class="card">
+        <h3>바로 다음에 할 일</h3>
+        <ol class="list">
+          <li>Phase 03e-2: current employee/admin identity resolver 추가</li>
+          <li>StageResult update/correction에 실제 actor 전달</li>
+          <li>관련 service/controller 테스트 보강</li>
+          <li>지원자 응답에 actor/history가 노출되지 않는지 회귀 검증</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>그 다음에 할 일</h3>
+        <ol class="list">
+          <li>Phase 03e-3: URL authorization 적용</li>
+          <li>Phase 03e-4: 401/403 <code>ApiResponse.fail</code> 처리</li>
+          <li>면접/평가 vertical slice 착수</li>
+          <li>메시지/알림 및 reporting/export 기능 분리 구현</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>검증 상태</h2>
+    <table>
+      <tr><th>항목</th><th>상태</th><th>비고</th></tr>
+      <tr>
+        <td>최근 전체 테스트</td>
+        <td><span class="badge done">성공</span></td>
+        <td>Phase 03d-5 완료 시점에 <code>.\gradlew.bat clean test --no-daemon</code> 성공 기록이 있음</td>
+      </tr>
+      <tr>
+        <td>Phase 03e-1</td>
+        <td><span class="badge pending">테스트 미실행</span></td>
+        <td>설계 문서 전용 작업이라 테스트를 실행하지 않음</td>
+      </tr>
+      <tr>
+        <td>이 현황 문서</td>
+        <td><span class="badge pending">테스트 미실행</span></td>
+        <td>HTML 문서 생성만 수행</td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>주의 사항</h2>
+    <div class="card">
+      <ul class="list">
+        <li>현재 작업트리에는 여러 Phase의 미커밋 변경이 함께 존재합니다. 이 문서는 그 상태를 기준으로 작성한 현황 요약입니다.</li>
+        <li>운영 전에는 반드시 SecurityConfig hardening과 실제 관리자 identity 전파를 먼저 완료해야 합니다.</li>
+        <li>지원자에게 노출되는 결과 API는 내부 점수, 코멘트, 결정자, 정정 이력을 노출하지 않는 정책을 유지해야 합니다.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+</body>
+</html>

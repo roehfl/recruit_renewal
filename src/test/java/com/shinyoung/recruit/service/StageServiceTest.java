@@ -616,7 +616,8 @@ class StageServiceTest {
             stageResultService.updateResult(
                     stageId,
                     result.stageResultId(),
-                    new StageResultUpdateRequest(StageResultStatus.PASSED, null, null)
+                    new StageResultUpdateRequest(StageResultStatus.PASSED, null, null),
+                    "employee01"
             );
         }
     }

@@ -17,6 +17,8 @@ import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
+import com.shinyoung.recruit.domain.entity.Stage;
+import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
@@ -32,6 +34,8 @@ import com.shinyoung.recruit.domain.repository.ApplicationMilitaryRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
+import com.shinyoung.recruit.domain.repository.StageRepository;
+import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
@@ -51,6 +55,8 @@ import com.shinyoung.recruit.enumeration.MilitaryServiceType;
 import com.shinyoung.recruit.enumeration.MilitarySubjectType;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
 import com.shinyoung.recruit.enumeration.QuestionCategory;
+import com.shinyoung.recruit.enumeration.StageResultStatus;
+import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.service.JobApplicationService;
 import com.shinyoung.recruit.service.JobPostingService;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,6 +84,7 @@ import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -145,6 +152,12 @@ class AdminApplicationSectionControllerTest {
 
     @Autowired
     private ApplicationAnswerRepository applicationAnswerRepository;
+
+    @Autowired
+    private StageRepository stageRepository;
+
+    @Autowired
+    private StageResultRepository stageResultRepository;
 
     private MockMvc mockMvc;
 
@@ -262,8 +275,52 @@ class AdminApplicationSectionControllerTest {
     }
 
     @Test
+    void admin_stage_results_return_stage_rows_with_nullable_result_fields() throws Exception {
+        JobApplication application = createApplication("admin-section-api-stage-result");
+        Stage first = stageRepository.save(stage(application.getJobPosting(), "Document Screening", 1, false));
+        Stage second = stageRepository.save(stage(application.getJobPosting(), "Final Interview", 2, true));
+        StageResult result = stageResultRepository.save(StageResult.initialize(second, application));
+        result.updateResult(
+                StageResultStatus.PASSED,
+                new BigDecimal("88.5"),
+                "passed",
+                LocalDateTime.of(2026, 7, 2, 11, 0),
+                "SYSTEM"
+        );
+
+        mockMvc.perform(get("/admin/applications/{applicationId}/stage-results", application.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].stageId").value(first.getId()))
+                .andExpect(jsonPath("$.data[0].stageName").value("Document Screening"))
+                .andExpect(jsonPath("$.data[0].stageType").value("DOCUMENT"))
+                .andExpect(jsonPath("$.data[0].stageOrder").value(1))
+                .andExpect(jsonPath("$.data[0].stageStatus").value("READY"))
+                .andExpect(jsonPath("$.data[0].finalStage").value(false))
+                .andExpect(jsonPath("$.data[0].resultAnnouncementDateTime").exists())
+                .andExpect(jsonPath("$.data[0].stageResultId").doesNotExist())
+                .andExpect(jsonPath("$.data[0].resultStatus").doesNotExist())
+                .andExpect(jsonPath("$.data[0].score").doesNotExist())
+                .andExpect(jsonPath("$.data[0].comment").doesNotExist())
+                .andExpect(jsonPath("$.data[0].decidedAt").doesNotExist())
+                .andExpect(jsonPath("$.data[0].decidedBy").doesNotExist())
+                .andExpect(jsonPath("$.data[1].stageId").value(second.getId()))
+                .andExpect(jsonPath("$.data[1].stageResultId").value(result.getId()))
+                .andExpect(jsonPath("$.data[1].resultStatus").value("PASSED"))
+                .andExpect(jsonPath("$.data[1].score").value(88.5))
+                .andExpect(jsonPath("$.data[1].comment").value("passed"))
+                .andExpect(jsonPath("$.data[1].decidedAt").exists())
+                .andExpect(jsonPath("$.data[1].decidedBy").doesNotExist());
+    }
+
+    @Test
     void missing_application_returns_not_found_api_response() throws Exception {
         mockMvc.perform(get("/admin/applications/{applicationId}/educations", 99999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
+
+        mockMvc.perform(get("/admin/applications/{applicationId}/stage-results", 99999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -280,13 +337,15 @@ class AdminApplicationSectionControllerTest {
                 "/admin/applications/1/awards",
                 "/admin/applications/1/gap-periods",
                 "/admin/applications/1/attachments",
-                "/admin/applications/1/answers"
+                "/admin/applications/1/answers",
+                "/admin/applications/1/stage-results"
         };
 
         for (String path : paths) {
             assertMethodNotAllowed(put(path).contentType(MediaType.APPLICATION_JSON).content("{}"));
             assertMethodNotAllowed(delete(path));
             assertMethodNotAllowed(post(path).contentType(MediaType.APPLICATION_JSON).content("{}"));
+            assertMethodNotAllowed(patch(path).contentType(MediaType.APPLICATION_JSON).content("{}"));
         }
     }
 
@@ -462,6 +521,17 @@ class AdminApplicationSectionControllerTest {
                 3000,
                 sortOrder
         ));
+    }
+
+    private Stage stage(JobPosting jobPosting, String stageName, Integer stageOrder, boolean finalStage) {
+        return Stage.create(
+                jobPosting,
+                stageName,
+                StageType.DOCUMENT,
+                stageOrder,
+                LocalDateTime.of(2026, 7, 1, 10, 0).plusDays(stageOrder),
+                finalStage
+        );
     }
 
     @TestConfiguration

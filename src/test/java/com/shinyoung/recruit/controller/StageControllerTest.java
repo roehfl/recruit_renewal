@@ -15,6 +15,7 @@ import com.shinyoung.recruit.dto.request.StageResultUpdateRequest;
 import com.shinyoung.recruit.dto.response.AdminStageResultResponse;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
+import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.JobApplicationService;
 import com.shinyoung.recruit.service.JobPostingService;
 import com.shinyoung.recruit.service.StageResultService;
@@ -24,6 +25,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +41,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -69,7 +76,10 @@ class StageControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .apply(springSecurity())
+                .defaultRequest(get("/").with(authentication(employeeAuthentication("employee01", "ROLE_ADMIN"))))
+                .build();
     }
 
     @Test
@@ -287,6 +297,24 @@ class StageControllerTest {
                 .andExpect(status().isMethodNotAllowed());
     }
 
+    @Test
+    void admin_stage_api_blocks_applicant_employee_without_admin_authority_and_anonymous() throws Exception {
+        Long jobPostingId = createJobPosting();
+        Applicant applicant = createApplicant("stage-auth-applicant");
+
+        mockMvc.perform(get("/admin/job-postings/{jobPostingId}/stages", jobPostingId)
+                        .with(authentication(applicantAuthentication(applicant))))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/admin/job-postings/{jobPostingId}/stages", jobPostingId)
+                        .with(authentication(employeeAuthentication("employee02", "ROLE_EMPLOYEE"))))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/admin/job-postings/{jobPostingId}/stages", jobPostingId)
+                        .with(anonymous()))
+                .andExpect(status().is4xxClientError());
+    }
+
     private Long createJobPosting() {
         return jobPostingService.create(new JobPostingCreateRequest(
                 "2026 recruitment",
@@ -305,7 +333,8 @@ class StageControllerTest {
             stageResultService.updateResult(
                     stageId,
                     result.stageResultId(),
-                    new StageResultUpdateRequest(StageResultStatus.PASSED, null, null)
+                    new StageResultUpdateRequest(StageResultStatus.PASSED, null, null),
+                    "employee01"
             );
         }
     }
@@ -372,5 +401,23 @@ class StageControllerTest {
                   "finalStage": %s
                 }
                 """.formatted(stageOrder, finalStage);
+    }
+
+    private Authentication employeeAuthentication(String loginId, String authority) {
+        CustomUserDetails userDetails = CustomUserDetails.fromLdap(
+                loginId,
+                "Recruit",
+                "Employee User",
+                List.of(new SimpleGrantedAuthority(authority))
+        );
+        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+    }
+
+    private Authentication applicantAuthentication(Applicant applicant) {
+        CustomUserDetails userDetails = CustomUserDetails.fromUser(
+                applicant,
+                List.of(new SimpleGrantedAuthority("ROLE_APPLICANT"))
+        );
+        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
     }
 }

@@ -1,5 +1,223 @@
 # Phase 03d-0 StageResult Domain Design
 
+## Phase 03e-2 Actor Propagation Implementation Note
+
+Phase 03e-2 replaced the temporary StageResult command actor with the authenticated employee login id.
+
+Implemented:
+
+- `CurrentEmployeeService` resolves an actor from `CustomUserDetails`.
+- The actor source is `CustomUserDetails.getUsername()`.
+- The resolver requires `userType == Employee`.
+- Null principal, applicant principal, and blank username are rejected.
+- `StageResultService.updateResult(stageId, resultId, request, actor)` stores `decidedBy = actor`.
+- `StageResultService.bulkUpdateResults(stageId, request, actor)` stores `decidedBy = actor` for each updated result.
+- `StageResultCorrectionService.correctResult(stageId, resultId, request, actor)` stores latest `StageResult.decidedBy = actor` and history `correctedBy = actor`.
+- `StageResultController` resolves actor only for update, bulk update, and correction commands.
+
+Policy confirmed:
+
+- General result update still requires `Stage.status == IN_PROGRESS`.
+- Correction still requires `Stage.status == RESULT_ANNOUNCED || CLOSED`.
+- Initialize, list, and correction history read do not require actor.
+- `StageResultCorrectionHistoryResponse.correctedBy` remains admin-only.
+- `AdminStageResultResponse.decidedBy` was not added.
+- `ApplicantStageResultResponse` was not changed and still excludes actor fields.
+
+Still deferred:
+
+- URL authorization in `SecurityConfig`.
+- 401/403 response handlers.
+- Employee FK or audit actor entity.
+- Actual admin authority rule selection.
+
+## Phase 03e-1 Admin/Auth Hardening Design Note
+
+Phase 03e-1 defined the security and identity hardening direction for StageResult admin commands.
+
+No StageResult Java code, test code, controller, service, repository, entity, DTO, `SecurityConfig`, or schema file is changed in this phase.
+
+Relevant current issue:
+
+- `StageResultService.updateResult` stores `decidedBy = "SYSTEM"`.
+- `StageResultCorrectionService.correctResult` stores `correctedBy = "SYSTEM"` and also updates latest `StageResult.decidedBy = "SYSTEM"`.
+- These placeholders are acceptable for the earlier vertical slices but are not sufficient for production auditability.
+
+Recommended Phase 03e-2 direction:
+
+- Add a current employee/admin resolver.
+- Have StageResult admin controllers receive `@AuthenticationPrincipal CustomUserDetails`.
+- Resolve an actor string from the authenticated employee/admin.
+- Pass the actor into StageResult service methods instead of reading `SecurityContextHolder` in domain services.
+- Store the actor in `decidedBy` for update/bulk update.
+- Store the actor in both `StageResultCorrectionHistory.correctedBy` and latest `StageResult.decidedBy` for correction.
+
+Candidate service signatures:
+
+```text
+updateResult(stageId, resultId, request, actor)
+bulkUpdateResults(stageId, request, actor)
+correctResult(stageId, resultId, request, actor)
+```
+
+Response exposure policy:
+
+- `StageResultCorrectionHistoryResponse.correctedBy` remains admin-only.
+- `AdminStageResultResponse.decidedBy` is a UI-driven candidate, not required immediately.
+- `ApplicantStageResultResponse` must not expose `decidedBy`, `correctedBy`, or correction history.
+
+Security hardening dependency:
+
+- Phase 03e-3 should protect `/admin/**` so applicants cannot call StageResult admin APIs.
+- Phase 03e-4 should provide JSON `ApiResponse.fail` for 401/403.
+
+## Phase 03d-5 Implementation Note
+
+Phase 03d-5 implemented post-announcement StageResult correction history.
+
+Implemented:
+
+- `StageResultCorrectionHistory`
+- `StageResultCorrectionHistoryRepository`
+- `StageResultCorrectionRequest`
+- `StageResultCorrectionHistoryResponse`
+- `StageResultCorrectionService`
+- `POST /admin/stages/{stageId}/results/{resultId}/correct`
+- `GET /admin/stages/{stageId}/results/{resultId}/histories`
+- correction reason required
+- result lookup by `resultId + stageId`
+- correction allowed only when `Stage.status == RESULT_ANNOUNCED || CLOSED`
+- correction blocked for `READY` and `IN_PROGRESS`
+- latest `StageResult` row updated in place
+- append-only history saved with previous/new status, score, comment, and decidedAt snapshots
+- `correctedAt` and `newDecidedAt` set to correction time
+- temporary `correctedBy = "SYSTEM"` and `decidedBy = "SYSTEM"`
+- history ordered by `correctedAt DESC, id DESC`
+
+Policy confirmed:
+
+- General `StageResultService.updateResult` remains the pre-announcement update path and is still limited to `IN_PROGRESS`.
+- Correction must not create duplicate `StageResult` rows.
+- `StageResult` does not receive a correction history collection.
+- No cascade or orphanRemoval is used for correction history.
+- Applicant-facing APIs continue to show only the latest corrected result.
+- Correction history is admin-only and is not exposed through `ApplicantStageResultResponse`.
+
+Still deferred:
+
+- real admin identity for `correctedBy` and `decidedBy`
+- correction notification/message sending
+- SecurityConfig changes
+- fine-grained authorization
+- audit logging beyond the correction history table
+- migration script management
+- interview/evaluation aggregation
+
+## Phase 03d-4 Implementation Note
+
+Phase 03d-4 implemented applicant-facing StageResult read.
+
+Implemented:
+
+- `GET /applications/{applicationId}/stage-results`
+- `ApplicantStageResultResponse`
+- `ApplicationStageResultService.getApplicantStageResults(Long applicantId, Long applicationId)`
+- `ApplicationStageResultController`
+- applicant-visible `StageResultRepository` query
+- applicant ownership validation with `applicationId + applicantId`
+- `DRAFT` application rejection
+- `SUBMITTED` and `WITHDRAWN` result read
+- visibility limited to `Stage.status == RESULT_ANNOUNCED || CLOSED`
+- no row returned for `READY` or `IN_PROGRESS` stages
+- no Stage-based null row for missing StageResult
+- no read-time write/upsert
+
+Applicant response fields:
+
+- `stageName`
+- `stageType`
+- `stageOrder`
+- `resultStatus`
+- `resultAnnouncementDateTime`
+- `decidedAt`
+
+Excluded from applicant response:
+
+- `stageResultId`
+- `score`
+- `comment`
+- `decidedBy`
+- correction history
+
+Still deferred:
+
+- Phase 03d-5 correction/history
+- scheduled release guard using `resultAnnouncementDateTime`
+- message/notification integration
+- SecurityConfig changes
+- read audit logging
+
+## Phase 03d-4/03d-5 Design Correction Note
+
+Phase 03d-4 and Phase 03d-5 are now split by exposure risk and audit requirement.
+
+Phase 03d-4 recommended scope:
+
+- Applicant-facing result read only.
+- Candidate API: `GET /applications/{applicationId}/stage-results`.
+- Applicant can read only their own application results.
+- `DRAFT` applications are not applicant result-read targets.
+- `SUBMITTED` and `WITHDRAWN` applications can read visible results.
+- Visible stages are limited to `Stage.status == RESULT_ANNOUNCED || CLOSED`.
+- `READY` and `IN_PROGRESS` stages are not returned, even as "not announced yet" rows.
+- `resultAnnouncementDateTime` is display data in the first implementation.
+- Applicant response DTO must be separate from `AdminApplicationStageResultResponse`.
+- Applicant response must not expose `score`, `comment`, or `decidedBy`.
+
+Phase 03d-5 recommended scope:
+
+- Post-announcement result correction only.
+- Candidate API: `POST /admin/stages/{stageId}/results/{resultId}/correct`.
+- Candidate history API: `GET /admin/stages/{stageId}/results/{resultId}/histories`.
+- Correction reason is required.
+- Recommended history entity: `StageResultCorrectionHistory`.
+- The latest `StageResult` is updated, and correction history is append-only.
+- Applicant-facing APIs show only the latest corrected result and never expose correction history.
+
+Reference:
+
+- `docs/codex/design/phase-03d-4-5-result-read-correction-design.md`
+- `docs/codex/reports/phase-03d-4-5-result-read-correction-design.html`
+
+## Phase 03d-3 Implementation Note
+
+Phase 03d-3 implemented the admin application stage-result lazy timeline API described as the Priority 3 API in this design.
+
+Implemented:
+
+- `GET /admin/applications/{applicationId}/stage-results`
+- `AdminApplicationStageResultResponse`
+- `AdminApplicationSectionService.getStageResults(Long applicationId)`
+- Stage-based timeline row creation using the application's `JobPosting`
+- StageResult merge by `Stage.id`
+- null result fields for stages without initialized StageResult rows
+- exclusion of `decidedBy` from the admin detail response
+
+Policy confirmed:
+
+- The API is admin-only by path.
+- It checks only that `applicationId` exists.
+- It allows `DRAFT`, `SUBMITTED`, and `WITHDRAWN` applications.
+- It does not apply applicant-facing announcement visibility.
+- It must not be reused for applicant-facing result read because `comment` may be an internal admin memo.
+
+Still deferred:
+
+- applicant-facing result read
+- correction history
+- message/notification integration
+- fine-grained authorization and read audit logging
+
 ## Phase Summary
 
 Phase 03d-0 is a design-only phase for the `StageResult` domain.
@@ -401,13 +619,17 @@ The following must be resolved before production use:
 | Phase 03d-1 | StageResult entity + initialize/list admin API | Entity, repository, result status enum, initialize command, stage result list | update/bulk/correction/applicant read |
 | Phase 03d-2 | StageResult update commands | single update, bulk update, validation, decidedAt/decidedBy policy candidate | correction history |
 | Phase 03d-3 | Application detail stage result lazy read | `GET /admin/applications/{applicationId}/stage-results` | applicant-facing result read |
-| Phase 03d-4 | Announcement integration | Stage announce checks, pending result guard, applicant exposure policy | message sending |
-| Phase 03d-5 | Security/audit hardening | permission rules, change history, correction command | interview evaluation aggregation |
+| Phase 03d-4 | Applicant-facing result read | `GET /applications/{applicationId}/stage-results`, applicant ownership, announcement visibility guard, applicant DTO | correction history, message sending |
+| Phase 03d-5 | Result correction history | correction command, correction history entity/API, mandatory reason, latest-result mutation policy | interview evaluation aggregation, notification sending |
 
 Recommended next implementation phase:
 
 - Phase 03d-1: StageResult Entity + initialize/list admin API. (Completed)
-- Next recommended implementation: Phase 03d-2 StageResult single/bulk update commands and Stage announce pending-result guard.
+- Phase 03d-2: StageResult single/bulk update commands and Stage announce pending-result guard. (Completed)
+- Phase 03d-3: Admin application stage-result lazy timeline API. (Completed)
+- Phase 03d-4: Applicant-facing result read with announcement visibility guard. (Completed)
+- Phase 03d-5: Result correction history. (Completed)
+- Next recommended implementation: real admin identity, correction notification policy, and audit/authorization hardening.
 
 ## Phase 03d-1 Implementation Note
 
@@ -459,15 +681,12 @@ Still deferred:
 
 ## Deferred Items
 
-- Java code implementation.
-- DB schema migration.
-- StageResult correction history.
-- Applicant-facing result read.
+- DB schema migration for correction history.
 - Message/notification integration.
 - Interview/evaluation aggregation.
 - Result export/download.
 - Fine-grained security and audit logging.
-- Stage command behavior changes.
+- Scheduled announcement guard based on `resultAnnouncementDateTime`.
 
 ## Verification Notes
 

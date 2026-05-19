@@ -83,7 +83,13 @@ public class StageResultService {
     }
 
     @Transactional
-    public AdminStageResultResponse updateResult(Long stageId, Long resultId, StageResultUpdateRequest request) {
+    public AdminStageResultResponse updateResult(
+            Long stageId,
+            Long resultId,
+            StageResultUpdateRequest request,
+            String actor
+    ) {
+        validateActor(actor);
         Stage stage = findStage(stageId);
         validateEditable(stage);
         validateUpdateRequest(request);
@@ -95,13 +101,18 @@ public class StageResultService {
                 request.score(),
                 request.comment(),
                 LocalDateTime.now(clock),
-                "SYSTEM"
+                actor
         );
         return AdminStageResultResponse.from(stageResult);
     }
 
     @Transactional
-    public StageResultBulkUpdateResponse bulkUpdateResults(Long stageId, StageResultBulkUpdateRequest request) {
+    public StageResultBulkUpdateResponse bulkUpdateResults(
+            Long stageId,
+            StageResultBulkUpdateRequest request,
+            String actor
+    ) {
+        validateActor(actor);
         Stage stage = findStage(stageId);
         validateEditable(stage);
         validateBulkRequest(request);
@@ -124,7 +135,7 @@ public class StageResultService {
                     item.score(),
                     item.comment(),
                     decidedAt,
-                    "SYSTEM"
+                    actor
             );
         }
 
@@ -185,6 +196,12 @@ public class StageResultService {
     private void validateComment(String comment) {
         if (comment != null && comment.length() > 2000) {
             throw new InvalidStageResultException("StageResult comment must be 2000 characters or less.");
+        }
+    }
+
+    private void validateActor(String actor) {
+        if (actor == null || actor.isBlank()) {
+            throw new InvalidStageResultException("StageResult actor is required.");
         }
     }
 

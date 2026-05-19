@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03d-3 Admin Application StageResult Timeline</title>
+  <style>
+    :root { --bg:#f6f8fb; --panel:#fff; --ink:#17202a; --muted:#5f6b7a; --line:#d9e0ea; --ok:#136f46; --blue:#1d5f99; --warn:#9a5b00; --bad:#a23b3b; --chip:#eef3f8; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Arial, "Noto Sans KR", sans-serif; background:var(--bg); color:var(--ink); line-height:1.55; }
+    header { padding:32px 36px; background:#1d3557; color:#fff; }
+    header p { max-width:980px; margin:8px 0 0; color:#dbe7f5; }
+    main { max-width:1180px; margin:0 auto; padding:28px; }
+    section { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:22px; margin-bottom:18px; box-shadow:0 8px 24px rgba(23,32,42,.05); }
+    h1,h2,h3 { margin:0 0 12px; line-height:1.2; }
+    h1 { font-size:28px; } h2 { font-size:20px; } h3 { font-size:16px; color:var(--muted); }
+    .grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); }
+    .card { border:1px solid var(--line); border-radius:8px; padding:14px; background:#fbfcfe; }
+    .badge { display:inline-block; padding:3px 8px; border-radius:999px; font-size:12px; font-weight:700; background:var(--chip); color:var(--ink); margin-right:6px; }
+    .done { color:var(--ok); background:#e8f6ef; }
+    .blue { color:var(--blue); background:#e6f1fb; }
+    .pending { color:var(--warn); background:#fff5df; }
+    .out { color:var(--bad); background:#ffecec; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    th,td { border:1px solid var(--line); padding:10px; vertical-align:top; text-align:left; }
+    th { background:#eef3f8; }
+    code { background:#eef3f8; border:1px solid #dce5ef; padding:1px 5px; border-radius:4px; font-family:Consolas, monospace; }
+    pre { background:#17202a; color:#f4f7fb; padding:14px; border-radius:8px; overflow:auto; }
+    ul { padding-left:20px; }
+    .note { color:var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Phase 03d-3 Admin Application StageResult Timeline Lazy API</h1>
+    <p>Generated: 2026-05-19 · Status <span class="badge done">Completed</span></p>
+    <p>관리자 지원서 상세 화면에서 전형 단계별 결과 이력을 lazy 방식으로 조회하는 read-only API를 추가했다.</p>
+  </header>
+  <main>
+    <section>
+      <h2>Executive Summary</h2>
+      <div class="grid">
+        <div class="card"><span class="badge done">Completed</span><strong>Lazy section API</strong><br><code>GET /admin/applications/{applicationId}/stage-results</code></div>
+        <div class="card"><span class="badge done">Completed</span><strong>Stage-based rows</strong><br>지원서 공고의 모든 Stage를 기준으로 row를 반환한다.</div>
+        <div class="card"><span class="badge done">Completed</span><strong>Result merge</strong><br>StageResult가 있으면 결과 필드를 병합하고 없으면 null로 둔다.</div>
+        <div class="card"><span class="badge pending">Deferred</span><strong>Applicant read</strong><br>지원자 결과 조회 API와 발표 노출 정책은 구현하지 않았다.</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Completed Scope</h2>
+      <ul>
+        <li>기존 <code>AdminApplicationSectionController</code>에 GET endpoint를 추가했다.</li>
+        <li>기존 <code>AdminApplicationSectionService</code>에 <code>getStageResults</code>를 추가했다.</li>
+        <li><code>AdminApplicationStageResultResponse</code> DTO를 추가했다.</li>
+        <li><code>StageResultRepository</code>에 application timeline 조회 JPQL을 추가했다.</li>
+        <li>DRAFT, SUBMITTED, WITHDRAWN 지원서 상태를 모두 조회 허용했다.</li>
+        <li><code>decidedBy</code>는 응답에 포함하지 않는다.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Not Implemented Scope</h2>
+      <div class="grid">
+        <div class="card"><span class="badge out">Out of scope</span>StageResult update/bulk 정책 변경</div>
+        <div class="card"><span class="badge out">Out of scope</span>Stage announce guard 변경</div>
+        <div class="card"><span class="badge out">Out of scope</span>Applicant-facing result API</div>
+        <div class="card"><span class="badge out">Out of scope</span>Correction history</div>
+        <div class="card"><span class="badge out">Out of scope</span>Message/notification</div>
+        <div class="card"><span class="badge out">Out of scope</span>SecurityConfig 변경</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>API List</h2>
+      <table>
+        <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+        <tr>
+          <td>GET</td>
+          <td><code>/admin/applications/{applicationId}/stage-results</code></td>
+          <td>관리자 지원서 상세 전형 timeline lazy 조회</td>
+          <td>None</td>
+          <td><code>ApiResponse&lt;List&lt;AdminApplicationStageResultResponse&gt;&gt;</code></td>
+        </tr>
+        <tr>
+          <td>POST/PUT/DELETE/PATCH</td>
+          <td><code>/admin/applications/{applicationId}/stage-results</code></td>
+          <td>Not supported</td>
+          <td>None</td>
+          <td>None</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <table>
+        <tr><th>File</th><th>Status</th><th>Purpose</th></tr>
+        <tr><td><code>AdminApplicationStageResultResponse.java</code></td><td><span class="badge blue">New</span></td><td>Timeline response DTO</td></tr>
+        <tr><td><code>StageResultRepository.java</code></td><td><span class="badge done">Modified</span></td><td>Application timeline result query</td></tr>
+        <tr><td><code>AdminApplicationSectionService.java</code></td><td><span class="badge done">Modified</span></td><td>Stage row creation and result merge</td></tr>
+        <tr><td><code>AdminApplicationSectionController.java</code></td><td><span class="badge done">Modified</span></td><td>GET endpoint</td></tr>
+        <tr><td><code>AdminApplicationSectionServiceTest.java</code></td><td><span class="badge done">Modified</span></td><td>Service coverage</td></tr>
+        <tr><td><code>AdminApplicationSectionControllerTest.java</code></td><td><span class="badge done">Modified</span></td><td>API coverage</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>Domain Structure</h2>
+      <table>
+        <tr><th>Relationship</th><th>Policy</th></tr>
+        <tr><td><code>JobApplication N : 1 JobPosting</code></td><td>지원서의 공고를 기준으로 Stage 목록을 찾는다.</td></tr>
+        <tr><td><code>Stage N : 1 JobPosting</code></td><td>Stage가 timeline row의 기준이다.</td></tr>
+        <tr><td><code>StageResult N : 1 Stage</code></td><td>결과가 있으면 stage id로 merge한다.</td></tr>
+        <tr><td><code>StageResult N : 1 JobApplication</code></td><td>요청 applicationId에 속한 결과만 조회한다.</td></tr>
+      </table>
+      <p class="note">Stage 또는 JobApplication에 StageResult 컬렉션은 추가하지 않았다.</p>
+    </section>
+
+    <section>
+      <h2>Validation Rules</h2>
+      <ul>
+        <li><code>applicationId</code>가 없으면 기존 관리자 섹션 API와 동일하게 not found 응답을 반환한다.</li>
+        <li>관리자 조회이므로 지원자 소유자 검증은 수행하지 않는다.</li>
+        <li>공고 상태, 접수기간, 결과 발표 여부와 무관하게 관리자에게 조회를 허용한다.</li>
+        <li>StageResult가 없는 Stage도 row로 반환하고 result field는 null이다.</li>
+        <li>다른 공고의 StageResult는 merge하지 않는다.</li>
+        <li><code>comment</code>는 관리자 메모 가능성이 있어 applicant-facing 응답 재사용을 금지한다.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Response Fields</h2>
+      <table>
+        <tr><th>Group</th><th>Fields</th><th>Policy</th></tr>
+        <tr><td>Stage</td><td><code>stageId</code>, <code>stageName</code>, <code>stageType</code>, <code>stageOrder</code>, <code>stageStatus</code>, <code>finalStage</code>, <code>resultAnnouncementDateTime</code></td><td>Stage 기준으로 항상 row 생성</td></tr>
+        <tr><td>Result</td><td><code>stageResultId</code>, <code>resultStatus</code>, <code>score</code>, <code>comment</code>, <code>decidedAt</code></td><td>StageResult가 없으면 null</td></tr>
+        <tr><td>Internal</td><td><code>decidedBy</code></td><td><span class="badge out">Not exposed</span></td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>Test Results</h2>
+      <pre>$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.service.AdminApplicationSectionServiceTest --tests com.shinyoung.recruit.controller.AdminApplicationSectionControllerTest
+$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.service.StageResultServiceTest --tests com.shinyoung.recruit.controller.StageResultControllerTest --tests com.shinyoung.recruit.service.StageServiceTest --tests com.shinyoung.recruit.controller.StageControllerTest
+$env:AES_SECRET_KEY='***'; .\gradlew.bat clean test --no-daemon</pre>
+      <p><span class="badge done">Success</span> Admin section tests passed.</p>
+      <p><span class="badge done">Success</span> StageResult and Stage regression tests passed.</p>
+      <p><span class="badge done">Success</span> Full clean test passed.</p>
+    </section>
+
+    <section>
+      <h2>Remaining Issues</h2>
+      <ul>
+        <li>Applicant-facing result read and announcement visibility remain deferred.</li>
+        <li>Result correction/history remains deferred.</li>
+        <li>Admin detail section read audit logging remains deferred.</li>
+        <li>Actual admin authorization is still a later security phase concern.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Next Phase Recommendation</h2>
+      <p>Next, design or implement applicant-facing result read with announcement visibility guard, and define correction history before allowing post-announcement changes.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -12,12 +12,16 @@ import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.dto.request.StageCreateRequest;
+import com.shinyoung.recruit.dto.request.StageResultUpdateRequest;
+import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.enumeration.StageStatus;
+import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.JobApplicationService;
 import com.shinyoung.recruit.service.JobPostingService;
 import com.shinyoung.recruit.service.StageService;
 import com.shinyoung.recruit.service.StageResultService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +30,10 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -44,6 +52,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -84,7 +95,16 @@ class StageResultControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .apply(springSecurity())
+                .defaultRequest(get("/").with(authentication(employeeAuthentication("employee01", "ROLE_ADMIN"))))
+                .build();
+        SecurityContextHolder.clearContext();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -129,6 +149,7 @@ class StageResultControllerTest {
         Long stageId = createStage(jobPostingId);
         stageService.start(jobPostingId, stageId);
         Long resultId = initializeAndFirstResultId(stageId);
+        authenticateEmployee("employee01");
 
         mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -157,6 +178,7 @@ class StageResultControllerTest {
         Long stageId = createStage(jobPostingId);
         stageService.start(jobPostingId, stageId);
         List<Long> resultIds = initializeResultIds(stageId);
+        authenticateEmployee("employee01");
 
         mockMvc.perform(post("/admin/stages/{stageId}/results/bulk", stageId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -188,12 +210,127 @@ class StageResultControllerTest {
     }
 
     @Test
+    void correct_result_returns_api_response() throws Exception {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-api-correct", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        Long resultId = createAnnouncedResult(jobPostingId, stageId);
+        authenticateEmployee("employee01");
+
+        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "resultStatus": "FAILED",
+                                  "score": 71.5,
+                                  "comment": "corrected",
+                                  "reason": "wrong result"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.data.stageResultId").value(resultId))
+                .andExpect(jsonPath("$.data.resultStatus").value("FAILED"))
+                .andExpect(jsonPath("$.data.score").value(71.5))
+                .andExpect(jsonPath("$.data.comment").value("corrected"))
+                .andExpect(jsonPath("$.data.decidedAt").exists());
+    }
+
+    @Test
+    void get_correction_histories_returns_api_response() throws Exception {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-api-history", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        Long resultId = createAnnouncedResult(jobPostingId, stageId);
+        authenticateEmployee("employee01");
+
+        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "resultStatus": "FAILED",
+                                  "score": 71.5,
+                                  "comment": "corrected",
+                                  "reason": "wrong result"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/admin/stages/{stageId}/results/{resultId}/histories", stageId, resultId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.data[0].historyId").exists())
+                .andExpect(jsonPath("$.data[0].stageResultId").value(resultId))
+                .andExpect(jsonPath("$.data[0].correctedAt").exists())
+                .andExpect(jsonPath("$.data[0].correctedBy").value("employee01"))
+                .andExpect(jsonPath("$.data[0].reason").value("wrong result"))
+                .andExpect(jsonPath("$.data[0].previousStatus").value("PASSED"))
+                .andExpect(jsonPath("$.data[0].newStatus").value("FAILED"))
+                .andExpect(jsonPath("$.data[0].previousScore").value(90))
+                .andExpect(jsonPath("$.data[0].newScore").value(71.5))
+                .andExpect(jsonPath("$.data[0].previousComment").value("passed"))
+                .andExpect(jsonPath("$.data[0].newComment").value("corrected"))
+                .andExpect(jsonPath("$.data[0].previousDecidedAt").exists())
+                .andExpect(jsonPath("$.data[0].newDecidedAt").exists());
+    }
+
+    @Test
+    void correction_validation_failure_returns_api_response() throws Exception {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-api-correction-invalid", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        Long resultId = createAnnouncedResult(jobPostingId, stageId);
+        authenticateEmployee("employee01");
+
+        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "resultStatus": "FAILED",
+                                  "score": null,
+                                  "comment": null,
+                                  "reason": " "
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void correction_fails_when_stage_is_in_progress() throws Exception {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-api-correction-progress", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        stageService.start(jobPostingId, stageId);
+        Long resultId = initializeAndFirstResultId(stageId);
+        authenticateEmployee("employee01");
+
+        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "resultStatus": "PASSED",
+                                  "score": null,
+                                  "comment": null,
+                                  "reason": "too early"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
     void update_validation_failure_returns_api_response() throws Exception {
         Long jobPostingId = createJobPosting();
         createSubmittedApplication("stage-result-api-invalid", jobPostingId);
         Long stageId = createStage(jobPostingId);
         stageService.start(jobPostingId, stageId);
         Long resultId = initializeAndFirstResultId(stageId);
+        authenticateEmployee("employee01");
 
         mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -214,6 +351,7 @@ class StageResultControllerTest {
         Long jobPostingId = createJobPosting();
         Long stageId = createStage(jobPostingId);
         stageService.start(jobPostingId, stageId);
+        authenticateEmployee("employee01");
 
         mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", stageId, 99999L)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -227,6 +365,96 @@ class StageResultControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void update_result_fails_when_principal_is_applicant_or_missing() throws Exception {
+        Long jobPostingId = createJobPosting();
+        Applicant applicant = createApplicant("stage-result-api-applicant-principal");
+        createSubmittedApplication("stage-result-api-update-auth", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        stageService.start(jobPostingId, stageId);
+        Long resultId = initializeAndFirstResultId(stageId);
+
+        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
+                        .with(authentication(applicantAuthentication(applicant)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "resultStatus": "PASSED",
+                                  "score": null,
+                                  "comment": null
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
+                        .with(anonymous())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "resultStatus": "PASSED",
+                                  "score": null,
+                                  "comment": null
+                                }
+                                """))
+                .andExpect(status().is4xxClientError());
+    }
+
+    @Test
+    void update_result_fails_when_employee_has_no_admin_authority() throws Exception {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-api-update-low-role", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        stageService.start(jobPostingId, stageId);
+        Long resultId = initializeAndFirstResultId(stageId);
+
+        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
+                        .with(authentication(employeeAuthentication("employee02", "ROLE_EMPLOYEE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "resultStatus": "PASSED",
+                                  "score": null,
+                                  "comment": null
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void correct_result_fails_when_principal_is_applicant_or_missing() throws Exception {
+        Long jobPostingId = createJobPosting();
+        Applicant applicant = createApplicant("stage-result-api-correct-applicant");
+        createSubmittedApplication("stage-result-api-correct-auth", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        Long resultId = createAnnouncedResult(jobPostingId, stageId);
+
+        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
+                        .with(authentication(applicantAuthentication(applicant)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "resultStatus": "FAILED",
+                                  "score": null,
+                                  "comment": null,
+                                  "reason": "wrong result"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
+                        .with(anonymous())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "resultStatus": "FAILED",
+                                  "score": null,
+                                  "comment": null,
+                                  "reason": "wrong result"
+                                }
+                                """))
+                .andExpect(status().is4xxClientError());
     }
 
     @Test
@@ -265,6 +493,12 @@ class StageResultControllerTest {
         mockMvc.perform(delete("/admin/stages/{stageId}/results", 1L))
                 .andExpect(status().isMethodNotAllowed());
         mockMvc.perform(patch("/admin/stages/{stageId}/results/{resultId}", 1L, 1L))
+                .andExpect(status().isMethodNotAllowed());
+        mockMvc.perform(put("/admin/stages/{stageId}/results/{resultId}/correct", 1L, 1L))
+                .andExpect(status().isMethodNotAllowed());
+        mockMvc.perform(patch("/admin/stages/{stageId}/results/{resultId}/correct", 1L, 1L))
+                .andExpect(status().isMethodNotAllowed());
+        mockMvc.perform(delete("/admin/stages/{stageId}/results/{resultId}/histories", 1L, 1L))
                 .andExpect(status().isMethodNotAllowed());
     }
 
@@ -313,6 +547,45 @@ class StageResultControllerTest {
         return stageResultService.getResults(stageId).stream()
                 .map(response -> response.stageResultId())
                 .toList();
+    }
+
+    private Long createAnnouncedResult(Long jobPostingId, Long stageId) {
+        stageService.start(jobPostingId, stageId);
+        Long resultId = initializeAndFirstResultId(stageId);
+        stageResultService.updateResult(
+                stageId,
+                resultId,
+                new StageResultUpdateRequest(StageResultStatus.PASSED, new java.math.BigDecimal("90"), "passed"),
+                "employee01"
+        );
+        stageService.announce(jobPostingId, stageId);
+        return resultId;
+    }
+
+    private void authenticateEmployee(String loginId) {
+        SecurityContextHolder.getContext().setAuthentication(employeeAuthentication(loginId, "ROLE_ADMIN"));
+    }
+
+    private Authentication employeeAuthentication(String loginId, String authority) {
+        CustomUserDetails userDetails = CustomUserDetails.fromLdap(
+                loginId,
+                "Recruit",
+                "Employee User",
+                List.of(new SimpleGrantedAuthority(authority))
+        );
+        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+    }
+
+    private void authenticateApplicant(Applicant applicant) {
+        SecurityContextHolder.getContext().setAuthentication(applicantAuthentication(applicant));
+    }
+
+    private Authentication applicantAuthentication(Applicant applicant) {
+        CustomUserDetails userDetails = CustomUserDetails.fromUser(
+                applicant,
+                List.of(new SimpleGrantedAuthority("ROLE_APPLICANT"))
+        );
+        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
     }
 
     private Applicant createApplicant(String loginId) {
