@@ -1,5 +1,41 @@
 # Phase 03e-1 Admin/Auth Hardening Design
 
+## Phase 03e-4 Implementation Note
+
+Phase 03e-4 implemented the security exception JSON response portion of this design.
+
+Implemented:
+
+- Added `CustomAuthenticationEntryPoint`.
+- Added `CustomAccessDeniedHandler`.
+- Registered both handlers through `SecurityConfig.exceptionHandling(...)`.
+- Anonymous protected requests now return `401`.
+- Authenticated users without required authority now return `403`.
+- Both responses set `Content-Type: application/json;charset=UTF-8`.
+- Both responses serialize `ApiResponse.fail(...)` with `ObjectMapper.writeValue(...)`.
+- `401` message is `Authentication is required.`
+- `403` message is `Access is denied.`
+- `ObjectProvider<ObjectMapper>` is used so the handlers can reuse a Spring mapper when available without forcing a global mapper bean.
+- `StageResultControllerTest`, `ApplicationStageResultControllerTest`, and `StageControllerTest` now assert JSON security response bodies.
+
+Preserved:
+
+- Phase 03e-3 URL authorization rules.
+- `/admin/**` authority policy.
+- `/applications/**` applicant policy.
+- `GET /job-postings/{jobPostingId}/application` applicant policy.
+- Public job posting read rule.
+- `anyRequest().permitAll()` fallback.
+- `GlobalExceptionHandler` handling for validation, business, and not-found exceptions.
+- StageResult actor propagation from Phase 03e-2.
+- Applicant response field hiding.
+
+Verification:
+
+- `ApplicationStageResultControllerTest` + `StageResultControllerTest` + `StageControllerTest`: success, 37 tests completed.
+- `StageResultServiceTest` + `StageResultCorrectionServiceTest`: success.
+- Full `clean test --no-daemon` was attempted twice and timed out. No XML failures/errors were found in generated partial results, but the full suite did not complete.
+
 ## Phase Name
 
 Phase 03e-1 - Admin/Auth Hardening Design

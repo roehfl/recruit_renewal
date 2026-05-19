@@ -1,5 +1,49 @@
 # 07. Implementation History
 
+## Phase 03e-4 - Security Exception JSON Response
+
+- Date: 2026-05-19
+- Goal: return Spring Security authentication and authorization failures in the existing JSON `ApiResponse.fail(...)` response shape.
+- Implemented:
+  - Added `CustomAuthenticationEntryPoint` for unauthenticated protected requests.
+  - Added `CustomAccessDeniedHandler` for authenticated users without sufficient authority.
+  - Registered both handlers in `SecurityConfig.exceptionHandling(...)`.
+  - 401 responses now use `ApiResponse.fail("Authentication is required.")`.
+  - 403 responses now use `ApiResponse.fail("Access is denied.")`.
+  - Security failure responses set JSON content type with UTF-8 encoding.
+  - Responses are serialized through `ObjectMapper.writeValue(...)`.
+  - Used `ObjectProvider<ObjectMapper>` to avoid requiring a global `ObjectMapper` bean in the current Boot 4 context.
+  - Added 401/403 JSON response assertions to StageResult, Stage, and applicant StageResult controller tests.
+- APIs affected:
+  - `/admin/**` security failure responses.
+  - `/applications/**` security failure responses.
+  - `GET /job-postings/{jobPostingId}/application` security failure responses.
+- Preserved:
+  - Phase 03e-3 URL authorization rules.
+  - StageResult actor propagation.
+  - `GlobalExceptionHandler` business exception behavior.
+  - `ApiResponse` structure.
+  - DTO shapes, DB schema, LDAP settings, and fallback `anyRequest().permitAll()`.
+- Tests:
+  - Initial sandbox test attempt failed because Gradle needed network access to download the wrapper distribution.
+  - First approved retry failed because no global `ObjectMapper` bean existed in the test context.
+  - After switching handlers to `ObjectProvider<ObjectMapper>`, targeted tests passed.
+  - `ApplicationStageResultControllerTest` + `StageResultControllerTest` + `StageControllerTest`: success, 37 tests completed.
+  - `StageResultServiceTest` + `StageResultCorrectionServiceTest`: success.
+  - Full `clean test --no-daemon`: attempted twice and timed out. No XML failures/errors were found in generated partial results, but the full suite did not complete.
+- Documentation:
+  - `docs/codex/implementation/phase-03e-4-security-exception-json-response.md`
+  - `docs/codex/reports/phase-03e-4-security-exception-json-response.html`
+  - `docs/codex/design/phase-03e-admin-auth-hardening-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Deferred:
+  - Classifying remaining API families.
+  - Replacing fallback `permitAll`.
+  - Profile-gating Swagger/OpenAPI and H2 console.
+  - Centralized security error code/message policy.
+- Next recommended phase:
+  - Classify remaining public/authenticated API families before tightening the fallback authorization rule.
+
 ## Phase 03e-3 - URL Authorization Hardening
 
 - Date: 2026-05-19

@@ -1,5 +1,29 @@
 # Phase 03 Application Design
 
+## Phase 03e-4 Security Exception JSON Response Implementation Note
+
+- Phase 03e-4 added Spring Security 401/403 JSON response handlers.
+- `CustomAuthenticationEntryPoint` handles unauthenticated requests before controller invocation and returns `401 + ApiResponse.fail("Authentication is required.")`.
+- `CustomAccessDeniedHandler` handles authenticated principals without required authority and returns `403 + ApiResponse.fail("Access is denied.")`.
+- `SecurityConfig` now registers both handlers through `exceptionHandling(...)`.
+- Phase 03e-3 URL authorization rules are unchanged:
+  - `/admin/**` requires `ROLE_ADMIN` or `ROLE_RECRUIT_ADMIN`.
+  - `/applications/**` requires `ROLE_APPLICANT`.
+  - `GET /job-postings/{jobPostingId}/application` requires `ROLE_APPLICANT`.
+  - public job posting reads remain public.
+  - fallback remains `anyRequest().permitAll()`.
+- Business validation and not-found responses still flow through `GlobalExceptionHandler`.
+- Applicant result responses still do not expose `stageResultId`, `score`, `comment`, `decidedBy`, `correctedBy`, or correction history.
+- Targeted security controller tests passed:
+  - `ApplicationStageResultControllerTest`
+  - `StageResultControllerTest`
+  - `StageControllerTest`
+- StageResult service regression tests passed:
+  - `StageResultServiceTest`
+  - `StageResultCorrectionServiceTest`
+- Full `clean test --no-daemon` was attempted twice and timed out without a completed success result.
+- Next recommendation: classify remaining API families before replacing the fallback `permitAll` rule.
+
 ## Phase 03e-2 StageResult Actor Propagation Implementation Note
 
 - Phase 03e-2 added `CurrentEmployeeService` for admin-side StageResult command actor resolution.
