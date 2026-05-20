@@ -1,5 +1,515 @@
 # 07. Implementation History
 
+## Phase 03i-4-2 - Attachment Soft Delete Command
+
+- Date: 2026-05-20
+- Goal: implement the attachment delete command slice from the Phase 03i-4 lifecycle design.
+- Implemented:
+  - Added `PhysicalFileStatus.DELETED`.
+  - Added `AttachmentDeleteActorType` with `APPLICANT` and `EMPLOYEE`.
+  - Added `ApplicationAttachment.deletedAt`, `deletedBy`, `deletedByType`, and `deletionReason`.
+  - Added `ApplicationAttachment.markDeleted(...)`.
+  - Added applicant delete command:
+    - `POST /applications/{applicationId}/attachments/{attachmentId}/delete`
+  - Added admin delete command:
+    - `POST /admin/applications/{applicationId}/attachments/{attachmentId}/delete`
+  - Added admin delete request validation with required reason and 1000-character max.
+  - Added `AttachmentDeleteResponse` without storage internals or physical status exposure.
+  - Added `ApplicationAttachmentDeleteService`.
+  - Updated applicant/admin normal metadata lists to exclude `DELETED`.
+  - Preserved download API shape; `DELETED` rows remain controlled 404 because download only accepts `STORED`.
+  - Kept upload append sort order based on all attachment rows, including `DELETED`.
+  - Kept metadata replace free from deleted-row sort-order conflicts.
+  - DB row is marked `DELETED` before physical file deletion.
+  - Physical file deletion for previously `STORED` rows runs after transaction commit.
+  - Physical delete failure is log-only and does not roll back DB soft delete.
+  - Storage failure logs avoid storage path exposure.
+- APIs:
+  - `POST /applications/{applicationId}/attachments/{attachmentId}/delete`
+  - `POST /admin/applications/{applicationId}/attachments/{attachmentId}/delete`
+- Preserved:
+  - `SecurityConfig`
+  - Upload API structure
+  - Download API structure
+  - Metadata replace API structure
+  - Dashboard readiness
+  - Submit validator
+  - Attachment required policy
+  - `downloadAvailable` omission
+- Deferred:
+  - Orphan scan dry-run
+  - Orphan cleanup execution
+  - Admin repair and mark-missing commands
+  - Include-deleted metadata read
+  - Separate deletion history table
+  - S3/NAS/object storage migration
+  - Virus scan/DLP
+  - HTTP DELETE method
+- Tests:
+  - `test --tests "*ApplicationAttachmentDelete*" --no-daemon`: success
+  - `test --tests "*ApplicationAttachment*" --no-daemon`: success
+  - `test --tests "*AdminApplicationSection*" --no-daemon`: success after sandbox network block rerun with approval
+  - `clean test --no-daemon`: success
+- Documentation:
+  - `docs/codex/implementation/phase-03i-4-2-attachment-delete-command.md`
+  - `docs/codex/reports/phase-03i-4-2-attachment-delete-command.html`
+  - `docs/codex/design/phase-03i-4-attachment-delete-cleanup-repair-design.md`
+  - `docs/codex/design/phase-03i-attachment-file-upload-download-design.md`
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Next recommended phase:
+  - Phase 03i-4-3 orphan storage scan dry-run.
+
+## Phase 03i-4 - Attachment Delete / Orphan Cleanup / Admin Repair Design
+
+- Date: 2026-05-20
+- Work type: documentation-only design phase.
+- Goal: design attachment delete, orphan cleanup, and admin repair policy after Phase 03i-2 upload and Phase 03i-3 download.
+- Created:
+  - `docs/codex/design/phase-03i-4-attachment-delete-cleanup-repair-design.md`
+  - `docs/codex/reports/phase-03i-4-attachment-delete-cleanup-repair-design.html`
+- Updated:
+  - `docs/codex/design/phase-03i-attachment-file-upload-download-design.md`
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/07-implementation-history.md`
+- Key decisions:
+  - Use POST command endpoints for delete candidates:
+    - `POST /applications/{applicationId}/attachments/{attachmentId}/delete`
+    - `POST /admin/applications/{applicationId}/attachments/{attachmentId}/delete`
+  - Choose soft lifecycle delete as the default, not hard DB row deletion.
+  - Phase 03i-4-2 later added `PhysicalFileStatus.DELETED`, kept the DB row, excluded deleted rows from normal metadata lists, and rejected deleted rows from download.
+  - Already `DELETED` rows should return 404 on repeated delete command calls.
+  - Upload append `sortOrder` should include `DELETED` rows in the max calculation.
+  - Metadata replace sort-order conflict checks should use active rows only and ignore `DELETED` rows.
+  - Applicant delete should be allowed only for the current applicant's own `DRAFT` application while accepting.
+  - Applicant delete should reject `SUBMITTED` and `WITHDRAWN`.
+  - Admin delete should be allowed for authorized admin/recruit-admin users on `DRAFT`, `SUBMITTED`, and `WITHDRAWN`, with reason required.
+  - Admin delete reason should be persisted on `ApplicationAttachment` through minimal delete fields; Phase 03i-4-2 uses `deletedAt`, `deletedBy`, `deletedByType`, and `deletionReason`, while a separate deletion history table remains deferred.
+  - DB lifecycle state should be updated before physical file deletion.
+  - Physical file deletion should run after DB transaction commit.
+  - Physical delete failure should create cleanup work rather than rolling back the committed DB deleted state.
+  - `MISSING` is a DB row state where the file is absent; orphan physical files have no active DB reference and should not be represented as a DB enum.
+  - Orphan cleanup and admin repair should start with dry-run scan and remain separate phases.
+  - Storage internals must remain hidden in metadata, delete, cleanup, and repair responses.
+- Phase split:
+  - Phase 03i-4-1: design only.
+  - Phase 03i-4-2: applicant DRAFT delete + admin delete command with persisted minimal delete audit fields.
+  - Phase 03i-4-3: orphan scan dry-run.
+  - Phase 03i-4-4: admin cleanup/repair command.
+  - Phase 03i-5: attachment required policy + dashboard/submit integration.
+- Tests:
+  - Not run.
+  - Reason: documentation-only design phase with no Java, test, config, schema, or runtime API changes.
+- Next recommended phase:
+  - Phase 03i-4-2 applicant DRAFT delete and admin delete command using soft deleted lifecycle state.
+
+## Phase 03i-3 - Attachment File Download
+
+- Date: 2026-05-20
+- Goal: implement applicant/admin physical attachment download for Phase 03i-2 `STORED` rows.
+- Implemented:
+  - Added `AttachmentStorageResource`.
+  - Added `AttachmentDownloadResource`.
+  - Extended `AttachmentStorageService.load(...)`.
+  - Added local storage load with root-containment validation.
+  - Added review fix to reject absolute `storagePath` values before root resolution.
+  - Added `ApplicationAttachmentDownloadService`.
+  - Added `AttachmentDownloadResponseFactory`.
+  - Added applicant download endpoint in `ApplicationAttachmentController`.
+  - Added `AdminApplicationAttachmentController`.
+  - Added repository scoped lookup methods for attachment/application matching.
+  - Returned streaming `ResponseEntity<Resource>` for successful downloads.
+  - Added safe `Content-Disposition` with ASCII `filename` fallback and UTF-8 `filename*`.
+  - Added `Content-Type`, actual physical `Content-Length`, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`, and `Pragma: no-cache`.
+  - Logged DB file-size mismatch and used actual physical file size in the response.
+  - Returned controlled 404 for `METADATA_ONLY`, `MISSING`, attachment/application mismatch, and missing physical files.
+  - Kept missing physical file handling read-only; no automatic DB status update to `MISSING`.
+- APIs:
+  - `GET /applications/{applicationId}/attachments/{attachmentId}/download`
+  - `GET /admin/applications/{applicationId}/attachments/{attachmentId}/download`
+- Preserved:
+  - Upload API
+  - Metadata replace behavior
+  - Metadata response field exposure
+  - Admin metadata read response shape
+  - `SecurityConfig`
+  - Dashboard readiness
+  - Submit validator
+  - `downloadAvailable` omission
+- Deferred:
+  - Delete endpoint
+  - Admin upload
+  - Orphan cleanup/admin repair
+  - S3/NAS/object storage
+  - Virus scan/DLP
+  - Attachment required policy
+- Tests:
+  - `test --tests "*ApplicationAttachmentDownload*" --no-daemon`: success
+  - `test --tests "*AttachmentStorage*" --no-daemon`: success
+  - `test --tests "*ApplicationAttachment*" --no-daemon`: success
+  - `clean test --no-daemon`: success
+- Documentation:
+  - `docs/codex/implementation/phase-03i-3-attachment-file-download.md`
+  - `docs/codex/reports/phase-03i-3-attachment-file-download.html`
+  - `docs/codex/design/phase-03i-attachment-file-upload-download-design.md`
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Next recommended phase:
+  - Phase 03i-4 attachment delete/orphan cleanup/admin repair policy.
+
+## Phase 03i-2 - Attachment File Upload
+
+- Date: 2026-05-20
+- Goal: implement applicant-owned single physical attachment upload while preserving the existing metadata-only APIs.
+- Implemented:
+  - Added `PhysicalFileStatus` enum.
+  - Added `ApplicationAttachment.physicalFileStatus` with `METADATA_ONLY` default and `STORED` upload state.
+  - Added `AttachmentProperties`.
+  - Enabled multipart parsing and configured parser size limits.
+  - Added local filesystem storage behind `AttachmentStorageService`.
+  - Added `AttachmentFilePolicy`.
+  - Added `ApplicationAttachmentFileService`.
+  - Added `POST /applications/{applicationId}/attachments/files`.
+  - Hardened metadata replace so it replaces only `METADATA_ONLY` rows.
+  - Preserved `STORED` rows during metadata replace.
+  - Added metadata replace validation to reject `sortOrder` conflicts with existing `STORED` rows.
+  - Rejected client-supplied `storedFileName` and `storagePath` with 400.
+  - Rejected upload request parts `sortOrder`, `displayName`, `originalFileName`, `storedFileName`, and `storagePath` with 400.
+  - Assigned upload `sortOrder` append-only server-side.
+  - Enforced file count/total-size limits from `physicalFileStatus=STORED` rows only.
+  - Added rollback cleanup for just-stored physical files.
+  - Added `@Param` to repository named query parameters and startup validation to `AttachmentProperties`.
+- API:
+  - `POST /applications/{applicationId}/attachments/files`
+  - Request: `multipart/form-data` with `file`, `attachmentType`, `sectionType`, optional `sectionRecordId`
+  - Response: `ApiResponse<AttachmentResponse>`
+- Preserved:
+  - `GET /applications/{applicationId}/attachments`
+  - `POST /applications/{applicationId}/attachments` response shape
+  - Admin metadata read response shape
+  - `SecurityConfig`
+  - Dashboard readiness
+  - Submit validator
+  - `AttachmentResponse` storage-field exclusion
+- Deferred:
+  - Applicant/admin download
+  - Admin upload
+  - Delete endpoint
+  - Orphan cleanup
+  - S3/NAS/object storage
+  - Virus scan/DLP
+  - `downloadAvailable`
+  - Attachment required policy
+- Tests:
+  - Targeted attachment tests passed:
+    - `ApplicationAttachmentServiceTest`
+    - `ApplicationAttachmentFileServiceTest`
+    - `ApplicationAttachmentControllerTest`
+  - Added review-fix coverage for metadata `sortOrder` conflict with existing `STORED` rows.
+  - Full `clean test --no-daemon`: success after review fix rerun with a longer timeout.
+- Documentation:
+  - `docs/codex/implementation/phase-03i-2-attachment-file-upload.md`
+  - `docs/codex/reports/phase-03i-2-attachment-file-upload.html`
+  - `docs/codex/design/phase-03i-attachment-file-upload-download-design.md`
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Next recommended phase:
+  - Phase 03i-3 applicant/admin download for `physicalFileStatus=STORED` rows.
+
+## Phase 03i-1 - Attachment File Upload/Download Design
+
+- Date: 2026-05-20
+- Work type: documentation-only design phase.
+- Goal: design real attachment file upload/download policy on top of the current metadata-only attachment slice.
+- Created:
+  - `docs/codex/design/phase-03i-attachment-file-upload-download-design.md`
+  - `docs/codex/reports/phase-03i-attachment-file-upload-download-design.html`
+- Updated:
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+  - `docs/codex/design/phase-03h-3-applicant-application-dashboard-design.md`
+- Current metadata state:
+  - Applicant metadata APIs remain `GET /applications/{applicationId}/attachments` and `POST /applications/{applicationId}/attachments`.
+  - Admin metadata API remains `GET /admin/applications/{applicationId}/attachments`.
+  - `ApplicationAttachment` already stores `originalFileName`, `storedFileName`, `storagePath`, `contentType`, `fileSize`, type, section, and ordering metadata.
+  - Applicant/admin metadata responses do not expose `storedFileName`, `storagePath`, absolute paths, or download URLs.
+- Recommended upload API:
+  - `POST /applications/{applicationId}/attachments/files`
+  - single-file `multipart/form-data`
+  - add `ApplicationAttachment.physicalFileStatus` as `@Enumerated(EnumType.STRING)`, `nullable=false`, default `METADATA_ONLY`; existing rows and test fixtures are `METADATA_ONLY`.
+  - values are `METADATA_ONLY`, `STORED`, and `MISSING`; only `STORED` server-uploaded rows are downloadable.
+  - keep existing metadata replace API separate from physical file upload, but harden it before upload ships so only `METADATA_ONLY` rows are replaced, file-backed rows are preserved, and client-supplied `storedFileName`/`storagePath` are rejected with 400.
+  - keep forbidden storage fields in `AttachmentRequest` or otherwise detect them explicitly for 400; do not rely on global Jackson unknown-property failure.
+  - file-backed row `sortOrder`, `attachmentType`, and `sectionType` edits are out of scope for Phase 03i-2 and need a later explicit reorder/update endpoint.
+  - derive `originalFileName` from sanitized multipart original filename; do not accept display/original filename override in Phase 03i-2.
+  - do not accept `sortOrder` in upload requests; upload is append-only and the server assigns the next `sortOrder`.
+  - include server-assigned `sortOrder` when reusing `AttachmentResponse`; do not add `downloadAvailable` until Phase 03i-3.
+- Recommended download APIs:
+  - applicant: `GET /applications/{applicationId}/attachments/{attachmentId}/download`
+  - admin: `GET /admin/applications/{applicationId}/attachments/{attachmentId}/download`
+  - use streaming response headers with safe `Content-Disposition`.
+  - allow download only for `physicalFileStatus=STORED` rows; legacy metadata-only rows are non-downloadable.
+- Storage policy:
+  - start with local filesystem storage behind `AttachmentStorageService`;
+  - generate UUID/ULID stored filenames server-side;
+  - store under a generated relative key such as `applications/{applicationId}/{yyyy}/{MM}/{dd}/{uuid}.{ext}`;
+  - prevent path traversal by normalizing and verifying final paths stay under `storageRoot`.
+  - local filesystem storage assumes single-node or shared-volume deployment; multi-node production needs NAS, S3/object storage, or another shared durable store.
+  - register transaction rollback cleanup after file save and use `saveAndFlush(...)` to catch DB failures before return when possible.
+- Validation policy:
+  - property-backed max file size, recommended default 20 MB;
+  - separate Spring multipart parser limits from business attachment limits and handle `MaxUploadSizeExceededException`;
+  - add per-application file count and total-size limits based only on `physicalFileStatus=STORED` rows;
+  - extension allowlist candidate: `pdf`, `jpg`, `jpeg`, `png`, `doc`, `docx`, `xls`, `xlsx`, `hwp`, `hwpx`;
+  - validate content type conservatively;
+  - reject blank filenames, path separators, control characters, and Windows reserved names;
+  - virus scan is deferred but documented as a production security requirement.
+- Phase split:
+  - Phase 03i-2: `physicalFileStatus` schema addition, metadata replace hardening, storage abstraction, applicant single-file upload, and DB-failure/rollback file cleanup compensation.
+  - Phase 03i-3: applicant/admin download.
+  - Phase 03i-4 candidate: admin upload/replace, delete, orphan cleanup.
+  - Phase 03i-5 candidate: attachment submit-required policy and dashboard readiness integration.
+- Tests:
+  - Not run.
+  - Reason: design/documentation-only phase with no Java, test, security, build, YAML, schema, or runtime API changes.
+
+## Phase 03h-4 - Applicant Application Dashboard API
+
+- Date: 2026-05-19
+- Goal: implement a read-only applicant dashboard summary API for one owned application detail screen.
+- Implemented:
+  - Added `ApplicationDashboardResponse`.
+  - Added `ApplicationCompletionSummaryResponse`.
+  - Added `ApplicationSectionReadinessResponse`.
+  - Added `ApplicationCompletionReadChecker`.
+  - Added `ApplicationDashboardService`.
+  - Added applicant-owned dashboard fetch query to `JobApplicationRepository`.
+  - Added optional section `existsByJobApplicationId` methods for certificate, language, award, and gap period repositories.
+  - Added `GET /applications/{applicationId:[0-9]+}/dashboard` to `ApplicationController`.
+  - Added `ApplicationDashboardServiceTest`.
+  - Expanded `ApplicationControllerTest` for dashboard response, security, ownership hiding, forbidden fields, and unsupported methods.
+- API:
+  - `GET /applications/{applicationId:[0-9]+}/dashboard`
+  - Response: `ApiResponse<ApplicationDashboardResponse>`
+- Action flag policy:
+  - `accepting = PUBLISHED posting + current time inside reception period`.
+  - `editable = DRAFT + accepting`.
+  - `submittable = DRAFT + accepting + submitBlockingIssueCount == 0`.
+  - `withdrawable = SUBMITTED + accepting`.
+  - `WITHDRAWN` returns all command flags as `false`.
+- Completion checker policy:
+  - Read-only checker mirrors current submit validator policy without calling submit or changing state.
+  - Missing `ApplicationFormConfig` is reported as `FORM_CONFIG / MISSING_CONFIG` and blocks `submittable`, matching submit command policy.
+  - Blocking readiness includes education, career, military, required question answers, and answer length.
+  - Optional guidance includes certificate, language, award, and gap period.
+  - Count policy is group-based; `requiredCompletionRate` uses integer floor and returns 100 when no required group exists.
+- Result summary policy:
+  - Uses existing applicant-visible StageResult query.
+  - Summary includes only `Stage.status == RESULT_ANNOUNCED || CLOSED`.
+  - Latest result uses `stageOrder DESC, stage.id DESC`.
+  - Detailed result rows remain in `GET /applications/{applicationId}/stage-results`.
+- Exposure policy:
+  - The dashboard response does not expose applicant personal data, `applicantId`, `stageResultId`, `score`, `comment`, `decidedBy`, `correctedBy`, correction history, `answerText`, `exemptionReason`, `certificateNumber`, or storage fields.
+- Preserved:
+  - `SecurityConfig`.
+  - `ApplicationSubmitValidator`.
+  - `POST /applications/{applicationId}/submit`.
+  - Detailed section save APIs.
+  - `GET /applications/{applicationId}/stage-results`.
+  - Applicant result response DTOs.
+  - Admin APIs.
+  - DB schema.
+  - Attachment readiness, per-question detailed error payloads, message/notification, and read audit logging remain unimplemented.
+- Tests:
+  - `ApplicationDashboardServiceTest`: success after test helper fix.
+  - `ApplicationControllerTest`: success.
+  - `JobApplicationServiceTest`: success.
+  - `ApplicationSubmitValidatorTest`: success.
+  - `ApplicationStageResultServiceTest` + `ApplicationStageResultControllerTest`: success.
+  - `.\gradlew.bat clean test --no-daemon`: success.
+- Documentation:
+  - `docs/codex/implementation/phase-03h-4-applicant-application-dashboard.md`
+  - `docs/codex/reports/phase-03h-4-applicant-application-dashboard.html`
+  - `docs/codex/design/phase-03h-3-applicant-application-dashboard-design.md`
+  - `docs/codex/design/phase-03h-applicant-my-applications-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Deferred:
+  - Attachment readiness policy.
+  - Per-question detailed error payload.
+  - Fine-grained completion details.
+  - Shared read/write validation policy extraction.
+  - Read audit logging.
+  - Message/notification.
+- Next recommended phase:
+  - Phase 03h-5 completion checker/detail improvement if frontend UX needs richer missing-section guidance.
+
+## Phase 03h-3 - Applicant Application Dashboard Design
+
+- Date: 2026-05-19
+- Goal: design a read-only applicant dashboard summary API for one owned application detail screen.
+- Work type: documentation-only design phase.
+- Created:
+  - `docs/codex/design/phase-03h-3-applicant-application-dashboard-design.md`
+  - `docs/codex/reports/phase-03h-3-applicant-application-dashboard-design.html`
+- Updated:
+  - `docs/codex/design/phase-03h-applicant-my-applications-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/07-implementation-history.md`
+- API design conclusion:
+  - `GET /applications/{applicationId}/dashboard`
+  - Applicant-only endpoint under the existing `/applications/**` security policy.
+  - Recommended response: `ApiResponse<ApplicationDashboardResponse>`.
+  - Recommended implementation mapping: `/applications/{applicationId:[0-9]+}/dashboard`.
+  - The request must not accept `applicantId`.
+- Response field conclusion:
+  - Include application/posting/position display summary.
+  - Include `applicationStatus`, `accepting`, `editable`, `submittable`, and `withdrawable`.
+  - Include `submittedAt` and `withdrawnAt`.
+  - Include `completionSummary`, `requiredMissingSections`, and `optionalIncompleteSections`.
+  - Include compact result summary fields: `latestAnnouncedStageName`, `latestResultStatus`.
+  - Do not expose applicant personal data, `stageResultId`, `score`, `comment`, actor fields, correction history, or storage fields.
+- Action flag policy:
+  - `accepting = PUBLISHED posting + current time inside reception period`.
+  - `editable = DRAFT + accepting`.
+  - `submittable = DRAFT + accepting + no submit-blocking readiness issue`.
+  - `withdrawable = SUBMITTED + accepting`.
+  - `WITHDRAWN` returns all command flags as `false`.
+- Completion and missing-section policy:
+  - Phase 03h-4 should add a read-only checker aligned with current `ApplicationSubmitValidator`.
+  - Required readiness includes `useEducation`, `useCareer`, `useMilitary`, active required question answers, and answer length checks.
+  - `useCertificate`, `useLanguage`, `useAward`, and `useGapPeriod` are optional guidance under the current submit policy.
+  - Attachment readiness is deferred until a config flag or explicit business rule exists.
+- Result summary policy:
+  - Same as Phase 03h-2: summary includes only stages with `Stage.status == RESULT_ANNOUNCED || CLOSED`.
+  - Detailed result rows remain in `GET /applications/{applicationId}/stage-results`.
+  - `score`, `comment`, actor fields, and correction history remain hidden.
+- Tests:
+  - Not executed.
+  - Reason: design/documentation-only phase with no Java, test, build, security, YAML, schema, submit validator, or StageResult API changes.
+- Recommended Phase 03h-4 implementation:
+  - Add dashboard response DTO records.
+  - Add a read-only completion checker.
+  - Add dashboard service orchestration.
+  - Add applicant-owned controller endpoint.
+  - Add service/controller tests for ownership, action flags, completion policy, result summary, and 401/403 behavior.
+- Deferred:
+  - Runtime API implementation.
+  - Attachment readiness policy.
+  - Fine-grained completion details.
+  - Per-question detailed errors.
+  - Shared policy extraction between submit validation and read-only dashboard checking.
+
+## Phase 03h-2 - Applicant My Applications API
+
+- Date: 2026-05-19
+- Goal: implement `GET /applications/me` so an applicant can read their own application list with compact announced-result summary.
+- Implemented:
+  - Added `MyApplicationResponse`.
+  - Added applicant-owned pageable list query to `JobApplicationRepository`.
+  - Added batch visible result summary query to `StageResultRepository`.
+  - Added `JobApplicationService.getMyApplications`.
+  - Added `GET /applications/me` to `ApplicationController`.
+  - Narrowed numeric application id routes in `ApplicationController` to prevent `/applications/me` from being treated as `{applicationId}` for unsupported methods.
+  - Added service tests for owned list, other applicant exclusion, all statuses, closed postings, sorting, page/size validation, `accepting`, visible result summary, and empty page.
+  - Added controller tests for response wrapper, page metadata, hidden fields, empty page, 401/403 JSON, and unsupported methods.
+- API:
+  - `GET /applications/me?page=0&size=20`
+  - Response: `ApiResponse<PageResponse<MyApplicationResponse>>`
+- Page/size policy:
+  - `page` default: `0`
+  - `size` default: `20`
+  - `page < 0` fails.
+  - `size <= 0` fails.
+  - `size > 100` fails.
+  - Sort: `createdAt DESC, id DESC`.
+- Result summary policy:
+  - Summary includes `announcedResultCount`, `latestAnnouncedStageName`, and `latestResultStatus`.
+  - Summary uses only `Stage.status == RESULT_ANNOUNCED || CLOSED`.
+  - `READY` and `IN_PROGRESS` are excluded.
+  - Latest visible result uses `stageOrder DESC, stage.id DESC`.
+  - Missing result rows are not synthesized.
+  - Detailed results remain in `GET /applications/{applicationId}/stage-results`.
+- Exposure policy:
+  - The list response does not expose applicant personal data.
+  - The list response does not expose `stageResultId`, `score`, `comment`, `decidedBy`, `correctedBy`, correction reason/history, or storage fields.
+- Preserved:
+  - `SecurityConfig`.
+  - Existing applicant result detail API.
+  - Applicant result response DTO.
+  - Admin APIs.
+  - DB schema.
+  - LDAP/security handlers.
+  - Message/notification and read audit behavior.
+- Tests:
+  - `JobApplicationServiceTest`: success after retry.
+  - `ApplicationControllerTest`: success.
+  - `ApplicationStageResultServiceTest` + `ApplicationStageResultControllerTest`: success.
+  - `StageResultServiceTest` + `StageResultCorrectionServiceTest`: success.
+  - `.\gradlew.bat clean test --no-daemon`: success.
+- Documentation:
+  - `docs/codex/implementation/phase-03h-2-applicant-my-applications.md`
+  - `docs/codex/reports/phase-03h-2-applicant-my-applications.html`
+  - `docs/codex/design/phase-03h-applicant-my-applications-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Deferred:
+  - Status filter.
+  - Custom sort query parameter.
+  - Dashboard completion rate.
+  - Missing-section guidance.
+  - Scheduled release guard by `resultAnnouncementDateTime`.
+  - Message/notification.
+  - Read audit logging.
+- Next recommended phase:
+  - Phase 03h-3 applicant my-page dashboard summary if frontend UX requires aggregate cards or completion guidance.
+
+## Phase 03h-1 - Applicant My Applications Design
+
+- Date: 2026-05-19
+- Goal: design the applicant-owned application list API `GET /applications/me` before implementation.
+- Work type: documentation-only design phase.
+- Created:
+  - `docs/codex/design/phase-03h-applicant-my-applications-design.md`
+  - `docs/codex/reports/phase-03h-applicant-my-applications-design.html`
+- Updated:
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/07-implementation-history.md`
+- API design conclusion:
+  - `GET /applications/me`
+  - Applicant-only endpoint under the existing `/applications/**` security policy.
+  - Recommended response: `ApiResponse<PageResponse<MyApplicationResponse>>`.
+  - Recommended request parameters: `page`, `size`.
+  - Recommended default sorting: `createdAt DESC, id DESC`.
+- Response field conclusion:
+  - Include application/posting/position identifiers and display names.
+  - Include application status and timestamps.
+  - Include posting reception period and `accepting`.
+  - Include compact result summary fields: `announcedResultCount`, `latestAnnouncedStageName`, `latestResultStatus`.
+  - Do not expose applicant personal data, `stageResultId`, `score`, `comment`, `decidedBy`, `correctedBy`, correction reason, or correction history.
+- Business policy:
+  - `DRAFT`, `SUBMITTED`, and `WITHDRAWN` applications are all listed.
+  - Existing applications remain visible when the posting is `CLOSED`.
+  - Result summary uses only stages with `Stage.status == RESULT_ANNOUNCED || CLOSED`.
+  - Detailed applicant stage results remain in `GET /applications/{applicationId}/stage-results`.
+- Recommended Phase 03h-2 implementation:
+  - Extend `JobApplicationService`.
+  - Add applicant-owned pageable list query to `JobApplicationRepository`.
+  - Add batch visible result summary query to avoid N+1 loading.
+  - Add `MyApplicationResponse`.
+  - Add `GET /applications/me` to `ApplicationController`.
+  - Add service/controller tests for ownership, included statuses, sorting, `accepting`, result summary visibility, and 401/403 behavior.
+- Tests:
+  - Not executed.
+  - Reason: design/documentation-only phase with no Java, test, build, security, YAML, or schema changes.
+- Deferred:
+  - Runtime API implementation.
+  - Dashboard summary.
+  - Completion rate and missing-section guidance.
+  - Status filters.
+  - Scheduled release guard by `resultAnnouncementDateTime`.
+- Next recommended phase:
+  - Phase 03h-2 - implement `GET /applications/me` basic pageable list and compact announced-result summary.
+
 ## Phase 03e-4 - Security Exception JSON Response
 
 - Date: 2026-05-19

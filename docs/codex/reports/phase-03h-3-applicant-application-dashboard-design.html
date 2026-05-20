@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03h-3 Applicant Application Dashboard Design</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #667085;
+      --border: #d8dee8;
+      --green: #0f7a4f;
+      --green-bg: #e8f6ef;
+      --blue: #1456b8;
+      --blue-bg: #e9f1ff;
+      --amber: #a65f00;
+      --amber-bg: #fff4df;
+      --red: #b42318;
+      --red-bg: #fdecec;
+      --gray: #475467;
+      --gray-bg: #eef2f6;
+      --code: #f2f4f7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.55;
+    }
+    header {
+      background: #111827;
+      color: #ffffff;
+      padding: 32px 40px;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 24px 48px;
+    }
+    h1, h2, h3 { margin: 0; }
+    h1 { font-size: 30px; line-height: 1.2; }
+    h2 {
+      margin-top: 30px;
+      margin-bottom: 12px;
+      font-size: 22px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    h3 {
+      margin-top: 18px;
+      margin-bottom: 8px;
+      font-size: 17px;
+    }
+    p { margin: 8px 0; }
+    code {
+      background: var(--code);
+      border-radius: 4px;
+      padding: 2px 5px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.94em;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+      align-items: center;
+    }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge.blue { color: var(--blue); background: var(--blue-bg); }
+    .badge.green { color: var(--green); background: var(--green-bg); }
+    .badge.amber { color: var(--amber); background: var(--amber-bg); }
+    .badge.red { color: var(--red); background: var(--red-bg); }
+    .badge.gray { color: var(--gray); background: var(--gray-bg); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      min-width: 0;
+    }
+    .card h3 { margin-top: 0; }
+    .summary {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      margin-top: 18px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 12px 0 18px;
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }
+    th {
+      background: #f2f4f7;
+      font-weight: 700;
+    }
+    tr:last-child td { border-bottom: none; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 5px 0; }
+    .muted { color: var(--muted); }
+    .callout {
+      border-left: 4px solid var(--amber);
+      background: var(--amber-bg);
+      padding: 12px 14px;
+      border-radius: 6px;
+      margin: 14px 0;
+    }
+    @media (max-width: 840px) {
+      header { padding: 26px 22px; }
+      main { padding: 22px 16px 38px; }
+      .grid, .grid.two { grid-template-columns: 1fr; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="muted" style="color:#cbd5e1;">Recruit Backend</div>
+    <h1>Phase 03h-3 Applicant Application Dashboard Design</h1>
+    <div class="meta">
+      <span class="badge blue">Completed: Design</span>
+      <span class="badge gray">Generated: 2026-05-19</span>
+      <span class="badge amber">Documentation Only</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="summary">
+      <h2>Executive Summary</h2>
+      <p>This phase designs <code>GET /applications/{applicationId}/dashboard</code>, an applicant-only dashboard summary API for one owned application.</p>
+      <p>The endpoint is intended to sit between <code>GET /applications/me</code> and detailed section APIs, returning action flags, completion summary, missing-section hints, and compact announced-result summary.</p>
+      <p>No runtime API, Java source, tests, security config, validator, or schema was changed in this phase.</p>
+      <p>The recommended next phase is Phase 03h-4, a narrow read-only implementation of the dashboard summary API.</p>
+    </section>
+
+    <section>
+      <h2>Scope</h2>
+      <div class="grid">
+        <div class="card">
+          <h3><span class="badge green">Completed</span></h3>
+          <ul>
+            <li>Dashboard API contract design</li>
+            <li>Applicant ownership and role policy</li>
+            <li>Action flag policy</li>
+            <li>Completion and missing-section policy</li>
+            <li>Phase 03h-4 implementation recommendation</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="badge red">Not Implemented</span></h3>
+          <ul>
+            <li>Java DTOs, services, repositories, controllers</li>
+            <li>API runtime endpoint</li>
+            <li>Submit validator changes</li>
+            <li>StageResult API changes</li>
+            <li>DB schema or security config changes</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="badge gray">Deferred</span></h3>
+          <ul>
+            <li>Attachment readiness policy</li>
+            <li>Per-question detailed errors</li>
+            <li>Fine-grained section progress</li>
+            <li>Shared validation policy extraction</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <table>
+        <thead><tr><th>Path</th><th>Status</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>docs/codex/design/phase-03h-3-applicant-application-dashboard-design.md</code></td><td><span class="badge green">New</span></td><td>Reference design</td></tr>
+          <tr><td><code>docs/codex/reports/phase-03h-3-applicant-application-dashboard-design.html</code></td><td><span class="badge green">New</span></td><td>Human-readable report</td></tr>
+          <tr><td><code>docs/codex/design/phase-03h-applicant-my-applications-design.md</code></td><td><span class="badge blue">Updated</span></td><td>Follow-up design note</td></tr>
+          <tr><td><code>docs/codex/design/phase-03-application-design.md</code></td><td><span class="badge blue">Updated</span></td><td>Application design status note</td></tr>
+          <tr><td><code>docs/codex/07-implementation-history.md</code></td><td><span class="badge blue">Updated</span></td><td>Phase history entry</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>API Design</h2>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>GET</code></td>
+            <td><code>/applications/{applicationId}/dashboard</code></td>
+            <td>Applicant reads one owned application dashboard summary</td>
+            <td>Path variable: <code>applicationId</code></td>
+            <td><code>ApiResponse&lt;ApplicationDashboardResponse&gt;</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        Recommended implementation mapping: <code>/applications/{applicationId:[0-9]+}/dashboard</code> to avoid collisions with <code>/applications/me</code>.
+      </div>
+    </section>
+
+    <section>
+      <h2>Response Fields</h2>
+      <table>
+        <thead><tr><th>Field</th><th>Policy</th></tr></thead>
+        <tbody>
+          <tr><td><code>applicationId</code>, <code>jobPostingId</code></td><td>Navigation and ownership-scoped display identifiers</td></tr>
+          <tr><td><code>jobPostingTitle</code>, <code>jobPositionName</code></td><td>Prefer application snapshots, fallback to current entity values</td></tr>
+          <tr><td><code>applicationStatus</code></td><td><code>DRAFT</code>, <code>SUBMITTED</code>, or <code>WITHDRAWN</code></td></tr>
+          <tr><td><code>accepting</code>, <code>editable</code>, <code>submittable</code>, <code>withdrawable</code></td><td>Action flag summary</td></tr>
+          <tr><td><code>submittedAt</code>, <code>withdrawnAt</code></td><td>Nullable lifecycle timestamps</td></tr>
+          <tr><td><code>completionSummary</code></td><td>Required/optional counts, rate, and blocking issue count</td></tr>
+          <tr><td><code>requiredMissingSections</code></td><td>Submit-blocking readiness issues</td></tr>
+          <tr><td><code>optionalIncompleteSections</code></td><td>Non-blocking enabled optional section hints</td></tr>
+          <tr><td><code>latestAnnouncedStageName</code>, <code>latestResultStatus</code></td><td>Compact visible result summary</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Not Exposed</h3>
+      <table>
+        <thead><tr><th>Data</th><th>Reason</th></tr></thead>
+        <tbody>
+          <tr><td>Applicant personal data</td><td>Not needed for dashboard summary</td></tr>
+          <tr><td>Internal result id, score, comment</td><td>Detailed/internal evaluation data</td></tr>
+          <tr><td>Employee/admin actor and correction history</td><td>Admin-only audit data</td></tr>
+          <tr><td>File storage path or stored filename</td><td>Internal storage data</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Domain Structure</h2>
+      <div class="grid two">
+        <div class="card">
+          <h3>Candidate DTOs</h3>
+          <ul>
+            <li><code>ApplicationDashboardResponse</code></li>
+            <li><code>ApplicationCompletionSummaryResponse</code></li>
+            <li><code>ApplicationSectionReadinessResponse</code></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Candidate Services</h3>
+          <ul>
+            <li><code>ApplicationDashboardService</code></li>
+            <li><code>ApplicationCompletionReadChecker</code></li>
+            <li>Existing owned application lookup pattern</li>
+            <li>Existing visible StageResult summary policy</li>
+          </ul>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Relationship</th><th>Dashboard Use</th></tr></thead>
+        <tbody>
+          <tr><td><code>JobApplication -> Applicant</code></td><td>Ownership check only; applicant data is not returned</td></tr>
+          <tr><td><code>JobApplication -> JobPosting</code></td><td>Posting status, reception period, title, form config</td></tr>
+          <tr><td><code>JobPosting -> ApplicationFormConfig</code></td><td>Required and optional section policy source</td></tr>
+          <tr><td><code>JobApplication -> detail section repositories</code></td><td>Completion and missing-section checks</td></tr>
+          <tr><td><code>JobApplication -> StageResult -> Stage</code></td><td>Visible result summary only</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Validation And Policy</h2>
+      <h3>Action Flags</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Policy</th></tr></thead>
+        <tbody>
+          <tr><td><code>accepting</code></td><td><code>PUBLISHED</code> posting and current time inside reception period</td></tr>
+          <tr><td><code>editable</code></td><td><code>DRAFT</code> and <code>accepting=true</code></td></tr>
+          <tr><td><code>submittable</code></td><td><code>DRAFT</code>, <code>accepting=true</code>, and no submit-blocking readiness issue</td></tr>
+          <tr><td><code>withdrawable</code></td><td><code>SUBMITTED</code> and <code>accepting=true</code></td></tr>
+          <tr><td><code>WITHDRAWN</code></td><td>All command flags are false</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Completion Policy</h3>
+      <table>
+        <thead><tr><th>Area</th><th>Blocking Policy</th></tr></thead>
+        <tbody>
+          <tr><td>Education</td><td><code>useEducation=true</code> requires at least one education row</td></tr>
+          <tr><td>Career</td><td><code>useCareer=true</code> requires profile, selected type, and career row rules by type</td></tr>
+          <tr><td>Military</td><td><code>useMilitary=true</code> requires record, subject type, and type-specific fields</td></tr>
+          <tr><td>Questions</td><td>Active required questions require non-null, non-blank answers</td></tr>
+          <tr><td>Answer length</td><td>Present non-null answers must pass effective max length checks</td></tr>
+          <tr><td>Certificate, Language, Award, GapPeriod</td><td>Optional hints only under the current submit policy</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Result Summary</h2>
+      <p>The dashboard result summary follows Phase 03h-2:</p>
+      <ul>
+        <li>Only <code>Stage.status == RESULT_ANNOUNCED || CLOSED</code> is visible.</li>
+        <li><code>READY</code> and <code>IN_PROGRESS</code> stages are excluded.</li>
+        <li>Latest result uses <code>stageOrder DESC, stage.id DESC</code>.</li>
+        <li>Detailed rows remain in <code>GET /applications/{applicationId}/stage-results</code>.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Test Results</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Result</th><th>Reason</th></tr></thead>
+        <tbody>
+          <tr><td>Gradle tests</td><td><span class="badge gray">Not Run</span></td><td>Documentation-only design phase</td></tr>
+          <tr><td>Document consistency review</td><td><span class="badge green">Completed</span></td><td>No runtime implementation intended</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Remaining Issues</h2>
+      <ul>
+        <li>Exact DTO names can be finalized during Phase 03h-4.</li>
+        <li>Read-only checker duplication with <code>ApplicationSubmitValidator</code> is acceptable initially but should be revisited if policy drift appears.</li>
+        <li>Attachment readiness needs a future config or business rule.</li>
+        <li>Per-question detailed error payloads are deferred.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Next Phase</h2>
+      <p>Phase 03h-4 should implement the basic dashboard summary API as a read-only vertical slice.</p>
+      <table>
+        <thead><tr><th>Step</th><th>Recommended Scope</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Add dashboard response DTO records</td></tr>
+          <tr><td>2</td><td>Add read-only completion checker aligned with current submit validator policy</td></tr>
+          <tr><td>3</td><td>Add dashboard service orchestration</td></tr>
+          <tr><td>4</td><td>Add applicant-owned controller endpoint</td></tr>
+          <tr><td>5</td><td>Add service and controller tests</td></tr>
+          <tr><td>6</td><td>Add implementation markdown and HTML report</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

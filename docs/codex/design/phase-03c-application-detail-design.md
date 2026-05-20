@@ -1,5 +1,132 @@
 # Phase 03c Application Detail Design
 
+## Phase 03i-4-2 Attachment Delete Command Implementation Note
+
+- Phase 03i-4-2 implemented applicant/admin soft delete commands for application attachments.
+- Applicant endpoint:
+  - `POST /applications/{applicationId}/attachments/{attachmentId}/delete`
+  - empty body
+  - owned application only
+  - allowed only for `DRAFT` applications while the published posting is accepting
+- Admin endpoint:
+  - `POST /admin/applications/{applicationId}/attachments/{attachmentId}/delete`
+  - request body: `{ "reason": "..." }`
+  - `reason` is required and limited to 1000 characters
+  - allowed for `DRAFT`, `SUBMITTED`, and `WITHDRAWN`
+- Added `PhysicalFileStatus.DELETED`.
+- Added `AttachmentDeleteActorType`.
+- Added `ApplicationAttachment.deletedAt`, `deletedBy`, `deletedByType`, and `deletionReason`.
+- Delete is a soft lifecycle transition; attachment rows are retained and normal applicant/admin metadata reads exclude `DELETED`.
+- Repeated delete, attachment/application mismatch, and other applicant access return hidden/control 404.
+- Download API was not changed and still accepts only `STORED`, so deleted rows are non-downloadable 404 cases.
+- For previously stored files, DB state is set to `DELETED` before physical deletion, and physical deletion runs after transaction commit.
+- Physical delete failure is logged without rolling back the DB soft delete.
+- Delete responses do not expose `storedFileName`, `storagePath`, `storageRoot`, absolute path, `physicalFileStatus`, or `downloadAvailable`.
+- Orphan cleanup, admin repair, include-deleted read, separate history table, required attachment policy, dashboard readiness, and submit validation remain deferred.
+- Reference:
+  - `docs/codex/implementation/phase-03i-4-2-attachment-delete-command.md`
+  - `docs/codex/reports/phase-03i-4-2-attachment-delete-command.html`
+
+## Phase 03i-4 Attachment Delete / Cleanup / Repair Design Note
+
+- Phase 03i-4 is a documentation-only design phase for attachment delete, orphan cleanup, and admin repair policy.
+- No Java source, test source, `SecurityConfig`, build, YAML, DB schema, runtime API, upload/download behavior, dashboard readiness, or submit validator behavior is changed.
+- Recommended delete endpoints for later implementation:
+  - Applicant: `POST /applications/{applicationId}/attachments/{attachmentId}/delete`
+  - Admin: `POST /admin/applications/{applicationId}/attachments/{attachmentId}/delete`
+- Recommended lifecycle policy is soft delete, not hard DB row deletion:
+  - keep the `ApplicationAttachment` row;
+  - `PhysicalFileStatus.DELETED` was later added in Phase 03i-4-2;
+  - exclude deleted rows from normal applicant/admin metadata lists;
+  - keep deleted rows non-downloadable.
+- Repeated delete of an already `DELETED` row returns 404; POST delete is not treated as idempotent success.
+- Upload append `sortOrder` should include `DELETED` rows in the max calculation, while metadata replace sort-order conflict checks should ignore `DELETED` rows and check active rows only.
+- Applicant delete is recommended only for owned `DRAFT` applications while the posting is accepting.
+- Applicant delete is rejected for `SUBMITTED` and `WITHDRAWN` applications.
+- Admin delete is allowed for authorized admin/recruit-admin users on `DRAFT`, `SUBMITTED`, and `WITHDRAWN` applications, but reason is required.
+- Admin delete reason is persisted on `ApplicationAttachment` through minimal delete fields in Phase 03i-4-2; a separate deletion history table remains deferred.
+- Physical file deletion should run after DB commit. Failure creates cleanup work rather than rolling back the committed DB deleted state.
+- Missing physical file and orphan physical file are separate:
+  - `MISSING`: DB row exists but physical file is absent.
+  - orphan physical file: physical file exists without an active DB reference.
+- Cleanup/repair is deferred and should start with dry-run scan before any destructive cleanup.
+- Attachment metadata/delete responses must not expose `storedFileName`, `storagePath`, `physicalFileStatus`, storage root, absolute path, or `downloadAvailable`.
+- Reference:
+  - `docs/codex/design/phase-03i-4-attachment-delete-cleanup-repair-design.md`
+  - `docs/codex/reports/phase-03i-4-attachment-delete-cleanup-repair-design.html`
+
+## Phase 03i-3 Attachment File Download Implementation Note
+
+- Phase 03i-3 implemented applicant/admin physical attachment download:
+  - `GET /applications/{applicationId}/attachments/{attachmentId}/download`
+  - `GET /admin/applications/{applicationId}/attachments/{attachmentId}/download`
+- Success response is a streaming file response (`ResponseEntity<Resource>`), not `ApiResponse`.
+- Failure responses still use existing JSON exception/security handlers.
+- Applicant download uses `CurrentApplicantService` and existing hidden 404 ownership policy.
+- Admin download uses existing `/admin/**` authorization; `SecurityConfig` was not changed.
+- Only `physicalFileStatus=STORED` rows are downloadable.
+- `METADATA_ONLY`, `MISSING`, attachment/application mismatch, and missing physical files return controlled 404.
+- Missing physical files do not auto-update the row to `MISSING` in this phase.
+- Review fix: absolute `storagePath` values are rejected before root resolution; attachment storage keys remain relative server-generated keys.
+- Download headers include DB-backed `Content-Type` with octet-stream fallback, actual physical `Content-Length`, safe `Content-Disposition` with UTF-8 `filename*`, `nosniff`, `no-store`, and `no-cache`.
+- Metadata responses remain unchanged and still exclude `storedFileName`, `storagePath`, `physicalFileStatus`, `downloadAvailable`, storage root, and absolute paths.
+- Upload API, metadata replace behavior, dashboard readiness, submit validator, admin upload, delete, orphan cleanup, and required attachment policy remain deferred/unchanged.
+- Reference:
+  - `docs/codex/implementation/phase-03i-3-attachment-file-download.md`
+  - `docs/codex/reports/phase-03i-3-attachment-file-download.html`
+
+## Phase 03i-2 Attachment File Upload Implementation Note
+
+- Phase 03i-2 implemented applicant single-file upload at `POST /applications/{applicationId}/attachments/files`.
+- Existing attachment metadata read remains `GET /applications/{applicationId}/attachments`.
+- Existing metadata replace remains `POST /applications/{applicationId}/attachments`, but now replaces only `physicalFileStatus=METADATA_ONLY` rows.
+- `physicalFileStatus=STORED` rows are preserved by metadata replace and cannot be reordered or edited by that endpoint.
+- Metadata replace rejects metadata `sortOrder` values that conflict with preserved `STORED` rows.
+- `AttachmentRequest` keeps `storedFileName` and `storagePath` detectable, and the service rejects non-null values with 400 instead of relying on global Jackson unknown-property failure.
+- Upload does not accept `sortOrder`; the server appends with max application attachment sort order + 1.
+- Upload count and total-size limits are calculated from `physicalFileStatus=STORED` rows only.
+- Upload response reuses `AttachmentResponse` and still excludes `storedFileName`, `storagePath`, `physicalFileStatus`, and `downloadAvailable`.
+- Download, admin upload, delete, orphan cleanup, dashboard readiness, and submit validator changes remain deferred.
+- Reference:
+  - `docs/codex/implementation/phase-03i-2-attachment-file-upload.md`
+  - `docs/codex/reports/phase-03i-2-attachment-file-upload.html`
+
+## Phase 03i-1 Attachment File Upload/Download Design Note
+
+- Phase 03i-1 designs upload/download around the existing Phase 03c-6 attachment metadata model.
+- This phase does not change `ApplicationAttachment`, `ApplicationAttachmentService`, `ApplicationAttachmentController`, request/response DTOs, admin section read APIs, schema, config, or tests.
+- Existing metadata APIs remain:
+  - `GET /applications/{applicationId}/attachments`
+  - `POST /applications/{applicationId}/attachments`
+  - `GET /admin/applications/{applicationId}/attachments`
+- Current metadata response policy remains:
+  - expose `attachmentId`, `attachmentType`, `sectionType`, `sectionRecordId`, `originalFileName`, `contentType`, `fileSize`, and `sortOrder`;
+  - do not expose `storedFileName`, `storagePath`, absolute paths, storage root, or direct download URLs.
+- Recommended upload implementation path:
+  - add `POST /applications/{applicationId}/attachments/files` in Phase 03i-2;
+  - add `ApplicationAttachment.physicalFileStatus` as `@Enumerated(EnumType.STRING)`, `nullable=false`, default `METADATA_ONLY`; existing rows and test fixtures are `METADATA_ONLY`;
+  - use values `METADATA_ONLY`, `STORED`, and `MISSING`;
+  - keep JSON metadata replace separate from physical file upload, but harden it first so it replaces only `METADATA_ONLY` rows, preserves file-backed rows, and rejects client-supplied `storedFileName`/`storagePath` with 400;
+  - keep forbidden storage fields in `AttachmentRequest` or otherwise detect them explicitly for 400; do not rely on global Jackson unknown-property failure;
+  - do not support file-backed row `sortOrder`, `attachmentType`, or `sectionType` edits through metadata replace in Phase 03i-2;
+  - do not accept `sortOrder` in upload requests; upload is append-only and the server assigns the next `sortOrder`;
+  - generate `storedFileName` and `storagePath` server-side;
+  - derive `originalFileName` from the sanitized multipart original filename and do not accept display/original filename overrides in Phase 03i-2;
+  - include server-assigned `sortOrder` in upload response if `AttachmentResponse` is reused;
+  - store bytes through a local storage abstraction first;
+  - register transaction rollback cleanup after file storage and use `saveAndFlush(...)` to catch DB failures before return when possible;
+  - enforce per-application file count and total-size limits using only `physicalFileStatus=STORED` rows.
+- Recommended download implementation path:
+  - applicant download: `GET /applications/{applicationId}/attachments/{attachmentId}/download`;
+  - admin download: `GET /admin/applications/{applicationId}/attachments/{attachmentId}/download`;
+  - return streaming file response with safe `Content-Disposition`;
+  - allow download only for `physicalFileStatus=STORED` rows. Legacy metadata-only rows remain non-downloadable.
+- `downloadAvailable` should not be added in Phase 03i-2 because download endpoints are deferred; decide it in Phase 03i-3.
+- Attachment remains outside final submit validation and dashboard readiness until a later policy phase decides a required attachment rule.
+- Reference:
+  - `docs/codex/design/phase-03i-attachment-file-upload-download-design.md`
+  - `docs/codex/reports/phase-03i-attachment-file-upload-download-design.html`
+
 ## Phase 03c-9-4 Implementation Note
 
 - Phase 03c-9-4 extended the Phase 03c-8 admin lazy section pattern with `GET /admin/applications/{applicationId}/answers`.

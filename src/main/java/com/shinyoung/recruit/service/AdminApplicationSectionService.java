@@ -35,6 +35,7 @@ import com.shinyoung.recruit.dto.response.AdminGapPeriodResponse;
 import com.shinyoung.recruit.dto.response.AdminLanguageResponse;
 import com.shinyoung.recruit.dto.response.AdminMilitaryResponse;
 import com.shinyoung.recruit.enumeration.CareerType;
+import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -144,7 +145,10 @@ public class AdminApplicationSectionService {
 
     public List<AdminAttachmentResponse> getAttachments(Long applicationId) {
         validateApplicationExists(applicationId);
-        return attachmentRepository.findByJobApplicationIdOrderBySortOrderAscIdAsc(applicationId)
+        return attachmentRepository.findByJobApplicationIdAndPhysicalFileStatusNotOrderBySortOrderAscIdAsc(
+                        applicationId,
+                        PhysicalFileStatus.DELETED
+                )
                 .stream()
                 .map(AdminAttachmentResponse::from)
                 .toList();

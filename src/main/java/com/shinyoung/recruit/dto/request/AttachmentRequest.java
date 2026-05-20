@@ -21,11 +21,9 @@ public record AttachmentRequest(
         @Size(max = 255, message = "Original file name must be 255 characters or less.")
         String originalFileName,
 
-        @NotBlank(message = "Stored file name is required.")
         @Size(max = 255, message = "Stored file name must be 255 characters or less.")
         String storedFileName,
 
-        @NotBlank(message = "Storage path is required.")
         @Size(max = 1000, message = "Storage path must be 1000 characters or less.")
         String storagePath,
 

@@ -22,6 +22,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -34,11 +35,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -108,7 +111,55 @@ class ApplicationAttachmentControllerTest {
                 .andExpect(jsonPath("$.message").exists())
                 .andExpect(jsonPath("$.data[0].originalFileName").value("resume.pdf"))
                 .andExpect(jsonPath("$.data[0].storedFileName").doesNotExist())
-                .andExpect(jsonPath("$.data[0].storagePath").doesNotExist());
+                .andExpect(jsonPath("$.data[0].storagePath").doesNotExist())
+                .andExpect(jsonPath("$.data[0].physicalFileStatus").doesNotExist())
+                .andExpect(jsonPath("$.data[0].downloadAvailable").doesNotExist());
+    }
+
+    @Test
+    void upload_attachment_file_returns_api_response_without_internal_storage_fields() throws Exception {
+        Applicant applicant = createApplicant("attachment-api-upload", "Attachment Api Upload");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        authenticate(applicant);
+
+        mockMvc.perform(multipart("/applications/{applicationId}/attachments/files", applicationId)
+                        .file(file("resume.pdf", "application/pdf", "resume"))
+                        .param("attachmentType", "RESUME")
+                        .param("sectionType", "APPLICATION"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.data.originalFileName").value("resume.pdf"))
+                .andExpect(jsonPath("$.data.sortOrder").value(0))
+                .andExpect(jsonPath("$.data.storedFileName").doesNotExist())
+                .andExpect(jsonPath("$.data.storagePath").doesNotExist())
+                .andExpect(jsonPath("$.data.physicalFileStatus").doesNotExist())
+                .andExpect(jsonPath("$.data.downloadAvailable").doesNotExist());
+    }
+
+    @Test
+    void upload_attachment_file_rejects_forbidden_multipart_parts() throws Exception {
+        Applicant applicant = createApplicant("attachment-api-upload-forbidden", "Attachment Api Upload Forbidden");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        authenticate(applicant);
+
+        mockMvc.perform(multipart("/applications/{applicationId}/attachments/files", applicationId)
+                        .file(file("resume.pdf", "application/pdf", "resume"))
+                        .param("attachmentType", "RESUME")
+                        .param("sectionType", "APPLICATION")
+                        .param("sortOrder", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
+
+        mockMvc.perform(multipart("/applications/{applicationId}/attachments/files", applicationId)
+                        .file(file("resume.pdf", "application/pdf", "resume"))
+                        .param("attachmentType", "RESUME")
+                        .param("sectionType", "APPLICATION")
+                        .param("storedFileName", "stored-resume.pdf"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
     }
 
     @Test
@@ -139,6 +190,34 @@ class ApplicationAttachmentControllerTest {
                                       "originalFileName": "resume.pdf",
                                       "storedFileName": "stored-resume.pdf",
                                       "storagePath": "/attachments/resume.pdf",
+                                      "contentType": "application/pdf",
+                                      "fileSize": 1024,
+                                      "sortOrder": 0
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void metadata_replace_rejects_client_supplied_storage_fields() throws Exception {
+        Applicant applicant = createApplicant("attachment-api-forbidden-storage", "Attachment Api Forbidden Storage");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        authenticate(applicant);
+
+        mockMvc.perform(post("/applications/{applicationId}/attachments", applicationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "attachments": [
+                                    {
+                                      "attachmentType": "RESUME",
+                                      "sectionType": "APPLICATION",
+                                      "originalFileName": "resume.pdf",
+                                      "storedFileName": "stored-resume.pdf",
                                       "contentType": "application/pdf",
                                       "fileSize": 1024,
                                       "sortOrder": 0
@@ -207,6 +286,15 @@ class ApplicationAttachmentControllerTest {
         );
     }
 
+    private MockMultipartFile file(String originalFileName, String contentType, String content) {
+        return new MockMultipartFile(
+                "file",
+                originalFileName,
+                contentType,
+                content.getBytes(StandardCharsets.UTF_8)
+        );
+    }
+
     private Applicant createApplicant(String loginId, String applicantName) {
         String ci = loginId + "-ci";
         Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
@@ -258,8 +346,6 @@ class ApplicationAttachmentControllerTest {
                       "attachmentType": "RESUME",
                       "sectionType": "APPLICATION",
                       "originalFileName": "resume.pdf",
-                      "storedFileName": "stored-resume.pdf",
-                      "storagePath": "/attachments/resume.pdf",
                       "contentType": "application/pdf",
                       "fileSize": 1024,
                       "sortOrder": 0

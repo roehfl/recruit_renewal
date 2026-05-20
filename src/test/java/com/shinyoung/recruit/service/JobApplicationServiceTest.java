@@ -17,15 +17,20 @@ import com.shinyoung.recruit.dto.request.ApplicationUpdateRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.dto.request.JobPostingQuestionCreateRequest;
+import com.shinyoung.recruit.dto.request.StageCreateRequest;
+import com.shinyoung.recruit.dto.request.StageResultUpdateRequest;
 import com.shinyoung.recruit.dto.response.JobPostingQuestionResponse;
 import com.shinyoung.recruit.dto.response.AdminApplicationDetailResponse;
 import com.shinyoung.recruit.dto.response.AdminApplicationSummaryResponse;
 import com.shinyoung.recruit.dto.response.ApplicationDetailResponse;
+import com.shinyoung.recruit.dto.response.MyApplicationResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
 import com.shinyoung.recruit.enumeration.QuestionCategory;
+import com.shinyoung.recruit.enumeration.StageResultStatus;
+import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
@@ -38,6 +43,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -64,6 +70,12 @@ class JobApplicationServiceTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private StageService stageService;
+
+    @Autowired
+    private StageResultService stageResultService;
 
     @Autowired
     private JobPostingQuestionService jobPostingQuestionService;
@@ -701,6 +713,120 @@ class JobApplicationServiceTest {
     }
 
     @Test
+    void get_my_applications_returns_only_owned_applications_with_all_statuses_and_closed_postings() {
+        Applicant applicant = createApplicant("my-list-owner", "My List Owner");
+        Applicant otherApplicant = createApplicant("my-list-other", "My List Other");
+        Long draftPostingId = createPublishedJobPosting("My List Draft Posting");
+        Long submittedPostingId = createPublishedJobPosting("My List Submitted Posting");
+        Long withdrawnPostingId = createPublishedJobPosting("My List Withdrawn Posting");
+        Long otherPostingId = createPublishedJobPosting("My List Other Posting");
+
+        Long draftApplicationId = createApplication(applicant, draftPostingId);
+        Long submittedApplicationId = createApplication(applicant, submittedPostingId);
+        jobApplicationService.submit(applicant.getId(), submittedApplicationId);
+        Long withdrawnApplicationId = createApplication(applicant, withdrawnPostingId);
+        jobApplicationService.submit(applicant.getId(), withdrawnApplicationId);
+        jobApplicationService.withdraw(applicant.getId(), withdrawnApplicationId);
+        jobPostingService.close(withdrawnPostingId);
+        Long otherApplicationId = createApplication(otherApplicant, otherPostingId);
+
+        PageResponse<MyApplicationResponse> response = jobApplicationService.getMyApplications(applicant.getId(), 0, 20);
+
+        assertThat(response.content()).extracting(MyApplicationResponse::applicationId)
+                .contains(draftApplicationId, submittedApplicationId, withdrawnApplicationId)
+                .doesNotContain(otherApplicationId);
+        assertThat(response.content()).extracting(MyApplicationResponse::applicationStatus)
+                .contains(JobApplicationStatus.DRAFT, JobApplicationStatus.SUBMITTED, JobApplicationStatus.WITHDRAWN);
+        assertThat(response.content())
+                .filteredOn(item -> item.applicationId().equals(withdrawnApplicationId))
+                .singleElement()
+                .extracting(MyApplicationResponse::jobPostingStatus)
+                .isEqualTo(JobPostingStatus.CLOSED);
+        assertThat(response.content()).isSortedAccordingTo(
+                Comparator
+                        .comparing(MyApplicationResponse::createdAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(MyApplicationResponse::applicationId)
+                        .reversed()
+        );
+    }
+
+    @Test
+    void get_my_applications_validates_page_and_size() {
+        Applicant applicant = createApplicant("my-list-page", "My List Page");
+
+        assertThatThrownBy(() -> jobApplicationService.getMyApplications(applicant.getId(), -1, 20))
+                .isInstanceOf(InvalidJobApplicationException.class);
+        assertThatThrownBy(() -> jobApplicationService.getMyApplications(applicant.getId(), 0, 0))
+                .isInstanceOf(InvalidJobApplicationException.class);
+        assertThatThrownBy(() -> jobApplicationService.getMyApplications(applicant.getId(), 0, 101))
+                .isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
+    void get_my_applications_calculates_accepting() {
+        Applicant applicant = createApplicant("my-list-accepting", "My List Accepting");
+        Long acceptingPostingId = createPublishedJobPosting("My List Accepting Posting");
+        Long futurePostingId = createPublishedJobPosting("My List Future Posting");
+        Long closedPostingId = createPublishedJobPosting("My List Closed Posting");
+        Long acceptingApplicationId = createApplication(applicant, acceptingPostingId);
+        Long futureApplicationId = createApplication(applicant, futurePostingId);
+        Long closedApplicationId = createApplication(applicant, closedPostingId);
+        setReceptionPeriod(
+                futurePostingId,
+                LocalDateTime.of(2026, 6, 16, 9, 0),
+                LocalDateTime.of(2026, 6, 30, 18, 0)
+        );
+        jobPostingService.close(closedPostingId);
+
+        PageResponse<MyApplicationResponse> response = jobApplicationService.getMyApplications(applicant.getId(), 0, 20);
+
+        assertThat(findMyApplication(response, acceptingApplicationId).accepting()).isTrue();
+        assertThat(findMyApplication(response, futureApplicationId).accepting()).isFalse();
+        assertThat(findMyApplication(response, closedApplicationId).accepting()).isFalse();
+    }
+
+    @Test
+    void get_my_applications_summarizes_only_visible_announced_results() {
+        Applicant applicant = createApplicant("my-list-result", "My List Result");
+        Long jobPostingId = createPublishedJobPosting("My List Result Posting");
+        Long applicationId = createApplication(applicant, jobPostingId);
+        jobApplicationService.submit(applicant.getId(), applicationId);
+        Long readyStageId = createStage(jobPostingId, 0, false);
+        Long inProgressStageId = createStage(jobPostingId, 1, false);
+        Long announcedStageId = createStage(jobPostingId, 2, false);
+        Long closedStageId = createStage(jobPostingId, 3, true);
+
+        stageResultService.initialize(readyStageId);
+        decideResult(jobPostingId, inProgressStageId, StageResultStatus.FAILED);
+        decideResult(jobPostingId, announcedStageId, StageResultStatus.FAILED);
+        stageService.announce(jobPostingId, announcedStageId);
+        decideResult(jobPostingId, closedStageId, StageResultStatus.PASSED);
+        stageService.announce(jobPostingId, closedStageId);
+        stageService.close(jobPostingId, closedStageId);
+
+        MyApplicationResponse response = findMyApplication(
+                jobApplicationService.getMyApplications(applicant.getId(), 0, 20),
+                applicationId
+        );
+
+        assertThat(response.announcedResultCount()).isEqualTo(2);
+        assertThat(response.latestAnnouncedStageName()).isEqualTo("Stage 3");
+        assertThat(response.latestResultStatus()).isEqualTo(StageResultStatus.PASSED);
+    }
+
+    @Test
+    void get_my_applications_returns_empty_page_when_applicant_has_no_applications() {
+        Applicant applicant = createApplicant("my-list-empty", "My List Empty");
+
+        PageResponse<MyApplicationResponse> response = jobApplicationService.getMyApplications(applicant.getId(), 0, 20);
+
+        assertThat(response.content()).isEmpty();
+        assertThat(response.totalElements()).isZero();
+        assertThat(response.page()).isZero();
+        assertThat(response.size()).isEqualTo(20);
+    }
+
+    @Test
     void admin_get_applications_success() {
         Applicant firstApplicant = createApplicant("admin-list-first", "Admin List First");
         Applicant secondApplicant = createApplicant("admin-list-second", "Admin List Second");
@@ -962,6 +1088,42 @@ class JobApplicationServiceTest {
 
     private Long firstJobPositionId(Long jobPostingId) {
         return jobPositionIds(jobPostingId).get(0);
+    }
+
+    private Long createApplication(Applicant applicant, Long jobPostingId) {
+        return jobApplicationService.create(
+                applicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
+        );
+    }
+
+    private Long createStage(Long jobPostingId, int stageOrder, boolean finalStage) {
+        return stageService.create(jobPostingId, new StageCreateRequest(
+                "Stage " + stageOrder,
+                StageType.DOCUMENT,
+                stageOrder,
+                LocalDateTime.of(2026, 7, stageOrder + 1, 10, 0),
+                finalStage
+        ));
+    }
+
+    private void decideResult(Long jobPostingId, Long stageId, StageResultStatus status) {
+        stageService.start(jobPostingId, stageId);
+        stageResultService.initialize(stageId);
+        Long resultId = stageResultService.getResults(stageId).get(0).stageResultId();
+        stageResultService.updateResult(
+                stageId,
+                resultId,
+                new StageResultUpdateRequest(status, new BigDecimal("90.0"), "internal"),
+                "employee01"
+        );
+    }
+
+    private MyApplicationResponse findMyApplication(PageResponse<MyApplicationResponse> response, Long applicationId) {
+        return response.content().stream()
+                .filter(item -> item.applicationId().equals(applicationId))
+                .findFirst()
+                .orElseThrow();
     }
 
     private List<Long> jobPositionIds(Long jobPostingId) {

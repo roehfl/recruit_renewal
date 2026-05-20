@@ -11,5 +11,7 @@ public interface ApplicationAwardRepository extends JpaRepository<ApplicationAwa
 
     List<ApplicationAward> findByJobApplicationId(Long applicationId);
 
+    boolean existsByJobApplicationId(Long applicationId);
+
     void deleteByJobApplicationId(Long applicationId);
 }

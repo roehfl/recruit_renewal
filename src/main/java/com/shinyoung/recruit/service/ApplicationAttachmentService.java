@@ -7,6 +7,7 @@ import com.shinyoung.recruit.dto.request.AttachmentReplaceRequest;
 import com.shinyoung.recruit.dto.request.AttachmentRequest;
 import com.shinyoung.recruit.dto.response.AttachmentResponse;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
+import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -42,9 +44,9 @@ public class ApplicationAttachmentService {
     ) {
         JobApplication application = sectionAccessService.findOwnedApplication(applicantId, applicationId);
         sectionAccessService.validateWritable(application);
-        validateRequest(request);
+        validateRequest(request, applicationId);
 
-        attachmentRepository.deleteByJobApplicationId(applicationId);
+        attachmentRepository.deleteByJobApplicationIdAndPhysicalFileStatus(applicationId, PhysicalFileStatus.METADATA_ONLY);
         List<ApplicationAttachment> attachments = request.attachments().stream()
                 .map(attachment -> toAttachment(application, attachment))
                 .toList();
@@ -53,7 +55,7 @@ public class ApplicationAttachmentService {
         return getAttachmentResponses(applicationId);
     }
 
-    private void validateRequest(AttachmentReplaceRequest request) {
+    private void validateRequest(AttachmentReplaceRequest request, Long applicationId) {
         if (request == null || request.attachments() == null) {
             throw new InvalidJobApplicationException("Attachment list is required.");
         }
@@ -63,6 +65,18 @@ public class ApplicationAttachmentService {
             validateAttachmentRequiredFields(attachment);
             if (!sortOrders.add(attachment.sortOrder())) {
                 throw new InvalidJobApplicationException("Attachment sort order must be unique.");
+            }
+        }
+
+        Set<Integer> storedSortOrders = new HashSet<>(
+                attachmentRepository.findSortOrdersByJobApplicationIdAndPhysicalFileStatus(
+                        applicationId,
+                        PhysicalFileStatus.STORED
+                )
+        );
+        for (Integer sortOrder : sortOrders) {
+            if (storedSortOrders.contains(sortOrder)) {
+                throw new InvalidJobApplicationException("Attachment sort order conflicts with stored file attachment.");
             }
         }
     }
@@ -78,12 +92,10 @@ public class ApplicationAttachmentService {
             throw new InvalidJobApplicationException("Section type is required.");
         }
         validateRequiredString(attachment.originalFileName(), "Original file name is required.");
-        validateRequiredString(attachment.storedFileName(), "Stored file name is required.");
-        validateRequiredString(attachment.storagePath(), "Storage path is required.");
+        validateForbiddenStorageField(attachment.storedFileName(), "storedFileName");
+        validateForbiddenStorageField(attachment.storagePath(), "storagePath");
         validateRequiredString(attachment.contentType(), "Content type is required.");
         validateMaxLength(attachment.originalFileName(), ORIGINAL_FILE_NAME_MAX_LENGTH, "Original file name");
-        validateMaxLength(attachment.storedFileName(), STORED_FILE_NAME_MAX_LENGTH, "Stored file name");
-        validateMaxLength(attachment.storagePath(), STORAGE_PATH_MAX_LENGTH, "Storage path");
         validateMaxLength(attachment.contentType(), CONTENT_TYPE_MAX_LENGTH, "Content type");
         if (attachment.fileSize() == null || attachment.fileSize() <= 0) {
             throw new InvalidJobApplicationException("File size must be greater than 0.");
@@ -106,6 +118,12 @@ public class ApplicationAttachmentService {
         }
     }
 
+    private void validateForbiddenStorageField(String value, String fieldName) {
+        if (value != null) {
+            throw new InvalidJobApplicationException(fieldName + " cannot be supplied by client.");
+        }
+    }
+
     private void validateSectionRecord(AttachmentRequest attachment) {
         if (attachment.sectionType() == ApplicationSectionType.APPLICATION && attachment.sectionRecordId() != null) {
             throw new InvalidJobApplicationException("Application section attachment cannot have a section record id.");
@@ -118,14 +136,15 @@ public class ApplicationAttachmentService {
     }
 
     private ApplicationAttachment toAttachment(JobApplication application, AttachmentRequest request) {
+        String metadataKey = "metadata-only-" + UUID.randomUUID();
         return ApplicationAttachment.create(
                 application,
                 request.attachmentType(),
                 request.sectionType(),
                 request.sectionRecordId(),
                 request.originalFileName(),
-                request.storedFileName(),
-                request.storagePath(),
+                metadataKey,
+                "metadata-only/" + application.getId() + "/" + metadataKey,
                 request.contentType(),
                 request.fileSize(),
                 request.sortOrder()
@@ -133,7 +152,10 @@ public class ApplicationAttachmentService {
     }
 
     private List<AttachmentResponse> getAttachmentResponses(Long applicationId) {
-        return attachmentRepository.findByJobApplicationIdOrderBySortOrderAscIdAsc(applicationId)
+        return attachmentRepository.findByJobApplicationIdAndPhysicalFileStatusNotOrderBySortOrderAscIdAsc(
+                        applicationId,
+                        PhysicalFileStatus.DELETED
+                )
                 .stream()
                 .map(AttachmentResponse::from)
                 .toList();

@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>Phase 03i-4 Attachment Delete Cleanup Repair Design</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; color: #1f2937; background: #f6f8fb; }
+    header { background: #12355b; color: #fff; padding: 28px 36px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px; }
+    h1, h2, h3 { margin: 0 0 14px; }
+    h2 { margin-top: 30px; color: #12355b; }
+    p { line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; background: #fff; border: 1px solid #d9e2ec; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e5edf5; text-align: left; vertical-align: top; }
+    th { background: #eaf2fb; color: #15395b; }
+    code { background: #eef2f7; padding: 2px 5px; border-radius: 4px; }
+    .badge { display: inline-block; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .completed { background: #d8f3dc; color: #176c36; }
+    .pending { background: #f3f4f6; color: #4b5563; }
+    .out { background: #fde2e2; color: #9b1c1c; }
+    .warning { background: #fff3cd; color: #8a5a00; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 18px; box-shadow: 0 1px 2px rgba(16, 59, 102, 0.06); }
+    .summary { background: #fff; border-left: 5px solid #2563eb; padding: 18px; margin: 20px 0; }
+    .list { margin: 0; padding-left: 18px; line-height: 1.7; }
+    .muted { color: #cbd5e1; }
+    .note { color: #64748b; }
+    @media (max-width: 860px) { .grid, .two { grid-template-columns: 1fr; } main { padding: 18px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="muted">Recruit Backend</div>
+    <h1>Phase 03i-4 - Attachment Delete / Orphan Cleanup / Admin Repair Design</h1>
+    <span class="badge completed">Design Completed</span>
+    <span class="badge warning">Generated 2026-05-20</span>
+  </header>
+  <main>
+    <section class="summary">
+      <h2>Executive Summary</h2>
+      <p>Phase 03i-4 is a documentation-only design phase for attachment delete, orphan cleanup, and admin repair policy after upload and download were implemented. No Java source, tests, security config, build files, YAML, schema, or runtime APIs are changed.</p>
+      <p>The recommended lifecycle decision is soft delete: keep the DB row, add a future <code>DELETED</code> physical file state, exclude deleted rows from normal metadata lists, and delete physical files after the DB transaction commits.</p>
+      <p>The phase can move forward to a narrow implementation: applicant DRAFT delete plus admin delete with required reason. Cleanup, repair, and audit history remain separate phases.</p>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h3>Completed Scope</h3>
+        <ul class="list">
+          <li>Applicant delete policy</li>
+          <li>Admin delete policy</li>
+          <li>Hard vs soft delete decision</li>
+          <li>Transaction and compensation strategy</li>
+          <li>Cleanup and repair candidates</li>
+          <li>Implementation phase split</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Not Implemented</h3>
+        <ul class="list">
+          <li>Delete endpoints</li>
+          <li>Cleanup scheduler</li>
+          <li>Admin repair commands</li>
+          <li>Audit table</li>
+          <li>Runtime enum/schema changes</li>
+          <li>Dashboard or submit integration</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Deferred</h3>
+        <ul class="list">
+          <li>Orphan scan dry-run implementation</li>
+          <li>Admin cleanup execution</li>
+          <li>Missing row repair</li>
+          <li>S3/NAS migration</li>
+          <li>Virus scan and DLP</li>
+          <li>Attachment required policy</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>Delete Policy Options</h2>
+      <table>
+        <thead><tr><th>Option</th><th>Behavior</th><th>Pros</th><th>Cons</th><th>Decision</th></tr></thead>
+        <tbody>
+          <tr><td>Option A</td><td>Hard delete DB row and delete physical file</td><td>Simple; disappears from lists</td><td>Weak audit; DB/filesystem mismatch risk</td><td><span class="badge out">Rejected default</span></td></tr>
+          <tr><td>Option B</td><td>Keep DB row, mark deleted, delete physical file after commit</td><td>Audit-friendly; safer for submitted evidence</td><td>Requires enum/query changes later</td><td><span class="badge completed">Recommended</span></td></tr>
+          <tr><td>Option C</td><td>Only implement narrow applicant DRAFT delete first</td><td>Small implementation</td><td>Does not solve admin or cleanup</td><td><span class="badge pending">Possible MVP slice only</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Recommended Policy</h2>
+      <div class="card">
+        <p>Use a soft lifecycle state, not hard delete, as the default. A later implementation should add <code>DELETED</code> to <code>PhysicalFileStatus</code>, exclude deleted rows from normal applicant/admin metadata lists, and reject deleted rows from download with controlled 404. <code>ORPHANED</code> should not be a DB enum because orphan physical files have no DB row.</p>
+        <p>Delete commands should also return 404 for rows that are already <code>DELETED</code>. Admin delete requires a reason, and Phase 03i-4-2 should persist that reason on <code>ApplicationAttachment</code> through minimal delete audit fields. A separate <code>ApplicationAttachmentDeletionHistory</code> table remains deferred.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Review Clarifications</h2>
+      <table>
+        <thead><tr><th>Topic</th><th>Final Policy</th></tr></thead>
+        <tbody>
+          <tr><td>Repeated delete</td><td>Already <code>DELETED</code> rows are excluded from delete lookup and return controlled 404. POST command success is not idempotent.</td></tr>
+          <tr><td>Upload append order</td><td>New upload <code>sortOrder</code> uses max across all rows, including <code>DELETED</code>, then adds 1.</td></tr>
+          <tr><td>Metadata replace conflict</td><td>Conflict checks use active rows only. <code>DELETED</code> row sort orders may be reused by metadata replace.</td></tr>
+          <tr><td>Admin reason</td><td>Persist reason on <code>ApplicationAttachment</code> with minimal delete audit fields such as <code>deletedAt</code>, <code>deletedBySnapshot</code>, <code>deletedByType</code>, and <code>deletedReason</code>.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>API Candidates</h2>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>POST</td><td><code>/applications/{applicationId}/attachments/{attachmentId}/delete</code></td><td>Applicant deletes owned editable attachment</td><td>Empty body</td><td><code>ApiResponse&lt;AttachmentDeleteResponse&gt;</code></td><td><span class="badge completed">Phase 03i-4-2 candidate</span></td></tr>
+          <tr><td>POST</td><td><code>/admin/applications/{applicationId}/attachments/{attachmentId}/delete</code></td><td>Admin deletes attachment with reason</td><td><code>reason</code></td><td><code>ApiResponse&lt;AttachmentDeleteResponse&gt;</code></td><td><span class="badge completed">Phase 03i-4-2 candidate</span></td></tr>
+          <tr><td>POST</td><td><code>/admin/attachments/storage-health/scan</code></td><td>Dry-run scan</td><td>Scan options</td><td>Scan report</td><td><span class="badge pending">Later</span></td></tr>
+          <tr><td>POST</td><td><code>/admin/attachments/orphans/cleanup</code></td><td>Cleanup confirmed orphan files</td><td>Cleanup request</td><td>Cleanup report</td><td><span class="badge pending">Later</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Transaction / Compensation Strategy</h2>
+      <table>
+        <thead><tr><th>Step</th><th>Policy</th></tr></thead>
+        <tbody>
+          <tr><td>Validation</td><td>Check actor, ownership/role, application state, attachment/application match, and admin reason.</td></tr>
+          <tr><td>DB state</td><td>Inside the transaction, mark the row <code>DELETED</code> instead of hard deleting it.</td></tr>
+          <tr><td>Physical file</td><td>Delete after DB commit using the stored relative key captured before the state change.</td></tr>
+          <tr><td>Physical delete failure</td><td>Do not roll back the committed DB delete; log cleanup work for orphan cleanup.</td></tr>
+          <tr><td>Missing file during delete</td><td>Treat idempotently as already absent; do not expose paths.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="two">
+      <div class="card">
+        <h2>Orphan Cleanup</h2>
+        <ul class="list">
+          <li>Start with dry-run only.</li>
+          <li>Detect files under storage root without active DB references.</li>
+          <li>Detect <code>DELETED</code> rows whose physical files still exist.</li>
+          <li>Prefer quarantine/move before permanent delete when operations can support it.</li>
+          <li>Never escape the configured storage root.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>Admin Repair</h2>
+        <ul class="list">
+          <li>Detect <code>STORED</code> rows with missing physical files.</li>
+          <li>Do not auto-mark <code>MISSING</code> during user download.</li>
+          <li>Defer <code>mark-missing</code> and <code>repair</code> commands.</li>
+          <li>Require audit for any repair that reattaches or changes evidence.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>Security / Exposure Policy</h2>
+      <table>
+        <thead><tr><th>Item</th><th>Policy</th></tr></thead>
+        <tbody>
+          <tr><td>Applicant delete</td><td>DRAFT + accepting + owner only; other applicants hidden as 404.</td></tr>
+          <tr><td>Admin delete</td><td>Allowed for authorized admin/recruit-admin; reason required.</td></tr>
+          <tr><td>Storage internals</td><td>No <code>storedFileName</code>, <code>storagePath</code>, storage root, or absolute local path in responses.</td></tr>
+          <tr><td>Deleted rows</td><td>Excluded from normal metadata lists and not downloadable.</td></tr>
+          <tr><td>Already deleted rows</td><td>Delete commands return 404 rather than repeated success.</td></tr>
+          <tr><td>Sort order</td><td>Upload append includes deleted rows; metadata replace conflicts ignore deleted rows.</td></tr>
+          <tr><td>Admin reason</td><td>Reason is persisted on the attachment row in the MVP; logs are not the source of truth.</td></tr>
+          <tr><td>Logging</td><td>Log actor, application id, attachment id, status, reason, and physical delete result without secrets.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Phase Split</h2>
+      <table>
+        <thead><tr><th>Phase</th><th>Scope</th><th>Out of Scope</th></tr></thead>
+        <tbody>
+          <tr><td>03i-4-1</td><td>Design only</td><td>Runtime changes</td></tr>
+          <tr><td>03i-4-2</td><td>Applicant DRAFT delete + admin delete command, soft <code>DELETED</code>, persisted admin reason, repeated delete 404</td><td>Scheduler, repair API, separate deletion history table</td></tr>
+          <tr><td>03i-4-3</td><td>Orphan scan dry-run</td><td>Physical cleanup execution</td></tr>
+          <tr><td>03i-4-4</td><td>Admin cleanup/repair commands</td><td>Upload/download redesign</td></tr>
+          <tr><td>03i-5</td><td>Required attachment policy and dashboard/submit integration</td><td>Storage lifecycle unless gaps remain</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Phase 03i-5 Connection</h2>
+      <div class="card">
+        <p>Required attachment and dashboard readiness checks must count only active usable rows. For physical-file requirements, only <code>STORED</code> rows should satisfy readiness; <code>METADATA_ONLY</code>, <code>MISSING</code>, and <code>DELETED</code> rows must not pass a required file rule. Orphan physical files never satisfy readiness because they have no active DB row.</p>
+        <p>Phase 03i-5 should reuse the active-row filtering introduced by delete implementation instead of creating separate visibility rules.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Test Plan</h2>
+      <table>
+        <thead><tr><th>Area</th><th>Required Tests</th></tr></thead>
+        <tbody>
+          <tr><td>Applicant delete</td><td>Owner DRAFT success, SUBMITTED/WITHDRAWN fail, other applicant hidden 404, repeated delete 404, metadata-only and stored policies, missing file idempotency, storage internals hidden.</td></tr>
+          <tr><td>Admin delete</td><td>Admin/recruit-admin success, applicant 403, anonymous 401, mismatch 404, repeated delete 404, reason required and persisted, submitted delete reason, storage internals hidden.</td></tr>
+          <tr><td>Sort order</td><td>Upload after delete uses all-row max including <code>DELETED</code>; metadata replace ignores <code>DELETED</code> row conflicts but still blocks active <code>STORED</code> conflicts.</td></tr>
+          <tr><td>Cleanup/repair</td><td>Orphan scan, missing STORED row detection, dry-run no-delete, root containment, unknown directory protection.</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Gradle tests were not run in this phase because only design documentation changed.</p>
+    </section>
+
+    <section>
+      <h2>Remaining Decisions</h2>
+      <ul class="list">
+        <li>Exact Java field names for the minimal delete audit fields on <code>ApplicationAttachment</code>.</li>
+        <li>Whether physical delete completion is persisted or handled through logs plus later scan.</li>
+        <li>Whether cleanup uses quarantine before permanent delete.</li>
+        <li>Whether admin metadata reads later support <code>includeDeleted</code>.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <table>
+        <thead><tr><th>File</th><th>Status</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>docs/codex/design/phase-03i-4-attachment-delete-cleanup-repair-design.md</code></td><td><span class="badge completed">New</span></td><td>Codex design source of truth</td></tr>
+          <tr><td><code>docs/codex/reports/phase-03i-4-attachment-delete-cleanup-repair-design.html</code></td><td><span class="badge completed">New</span></td><td>Self-contained human report</td></tr>
+          <tr><td><code>docs/codex/design/phase-03i-attachment-file-upload-download-design.md</code></td><td><span class="badge completed">Modified</span></td><td>Phase note added</td></tr>
+          <tr><td><code>docs/codex/design/phase-03c-application-detail-design.md</code></td><td><span class="badge completed">Modified</span></td><td>Phase note added</td></tr>
+          <tr><td><code>docs/codex/design/phase-03-application-design.md</code></td><td><span class="badge completed">Modified</span></td><td>Phase note added</td></tr>
+          <tr><td><code>docs/codex/07-implementation-history.md</code></td><td><span class="badge completed">Modified</span></td><td>History entry added</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

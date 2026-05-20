@@ -12,12 +12,18 @@ import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPostingQuestionCreateRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
+import com.shinyoung.recruit.dto.request.StageCreateRequest;
+import com.shinyoung.recruit.dto.request.StageResultUpdateRequest;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
 import com.shinyoung.recruit.enumeration.QuestionCategory;
+import com.shinyoung.recruit.enumeration.StageResultStatus;
+import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.JobApplicationService;
 import com.shinyoung.recruit.service.JobPostingService;
 import com.shinyoung.recruit.service.JobPostingQuestionService;
+import com.shinyoung.recruit.service.StageResultService;
+import com.shinyoung.recruit.service.StageService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +34,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -44,8 +51,13 @@ import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -75,6 +87,12 @@ class ApplicationControllerTest {
 
     @Autowired
     private JobApplicationService jobApplicationService;
+
+    @Autowired
+    private StageService stageService;
+
+    @Autowired
+    private StageResultService stageResultService;
 
     private MockMvc mockMvc;
 
@@ -400,6 +418,243 @@ class ApplicationControllerTest {
     }
 
     @Test
+    void get_my_applications_returns_api_response() throws Exception {
+        Applicant applicant = createApplicant("api-my-list", "Api My List");
+        Long jobPostingId = createPublishedJobPosting();
+        Long applicationId = createApplication(applicant, jobPostingId);
+        jobApplicationService.submit(applicant.getId(), applicationId);
+        Long stageId = createStage(jobPostingId, 0, true);
+        decideAndAnnounce(jobPostingId, stageId, StageResultStatus.PASSED);
+        MockMvc securedMockMvc = securedMockMvc();
+
+        securedMockMvc.perform(get("/applications/me")
+                        .param("page", "0")
+                        .param("size", "20")
+                        .with(authentication(applicantAuthentication(applicant))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.data.content").isArray())
+                .andExpect(jsonPath("$.data.content[0].applicationId").value(applicationId))
+                .andExpect(jsonPath("$.data.content[0].jobPostingId").value(jobPostingId))
+                .andExpect(jsonPath("$.data.content[0].jobPostingTitle").value("2026 recruitment"))
+                .andExpect(jsonPath("$.data.content[0].jobPostingStatus").value("PUBLISHED"))
+                .andExpect(jsonPath("$.data.content[0].jobPositionId").isNumber())
+                .andExpect(jsonPath("$.data.content[0].jobPositionName").value("Backend"))
+                .andExpect(jsonPath("$.data.content[0].applicationStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.content[0].createdAt").exists())
+                .andExpect(jsonPath("$.data.content[0].submittedAt").exists())
+                .andExpect(jsonPath("$.data.content[0].withdrawnAt").doesNotExist())
+                .andExpect(jsonPath("$.data.content[0].receptionStartDateTime").exists())
+                .andExpect(jsonPath("$.data.content[0].receptionEndDateTime").exists())
+                .andExpect(jsonPath("$.data.content[0].accepting").value(true))
+                .andExpect(jsonPath("$.data.content[0].announcedResultCount").value(1))
+                .andExpect(jsonPath("$.data.content[0].latestAnnouncedStageName").value("Stage 0"))
+                .andExpect(jsonPath("$.data.content[0].latestResultStatus").value("PASSED"))
+                .andExpect(jsonPath("$.data.content[0].applicantId").doesNotExist())
+                .andExpect(jsonPath("$.data.content[0].score").doesNotExist())
+                .andExpect(jsonPath("$.data.content[0].comment").doesNotExist())
+                .andExpect(jsonPath("$.data.content[0].decidedBy").doesNotExist())
+                .andExpect(jsonPath("$.data.content[0].correctedBy").doesNotExist())
+                .andExpect(jsonPath("$.data.content[0].stageResultId").doesNotExist())
+                .andExpect(jsonPath("$.data.content[0].histories").doesNotExist())
+                .andExpect(jsonPath("$.data.page").value(0))
+                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.totalPages").value(1))
+                .andExpect(jsonPath("$.data.first").value(true))
+                .andExpect(jsonPath("$.data.last").value(true));
+    }
+
+    @Test
+    void get_application_dashboard_returns_api_response() throws Exception {
+        Applicant applicant = createApplicant("api-dashboard", "Api Dashboard");
+        Long jobPostingId = createPublishedJobPosting();
+        Long applicationId = createApplication(applicant, jobPostingId);
+        Long stageId = createStage(jobPostingId, 0, true);
+        jobApplicationService.submit(applicant.getId(), applicationId);
+        decideAndAnnounce(jobPostingId, stageId, StageResultStatus.PASSED);
+        MockMvc securedMockMvc = securedMockMvc();
+
+        securedMockMvc.perform(get("/applications/{applicationId}/dashboard", applicationId)
+                        .with(authentication(applicantAuthentication(applicant))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.data.applicationId").value(applicationId))
+                .andExpect(jsonPath("$.data.jobPostingId").value(jobPostingId))
+                .andExpect(jsonPath("$.data.jobPostingTitle").value("2026 recruitment"))
+                .andExpect(jsonPath("$.data.jobPositionName").value("Backend"))
+                .andExpect(jsonPath("$.data.applicationStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.accepting").value(true))
+                .andExpect(jsonPath("$.data.editable").value(false))
+                .andExpect(jsonPath("$.data.submittable").value(false))
+                .andExpect(jsonPath("$.data.withdrawable").value(true))
+                .andExpect(jsonPath("$.data.submittedAt").exists())
+                .andExpect(jsonPath("$.data.withdrawnAt").doesNotExist())
+                .andExpect(jsonPath("$.data.completionSummary.requiredSectionCount").value(0))
+                .andExpect(jsonPath("$.data.completionSummary.submitBlockingIssueCount").value(0))
+                .andExpect(jsonPath("$.data.requiredMissingSections").isArray())
+                .andExpect(jsonPath("$.data.optionalIncompleteSections").isArray())
+                .andExpect(jsonPath("$.data.latestAnnouncedStageName").value("Stage 0"))
+                .andExpect(jsonPath("$.data.latestResultStatus").value("PASSED"))
+                .andExpect(jsonPath("$.data.applicantId").doesNotExist())
+                .andExpect(jsonPath("$.data.score").doesNotExist())
+                .andExpect(jsonPath("$.data.comment").doesNotExist())
+                .andExpect(jsonPath("$.data.decidedBy").doesNotExist())
+                .andExpect(jsonPath("$.data.correctedBy").doesNotExist())
+                .andExpect(jsonPath("$.data.stageResultId").doesNotExist())
+                .andExpect(jsonPath("$.data.answerText").doesNotExist())
+                .andExpect(jsonPath("$.data.exemptionReason").doesNotExist())
+                .andExpect(jsonPath("$.data.certificateNumber").doesNotExist())
+                .andExpect(jsonPath("$.data.histories").doesNotExist())
+                .andExpect(jsonPath("$.data.storagePath").doesNotExist())
+                .andExpect(jsonPath("$.data.storedFileName").doesNotExist());
+    }
+
+    @Test
+    void get_application_dashboard_returns_required_missing_sections() throws Exception {
+        Applicant applicant = createApplicant("api-dashboard-missing", "Api Dashboard Missing");
+        Long jobPostingId = createPublishedJobPosting(new ApplicationFormConfigRequest(
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+        ));
+        Long applicationId = createApplication(applicant, jobPostingId);
+        MockMvc securedMockMvc = securedMockMvc();
+
+        securedMockMvc.perform(get("/applications/{applicationId}/dashboard", applicationId)
+                        .with(authentication(applicantAuthentication(applicant))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.editable").value(true))
+                .andExpect(jsonPath("$.data.submittable").value(false))
+                .andExpect(jsonPath("$.data.completionSummary.requiredSectionCount").value(1))
+                .andExpect(jsonPath("$.data.completionSummary.submitBlockingIssueCount").value(1))
+                .andExpect(jsonPath("$.data.requiredMissingSections[0].sectionCode").value("EDUCATION"))
+                .andExpect(jsonPath("$.data.requiredMissingSections[0].reasonCode").value("MISSING_ROW"));
+    }
+
+    @Test
+    void get_application_dashboard_blocks_employee_admin_and_anonymous() throws Exception {
+        Applicant applicant = createApplicant("api-dashboard-security", "Api Dashboard Security");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        MockMvc securedMockMvc = securedMockMvc();
+
+        securedMockMvc.perform(get("/applications/{applicationId}/dashboard", applicationId)
+                        .with(authentication(employeeAuthentication("employee-dashboard", "ROLE_ADMIN"))))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Access is denied."));
+
+        securedMockMvc.perform(get("/applications/{applicationId}/dashboard", applicationId)
+                        .with(anonymous()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Authentication is required."));
+    }
+
+    @Test
+    void get_application_dashboard_hides_other_applicants_application() throws Exception {
+        Applicant owner = createApplicant("api-dashboard-owner", "Api Dashboard Owner");
+        Applicant other = createApplicant("api-dashboard-other", "Api Dashboard Other");
+        Long applicationId = createApplication(owner, createPublishedJobPosting());
+
+        securedMockMvc().perform(get("/applications/{applicationId}/dashboard", applicationId)
+                        .with(authentication(applicantAuthentication(other))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void get_my_applications_returns_empty_page_for_applicant_without_applications() throws Exception {
+        Applicant applicant = createApplicant("api-my-list-empty", "Api My List Empty");
+
+        securedMockMvc().perform(get("/applications/me")
+                        .with(authentication(applicantAuthentication(applicant))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content").isEmpty())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+    }
+
+    @Test
+    void get_my_applications_blocks_employee_admin_and_anonymous() throws Exception {
+        MockMvc securedMockMvc = securedMockMvc();
+
+        securedMockMvc.perform(get("/applications/me")
+                        .with(authentication(employeeAuthentication("employee-admin", "ROLE_ADMIN"))))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Access is denied."));
+
+        securedMockMvc.perform(get("/applications/me")
+                        .with(anonymous()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Authentication is required."));
+    }
+
+    @Test
+    void unsupported_methods_are_not_added_for_my_applications() throws Exception {
+        Applicant applicant = createApplicant("api-my-list-method", "Api My List Method");
+        MockMvc securedMockMvc = securedMockMvc();
+
+        securedMockMvc.perform(post("/applications/me")
+                        .with(authentication(applicantAuthentication(applicant)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isMethodNotAllowed());
+        securedMockMvc.perform(put("/applications/me")
+                        .with(authentication(applicantAuthentication(applicant)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isMethodNotAllowed());
+        securedMockMvc.perform(patch("/applications/me")
+                        .with(authentication(applicantAuthentication(applicant)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isMethodNotAllowed());
+        securedMockMvc.perform(delete("/applications/me")
+                        .with(authentication(applicantAuthentication(applicant))))
+                .andExpect(status().isMethodNotAllowed());
+    }
+
+    @Test
+    void unsupported_methods_are_not_added_for_application_dashboard() throws Exception {
+        Applicant applicant = createApplicant("api-dashboard-method", "Api Dashboard Method");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        MockMvc securedMockMvc = securedMockMvc();
+
+        securedMockMvc.perform(post("/applications/{applicationId}/dashboard", applicationId)
+                        .with(authentication(applicantAuthentication(applicant)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isMethodNotAllowed());
+        securedMockMvc.perform(put("/applications/{applicationId}/dashboard", applicationId)
+                        .with(authentication(applicantAuthentication(applicant)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isMethodNotAllowed());
+        securedMockMvc.perform(patch("/applications/{applicationId}/dashboard", applicationId)
+                        .with(authentication(applicantAuthentication(applicant)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isMethodNotAllowed());
+        securedMockMvc.perform(delete("/applications/{applicationId}/dashboard", applicationId)
+                        .with(authentication(applicantAuthentication(applicant))))
+                .andExpect(status().isMethodNotAllowed());
+    }
+
+    @Test
     void put_method_is_not_supported_for_application_update() throws Exception {
         mockMvc.perform(put("/applications/{applicationId}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -414,23 +669,45 @@ class ApplicationControllerTest {
     }
 
     private void authenticate(Applicant applicant) {
-        authenticate(CustomUserDetails.fromUser(
-                applicant,
-                List.of(new SimpleGrantedAuthority("ROLE_APPLICANT"))
-        ));
+        authenticate(applicantAuthentication(applicant));
     }
 
     private void authenticate(Employee employee) {
-        authenticate(CustomUserDetails.fromUser(
-                employee,
-                List.of(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))
-        ));
+        authenticate(CustomUserDetails.fromUser(employee, List.of(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))));
     }
 
     private void authenticate(CustomUserDetails userDetails) {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities())
         );
+    }
+
+    private void authenticate(Authentication authentication) {
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
+    private Authentication applicantAuthentication(Applicant applicant) {
+        CustomUserDetails userDetails = CustomUserDetails.fromUser(
+                applicant,
+                List.of(new SimpleGrantedAuthority("ROLE_APPLICANT"))
+        );
+        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+    }
+
+    private Authentication employeeAuthentication(String loginId, String authority) {
+        CustomUserDetails userDetails = CustomUserDetails.fromLdap(
+                loginId,
+                "Recruit",
+                "Employee User",
+                List.of(new SimpleGrantedAuthority(authority))
+        );
+        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+    }
+
+    private MockMvc securedMockMvc() {
+        return MockMvcBuilders.webAppContextSetup(context)
+                .apply(springSecurity())
+                .build();
     }
 
     private Long createApplication(Applicant applicant, Long jobPostingId) {
@@ -504,6 +781,24 @@ class ApplicationControllerTest {
                 maxLength,
                 0
         ));
+    }
+
+    private Long createStage(Long jobPostingId, int stageOrder, boolean finalStage) {
+        return stageService.create(jobPostingId, new StageCreateRequest(
+                "Stage " + stageOrder,
+                StageType.DOCUMENT,
+                stageOrder,
+                LocalDateTime.of(2026, 7, stageOrder + 1, 10, 0),
+                finalStage
+        ));
+    }
+
+    private void decideAndAnnounce(Long jobPostingId, Long stageId, StageResultStatus status) {
+        stageService.start(jobPostingId, stageId);
+        stageResultService.initialize(stageId);
+        Long resultId = stageResultService.getResults(stageId).get(0).stageResultId();
+        stageResultService.updateResult(stageId, resultId, new StageResultUpdateRequest(status, null, "internal"), "employee01");
+        stageService.announce(jobPostingId, stageId);
     }
 
     private Long firstJobPositionId(Long jobPostingId) {

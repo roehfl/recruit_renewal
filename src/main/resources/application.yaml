@@ -16,7 +16,9 @@ spring:
     name: recruit
   servlet:
     multipart:
-      enabled: false
+      enabled: true
+      max-file-size: ${RECRUIT_ATTACHMENT_MULTIPART_MAX_FILE_SIZE:25MB}
+      max-request-size: ${RECRUIT_ATTACHMENT_MULTIPART_MAX_REQUEST_SIZE:105MB}
   Jackson:
     deserialization:
       fail-on-unknown-properties: false
@@ -33,3 +35,11 @@ spring:
 crypto:
   aes:
     key: ${AES_SECRET_KEY}
+recruit:
+  attachment:
+    storage-root: ${RECRUIT_ATTACHMENT_STORAGE_ROOT:attachments}
+    max-file-size: ${RECRUIT_ATTACHMENT_MAX_FILE_SIZE:20MB}
+    max-files-per-application: ${RECRUIT_ATTACHMENT_MAX_FILES_PER_APPLICATION:20}
+    max-total-size-per-application: ${RECRUIT_ATTACHMENT_MAX_TOTAL_SIZE_PER_APPLICATION:100MB}
+    allowed-extensions: ${RECRUIT_ATTACHMENT_ALLOWED_EXTENSIONS:pdf,jpg,jpeg,png,doc,docx,xls,xlsx,hwp,hwpx}
+    allowed-content-types: ${RECRUIT_ATTACHMENT_ALLOWED_CONTENT_TYPES:application/pdf,image/jpeg,image/png,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/x-hwp,application/haansofthwp,application/vnd.hancom.hwpx}

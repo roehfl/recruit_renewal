@@ -11,5 +11,7 @@ public interface ApplicationLanguageRepository extends JpaRepository<Application
 
     List<ApplicationLanguage> findByJobApplicationId(Long applicationId);
 
+    boolean existsByJobApplicationId(Long applicationId);
+
     void deleteByJobApplicationId(Long applicationId);
 }

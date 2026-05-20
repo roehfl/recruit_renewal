@@ -4,23 +4,28 @@ import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
+import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPositionRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.dto.condition.AdminApplicationSearchCondition;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationUpdateRequest;
 import com.shinyoung.recruit.dto.response.AdminApplicationDetailResponse;
 import com.shinyoung.recruit.dto.response.AdminApplicationSummaryResponse;
 import com.shinyoung.recruit.dto.response.ApplicationDetailResponse;
+import com.shinyoung.recruit.dto.response.MyApplicationResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
+import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -28,7 +33,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +50,7 @@ public class JobApplicationService {
     private final ApplicantRepository applicantRepository;
     private final JobPostingRepository jobPostingRepository;
     private final JobPositionRepository jobPositionRepository;
+    private final StageResultRepository stageResultRepository;
     private final ApplicationSubmitValidator applicationSubmitValidator;
     private final Clock clock;
 
@@ -74,6 +84,29 @@ public class JobApplicationService {
         JobApplication application = jobApplicationRepository.findByApplicantIdAndJobPostingId(applicantId, jobPostingId)
                 .orElseThrow(() -> new JobApplicationNotFoundException("지원서를 찾을 수 없습니다. jobPostingId=" + jobPostingId));
         return ApplicationDetailResponse.from(application);
+    }
+
+    public PageResponse<MyApplicationResponse> getMyApplications(Long applicantId, int page, int size) {
+        validatePageRequest(page, size);
+        Page<JobApplication> applications = jobApplicationRepository.findMyApplications(
+                applicantId,
+                createPageRequest(page, size)
+        );
+        Map<Long, ApplicationResultSummary> summaries = loadApplicationResultSummaries(applications.getContent());
+
+        return PageResponse.from(applications.map(application -> {
+            ApplicationResultSummary summary = summaries.getOrDefault(
+                    application.getId(),
+                    ApplicationResultSummary.empty()
+            );
+            return MyApplicationResponse.from(
+                    application,
+                    isAccepting(application.getJobPosting()),
+                    summary.announcedResultCount(),
+                    summary.latestAnnouncedStageName(),
+                    summary.latestResultStatus()
+            );
+        }));
     }
 
     @Transactional
@@ -196,6 +229,16 @@ public class JobApplicationService {
         }
     }
 
+    private boolean isAccepting(JobPosting jobPosting) {
+        if (jobPosting.getStatus() != JobPostingStatus.PUBLISHED) {
+            return false;
+        }
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        return !now.isBefore(jobPosting.getReceptionStartDateTime())
+                && !now.isAfter(jobPosting.getReceptionEndDateTime());
+    }
+
     private void validateDraftForUpdate(JobApplication application) {
         if (application.getStatus() != JobApplicationStatus.DRAFT) {
             throw new InvalidJobApplicationException("임시저장 상태의 지원서만 수정할 수 있습니다.");
@@ -280,5 +323,46 @@ public class JobApplicationService {
             return applicant.getName();
         }
         throw new InvalidJobApplicationException("지원자 이름을 확인할 수 없습니다.");
+    }
+
+    private Map<Long, ApplicationResultSummary> loadApplicationResultSummaries(List<JobApplication> applications) {
+        List<Long> applicationIds = applications.stream()
+                .map(JobApplication::getId)
+                .toList();
+        if (applicationIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return stageResultRepository.findVisibleByJobApplicationIdsForApplicantSummary(applicationIds).stream()
+                .collect(Collectors.groupingBy(
+                        result -> result.getJobApplication().getId(),
+                        Collectors.collectingAndThen(Collectors.toList(), ApplicationResultSummary::from)
+                ));
+    }
+
+    private record ApplicationResultSummary(
+            long announcedResultCount,
+            String latestAnnouncedStageName,
+            StageResultStatus latestResultStatus
+    ) {
+        private static final Comparator<StageResult> LATEST_RESULT_COMPARATOR =
+                Comparator
+                        .comparing((StageResult result) -> result.getStage().getStageOrder())
+                        .thenComparing(result -> result.getStage().getId());
+
+        static ApplicationResultSummary empty() {
+            return new ApplicationResultSummary(0, null, null);
+        }
+
+        static ApplicationResultSummary from(List<StageResult> results) {
+            return results.stream()
+                    .max(LATEST_RESULT_COMPARATOR)
+                    .map(result -> new ApplicationResultSummary(
+                            results.size(),
+                            result.getStage().getStageName(),
+                            result.getResultStatus()
+                    ))
+                    .orElseGet(ApplicationResultSummary::empty);
+        }
     }
 }

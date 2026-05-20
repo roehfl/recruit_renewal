@@ -11,5 +11,7 @@ public interface ApplicationGapPeriodRepository extends JpaRepository<Applicatio
 
     List<ApplicationGapPeriod> findByJobApplicationId(Long applicationId);
 
+    boolean existsByJobApplicationId(Long applicationId);
+
     void deleteByJobApplicationId(Long applicationId);
 }

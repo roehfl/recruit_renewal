@@ -1,7 +1,9 @@
 package com.shinyoung.recruit.domain.entity;
 
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
+import com.shinyoung.recruit.enumeration.AttachmentDeleteActorType;
 import com.shinyoung.recruit.enumeration.AttachmentType;
+import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -17,6 +19,8 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(
@@ -68,6 +72,22 @@ public class ApplicationAttachment extends BaseEntity {
     @Column(nullable = false)
     private Integer sortOrder;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private PhysicalFileStatus physicalFileStatus = PhysicalFileStatus.METADATA_ONLY;
+
+    private LocalDateTime deletedAt;
+
+    @Column(length = 255)
+    private String deletedBy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    private AttachmentDeleteActorType deletedByType;
+
+    @Column(length = 1000)
+    private String deletionReason;
+
     private ApplicationAttachment(
             JobApplication jobApplication,
             AttachmentType attachmentType,
@@ -78,7 +98,8 @@ public class ApplicationAttachment extends BaseEntity {
             String storagePath,
             String contentType,
             Long fileSize,
-            Integer sortOrder
+            Integer sortOrder,
+            PhysicalFileStatus physicalFileStatus
     ) {
         this.jobApplication = jobApplication;
         this.attachmentType = attachmentType;
@@ -90,6 +111,7 @@ public class ApplicationAttachment extends BaseEntity {
         this.contentType = contentType;
         this.fileSize = fileSize;
         this.sortOrder = sortOrder;
+        this.physicalFileStatus = physicalFileStatus == null ? PhysicalFileStatus.METADATA_ONLY : physicalFileStatus;
     }
 
     public static ApplicationAttachment create(
@@ -114,7 +136,48 @@ public class ApplicationAttachment extends BaseEntity {
                 storagePath,
                 contentType,
                 fileSize,
-                sortOrder
+                sortOrder,
+                PhysicalFileStatus.METADATA_ONLY
         );
+    }
+
+    public static ApplicationAttachment createStored(
+            JobApplication jobApplication,
+            AttachmentType attachmentType,
+            ApplicationSectionType sectionType,
+            Long sectionRecordId,
+            String originalFileName,
+            String storedFileName,
+            String storagePath,
+            String contentType,
+            Long fileSize,
+            Integer sortOrder
+    ) {
+        return new ApplicationAttachment(
+                jobApplication,
+                attachmentType,
+                sectionType,
+                sectionRecordId,
+                originalFileName,
+                storedFileName,
+                storagePath,
+                contentType,
+                fileSize,
+                sortOrder,
+                PhysicalFileStatus.STORED
+        );
+    }
+
+    public void markDeleted(
+            String deletedBy,
+            AttachmentDeleteActorType deletedByType,
+            String deletionReason,
+            LocalDateTime deletedAt
+    ) {
+        this.physicalFileStatus = PhysicalFileStatus.DELETED;
+        this.deletedBy = deletedBy;
+        this.deletedByType = deletedByType;
+        this.deletionReason = deletionReason;
+        this.deletedAt = deletedAt;
     }
 }

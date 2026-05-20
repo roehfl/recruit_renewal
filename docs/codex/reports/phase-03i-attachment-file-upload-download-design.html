@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03i-1 Attachment File Upload/Download Design</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #5d6b82;
+      --line: #d9e0ea;
+      --blue: #1f6feb;
+      --green: #1a7f37;
+      --amber: #9a6700;
+      --red: #b42318;
+      --gray: #6b7280;
+      --soft-blue: #eaf2ff;
+      --soft-green: #eaf7ef;
+      --soft-amber: #fff7df;
+      --soft-red: #fff0ee;
+      --soft-gray: #f1f3f5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.55;
+    }
+    header {
+      background: #0f172a;
+      color: #fff;
+      padding: 32px 40px;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 24px 56px;
+    }
+    h1, h2, h3 { margin: 0 0 12px; }
+    h1 { font-size: 30px; }
+    h2 { font-size: 22px; margin-top: 28px; }
+    h3 { font-size: 17px; margin-top: 18px; }
+    p { margin: 0 0 12px; }
+    code {
+      background: var(--soft-gray);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 0.92em;
+    }
+    pre {
+      background: #111827;
+      color: #f8fafc;
+      border-radius: 8px;
+      overflow-x: auto;
+      padding: 14px 16px;
+    }
+    pre code {
+      background: transparent;
+      border: 0;
+      padding: 0;
+      color: inherit;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 22px;
+      margin-top: 18px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 4px;
+      background: #fff;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f8fafc;
+      font-weight: 700;
+    }
+    ul {
+      margin: 8px 0 0 20px;
+      padding: 0;
+    }
+    .header-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .subtitle {
+      color: #cbd5e1;
+      margin-top: 8px;
+      max-width: 860px;
+    }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .badge.blue { color: var(--blue); background: var(--soft-blue); border-color: #b9d3ff; }
+    .badge.green { color: var(--green); background: var(--soft-green); border-color: #b7e1c1; }
+    .badge.amber { color: var(--amber); background: var(--soft-amber); border-color: #f0d98c; }
+    .badge.red { color: var(--red); background: var(--soft-red); border-color: #ffc8c2; }
+    .badge.gray { color: var(--gray); background: var(--soft-gray); border-color: var(--line); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      background: #fff;
+    }
+    .card h3 { margin-top: 0; }
+    .summary {
+      border-left: 5px solid var(--blue);
+    }
+    .muted { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-row">
+      <div>
+        <div class="muted">Recruit Backend Codex Report</div>
+        <h1>Phase 03i-1 Attachment File Upload/Download Design</h1>
+      </div>
+      <span class="badge blue">Design Completed</span>
+    </div>
+    <p class="subtitle">Generated on 2026-05-20. Documentation-only design phase for applicant/admin attachment upload and download policy.</p>
+  </header>
+
+  <main>
+    <section class="summary">
+      <h2>Executive Summary</h2>
+      <p>Phase 03i-1 defines how the project should move from attachment metadata rows to real multipart upload and controlled download.</p>
+      <p>The recommended upload path is a new single-file multipart command: <code>POST /applications/{applicationId}/attachments/files</code>.</p>
+      <p>Before upload ships, Phase 03i-2 must add <code>physicalFileStatus</code> and harden metadata replace so it cannot delete or update file-backed rows or trust client-supplied storage fields.</p>
+      <p>The recommended download paths are applicant-owned and admin-owned streaming endpoints, both hiding storage internals.</p>
+      <p>No Java source, tests, security configuration, build files, YAML, database schema, or existing API behavior changed in this phase.</p>
+    </section>
+
+    <section>
+      <h2>Scope</h2>
+      <div class="grid">
+        <div class="card">
+          <h3><span class="badge green">Completed</span></h3>
+          <ul>
+            <li>Current metadata state summarized</li>
+            <li>Upload API options compared</li>
+            <li>Download API policy defined</li>
+            <li>Storage and filename policy defined</li>
+            <li>Metadata replace collision policy defined</li>
+            <li>Validation, security, and phase split documented</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="badge red">Not Implemented</span></h3>
+          <ul>
+            <li>Multipart upload</li>
+            <li>Download streaming</li>
+            <li>Storage service</li>
+            <li>Schema/config changes</li>
+            <li>Delete or orphan cleanup</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="badge amber">Deferred</span></h3>
+          <ul>
+            <li>Admin upload/replace</li>
+            <li>Virus scanning</li>
+            <li>S3/NAS integration</li>
+            <li>Attachment submit-required policy</li>
+            <li>Dashboard readiness integration</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Current Attachment Metadata</h2>
+      <table>
+        <thead>
+          <tr><th>Area</th><th>Current State</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Entity</td><td><code>ApplicationAttachment</code> stores metadata under <code>JobApplication</code>.</td></tr>
+          <tr><td>Applicant APIs</td><td><code>GET /applications/{applicationId}/attachments</code>, <code>POST /applications/{applicationId}/attachments</code></td></tr>
+          <tr><td>Admin API</td><td><code>GET /admin/applications/{applicationId}/attachments</code></td></tr>
+          <tr><td>Missing Runtime Pieces</td><td>No multipart upload, byte storage, download streaming, storage abstraction, delete, or cleanup.</td></tr>
+          <tr><td>Exposure Boundary</td><td><code>storedFileName</code> and <code>storagePath</code> are internal and not exposed by applicant/admin metadata responses.</td></tr>
+          <tr><td>File State</td><td>Add <code>ApplicationAttachment.physicalFileStatus</code> mapped with <code>@Enumerated(EnumType.STRING)</code>, <code>nullable=false</code>, and default <code>METADATA_ONLY</code>. Values are <code>METADATA_ONLY</code>, <code>STORED</code>, and <code>MISSING</code>. Existing rows and test fixtures are <code>METADATA_ONLY</code>; operational DB migration should set a non-null default. Only <code>STORED</code> server-uploaded rows are downloadable.</td></tr>
+          <tr><td>Replace Risk</td><td>Current metadata replace deletes rows by application; Phase 03i-2 must replace only <code>METADATA_ONLY</code> rows, preserve file-backed rows, and reject untrusted storage fields with 400.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Upload API Options</h2>
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Path</th><th>Status</th><th>Reason</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>A</td><td><code>POST /applications/{applicationId}/attachments/files</code></td><td><span class="badge green">Recommended</span></td><td>Separates byte upload from metadata editing; requires metadata replace hardening before file-backed rows exist.</td></tr>
+          <tr><td>B</td><td><code>POST /applications/{applicationId}/attachments/{attachmentId}/file</code></td><td><span class="badge gray">Later Candidate</span></td><td>Useful only if the UX needs a two-step metadata row then file replacement workflow.</td></tr>
+          <tr><td>C</td><td><code>POST /applications/{applicationId}/attachments</code> multipart</td><td><span class="badge red">Not Recommended</span></td><td>Conflicts with the existing JSON metadata replace contract.</td></tr>
+        </tbody>
+      </table>
+      <h3>Recommended Multipart Parts</h3>
+      <table>
+        <thead>
+          <tr><th>Part</th><th>Required</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>file</code></td><td>Yes</td><td>Uploaded file bytes</td></tr>
+          <tr><td><code>attachmentType</code></td><td>Yes</td><td>Existing attachment business type</td></tr>
+          <tr><td><code>sectionType</code></td><td>Yes</td><td>Existing section hint</td></tr>
+          <tr><td><code>sectionRecordId</code></td><td>No</td><td>Same metadata rules as current attachment rows</td></tr>
+          <tr><td><code>displayName</code> or <code>originalFileName</code></td><td>No</td><td>Excluded in Phase 03i-2; derive display name from sanitized multipart original filename</td></tr>
+          <tr><td><code>sortOrder</code></td><td>No</td><td>Not accepted in Phase 03i-2; server assigns append-only ordering</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Download APIs</h2>
+      <table>
+        <thead>
+          <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Response</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>GET</code></td><td><code>/applications/{applicationId}/attachments/{attachmentId}/download</code></td><td>Applicant downloads own attachment</td><td>Streaming file response</td></tr>
+          <tr><td><code>GET</code></td><td><code>/admin/applications/{applicationId}/attachments/{attachmentId}/download</code></td><td>Admin downloads application attachment</td><td>Streaming file response</td></tr>
+        </tbody>
+      </table>
+      <h3>Headers</h3>
+      <table>
+        <thead>
+          <tr><th>Header</th><th>Policy</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Content-Type</code></td><td>Stored validated type or <code>application/octet-stream</code> fallback</td></tr>
+          <tr><td><code>Content-Length</code></td><td>Stored file size when the physical file exists</td></tr>
+          <tr><td><code>Content-Disposition</code></td><td>Use ASCII <code>filename</code> fallback and RFC 5987 UTF-8 <code>filename*</code></td></tr>
+          <tr><td><code>X-Content-Type-Options</code></td><td><code>nosniff</code> recommended</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Storage Structure</h2>
+      <p>Phase 03i-2 should start with local filesystem storage behind an abstraction.</p>
+      <p><span class="badge amber">Assumption</span> Local filesystem storage is for development, single-node deployment, or shared-volume deployment. Multi-node production needs NAS, S3/object storage, or another shared durable store; sticky session is not a file storage solution.</p>
+      <pre><code>applications/{applicationId}/{yyyy}/{MM}/{dd}/{uuid}.{ext}</code></pre>
+      <table>
+        <thead>
+          <tr><th>Rule</th><th>Decision</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Physical filename</td><td>Generated UUID or ULID, never the original filename</td></tr>
+          <tr><td>Storage path</td><td>Server-generated relative key under configured root</td></tr>
+          <tr><td>Path traversal defense</td><td>Normalize root and final path; reject if final path escapes root</td></tr>
+          <tr><td>Compensation</td><td>Register transaction rollback cleanup after file save and use <code>saveAndFlush(...)</code> to surface DB failures before return when possible.</td></tr>
+          <tr><td>Future migration</td><td>Introduce <code>AttachmentStorageService</code> and <code>LocalAttachmentStorageService</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Validation Rules</h2>
+      <table>
+        <thead>
+          <tr><th>Area</th><th>Recommended Policy</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Size</td><td>Separate Spring multipart parser limits from business limit; handle <code>MaxUploadSizeExceededException</code> through controlled API failure.</td></tr>
+          <tr><td>Count/Total</td><td>Add <code>max-files-per-application</code> and <code>max-total-size-per-application</code> business limits calculated from <code>physicalFileStatus=STORED</code> rows only.</td></tr>
+          <tr><td>Extensions</td><td>Allow <code>pdf, jpg, jpeg, png, doc, docx, xls, xlsx, hwp, hwpx</code></td></tr>
+          <tr><td>Content type</td><td>Do not trust client value alone; validate against allowlist and later add sniffing if needed</td></tr>
+          <tr><td>Filename</td><td>Reject blank, path separators, control chars, and Windows reserved names; trim/normalize whitespace; limit to 255 chars.</td></tr>
+          <tr><td>Virus scan</td><td>Deferred from first implementation; document as production security requirement</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Forbidden Exposure</h2>
+      <table>
+        <thead>
+          <tr><th>Data</th><th>Policy</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>storedFileName</code></td><td><span class="badge red">Do Not Expose</span> Internal storage filename</td></tr>
+          <tr><td><code>storagePath</code></td><td><span class="badge red">Do Not Expose</span> Internal storage key/path</td></tr>
+          <tr><td><code>physicalFileStatus</code></td><td><span class="badge red">Do Not Expose</span> Internal lifecycle state</td></tr>
+          <tr><td>Absolute path</td><td><span class="badge red">Do Not Expose</span> Infrastructure detail</td></tr>
+          <tr><td>Storage root</td><td><span class="badge red">Do Not Expose</span> Operational path</td></tr>
+          <tr><td><code>downloadAvailable</code></td><td><span class="badge amber">Phase 03i-3 Only</span> Do not add in Phase 03i-2 while download endpoints are deferred</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Phase Split</h2>
+      <table>
+        <thead>
+          <tr><th>Phase</th><th>Recommended Scope</th><th>Excluded</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>03i-1</td><td>Design only</td><td>Any code/config/schema/test changes</td></tr>
+          <tr><td>03i-2</td><td><code>physicalFileStatus</code> schema + metadata replace hardening + storage abstraction + applicant single-file upload + rollback cleanup compensation</td><td>Download, admin upload, explicit delete command, scheduled orphan cleanup, file-backed reorder/update, S3/NAS</td></tr>
+          <tr><td>03i-3</td><td>Applicant/admin download streaming</td><td>Upload redesign, delete, cleanup</td></tr>
+          <tr><td>03i-4</td><td>Admin upload/replace, delete, orphan cleanup</td><td>Submit required policy unless decided</td></tr>
+          <tr><td>03i-5</td><td>Attachment submit required policy + dashboard readiness</td><td>Storage mechanics unless gaps remain</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Test Plan</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Upload</h3>
+          <ul>
+            <li>Owner DRAFT upload success</li>
+            <li>SUBMITTED/WITHDRAWN upload failure</li>
+            <li>Other applicant hidden 404</li>
+            <li>Size/extension/content-type failure</li>
+            <li>Count and total-size limit failure</li>
+            <li>Generated storage path under root</li>
+            <li>Uploaded row has physicalFileStatus=STORED</li>
+            <li>sortOrder request rejected and response sortOrder server-assigned</li>
+            <li>DB failure and rollback cleanup attempt</li>
+            <li>Metadata replace preserves file-backed rows and replaces only METADATA_ONLY rows</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Download</h3>
+          <ul>
+            <li>Applicant owner download success</li>
+            <li>Admin download success</li>
+            <li>Attachment/application mismatch 404</li>
+            <li>Korean filename header handling</li>
+            <li>Missing physical file controlled 404</li>
+            <li>Rows without physicalFileStatus=STORED are not downloadable</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Regression</h3>
+          <ul>
+            <li>Existing metadata path/purpose preserved</li>
+            <li>Storage fields rejected as client input with 400</li>
+            <li>Forbidden storage fields are detected explicitly, not by global unknown-property failure</li>
+            <li>File-backed sort/order/type edits deferred to explicit endpoint</li>
+            <li>Admin metadata read unchanged</li>
+            <li>Dashboard/list/result APIs unaffected</li>
+            <li>Submit validator unchanged until later policy phase</li>
+          </ul>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Result</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Gradle tests</td><td><span class="badge gray">Not Run</span></td><td>Documentation-only phase with no Java/test/config/schema changes.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Remaining Issues</h2>
+      <ul>
+        <li>Choose whether <code>uploadedAt</code> is a dedicated column or derived from audit timestamps.</li>
+        <li>Choose exact size defaults for Spring multipart limits and business attachment limits.</li>
+        <li>Choose exact defaults for per-application file count and total-size limits.</li>
+        <li>Add <code>downloadAvailable</code> only with Phase 03i-3 download semantics, not Phase 03i-2 upload.</li>
+        <li>Decide magic-number sniffing and virus scan timeline.</li>
+        <li>Decide delete/orphan cleanup and audit policy.</li>
+        <li>Decide a later reorder/update endpoint for file-backed attachment metadata.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Next Phase</h2>
+      <p>Recommended next phase: Phase 03i-2, adding the non-null <code>physicalFileStatus</code> enum column/default, hardening metadata replace, implementing append-only applicant upload without a request <code>sortOrder</code>, validating count/total limits from <code>STORED</code> rows only, adding rollback cleanup, and deferring download availability until Phase 03i-3.</p>
+    </section>
+  </main>
+</body>
+</html>

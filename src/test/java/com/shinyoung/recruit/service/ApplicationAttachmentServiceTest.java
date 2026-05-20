@@ -7,6 +7,7 @@ import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
+import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
@@ -18,6 +19,7 @@ import com.shinyoung.recruit.dto.response.AttachmentResponse;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
 import com.shinyoung.recruit.enumeration.AttachmentType;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
+import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import org.junit.jupiter.api.Test;
@@ -41,7 +43,10 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
+@SpringBootTest(properties = {
+        "crypto.aes.key=22791194512954214612461221261067",
+        "recruit.attachment.storage-root=build/test-attachments/application-attachment-service"
+})
 @Transactional
 class ApplicationAttachmentServiceTest {
 
@@ -64,6 +69,9 @@ class ApplicationAttachmentServiceTest {
 
     @Autowired
     private JobPostingRepository jobPostingRepository;
+
+    @Autowired
+    private JobApplicationRepository jobApplicationRepository;
 
     @Autowired
     private ApplicationAttachmentRepository attachmentRepository;
@@ -113,6 +121,67 @@ class ApplicationAttachmentServiceTest {
         assertThat(attachmentRepository.findByJobApplicationId(applicationId)).isEmpty();
         assertThat(attachmentRepository.findAll()).extracting(ApplicationAttachment::getId)
                 .doesNotContainAnyElementsOf(oldIds);
+    }
+
+    @Test
+    void replace_preserves_stored_rows_and_replaces_only_metadata_rows() {
+        Applicant applicant = createApplicant("attachment-preserve-stored", "Attachment Preserve Stored");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        applicationAttachmentService.replaceAttachments(
+                applicant.getId(),
+                applicationId,
+                new AttachmentReplaceRequest(List.of(attachment("metadata.pdf", AttachmentType.RESUME, ApplicationSectionType.APPLICATION, null, 0)))
+        );
+        ApplicationAttachment stored = attachmentRepository.save(ApplicationAttachment.createStored(
+                jobApplicationRepository.findById(applicationId).orElseThrow(),
+                AttachmentType.PORTFOLIO,
+                ApplicationSectionType.APPLICATION,
+                null,
+                "portfolio.pdf",
+                "stored-portfolio.pdf",
+                "applications/" + applicationId + "/portfolio.pdf",
+                "application/pdf",
+                2048L,
+                5
+        ));
+
+        List<AttachmentResponse> responses = applicationAttachmentService.replaceAttachments(
+                applicant.getId(),
+                applicationId,
+                new AttachmentReplaceRequest(List.of(attachment("new-metadata.pdf", AttachmentType.ETC, ApplicationSectionType.APPLICATION, null, 1)))
+        );
+
+        assertThat(responses).extracting(AttachmentResponse::attachmentId).contains(stored.getId());
+        assertThat(attachmentRepository.findByJobApplicationId(applicationId))
+                .extracting(ApplicationAttachment::getPhysicalFileStatus)
+                .containsExactlyInAnyOrder(PhysicalFileStatus.METADATA_ONLY, PhysicalFileStatus.STORED);
+        ApplicationAttachment storedAfterReplace = attachmentRepository.findById(stored.getId()).orElseThrow();
+        assertThat(storedAfterReplace.getAttachmentType()).isEqualTo(AttachmentType.PORTFOLIO);
+        assertThat(storedAfterReplace.getSortOrder()).isEqualTo(5);
+    }
+
+    @Test
+    void replace_fails_when_metadata_sort_order_conflicts_with_stored_row() {
+        Applicant applicant = createApplicant("attachment-conflict-stored", "Attachment Conflict Stored");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        attachmentRepository.save(ApplicationAttachment.createStored(
+                jobApplicationRepository.findById(applicationId).orElseThrow(),
+                AttachmentType.PORTFOLIO,
+                ApplicationSectionType.APPLICATION,
+                null,
+                "portfolio.pdf",
+                "stored-portfolio.pdf",
+                "applications/" + applicationId + "/portfolio.pdf",
+                "application/pdf",
+                2048L,
+                5
+        ));
+
+        assertThatThrownBy(() -> applicationAttachmentService.replaceAttachments(
+                applicant.getId(),
+                applicationId,
+                new AttachmentReplaceRequest(List.of(attachment("metadata-conflict.pdf", AttachmentType.RESUME, ApplicationSectionType.APPLICATION, null, 5)))
+        )).isInstanceOf(InvalidJobApplicationException.class);
     }
 
     @Test
@@ -319,7 +388,45 @@ class ApplicationAttachmentServiceTest {
                 .map(RecordComponent::getName)
                 .toList();
 
-        assertThat(componentNames).doesNotContain("storedFileName", "storagePath");
+        assertThat(componentNames).doesNotContain("storedFileName", "storagePath", "physicalFileStatus", "downloadAvailable");
+    }
+
+    @Test
+    void replace_rejects_client_supplied_storage_fields() {
+        Applicant applicant = createApplicant("attachment-forbidden-storage", "Attachment Forbidden Storage");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+
+        assertThatThrownBy(() -> applicationAttachmentService.replaceAttachments(
+                applicant.getId(),
+                applicationId,
+                new AttachmentReplaceRequest(List.of(new AttachmentRequest(
+                        AttachmentType.RESUME,
+                        ApplicationSectionType.APPLICATION,
+                        null,
+                        "resume.pdf",
+                        "stored-resume.pdf",
+                        null,
+                        "application/pdf",
+                        1024L,
+                        0
+                )))
+        )).isInstanceOf(InvalidJobApplicationException.class);
+
+        assertThatThrownBy(() -> applicationAttachmentService.replaceAttachments(
+                applicant.getId(),
+                applicationId,
+                new AttachmentReplaceRequest(List.of(new AttachmentRequest(
+                        AttachmentType.RESUME,
+                        ApplicationSectionType.APPLICATION,
+                        null,
+                        "resume.pdf",
+                        null,
+                        "applications/1/resume.pdf",
+                        "application/pdf",
+                        1024L,
+                        0
+                )))
+        )).isInstanceOf(InvalidJobApplicationException.class);
     }
 
     private Applicant createApplicant(String loginId, String applicantName) {
@@ -377,8 +484,8 @@ class ApplicationAttachmentServiceTest {
                 sectionType,
                 sectionRecordId,
                 originalFileName,
-                "stored-" + originalFileName,
-                "/attachments/" + originalFileName,
+                null,
+                null,
                 "application/pdf",
                 1024L,
                 sortOrder

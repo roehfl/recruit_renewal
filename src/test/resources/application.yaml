@@ -21,6 +21,12 @@ spring:
   h2:
     console:
       enabled: true
+  servlet:
+    multipart:
+      enabled: true
 crypto:
   aes:
     key: ${AES_SECRET_KEY}
+recruit:
+  attachment:
+    storage-root: build/test-attachments

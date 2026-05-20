@@ -11,5 +11,7 @@ public interface ApplicationCertificateRepository extends JpaRepository<Applicat
 
     List<ApplicationCertificate> findByJobApplicationId(Long applicationId);
 
+    boolean existsByJobApplicationId(Long applicationId);
+
     void deleteByJobApplicationId(Long applicationId);
 }

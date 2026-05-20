@@ -72,4 +72,25 @@ public interface StageResultRepository extends JpaRepository<StageResult, Long> 
             @Param("jobApplicationId") Long jobApplicationId,
             @Param("visibleStatuses") Collection<StageStatus> visibleStatuses
     );
+
+    default List<StageResult> findVisibleByJobApplicationIdsForApplicantSummary(Collection<Long> jobApplicationIds) {
+        return findVisibleByJobApplicationIdsForApplicantSummary(
+                jobApplicationIds,
+                List.of(StageStatus.RESULT_ANNOUNCED, StageStatus.CLOSED)
+        );
+    }
+
+    @Query("""
+            select result
+            from StageResult result
+            join fetch result.stage stage
+            join fetch result.jobApplication application
+            where application.id in :jobApplicationIds
+              and stage.status in :visibleStatuses
+            order by application.id asc, stage.stageOrder asc, stage.id asc
+            """)
+    List<StageResult> findVisibleByJobApplicationIdsForApplicantSummary(
+            @Param("jobApplicationIds") Collection<Long> jobApplicationIds,
+            @Param("visibleStatuses") Collection<StageStatus> visibleStatuses
+    );
 }

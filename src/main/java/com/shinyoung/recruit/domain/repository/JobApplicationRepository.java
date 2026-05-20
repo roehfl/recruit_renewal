@@ -23,6 +23,26 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
     @EntityGraph(attributePaths = {"applicant", "jobPosting", "jobPosition"})
     List<JobApplication> findByJobPostingId(Long jobPostingId);
 
+    @EntityGraph(attributePaths = {"jobPosting", "jobPosition"})
+    @Query("""
+            select application
+            from JobApplication application
+            where application.applicant.id = :applicantId
+            """)
+    Page<JobApplication> findMyApplications(@Param("applicantId") Long applicantId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"jobPosting", "jobPosting.applicationFormConfig", "jobPosition"})
+    @Query("""
+            select application
+            from JobApplication application
+            where application.id = :applicationId
+              and application.applicant.id = :applicantId
+            """)
+    Optional<JobApplication> findDashboardByIdAndApplicantId(
+            @Param("applicationId") Long applicationId,
+            @Param("applicantId") Long applicantId
+    );
+
     @EntityGraph(attributePaths = {"applicant", "jobPosting", "jobPosition"})
     @Query("""
             select application
