@@ -3,6 +3,8 @@ package com.shinyoung.recruit.service;
 import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
+import com.shinyoung.recruit.domain.repository.JobPositionCountProjection;
+import com.shinyoung.recruit.domain.repository.JobPositionRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
@@ -11,7 +13,10 @@ import com.shinyoung.recruit.dto.request.JobPostingUpdateRequest;
 import com.shinyoung.recruit.dto.response.JobPostingDetailResponse;
 import com.shinyoung.recruit.dto.response.JobPostingListResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
+import com.shinyoung.recruit.enumeration.EmploymentType;
+import com.shinyoung.recruit.enumeration.JobPositionApplicationType;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
+import com.shinyoung.recruit.enumeration.JobPostingType;
 import com.shinyoung.recruit.exception.InvalidJobPostingException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -22,36 +27,59 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class JobPostingService {
 
+    private static final Pattern HTML_TAG_PATTERN = Pattern.compile("<[^>]+>");
+    private static final int SUMMARY_MAX_LENGTH = 500;
+    private static final int JOB_POSITION_TEXT_MAX_LENGTH = 100;
+
     private final JobPostingRepository jobPostingRepository;
+    private final JobPositionRepository jobPositionRepository;
     private final Clock clock;
 
     public PageResponse<JobPostingListResponse> getJobPostings(int page, int size) {
         validatePageRequest(page, size);
+        LocalDateTime now = LocalDateTime.now(clock);
         Page<JobPosting> result = jobPostingRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(page, size));
-        return PageResponse.from(result.map(JobPostingListResponse::from));
+        Map<Long, Long> positionCounts = getPositionCounts(result.getContent());
+        return PageResponse.from(result.map(jobPosting -> JobPostingListResponse.from(
+                jobPosting,
+                now,
+                positionCounts.getOrDefault(jobPosting.getId(), 0L).intValue()
+        )));
     }
 
     public JobPostingDetailResponse getJobPosting(Long id) {
         JobPosting jobPosting = findJobPostingDetail(id);
-        return JobPostingDetailResponse.from(jobPosting);
+        return JobPostingDetailResponse.from(jobPosting, LocalDateTime.now(clock));
     }
 
     @Transactional
     public Long create(JobPostingCreateRequest request) {
-        validateRequest(request.title(), request.receptionStartDateTime(), request.receptionEndDateTime(), request.jobPositions());
+        validateRequest(request);
 
         JobPosting jobPosting = JobPosting.create(
                 request.title(),
+                defaultPostingType(request.postingType()),
+                request.summary(),
                 request.contentHtml(),
                 request.receptionStartDateTime(),
-                request.receptionEndDateTime()
+                request.receptionEndDateTime(),
+                request.displayStartDateTime(),
+                request.displayEndDateTime(),
+                defaultVisible(request.visible()),
+                defaultPinned(request.pinned()),
+                defaultDisplayOrder(request.displayOrder())
         );
 
         jobPosting.replaceJobPositions(toJobPositions(request.jobPositions()));
@@ -63,7 +91,7 @@ public class JobPostingService {
 
     @Transactional
     public Long update(Long id, JobPostingUpdateRequest request) {
-        validateRequest(request.title(), request.receptionStartDateTime(), request.receptionEndDateTime(), request.jobPositions());
+        validateRequest(request);
 
         JobPosting jobPosting = findJobPosting(id);
         if (jobPosting.getStatus() == JobPostingStatus.CLOSED) {
@@ -72,9 +100,16 @@ public class JobPostingService {
 
         jobPosting.updateBasicInfo(
                 request.title(),
+                defaultPostingType(request.postingType()),
+                request.summary(),
                 request.contentHtml(),
                 request.receptionStartDateTime(),
-                request.receptionEndDateTime()
+                request.receptionEndDateTime(),
+                request.displayStartDateTime(),
+                request.displayEndDateTime(),
+                defaultVisible(request.visible()),
+                defaultPinned(request.pinned()),
+                defaultDisplayOrder(request.displayOrder())
         );
         jobPosting.replaceJobPositions(toJobPositions(request.jobPositions()));
         jobPosting.updateApplicationFormConfig(toApplicationFormConfig(request.applicationFormConfig()));
@@ -121,6 +156,20 @@ public class JobPostingService {
                 .orElseThrow(() -> new JobPostingNotFoundException("채용공고를 찾을 수 없습니다. id=" + id));
     }
 
+    private Map<Long, Long> getPositionCounts(List<JobPosting> jobPostings) {
+        List<Long> ids = jobPostings.stream()
+                .map(JobPosting::getId)
+                .toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return jobPositionRepository.countByJobPostingIds(ids).stream()
+                .collect(Collectors.toMap(
+                        JobPositionCountProjection::getJobPostingId,
+                        JobPositionCountProjection::getPositionCount
+                ));
+    }
+
     private void validatePageRequest(int page, int size) {
         if (page < 0) {
             throw new InvalidJobPostingException("페이지 번호는 0 이상이어야 합니다.");
@@ -130,17 +179,83 @@ public class JobPostingService {
         }
     }
 
-    private void validateRequest(String title, LocalDateTime start, LocalDateTime end, List<JobPositionRequest> jobPositions) {
+    private void validateRequest(JobPostingCreateRequest request) {
+        validateRequest(
+                request.title(),
+                request.contentHtml(),
+                request.summary(),
+                request.receptionStartDateTime(),
+                request.receptionEndDateTime(),
+                request.displayStartDateTime(),
+                request.displayEndDateTime(),
+                request.displayOrder(),
+                request.jobPositions()
+        );
+    }
+
+    private void validateRequest(JobPostingUpdateRequest request) {
+        validateRequest(
+                request.title(),
+                request.contentHtml(),
+                request.summary(),
+                request.receptionStartDateTime(),
+                request.receptionEndDateTime(),
+                request.displayStartDateTime(),
+                request.displayEndDateTime(),
+                request.displayOrder(),
+                request.jobPositions()
+        );
+    }
+
+    private void validateRequest(
+            String title,
+            String contentHtml,
+            String summary,
+            LocalDateTime receptionStart,
+            LocalDateTime receptionEnd,
+            LocalDateTime displayStart,
+            LocalDateTime displayEnd,
+            Integer displayOrder,
+            List<JobPositionRequest> jobPositions
+    ) {
         if (title == null || title.isBlank()) {
             throw new InvalidJobPostingException("공고 제목은 필수입니다.");
         }
-        validateReceptionPeriod(start, end);
+        if (contentHtml == null || contentHtml.isBlank()) {
+            throw new InvalidJobPostingException("공고 내용은 필수입니다.");
+        }
+        validateSummary(summary);
+        validateDisplayOrder(displayOrder);
+        validateReceptionPeriod(receptionStart, receptionEnd);
+        validateDisplayPeriod(displayStart, displayEnd);
         validateJobPositions(jobPositions);
+        validateJobPositionSortOrders(jobPositions);
     }
 
     private void validateReceptionPeriod(LocalDateTime start, LocalDateTime end) {
         if (start == null || end == null || !end.isAfter(start)) {
             throw new InvalidJobPostingException("접수 종료일시는 시작일시 이후여야 합니다.");
+        }
+    }
+
+    private void validateDisplayPeriod(LocalDateTime start, LocalDateTime end) {
+        if (start != null && end != null && start.isAfter(end)) {
+            throw new InvalidJobPostingException("노출 종료일시는 시작일시 이후이거나 같아야 합니다.");
+        }
+    }
+
+    private void validateSummary(String summary) {
+        if (summary != null && summary.length() > SUMMARY_MAX_LENGTH) {
+            throw new InvalidJobPostingException("공고 요약은 500자 이하이어야 합니다.");
+        }
+        if (summary != null && HTML_TAG_PATTERN.matcher(summary).find()) {
+            throw new InvalidJobPostingException("공고 요약에는 HTML 태그를 사용할 수 없습니다.");
+        }
+    }
+
+    private void validateDisplayOrder(Integer displayOrder) {
+        if (displayOrder != null && displayOrder < 0) {
+            throw new InvalidJobPostingException("공고 표시 순서는 0 이상이어야 합니다.");
         }
     }
 
@@ -150,9 +265,50 @@ public class JobPostingService {
         }
     }
 
+    private void validateJobPosition(JobPositionRequest request) {
+        if (request.positionName() == null || request.positionName().isBlank()) {
+            throw new InvalidJobPostingException("모집분야명은 필수입니다.");
+        }
+        validateMaxLength(request.positionName(), JOB_POSITION_TEXT_MAX_LENGTH, "모집분야명");
+        validateMaxLength(request.jobGroup(), JOB_POSITION_TEXT_MAX_LENGTH, "직군");
+        validateMaxLength(request.jobTitle(), JOB_POSITION_TEXT_MAX_LENGTH, "담당 직무명");
+        validateMaxLength(request.workLocation(), JOB_POSITION_TEXT_MAX_LENGTH, "근무지");
+        if (request.headcount() == null || request.headcount() < 1) {
+            throw new InvalidJobPostingException("모집 인원은 1 이상이어야 합니다.");
+        }
+        if (request.sortOrder() == null || request.sortOrder() < 0) {
+            throw new InvalidJobPostingException("모집분야 정렬 순서는 0 이상이어야 합니다.");
+        }
+    }
+
+    private void validateMaxLength(String value, int maxLength, String fieldName) {
+        if (value != null && value.length() > maxLength) {
+            throw new InvalidJobPostingException(fieldName + "은 " + maxLength + "자 이하이어야 합니다.");
+        }
+    }
+
+    private void validateJobPositionSortOrders(List<JobPositionRequest> jobPositions) {
+        Set<Integer> sortOrders = new HashSet<>();
+        for (JobPositionRequest jobPosition : jobPositions) {
+            validateJobPosition(jobPosition);
+            if (jobPosition.sortOrder() != null && !sortOrders.add(jobPosition.sortOrder())) {
+                throw new InvalidJobPostingException("모집분야 정렬 순서는 중복될 수 없습니다.");
+            }
+        }
+    }
+
     private List<JobPosition> toJobPositions(List<JobPositionRequest> requests) {
         return requests.stream()
-                .map(it -> JobPosition.create(it.positionName(), it.headcount(), it.sortOrder()))
+                .map(it -> JobPosition.create(
+                        it.positionName(),
+                        defaultApplicationType(it.applicationType()),
+                        it.jobGroup(),
+                        it.jobTitle(),
+                        it.workLocation(),
+                        defaultEmploymentType(it.employmentType()),
+                        it.headcount(),
+                        it.sortOrder()
+                ))
                 .toList();
     }
 
@@ -166,5 +322,29 @@ public class JobPostingService {
                 request.useAward(),
                 request.useGapPeriod()
         );
+    }
+
+    private JobPostingType defaultPostingType(JobPostingType postingType) {
+        return postingType == null ? JobPostingType.PUBLIC_RECRUITMENT : postingType;
+    }
+
+    private Boolean defaultVisible(Boolean visible) {
+        return visible == null || visible;
+    }
+
+    private Boolean defaultPinned(Boolean pinned) {
+        return pinned != null && pinned;
+    }
+
+    private Integer defaultDisplayOrder(Integer displayOrder) {
+        return displayOrder == null ? 0 : displayOrder;
+    }
+
+    private JobPositionApplicationType defaultApplicationType(JobPositionApplicationType applicationType) {
+        return applicationType == null ? JobPositionApplicationType.NEW_GRADUATE_OR_EXPERIENCED : applicationType;
+    }
+
+    private EmploymentType defaultEmploymentType(EmploymentType employmentType) {
+        return employmentType == null ? EmploymentType.FULL_TIME : employmentType;
     }
 }

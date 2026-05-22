@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Phase 03i-4-3 Attachment Storage Health Scan Dry-Run</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; color: #172033; background: #f5f7fb; }
+    header { background: #17324d; color: white; padding: 28px 36px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 48px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin-top: 30px; font-size: 20px; color: #17324d; }
+    p { line-height: 1.55; }
+    table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #dde4ef; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #dde4ef; text-align: left; vertical-align: top; }
+    th { background: #eef3f8; color: #24384f; }
+    code { background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .completed { background: #d9f7e8; color: #11633b; }
+    .pending { background: #fff1cc; color: #7c5200; }
+    .out { background: #f8d7da; color: #842029; }
+    .info { background: #d8ebff; color: #0f4d85; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card { background: white; border: 1px solid #dde4ef; border-radius: 8px; padding: 16px; }
+    .card h3 { margin: 0 0 10px; color: #17324d; font-size: 16px; }
+    .muted { color: #637083; }
+    .summary { background: white; border-left: 5px solid #2d7dd2; padding: 18px; border-radius: 8px; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 6px 0; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<header>
+  <div class="badge completed">Completed</div>
+  <h1>Phase 03i-4-3 Attachment Storage Health Scan Dry-Run</h1>
+  <div>Shinyoung Recruit Backend Renewal · Generated/updated: 2026-05-20</div>
+</header>
+<main>
+  <section class="summary">
+    <h2>Executive Summary</h2>
+    <p>Implemented an admin dry-run scan for attachment storage health. The scan compares retained attachment rows with local physical files and reports mismatches without deleting files or changing DB state.</p>
+    <p>The phase also improved physical delete observability with a structured delete result while preserving the existing delete API response contract.</p>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h3>Completed Scope</h3>
+      <span class="badge completed">Completed</span>
+      <ul>
+        <li>Admin scan API</li>
+        <li>Read-only storage/DB comparison</li>
+        <li>Safe hashed file-key reporting</li>
+        <li>Delete result observability</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Not Implemented</h3>
+      <span class="badge out">Out of scope</span>
+      <ul>
+        <li>Physical cleanup/delete</li>
+        <li>Mark-missing mutation</li>
+        <li>Repair or reattach command</li>
+        <li>Scheduler or persisted scan history</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Deferred</h3>
+      <span class="badge pending">Pending</span>
+      <ul>
+        <li>Quarantine policy</li>
+        <li>Cleanup confirmation workflow</li>
+        <li>Repair audit policy</li>
+        <li>Object storage scanner</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>API List</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/admin/attachments/storage-health/scan</code></td>
+        <td>Run dry-run attachment storage health scan</td>
+        <td>No body</td>
+        <td><code>ApiResponse&lt;AttachmentStorageHealthScanResponse&gt;</code></td>
+      </tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Changed Files</h2>
+    <table>
+      <tr><th>Area</th><th>Files</th></tr>
+      <tr><td>Controller</td><td><code>AdminAttachmentStorageHealthController</code></td></tr>
+      <tr><td>Service</td><td><code>AttachmentStorageHealthScanService</code>, <code>AttachmentStorageDeleteResult</code>, <code>AttachmentStorageService</code>, <code>LocalAttachmentStorageService</code>, <code>ApplicationAttachmentDeleteService</code></td></tr>
+      <tr><td>DTO / Enum</td><td><code>AttachmentStorageHealthScanResponse</code>, <code>AttachmentStorageHealthIssueResponse</code>, <code>AttachmentStorageHealthIssueType</code></td></tr>
+      <tr><td>Repository / Exception</td><td><code>ApplicationAttachmentRepository</code>, <code>StorageHealthScanException</code>, <code>GlobalExceptionHandler</code></td></tr>
+      <tr><td>Tests</td><td><code>AttachmentStorageHealthScanServiceTest</code>, <code>AdminAttachmentStorageHealthControllerTest</code>, <code>LocalAttachmentStorageServiceTest</code>, <code>ApplicationAttachmentDeleteServiceTest</code></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Domain / Entity Structure</h2>
+    <div class="card">
+      <p><code>ApplicationAttachment</code> remains the retained attachment lifecycle row under <code>JobApplication</code>. The scan reads <code>STORED</code>, <code>DELETED</code>, and <code>MISSING</code> rows, and excludes <code>METADATA_ONLY</code>.</p>
+      <p>No entity relationship, schema, or lifecycle status is mutated by the scan.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Validation Rules</h2>
+    <table>
+      <tr><th>Rule</th><th>Status</th></tr>
+      <tr><td>Dry-run only; no file delete</td><td><span class="badge completed">Enforced</span></td></tr>
+      <tr><td>No DB status mutation</td><td><span class="badge completed">Enforced</span></td></tr>
+      <tr><td>Managed key pattern: <code>applications/{applicationId}/{yyyy}/{MM}/{dd}/{filename}</code></td><td><span class="badge completed">Enforced</span></td></tr>
+      <tr><td>Invalid absolute/traversal/root-escape keys are reported safely</td><td><span class="badge completed">Enforced</span></td></tr>
+      <tr><td>Symbolic links are not followed</td><td><span class="badge completed">Enforced</span></td></tr>
+      <tr><td>Raw storage paths and roots are not exposed</td><td><span class="badge completed">Enforced</span></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Issue Categories</h2>
+    <table>
+      <tr><th>Category</th><th>Meaning</th></tr>
+      <tr><td><code>STORED_MISSING_PHYSICAL_FILE</code></td><td>A stored DB row has no matching file.</td></tr>
+      <tr><td><code>DELETED_PHYSICAL_FILE_REMAINING</code></td><td>A deleted DB row still has a file.</td></tr>
+      <tr><td><code>ORPHAN_PHYSICAL_FILE</code></td><td>A managed file has no active DB reference.</td></tr>
+      <tr><td><code>INVALID_STORAGE_PATH</code></td><td>A DB row has an invalid persisted storage key.</td></tr>
+      <tr><td><code>MISSING_ROW_PHYSICAL_FILE_PRESENT</code></td><td>A missing-state row still has a file.</td></tr>
+      <tr><td><code>IGNORED_UNMANAGED_FILE</code></td><td>An unmanaged storage entry was ignored.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Test Results</h2>
+    <table>
+      <tr><th>Command</th><th>Result</th><th>Notes</th></tr>
+      <tr><td><code>test --tests "*AttachmentStorageHealth*" --no-daemon</code></td><td><span class="badge completed">Success</span></td><td>Focused scan API/service tests passed.</td></tr>
+      <tr><td><code>test --tests "*LocalAttachmentStorageServiceTest*" --no-daemon</code></td><td><span class="badge completed">Success</span></td><td>Structured delete result tests passed.</td></tr>
+      <tr><td><code>test --tests "*ApplicationAttachmentDelete*" --no-daemon</code></td><td><span class="badge completed">Success</span></td><td>Delete command regressions passed.</td></tr>
+      <tr><td><code>test --tests "*ApplicationAttachment*" --no-daemon</code></td><td><span class="badge completed">Success</span></td><td>Broader attachment regressions passed.</td></tr>
+      <tr><td><code>clean test --no-daemon</code></td><td><span class="badge completed">Success</span></td><td>Full regression passed after documentation update.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Remaining Issues</h2>
+    <div class="card">
+      <ul>
+        <li>Scan results are not persisted.</li>
+        <li>Cleanup and repair are intentionally not implemented.</li>
+        <li>Quarantine-before-delete remains a later policy decision.</li>
+        <li>Object storage scanner behavior remains undecided.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Next Phase</h2>
+    <div class="card">
+      <p>Recommended next phase: Phase 03i-4-4 admin cleanup/repair. It should use explicit admin confirmation, avoid raw path exposure, and consider quarantine before permanent delete.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

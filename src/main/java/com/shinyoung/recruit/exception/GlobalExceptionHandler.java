@@ -138,4 +138,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.fail("Attachment file size exceeds the allowed limit."));
     }
+
+    @ExceptionHandler(StorageHealthScanException.class)
+    public ResponseEntity<ApiResponse<Void>> handleStorageHealthScan(StorageHealthScanException e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
 }

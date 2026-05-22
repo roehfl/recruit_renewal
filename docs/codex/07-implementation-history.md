@@ -1,5 +1,252 @@
 # 07. Implementation History
 
+## Phase 03k - ApplicationFormConfig Use/Required Policy Split Design
+
+- Date: 2026-05-22
+- Work type: documentation-only design phase.
+- Goal: design how `ApplicationFormConfig` separates section usage policy from final-submit required policy.
+- Created:
+  - `docs/codex/design/phase-03k-application-form-required-policy-design.md`
+  - `docs/codex/reports/phase-03k-application-form-required-policy-design.html`
+- Key design decisions:
+  - Keep existing `useXxx` fields as the section visibility and applicant section API access policy.
+  - Add explicit `requireXxx` fields as the final-submit blocking and dashboard required-readiness policy.
+  - Recommended new fields:
+    - `requireEducation`
+    - `requireCareer`
+    - `requireCertificate`
+    - `requireLanguage`
+    - `requireMilitary`
+    - `requireAward`
+    - `requireGapPeriod`
+  - Use nullable `Boolean requireXxx` fields in `ApplicationFormConfigRequest` for backward compatibility.
+  - Create requests default omitted required fields to preserve current behavior:
+    - `requireEducation = useEducation`
+    - `requireCareer = useCareer`
+    - `requireMilitary = useMilitary`
+    - `requireCertificate = false`
+    - `requireLanguage = false`
+    - `requireAward = false`
+    - `requireGapPeriod = false`
+  - Update requests preserve existing `requireXxx` values when the fields are omitted.
+  - Update requests force the matching `requireXxx=false` when `useXxx` is changed to false, while explicit `useXxx=false && requireXxx=true` remains invalid.
+  - Reject `useXxx=false && requireXxx=true` as a 400-equivalent validation failure; do not silently coerce it.
+  - Review fix: do not expose `requireXxx` in admin/public request or response payloads before submit validator and dashboard readiness also use `requireXxx`.
+  - Recommend Phase 03k-1 as an end-to-end implementation:
+    - add/backfill fields,
+    - extend admin create/update requests,
+    - extend admin/public detail responses,
+    - validate `requireXxx -> useXxx`,
+    - convert `ApplicationSubmitValidator`,
+    - convert `ApplicationCompletionReadChecker`,
+    - keep `ApplicationSectionAccessService` on `useXxx`.
+  - Extend admin detail and public detail `applicationFormConfig` responses with required flags only in the same implementation slice that converts submit/dashboard policy.
+  - Keep public list excluding `applicationFormConfig`.
+  - Keep `ApplicationSectionAccessService` based on `useXxx`, because optional sections must remain writable.
+  - Keep active `JobPostingQuestion.required` as the question-level required policy; do not add question required flags to `ApplicationFormConfig`.
+  - Exclude attachment requiredness from Phase 03k implementation and split it into a later attachment policy phase.
+- API impact designed:
+  - No endpoint path changes.
+  - Existing admin posting create/update config payloads get optional required fields in the same phase that converts submit/dashboard policy.
+  - Existing admin posting detail and public posting detail config responses get required fields in the same phase that converts submit/dashboard policy.
+  - Existing dashboard and submit APIs change behavior together with required-field exposure.
+- Tests:
+  - Not run.
+  - Reason: documentation-only design phase with no Java source, test source, DB schema, or runtime API behavior changes.
+- Deferred:
+  - Java implementation
+  - test implementation
+  - DB migration file
+  - attachment required policy
+  - SMS/EMAIL and LDAP integration
+- Next recommended phase:
+  - Phase 03k-1 end-to-end required policy implementation.
+  - Phase 03k-2 only for optional hardening or migration follow-up if needed.
+
+## Phase 03j-2 - Public JobPosting Exposure, Filter, Sort, and Response Contract
+
+- Date: 2026-05-22
+- Goal: implement the public `JobPosting` list/detail exposure contract from the Phase 03j design without adding endpoint paths.
+- Implemented:
+  - Applied public exposure filters to `GET /job-postings` and `GET /job-postings/{id}`:
+    - `status = PUBLISHED`
+    - `visible = true`
+    - current time is inside optional display period
+  - Kept reception period separate from exposure so closed reception postings remain visible when display policy allows them.
+  - Added public list DB sorting:
+    - `pinned desc`
+    - `ACCEPTING`, `UPCOMING`, `CLOSED`
+    - `displayOrder asc`
+    - `receptionEndDateTime asc`
+    - `publishedAt desc`
+    - `id desc`
+  - Expanded public list response with `postingType`, `summary`, `receptionStatus`, `pinned`, and `positions`.
+  - Expanded public detail response with `postingType`, `summary`, `receptionStatus`, and `pinned`.
+  - Expanded public position response with `applicationType`, `jobGroup`, `jobTitle`, `workLocation`, and `employmentType`.
+  - Excluded admin/internal fields from public responses:
+    - `status`
+    - `visible`
+    - `displayStartDateTime`
+    - `displayEndDateTime`
+    - `displayOrder`
+    - audit fields
+  - Added page-level public position batch lookup to avoid list N+1.
+  - Added service/controller tests for exposure, sorting, response fields, and not-found behavior.
+  - Review fix: split the broad public sorting test into narrower coverage and added isolated checks for `receptionEndDateTime asc` and final `id desc` tie-break ordering.
+  - Review fix: removed unused `JobPostingRepository.findAllByStatusOrderByCreatedAtDesc(...)` after public reads moved to `findPublicList(...)`.
+- APIs:
+  - No endpoint path was added.
+  - Existing `GET /job-postings` response shape changed for public applicant-facing fields.
+  - Existing `GET /job-postings/{id}` response shape changed for public applicant-facing fields.
+- Tests:
+  - `$env:AES_SECRET_KEY='<test-value>'; .\gradlew.bat cleanTest test --tests com.shinyoung.recruit.service.JobPostingPublicServiceTest --tests com.shinyoung.recruit.controller.JobPostingPublicControllerTest --no-daemon`: success
+  - `$env:AES_SECRET_KEY='<test-value>'; .\gradlew.bat clean test --no-daemon`: success, 572 tests, 0 failures, 0 ignored, 100% successful
+- Documentation:
+  - `docs/codex/implementation/phase-03j-2-public-job-posting-exposure-status.md`
+  - `docs/codex/reports/phase-03j-2-public-job-posting-exposure-report.html`
+- Deferred:
+  - persistent DB migration scripts
+  - public frontend rendering rules for nullable position metadata
+  - `ApplicationFormConfig` usage/required policy split
+- Next recommended phase:
+  - Phase 03k ApplicationFormConfig use/required policy split.
+
+## Phase 03j-1 - JobPosting Domain Expansion Status
+
+- Date: 2026-05-22
+- Goal: implement the internal and admin-side `JobPosting` and `JobPosition` domain expansion from the Phase 03j design.
+- Implemented:
+  - Added `JobPostingType`, `JobPositionApplicationType`, and `ReceptionStatus`.
+  - Added `JobPosting` fields: `postingType`, `summary`, `displayStartDateTime`, `displayEndDateTime`, `visible`, `pinned`, and `displayOrder`.
+  - Added `JobPosition` fields: `applicationType`, `jobGroup`, `jobTitle`, `workLocation`, and `employmentType`.
+  - Extended admin create/update request DTOs and admin list/detail/position response DTOs.
+  - Added `summary` HTML tag rejection, display-period validation, and duplicate position `sortOrder` validation.
+  - Review fix: added Service direct-call validation for `summary` length, `displayOrder`, and `JobPositionRequest` field constraints that were previously covered only by Controller Bean Validation.
+  - Review fix: added `JobPositionCountProjection` and grouped `JobPositionRepository.countByJobPostingIds(...)` so admin list `positionCount` does not trigger lazy collection N+1.
+  - Review fix: corrected implementation report wording for `JobPositionApplicationType` to match the actual three enum constants.
+  - Added defaulting for omitted new fields to preserve existing caller compatibility.
+  - Added new application creation guard for `visible` and display period while keeping existing update/submit/withdraw guards unchanged.
+  - Updated `ApplicationFormConfig` to mutate the existing one-to-one row on update.
+- APIs:
+  - No new endpoint path was added.
+  - Existing `/admin/job-postings` create/update/list/detail responses now include the new admin fields.
+- Tests:
+  - `$env:AES_SECRET_KEY='<test-value>'; .\gradlew.bat test --tests com.shinyoung.recruit.service.JobPostingServiceTest --tests com.shinyoung.recruit.controller.JobPostingControllerTest --tests com.shinyoung.recruit.service.JobApplicationServiceTest --no-daemon`: success
+  - `$env:AES_SECRET_KEY='<test-value>'; .\gradlew.bat clean test --no-daemon`: success
+- Documentation:
+  - `docs/codex/implementation/phase-03j-1-job-posting-domain-expansion-status.md`
+  - `docs/codex/reports/phase-03j-1-job-posting-domain-expansion-report.html`
+- Deferred:
+  - public job posting visible/display filtering
+  - public pinned/display-order sorting
+  - public response field subset
+  - persistent DB migration scripts
+- Next recommended phase:
+  - Phase 03j-2 public job posting exposure and sorting.
+
+## Phase 03j - JobPosting Domain Display & Position Metadata Expansion Design
+
+- Date: 2026-05-22
+- Work type: documentation-only design phase.
+- Goal: design a safe expansion of `JobPosting` display metadata and `JobPosition` classification metadata for applicant-facing job posting pages and admin job posting management.
+- Created:
+  - `docs/codex/design/phase-03j-job-posting-domain-expansion-design.md`
+  - `docs/codex/reports/phase-03j-job-posting-domain-expansion-design.html`
+- Key decisions:
+  - Keep `JobPostingStatus` as the admin operating state and add separate public display controls: `visible`, `displayStartDateTime`, and `displayEndDateTime`.
+  - Apply `visible/display` conditions to new application creation so hidden postings cannot receive new applications by direct id, while preserving existing application update/submit/withdraw commands with the current `PUBLISHED + reception period` guard.
+  - Add response-only `ReceptionStatus` as a derived value and keep the existing `accepting` boolean for public API compatibility.
+  - Clarify that `accepting` is only the compatibility boolean for `status=PUBLISHED + reception period`; it does not include `visible/display` and must not be treated as new-application creatability.
+  - Do not add `creatable`, `applicationCreatable`, or `publiclyVisible` response booleans in this design; new-application creatability stays in the service guard.
+  - Sort public postings by `pinned desc`, derived reception-status priority, `displayOrder`, reception end, published time, and id so closed postings do not appear above accepting postings.
+  - Use `PUBLIC_RECRUITMENT`, `EXPERIENCED_RECRUITMENT`, `INTERN_RECRUITMENT`, and `ROLLING_RECRUITMENT` for `JobPostingType` candidates to avoid conflict with employment-type naming.
+  - Keep `JobPosition.positionName` as the display/snapshot source and add separate metadata for application type, job group, job title, work location, and employment type.
+  - Start `jobGroup` and `workLocation` as nullable metadata and let the public screen hide null values instead of storing temporary placeholder strings.
+  - Reuse the existing `EmploymentType` enum for position employment type.
+  - Keep `displayOrder` internal/admin-facing; public APIs may expose `pinned` but should not expose `displayOrder`.
+  - Reject HTML tags in `summary` rather than storing sanitized HTML.
+  - Avoid QueryDSL introduction in the next implementation slice; use projection expansion plus batch position lookup to avoid N+1.
+- Deferred:
+  - Java source implementation.
+  - Test implementation.
+  - DB migration file creation.
+  - CommonCode management UI/API.
+  - Excel/PDF/statistics/messaging integrations.
+- Tests:
+  - Not run.
+  - Reason: documentation-only design phase with no Java source, test source, configuration, schema, or runtime API changes.
+- Next recommended phase:
+  - Phase 03j-1 Entity/DTO/Service expansion, followed by Phase 03j-2 public query filter/sort/response expansion.
+  - Phase 03j-1 must not implement public list filtering, public sorting, or public response contract changes; those remain Phase 03j-2 scope.
+
+## Phase 03i-4-3 - Attachment Storage Health Scan Dry-Run
+
+- Date: 2026-05-20
+- Goal: implement the dry-run storage health scan slice from the Phase 03i-4 attachment lifecycle design.
+- Implemented:
+  - Added admin dry-run scan API:
+    - `POST /admin/attachments/storage-health/scan`
+  - Added `AttachmentStorageHealthScanService`.
+  - Added `AttachmentStorageHealthScanResponse`.
+  - Added `AttachmentStorageHealthIssueResponse`.
+  - Added `AttachmentStorageHealthIssueType`.
+  - Added `StorageHealthScanException`.
+  - Added status-list lookup to `ApplicationAttachmentRepository`.
+  - Scan compares local managed physical files with `ApplicationAttachment` rows in `STORED`, `DELETED`, and `MISSING`.
+  - `METADATA_ONLY` rows are excluded from physical file comparison.
+  - Implemented issue categories:
+    - `STORED_MISSING_PHYSICAL_FILE`
+    - `DELETED_PHYSICAL_FILE_REMAINING`
+    - `ORPHAN_PHYSICAL_FILE`
+    - `INVALID_STORAGE_PATH`
+    - `MISSING_ROW_PHYSICAL_FILE_PRESENT`
+    - `IGNORED_UNMANAGED_FILE`
+  - Scan is dry-run only and does not delete files.
+  - Scan does not mutate DB rows or mark `STORED` rows as `MISSING`.
+  - Issue responses expose hashed file keys through `fileKeyHash` and do not expose raw storage keys or paths.
+  - Added `AttachmentStorageDeleteResult`.
+  - Added `AttachmentStorageService.deleteIfExistsWithResult(...)` while preserving `deleteIfExists(...)` as a compatibility default method.
+  - Updated `LocalAttachmentStorageService` to return structured delete results for deleted, absent, invalid-path, and failed delete attempts.
+  - Updated `ApplicationAttachmentDeleteService` to log post-commit physical delete result metadata without changing delete API responses.
+- API:
+  - `POST /admin/attachments/storage-health/scan`
+  - Request: none
+  - Response: `ApiResponse<AttachmentStorageHealthScanResponse>`
+- Security:
+  - Reuses existing `/admin/**` authorization.
+  - `SecurityConfig` was not modified.
+  - `ROLE_ADMIN` and `ROLE_RECRUIT_ADMIN` can scan.
+  - Applicant users receive 403; anonymous users receive 401.
+- Preserved:
+  - Upload API structure.
+  - Download API structure.
+  - Delete API response shape.
+  - Metadata response field exposure.
+  - Dashboard readiness and submit validator.
+- Deferred:
+  - Actual orphan cleanup/delete.
+  - Scheduler.
+  - Quarantine/move before delete.
+  - Admin repair and mark-missing commands.
+  - Persisted scan history.
+  - Include-deleted metadata read.
+  - Object storage scanner.
+- Tests:
+  - `test --tests "*AttachmentStorageHealth*" --no-daemon`: success after sandbox Gradle wrapper network approval and test fixes.
+  - `test --tests "*LocalAttachmentStorageServiceTest*" --no-daemon`: success.
+  - `test --tests "*ApplicationAttachmentDelete*" --no-daemon`: success.
+  - `test --tests "*ApplicationAttachment*" --no-daemon`: success.
+  - `clean test --no-daemon`: success after rerun with a longer timeout.
+- Documentation:
+  - `docs/codex/implementation/phase-03i-4-3-attachment-storage-health-scan.md`
+  - `docs/codex/reports/phase-03i-4-3-attachment-storage-health-scan.html`
+  - `docs/codex/design/phase-03i-4-attachment-delete-cleanup-repair-design.md`
+  - `docs/codex/design/phase-03i-attachment-file-upload-download-design.md`
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Next recommended phase:
+  - Phase 03i-4-4 admin cleanup/repair after dry-run output policy is reviewed.
+
 ## Phase 03i-4-2 - Attachment Soft Delete Command
 
 - Date: 2026-05-20

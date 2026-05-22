@@ -20,6 +20,7 @@ import com.shinyoung.recruit.dto.response.MyApplicationResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
+import com.shinyoung.recruit.enumeration.ReceptionStatus;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
@@ -58,7 +59,7 @@ public class JobApplicationService {
     public Long create(Long applicantId, ApplicationCreateRequest request) {
         Applicant applicant = findApplicant(applicantId);
         JobPosting jobPosting = findJobPosting(request.jobPostingId());
-        validatePublishedAndAccepting(jobPosting);
+        validatePublishedAcceptingAndVisibleForCreate(jobPosting);
         validateApplicationFormConfig(jobPosting);
         validateNotDuplicated(applicantId, jobPosting.getId());
 
@@ -229,14 +230,31 @@ public class JobApplicationService {
         }
     }
 
+    private void validatePublishedAcceptingAndVisibleForCreate(JobPosting jobPosting) {
+        validatePublishedAndAccepting(jobPosting);
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (!jobPosting.isVisible() || !isWithinDisplayPeriod(jobPosting, now)) {
+            throw new InvalidJobApplicationException("현재 지원서를 생성할 수 없는 채용공고입니다.");
+        }
+    }
+
     private boolean isAccepting(JobPosting jobPosting) {
         if (jobPosting.getStatus() != JobPostingStatus.PUBLISHED) {
             return false;
         }
 
         LocalDateTime now = LocalDateTime.now(clock);
-        return !now.isBefore(jobPosting.getReceptionStartDateTime())
-                && !now.isAfter(jobPosting.getReceptionEndDateTime());
+        return ReceptionStatus.from(
+                jobPosting.getReceptionStartDateTime(),
+                jobPosting.getReceptionEndDateTime(),
+                now
+        ) == ReceptionStatus.ACCEPTING;
+    }
+
+    private boolean isWithinDisplayPeriod(JobPosting jobPosting, LocalDateTime now) {
+        return (jobPosting.getDisplayStartDateTime() == null || !now.isBefore(jobPosting.getDisplayStartDateTime()))
+                && (jobPosting.getDisplayEndDateTime() == null || !now.isAfter(jobPosting.getDisplayEndDateTime()));
     }
 
     private void validateDraftForUpdate(JobApplication application) {

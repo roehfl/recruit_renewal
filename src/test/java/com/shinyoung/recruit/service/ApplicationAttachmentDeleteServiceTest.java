@@ -277,6 +277,23 @@ class ApplicationAttachmentDeleteServiceTest {
     }
 
     @Test
+    void invalid_storage_path_delete_still_keeps_api_contract_and_marks_deleted() {
+        Applicant applicant = createApplicant("delete-invalid-storage", "Delete Invalid Storage");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        Long attachmentId = upload(applicant, applicationId, "invalid.pdf", "invalid");
+        ApplicationAttachment attachment = attachmentRepository.findById(attachmentId).orElseThrow();
+        ReflectionTestUtils.setField(attachment, "storagePath", "../outside.pdf");
+        attachmentRepository.saveAndFlush(attachment);
+
+        AttachmentDeleteResponse response = deleteService.deleteForApplicant(applicant.getId(), applicationId, attachmentId);
+
+        assertThat(response.deleted()).isTrue();
+        assertThat(response.physicalDeleteRequested()).isTrue();
+        assertThat(attachmentRepository.findById(attachmentId).orElseThrow().getPhysicalFileStatus())
+                .isEqualTo(PhysicalFileStatus.DELETED);
+    }
+
+    @Test
     void upload_append_sort_order_includes_deleted_rows_and_metadata_replace_ignores_deleted_conflict() {
         Applicant applicant = createApplicant("delete-sort", "Delete Sort");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());

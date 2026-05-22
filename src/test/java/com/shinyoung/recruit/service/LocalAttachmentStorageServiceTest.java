@@ -71,6 +71,34 @@ class LocalAttachmentStorageServiceTest {
                 .hasMessage("Attachment file was not found.");
     }
 
+    @Test
+    void delete_if_exists_with_result_reports_deleted_absent_and_invalid_path_without_exposing_path() throws Exception {
+        Path storedPath = storageRoot.resolve("applications/1/2026/06/15/resume.pdf");
+        Files.createDirectories(storedPath.getParent());
+        Files.writeString(storedPath, "resume", StandardCharsets.UTF_8);
+        LocalAttachmentStorageService storageService = storageService();
+
+        AttachmentStorageDeleteResult deleted = storageService.deleteIfExistsWithResult(
+                "applications/1/2026/06/15/resume.pdf"
+        );
+        AttachmentStorageDeleteResult absent = storageService.deleteIfExistsWithResult(
+                "applications/1/2026/06/15/resume.pdf"
+        );
+        AttachmentStorageDeleteResult invalid = storageService.deleteIfExistsWithResult("../outside.pdf");
+
+        assertThat(deleted.requested()).isTrue();
+        assertThat(deleted.deleted()).isTrue();
+        assertThat(deleted.existed()).isTrue();
+        assertThat(deleted.failed()).isFalse();
+        assertThat(absent.requested()).isTrue();
+        assertThat(absent.deleted()).isFalse();
+        assertThat(absent.existed()).isFalse();
+        assertThat(absent.failed()).isFalse();
+        assertThat(invalid.failed()).isTrue();
+        assertThat(invalid.failureCode()).isEqualTo("INVALID_STORAGE_PATH");
+        assertThat(invalid.message()).doesNotContain("outside.pdf");
+    }
+
     private LocalAttachmentStorageService storageService() {
         AttachmentProperties properties = new AttachmentProperties();
         properties.setStorageRoot(storageRoot);

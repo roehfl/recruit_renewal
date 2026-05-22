@@ -5,7 +5,12 @@ import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.dto.request.JobPostingUpdateRequest;
 import com.shinyoung.recruit.dto.response.JobPostingDetailResponse;
+import com.shinyoung.recruit.dto.response.JobPostingListResponse;
+import com.shinyoung.recruit.enumeration.EmploymentType;
+import com.shinyoung.recruit.enumeration.JobPositionApplicationType;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
+import com.shinyoung.recruit.enumeration.JobPostingType;
+import com.shinyoung.recruit.enumeration.ReceptionStatus;
 import com.shinyoung.recruit.exception.InvalidJobPostingException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
 import org.junit.jupiter.api.Test;
@@ -47,6 +52,70 @@ class JobPostingServiceTest {
     }
 
     @Test
+    void 공고_생성시_확장필드를_저장한다() {
+        JobPostingCreateRequest request = new JobPostingCreateRequest(
+                "2026 경력 채용",
+                JobPostingType.EXPERIENCED_RECRUITMENT,
+                "경력직 모집",
+                "<p>내용</p>",
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 2, 18, 0),
+                LocalDateTime.of(2026, 5, 25, 9, 0),
+                LocalDateTime.of(2026, 6, 10, 18, 0),
+                false,
+                true,
+                7,
+                List.of(new JobPositionRequest(
+                        "리서치",
+                        JobPositionApplicationType.EXPERIENCED,
+                        "Research",
+                        "Equity Analyst",
+                        "Seoul",
+                        EmploymentType.CONTRACT,
+                        3,
+                        0
+                )),
+                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+        );
+
+        Long id = jobPostingService.create(request);
+
+        JobPostingDetailResponse detail = jobPostingService.getJobPosting(id);
+        assertThat(detail.postingType()).isEqualTo(JobPostingType.EXPERIENCED_RECRUITMENT);
+        assertThat(detail.summary()).isEqualTo("경력직 모집");
+        assertThat(detail.displayStartDateTime()).isEqualTo(LocalDateTime.of(2026, 5, 25, 9, 0));
+        assertThat(detail.displayEndDateTime()).isEqualTo(LocalDateTime.of(2026, 6, 10, 18, 0));
+        assertThat(detail.visible()).isFalse();
+        assertThat(detail.pinned()).isTrue();
+        assertThat(detail.displayOrder()).isEqualTo(7);
+        assertThat(detail.positionCount()).isEqualTo(1);
+        assertThat(detail.jobPositions().get(0).applicationType()).isEqualTo(JobPositionApplicationType.EXPERIENCED);
+        assertThat(detail.jobPositions().get(0).jobGroup()).isEqualTo("Research");
+        assertThat(detail.jobPositions().get(0).jobTitle()).isEqualTo("Equity Analyst");
+        assertThat(detail.jobPositions().get(0).workLocation()).isEqualTo("Seoul");
+        assertThat(detail.jobPositions().get(0).employmentType()).isEqualTo(EmploymentType.CONTRACT);
+    }
+
+    @Test
+    void 공고_생성시_확장필드_null이면_기본값을_적용한다() {
+        Long id = jobPostingService.create(createRequest());
+
+        JobPostingDetailResponse detail = jobPostingService.getJobPosting(id);
+        assertThat(detail.postingType()).isEqualTo(JobPostingType.PUBLIC_RECRUITMENT);
+        assertThat(detail.summary()).isNull();
+        assertThat(detail.displayStartDateTime()).isNull();
+        assertThat(detail.displayEndDateTime()).isNull();
+        assertThat(detail.visible()).isTrue();
+        assertThat(detail.pinned()).isFalse();
+        assertThat(detail.displayOrder()).isZero();
+        assertThat(detail.jobPositions().get(0).applicationType()).isEqualTo(JobPositionApplicationType.NEW_GRADUATE_OR_EXPERIENCED);
+        assertThat(detail.jobPositions().get(0).jobGroup()).isNull();
+        assertThat(detail.jobPositions().get(0).jobTitle()).isNull();
+        assertThat(detail.jobPositions().get(0).workLocation()).isNull();
+        assertThat(detail.jobPositions().get(0).employmentType()).isEqualTo(EmploymentType.FULL_TIME);
+    }
+
+    @Test
     void 접수종료일시가_시작보다_빠르면_생성실패() {
         JobPostingCreateRequest request = new JobPostingCreateRequest(
                 "2026 상반기 채용",
@@ -72,6 +141,156 @@ class JobPostingServiceTest {
         );
 
         assertThatThrownBy(() -> jobPostingService.create(request)).isInstanceOf(InvalidJobPostingException.class);
+    }
+
+    @Test
+    void summary에_HTML_태그가_있으면_생성_수정_실패() {
+        JobPostingCreateRequest create = new JobPostingCreateRequest(
+                "2026 상반기 채용",
+                null,
+                "<b>요약</b>",
+                "<p>내용</p>",
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 2, 18, 0),
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+        );
+        assertThatThrownBy(() -> jobPostingService.create(create)).isInstanceOf(InvalidJobPostingException.class);
+
+        Long id = jobPostingService.create(createRequest());
+        JobPostingUpdateRequest update = new JobPostingUpdateRequest(
+                "수정",
+                null,
+                "<i>요약</i>",
+                "<p>수정</p>",
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 2, 18, 0),
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                new ApplicationFormConfigRequest(true, false, false, false, false, false, false)
+        );
+        assertThatThrownBy(() -> jobPostingService.update(id, update)).isInstanceOf(InvalidJobPostingException.class);
+    }
+
+    @Test
+    void 노출기간이_역전되면_생성_수정_실패() {
+        JobPostingCreateRequest create = new JobPostingCreateRequest(
+                "2026 상반기 채용",
+                null,
+                "요약",
+                "<p>내용</p>",
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 2, 18, 0),
+                LocalDateTime.of(2026, 6, 3, 9, 0),
+                LocalDateTime.of(2026, 6, 2, 9, 0),
+                null,
+                null,
+                null,
+                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+        );
+        assertThatThrownBy(() -> jobPostingService.create(create)).isInstanceOf(InvalidJobPostingException.class);
+
+        Long id = jobPostingService.create(createRequest());
+        JobPostingUpdateRequest update = new JobPostingUpdateRequest(
+                "수정",
+                null,
+                "요약",
+                "<p>수정</p>",
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 2, 18, 0),
+                LocalDateTime.of(2026, 6, 3, 9, 0),
+                LocalDateTime.of(2026, 6, 2, 9, 0),
+                null,
+                null,
+                null,
+                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                new ApplicationFormConfigRequest(true, false, false, false, false, false, false)
+        );
+        assertThatThrownBy(() -> jobPostingService.update(id, update)).isInstanceOf(InvalidJobPostingException.class);
+    }
+
+    @Test
+    void 모집분야_sortOrder가_중복되면_생성_실패() {
+        JobPostingCreateRequest request = new JobPostingCreateRequest(
+                "2026 상반기 채용",
+                "<p>내용</p>",
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 2, 18, 0),
+                List.of(
+                        new JobPositionRequest("백엔드", 2, 1),
+                        new JobPositionRequest("프론트엔드", 1, 1)
+                ),
+                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+        );
+
+        assertThatThrownBy(() -> jobPostingService.create(request)).isInstanceOf(InvalidJobPostingException.class);
+    }
+
+    @Test
+    void service_직접호출시_공고_확장필드_검증을_수행한다() {
+        assertThatThrownBy(() -> jobPostingService.create(createExtendedRequest("a".repeat(501), null, List.of(new JobPositionRequest("백엔드", 2, 1)))))
+                .isInstanceOf(InvalidJobPostingException.class);
+
+        assertThatThrownBy(() -> jobPostingService.create(createExtendedRequest("요약", -1, List.of(new JobPositionRequest("백엔드", 2, 1)))))
+                .isInstanceOf(InvalidJobPostingException.class);
+    }
+
+    @Test
+    void service_직접호출시_모집분야_필드_검증을_수행한다() {
+        String tooLong = "a".repeat(101);
+
+        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest("", 1, 0))))
+                .isInstanceOf(InvalidJobPostingException.class);
+        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest(tooLong, 1, 0))))
+                .isInstanceOf(InvalidJobPostingException.class);
+        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest("백엔드", null, 0))))
+                .isInstanceOf(InvalidJobPostingException.class);
+        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest("백엔드", 0, 0))))
+                .isInstanceOf(InvalidJobPostingException.class);
+        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest("백엔드", 1, null))))
+                .isInstanceOf(InvalidJobPostingException.class);
+        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest("백엔드", 1, -1))))
+                .isInstanceOf(InvalidJobPostingException.class);
+        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest(
+                "백엔드",
+                JobPositionApplicationType.EXPERIENCED,
+                tooLong,
+                "Backend",
+                "Seoul",
+                EmploymentType.FULL_TIME,
+                1,
+                0
+        )))).isInstanceOf(InvalidJobPostingException.class);
+        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest(
+                "백엔드",
+                JobPositionApplicationType.EXPERIENCED,
+                "IT",
+                tooLong,
+                "Seoul",
+                EmploymentType.FULL_TIME,
+                1,
+                0
+        )))).isInstanceOf(InvalidJobPostingException.class);
+        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest(
+                "백엔드",
+                JobPositionApplicationType.EXPERIENCED,
+                "IT",
+                "Backend",
+                tooLong,
+                EmploymentType.FULL_TIME,
+                1,
+                0
+        )))).isInstanceOf(InvalidJobPostingException.class);
     }
 
     @Test
@@ -154,6 +373,83 @@ class JobPostingServiceTest {
         assertThatThrownBy(() -> jobPostingService.update(id, update)).isInstanceOf(InvalidJobPostingException.class);
     }
 
+    @Test
+    void 공고_수정시_확장필드를_변경한다() {
+        Long id = jobPostingService.create(createRequest());
+        JobPostingUpdateRequest update = new JobPostingUpdateRequest(
+                "수정",
+                JobPostingType.INTERN_RECRUITMENT,
+                "인턴 채용",
+                "<p>수정</p>",
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 2, 18, 0),
+                LocalDateTime.of(2026, 5, 30, 9, 0),
+                LocalDateTime.of(2026, 6, 5, 18, 0),
+                false,
+                true,
+                3,
+                List.of(new JobPositionRequest(
+                        "인턴",
+                        JobPositionApplicationType.NEW_GRADUATE,
+                        "IT",
+                        "Backend Intern",
+                        "Seoul",
+                        EmploymentType.INTERN,
+                        1,
+                        0
+                )),
+                new ApplicationFormConfigRequest(true, false, false, false, false, false, false)
+        );
+
+        jobPostingService.update(id, update);
+
+        JobPostingDetailResponse detail = jobPostingService.getJobPosting(id);
+        assertThat(detail.title()).isEqualTo("수정");
+        assertThat(detail.postingType()).isEqualTo(JobPostingType.INTERN_RECRUITMENT);
+        assertThat(detail.summary()).isEqualTo("인턴 채용");
+        assertThat(detail.visible()).isFalse();
+        assertThat(detail.pinned()).isTrue();
+        assertThat(detail.displayOrder()).isEqualTo(3);
+        assertThat(detail.jobPositions().get(0).employmentType()).isEqualTo(EmploymentType.INTERN);
+    }
+
+    @Test
+    void 관리자_응답은_ReceptionStatus와_accepting을_계산한다() {
+        Long acceptingId = jobPostingService.create(createRequest());
+        jobPostingService.publish(acceptingId);
+        Long upcomingId = jobPostingService.create(new JobPostingCreateRequest(
+                "예정",
+                "<p>내용</p>",
+                LocalDateTime.of(2026, 6, 2, 9, 0),
+                LocalDateTime.of(2026, 6, 3, 18, 0),
+                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+        ));
+        Long closedByTimeId = jobPostingService.create(new JobPostingCreateRequest(
+                "기간마감",
+                "<p>내용</p>",
+                LocalDateTime.of(2026, 5, 1, 9, 0),
+                LocalDateTime.of(2026, 5, 2, 18, 0),
+                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+        ));
+
+        assertThat(jobPostingService.getJobPosting(acceptingId).receptionStatus()).isEqualTo(ReceptionStatus.ACCEPTING);
+        assertThat(jobPostingService.getJobPosting(acceptingId).accepting()).isTrue();
+        assertThat(jobPostingService.getJobPosting(upcomingId).receptionStatus()).isEqualTo(ReceptionStatus.UPCOMING);
+        assertThat(jobPostingService.getJobPosting(upcomingId).accepting()).isFalse();
+        assertThat(jobPostingService.getJobPosting(closedByTimeId).receptionStatus()).isEqualTo(ReceptionStatus.CLOSED);
+        assertThat(jobPostingService.getJobPosting(closedByTimeId).accepting()).isFalse();
+
+        JobPostingListResponse listItem = jobPostingService.getJobPostings(0, 10).content().stream()
+                .filter(it -> it.id().equals(acceptingId))
+                .findFirst()
+                .orElseThrow();
+        assertThat(listItem.receptionStatus()).isEqualTo(ReceptionStatus.ACCEPTING);
+        assertThat(listItem.accepting()).isTrue();
+        assertThat(listItem.positionCount()).isEqualTo(1);
+    }
+
     private JobPostingCreateRequest createRequest() {
         return new JobPostingCreateRequest(
                 "2026 상반기 채용",
@@ -161,6 +457,28 @@ class JobPostingServiceTest {
                 LocalDateTime.of(2026, 6, 1, 9, 0),
                 LocalDateTime.of(2026, 6, 2, 18, 0),
                 List.of(new JobPositionRequest("백엔드", 2, 1)),
+                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+        );
+    }
+
+    private JobPostingCreateRequest createRequestWithPosition(JobPositionRequest jobPosition) {
+        return createExtendedRequest("요약", null, List.of(jobPosition));
+    }
+
+    private JobPostingCreateRequest createExtendedRequest(String summary, Integer displayOrder, List<JobPositionRequest> jobPositions) {
+        return new JobPostingCreateRequest(
+                "2026 상반기 채용",
+                JobPostingType.PUBLIC_RECRUITMENT,
+                summary,
+                "<p>내용</p>",
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 2, 18, 0),
+                null,
+                null,
+                true,
+                false,
+                displayOrder,
+                jobPositions,
                 new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
         );
     }

@@ -1,5 +1,44 @@
 # Phase 03i-4 - Attachment Delete / Orphan Cleanup / Admin Repair Design
 
+## Phase 03i-4-3 Implementation Note
+
+Phase 03i-4-3 implemented the storage health scan dry-run portion of this design.
+
+Implemented:
+
+- Added admin dry-run scan API:
+  - `POST /admin/attachments/storage-health/scan`
+  - no request body
+  - response: `ApiResponse<AttachmentStorageHealthScanResponse>`
+- The scan is read-only and always reports `dryRun=true`.
+- Existing `/admin/**` security is reused; `SecurityConfig` was not changed.
+- `ROLE_ADMIN` and `ROLE_RECRUIT_ADMIN` can scan.
+- Applicant access is blocked with 403 and anonymous access with 401.
+- Scan compares local physical files under `recruit.attachment.storage-root` with `ApplicationAttachment` rows in `STORED`, `DELETED`, and `MISSING`.
+- `METADATA_ONLY` rows are excluded from storage comparison.
+- Managed physical file pattern is `applications/{applicationId}/{yyyy}/{MM}/{dd}/{filename}`.
+- Scan categories implemented:
+  - `STORED_MISSING_PHYSICAL_FILE`
+  - `DELETED_PHYSICAL_FILE_REMAINING`
+  - `ORPHAN_PHYSICAL_FILE`
+  - `INVALID_STORAGE_PATH`
+  - `MISSING_ROW_PHYSICAL_FILE_PRESENT`
+  - `IGNORED_UNMANAGED_FILE`
+- Scan does not delete physical files.
+- Scan does not mutate DB rows.
+- Scan does not mark `STORED` rows as `MISSING`.
+- Issue responses expose `fileKeyHash` instead of raw storage keys.
+- Scan responses do not expose `storedFileName`, `storagePath`, storage root, absolute path, or local filesystem paths.
+- `AttachmentStorageService` now has result-returning `deleteIfExistsWithResult(...)`; the legacy `deleteIfExists(...)` method remains as a default compatibility wrapper.
+- `LocalAttachmentStorageService` returns `AttachmentStorageDeleteResult` for deleted, absent, invalid-path, and failure outcomes.
+- `ApplicationAttachmentDeleteService` logs post-commit physical delete results with application/attachment IDs and safe result metadata while preserving the existing delete API response.
+- Cleanup execution, scheduler, quarantine, admin repair, mark-missing command, persisted scan history, include-deleted read, and object storage scanning remain deferred.
+
+Implementation reference:
+
+- `docs/codex/implementation/phase-03i-4-3-attachment-storage-health-scan.md`
+- `docs/codex/reports/phase-03i-4-3-attachment-storage-health-scan.html`
+
 ## Phase 03i-4-2 Implementation Note
 
 Phase 03i-4-2 implemented the delete-command portion of this design.
@@ -299,7 +338,7 @@ These are candidates only; do not implement all in Phase 03i-4-2.
 | Method | Path | Purpose | Recommendation |
 |---|---|---|---|
 | `GET` | `/admin/attachments/storage-health` | Read last scan summary | Later phase |
-| `POST` | `/admin/attachments/storage-health/scan` | Start dry-run scan | Phase 03i-4-3 candidate |
+| `POST` | `/admin/attachments/storage-health/scan` | Start dry-run scan | Implemented in Phase 03i-4-3 |
 | `POST` | `/admin/applications/{applicationId}/attachments/{attachmentId}/mark-missing` | Mark a `STORED` row as `MISSING` | Later repair phase |
 | `POST` | `/admin/applications/{applicationId}/attachments/{attachmentId}/repair` | Repair metadata or reattach file | Later repair phase |
 | `POST` | `/admin/attachments/orphans/cleanup` | Cleanup orphan physical files | Phase 03i-4-4 candidate |
@@ -590,7 +629,7 @@ No class is implemented in Phase 03i-4. Candidate later classes or modifications
 |---|---|---|
 | Phase 03i-4-1 | Delete/cleanup/repair design only | Any Java/test/config/schema/runtime changes |
 | Phase 03i-4-2 | Applicant DRAFT delete + admin delete command using soft `DELETED` lifecycle state; reason required and persisted for admin; already deleted rows return 404 | Scheduler, repair API, separate deletion history table |
-| Phase 03i-4-3 | Orphan storage scan dry-run and storage-health report | Physical deletion of candidates |
+| Phase 03i-4-3 | Orphan storage scan dry-run and storage-health report | Physical deletion of candidates; implemented |
 | Phase 03i-4-4 | Admin cleanup/repair commands after dry-run policy is validated | Upload/download redesign |
 | Phase 03i-5 | Attachment required policy + dashboard/submit integration | Storage lifecycle mechanics unless gaps remain |
 

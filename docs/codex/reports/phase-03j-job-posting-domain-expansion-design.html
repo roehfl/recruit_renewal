@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03j - JobPosting Domain Expansion Design</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #5d6b82;
+      --line: #d9e0ea;
+      --blue: #1f6feb;
+      --green: #1a7f37;
+      --amber: #9a6700;
+      --red: #b42318;
+      --gray: #6b7280;
+      --soft-blue: #eaf2ff;
+      --soft-green: #eaf7ef;
+      --soft-amber: #fff7df;
+      --soft-red: #fff0ee;
+      --soft-gray: #f1f3f5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      line-height: 1.58;
+    }
+    header {
+      background: #0f172a;
+      color: #fff;
+      padding: 32px 40px;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 24px 56px;
+    }
+    h1, h2, h3 { margin: 0 0 12px; }
+    h1 { font-size: 30px; line-height: 1.25; }
+    h2 { font-size: 22px; margin-top: 28px; }
+    h3 { font-size: 17px; margin-top: 18px; }
+    p { margin: 0 0 12px; }
+    code {
+      background: var(--soft-gray);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.92em;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 22px;
+      margin-top: 18px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 4px;
+      background: #fff;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f8fafc;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    ul {
+      margin: 8px 0 0 20px;
+      padding: 0;
+    }
+    li { margin: 4px 0; }
+    .header-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .subtitle {
+      color: #cbd5e1;
+      margin-top: 8px;
+      max-width: 880px;
+    }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .badge.blue { color: var(--blue); background: var(--soft-blue); border-color: #b9d3ff; }
+    .badge.green { color: var(--green); background: var(--soft-green); border-color: #b7e1c1; }
+    .badge.amber { color: var(--amber); background: var(--soft-amber); border-color: #f0d98c; }
+    .badge.red { color: var(--red); background: var(--soft-red); border-color: #ffc8c2; }
+    .badge.gray { color: var(--gray); background: var(--soft-gray); border-color: var(--line); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      background: #fff;
+    }
+    .card h3 { margin-top: 0; }
+    .summary { border-left: 5px solid var(--blue); }
+    .muted { color: var(--muted); }
+    .table-wrap { overflow-x: auto; }
+    @media (max-width: 820px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 42px; }
+      h1 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-row">
+      <div>
+        <div class="muted">Recruit Backend Codex Report</div>
+        <h1>Phase 03j - JobPosting Domain Display &amp; Position Metadata Expansion Design</h1>
+      </div>
+      <span class="badge blue">Design Completed</span>
+    </div>
+    <p class="subtitle">Generated on 2026-05-22. Documentation-only design phase for expanding job posting display metadata and job position classification metadata.</p>
+  </header>
+
+  <main>
+    <section class="summary">
+      <h2>Executive Summary</h2>
+      <p>이번 설계는 기존 최소 CRUD 수준의 <code>JobPosting</code>, <code>JobPosition</code>을 지원자 공고 목록/상세와 관리자 공고 관리 화면에 맞게 확장하는 방향을 정리했다.</p>
+      <p>핵심 결정은 운영 상태와 공개 노출 여부를 분리하고, 접수 기간과 화면 노출 기간을 분리하는 것이다.</p>
+      <p><code>ReceptionStatus</code>는 DB에 저장하지 않고 응답에서 파생하며, 공개 목록은 접수중, 접수예정, 접수마감 순으로 정렬한다.</p>
+      <p>숨김 공고는 공개 조회와 신규 지원서 생성을 차단하지만, 이미 작성 중인 지원서 수정/제출/철회는 기존 접수기간 정책을 유지한다.</p>
+      <p>이번 Phase에서는 Java 소스, 테스트, DB schema, runtime API를 변경하지 않았다.</p>
+    </section>
+
+    <section>
+      <h2>Scope</h2>
+      <div class="grid">
+        <div class="card">
+          <h3><span class="badge green">Completed</span></h3>
+          <ul>
+            <li><code>JobPosting</code> 표시/노출/정렬 필드 설계</li>
+            <li><code>JobPosition</code> 지원구분/직군/근무지/고용형태 설계</li>
+            <li>공개 목록 필터와 정렬 정책 정의</li>
+            <li>관리자/공개 DTO 확장 방향 정의</li>
+            <li>migration 호환성과 테스트 계획 정리</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="badge red">Not Implemented</span></h3>
+          <ul>
+            <li>Entity/DTO/Repository/Service/Controller 수정</li>
+            <li>테스트 코드 추가</li>
+            <li>DB migration 파일 생성</li>
+            <li>공통코드 관리자 화면</li>
+            <li>엑셀, PDF, 통계 기능</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="badge amber">Deferred</span></h3>
+          <ul>
+            <li>관리자 검색/필터 고도화</li>
+            <li>공통코드 전환</li>
+            <li>채용 인원 비공개/미정 표시 정책</li>
+            <li>지원서 필수 항목 정책 확장</li>
+            <li>QueryDSL 또는 Specification 도입</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Current Problem</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Domain</th><th>Current State</th><th>Problem</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>JobPosting</code></td>
+              <td><code>title</code>, <code>contentHtml</code>, 접수기간, <code>status</code>, 게시/마감 시각 중심</td>
+              <td>짧은 설명, 공고 구분, 공개 노출 기간, 상단 고정, 수동 정렬, 접수 상태 표시를 안정적으로 처리하기 어렵다.</td>
+            </tr>
+            <tr>
+              <td><code>JobPosition</code></td>
+              <td><code>positionName</code>, <code>headcount</code>, <code>sortOrder</code> 중심</td>
+              <td>지원구분, 직군, 세부 직무, 근무지, 고용형태를 분리할 수 없어 검색/필터/태그/통계 확장에 불리하다.</td>
+            </tr>
+            <tr>
+              <td>Public Query</td>
+              <td><code>PUBLISHED</code>만 조회하고 <code>createdAt desc</code>에 가깝게 정렬</td>
+              <td>운영 상태와 공개 노출이 결합되어 있고, 공개 화면용 deterministic 정렬 기준이 부족하다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Domain Change Summary</h2>
+      <h3>JobPosting Fields</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Field</th><th>Type</th><th>Default</th><th>Purpose</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>postingType</code></td><td><code>JobPostingType</code></td><td><code>PUBLIC_RECRUITMENT</code></td><td>공개채용/경력/인턴/수시 등 공고 분류</td><td><span class="badge blue">Designed</span></td></tr>
+            <tr><td><code>summary</code></td><td><code>String</code></td><td><code>null</code></td><td>목록 카드용 짧은 설명</td><td><span class="badge blue">Designed</span></td></tr>
+            <tr><td><code>displayStartDateTime</code></td><td><code>LocalDateTime</code></td><td><code>null</code></td><td>공개 화면 노출 시작</td><td><span class="badge blue">Designed</span></td></tr>
+            <tr><td><code>displayEndDateTime</code></td><td><code>LocalDateTime</code></td><td><code>null</code></td><td>공개 화면 노출 종료</td><td><span class="badge blue">Designed</span></td></tr>
+            <tr><td><code>visible</code></td><td><code>boolean</code></td><td><code>true</code></td><td>지원자 공개 화면 노출 여부</td><td><span class="badge blue">Designed</span></td></tr>
+            <tr><td><code>pinned</code></td><td><code>boolean</code></td><td><code>false</code></td><td>공개 목록 상단 고정</td><td><span class="badge blue">Designed</span></td></tr>
+            <tr><td><code>displayOrder</code></td><td><code>Integer</code></td><td><code>0</code></td><td>공개 목록 수동 정렬에 사용하되 공개 API 응답에서는 비노출</td><td><span class="badge blue">Designed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>JobPosition Fields</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Field</th><th>Type</th><th>Policy</th><th>Purpose</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>applicationType</code></td><td><code>JobPositionApplicationType</code></td><td>도메인 필수, 초기 호환 default 가능</td><td>신입/경력/신입경력 구분</td></tr>
+            <tr><td><code>jobGroup</code></td><td><code>String</code></td><td>초기 nullable, 응답 null 허용/화면 미표시</td><td>직군/분야 태그와 필터</td></tr>
+            <tr><td><code>jobTitle</code></td><td><code>String</code></td><td>nullable</td><td>세부 직무명</td></tr>
+            <tr><td><code>workLocation</code></td><td><code>String</code></td><td>초기 nullable, 응답 null 허용/화면 미표시</td><td>근무지 태그와 필터</td></tr>
+            <tr><td><code>employmentType</code></td><td><code>EmploymentType</code></td><td>기존 enum 재사용</td><td>고용형태</td></tr>
+            <tr><td><code>positionName</code></td><td><code>String</code></td><td>유지</td><td>화면 표시용 모집분야명과 기존 Application snapshot 원천</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>API Impact</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Method</th><th>Path</th><th>Impact</th><th>Response/Request Policy</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>GET</code></td><td><code>/admin/job-postings</code></td><td>관리자 목록 응답 확장</td><td>운영 상태, 공개 노출 필드, 접수 상태, 모집분야 요약 포함</td></tr>
+            <tr><td><code>GET</code></td><td><code>/admin/job-postings/{id}</code></td><td>관리자 상세 응답 확장</td><td>목록 필드 전체, <code>contentHtml</code>, 확장 모집분야, 항목 설정 포함</td></tr>
+            <tr><td><code>POST</code></td><td><code>/admin/job-postings</code></td><td>관리자 생성 request 확장</td><td>초기 구현에서는 확장 필드 null 기본값으로 기존 클라이언트 호환</td></tr>
+            <tr><td><code>POST</code></td><td><code>/admin/job-postings/{id}</code></td><td>관리자 수정 request 확장</td><td>상태 변경은 계속 별도 command API만 사용</td></tr>
+            <tr><td><code>GET</code></td><td><code>/job-postings</code></td><td>공개 목록 필터/정렬/응답 확장</td><td>내부 <code>status</code>, <code>visible</code>, display 기간은 비노출</td></tr>
+            <tr><td><code>GET</code></td><td><code>/job-postings/{id}</code></td><td>공개 상세 필터/응답 확장</td><td>공개 목록과 동일 조건 적용, 숨김은 404 정책 유지</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Display And Query Policy</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Public Filter</h3>
+          <ul>
+            <li><code>status = PUBLISHED</code></li>
+            <li><code>visible = true</code></li>
+            <li><code>displayStartDateTime</code>이 없거나 현재 이전</li>
+            <li><code>displayEndDateTime</code>이 없거나 현재 이후</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Public Sort</h3>
+          <ul>
+            <li><code>pinned desc</code></li>
+            <li><code>receptionStatusPriority asc</code></li>
+            <li><code>displayOrder asc</code></li>
+            <li><code>receptionEndDateTime asc</code></li>
+            <li><code>publishedAt desc</code></li>
+            <li><code>id desc</code></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Reception Status</h3>
+          <ul>
+            <li><code>UPCOMING</code>: 접수 시작 전</li>
+            <li><code>ACCEPTING</code>: 접수 기간 안</li>
+            <li><code>CLOSED</code>: 접수 종료 후</li>
+            <li>DB 저장 없이 응답에서 계산</li>
+          </ul>
+        </div>
+      </div>
+      <p class="muted">접수마감 공고도 display 기간 안이면 노출될 수 있으므로 접수 종료일 오름차순보다 <code>receptionStatusPriority</code>를 먼저 적용한다. 구현은 JPQL <code>CASE WHEN</code> 정렬을 우선 검토하고, Service 정렬은 전체 결과를 정렬한 뒤 pagination하는 경우에만 사용한다.</p>
+      <p class="muted"><code>accepting</code>은 기존 호환용 접수기간 기반 boolean이다. <code>status=PUBLISHED</code>와 접수기간 안쪽 여부만 포함하며 <code>visible/display</code> 조건은 포함하지 않는다.</p>
+    </section>
+
+    <section>
+      <h2>Application Command Policy</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Command</th><th>Policy</th><th>Reason</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>신규 지원서 생성</td>
+              <td><code>PUBLISHED</code>, 접수중, <code>visible=true</code>, display 기간 안쪽 조건을 모두 적용</td>
+              <td>숨김 공고 ID를 직접 호출해 신규 지원서를 생성하는 우회 경로를 차단한다.</td>
+            </tr>
+            <tr>
+              <td>기존 지원서 수정/제출/철회</td>
+              <td><code>PUBLISHED</code>와 접수기간 안쪽 조건 유지. <code>visible/display</code> 조건은 적용하지 않음</td>
+              <td>운영자가 목록 노출을 내렸더라도 이미 작성 중인 지원서 흐름은 보존한다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">이번 Phase에서는 <code>creatable</code>, <code>applicationCreatable</code>, <code>publiclyVisible</code> 같은 추가 boolean 응답 필드를 만들지 않는다. 신규 지원서 생성 가능 여부는 response field가 아니라 service guard에서 판단한다.</p>
+    </section>
+
+    <section>
+      <h2>Screen Impact</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Screen</th><th>Impact</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>지원자 공고 목록</td><td>공고 구분, 짧은 설명, 접수예정/접수중/접수마감, 상단 고정, 모집분야 태그 표시가 가능해진다.</td></tr>
+            <tr><td>지원자 공고 상세</td><td>확장된 모집분야 메타데이터와 기존 지원서 항목 설정을 함께 내려준다.</td></tr>
+            <tr><td>관리자 공고 목록</td><td>노출 여부, 노출 기간, 수동 정렬, 접수 상태를 운영자가 확인할 수 있다.</td></tr>
+            <tr><td>관리자 공고 등록/수정</td><td>공고 분류, 목록 요약, 화면 노출 기간, 상단 고정, 모집분야 분류 정보를 입력한다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>DB Impact</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Table</th><th>Columns</th><th>Compatibility Strategy</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>job_posting</code></td>
+              <td><code>posting_type</code>, <code>summary</code>, <code>display_start_date_time</code>, <code>display_end_date_time</code>, <code>visible</code>, <code>pinned</code>, <code>display_order</code></td>
+              <td>기존 데이터는 <code>PUBLIC_RECRUITMENT</code>, <code>visible=true</code>, <code>pinned=false</code>, <code>displayOrder=0</code>로 보정한다. enum은 문자열 저장, boolean은 DB default와 Java default를 함께 둔다.</td>
+            </tr>
+            <tr>
+              <td><code>job_position</code></td>
+              <td><code>application_type</code>, <code>job_group</code>, <code>job_title</code>, <code>work_location</code>, <code>employment_type</code></td>
+              <td>기존 <code>positionName</code>, <code>headcount</code>, <code>sortOrder</code>는 유지한다. <code>jobGroup</code>, <code>workLocation</code>은 초기 nullable로 두고 임시 문자열을 저장하지 않는다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Validation Rules</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>JobPosting</h3>
+          <ul>
+            <li><code>title</code>, <code>contentHtml</code> 필수</li>
+            <li><code>summary</code> 최대 500자 후보</li>
+            <li><code>summary</code> HTML 태그 포함 시 400으로 거절</li>
+            <li>접수 시작은 종료보다 이전</li>
+            <li>노출 시작은 노출 종료보다 이후일 수 없음</li>
+            <li><code>displayOrder >= 0</code></li>
+            <li><code>CLOSED</code> 공고 일반 수정 금지 유지</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>JobPosition</h3>
+          <ul>
+            <li>모집분야 최소 1개</li>
+            <li><code>positionName</code> 필수</li>
+            <li><code>jobGroup</code>, <code>workLocation</code>은 초기 nullable</li>
+            <li><code>headcount >= 1</code> 유지</li>
+            <li><code>sortOrder >= 0</code></li>
+            <li>같은 공고 request 내 <code>sortOrder</code> 중복 금지 권장</li>
+            <li><code>EmploymentType</code> 재사용</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>File</th><th>Status</th><th>Purpose</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>docs/codex/design/phase-03j-job-posting-domain-expansion-design.md</code></td><td><span class="badge green">Created</span></td><td>Codex reference design document</td></tr>
+            <tr><td><code>docs/codex/reports/phase-03j-job-posting-domain-expansion-design.html</code></td><td><span class="badge green">Created</span></td><td>Human-readable phase report</td></tr>
+            <tr><td><code>docs/codex/07-implementation-history.md</code></td><td><span class="badge blue">Updated</span></td><td>Design completion history entry</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Test Results</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Command</th><th>Result</th><th>Reason</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Not run</td>
+              <td><span class="badge gray">Not Applicable</span></td>
+              <td>Documentation-only design phase. No Java source, test source, configuration, schema, or runtime API behavior changed.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Remaining Issues</h2>
+      <ul>
+        <li>실제 운영 코드값과 표시명은 화면/운영 정책 확정 후 조정할 수 있다.</li>
+        <li>명시적 DB migration 체계가 약하므로 구현 Phase에서 H2와 운영 DB 반영 절차를 분리해야 한다.</li>
+        <li>공개 목록에 모집분야 전체를 포함할지 요약만 포함할지는 프론트 카드 요구와 성능 기준을 함께 확인해야 한다.</li>
+        <li>공통코드 관리 기능은 이번 Phase 범위 밖이다.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Next Phase Recommendation</h2>
+      <div class="grid">
+        <div class="card">
+          <h3><span class="badge blue">Phase 03j-1</span></h3>
+          <p>Entity, enum, request/response DTO, 관리자 service/controller 테스트를 확장한다. 공개 목록 필터, 공개 목록 정렬, 공개 response 변경은 이 단계에서 금지한다.</p>
+        </div>
+        <div class="card">
+          <h3><span class="badge blue">Phase 03j-2</span></h3>
+          <p>공개 목록 projection, visible/display 필터, 접수 상태 우선순위 정렬, 공개 response 확장을 구현한다. <code>displayOrder</code>는 공개 응답에서 제외한다.</p>
+        </div>
+        <div class="card">
+          <h3><span class="badge amber">Phase 03j-3 Candidate</span></h3>
+          <p>관리자 검색/필터와 공통코드 전환 필요성을 별도 검토한다.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

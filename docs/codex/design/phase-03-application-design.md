@@ -1,5 +1,22 @@
 # Phase 03 Application Design
 
+## Phase 03i-4-3 Attachment Storage Health Scan Implementation Note
+
+- Phase 03i-4-3 implemented the admin storage health scan dry-run API:
+  - `POST /admin/attachments/storage-health/scan`
+  - response: `ApiResponse<AttachmentStorageHealthScanResponse>`
+- Existing `/admin/**` authorization is reused; `SecurityConfig` was not modified.
+- The scan is read-only and does not delete files, mutate DB rows, or mark attachments as `MISSING`.
+- The scan compares managed local storage files with `ApplicationAttachment` rows in `STORED`, `DELETED`, and `MISSING`.
+- `METADATA_ONLY` rows are excluded from physical file mismatch checks.
+- The response summarizes stored-row missing files, deleted-row remaining files, orphan physical files, invalid storage keys, missing-row physical files, and ignored unmanaged files.
+- Issue rows expose `fileKeyHash` and safe metadata only; raw storage paths, storage roots, absolute paths, and stored filenames are not exposed.
+- `AttachmentStorageService.deleteIfExistsWithResult(...)` was added for delete observability while preserving the existing delete API contract.
+- Cleanup execution, quarantine, scheduler, admin repair, mark-missing command, and persisted scan history remain deferred.
+- References:
+  - `docs/codex/implementation/phase-03i-4-3-attachment-storage-health-scan.md`
+  - `docs/codex/reports/phase-03i-4-3-attachment-storage-health-scan.html`
+
 ## Phase 03i-4-2 Attachment Delete Command Implementation Note
 
 - Phase 03i-4-2 implemented attachment soft delete command APIs:

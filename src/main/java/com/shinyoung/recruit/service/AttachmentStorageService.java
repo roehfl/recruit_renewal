@@ -11,7 +11,11 @@ public interface AttachmentStorageService {
             String extension
     );
 
-    void deleteIfExists(String storagePath);
+    default void deleteIfExists(String storagePath) {
+        deleteIfExistsWithResult(storagePath);
+    }
+
+    AttachmentStorageDeleteResult deleteIfExistsWithResult(String storagePath);
 
     boolean exists(String storagePath);
 

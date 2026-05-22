@@ -58,11 +58,19 @@ public class LocalAttachmentStorageService implements AttachmentStorageService {
     }
 
     @Override
-    public void deleteIfExists(String storagePath) {
+    public AttachmentStorageDeleteResult deleteIfExistsWithResult(String storagePath) {
         try {
-            Files.deleteIfExists(resolveUnderRoot(storagePath));
-        } catch (IOException | RuntimeException e) {
+            boolean deleted = Files.deleteIfExists(resolveUnderRoot(storagePath));
+            return deleted ? AttachmentStorageDeleteResult.deletedFile() : AttachmentStorageDeleteResult.absentFile();
+        } catch (JobApplicationNotFoundException e) {
+            log.warn("Attachment file delete rejected invalid storage key.");
+            return AttachmentStorageDeleteResult.invalidPath();
+        } catch (IOException e) {
             log.warn("Failed to delete attachment file.", e);
+            return AttachmentStorageDeleteResult.failed("DELETE_FAILED", "Attachment file could not be deleted.");
+        } catch (RuntimeException e) {
+            log.warn("Failed to delete attachment file.", e);
+            return AttachmentStorageDeleteResult.failed("DELETE_FAILED", "Attachment file could not be deleted.");
         }
     }
 

@@ -136,7 +136,26 @@ public class ApplicationAttachmentDeleteService {
 
     private void deletePhysicalFile(Long applicationId, Long attachmentId, String storagePath) {
         try {
-            storageService.deleteIfExists(storagePath);
+            AttachmentStorageDeleteResult result = storageService.deleteIfExistsWithResult(storagePath);
+            if (result.failed()) {
+                log.warn(
+                        "Attachment physical delete failed after DB soft delete. applicationId={}, attachmentId={}, deleted={}, existed={}, failureCode={}, message={}",
+                        applicationId,
+                        attachmentId,
+                        result.deleted(),
+                        result.existed(),
+                        result.failureCode(),
+                        result.message()
+                );
+                return;
+            }
+            log.info(
+                    "Attachment physical delete completed after DB soft delete. applicationId={}, attachmentId={}, deleted={}, existed={}",
+                    applicationId,
+                    attachmentId,
+                    result.deleted(),
+                    result.existed()
+            );
         } catch (RuntimeException e) {
             log.warn(
                     "Attachment physical delete failed after DB soft delete. applicationId={}, attachmentId={}",

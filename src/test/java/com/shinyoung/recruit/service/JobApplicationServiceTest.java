@@ -180,6 +180,32 @@ class JobApplicationServiceTest {
     }
 
     @Test
+    void create_application_fails_when_job_posting_is_hidden_or_outside_display_period() {
+        Applicant hiddenApplicant = createApplicant("applicant-hidden-posting", "Applicant Hidden");
+        Long hiddenJobPostingId = createPublishedJobPosting("Hidden Posting");
+        setDisplayPolicy(hiddenJobPostingId, false, null, null);
+
+        assertThatThrownBy(() -> jobApplicationService.create(
+                hiddenApplicant.getId(),
+                new ApplicationCreateRequest(hiddenJobPostingId, firstJobPositionId(hiddenJobPostingId))
+        )).isInstanceOf(InvalidJobApplicationException.class);
+
+        Applicant displayApplicant = createApplicant("applicant-display-posting", "Applicant Display");
+        Long displayJobPostingId = createPublishedJobPosting("Display Future Posting");
+        setDisplayPolicy(
+                displayJobPostingId,
+                true,
+                LocalDateTime.of(2026, 6, 16, 9, 0),
+                LocalDateTime.of(2026, 6, 30, 18, 0)
+        );
+
+        assertThatThrownBy(() -> jobApplicationService.create(
+                displayApplicant.getId(),
+                new ApplicationCreateRequest(displayJobPostingId, firstJobPositionId(displayJobPostingId))
+        )).isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
     void create_application_fails_when_reference_is_invalid() {
         Applicant applicant = createApplicant("applicant-reference", "Applicant F");
         Long jobPostingId = createPublishedJobPosting("Reference Posting");
@@ -301,6 +327,37 @@ class JobApplicationServiceTest {
         assertThat(detail.status()).isEqualTo(JobApplicationStatus.DRAFT);
         assertThat(application.getSubmittedAt()).isNull();
         assertThat(application.getWithdrawnAt()).isNull();
+    }
+
+    @Test
+    void existing_application_commands_ignore_visible_and_display_conditions() {
+        Applicant applicant = createApplicant("applicant-existing-display", "Applicant Existing Display");
+        Long jobPostingId = createPublishedJobPosting("Existing Display Posting");
+        List<Long> jobPositionIds = jobPositionIds(jobPostingId);
+        Long applicationId = jobApplicationService.create(
+                applicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, jobPositionIds.get(0))
+        );
+        setDisplayPolicy(
+                jobPostingId,
+                false,
+                LocalDateTime.of(2026, 6, 16, 9, 0),
+                LocalDateTime.of(2026, 6, 30, 18, 0)
+        );
+
+        jobApplicationService.updateDraft(
+                applicant.getId(),
+                applicationId,
+                new ApplicationUpdateRequest(jobPositionIds.get(1))
+        );
+        jobApplicationService.submit(applicant.getId(), applicationId);
+        jobApplicationService.withdraw(applicant.getId(), applicationId);
+
+        JobApplication application = jobApplicationRepository.findById(applicationId).orElseThrow();
+        assertThat(application.getJobPosition().getId()).isEqualTo(jobPositionIds.get(1));
+        assertThat(application.getStatus()).isEqualTo(JobApplicationStatus.WITHDRAWN);
+        assertThat(application.getSubmittedAt()).isNotNull();
+        assertThat(application.getWithdrawnAt()).isNotNull();
     }
 
     @Test
@@ -1141,6 +1198,28 @@ class JobApplicationServiceTest {
                 jobPosting.getContentHtml(),
                 start,
                 end
+        );
+    }
+
+    private void setDisplayPolicy(
+            Long jobPostingId,
+            boolean visible,
+            LocalDateTime displayStart,
+            LocalDateTime displayEnd
+    ) {
+        JobPosting jobPosting = jobPostingRepository.findById(jobPostingId).orElseThrow();
+        jobPosting.updateBasicInfo(
+                jobPosting.getTitle(),
+                jobPosting.getPostingType(),
+                jobPosting.getSummary(),
+                jobPosting.getContentHtml(),
+                jobPosting.getReceptionStartDateTime(),
+                jobPosting.getReceptionEndDateTime(),
+                displayStart,
+                displayEnd,
+                visible,
+                jobPosting.isPinned(),
+                jobPosting.getDisplayOrder()
         );
     }
 

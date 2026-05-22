@@ -1,0 +1,10 @@
+package com.shinyoung.recruit.enumeration;
+
+public enum AttachmentStorageHealthIssueType {
+    STORED_MISSING_PHYSICAL_FILE,
+    DELETED_PHYSICAL_FILE_REMAINING,
+    ORPHAN_PHYSICAL_FILE,
+    INVALID_STORAGE_PATH,
+    MISSING_ROW_PHYSICAL_FILE_PRESENT,
+    IGNORED_UNMANAGED_FILE
+}

@@ -53,6 +53,16 @@ public class ApplicationFormConfig {
         return new ApplicationFormConfig(useEducation, useCareer, useCertificate, useLanguage, useMilitary, useAward, useGapPeriod);
     }
 
+    public void update(boolean useEducation, boolean useCareer, boolean useCertificate, boolean useLanguage, boolean useMilitary, boolean useAward, boolean useGapPeriod) {
+        this.useEducation = useEducation;
+        this.useCareer = useCareer;
+        this.useCertificate = useCertificate;
+        this.useLanguage = useLanguage;
+        this.useMilitary = useMilitary;
+        this.useAward = useAward;
+        this.useGapPeriod = useGapPeriod;
+    }
+
     void assignJobPosting(JobPosting jobPosting) {
         this.jobPosting = jobPosting;
     }
