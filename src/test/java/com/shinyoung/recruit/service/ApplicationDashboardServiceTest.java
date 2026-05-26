@@ -1,16 +1,19 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
+import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
 import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.ApplicationMilitary;
 import com.shinyoung.recruit.domain.entity.JobApplication;
+import com.shinyoung.recruit.domain.entity.JobPostingAttachmentRequirement;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
 import com.shinyoung.recruit.domain.entity.Stage;
 import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
@@ -20,14 +23,19 @@ import com.shinyoung.recruit.domain.repository.ApplicationGapPeriodRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationLanguageRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationMilitaryRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingAttachmentRequirementRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
 import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.dto.response.ApplicationDashboardResponse;
 import com.shinyoung.recruit.dto.response.ApplicationSectionReadinessResponse;
+import com.shinyoung.recruit.enumeration.ApplicationSectionType;
+import com.shinyoung.recruit.enumeration.AttachmentDeleteActorType;
+import com.shinyoung.recruit.enumeration.AttachmentType;
 import com.shinyoung.recruit.enumeration.CareerType;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.enumeration.MilitarySubjectType;
+import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
@@ -98,6 +106,12 @@ class ApplicationDashboardServiceTest {
     @Mock
     private ApplicationGapPeriodRepository gapPeriodRepository;
 
+    @Mock
+    private JobPostingAttachmentRequirementRepository attachmentRequirementRepository;
+
+    @Mock
+    private ApplicationAttachmentRepository attachmentRepository;
+
     private ApplicationDashboardService dashboardService;
 
     @BeforeEach
@@ -112,7 +126,9 @@ class ApplicationDashboardServiceTest {
                 certificateRepository,
                 languageRepository,
                 awardRepository,
-                gapPeriodRepository
+                gapPeriodRepository,
+                attachmentRequirementRepository,
+                attachmentRepository
         );
         dashboardService = new ApplicationDashboardService(
                 jobApplicationRepository,
@@ -126,6 +142,10 @@ class ApplicationDashboardServiceTest {
         lenient().when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of());
         lenient().when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
+                .thenReturn(List.of());
+        lenient().when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of());
+        lenient().when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
                 .thenReturn(List.of());
         lenient().when(careerProfileRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(Optional.empty());
@@ -365,6 +385,150 @@ class ApplicationDashboardServiceTest {
     }
 
     @Test
+    void enabled_but_not_required_core_sections_are_optional_and_not_blocking() {
+        ApplicationFormConfig config = config(
+                true, false,
+                true, false,
+                false, false,
+                false, false,
+                true, false,
+                false, false,
+                false, false
+        );
+
+        ApplicationDashboardResponse response = dashboardFor(config);
+
+        assertThat(response.submittable()).isTrue();
+        assertThat(response.completionSummary().requiredSectionCount()).isZero();
+        assertThat(response.completionSummary().optionalSectionCount()).isEqualTo(3);
+        assertThat(response.optionalIncompleteSections())
+                .extracting(ApplicationSectionReadinessResponse::sectionCode)
+                .containsExactlyInAnyOrder("EDUCATION", "CAREER", "MILITARY");
+        assertThat(response.optionalIncompleteSections())
+                .extracting(ApplicationSectionReadinessResponse::message)
+                .allSatisfy(message -> assertThat(message).doesNotContain("required before submit"));
+    }
+
+    @Test
+    void optional_domain_section_can_be_required_and_block_submit() {
+        ApplicationFormConfig config = config(
+                false, false,
+                false, false,
+                true, true,
+                true, true,
+                false, false,
+                true, true,
+                true, true
+        );
+
+        ApplicationDashboardResponse response = dashboardFor(config);
+
+        assertThat(response.submittable()).isFalse();
+        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(4);
+        assertThat(response.requiredMissingSections())
+                .extracting(ApplicationSectionReadinessResponse::sectionCode, ApplicationSectionReadinessResponse::reasonCode)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple("CERTIFICATE", "MISSING_ROW"),
+                        org.assertj.core.groups.Tuple.tuple("LANGUAGE", "MISSING_ROW"),
+                        org.assertj.core.groups.Tuple.tuple("AWARD", "MISSING_ROW"),
+                        org.assertj.core.groups.Tuple.tuple("GAP_PERIOD", "MISSING_ROW")
+                );
+    }
+
+    @Test
+    void required_attachment_missing_is_blocking() {
+        when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")));
+
+        ApplicationDashboardResponse response = dashboardFor(config());
+
+        assertThat(response.submittable()).isFalse();
+        assertThat(response.requiredMissingSections())
+                .extracting(ApplicationSectionReadinessResponse::sectionCode, ApplicationSectionReadinessResponse::reasonCode)
+                .contains(org.assertj.core.groups.Tuple.tuple("ATTACHMENT", "REQUIRED_ATTACHMENT_MISSING"));
+    }
+
+    @Test
+    void required_attachment_is_complete_only_with_matching_stored_row() {
+        when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")));
+        when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
+                .thenReturn(List.of(attachment(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, false)));
+
+        ApplicationDashboardResponse response = dashboardFor(config());
+
+        assertThat(response.submittable()).isTrue();
+        assertThat(response.requiredMissingSections()).isEmpty();
+        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(1);
+        assertThat(response.completionSummary().completedRequiredSectionCount()).isEqualTo(1);
+    }
+
+    @Test
+    void required_attachment_group_ignores_optional_missing_issue_when_required_requirement_exists() {
+        when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(
+                        requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume"),
+                        requirement(false, 1, AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, "Portfolio")
+                ));
+        when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
+                .thenReturn(List.of(attachment(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, false)));
+
+        ApplicationDashboardResponse response = dashboardFor(config());
+
+        assertThat(response.submittable()).isTrue();
+        assertThat(response.requiredMissingSections()).isEmpty();
+        assertThat(response.optionalIncompleteSections()).isEmpty();
+        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(1);
+        assertThat(response.completionSummary().completedRequiredSectionCount()).isEqualTo(1);
+        assertThat(response.completionSummary().optionalSectionCount()).isZero();
+        assertThat(response.completionSummary().optionalIncompleteCount()).isZero();
+    }
+
+    @Test
+    void wrong_or_deleted_attachment_does_not_satisfy_required_rule() {
+        when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")));
+        when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
+                .thenReturn(List.of(
+                        attachment(AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, false),
+                        attachment(AttachmentType.RESUME, ApplicationSectionType.CAREER, false),
+                        attachment(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, true)
+                ));
+
+        ApplicationDashboardResponse response = dashboardFor(config());
+
+        assertRequiredIssue(response, "ATTACHMENT", "REQUIRED_ATTACHMENT_MISSING");
+    }
+
+    @Test
+    void optional_attachment_min_count_zero_does_not_create_optional_issue() {
+        when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(requirement(false, 0, AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, "Portfolio")));
+
+        ApplicationDashboardResponse response = dashboardFor(config());
+
+        assertThat(response.submittable()).isTrue();
+        assertThat(response.optionalIncompleteSections()).isEmpty();
+        assertThat(response.completionSummary().optionalSectionCount()).isZero();
+    }
+
+    @Test
+    void optional_attachment_min_count_positive_creates_non_blocking_issue() {
+        when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(requirement(false, 1, AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, "Portfolio")));
+
+        ApplicationDashboardResponse response = dashboardFor(config());
+
+        assertThat(response.submittable()).isTrue();
+        assertThat(response.optionalIncompleteSections())
+                .extracting(ApplicationSectionReadinessResponse::sectionCode, ApplicationSectionReadinessResponse::reasonCode)
+                .contains(org.assertj.core.groups.Tuple.tuple("ATTACHMENT", "OPTIONAL_ATTACHMENT_MISSING"));
+        assertThat(response.optionalIncompleteSections())
+                .extracting(ApplicationSectionReadinessResponse::message)
+                .allSatisfy(message -> assertThat(message).doesNotContain("required before submit"));
+    }
+
+    @Test
     void latest_result_summary_uses_highest_visible_stage_order_and_id() {
         JobApplication application = application(JobApplicationStatus.DRAFT, acceptingPosting(config()));
         stubDashboard(application);
@@ -445,12 +609,53 @@ class ApplicationDashboardServiceTest {
     ) {
         ApplicationFormConfig config = mock(ApplicationFormConfig.class);
         lenient().when(config.isUseEducation()).thenReturn(useEducation);
+        lenient().when(config.isRequireEducation()).thenReturn(useEducation);
         lenient().when(config.isUseCareer()).thenReturn(useCareer);
+        lenient().when(config.isRequireCareer()).thenReturn(useCareer);
         lenient().when(config.isUseCertificate()).thenReturn(useCertificate);
+        lenient().when(config.isRequireCertificate()).thenReturn(false);
         lenient().when(config.isUseLanguage()).thenReturn(useLanguage);
+        lenient().when(config.isRequireLanguage()).thenReturn(false);
         lenient().when(config.isUseMilitary()).thenReturn(useMilitary);
+        lenient().when(config.isRequireMilitary()).thenReturn(useMilitary);
         lenient().when(config.isUseAward()).thenReturn(useAward);
+        lenient().when(config.isRequireAward()).thenReturn(false);
         lenient().when(config.isUseGapPeriod()).thenReturn(useGapPeriod);
+        lenient().when(config.isRequireGapPeriod()).thenReturn(false);
+        return config;
+    }
+
+    private ApplicationFormConfig config(
+            boolean useEducation,
+            boolean requireEducation,
+            boolean useCareer,
+            boolean requireCareer,
+            boolean useCertificate,
+            boolean requireCertificate,
+            boolean useLanguage,
+            boolean requireLanguage,
+            boolean useMilitary,
+            boolean requireMilitary,
+            boolean useAward,
+            boolean requireAward,
+            boolean useGapPeriod,
+            boolean requireGapPeriod
+    ) {
+        ApplicationFormConfig config = mock(ApplicationFormConfig.class);
+        lenient().when(config.isUseEducation()).thenReturn(useEducation);
+        lenient().when(config.isRequireEducation()).thenReturn(requireEducation);
+        lenient().when(config.isUseCareer()).thenReturn(useCareer);
+        lenient().when(config.isRequireCareer()).thenReturn(requireCareer);
+        lenient().when(config.isUseCertificate()).thenReturn(useCertificate);
+        lenient().when(config.isRequireCertificate()).thenReturn(requireCertificate);
+        lenient().when(config.isUseLanguage()).thenReturn(useLanguage);
+        lenient().when(config.isRequireLanguage()).thenReturn(requireLanguage);
+        lenient().when(config.isUseMilitary()).thenReturn(useMilitary);
+        lenient().when(config.isRequireMilitary()).thenReturn(requireMilitary);
+        lenient().when(config.isUseAward()).thenReturn(useAward);
+        lenient().when(config.isRequireAward()).thenReturn(requireAward);
+        lenient().when(config.isUseGapPeriod()).thenReturn(useGapPeriod);
+        lenient().when(config.isRequireGapPeriod()).thenReturn(requireGapPeriod);
         return config;
     }
 
@@ -502,5 +707,52 @@ class ApplicationDashboardServiceTest {
         lenient().when(result.getStage()).thenReturn(stage);
         lenient().when(result.getResultStatus()).thenReturn(status);
         return result;
+    }
+
+    private JobPostingAttachmentRequirement requirement(
+            boolean required,
+            int minCount,
+            AttachmentType attachmentType,
+            ApplicationSectionType sectionType,
+            String displayName
+    ) {
+        return JobPostingAttachmentRequirement.create(
+                null,
+                attachmentType,
+                sectionType,
+                required,
+                minCount,
+                0,
+                displayName,
+                null
+        );
+    }
+
+    private ApplicationAttachment attachment(
+            AttachmentType attachmentType,
+            ApplicationSectionType sectionType,
+            boolean deleted
+    ) {
+        ApplicationAttachment attachment = ApplicationAttachment.createStored(
+                null,
+                attachmentType,
+                sectionType,
+                null,
+                "test.pdf",
+                "stored.pdf",
+                "/test/stored.pdf",
+                "application/pdf",
+                100L,
+                0
+        );
+        if (deleted) {
+            attachment.markDeleted(
+                    "test",
+                    AttachmentDeleteActorType.APPLICANT,
+                    "test delete",
+                    LocalDateTime.of(2026, 6, 2, 0, 0)
+            );
+        }
+        return attachment;
     }
 }

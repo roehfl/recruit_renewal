@@ -1,11 +1,20 @@
 package com.shinyoung.recruit.controller;
 
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
+import com.shinyoung.recruit.dto.request.AttachmentRequirementReplaceRequest;
+import com.shinyoung.recruit.dto.request.AttachmentRequirementRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
+import com.shinyoung.recruit.dto.request.JobPostingQuestionCreateRequest;
+import com.shinyoung.recruit.enumeration.ApplicationSectionType;
+import com.shinyoung.recruit.enumeration.AttachmentType;
 import com.shinyoung.recruit.enumeration.EmploymentType;
 import com.shinyoung.recruit.enumeration.JobPositionApplicationType;
 import com.shinyoung.recruit.enumeration.JobPostingType;
+import com.shinyoung.recruit.enumeration.QuestionAnswerType;
+import com.shinyoung.recruit.enumeration.QuestionCategory;
+import com.shinyoung.recruit.service.JobPostingAttachmentRequirementService;
+import com.shinyoung.recruit.service.JobPostingQuestionService;
 import com.shinyoung.recruit.service.JobPostingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +53,12 @@ class JobPostingPublicControllerTest {
     @Autowired
     private JobPostingService jobPostingService;
 
+    @Autowired
+    private JobPostingQuestionService jobPostingQuestionService;
+
+    @Autowired
+    private JobPostingAttachmentRequirementService attachmentRequirementService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -71,6 +86,15 @@ class JobPostingPublicControllerTest {
                 .andExpect(jsonPath("$.data.content[0].positions[0].jobTitle").value("Analyst"))
                 .andExpect(jsonPath("$.data.content[0].positions[0].workLocation").value("Seoul"))
                 .andExpect(jsonPath("$.data.content[0].positions[0].employmentType").value("FULL_TIME"))
+                .andExpect(jsonPath("$.data.content[0].applicationFormRequiredPolicy.requiredSectionCount").value(2))
+                .andExpect(jsonPath("$.data.content[0].applicationFormRequiredPolicy.optionalSectionCount").value(1))
+                .andExpect(jsonPath("$.data.content[0].applicationFormRequiredPolicy.requiredQuestionCount").value(0))
+                .andExpect(jsonPath("$.data.content[0].applicationFormRequiredPolicy.attachmentRequired").value(false))
+                .andExpect(jsonPath("$.data.content[0].applicationFormRequiredPolicy.sections[0].sectionCode").value("EDUCATION"))
+                .andExpect(jsonPath("$.data.content[0].applicationFormRequiredPolicy.sections[0].requirementType").value("REQUIRED"))
+                .andExpect(jsonPath("$.data.content[0].applicationFormRequiredPolicy.sections[8].sectionCode").value("ATTACHMENT"))
+                .andExpect(jsonPath("$.data.content[0].applicationFormRequiredPolicy.sections[8].requirementType").value("DISABLED"))
+                .andExpect(jsonPath("$.data.content[0].attachmentRequirements").doesNotExist())
                 .andExpect(jsonPath("$.data.content[0].status").doesNotExist())
                 .andExpect(jsonPath("$.data.content[0].visible").doesNotExist())
                 .andExpect(jsonPath("$.data.content[0].displayStartDateTime").doesNotExist())
@@ -96,6 +120,13 @@ class JobPostingPublicControllerTest {
                 .andExpect(jsonPath("$.data.pinned").value(true))
                 .andExpect(jsonPath("$.data.jobPositions[0].sortOrder").value(1))
                 .andExpect(jsonPath("$.data.applicationFormConfig.useEducation").value(true))
+                .andExpect(jsonPath("$.data.applicationFormConfig.requireEducation").value(true))
+                .andExpect(jsonPath("$.data.applicationFormConfig.requireCertificate").value(false))
+                .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.requiredSectionCount").value(2))
+                .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.optionalSectionCount").value(1))
+                .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.sections[4].sectionCode").value("MILITARY"))
+                .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.sections[4].requirementType").value("REQUIRED"))
+                .andExpect(jsonPath("$.data.attachmentRequirements").isArray())
                 .andExpect(jsonPath("$.data.status").doesNotExist())
                 .andExpect(jsonPath("$.data.visible").doesNotExist())
                 .andExpect(jsonPath("$.data.displayStartDateTime").doesNotExist())
@@ -104,6 +135,59 @@ class JobPostingPublicControllerTest {
                 .andExpect(jsonPath("$.data.createdAt").doesNotExist())
                 .andExpect(jsonPath("$.data.updatedAt").doesNotExist())
                 .andExpect(jsonPath("$.data.closedAt").doesNotExist());
+    }
+
+    @Test
+    void public_detail_exposes_question_policy_counts_as_json() throws Exception {
+        Long id = jobPostingService.create(publicRequest("question policy", true, displayStart(), displayEnd(), false));
+        createQuestion(id, 0, true);
+        createQuestion(id, 1, false);
+        jobPostingService.publish(id);
+
+        mockMvc.perform(get("/job-postings/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.requiredQuestionCount").value(1))
+                .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.optionalQuestionCount").value(1))
+                .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.hasRequiredQuestion").value(true))
+                .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.sections[7].sectionCode").value("QUESTION"))
+                .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.sections[7].enabled").value(true))
+                .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.sections[7].required").value(true))
+                .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.sections[7].requirementType").value("REQUIRED"));
+    }
+
+    @Test
+    void public_detail_exposes_safe_attachment_requirements_as_json() throws Exception {
+        Long id = jobPostingService.create(publicRequest("attachment policy", true, displayStart(), displayEnd(), false));
+        attachmentRequirementService.replaceRequirements(
+                id,
+                new AttachmentRequirementReplaceRequest(List.of(
+                        new AttachmentRequirementRequest(
+                                AttachmentType.RESUME,
+                                ApplicationSectionType.APPLICATION,
+                                true,
+                                1,
+                                0,
+                                "Resume",
+                                "Upload resume."
+                        )
+                ))
+        );
+        jobPostingService.publish(id);
+
+        mockMvc.perform(get("/job-postings/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.attachmentRequired").value(true))
+                .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.sections[8].sectionCode").value("ATTACHMENT"))
+                .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.sections[8].requirementType").value("REQUIRED"))
+                .andExpect(jsonPath("$.data.attachmentRequirements[0].attachmentType").value("RESUME"))
+                .andExpect(jsonPath("$.data.attachmentRequirements[0].sectionType").value("APPLICATION"))
+                .andExpect(jsonPath("$.data.attachmentRequirements[0].required").value(true))
+                .andExpect(jsonPath("$.data.attachmentRequirements[0].minCount").value(1))
+                .andExpect(jsonPath("$.data.attachmentRequirements[0].displayName").value("Resume"))
+                .andExpect(jsonPath("$.data.attachmentRequirements[0].storagePath").doesNotExist())
+                .andExpect(jsonPath("$.data.attachmentRequirements[0].physicalFileStatus").doesNotExist());
     }
 
     @Test
@@ -129,6 +213,23 @@ class JobPostingPublicControllerTest {
         Long id = jobPostingService.create(request);
         jobPostingService.publish(id);
         return id;
+    }
+
+    private void createQuestion(Long jobPostingId, int sortOrder, boolean required) {
+        jobPostingQuestionService.createQuestion(
+                jobPostingId,
+                new JobPostingQuestionCreateRequest(
+                        null,
+                        "Question " + sortOrder,
+                        "Helper " + sortOrder,
+                        QuestionCategory.GENERAL,
+                        QuestionAnswerType.SHORT_TEXT,
+                        required,
+                        0,
+                        500,
+                        sortOrder
+                )
+        );
     }
 
     private JobPostingCreateRequest publicRequest(

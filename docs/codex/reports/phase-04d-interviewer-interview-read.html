@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 04d Interviewer Interview Read</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f4f7fb; line-height: 1.55; }
+    header { background: #16324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 32px 0 14px; font-size: 22px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d8e1eb; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e7edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #edf2f7; padding: 2px 5px; border-radius: 4px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f4d7da; color: #842029; }
+    .warn { background: #ffe7b1; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d8e1eb; border-radius: 8px; padding: 16px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .section { margin-top: 24px; }
+    @media (max-width: 860px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>Shinyoung Recruit Backend</div>
+  <h1>Phase 04d - Interviewer Interview Read</h1>
+  <span class="badge done">Completed</span>
+  <span class="badge muted">Generated: 2026-05-26</span>
+</header>
+
+<main>
+  <section class="summary">
+    <div class="card">
+      <h2>Executive Summary</h2>
+      <p>Phase 04d adds interviewer-owned, read-only interview schedule APIs.</p>
+      <p>The APIs expose only schedules where the current employee is assigned as an <code>INTERVIEWER</code> participant, and only when the schedule is <code>CONFIRMED</code> or <code>CANCELLED</code>.</p>
+      <p><code>DRAFT</code> schedules, other employees' assignments, admin memo, other interviewer lists, and <code>StageResult</code> internals are hidden.</p>
+      <p>The phase can move to Phase 04e stabilization or the next roadmap phase.</p>
+    </div>
+    <div class="card">
+      <h2>Status</h2>
+      <p><span class="badge done">Service complete</span></p>
+      <p><span class="badge done">Controller complete</span></p>
+      <p><span class="badge done">Repository queries complete</span></p>
+      <p><span class="badge done">Targeted tests passed</span></p>
+      <p><span class="badge pending">Full suite not run by instruction</span></p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Scope</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Completed Scope</h3>
+        <ul class="list">
+          <li>Interviewer interview list.</li>
+          <li>Interviewer interview detail.</li>
+          <li>Current employee ownership guard.</li>
+          <li>DRAFT hiding and bad-request status filter guard.</li>
+          <li>Assigned candidate list in detail response.</li>
+          <li>Interviewer-safe response DTOs.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Not Implemented</h3>
+        <ul class="list">
+          <li>Admin write API changes.</li>
+          <li>Applicant read API changes.</li>
+          <li>Interview evaluation.</li>
+          <li>Scoring or result decisions.</li>
+          <li>Messages, exports, PDF, calendar.</li>
+          <li>Frontend/static resources.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Deferred</h3>
+        <ul class="list">
+          <li>Dedicated interviewer role policy refinement.</li>
+          <li>Participant-level cancellation command.</li>
+          <li>Production DB migration files.</li>
+          <li>Evaluation handoff policy.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Changed Files</h2>
+    <table>
+      <tr><th>File</th><th>Change</th></tr>
+      <tr><td><code>InterviewerInterviewService.java</code></td><td>Interviewer read service and validation guards.</td></tr>
+      <tr><td><code>InterviewerInterviewController.java</code></td><td>Interviewer interview read-only APIs.</td></tr>
+      <tr><td><code>InterviewerInterviewSummaryResponse.java</code></td><td>Interviewer-safe list response.</td></tr>
+      <tr><td><code>InterviewerInterviewDetailResponse.java</code></td><td>Interviewer-safe detail response.</td></tr>
+      <tr><td><code>InterviewerInterviewCandidateResponse.java</code></td><td>Assigned candidate response.</td></tr>
+      <tr><td><code>InterviewParticipantRepository.java</code></td><td>Interviewer visibility and assigned candidate queries.</td></tr>
+      <tr><td><code>EmployeeRepository.java</code></td><td>Current employee lookup by login id.</td></tr>
+      <tr><td><code>CurrentEmployeeService.java</code></td><td>Current employee id resolver.</td></tr>
+      <tr><td><code>SecurityConfig.java</code></td><td><code>/interviewer/**</code> requires employee-family authority.</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Architecture and Domain</h2>
+    <div class="two">
+      <div class="card">
+        <h3>Entity Structure</h3>
+        <ul class="list">
+          <li><code>Interview</code> belongs to <code>JobPosting</code> and <code>Stage</code>.</li>
+          <li><code>InterviewParticipant</code> belongs to <code>Interview</code>.</li>
+          <li>Interviewer reads only interviewer participant rows.</li>
+          <li>Interviewer rows point to <code>Employee</code>.</li>
+          <li>Detail candidate rows point to <code>JobApplication</code>.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Data Ownership</h3>
+        <ul class="list">
+          <li>Employee id is resolved from session principal login id.</li>
+          <li>No API accepts employee id or user id.</li>
+          <li>Repository queries apply ownership and visibility together.</li>
+          <li>Non-owned or non-visible details return not found.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>API List</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/interviewer/interviews?status=&amp;from=&amp;to=</code></td>
+        <td>All visible schedules assigned to current employee as interviewer.</td>
+        <td>Optional query params only.</td>
+        <td><code>ApiResponse&lt;List&lt;InterviewerInterviewSummaryResponse&gt;&gt;</code></td>
+      </tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/interviewer/interviews/{interviewId}</code></td>
+        <td>One visible schedule detail with assigned candidates.</td>
+        <td>Interview id.</td>
+        <td><code>ApiResponse&lt;InterviewerInterviewDetailResponse&gt;</code></td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Validation Rules</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Visibility</h3>
+        <ul class="list">
+          <li>Visible: <code>CONFIRMED</code>, <code>CANCELLED</code>.</li>
+          <li>Hidden: <code>DRAFT</code>.</li>
+          <li>Interviewer rows only.</li>
+          <li><code>participantStatus = ASSIGNED</code> only.</li>
+          <li>Current employee assignment only.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Candidate List</h3>
+        <ul class="list">
+          <li>Loaded after interviewer ownership is verified.</li>
+          <li>Assigned candidate participants only.</li>
+          <li>Cancelled candidate participants are excluded.</li>
+          <li>Other interviewer rows are not exposed.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Forbidden Response Fields</h3>
+        <ul class="list">
+          <li>Admin memo and cancel/internal memo.</li>
+          <li>Other interviewer employee id/name/department.</li>
+          <li>Interviewer participant list.</li>
+          <li><code>StageResult</code> status, history, and announcement fields.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Test Results</h2>
+    <div class="card">
+      <p>Executed targeted command:</p>
+      <p><code>$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests com.shinyoung.recruit.service.InterviewerInterviewServiceTest --tests com.shinyoung.recruit.controller.InterviewerInterviewControllerTest --tests com.shinyoung.recruit.domain.repository.InterviewParticipantRepositoryTest --tests com.shinyoung.recruit.service.ApplicantInterviewServiceTest --tests com.shinyoung.recruit.service.InterviewServiceTest --tests com.shinyoung.recruit.service.CurrentEmployeeServiceTest --no-daemon</code></p>
+      <p>Result: <span class="badge done">BUILD SUCCESSFUL</span></p>
+      <p>Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> explicitly limited this slice to targeted tests. Required note: full tests were not run because of development PC performance concerns and potential full-suite timeout.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Remaining Issues</h2>
+    <table>
+      <tr><th>Issue</th><th>Status</th><th>Handling</th></tr>
+      <tr><td>Interview evaluation</td><td><span class="badge pending">Pending</span></td><td>Handle after scheduling read slices are stabilized.</td></tr>
+      <tr><td>Dedicated interviewer role policy</td><td><span class="badge pending">Pending</span></td><td>Current access allows employee-family authorities; assignment controls final visibility.</td></tr>
+      <tr><td>Production schema migration</td><td><span class="badge warn">Manual</span></td><td>No migration file added in this phase.</td></tr>
+      <tr><td>StageResult mutation</td><td><span class="badge done">Not changed</span></td><td>Phase 04d does not use <code>StageResultRepository</code>.</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Next Phase</h2>
+    <div class="card">
+      <p><span class="badge info">Phase 04e - Interview Scheduling Stabilization / Test Hardening</span></p>
+      <p>Recommended next slice: re-check 04a-04d response consistency, cancelled schedule edge cases, participant lifecycle tests, and final authorization matrix.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

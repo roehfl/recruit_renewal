@@ -129,6 +129,7 @@
       <p>This phase defines how application form section usage and final-submit requiredness should be separated.</p>
       <p>The recommendation is to keep existing <code>useXxx</code> fields for visibility and section API access, and add explicit <code>requireXxx</code> fields for submit-blocking and dashboard required-readiness policy.</p>
       <p>Review update: <code>requireXxx</code> must not be exposed in request or response payloads before submit and dashboard policies also use it. The recommended Phase 03k-1 is now an end-to-end policy change.</p>
+      <p>Implementation note: the completed Phase 03k-1 was later narrowed by <code>instruction.md</code> to a public read-only compatibility slice. It adds <code>applicationFormRequiredPolicy</code> to public job posting responses, but it does not implement the target <code>requireXxx</code> fields, schema migration, submit validator conversion, or dashboard completion conversion described by this design.</p>
       <p>No Java source, test source, DB migration, runtime API behavior, security configuration, SMS/email, or LDAP behavior is changed in this design phase.</p>
     </div>
     <div class="card">

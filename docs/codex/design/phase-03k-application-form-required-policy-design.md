@@ -17,6 +17,19 @@ The current implementation has only `useXxx` flags. Those flags currently drive 
 
 This coupling makes it difficult to support postings where a section is visible and editable but not required. Phase 03k defines the target policy, API shape, validation rules, migration/default strategy, and implementation phase split. This is a documentation-only design phase.
 
+## Implementation Note - Phase 03k-1
+
+Phase 03k-1 was implemented as a narrowed public read-only compatibility slice based on `instruction.md`.
+
+That implementation does not add the target `requireXxx` fields described by this design. It adds `applicationFormRequiredPolicy` to public job posting list/detail responses and derives the policy from the current effective behavior:
+
+- `EDUCATION`, `CAREER`, and `MILITARY` are required when their existing `useXxx` flag is `true`.
+- `CERTIFICATE`, `LANGUAGE`, `AWARD`, and `GAP_PERIOD` are optional when their existing `useXxx` flag is `true`.
+- `QUESTION` is based on active `JobPostingQuestion.required` counts.
+- `ATTACHMENT` remains deferred and not required.
+
+The Phase 03k target design remains deferred until schema, admin request/response, submit validator, and dashboard completion behavior can be changed together.
+
 ## Scope
 
 - Analyze current `ApplicationFormConfig` behavior.

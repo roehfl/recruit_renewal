@@ -1,14 +1,25 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
+import com.shinyoung.recruit.dto.request.AttachmentRequirementReplaceRequest;
+import com.shinyoung.recruit.dto.request.AttachmentRequirementRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
+import com.shinyoung.recruit.dto.request.JobPostingQuestionCreateRequest;
+import com.shinyoung.recruit.dto.response.ApplicationFormRequiredPolicyResponse;
+import com.shinyoung.recruit.dto.response.ApplicationFormSectionPolicyResponse;
 import com.shinyoung.recruit.dto.response.JobPostingPublicDetailResponse;
 import com.shinyoung.recruit.dto.response.JobPostingPublicListResponse;
+import com.shinyoung.recruit.dto.response.JobPostingQuestionResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
+import com.shinyoung.recruit.enumeration.ApplicationFormRequirementType;
+import com.shinyoung.recruit.enumeration.ApplicationSectionType;
+import com.shinyoung.recruit.enumeration.AttachmentType;
 import com.shinyoung.recruit.enumeration.EmploymentType;
 import com.shinyoung.recruit.enumeration.JobPositionApplicationType;
 import com.shinyoung.recruit.enumeration.JobPostingType;
+import com.shinyoung.recruit.enumeration.QuestionAnswerType;
+import com.shinyoung.recruit.enumeration.QuestionCategory;
 import com.shinyoung.recruit.enumeration.ReceptionStatus;
 import com.shinyoung.recruit.exception.InvalidJobPostingException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
@@ -43,6 +54,12 @@ class JobPostingPublicServiceTest {
 
     @Autowired
     private JobPostingPublicService jobPostingPublicService;
+
+    @Autowired
+    private JobPostingQuestionService jobPostingQuestionService;
+
+    @Autowired
+    private JobPostingAttachmentRequirementService attachmentRequirementService;
 
     @Test
     void public_list_returns_only_published_visible_displayable_postings() {
@@ -298,6 +315,179 @@ class JobPostingPublicServiceTest {
     }
 
     @Test
+    void public_list_includes_application_form_required_policy() {
+        Long id = createPublishedPosting(request(
+                "policy",
+                JobPostingType.PUBLIC_RECRUITMENT,
+                "policy summary",
+                receptionStart(),
+                receptionEnd(),
+                displayStart(),
+                displayEnd(),
+                true,
+                false,
+                1
+        ));
+
+        ApplicationFormRequiredPolicyResponse policy = findById(
+                jobPostingPublicService.getJobPostings(0, 10),
+                id
+        ).applicationFormRequiredPolicy();
+
+        assertThat(policy.requiredSectionCount()).isEqualTo(2);
+        assertThat(policy.optionalSectionCount()).isEqualTo(2);
+        assertThat(policy.requiredQuestionCount()).isZero();
+        assertThat(policy.optionalQuestionCount()).isZero();
+        assertThat(policy.hasRequiredQuestion()).isFalse();
+        assertThat(policy.attachmentRequired()).isFalse();
+        assertThat(policy.sections())
+                .extracting(ApplicationFormSectionPolicyResponse::sectionCode)
+                .containsExactly(
+                        "EDUCATION",
+                        "CAREER",
+                        "CERTIFICATE",
+                        "LANGUAGE",
+                        "MILITARY",
+                        "AWARD",
+                        "GAP_PERIOD",
+                        "QUESTION",
+                        "ATTACHMENT"
+                );
+        assertSection(policy, "EDUCATION", true, true, ApplicationFormRequirementType.REQUIRED);
+        assertSection(policy, "CAREER", false, false, ApplicationFormRequirementType.DISABLED);
+        assertSection(policy, "CERTIFICATE", true, false, ApplicationFormRequirementType.OPTIONAL);
+        assertSection(policy, "LANGUAGE", false, false, ApplicationFormRequirementType.DISABLED);
+        assertSection(policy, "MILITARY", true, true, ApplicationFormRequirementType.REQUIRED);
+        assertSection(policy, "AWARD", true, false, ApplicationFormRequirementType.OPTIONAL);
+        assertSection(policy, "GAP_PERIOD", false, false, ApplicationFormRequirementType.DISABLED);
+        assertSection(policy, "QUESTION", false, false, ApplicationFormRequirementType.DISABLED);
+        assertSection(policy, "ATTACHMENT", false, false, ApplicationFormRequirementType.DISABLED);
+    }
+
+    @Test
+    void public_policy_uses_explicit_required_flags_from_detail_and_list() {
+        Long id = jobPostingService.create(request(
+                "explicit required policy",
+                JobPostingType.PUBLIC_RECRUITMENT,
+                "explicit required policy summary",
+                receptionStart(),
+                receptionEnd(),
+                displayStart(),
+                displayEnd(),
+                true,
+                false,
+                1,
+                new ApplicationFormConfigRequest(
+                        true,
+                        false,
+                        true,
+                        true,
+                        true,
+                        true,
+                        false,
+                        false,
+                        true,
+                        false,
+                        true,
+                        true,
+                        true,
+                        false
+                )
+        ));
+        jobPostingService.publish(id);
+
+        ApplicationFormRequiredPolicyResponse detailPolicy =
+                jobPostingPublicService.getJobPosting(id).applicationFormRequiredPolicy();
+        ApplicationFormRequiredPolicyResponse listPolicy = findById(
+                jobPostingPublicService.getJobPostings(0, 10),
+                id
+        ).applicationFormRequiredPolicy();
+
+        assertThat(detailPolicy.requiredSectionCount()).isEqualTo(3);
+        assertThat(detailPolicy.optionalSectionCount()).isEqualTo(3);
+        assertSection(detailPolicy, "EDUCATION", true, false, ApplicationFormRequirementType.OPTIONAL);
+        assertSection(detailPolicy, "CAREER", true, true, ApplicationFormRequirementType.REQUIRED);
+        assertSection(detailPolicy, "CERTIFICATE", true, true, ApplicationFormRequirementType.REQUIRED);
+        assertSection(detailPolicy, "MILITARY", true, false, ApplicationFormRequirementType.OPTIONAL);
+        assertSection(detailPolicy, "AWARD", true, true, ApplicationFormRequirementType.REQUIRED);
+        assertSection(detailPolicy, "GAP_PERIOD", true, false, ApplicationFormRequirementType.OPTIONAL);
+        assertThat(listPolicy).isEqualTo(detailPolicy);
+    }
+
+    @Test
+    void public_list_uses_attachment_requirement_aggregate_without_exposing_full_list() {
+        Long id = jobPostingService.create(request(
+                "attachment aggregate",
+                JobPostingType.PUBLIC_RECRUITMENT,
+                "attachment aggregate summary",
+                receptionStart(),
+                receptionEnd(),
+                displayStart(),
+                displayEnd(),
+                true,
+                false,
+                1
+        ));
+        replaceAttachmentRequirements(id, List.of(
+                attachmentRequirement(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, true, 1)
+        ));
+        jobPostingService.publish(id);
+
+        JobPostingPublicListResponse response = findById(jobPostingPublicService.getJobPostings(0, 10), id);
+
+        assertThat(response.applicationFormRequiredPolicy().attachmentRequired()).isTrue();
+        assertSection(response.applicationFormRequiredPolicy(), "ATTACHMENT", true, true, ApplicationFormRequirementType.REQUIRED);
+    }
+
+    @Test
+    void public_detail_exposes_safe_attachment_requirements_and_policy_states() {
+        Long requiredId = jobPostingService.create(request(
+                "required attachment detail",
+                JobPostingType.PUBLIC_RECRUITMENT,
+                "required attachment detail summary",
+                receptionStart(),
+                receptionEnd(),
+                displayStart(),
+                displayEnd(),
+                true,
+                false,
+                1
+        ));
+        replaceAttachmentRequirements(requiredId, List.of(
+                attachmentRequirement(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, true, 1)
+        ));
+        jobPostingService.publish(requiredId);
+
+        JobPostingPublicDetailResponse required = jobPostingPublicService.getJobPosting(requiredId);
+
+        assertThat(required.attachmentRequirements()).hasSize(1);
+        assertThat(required.attachmentRequirements().get(0).attachmentType()).isEqualTo(AttachmentType.RESUME);
+        assertThat(required.attachmentRequirements().get(0).required()).isTrue();
+        assertSection(required.applicationFormRequiredPolicy(), "ATTACHMENT", true, true, ApplicationFormRequirementType.REQUIRED);
+
+        Long optionalId = jobPostingService.create(request(
+                "optional attachment detail",
+                JobPostingType.PUBLIC_RECRUITMENT,
+                "optional attachment detail summary",
+                receptionStart(),
+                receptionEnd(),
+                displayStart(),
+                displayEnd(),
+                true,
+                false,
+                1
+        ));
+        replaceAttachmentRequirements(optionalId, List.of(
+                attachmentRequirement(AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, false, 0)
+        ));
+        jobPostingService.publish(optionalId);
+
+        JobPostingPublicDetailResponse optional = jobPostingPublicService.getJobPosting(optionalId);
+        assertThat(optional.applicationFormRequiredPolicy().attachmentRequired()).isFalse();
+        assertSection(optional.applicationFormRequiredPolicy(), "ATTACHMENT", true, false, ApplicationFormRequirementType.OPTIONAL);
+    }
+
+    @Test
     void public_list_empty_page_responds_safely() {
         PageResponse<JobPostingPublicListResponse> response = jobPostingPublicService.getJobPostings(0, 10);
 
@@ -334,7 +524,44 @@ class JobPostingPublicServiceTest {
                 .extracting(position -> position.positionName())
                 .containsExactly("Analyst", "Developer");
         assertThat(response.applicationFormConfig().useEducation()).isTrue();
+        assertThat(response.applicationFormConfig().requireEducation()).isTrue();
         assertThat(response.applicationFormConfig().useAward()).isTrue();
+        assertThat(response.applicationFormConfig().requireAward()).isFalse();
+    }
+
+    @Test
+    void public_detail_and_list_include_active_question_policy_counts() {
+        Long id = jobPostingService.create(request(
+                "question policy",
+                JobPostingType.PUBLIC_RECRUITMENT,
+                "question policy summary",
+                receptionStart(),
+                receptionEnd(),
+                displayStart(),
+                displayEnd(),
+                true,
+                false,
+                1
+        ));
+        createQuestion(id, 0, true);
+        createQuestion(id, 1, false);
+        JobPostingQuestionResponse inactiveQuestion = createQuestion(id, 2, true);
+        jobPostingQuestionService.deactivateQuestion(id, inactiveQuestion.questionId());
+        jobPostingService.publish(id);
+
+        ApplicationFormRequiredPolicyResponse detailPolicy =
+                jobPostingPublicService.getJobPosting(id).applicationFormRequiredPolicy();
+        ApplicationFormRequiredPolicyResponse listPolicy = findById(
+                jobPostingPublicService.getJobPostings(0, 10),
+                id
+        ).applicationFormRequiredPolicy();
+
+        assertThat(detailPolicy.requiredQuestionCount()).isEqualTo(1);
+        assertThat(detailPolicy.optionalQuestionCount()).isEqualTo(1);
+        assertThat(detailPolicy.hasRequiredQuestion()).isTrue();
+        assertThat(detailPolicy.requiredSectionCount()).isEqualTo(3);
+        assertSection(detailPolicy, "QUESTION", true, true, ApplicationFormRequirementType.REQUIRED);
+        assertThat(listPolicy).isEqualTo(detailPolicy);
     }
 
     @Test
@@ -413,6 +640,64 @@ class JobPostingPublicServiceTest {
                 .orElseThrow();
     }
 
+    private JobPostingQuestionResponse createQuestion(Long jobPostingId, int sortOrder, boolean required) {
+        return jobPostingQuestionService.createQuestion(
+                jobPostingId,
+                new JobPostingQuestionCreateRequest(
+                        null,
+                        "Question " + sortOrder,
+                        "Helper " + sortOrder,
+                        QuestionCategory.GENERAL,
+                        QuestionAnswerType.SHORT_TEXT,
+                        required,
+                        0,
+                        500,
+                        sortOrder
+                )
+        );
+    }
+
+    private void replaceAttachmentRequirements(Long jobPostingId, List<AttachmentRequirementRequest> requirements) {
+        attachmentRequirementService.replaceRequirements(
+                jobPostingId,
+                new AttachmentRequirementReplaceRequest(requirements)
+        );
+    }
+
+    private AttachmentRequirementRequest attachmentRequirement(
+            AttachmentType attachmentType,
+            ApplicationSectionType sectionType,
+            boolean required,
+            int minCount
+    ) {
+        return new AttachmentRequirementRequest(
+                attachmentType,
+                sectionType,
+                required,
+                minCount,
+                0,
+                attachmentType.name(),
+                "safe public guidance"
+        );
+    }
+
+    private void assertSection(
+            ApplicationFormRequiredPolicyResponse policy,
+            String sectionCode,
+            boolean enabled,
+            boolean required,
+            ApplicationFormRequirementType requirementType
+    ) {
+        ApplicationFormSectionPolicyResponse section = policy.sections().stream()
+                .filter(item -> item.sectionCode().equals(sectionCode))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(section.enabled()).isEqualTo(enabled);
+        assertThat(section.required()).isEqualTo(required);
+        assertThat(section.requirementType()).isEqualTo(requirementType);
+    }
+
     private JobPostingCreateRequest request(
             String title,
             boolean pinned,
@@ -472,6 +757,34 @@ class JobPostingPublicServiceTest {
             boolean pinned,
             int displayOrder
     ) {
+        return request(
+                title,
+                postingType,
+                summary,
+                receptionStartDateTime,
+                receptionEndDateTime,
+                displayStartDateTime,
+                displayEndDateTime,
+                visible,
+                pinned,
+                displayOrder,
+                new ApplicationFormConfigRequest(true, false, true, false, true, true, false)
+        );
+    }
+
+    private JobPostingCreateRequest request(
+            String title,
+            JobPostingType postingType,
+            String summary,
+            LocalDateTime receptionStartDateTime,
+            LocalDateTime receptionEndDateTime,
+            LocalDateTime displayStartDateTime,
+            LocalDateTime displayEndDateTime,
+            boolean visible,
+            boolean pinned,
+            int displayOrder,
+            ApplicationFormConfigRequest applicationFormConfig
+    ) {
         return new JobPostingCreateRequest(
                 title,
                 postingType,
@@ -506,7 +819,7 @@ class JobPostingPublicServiceTest {
                                 1
                         )
                 ),
-                new ApplicationFormConfigRequest(true, false, true, false, true, true, false)
+                applicationFormConfig
         );
     }
 

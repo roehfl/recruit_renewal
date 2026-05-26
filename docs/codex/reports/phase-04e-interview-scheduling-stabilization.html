@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 04e - Interview Scheduling Stabilization</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #14324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 22px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d8e1eb; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e7edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #edf2f7; padding: 2px 5px; border-radius: 4px; }
+    pre { white-space: pre-wrap; background: #111827; color: #e5e7eb; padding: 14px; border-radius: 8px; overflow-x: auto; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .pending { background: #f3e7cc; color: #7a4b00; }
+    .blocked { background: #f4d7da; color: #842029; }
+    .warn { background: #fff0c2; color: #765300; }
+    .muted { background: #e8edf2; color: #536171; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .card { background: #fff; border: 1px solid #d8e1eb; border-radius: 8px; padding: 16px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .section { margin-top: 24px; }
+    .small { font-size: 13px; color: #526173; }
+    @media (max-width: 860px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>Shinyoung Recruit Backend</div>
+  <h1>Phase 04e - Interview Scheduling Stabilization</h1>
+  <span class="badge done">Completed</span>
+  <span class="badge muted">Generated: 2026-05-26</span>
+</header>
+
+<main>
+  <section class="section">
+    <div class="card">
+      <h2>Executive Summary</h2>
+      <p>Phase 04e closes the interview scheduling phase with stabilization and targeted regression tests. No production API, entity, DTO, service, or controller behavior was added.</p>
+      <p>The key regression verifies that admin cancellation changes only <code>Interview.status</code>, keeps participant rows assigned, leaves <code>StageResult</code> unchanged, and remains visible to assigned applicants and interviewers.</p>
+      <p>Admin/applicant/interviewer authorization boundaries were reviewed and documented. Phase 04 can now hand off to <code>Phase 05 - Interview Evaluation</code>.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Scope</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Completed Scope</h3>
+        <p><span class="badge done">Completed</span></p>
+        <ul class="list">
+          <li>Cross-slice cancellation regression test.</li>
+          <li>Participant lifecycle hardening.</li>
+          <li><code>StageResult</code> non-mutation regression.</li>
+          <li>Admin interview authorization test.</li>
+          <li>Roadmap/history/status documentation update.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Not Implemented</h3>
+        <p><span class="badge blocked">Out of scope</span></p>
+        <ul class="list">
+          <li>No new production endpoints.</li>
+          <li>No new request/response DTOs.</li>
+          <li>No <code>InterviewEvaluation</code>.</li>
+          <li>No message, Excel, PDF, calendar, or frontend work.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Deferred</h3>
+        <p><span class="badge pending">Next phase</span></p>
+        <ul class="list">
+          <li>Evaluation draft/save/submit flow.</li>
+          <li>Admin evaluation read status.</li>
+          <li>Dedicated interviewer operating role policy.</li>
+          <li>Production DB deployment DDL process.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Changed Files</h2>
+    <table>
+      <tr><th>File</th><th>Change</th></tr>
+      <tr><td><code>src/test/java/com/shinyoung/recruit/service/InterviewSchedulingStabilizationServiceTest.java</code></td><td>New cross-slice stabilization test.</td></tr>
+      <tr><td><code>src/test/java/com/shinyoung/recruit/controller/InterviewAdminControllerTest.java</code></td><td>Added admin/applicant/anonymous authorization matrix coverage.</td></tr>
+      <tr><td><code>docs/codex/implementation/phase-04e-interview-scheduling-stabilization.md</code></td><td>Codex source-of-truth implementation document.</td></tr>
+      <tr><td><code>docs/codex/reports/phase-04e-interview-scheduling-stabilization.html</code></td><td>Self-contained human-readable report.</td></tr>
+      <tr><td><code>docs/codex/06-implementation-roadmap.md</code></td><td>Phase 04e completion and Phase 05 next step.</td></tr>
+      <tr><td><code>docs/codex/07-implementation-history.md</code></td><td>Phase 04e history entry.</td></tr>
+      <tr><td><code>docs/codex/reports/current-implementation-status.html</code></td><td>Current status updated to Phase 04 complete.</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Architecture Domain</h2>
+    <div class="two">
+      <div class="card">
+        <h3>Entity Relationship Summary</h3>
+        <ul class="list">
+          <li><code>Interview</code> belongs to <code>JobPosting</code> and <code>Stage</code>.</li>
+          <li><code>InterviewParticipant</code> belongs to <code>Interview</code>.</li>
+          <li>Candidate participants point to <code>JobApplication</code>.</li>
+          <li>Interviewer participants point to <code>Employee</code>.</li>
+          <li><code>StageResult</code> remains separate from scheduling state.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Data Ownership Rules</h3>
+        <ul class="list">
+          <li>Applicant reads use current applicant and assigned candidate participant rows.</li>
+          <li>Interviewer reads use current employee and assigned interviewer participant rows.</li>
+          <li>Admin APIs remain behind <code>/admin/**</code> authority checks.</li>
+          <li>Request parameters never accept applicant id or employee id for personal reads.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>API List</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Status</th></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/job-postings/{jobPostingId}/interviews</code></td><td>Admin schedule list.</td><td><span class="badge done">Re-verified</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/interviews/{interviewId}</code></td><td>Admin schedule detail.</td><td><span class="badge done">Existing</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/job-postings/{jobPostingId}/interviews</code></td><td>Create draft schedule.</td><td><span class="badge done">Existing</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/interviews/{interviewId}</code></td><td>Update draft schedule.</td><td><span class="badge done">Existing</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/interviews/{interviewId}/participants</code></td><td>Replace draft participants.</td><td><span class="badge done">Existing</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/interviews/{interviewId}/confirm</code></td><td>Confirm schedule.</td><td><span class="badge done">Existing</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/interviews/{interviewId}/cancel</code></td><td>Cancel schedule.</td><td><span class="badge done">Re-verified</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/applicant/interviews</code></td><td>Applicant visible schedule list.</td><td><span class="badge done">Re-verified</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/applicant/applications/{applicationId}/interviews</code></td><td>Applicant application schedule list.</td><td><span class="badge done">Re-verified</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/applicant/interviews/{interviewId}</code></td><td>Applicant schedule detail.</td><td><span class="badge done">Re-verified</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/interviewer/interviews</code></td><td>Interviewer visible schedule list.</td><td><span class="badge done">Re-verified</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/interviewer/interviews/{interviewId}</code></td><td>Interviewer schedule detail.</td><td><span class="badge done">Re-verified</span></td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Validation Rules</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Cancellation</h3>
+        <ul class="list">
+          <li>Only <code>CONFIRMED</code> interviews can be cancelled.</li>
+          <li>Cancel changes only <code>Interview.status</code>.</li>
+          <li>Participant rows remain <code>ASSIGNED</code>.</li>
+          <li>Cancelled schedules remain visible to assigned users.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Visibility</h3>
+        <ul class="list">
+          <li>Applicant/interviewer reads expose <code>CONFIRMED</code> and <code>CANCELLED</code>.</li>
+          <li><code>DRAFT</code> remains hidden outside admin APIs.</li>
+          <li>Non-owned detail reads are hidden as not found.</li>
+          <li>Cancelled participant rows are hidden.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>StageResult</h3>
+        <ul class="list">
+          <li>Scheduling confirm reads prior-stage pass eligibility.</li>
+          <li>Scheduling cancel does not mutate results.</li>
+          <li>Read DTOs do not expose result internals.</li>
+          <li>Evaluation integration is deferred to Phase 05.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Authorization Matrix</h2>
+    <table>
+      <tr><th>API area</th><th>Admin</th><th>Recruit admin</th><th>Employee/interviewer</th><th>Applicant</th><th>Anonymous</th></tr>
+      <tr><td><code>/admin/**</code> interview APIs</td><td>Allowed</td><td>Allowed</td><td>Rejected unless admin authority is present</td><td>403</td><td>401</td></tr>
+      <tr><td><code>/applicant/**</code> interview APIs</td><td>403</td><td>403</td><td>403</td><td>Allowed, then ownership checked</td><td>401</td></tr>
+      <tr><td><code>/interviewer/**</code> interview APIs</td><td>Allowed, then assignment checked</td><td>Allowed, then assignment checked</td><td>Allowed, then assignment checked</td><td>403</td><td>401</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Test Results</h2>
+    <div class="card">
+      <p><span class="badge done">BUILD SUCCESSFUL</span></p>
+      <pre>$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests com.shinyoung.recruit.service.InterviewSchedulingStabilizationServiceTest --tests com.shinyoung.recruit.controller.InterviewAdminControllerTest --tests com.shinyoung.recruit.service.InterviewerInterviewServiceTest --tests com.shinyoung.recruit.controller.InterviewerInterviewControllerTest --tests com.shinyoung.recruit.service.ApplicantInterviewServiceTest --tests com.shinyoung.recruit.controller.ApplicantInterviewControllerTest --tests com.shinyoung.recruit.domain.repository.InterviewParticipantRepositoryTest --tests com.shinyoung.recruit.service.InterviewServiceTest --tests com.shinyoung.recruit.service.CurrentEmployeeServiceTest --no-daemon</pre>
+      <p>Initial sandbox execution failed because Gradle wrapper network download was blocked. The same targeted command passed after approved escalation for Gradle wrapper network access.</p>
+      <p>Full <code>test</code> and <code>clean test</code> were not run because the active Phase 04 instructions require targeted verification only.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Remaining Issues</h2>
+    <div class="card">
+      <ul class="list">
+        <li><code>InterviewEvaluation</code> is not implemented yet.</li>
+        <li>Dedicated interviewer operating role policy can be tightened later.</li>
+        <li>Participant partial cancellation command is still not implemented.</li>
+        <li>No migration file or production DDL was generated.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Next Phase</h2>
+    <div class="card">
+      <p><span class="badge pending">Phase 05 - Interview Evaluation</span></p>
+      <ul class="list">
+        <li>Add <code>InterviewEvaluation</code> domain and repository.</li>
+        <li>Support assigned interviewer draft/save/submit workflows.</li>
+        <li>Add admin evaluation read APIs.</li>
+        <li>Define explicit <code>StageResult</code> integration policy.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+</body>
+</html>

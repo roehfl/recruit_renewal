@@ -3,17 +3,28 @@ package com.shinyoung.recruit.service;
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
 import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
+import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
 import com.shinyoung.recruit.domain.entity.ApplicationMilitary;
 import com.shinyoung.recruit.domain.entity.JobApplication;
+import com.shinyoung.recruit.domain.entity.JobPostingAttachmentRequirement;
 import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationGapPeriodRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationLanguageRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationMilitaryRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingAttachmentRequirementRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
+import com.shinyoung.recruit.enumeration.ApplicationSectionType;
+import com.shinyoung.recruit.enumeration.AttachmentType;
 import com.shinyoung.recruit.enumeration.CareerType;
 import com.shinyoung.recruit.enumeration.MilitarySubjectType;
+import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,8 +48,14 @@ public class ApplicationSubmitValidator {
     private final ApplicationCareerProfileRepository careerProfileRepository;
     private final ApplicationCareerRepository careerRepository;
     private final ApplicationMilitaryRepository militaryRepository;
+    private final ApplicationCertificateRepository certificateRepository;
+    private final ApplicationLanguageRepository languageRepository;
+    private final ApplicationAwardRepository awardRepository;
+    private final ApplicationGapPeriodRepository gapPeriodRepository;
     private final JobPostingQuestionRepository jobPostingQuestionRepository;
     private final ApplicationAnswerRepository applicationAnswerRepository;
+    private final JobPostingAttachmentRequirementRepository attachmentRequirementRepository;
+    private final ApplicationAttachmentRepository attachmentRepository;
 
     public void validate(JobApplication application) {
         ApplicationFormConfig config = application.getJobPosting().getApplicationFormConfig();
@@ -49,11 +67,16 @@ public class ApplicationSubmitValidator {
         validateEducation(config, applicationId);
         validateCareer(config, applicationId);
         validateMilitary(config, applicationId);
+        validateSimpleRequiredSection(config.isUseCertificate(), config.isRequireCertificate(), () -> certificateRepository.existsByJobApplicationId(applicationId), "Certificate");
+        validateSimpleRequiredSection(config.isUseLanguage(), config.isRequireLanguage(), () -> languageRepository.existsByJobApplicationId(applicationId), "Language");
+        validateSimpleRequiredSection(config.isUseAward(), config.isRequireAward(), () -> awardRepository.existsByJobApplicationId(applicationId), "Award");
+        validateSimpleRequiredSection(config.isUseGapPeriod(), config.isRequireGapPeriod(), () -> gapPeriodRepository.existsByJobApplicationId(applicationId), "Gap period");
         validateAnswers(application);
+        validateAttachmentRequirements(application);
     }
 
     private void validateEducation(ApplicationFormConfig config, Long applicationId) {
-        if (!config.isUseEducation()) {
+        if (!isRequired(config.isUseEducation(), config.isRequireEducation())) {
             return;
         }
         if (!educationRepository.existsByJobApplicationId(applicationId)) {
@@ -62,7 +85,7 @@ public class ApplicationSubmitValidator {
     }
 
     private void validateCareer(ApplicationFormConfig config, Long applicationId) {
-        if (!config.isUseCareer()) {
+        if (!isRequired(config.isUseCareer(), config.isRequireCareer())) {
             return;
         }
 
@@ -83,7 +106,7 @@ public class ApplicationSubmitValidator {
     }
 
     private void validateMilitary(ApplicationFormConfig config, Long applicationId) {
-        if (!config.isUseMilitary()) {
+        if (!isRequired(config.isUseMilitary(), config.isRequireMilitary())) {
             return;
         }
 
@@ -167,5 +190,57 @@ public class ApplicationSubmitValidator {
             return SHORT_TEXT_MAX_LENGTH;
         }
         return LONG_TEXT_MAX_LENGTH;
+    }
+
+    private void validateSimpleRequiredSection(
+            boolean useSection,
+            boolean requireSection,
+            BooleanSupplier exists,
+            String sectionName
+    ) {
+        if (!isRequired(useSection, requireSection) || exists.getAsBoolean()) {
+            return;
+        }
+        throw new InvalidJobApplicationException(sectionName + " section is required before submit.");
+    }
+
+    private boolean isRequired(boolean useSection, boolean requireSection) {
+        return useSection && requireSection;
+    }
+
+    private void validateAttachmentRequirements(JobApplication application) {
+        List<JobPostingAttachmentRequirement> requirements = attachmentRequirementRepository
+                .findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(application.getJobPosting().getId());
+        if (requirements.isEmpty()) {
+            return;
+        }
+
+        Map<AttachmentRequirementKey, Long> storedCounts = attachmentRepository
+                .findByJobApplicationIdAndPhysicalFileStatus(application.getId(), PhysicalFileStatus.STORED)
+                .stream()
+                .filter(attachment -> attachment.getDeletedAt() == null)
+                .collect(Collectors.groupingBy(
+                        attachment -> new AttachmentRequirementKey(
+                                attachment.getAttachmentType(),
+                                attachment.getSectionType()
+                        ),
+                        Collectors.counting()
+                ));
+
+        for (JobPostingAttachmentRequirement requirement : requirements) {
+            long storedCount = storedCounts.getOrDefault(
+                    new AttachmentRequirementKey(requirement.getAttachmentType(), requirement.getSectionType()),
+                    0L
+            );
+            if (storedCount < requirement.getMinCount()) {
+                throw new InvalidJobApplicationException(requirement.getDisplayName() + " attachment is required before submit.");
+            }
+        }
+    }
+
+    private record AttachmentRequirementKey(
+            AttachmentType attachmentType,
+            ApplicationSectionType sectionType
+    ) {
     }
 }

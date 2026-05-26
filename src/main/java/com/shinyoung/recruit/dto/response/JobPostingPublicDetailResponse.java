@@ -1,6 +1,9 @@
 package com.shinyoung.recruit.dto.response;
 
 import com.shinyoung.recruit.domain.entity.JobPosting;
+import com.shinyoung.recruit.domain.entity.JobPostingAttachmentRequirement;
+import com.shinyoung.recruit.domain.repository.JobPostingAttachmentRequirementPolicyCount;
+import com.shinyoung.recruit.domain.repository.JobPostingQuestionPolicyCount;
 import com.shinyoung.recruit.enumeration.JobPostingType;
 import com.shinyoung.recruit.enumeration.ReceptionStatus;
 
@@ -20,9 +23,17 @@ public record JobPostingPublicDetailResponse(
         boolean accepting,
         boolean pinned,
         List<JobPositionPublicResponse> jobPositions,
-        ApplicationFormConfigPublicResponse applicationFormConfig
+        ApplicationFormConfigPublicResponse applicationFormConfig,
+        ApplicationFormRequiredPolicyResponse applicationFormRequiredPolicy,
+        List<AttachmentRequirementPublicResponse> attachmentRequirements
 ) {
-    public static JobPostingPublicDetailResponse from(JobPosting jobPosting, LocalDateTime now) {
+    public static JobPostingPublicDetailResponse from(
+            JobPosting jobPosting,
+            LocalDateTime now,
+            JobPostingQuestionPolicyCount questionPolicyCount,
+            JobPostingAttachmentRequirementPolicyCount attachmentPolicyCount,
+            List<JobPostingAttachmentRequirement> attachmentRequirements
+    ) {
         ReceptionStatus receptionStatus = ReceptionStatus.from(
                 jobPosting.getReceptionStartDateTime(),
                 jobPosting.getReceptionEndDateTime(),
@@ -46,7 +57,15 @@ public record JobPostingPublicDetailResponse(
                                 Comparator.nullsLast(Integer::compareTo)
                         ))
                         .toList(),
-                ApplicationFormConfigPublicResponse.from(jobPosting.getApplicationFormConfig())
+                ApplicationFormConfigPublicResponse.from(jobPosting.getApplicationFormConfig()),
+                ApplicationFormRequiredPolicyResponse.from(
+                        jobPosting.getApplicationFormConfig(),
+                        questionPolicyCount,
+                        attachmentPolicyCount
+                ),
+                attachmentRequirements.stream()
+                        .map(AttachmentRequirementPublicResponse::from)
+                        .toList()
         );
     }
 }

@@ -1,5 +1,703 @@
 # 07. Implementation History
 
+## Current Progress Snapshot - 2026-05-26
+
+- Purpose: align implementation history with the actual codebase and the updated roadmap.
+- Roadmap source updated:
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/reports/current-implementation-status.html`
+- Current completed implementation groups:
+  - Foundation:
+    - session-based auth baseline
+    - DB/LDAP authentication route baseline
+    - menu APIs
+    - notice APIs
+    - common response/exception/auditing/crypto/hash baseline
+  - Job posting:
+    - admin CRUD
+    - publish/close commands
+    - public list/detail
+    - job position metadata
+    - posting display policy and public exposure/sort/filter contract
+    - application form use/required policy split
+    - attachment requirement policy
+  - Stage and result:
+    - stage CRUD/reorder/status commands
+    - stage result initialize/list/update/bulk update
+    - applicant result read
+    - admin application stage result timeline
+    - result correction and correction history
+  - Application:
+    - create/read/update/submit/withdraw
+    - applicant my applications
+    - applicant dashboard
+    - admin application list/detail
+    - admin section lazy read
+  - Application detail sections:
+    - education
+    - career
+    - certificate
+    - language
+    - military
+    - award
+    - gap period
+  - Question and answer:
+    - question template
+    - job posting question
+    - applicant answer save/read
+    - answer submit validator
+    - admin answer read
+  - Attachment:
+    - metadata replace/read
+    - local file upload
+    - applicant/admin download
+    - applicant/admin soft delete
+    - storage health scan dry-run
+    - required attachment policy integrated with public policy, dashboard, and submit validator
+  - Interview scheduling domain:
+    - `Interview` schedule/group entity
+    - `InterviewParticipant` candidate/interviewer assignment entity
+    - interview method/status and participant role/status enums
+    - schedule and participant repositories
+    - entity/repository targeted tests
+  - Interview schedule admin management:
+    - admin schedule list/detail APIs
+    - admin DRAFT create/update APIs
+    - DRAFT participant replace command
+    - confirm/cancel commands
+    - candidate eligibility, previous-result visibility, duplicate, and time collision guards
+  - Applicant interview schedule read:
+    - applicant-owned schedule list/detail APIs
+    - DRAFT hiding and CONFIRMED/CANCELLED exposure
+    - candidate role and assigned participant status visibility guard
+    - admin memo, interviewer identity, other candidate, and StageResult field hiding
+  - Interviewer interview schedule read:
+    - interviewer-owned schedule list/detail APIs
+    - DRAFT hiding and CONFIRMED/CANCELLED exposure
+    - interviewer role and assigned participant status visibility guard
+    - assigned candidate list in interviewer detail
+    - admin memo, other interviewer, and StageResult field hiding
+  - Interview scheduling stabilization:
+    - cross-slice cancellation regression across admin/applicant/interviewer services
+    - participant lifecycle regression for cancelled schedules
+    - StageResult non-mutation regression for scheduling cancel/read flows
+    - admin/applicant/interviewer authorization matrix review
+- Current partial implementation groups:
+  - Auth/authorization hardening:
+    - URL authorization and JSON 401/403 are implemented.
+    - full operating role matrix, interviewer-specific authorization, and production LDAP/role mapping validation remain.
+  - Audit:
+    - StageResult actor propagation exists.
+    - general immutable activity/access audit is not implemented.
+  - Attachment lifecycle:
+    - dry-run scan exists.
+    - cleanup/repair commit command and optional deletion history table remain.
+  - DB operations:
+    - H2 generated schema and tests are available.
+    - persistent MariaDB migration files are not in place.
+- Current completed design groups:
+  - Phase 04 Interview Scheduling:
+    - `Interview` schedule/group design.
+    - `InterviewParticipant` candidate/interviewer assignment design.
+    - admin, applicant, and interviewer API draft.
+    - visibility, candidate eligibility, stage status, participant lifecycle, confirmation, collision, and `StageResult` non-mutation policies.
+- Current remaining major work:
+  - Phase 05 candidate: interview evaluation.
+  - Phase 06 candidate: message batch/send log and provider adapter boundary.
+  - Phase 07 candidate: Excel/PDF/statistics.
+  - Phase 08 candidate: privacy purge, retention, and activity audit.
+  - Separate candidate: CommonCode and School master data.
+- Consistency note:
+  - The previous roadmap treated JobPosting, Stage, Application, application detail sections, and attachment file handling as pending.
+  - As of this snapshot, those areas are implemented and documented under `docs/codex/implementation/`.
+  - The roadmap now treats Phase 01 through Phase 03k implementation slices as completed or partially completed according to the actual codebase.
+- Latest full verification known from implementation records:
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat clean test --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Date recorded: 2026-05-22
+
+## Phase 04e - Interview Scheduling Stabilization / Test Hardening
+
+- Date: 2026-05-26
+- Work type: stabilization and targeted regression slice.
+- Goal: close Phase 04 by hardening cross-slice scheduling behavior and documenting the authorization matrix before Phase 05 interview evaluation.
+- Created:
+  - `src/test/java/com/shinyoung/recruit/service/InterviewSchedulingStabilizationServiceTest.java`
+  - `docs/codex/implementation/phase-04e-interview-scheduling-stabilization.md`
+  - `docs/codex/reports/phase-04e-interview-scheduling-stabilization.html`
+- Updated:
+  - `src/test/java/com/shinyoung/recruit/controller/InterviewAdminControllerTest.java`
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+  - `docs/codex/implementation/phase-04b-admin-interview-schedule-management.md`
+  - `docs/codex/implementation/phase-04c-applicant-interview-read.md`
+  - `docs/codex/implementation/phase-04d-interviewer-interview-read.md`
+- Implemented:
+  - Cross-slice test that creates, assigns, confirms, and cancels an interview through `InterviewService`.
+  - Applicant detail read remains visible after cancel and returns `CANCELLED`.
+  - Interviewer detail read remains visible after cancel and returns assigned candidate list.
+  - Participant rows remain `ASSIGNED` after schedule cancellation.
+  - Previous-stage `StageResult` remains `PASSED`.
+  - Admin interview list route accepts admin auth, rejects applicant with 403, and rejects anonymous with 401.
+- StageResult policy:
+  - Phase 04e does not change production `StageResult` behavior.
+  - The new stabilization test verifies scheduling cancel/read flows do not mutate previous-stage result state.
+- Tests:
+  - Initial sandbox command failed while Gradle wrapper tried to download Gradle because network access was restricted.
+  - Command after approved escalation: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.InterviewSchedulingStabilizationServiceTest --tests com.shinyoung.recruit.controller.InterviewAdminControllerTest --tests com.shinyoung.recruit.service.InterviewerInterviewServiceTest --tests com.shinyoung.recruit.controller.InterviewerInterviewControllerTest --tests com.shinyoung.recruit.service.ApplicantInterviewServiceTest --tests com.shinyoung.recruit.controller.ApplicantInterviewControllerTest --tests com.shinyoung.recruit.domain.repository.InterviewParticipantRepositoryTest --tests com.shinyoung.recruit.service.InterviewServiceTest --tests com.shinyoung.recruit.service.CurrentEmployeeServiceTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Full `test` and `clean test` were not run because current `instruction.md` still limits Phase 04 work to targeted tests and records development PC performance/full-suite timeout concerns.
+- Deferred:
+  - `InterviewEvaluation`.
+  - interviewer evaluation draft/save/submit.
+  - admin evaluation read.
+  - message, Excel, PDF, calendar, frontend, and migration files.
+- Next recommended phase:
+  - `Phase 05 - Interview Evaluation`
+
+## Phase 04d - Interviewer Interview Read
+
+- Date: 2026-05-26
+- Work type: service/API implementation slice.
+- Goal: implement read-only interviewer interview schedule APIs for the current authenticated employee.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/dto/response/InterviewerInterviewSummaryResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/InterviewerInterviewDetailResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/InterviewerInterviewCandidateResponse.java`
+  - `src/main/java/com/shinyoung/recruit/service/InterviewerInterviewService.java`
+  - `src/main/java/com/shinyoung/recruit/controller/InterviewerInterviewController.java`
+  - `src/test/java/com/shinyoung/recruit/service/InterviewerInterviewServiceTest.java`
+  - `src/test/java/com/shinyoung/recruit/controller/InterviewerInterviewControllerTest.java`
+  - `docs/codex/implementation/phase-04d-interviewer-interview-read.md`
+  - `docs/codex/reports/phase-04d-interviewer-interview-read.html`
+- Updated:
+  - `src/main/java/com/shinyoung/recruit/domain/repository/EmployeeRepository.java`
+  - `src/main/java/com/shinyoung/recruit/service/CurrentEmployeeService.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepository.java`
+  - `src/main/java/com/shinyoung/recruit/config/SecurityConfig.java`
+  - `src/test/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepositoryTest.java`
+  - `src/test/java/com/shinyoung/recruit/service/CurrentEmployeeServiceTest.java`
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+- Implemented APIs:
+  - `GET /interviewer/interviews?status=&from=&to=`
+  - `GET /interviewer/interviews/{interviewId}`
+- Implemented:
+  - Current employee ownership guard through `CurrentEmployeeService`.
+  - `EmployeeRepository.findByLoginId` to resolve principal login id to employee id.
+  - No request path/query/body accepts employee id or user id.
+  - Interviewer visibility query is rooted in `InterviewParticipant`.
+  - `Interview.status` visible values are `CONFIRMED` and `CANCELLED`.
+  - `DRAFT` schedules are hidden; `status=DRAFT` list requests return 400.
+  - Only `role=INTERVIEWER` and `participantStatus=ASSIGNED` rows are visible.
+  - Detail reads return 404 for DRAFT, non-owned, non-assigned, or candidate-only records.
+  - Detail candidate list is loaded only after interviewer ownership is verified.
+  - Candidate list includes only assigned `CANDIDATE` participant rows.
+  - Response DTOs expose schedule, posting, stage, method, place/URL, status, cancelled flag, and assigned candidate summary only.
+  - Interviewer response excludes admin memo, other interviewer details, and `StageResult` internals.
+  - `/interviewer/**` now requires employee-family authorities; assignment still controls final visibility.
+- StageResult policy:
+  - Phase 04d does not inject or call `StageResultRepository`.
+  - Phase 04d does not create, update, delete, initialize, announce, correct, or publish `StageResult`.
+- Tests:
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.InterviewerInterviewServiceTest --tests com.shinyoung.recruit.controller.InterviewerInterviewControllerTest --tests com.shinyoung.recruit.domain.repository.InterviewParticipantRepositoryTest --tests com.shinyoung.recruit.service.ApplicantInterviewServiceTest --tests com.shinyoung.recruit.service.InterviewServiceTest --tests com.shinyoung.recruit.service.CurrentEmployeeServiceTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Full `test` and `clean test` were not run because `instruction.md` limited this phase to targeted tests and records development PC performance concerns for full-suite execution.
+- Deferred:
+  - `InterviewEvaluation`.
+  - message, Excel, PDF, calendar, frontend, and migration files.
+- Next recommended phase:
+  - `Phase 04e - Interview Scheduling Stabilization / Test Hardening`
+
+## Phase 04c - Applicant Interview Read
+
+- Date: 2026-05-26
+- Work type: service/API implementation slice.
+- Goal: implement read-only applicant interview schedule APIs for the current authenticated applicant.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicantInterviewSummaryResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicantInterviewDetailResponse.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicantInterviewService.java`
+  - `src/main/java/com/shinyoung/recruit/controller/ApplicantInterviewController.java`
+  - `src/test/java/com/shinyoung/recruit/service/ApplicantInterviewServiceTest.java`
+  - `src/test/java/com/shinyoung/recruit/controller/ApplicantInterviewControllerTest.java`
+  - `docs/codex/implementation/phase-04c-applicant-interview-read.md`
+  - `docs/codex/reports/phase-04c-applicant-interview-read.html`
+- Updated:
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepository.java`
+  - `src/main/java/com/shinyoung/recruit/config/SecurityConfig.java`
+  - `src/test/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepositoryTest.java`
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+- Implemented APIs:
+  - `GET /applicant/interviews?status=&from=&to=`
+  - `GET /applicant/applications/{applicationId}/interviews?status=&from=&to=`
+  - `GET /applicant/interviews/{interviewId}`
+- Implemented:
+  - Current applicant ownership guard through `CurrentApplicantService`.
+  - No request path/query/body accepts applicant id or user id.
+  - Applicant visibility query is rooted in `InterviewParticipant`.
+  - `Interview.status` visible values are `CONFIRMED` and `CANCELLED`.
+  - `DRAFT` schedules are hidden; `status=DRAFT` list requests return 400.
+  - Only `role=CANDIDATE` and `participantStatus=ASSIGNED` rows are visible.
+  - Withdrawn applications are inaccessible.
+  - Per-application reads verify `JobApplication` ownership.
+  - Detail reads return 404 for DRAFT, non-owned, non-assigned, or interviewer-only records.
+  - Response DTOs expose schedule, posting, position, stage, method, place/URL, status, and cancelled flag only.
+  - Applicant response excludes admin memo, other candidates, interviewer identity, and `StageResult` internals.
+  - `/applicant/**` now requires `ROLE_APPLICANT`.
+- StageResult policy:
+  - Phase 04c does not inject or call `StageResultRepository`.
+  - Phase 04c does not create, update, delete, initialize, announce, correct, or publish `StageResult`.
+- Tests:
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.ApplicantInterviewServiceTest --tests com.shinyoung.recruit.controller.ApplicantInterviewControllerTest --tests com.shinyoung.recruit.domain.repository.InterviewParticipantRepositoryTest --tests com.shinyoung.recruit.service.InterviewServiceTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Full `test` and `clean test` were not run because `instruction.md` limited this phase to targeted tests and records development PC performance concerns for full-suite execution.
+- Deferred:
+  - interviewer interview read API.
+  - `InterviewEvaluation`.
+  - message, Excel, PDF, calendar, frontend, and migration files.
+- Next recommended phase:
+  - Completed by `Phase 04d - Interviewer Interview Read`.
+  - Current next phase is `Phase 05 - Interview Evaluation`.
+
+## Phase 04b - Admin Interview Schedule Management
+
+- Date: 2026-05-26
+- Work type: service/API implementation slice.
+- Goal: implement administrator interview schedule management on top of the Phase 04a interview domain.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/dto/request/InterviewCreateRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/request/InterviewUpdateRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/request/InterviewParticipantReplaceRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/request/InterviewCandidateParticipantRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/request/InterviewInterviewerParticipantRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminInterviewSummaryResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminInterviewDetailResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminInterviewParticipantResponse.java`
+  - `src/main/java/com/shinyoung/recruit/service/InterviewService.java`
+  - `src/main/java/com/shinyoung/recruit/controller/InterviewAdminController.java`
+  - `src/main/java/com/shinyoung/recruit/exception/InterviewNotFoundException.java`
+  - `src/main/java/com/shinyoung/recruit/exception/InvalidInterviewException.java`
+  - `src/test/java/com/shinyoung/recruit/service/InterviewServiceTest.java`
+  - `src/test/java/com/shinyoung/recruit/controller/InterviewAdminControllerTest.java`
+  - `docs/codex/implementation/phase-04b-admin-interview-schedule-management.md`
+  - `docs/codex/reports/phase-04b-admin-interview-schedule-management.html`
+- Updated:
+  - `src/main/java/com/shinyoung/recruit/domain/entity/Interview.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewRepository.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepository.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/StageResultRepository.java`
+  - `src/main/java/com/shinyoung/recruit/exception/GlobalExceptionHandler.java`
+  - `src/test/java/com/shinyoung/recruit/domain/repository/InterviewRepositoryTest.java`
+  - `src/test/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepositoryTest.java`
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+- Implemented:
+  - Admin list/detail:
+    - `GET /admin/job-postings/{jobPostingId}/interviews?stageId=&status=&from=&to=`
+    - `GET /admin/interviews/{interviewId}`
+  - Admin commands:
+    - `POST /admin/job-postings/{jobPostingId}/interviews`
+    - `POST /admin/interviews/{interviewId}`
+    - `POST /admin/interviews/{interviewId}/participants`
+    - `POST /admin/interviews/{interviewId}/confirm`
+    - `POST /admin/interviews/{interviewId}/cancel`
+  - `StageType` allowlist guard: `FIRST_INTERVIEW`, `SECOND_INTERVIEW`, `FINAL_INTERVIEW`.
+  - `StageStatus` guard: create/update/replace/confirm allowed only in `READY` and `IN_PROGRESS`.
+  - DRAFT-only update and participant replacement.
+  - Participant replacement uses `Interview.clearParticipantsForDraft()` and JPA `orphanRemoval` rather than a duplicate repository `deleteAll` path.
+  - Confirm requires at least one assigned candidate and interviewer.
+  - Candidate same posting and `SUBMITTED` status checks.
+  - Previous-stage visible `PASSED` result eligibility check.
+  - Duplicate candidate/interviewer and duplicate role sort-order rejection.
+  - Confirmed schedule time collision checks for candidate and interviewer.
+  - Cancel changes only `Interview.status` from `CONFIRMED` to `CANCELLED`.
+  - Cancel is allowed only while the stage is `READY` or `IN_PROGRESS`; `RESULT_ANNOUNCED` and `CLOSED` reject cancel.
+  - Confirm/cancel commands do not accept request body until an audit/history model exists for memo or cancel reason.
+- StageResult policy:
+  - `StageResult` is read only for previous-stage eligibility.
+  - Phase 04b does not create, update, announce, correct, publish, or initialize `StageResult`.
+- Tests:
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.InterviewServiceTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.controller.InterviewAdminControllerTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.domain.repository.InterviewRepositoryTest --tests com.shinyoung.recruit.domain.repository.InterviewParticipantRepositoryTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Full `test` and `clean test` were not run because `instruction.md` limited this phase to targeted tests.
+- Deferred:
+  - applicant interview read API.
+  - interviewer interview read API.
+  - `InterviewEvaluation`.
+  - message, Excel, PDF, calendar, frontend, and migration files.
+- Next recommended phase:
+  - Completed by `Phase 04c - Applicant Interview Read`.
+  - Current next phase is `Phase 05 - Interview Evaluation`.
+
+## Phase 04a - Interview Scheduling Domain
+
+- Date: 2026-05-26
+- Work type: domain/repository implementation slice.
+- Goal: add the domain foundation for interview schedules, interview groups, candidate assignments, and interviewer assignments.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/enumeration/InterviewMethod.java`
+  - `src/main/java/com/shinyoung/recruit/enumeration/InterviewStatus.java`
+  - `src/main/java/com/shinyoung/recruit/enumeration/InterviewParticipantRole.java`
+  - `src/main/java/com/shinyoung/recruit/enumeration/InterviewParticipantStatus.java`
+  - `src/main/java/com/shinyoung/recruit/domain/entity/Interview.java`
+  - `src/main/java/com/shinyoung/recruit/domain/entity/InterviewParticipant.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewRepository.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepository.java`
+  - `src/test/java/com/shinyoung/recruit/domain/entity/InterviewTest.java`
+  - `src/test/java/com/shinyoung/recruit/domain/entity/InterviewParticipantTest.java`
+  - `src/test/java/com/shinyoung/recruit/domain/repository/InterviewRepositoryTest.java`
+  - `src/test/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepositoryTest.java`
+  - `docs/codex/implementation/phase-04a-interview-scheduling-domain.md`
+  - `docs/codex/reports/phase-04a-interview-scheduling-domain.html`
+- Updated:
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+  - `docs/codex/design/phase-04-interview-scheduling-design.md`
+- Implemented:
+  - `Interview` belongs to one `JobPosting` and one `Stage`.
+  - `Interview.stage.jobPosting` must match `Interview.jobPosting`.
+  - `Interview.groupName`, `startDateTime`, `endDateTime`, and `method` are required.
+  - `Interview.endDateTime` must be after `startDateTime`.
+  - `IN_PERSON` and `HYBRID` require `locationName`.
+  - `ONLINE` and `HYBRID` require `onlineMeetingUrl`.
+  - `Interview.status` defaults to `DRAFT`.
+  - `InterviewParticipant` candidate rows require `JobApplication` and no `Employee`.
+  - `InterviewParticipant` interviewer rows require `Employee` and no `JobApplication`.
+  - `InterviewParticipant.participantStatus` defaults to `ASSIGNED`.
+  - repository methods were added for schedule lookup, participant lookup, and duplicate-check candidates.
+- StageType check:
+  - Actual source values on 2026-05-26: `DOCUMENT`, `FIRST_INTERVIEW`, `SECOND_INTERVIEW`, `FINAL_INTERVIEW`, `ETC`.
+  - Phase 04a did not modify `StageType`.
+  - Later service validation should allow only `FIRST_INTERVIEW`, `SECOND_INTERVIEW`, and `FINAL_INTERVIEW`.
+- StageResult policy:
+  - `StageResult` source was not modified.
+  - Interview Scheduling still does not create, update, announce, or correct `StageResult`.
+- APIs:
+  - No API was added in Phase 04a.
+  - No controller, request DTO, response DTO, or service command was added.
+- Tests:
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.domain.entity.InterviewTest --tests com.shinyoung.recruit.domain.entity.InterviewParticipantTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.domain.repository.InterviewRepositoryTest --tests com.shinyoung.recruit.domain.repository.InterviewParticipantRepositoryTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.StageServiceTest --tests com.shinyoung.recruit.service.StageResultServiceTest --tests com.shinyoung.recruit.service.JobApplicationServiceTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Full `test` and `clean test` were not run because `instruction.md` explicitly forbids full suite execution for this slice.
+- Deferred:
+  - admin schedule CRUD and participant replace command.
+  - confirmation/cancellation service validation.
+  - applicant and interviewer read APIs.
+  - `InterviewEvaluation`.
+  - message, Excel, PDF, calendar, frontend, and migration files.
+- Next recommended phase:
+  - Completed by `Phase 04b - Admin Interview Schedule Management`.
+  - Current next phase is `Phase 05 - Interview Evaluation`.
+
+## Phase 04 - Interview Scheduling Design
+
+- Date: 2026-05-26
+- Work type: documentation-only design phase.
+- Goal: define the backend design for interview schedules, interview groups, candidate assignment, and interviewer assignment.
+- Created:
+  - `docs/codex/design/phase-04-interview-scheduling-design.md`
+  - `docs/codex/reports/phase-04-interview-scheduling-design.html`
+- Updated:
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/reports/current-implementation-status.html`
+  - `docs/codex/01-project-context.md`
+- Key design decisions:
+  - `Interview` is the schedule/group root connected to `JobPosting` and `Stage`.
+  - `InterviewParticipant` represents both candidate and interviewer assignment rows.
+  - Candidate rows require `jobApplication` and do not use `employee`.
+  - Interviewer rows require `employee` and do not use `jobApplication`.
+  - `Interview.stage.stageType` must be one of `FIRST_INTERVIEW`, `SECOND_INTERVIEW`, or `FINAL_INTERVIEW`.
+  - As of the Phase 04a implementation check on 2026-05-26, source `StageType` contains `DOCUMENT`, `FIRST_INTERVIEW`, `SECOND_INTERVIEW`, `FINAL_INTERVIEW`, and `ETC`; service validation should allow interview scheduling only for the three interview values.
+  - `groupName` is required. A single-group schedule can use a default such as `1조`.
+  - Interview schedule status is `DRAFT`, `CONFIRMED`, or `CANCELLED`.
+  - Participant status is `ASSIGNED` or `CANCELLED`.
+  - First implementation uses participant `ASSIGNED`; participant `CANCELLED` is reserved for later partial participant cancellation/amendment unless explicitly implemented.
+  - `StageResult` remains responsible only for pass/fail/pending result decisions, announcement, and correction history.
+  - Interview Scheduling does not create, update, announce, or correct `StageResult`.
+  - Admin confirmation may read `StageResult` to verify candidate eligibility; applicant interview reads do not expose or mutate `StageResult`.
+  - Applicant and interviewer reads hide `DRAFT` schedules and return only assigned `CONFIRMED` or `CANCELLED` schedules.
+  - Applicant responses hide other candidates, interviewer lists, and admin internal memo.
+  - Interviewer responses are assignment-only and may include candidate lists, but not admin internal memo.
+- API draft:
+  - `GET /admin/job-postings/{jobPostingId}/interviews?stageId=&status=&from=&to=`
+  - `GET /admin/interviews/{interviewId}`
+  - `POST /admin/job-postings/{jobPostingId}/interviews`
+  - `POST /admin/interviews/{interviewId}`
+  - `POST /admin/interviews/{interviewId}/participants`
+  - `POST /admin/interviews/{interviewId}/confirm`
+  - `POST /admin/interviews/{interviewId}/cancel`
+  - `GET /applicant/applications/{applicationId}/interviews`
+  - `GET /interviewer/interviews?from=&to=&jobPostingId=&stageId=`
+  - `GET /interviewer/interviews/{interviewId}`
+- Validation policy:
+  - confirmation requires at least one assigned candidate and one assigned interviewer.
+  - end time must be after start time.
+  - stage and candidate applications must belong to the same job posting.
+  - interview creation and confirmation require stage status `READY` or `IN_PROGRESS`.
+  - `RESULT_ANNOUNCED` and `CLOSED` stages reject new creation, participant replacement, and confirmation.
+  - cancelling a confirmed interview is allowed until the stage becomes `CLOSED`.
+  - candidate eligibility requires same posting, `SUBMITTED` application status, and previous-stage pass when a previous stage exists.
+  - duplicate assignment and confirmed-schedule time collision must be rejected.
+  - collision checks target `CONFIRMED` schedules with `ASSIGNED` participants, same candidate application or same interviewer employee, excluding the current interview, with overlap condition `existing.startDateTime < requested.endDateTime && requested.startDateTime < existing.endDateTime`.
+  - cancelled schedules are ignored by collision checks.
+  - DRAFT participant replacement may delete and recreate rows.
+  - cancelling a confirmed interview changes only `Interview.status`; participant rows remain `ASSIGNED`.
+  - confirmed schedules are not mutable in the first implementation slice; cancel/recreate is the initial policy.
+  - candidate/interviewer uniqueness candidates are documented, but final duplicate protection remains in service because nullable role-specific FKs can weaken DB uniqueness.
+- Tests:
+  - Gradle tests were not run because this phase changed documentation only.
+  - Documentation consistency was checked with text search after edits.
+- Deferred:
+  - Java implementation, tests, schema, and runtime API behavior.
+  - `InterviewEvaluation`.
+  - message delivery.
+  - Excel/PDF/calendar/frontend work.
+- Next recommended phase:
+  - Superseded by the completed `Phase 04a - Interview Scheduling Domain` and `Phase 04b - Admin Interview Schedule Management` entries above.
+  - Current next phase is `Phase 05 - Interview Evaluation`.
+
+## Phase 03i-5-2 - Attachment Required Policy Implementation
+
+- Date: 2026-05-22
+- Goal: implement the dedicated per-posting attachment required policy designed in Phase 03i-5.
+- Implemented:
+  - Added `JobPostingAttachmentRequirement` as the attachment requirement model for the first unit:
+    - `jobPosting + attachmentType + sectionType`
+  - Added admin APIs:
+    - `GET /admin/job-postings/{jobPostingId}/attachment-requirements`
+    - `POST /admin/job-postings/{jobPostingId}/attachment-requirements`
+  - Implemented DRAFT-only replace-all behavior for admin configuration.
+  - Rejected duplicate `(attachmentType, sectionType)` rows in service validation.
+  - Kept public list aggregate-only and exposed safe `attachmentRequirements` only in public detail.
+  - Derived `ApplicationFormRequiredPolicyResponse.attachmentRequired` from actual requirement rows.
+  - Mapped attachment policy as:
+    - no rows: `DISABLED`
+    - optional-only rows: `OPTIONAL`
+    - any required row: `REQUIRED`
+  - Added dashboard `ATTACHMENT` readiness integration:
+    - required rows create blocking `REQUIRED_ATTACHMENT_MISSING`.
+    - optional rows with `minCount > 0` create non-blocking `OPTIONAL_ATTACHMENT_MISSING` only when the posting has no required attachment rows.
+    - optional rows with `minCount = 0` are guide-only.
+    - review fix: when required and optional attachment rows are mixed, dashboard readiness keeps only the required `ATTACHMENT` group and suppresses optional missing attachment issues so `optionalIncompleteCount` cannot increase without an optional group.
+  - Added final submit validation for required attachments only.
+  - Counted only active stored metadata rows:
+    - same application
+    - same attachment type
+    - same section type
+    - `physicalFileStatus=STORED`
+    - `deletedAt == null`
+  - Did not add filesystem checks to dashboard or submit validation.
+- Created:
+  - `docs/codex/implementation/phase-03i-5-2-attachment-required-policy.md`
+  - `docs/codex/reports/phase-03i-5-2-attachment-required-policy.html`
+- Tests:
+  - Target Phase 03i-5-2 Gradle test group passed.
+  - Existing attachment upload/download/delete/storage regression test group passed.
+  - Full `clean test` passed in 12m 49s.
+  - Review fix targeted `ApplicationDashboardServiceTest` passed.
+  - Review fix target Phase 03i-5-2 Gradle test group passed in 2m 56s.
+  - Initial non-escalated Gradle run failed because the wrapper attempted a network download inside the sandbox.
+- Deferred:
+  - Migration file or formal migration framework.
+  - Published posting policy amendment/versioning.
+  - `sectionRecordId`, `maxCount`, conditional, per-position, per-applicant-type, active/versioned, or template-linked requirements.
+  - Filesystem storage health validation inside dashboard or submit.
+- Next recommended phase:
+  - Continue with Interview Scheduling design/implementation, then revisit versioned published-posting attachment policy edits if needed.
+
+## Phase 03i-5-1 - Attachment Required Policy Design
+
+- Date: 2026-05-22
+- Work type: documentation-only design phase.
+- Goal: design the dedicated attachment required policy that will later integrate public policy, applicant dashboard readiness, and final submit validation.
+- Created:
+  - `docs/codex/design/phase-03i-5-attachment-required-policy-design.md`
+  - `docs/codex/reports/phase-03i-5-attachment-required-policy-design.html`
+- Key design decisions:
+  - Do not add `useAttachment` or `requireAttachment` to `ApplicationFormConfig`.
+  - Use a dedicated per-posting policy model: `JobPostingAttachmentRequirement`.
+  - Recommended first required unit: `jobPosting + attachmentType + sectionType`.
+  - Recommended first fields:
+    - `id`
+    - `jobPosting`
+    - `attachmentType`
+    - `sectionType`
+    - `required`
+    - `minCount`
+    - `sortOrder`
+    - `displayName`
+    - `description`
+    - auditing fields from `BaseEntity`
+  - Defer `sectionRecordId`, `maxCount`, conditional requirements, per applicant type, per position, active/versioning, and template linkage.
+  - A requirement is satisfied only by `ApplicationAttachment` rows for the same application with matching `attachmentType`, matching `sectionType`, `physicalFileStatus=STORED`, and no delete lifecycle marker.
+  - `METADATA_ONLY`, `MISSING`, `DELETED`, and orphan physical files do not satisfy requirements.
+  - Recommended admin API shape is replace-all for DRAFT postings:
+    - `GET /admin/job-postings/{jobPostingId}/attachment-requirements`
+    - `POST /admin/job-postings/{jobPostingId}/attachment-requirements`
+  - Published posting mutation is deferred because it can affect in-progress applicants.
+  - Public policy should derive `applicationFormRequiredPolicy.attachmentRequired` from required attachment rows.
+  - Public detail should expose a separate safe attachment requirement list; public list should keep aggregate policy only unless frontend requirements change.
+  - Dashboard should use one `ATTACHMENT` readiness group and `REQUIRED_ATTACHMENT_MISSING` issues for missing required rows.
+  - Submit validation should count matching stored, non-deleted attachments and fail when count is below `minCount`.
+  - Review update: optional attachment rows with `required=false, minCount=0` are guidance only and do not create dashboard optional incomplete issues.
+  - Review update: optional attachment rows with `required=false, minCount>0` can create dashboard optional incomplete issues but never block submit.
+  - Review update: `STORED` rows whose physical files are missing are treated as an operational risk handled by storage health scan/repair; Phase 03i-5-2 does not need filesystem checks inside submit/dashboard.
+  - Review update: public detail `attachmentRequirements`, public aggregate policy, dashboard readiness, and submit validator integration must ship in the same externally visible implementation slice.
+- Tests:
+  - Not run. This phase changed documentation only and intentionally did not modify Java, test, config, schema, or runtime API files.
+- Deferred:
+  - Java implementation
+  - database migration or manual DDL
+  - published posting policy mutation
+  - submitted application status impact after admin evidence deletion
+  - row-level, conditional, per-position, per-applicant-type, and template-linked requirements
+- Next recommended phase:
+  - `Phase 03i-5-2 - Attachment Required Policy Implementation`
+
+## Phase 03k-2 - Application Form Required Policy
+
+- Date: 2026-05-22
+- Goal: implement the end-to-end `ApplicationFormConfig.useXxx` and `requireXxx` policy split.
+- Implemented:
+  - Added seven persisted `ApplicationFormConfig.requireXxx` fields:
+    - `requireEducation`
+    - `requireCareer`
+    - `requireCertificate`
+    - `requireLanguage`
+    - `requireMilitary`
+    - `requireAward`
+    - `requireGapPeriod`
+  - Extended `ApplicationFormConfigRequest` with nullable `Boolean requireXxx` fields while keeping the 7-argument compatibility constructor.
+  - Added create defaults:
+    - education, career, and military default to matching `useXxx`.
+    - certificate, language, award, and gap period default to `false`.
+  - Added update rules:
+    - explicit `requireXxx` values are applied and validated.
+    - omitted values are preserved while the section stays enabled.
+    - omitted values reset to `false` when the section is disabled.
+  - Rejected `useXxx=false && requireXxx=true` via `InvalidJobPostingException`.
+  - Extended admin and public detail application form config responses with `requireXxx`.
+  - Kept public list `applicationFormConfig` hidden.
+  - Extended public list projection/query to include nullable `requireXxx` values for `applicationFormRequiredPolicy`.
+  - Converted public required policy to `enabled=useXxx`, `required=useXxx && requireXxx`.
+  - Converted final submit validation to use explicit required flags.
+  - Added submit-blocking existence checks for required certificate, language, award, and gap period sections.
+  - Converted dashboard completion readiness to separate required and optional enabled groups by explicit required flags.
+  - Preserved `ApplicationSectionAccessService` behavior: section access remains controlled by `useXxx`.
+- Created:
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationSectionAccessServiceTest.java`
+  - `docs/codex/implementation/phase-03k-2-application-form-required-policy.md`
+  - `docs/codex/reports/phase-03k-2-application-form-required-policy.html`
+- Modified:
+  - `src/main/java/com/shinyoung/recruit/domain/entity/ApplicationFormConfig.java`
+  - `src/main/java/com/shinyoung/recruit/domain/entity/JobPosting.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingPublicListProjection.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingRepository.java`
+  - `src/main/java/com/shinyoung/recruit/dto/request/ApplicationFormConfigRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormConfigResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormConfigPublicResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormRequiredPolicyResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/JobPostingPublicListResponse.java`
+  - `src/main/java/com/shinyoung/recruit/service/JobPostingService.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationSubmitValidator.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationCompletionReadChecker.java`
+  - related service/controller/DTO tests.
+- API impact:
+  - `POST /admin/job-postings`: `applicationFormConfig.requireXxx` may be provided or omitted.
+  - `POST /admin/job-postings/{id}`: omitted required flags preserve/reset according to section enablement.
+  - `GET /admin/job-postings/{id}`: returns `requireXxx` in `applicationFormConfig`.
+  - `GET /job-postings`: still hides `applicationFormConfig`; returns policy derived from explicit require flags.
+  - `GET /job-postings/{id}`: returns `requireXxx` in public detail config and policy.
+- Tests:
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.JobPostingServiceTest --tests com.shinyoung.recruit.service.ApplicationSubmitValidatorTest --tests com.shinyoung.recruit.service.ApplicationDashboardServiceTest --tests com.shinyoung.recruit.service.ApplicationSectionAccessServiceTest --tests com.shinyoung.recruit.dto.response.ApplicationFormPolicyResponseTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.JobPostingPublicServiceTest --tests com.shinyoung.recruit.controller.JobPostingPublicControllerTest --tests com.shinyoung.recruit.controller.JobPostingControllerTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Full check attempted: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat clean test --no-daemon`
+  - Full check result after review fix: `BUILD SUCCESSFUL` in 15m 4s.
+  - Review fix: optional dashboard incomplete messages no longer use submit-blocking wording such as `required before submit`.
+- Operational note:
+  - No migration framework is active. The implementation document includes required manual MariaDB DDL and backfill SQL for persistent databases.
+- Deferred:
+  - attachment required enforcement
+  - persistent DB DDL remains manual
+  - optional-section frontend copy review
+- Next recommended phase:
+  - Extend the same policy model to attachment requirements or continue with the next applicant/interview workflow phase.
+
+## Phase 03k-1 - Public Application Form Required Policy
+
+- Date: 2026-05-22
+- Goal: expose the current effective application form required/optional policy in public job posting list/detail responses without changing schema or submit/dashboard behavior.
+- Implemented:
+  - Added `applicationFormRequiredPolicy` to public `GET /job-postings` list items.
+  - Added `applicationFormRequiredPolicy` to public `GET /job-postings/{id}` detail responses.
+  - Derived section policy from existing `ApplicationFormConfig.useXxx` values:
+    - `EDUCATION`, `CAREER`, `MILITARY`: required when enabled.
+    - `CERTIFICATE`, `LANGUAGE`, `AWARD`, `GAP_PERIOD`: optional when enabled.
+  - Derived question policy from active `JobPostingQuestion.required` values.
+  - Added deferred attachment policy with `attachmentRequired=false`.
+  - Added batch active/required question count projection to avoid per-posting count queries in public list responses.
+  - Review fix: converted `requirementType` from a raw Java string to `ApplicationFormRequirementType` enum while preserving JSON enum-name strings.
+  - Review fix: added DTO-level null config guard tests.
+  - Review fix: added controller JSON coverage for non-zero required/optional question counts.
+  - Kept public list `applicationFormConfig` hidden.
+  - Kept public detail `applicationFormConfig` for compatibility and added policy beside it.
+  - Added a null-config public response guard for legacy data.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingQuestionPolicyCount.java`
+  - `src/main/java/com/shinyoung/recruit/enumeration/ApplicationFormRequirementType.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormRequiredPolicyResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormSectionPolicyResponse.java`
+  - `src/test/java/com/shinyoung/recruit/dto/response/ApplicationFormPolicyResponseTest.java`
+  - `docs/codex/implementation/phase-03k-1-application-form-required-policy.md`
+  - `docs/codex/reports/phase-03k-1-application-form-required-policy.html`
+- Modified:
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingRepository.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingPublicListProjection.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingQuestionRepository.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormConfigPublicResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/JobPostingPublicListResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/JobPostingPublicDetailResponse.java`
+  - `src/main/java/com/shinyoung/recruit/service/JobPostingPublicService.java`
+  - `src/test/java/com/shinyoung/recruit/service/JobPostingPublicServiceTest.java`
+  - `src/test/java/com/shinyoung/recruit/controller/JobPostingPublicControllerTest.java`
+  - `docs/codex/design/phase-03k-application-form-required-policy-design.md`
+  - `docs/codex/reports/phase-03k-application-form-required-policy-design.html`
+- Design conflict note:
+  - The Phase 03k design describes an end-to-end `requireXxx` target model.
+  - The Phase 03k-1 instruction explicitly limited implementation to a public read-only compatibility slice and prohibited DB/entity/submit/dashboard changes.
+  - This phase therefore exposes the current effective policy only and does not complete the target `requireXxx` design.
+- Tests:
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.dto.response.ApplicationFormPolicyResponseTest --tests com.shinyoung.recruit.service.JobPostingPublicServiceTest --tests com.shinyoung.recruit.controller.JobPostingPublicControllerTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Targeted test count: 19 tests, 0 failures, 0 skipped.
+  - Full check attempted: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat clean test --no-daemon`
+  - Full check result: timed out after 10 minutes before test result XML was produced; Gradle processes were stopped with `.\gradlew.bat --stop`.
+- Deferred:
+  - `requireXxx` DB/entity fields
+  - admin required policy configuration
+  - final-submit validator conversion
+  - dashboard completion conversion
+  - attachment required policy
+- Next recommended phase:
+  - Either implement the full Phase 03k target model end-to-end, or keep the compatibility policy and move to the next applicant workflow phase.
+
 ## Phase 03k - ApplicationFormConfig Use/Required Policy Split Design
 
 - Date: 2026-05-22

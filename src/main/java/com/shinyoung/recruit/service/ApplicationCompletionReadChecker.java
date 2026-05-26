@@ -1,12 +1,15 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
+import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
 import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.ApplicationMilitary;
 import com.shinyoung.recruit.domain.entity.JobApplication;
+import com.shinyoung.recruit.domain.entity.JobPostingAttachmentRequirement;
 import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
@@ -15,11 +18,15 @@ import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationGapPeriodRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationLanguageRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationMilitaryRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingAttachmentRequirementRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
 import com.shinyoung.recruit.dto.response.ApplicationCompletionSummaryResponse;
 import com.shinyoung.recruit.dto.response.ApplicationSectionReadinessResponse;
+import com.shinyoung.recruit.enumeration.ApplicationSectionType;
+import com.shinyoung.recruit.enumeration.AttachmentType;
 import com.shinyoung.recruit.enumeration.CareerType;
 import com.shinyoung.recruit.enumeration.MilitarySubjectType;
+import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 @Service
@@ -49,6 +57,7 @@ public class ApplicationCompletionReadChecker {
     private static final String LANGUAGE = "LANGUAGE";
     private static final String AWARD = "AWARD";
     private static final String GAP_PERIOD = "GAP_PERIOD";
+    private static final String ATTACHMENT = "ATTACHMENT";
 
     private final ApplicationEducationRepository educationRepository;
     private final ApplicationCareerProfileRepository careerProfileRepository;
@@ -60,6 +69,8 @@ public class ApplicationCompletionReadChecker {
     private final ApplicationLanguageRepository languageRepository;
     private final ApplicationAwardRepository awardRepository;
     private final ApplicationGapPeriodRepository gapPeriodRepository;
+    private final JobPostingAttachmentRequirementRepository attachmentRequirementRepository;
+    private final ApplicationAttachmentRepository attachmentRepository;
 
     public CompletionReadinessResult check(JobApplication application) {
         Long applicationId = application.getId();
@@ -79,9 +90,13 @@ public class ApplicationCompletionReadChecker {
             checkEducation(config, applicationId, accumulator);
             checkCareer(config, applicationId, accumulator);
             checkMilitary(config, applicationId, accumulator);
-            checkOptionalSections(config, applicationId, accumulator);
+            checkSimpleSection(config.isUseCertificate(), config.isRequireCertificate(), () -> certificateRepository.existsByJobApplicationId(applicationId), CERTIFICATE, "Certificate", accumulator);
+            checkSimpleSection(config.isUseLanguage(), config.isRequireLanguage(), () -> languageRepository.existsByJobApplicationId(applicationId), LANGUAGE, "Language", accumulator);
+            checkSimpleSection(config.isUseAward(), config.isRequireAward(), () -> awardRepository.existsByJobApplicationId(applicationId), AWARD, "Award", accumulator);
+            checkSimpleSection(config.isUseGapPeriod(), config.isRequireGapPeriod(), () -> gapPeriodRepository.existsByJobApplicationId(applicationId), GAP_PERIOD, "Gap period", accumulator);
         }
         checkQuestions(application, accumulator);
+        checkAttachments(application, accumulator);
 
         return accumulator.toResult();
     }
@@ -90,15 +105,16 @@ public class ApplicationCompletionReadChecker {
         if (!config.isUseEducation()) {
             return;
         }
-        accumulator.addRequiredGroup(EDUCATION);
+        boolean required = config.isRequireEducation();
+        addGroup(EDUCATION, required, accumulator);
         if (!educationRepository.existsByJobApplicationId(applicationId)) {
-            accumulator.addRequiredIssue(item(
+            addIssue(item(
                     EDUCATION,
                     "Education",
-                    true,
+                    required,
                     "MISSING_ROW",
-                    "Education section is required before submit."
-            ));
+                    sectionMissingMessage("Education", required)
+            ), required, accumulator);
         }
     }
 
@@ -106,50 +122,59 @@ public class ApplicationCompletionReadChecker {
         if (!config.isUseCareer()) {
             return;
         }
-        accumulator.addRequiredGroup(CAREER);
+        boolean required = config.isRequireCareer();
+        addGroup(CAREER, required, accumulator);
 
         Optional<ApplicationCareerProfile> profile = careerProfileRepository.findByJobApplicationId(applicationId);
         if (profile.isEmpty()) {
-            accumulator.addRequiredIssue(item(
+            addIssue(item(
                     CAREER,
                     "Career",
-                    true,
+                    required,
                     "MISSING_PROFILE",
-                    "Career profile is required before submit."
-            ));
+                    required
+                            ? "Career profile is required before submit."
+                            : "Career profile is empty."
+            ), required, accumulator);
             return;
         }
 
         CareerType careerType = profile.get().getCareerType();
         if (careerType == null || careerType == CareerType.NOT_SELECTED) {
-            accumulator.addRequiredIssue(item(
+            addIssue(item(
                     CAREER,
                     "Career",
-                    true,
+                    required,
                     "TYPE_NOT_SELECTED",
-                    "Career type must be selected before submit."
-            ));
+                    required
+                            ? "Career type must be selected before submit."
+                            : "Career type has not been selected."
+            ), required, accumulator);
             return;
         }
 
         boolean hasCareerRows = careerRepository.existsByJobApplicationId(applicationId);
         if (careerType == CareerType.EXPERIENCED && !hasCareerRows) {
-            accumulator.addRequiredIssue(item(
+            addIssue(item(
                     CAREER,
                     "Career",
-                    true,
+                    required,
                     "MISSING_ROW",
-                    "Career rows are required for experienced applicants before submit."
-            ));
+                    required
+                            ? "Career rows are required for experienced applicants before submit."
+                            : "Career rows are empty for the selected career type."
+            ), required, accumulator);
         }
         if ((careerType == CareerType.NEWCOMER || careerType == CareerType.NOT_APPLICABLE) && hasCareerRows) {
-            accumulator.addRequiredIssue(item(
+            addIssue(item(
                     CAREER,
                     "Career",
-                    true,
+                    required,
                     "INVALID_DISALLOWED_ROW",
-                    "Career rows are not allowed for the selected career type before submit."
-            ));
+                    required
+                            ? "Career rows are not allowed for the selected career type before submit."
+                            : "Career rows do not match the selected career type."
+            ), required, accumulator);
         }
     }
 
@@ -157,51 +182,58 @@ public class ApplicationCompletionReadChecker {
         if (!config.isUseMilitary()) {
             return;
         }
-        accumulator.addRequiredGroup(MILITARY);
+        boolean required = config.isRequireMilitary();
+        addGroup(MILITARY, required, accumulator);
 
         Optional<ApplicationMilitary> military = militaryRepository.findByJobApplicationId(applicationId);
         if (military.isEmpty()) {
-            accumulator.addRequiredIssue(item(
+            addIssue(item(
                     MILITARY,
                     "Military",
-                    true,
+                    required,
                     "MISSING_ROW",
-                    "Military section is required before submit."
-            ));
+                    sectionMissingMessage("Military", required)
+            ), required, accumulator);
             return;
         }
 
         MilitarySubjectType subjectType = military.get().getMilitarySubjectType();
         if (subjectType == null) {
-            accumulator.addRequiredIssue(item(
+            addIssue(item(
                     MILITARY,
                     "Military",
-                    true,
+                    required,
                     "TYPE_NOT_SELECTED",
-                    "Military subject type is required before submit."
-            ));
+                    required
+                            ? "Military subject type is required before submit."
+                            : "Military subject type has not been selected."
+            ), required, accumulator);
             return;
         }
 
         if (subjectType == MilitarySubjectType.COMPLETED
                 && (military.get().getServiceStartDate() == null || military.get().getServiceEndDate() == null)) {
-            accumulator.addRequiredIssue(item(
+            addIssue(item(
                     MILITARY,
                     "Military",
-                    true,
+                    required,
                     "MISSING_PERIOD",
-                    "Military service period is required for completed applicants before submit."
-            ));
+                    required
+                            ? "Military service period is required for completed applicants before submit."
+                            : "Military service period is incomplete."
+            ), required, accumulator);
         }
         if (subjectType == MilitarySubjectType.EXEMPTED
                 && (military.get().getExemptionReason() == null || military.get().getExemptionReason().isBlank())) {
-            accumulator.addRequiredIssue(item(
+            addIssue(item(
                     MILITARY,
                     "Military",
-                    true,
+                    required,
                     "MISSING_REASON",
-                    "Military exemption reason is required before submit."
-            ));
+                    required
+                            ? "Military exemption reason is required before submit."
+                            : "Military exemption reason is empty."
+            ), required, accumulator);
         }
     }
 
@@ -286,57 +318,54 @@ public class ApplicationCompletionReadChecker {
         return LONG_TEXT_MAX_LENGTH;
     }
 
-    private void checkOptionalSections(ApplicationFormConfig config, Long applicationId, ReadinessAccumulator accumulator) {
-        if (config.isUseCertificate()) {
-            checkOptionalSection(
-                    certificateRepository.existsByJobApplicationId(applicationId),
-                    CERTIFICATE,
-                    "Certificate",
-                    accumulator
-            );
-        }
-        if (config.isUseLanguage()) {
-            checkOptionalSection(
-                    languageRepository.existsByJobApplicationId(applicationId),
-                    LANGUAGE,
-                    "Language",
-                    accumulator
-            );
-        }
-        if (config.isUseAward()) {
-            checkOptionalSection(
-                    awardRepository.existsByJobApplicationId(applicationId),
-                    AWARD,
-                    "Award",
-                    accumulator
-            );
-        }
-        if (config.isUseGapPeriod()) {
-            checkOptionalSection(
-                    gapPeriodRepository.existsByJobApplicationId(applicationId),
-                    GAP_PERIOD,
-                    "Gap period",
-                    accumulator
-            );
-        }
-    }
-
-    private void checkOptionalSection(
-            boolean complete,
+    private void checkSimpleSection(
+            boolean useSection,
+            boolean requireSection,
+            BooleanSupplier complete,
             String sectionCode,
             String sectionName,
             ReadinessAccumulator accumulator
     ) {
-        accumulator.addOptionalGroup(sectionCode);
-        if (!complete) {
-            accumulator.addOptionalIssue(item(
+        if (!useSection) {
+            return;
+        }
+        addGroup(sectionCode, requireSection, accumulator);
+        if (!complete.getAsBoolean()) {
+            addIssue(item(
                     sectionCode,
                     sectionName,
-                    false,
-                    "OPTIONAL_EMPTY",
+                    requireSection,
+                    requireSection ? "MISSING_ROW" : "OPTIONAL_EMPTY",
                     sectionName + " section is empty."
-            ));
+            ), requireSection, accumulator);
         }
+    }
+
+    private void addGroup(String sectionCode, boolean required, ReadinessAccumulator accumulator) {
+        if (required) {
+            accumulator.addRequiredGroup(sectionCode);
+            return;
+        }
+        accumulator.addOptionalGroup(sectionCode);
+    }
+
+    private void addIssue(
+            ApplicationSectionReadinessResponse issue,
+            boolean required,
+            ReadinessAccumulator accumulator
+    ) {
+        if (required) {
+            accumulator.addRequiredIssue(issue);
+            return;
+        }
+        accumulator.addOptionalIssue(issue);
+    }
+
+    private String sectionMissingMessage(String sectionName, boolean required) {
+        if (required) {
+            return sectionName + " section is required before submit.";
+        }
+        return sectionName + " section is empty.";
     }
 
     private ApplicationSectionReadinessResponse item(
@@ -354,6 +383,64 @@ public class ApplicationCompletionReadChecker {
                 reasonCode,
                 message
         );
+    }
+
+    private void checkAttachments(JobApplication application, ReadinessAccumulator accumulator) {
+        List<JobPostingAttachmentRequirement> requirements = attachmentRequirementRepository
+                .findByJobPostingIdOrderBySortOrderAscIdAsc(application.getJobPosting().getId());
+        if (requirements.isEmpty()) {
+            return;
+        }
+
+        Map<AttachmentRequirementKey, Long> storedCounts = attachmentRepository
+                .findByJobApplicationIdAndPhysicalFileStatus(application.getId(), PhysicalFileStatus.STORED)
+                .stream()
+                .filter(attachment -> attachment.getDeletedAt() == null)
+                .collect(Collectors.groupingBy(
+                        attachment -> new AttachmentRequirementKey(
+                                attachment.getAttachmentType(),
+                                attachment.getSectionType()
+                        ),
+                        Collectors.counting()
+                ));
+
+        boolean hasRequired = requirements.stream().anyMatch(JobPostingAttachmentRequirement::isRequired);
+        boolean hasOptionalRecommendation = requirements.stream()
+                .anyMatch(requirement -> !requirement.isRequired() && requirement.getMinCount() > 0);
+        if (hasRequired) {
+            accumulator.addRequiredGroup(ATTACHMENT);
+        } else if (hasOptionalRecommendation) {
+            accumulator.addOptionalGroup(ATTACHMENT);
+        }
+
+        for (JobPostingAttachmentRequirement requirement : requirements) {
+            long storedCount = storedCounts.getOrDefault(
+                    new AttachmentRequirementKey(requirement.getAttachmentType(), requirement.getSectionType()),
+                    0L
+            );
+            if (requirement.isRequired() && storedCount < requirement.getMinCount()) {
+                accumulator.addRequiredIssue(item(
+                        ATTACHMENT,
+                        "Attachment",
+                        true,
+                        "REQUIRED_ATTACHMENT_MISSING",
+                        requirement.getDisplayName() + " attachment is required before submit."
+                ));
+                continue;
+            }
+            if (!hasRequired
+                    && !requirement.isRequired()
+                    && requirement.getMinCount() > 0
+                    && storedCount < requirement.getMinCount()) {
+                accumulator.addOptionalIssue(item(
+                        ATTACHMENT,
+                        "Attachment",
+                        false,
+                        "OPTIONAL_ATTACHMENT_MISSING",
+                        requirement.getDisplayName() + " attachment has not been uploaded."
+                ));
+            }
+        }
     }
 
     public record CompletionReadinessResult(
@@ -415,5 +502,11 @@ public class ApplicationCompletionReadChecker {
                     List.copyOf(optionalIssues)
             );
         }
+    }
+
+    private record AttachmentRequirementKey(
+            AttachmentType attachmentType,
+            ApplicationSectionType sectionType
+    ) {
     }
 }

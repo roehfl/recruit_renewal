@@ -1,6 +1,8 @@
 package com.shinyoung.recruit.dto.response;
 
 import com.shinyoung.recruit.domain.entity.JobPosition;
+import com.shinyoung.recruit.domain.repository.JobPostingAttachmentRequirementPolicyCount;
+import com.shinyoung.recruit.domain.repository.JobPostingQuestionPolicyCount;
 import com.shinyoung.recruit.domain.repository.JobPostingPublicListProjection;
 import com.shinyoung.recruit.enumeration.JobPostingType;
 import com.shinyoung.recruit.enumeration.ReceptionStatus;
@@ -18,12 +20,15 @@ public record JobPostingPublicListResponse(
         ReceptionStatus receptionStatus,
         boolean accepting,
         boolean pinned,
-        List<JobPositionPublicResponse> positions
+        List<JobPositionPublicResponse> positions,
+        ApplicationFormRequiredPolicyResponse applicationFormRequiredPolicy
 ) {
     public static JobPostingPublicListResponse from(
             JobPostingPublicListProjection jobPosting,
             List<JobPosition> positions,
-            LocalDateTime now
+            LocalDateTime now,
+            JobPostingQuestionPolicyCount questionPolicyCount,
+            JobPostingAttachmentRequirementPolicyCount attachmentPolicyCount
     ) {
         ReceptionStatus receptionStatus = ReceptionStatus.from(
                 jobPosting.getReceptionStartDateTime(),
@@ -42,7 +47,25 @@ public record JobPostingPublicListResponse(
                 Boolean.TRUE.equals(jobPosting.getPinned()),
                 positions.stream()
                         .map(JobPositionPublicResponse::from)
-                        .toList()
+                        .toList(),
+                ApplicationFormRequiredPolicyResponse.from(
+                        jobPosting.getUseEducation(),
+                        jobPosting.getRequireEducation(),
+                        jobPosting.getUseCareer(),
+                        jobPosting.getRequireCareer(),
+                        jobPosting.getUseCertificate(),
+                        jobPosting.getRequireCertificate(),
+                        jobPosting.getUseLanguage(),
+                        jobPosting.getRequireLanguage(),
+                        jobPosting.getUseMilitary(),
+                        jobPosting.getRequireMilitary(),
+                        jobPosting.getUseAward(),
+                        jobPosting.getRequireAward(),
+                        jobPosting.getUseGapPeriod(),
+                        jobPosting.getRequireGapPeriod(),
+                        questionPolicyCount,
+                        attachmentPolicyCount
+                )
         );
     }
 

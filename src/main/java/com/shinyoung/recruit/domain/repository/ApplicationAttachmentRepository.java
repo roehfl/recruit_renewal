@@ -20,6 +20,11 @@ public interface ApplicationAttachmentRepository extends JpaRepository<Applicati
             PhysicalFileStatus physicalFileStatus
     );
 
+    List<ApplicationAttachment> findByJobApplicationIdAndPhysicalFileStatus(
+            Long applicationId,
+            PhysicalFileStatus physicalFileStatus
+    );
+
     List<ApplicationAttachment> findByJobApplicationId(Long applicationId);
 
     List<ApplicationAttachment> findByPhysicalFileStatusIn(Collection<PhysicalFileStatus> physicalFileStatuses);

@@ -83,7 +83,7 @@ public class JobPostingService {
         );
 
         jobPosting.replaceJobPositions(toJobPositions(request.jobPositions()));
-        jobPosting.updateApplicationFormConfig(toApplicationFormConfig(request.applicationFormConfig()));
+        jobPosting.updateApplicationFormConfig(toCreateApplicationFormConfig(request.applicationFormConfig()));
 
         JobPosting saved = jobPostingRepository.save(jobPosting);
         return saved.getId();
@@ -112,7 +112,10 @@ public class JobPostingService {
                 defaultDisplayOrder(request.displayOrder())
         );
         jobPosting.replaceJobPositions(toJobPositions(request.jobPositions()));
-        jobPosting.updateApplicationFormConfig(toApplicationFormConfig(request.applicationFormConfig()));
+        jobPosting.updateApplicationFormConfig(toUpdateApplicationFormConfig(
+                request.applicationFormConfig(),
+                jobPosting.getApplicationFormConfig()
+        ));
 
         return jobPosting.getId();
     }
@@ -312,16 +315,102 @@ public class JobPostingService {
                 .toList();
     }
 
-    private ApplicationFormConfig toApplicationFormConfig(ApplicationFormConfigRequest request) {
+    private ApplicationFormConfig toCreateApplicationFormConfig(ApplicationFormConfigRequest request) {
+        boolean requireEducation = defaultRequired(request.requireEducation(), request.useEducation());
+        boolean requireCareer = defaultRequired(request.requireCareer(), request.useCareer());
+        boolean requireCertificate = defaultRequired(request.requireCertificate(), false);
+        boolean requireLanguage = defaultRequired(request.requireLanguage(), false);
+        boolean requireMilitary = defaultRequired(request.requireMilitary(), request.useMilitary());
+        boolean requireAward = defaultRequired(request.requireAward(), false);
+        boolean requireGapPeriod = defaultRequired(request.requireGapPeriod(), false);
+        validateApplicationFormRequirement(request, requireEducation, requireCareer, requireCertificate, requireLanguage, requireMilitary, requireAward, requireGapPeriod);
         return ApplicationFormConfig.create(
                 request.useEducation(),
+                requireEducation,
                 request.useCareer(),
+                requireCareer,
                 request.useCertificate(),
+                requireCertificate,
                 request.useLanguage(),
+                requireLanguage,
                 request.useMilitary(),
+                requireMilitary,
                 request.useAward(),
-                request.useGapPeriod()
+                requireAward,
+                request.useGapPeriod(),
+                requireGapPeriod
         );
+    }
+
+    private ApplicationFormConfig toUpdateApplicationFormConfig(
+            ApplicationFormConfigRequest request,
+            ApplicationFormConfig currentConfig
+    ) {
+        if (currentConfig == null) {
+            return toCreateApplicationFormConfig(request);
+        }
+
+        boolean requireEducation = resolveUpdatedRequired(request.useEducation(), request.requireEducation(), currentConfig.isRequireEducation());
+        boolean requireCareer = resolveUpdatedRequired(request.useCareer(), request.requireCareer(), currentConfig.isRequireCareer());
+        boolean requireCertificate = resolveUpdatedRequired(request.useCertificate(), request.requireCertificate(), currentConfig.isRequireCertificate());
+        boolean requireLanguage = resolveUpdatedRequired(request.useLanguage(), request.requireLanguage(), currentConfig.isRequireLanguage());
+        boolean requireMilitary = resolveUpdatedRequired(request.useMilitary(), request.requireMilitary(), currentConfig.isRequireMilitary());
+        boolean requireAward = resolveUpdatedRequired(request.useAward(), request.requireAward(), currentConfig.isRequireAward());
+        boolean requireGapPeriod = resolveUpdatedRequired(request.useGapPeriod(), request.requireGapPeriod(), currentConfig.isRequireGapPeriod());
+        validateApplicationFormRequirement(request, requireEducation, requireCareer, requireCertificate, requireLanguage, requireMilitary, requireAward, requireGapPeriod);
+
+        return ApplicationFormConfig.create(
+                request.useEducation(),
+                requireEducation,
+                request.useCareer(),
+                requireCareer,
+                request.useCertificate(),
+                requireCertificate,
+                request.useLanguage(),
+                requireLanguage,
+                request.useMilitary(),
+                requireMilitary,
+                request.useAward(),
+                requireAward,
+                request.useGapPeriod(),
+                requireGapPeriod
+        );
+    }
+
+    private boolean defaultRequired(Boolean requestedRequired, boolean defaultValue) {
+        return requestedRequired == null ? defaultValue : requestedRequired;
+    }
+
+    private boolean resolveUpdatedRequired(boolean useSection, Boolean requestedRequired, boolean currentRequired) {
+        if (requestedRequired != null) {
+            return requestedRequired;
+        }
+        return useSection && currentRequired;
+    }
+
+    private void validateApplicationFormRequirement(
+            ApplicationFormConfigRequest request,
+            boolean requireEducation,
+            boolean requireCareer,
+            boolean requireCertificate,
+            boolean requireLanguage,
+            boolean requireMilitary,
+            boolean requireAward,
+            boolean requireGapPeriod
+    ) {
+        validateApplicationFormRequirement(request.useEducation(), requireEducation, "education");
+        validateApplicationFormRequirement(request.useCareer(), requireCareer, "career");
+        validateApplicationFormRequirement(request.useCertificate(), requireCertificate, "certificate");
+        validateApplicationFormRequirement(request.useLanguage(), requireLanguage, "language");
+        validateApplicationFormRequirement(request.useMilitary(), requireMilitary, "military");
+        validateApplicationFormRequirement(request.useAward(), requireAward, "award");
+        validateApplicationFormRequirement(request.useGapPeriod(), requireGapPeriod, "gap period");
+    }
+
+    private void validateApplicationFormRequirement(boolean useSection, boolean requireSection, String sectionName) {
+        if (!useSection && requireSection) {
+            throw new InvalidJobPostingException(sectionName + " section cannot be required when disabled.");
+        }
     }
 
     private JobPostingType defaultPostingType(JobPostingType postingType) {

@@ -4,22 +4,36 @@ import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 
 public record ApplicationFormConfigResponse(
         boolean useEducation,
+        boolean requireEducation,
         boolean useCareer,
+        boolean requireCareer,
         boolean useCertificate,
+        boolean requireCertificate,
         boolean useLanguage,
+        boolean requireLanguage,
         boolean useMilitary,
+        boolean requireMilitary,
         boolean useAward,
-        boolean useGapPeriod
+        boolean requireAward,
+        boolean useGapPeriod,
+        boolean requireGapPeriod
 ) {
     public static ApplicationFormConfigResponse from(ApplicationFormConfig config) {
         return new ApplicationFormConfigResponse(
                 config.isUseEducation(),
+                config.isRequireEducation(),
                 config.isUseCareer(),
+                config.isRequireCareer(),
                 config.isUseCertificate(),
+                config.isRequireCertificate(),
                 config.isUseLanguage(),
+                config.isRequireLanguage(),
                 config.isUseMilitary(),
+                config.isRequireMilitary(),
                 config.isUseAward(),
-                config.isUseGapPeriod()
+                config.isRequireAward(),
+                config.isUseGapPeriod(),
+                config.isRequireGapPeriod()
         );
     }
 }

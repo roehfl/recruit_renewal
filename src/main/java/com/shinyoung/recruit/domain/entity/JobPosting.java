@@ -192,12 +192,19 @@ public class JobPosting extends BaseEntity {
         if (this.applicationFormConfig != null) {
             this.applicationFormConfig.update(
                     config.isUseEducation(),
+                    config.isRequireEducation(),
                     config.isUseCareer(),
+                    config.isRequireCareer(),
                     config.isUseCertificate(),
+                    config.isRequireCertificate(),
                     config.isUseLanguage(),
+                    config.isRequireLanguage(),
                     config.isUseMilitary(),
+                    config.isRequireMilitary(),
                     config.isUseAward(),
-                    config.isUseGapPeriod()
+                    config.isRequireAward(),
+                    config.isUseGapPeriod(),
+                    config.isRequireGapPeriod()
             );
             return;
         }

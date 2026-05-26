@@ -1,5 +1,35 @@
 # 01. Project Context
 
+## 0. Current Status Note - 2026-05-26
+
+이 문서는 프로젝트의 기본 맥락과 개발 규칙을 설명하는 기준 문서다. 다만 최초 작성 시점 이후 구현이 많이 진행되어, 아래 “현재 API 현황”과 “앞으로 추가할 도메인” 일부는 최신 구현 범위를 모두 반영하지 않을 수 있다.
+
+최신 구현 진행상황은 다음 문서를 우선 기준으로 본다.
+
+1. `docs/codex/06-implementation-roadmap.md`
+2. `docs/codex/07-implementation-history.md`
+3. `docs/codex/implementation/*.md`
+4. `docs/codex/reports/current-implementation-status.html`
+
+2026-05-26 현재 완료된 큰 범위:
+
+- JobPosting admin/public, JobPosition, 공고 표시 정책
+- Stage, StageResult, 결과 정정 이력
+- Application 생성/조회/임시저장/제출/철회, 내 지원서, dashboard
+- Application 상세 섹션: education, career, certificate, language, military, award, gap period
+- QuestionTemplate, JobPostingQuestion, ApplicationAnswer
+- ApplicationAttachment metadata, file upload/download, soft delete, storage health scan
+- ApplicationFormConfig use/require split
+- JobPostingAttachmentRequirement와 첨부 필수 dashboard/submit 연동
+
+아직 남은 큰 범위:
+
+- Interview, InterviewParticipant, InterviewEvaluation
+- MessageBatch, MessageSendLog
+- Excel/PDF/statistics
+- ActivityLog, privacy purge/retention
+- CommonCode, School master data
+
 이 문서는 Codex Cloud 신규 컨테이너에서 현재 Spring Boot 프로젝트를 이어 개발하기 위한 프로젝트 현황 문서다.
 
 ## 1. 프로젝트 개요

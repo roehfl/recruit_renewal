@@ -19,4 +19,32 @@ public interface JobPostingPublicListProjection {
     LocalDateTime getReceptionEndDateTime();
 
     Boolean getPinned();
+
+    Boolean getUseEducation();
+
+    Boolean getRequireEducation();
+
+    Boolean getUseCareer();
+
+    Boolean getRequireCareer();
+
+    Boolean getUseCertificate();
+
+    Boolean getRequireCertificate();
+
+    Boolean getUseLanguage();
+
+    Boolean getRequireLanguage();
+
+    Boolean getUseMilitary();
+
+    Boolean getRequireMilitary();
+
+    Boolean getUseAward();
+
+    Boolean getRequireAward();
+
+    Boolean getUseGapPeriod();
+
+    Boolean getRequireGapPeriod();
 }

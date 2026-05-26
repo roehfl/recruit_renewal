@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Recruit Backend Implementation Status</title>
+  <title>Recruit Backend Current Implementation Status</title>
   <style>
     body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f4f7fb; line-height: 1.55; }
     header { background: #142f47; color: #fff; padding: 34px 42px; }
-    main { max-width: 1200px; margin: 0 auto; padding: 28px 24px 56px; }
+    main { max-width: 1220px; margin: 0 auto; padding: 28px 24px 56px; }
     h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
     h2 { margin: 34px 0 14px; font-size: 22px; }
     h3 { margin: 0 0 10px; font-size: 16px; }
@@ -23,6 +23,7 @@
     .pending { background: #f3e7cc; color: #7a4b00; }
     .blocked { background: #f4d7da; color: #842029; }
     .muted { background: #e8edf2; color: #536171; }
+    .info { background: #dbeafe; color: #1d4ed8; }
     .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
     .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
@@ -42,239 +43,275 @@
 <body>
 <header>
   <div>Shinyoung Recruit Backend</div>
-  <h1>현재 구현 현황 및 남은 작업</h1>
+  <h1>Current Implementation Status</h1>
   <span class="badge done">Status Snapshot</span>
-  <span class="badge muted">Generated: 2026-05-19</span>
+  <span class="badge muted">Generated: 2026-05-26</span>
 </header>
 
 <main>
   <section class="summary">
     <div class="card">
-      <h2>요약</h2>
-      <p>현재 백엔드는 채용 공고, 전형 단계, 지원서 작성/제출, 지원서 상세 섹션, 질문/답변, 전형 결과 관리의 주요 vertical slice가 구현된 상태입니다.</p>
-      <p>최근 작업 기준으로 StageResult는 관리자 초기화/조회/수정/일괄수정, 관리자 지원서 상세 timeline, 지원자 결과 조회, 발표 후 정정 이력까지 구현되어 있습니다.</p>
-      <p>운영 전 남은 핵심 축은 인증/인가 hardening, 실제 관리자 identity 전파, 메시지/알림, 면접/평가, 엑셀/PDF/통계/파기 기능입니다.</p>
+      <h2>Summary</h2>
+      <p>The backend has moved beyond scaffold work. Job postings, stages, applications, detailed application sections, questions/answers, stage results, attachments, and required attachment policy are implemented and documented.</p>
+      <p>Phase 04 Interview Scheduling is complete through stabilization. The design, Phase 04a domain/repository implementation, Phase 04b admin schedule management, Phase 04c applicant read, Phase 04d interviewer read, and Phase 04e stabilization/test hardening are complete.</p>
+      <p>The next implementation slice is Phase 05, focused on interview evaluation.</p>
     </div>
     <div class="card">
-      <h2>전체 상태</h2>
-      <p><span class="badge done">Core CRUD Implemented</span></p>
-      <p><span class="badge done">StageResult 03d Complete</span></p>
-      <p><span class="badge partial">Security Hardening Designed</span></p>
-      <p><span class="badge pending">Interview/Message/Export Pending</span></p>
+      <h2>Overall State</h2>
+      <p><span class="badge done">JobPosting complete</span></p>
+      <p><span class="badge done">Application core complete</span></p>
+      <p><span class="badge done">StageResult complete</span></p>
+      <p><span class="badge done">Attachment lifecycle complete</span></p>
+      <p><span class="badge done">Phase 04a domain complete</span></p>
+      <p><span class="badge done">Phase 04b admin API complete</span></p>
+      <p><span class="badge done">Phase 04c applicant read complete</span></p>
+      <p><span class="badge done">Phase 04d interviewer read complete</span></p>
+      <p><span class="badge done">Phase 04e stabilization complete</span></p>
+      <p><span class="badge partial">Auth/authorization partially hardened</span></p>
     </div>
   </section>
 
   <section class="section">
-    <h2>구현 완료 범위</h2>
+    <h2>Completed Implementation Scope</h2>
     <table>
-      <tr><th>영역</th><th>상태</th><th>구현된 주요 내용</th><th>대표 API/산출물</th></tr>
+      <tr><th>Area</th><th>Status</th><th>Current implementation</th><th>Primary docs/API</th></tr>
       <tr>
-        <td>공통 기반</td>
-        <td><span class="badge done">완료</span></td>
-        <td>Spring Boot 기반, 공통 응답 <code>ApiResponse</code>, 예외 처리, JPA Auditing, 암호화/해시 유틸 기반</td>
-        <td><code>GlobalExceptionHandler</code>, <code>BaseEntity</code></td>
+        <td>Common foundation</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Common response, exception handling, JPA auditing, crypto/hash baseline, H2 test baseline.</td>
+        <td><code>ApiResponse</code>, <code>PageResponse</code>, <code>GlobalExceptionHandler</code></td>
       </tr>
       <tr>
-        <td>인증 기본 흐름</td>
-        <td><span class="badge partial">부분 완료</span></td>
-        <td>세션 기반 로그인 구조, 지원자 DB 인증, 임직원 LDAP 인증/JIT 후보, <code>CustomUserDetails</code>, 지원자 current resolver</td>
-        <td><code>/auth/login</code>, <code>CurrentApplicantService</code></td>
+        <td>Auth baseline</td>
+        <td><span class="badge partial">Partial</span></td>
+        <td>Session login/logout/me, applicant DB auth, employee LDAP/JIT structure.</td>
+        <td><code>/auth/login</code>, <code>/auth/me</code></td>
       </tr>
       <tr>
-        <td>메뉴/공지</td>
-        <td><span class="badge done">완료</span></td>
-        <td>메뉴 tree/detail/breadcrumb, 공지 목록/상세/등록 기본 API</td>
+        <td>Menu and notice</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Menu tree/detail/breadcrumb, admin menu create/update, notice list/detail/create.</td>
         <td><code>/menu/**</code>, <code>/board/notices</code></td>
       </tr>
       <tr>
-        <td>채용 공고</td>
-        <td><span class="badge done">완료</span></td>
-        <td>관리자 공고 CRUD, 게시/마감, 모집 분야, 지원서 설정, 지원자 공개 공고 조회</td>
+        <td>Job posting</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Admin CRUD, publish/close, job positions, display policy, public list/detail filtering and sorting.</td>
         <td><code>/admin/job-postings</code>, <code>/job-postings</code></td>
       </tr>
       <tr>
-        <td>전형 단계</td>
-        <td><span class="badge done">완료</span></td>
-        <td>전형 단계 CRUD, 순서 변경, 시작/발표/마감 상태 전이, 발표 전 StageResult pending guard</td>
-        <td><code>/admin/job-postings/{jobPostingId}/stages</code></td>
+        <td>Application form policy</td>
+        <td><span class="badge done">Complete</span></td>
+        <td><code>ApplicationFormConfig.useXxx</code> and <code>requireXxx</code> split, public required policy, submit/dashboard integration.</td>
+        <td><code>phase-03k-2</code></td>
       </tr>
       <tr>
-        <td>지원서 루트</td>
-        <td><span class="badge done">완료</span></td>
-        <td>지원서 생성, 임시저장 수정, 최종 제출, 철회, 내 지원서/관리자 목록/상세 조회</td>
-        <td><code>/applications</code>, <code>/admin/applications</code></td>
+        <td>Stage and StageResult</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Stage CRUD/reorder/status commands, StageResult initialize/list/update/bulk/correction, applicant result read.</td>
+        <td><code>/admin/job-postings/{id}/stages</code>, <code>/admin/stages/{id}/results</code></td>
       </tr>
       <tr>
-        <td>지원서 상세 섹션</td>
-        <td><span class="badge done">완료</span></td>
-        <td>학력, 경력, 자격, 어학, 병역, 수상, 공백기간, 첨부파일 metadata 저장/조회와 관리자 lazy read</td>
-        <td><code>/applications/{id}/educations</code> 등</td>
+        <td>Application flow</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Create, read, my list, dashboard, draft update, final submit, withdraw, admin application read.</td>
+        <td><code>/applications</code>, <code>/applications/me</code>, <code>/applications/{id}/dashboard</code></td>
       </tr>
       <tr>
-        <td>질문/답변</td>
-        <td><span class="badge done">완료</span></td>
-        <td>질문 템플릿, 공고별 질문, 지원자 답변 저장/조회, 제출 시 필수 답변 검증, 관리자 답변 lazy read</td>
-        <td><code>/admin/job-postings/{id}/questions</code>, <code>/applications/{id}/answers</code></td>
+        <td>Application detail sections</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Education, career, certificate, language, military, award, gap period, admin lazy section read.</td>
+        <td><code>/applications/{id}/educations</code> and related section APIs</td>
       </tr>
       <tr>
-        <td>전형 결과</td>
-        <td><span class="badge done">완료</span></td>
-        <td>StageResult entity, 관리자 initialize/list/update/bulk, 지원서 상세 timeline, 지원자 발표 결과 조회, 발표 후 정정 이력</td>
-        <td><code>/admin/stages/{stageId}/results</code>, <code>/applications/{id}/stage-results</code></td>
+        <td>Question and answer</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Question templates, posting questions, answer save/read, submit validation, admin answer read.</td>
+        <td><code>/admin/question-templates</code>, <code>/applications/{id}/answers</code></td>
       </tr>
       <tr>
-        <td>Auth hardening 설계</td>
-        <td><span class="badge done">설계 완료</span></td>
-        <td>관리자/지원자 API 보호 정책, current employee/admin resolver 후보, StageResult actor 전파, 401/403 응답 정책 설계</td>
-        <td><code>phase-03e-admin-auth-hardening-design.md</code></td>
+        <td>Attachment lifecycle</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Metadata, physical upload, applicant/admin download, applicant/admin soft delete, storage health dry-run.</td>
+        <td><code>/applications/{id}/attachments</code>, <code>/admin/attachments/storage-health/scan</code></td>
+      </tr>
+      <tr>
+        <td>Attachment required policy</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Per-posting attachment requirements, DRAFT-only replace-all, public safe exposure, dashboard/submit integration.</td>
+        <td><code>/admin/job-postings/{id}/attachment-requirements</code>, <code>phase-03i-5-2</code></td>
+      </tr>
+      <tr>
+        <td>Interview scheduling domain</td>
+        <td><span class="badge done">04a complete</span></td>
+        <td><code>Interview</code>, <code>InterviewParticipant</code>, four enums, repositories, entity/repository tests.</td>
+        <td><code>phase-04a-interview-scheduling-domain</code></td>
+      </tr>
+      <tr>
+        <td>Interview schedule admin management</td>
+        <td><span class="badge done">04b complete</span></td>
+        <td>Admin list/detail, DRAFT create/update, participant replacement, confirm/cancel commands, eligibility and collision guards.</td>
+        <td><code>phase-04b-admin-interview-schedule-management</code></td>
+      </tr>
+      <tr>
+        <td>Applicant interview schedule read</td>
+        <td><span class="badge done">04c complete</span></td>
+        <td>Applicant-owned list/detail, DRAFT hiding, CONFIRMED/CANCELLED exposure, candidate assignment and ownership guards, applicant-safe response.</td>
+        <td><code>phase-04c-applicant-interview-read</code></td>
+      </tr>
+      <tr>
+        <td>Interviewer interview schedule read</td>
+        <td><span class="badge done">04d complete</span></td>
+        <td>Interviewer-owned list/detail, DRAFT hiding, CONFIRMED/CANCELLED exposure, assignment guard, assigned candidate detail list, interviewer-safe response.</td>
+        <td><code>phase-04d-interviewer-interview-read</code></td>
+      </tr>
+      <tr>
+        <td>Interview scheduling stabilization</td>
+        <td><span class="badge done">04e complete</span></td>
+        <td>Cross-slice cancellation regression, participant lifecycle hardening, StageResult non-mutation regression, authorization matrix review.</td>
+        <td><code>phase-04e-interview-scheduling-stabilization</code></td>
       </tr>
     </table>
   </section>
 
   <section class="section">
-    <h2>StageResult 상세 현황</h2>
-    <div class="grid">
+    <h2>Phase 04 Status</h2>
+    <div class="two">
       <div class="card">
-        <h3>관리자 결과 관리</h3>
+        <h3>Completed</h3>
+        <p><span class="badge done">Phase 04 design</span></p>
         <ul class="list">
-          <li>전형별 결과 초기화</li>
-          <li>전형별 결과 목록 조회</li>
-          <li>단건 결과 update</li>
-          <li>일괄 결과 update</li>
-          <li>발표 전 pending 결과 guard</li>
+          <li>Interview schedule/group design.</li>
+          <li>Candidate and interviewer participant assignment model.</li>
+          <li>Admin, applicant, and interviewer API draft.</li>
+          <li>Visibility, eligibility, stage status, collision, and <code>StageResult</code> non-mutation policies.</li>
+        </ul>
+        <p><span class="badge done">Phase 04a implementation</span></p>
+        <ul class="list">
+          <li><code>Interview</code> and <code>InterviewParticipant</code> entities.</li>
+          <li>Interview method/status and participant role/status enums.</li>
+          <li>Repositories and targeted tests.</li>
         </ul>
       </div>
       <div class="card">
-        <h3>지원서/지원자 조회</h3>
+        <h3>Completed Slices</h3>
+        <p><span class="badge done">Phase 04b - Admin Interview Schedule Management</span></p>
         <ul class="list">
-          <li>관리자 지원서 상세 전형결과 timeline</li>
-          <li>지원자 본인 결과 조회</li>
-          <li><code>RESULT_ANNOUNCED</code>, <code>CLOSED</code>만 지원자 노출</li>
-          <li>지원자 응답에서 score/comment/decidedBy/history 제외</li>
+          <li>Admin create/update/read service and API.</li>
+          <li>DRAFT participant replacement.</li>
+          <li>Confirm/cancel commands.</li>
+          <li><code>StageType</code> allowlist and <code>StageStatus</code> guards.</li>
+          <li>Candidate eligibility checks.</li>
+          <li>Duplicate assignment and confirmed-schedule collision checks.</li>
+          <li><code>StageResult</code> non-mutation regression.</li>
         </ul>
-      </div>
-      <div class="card">
-        <h3>정정 이력</h3>
+        <p><span class="badge done">Phase 04c - Applicant Interview Read</span></p>
         <ul class="list">
-          <li>발표 후 별도 correction command</li>
-          <li>정정 reason 필수</li>
-          <li>최신 StageResult 갱신</li>
-          <li>previous/new snapshot append-only 저장</li>
-          <li>관리자 history API 제공</li>
+          <li>Applicant-owned schedule read API.</li>
+          <li>Hide <code>DRAFT</code> schedules.</li>
+          <li>Return only assigned <code>CONFIRMED</code> or <code>CANCELLED</code> schedules.</li>
+          <li>Hide other candidates, interviewer lists, and admin memo.</li>
+        </ul>
+        <p><span class="badge done">Phase 04d - Interviewer Interview Read</span></p>
+        <ul class="list">
+          <li>Interviewer-owned assigned schedule read API.</li>
+          <li>Hide <code>DRAFT</code> schedules.</li>
+          <li>Return only assigned <code>CONFIRMED</code> or <code>CANCELLED</code> schedules.</li>
+          <li>Hide admin memo and <code>StageResult</code> internals.</li>
+          <li>Expose assigned candidate list in detail only.</li>
+        </ul>
+        <p><span class="badge done">Phase 04e - Interview Scheduling Stabilization</span></p>
+        <ul class="list">
+          <li>Cross-slice API and response consistency.</li>
+          <li>Cancelled schedule and participant lifecycle edge-case tests.</li>
+          <li>Admin/applicant/employee/interviewer authorization matrix review.</li>
+          <li>Clean handoff to <code>Phase 05 - Interview Evaluation</code>.</li>
         </ul>
       </div>
     </div>
   </section>
 
   <section class="section">
-    <h2>남아있는 주요 작업</h2>
+    <h2>Partial and Operational Areas</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Security/Auth</h3>
+        <p><span class="badge partial">Partial</span></p>
+        <ul class="list">
+          <li>URL authorization and JSON 401/403 exist.</li>
+          <li>Operating role matrix and interviewer-specific roles remain.</li>
+          <li>LDAP/role mapping production validation remains.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>DB Operations</h3>
+        <p><span class="badge partial">Manual schema needed</span></p>
+        <ul class="list">
+          <li>H2 generated schema and tests are available.</li>
+          <li>No migration framework is active.</li>
+          <li>Persistent MariaDB changes require manual DDL through the deployment process.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Attachment Lifecycle</h3>
+        <p><span class="badge partial">Partial</span></p>
+        <ul class="list">
+          <li>Upload/download/delete/scan are implemented.</li>
+          <li>Repair/cleanup commit command remains.</li>
+          <li>Separate deletion history table remains undecided.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Remaining Major Work</h2>
     <table>
-      <tr><th>우선순위</th><th>영역</th><th>남은 작업</th><th>권장 다음 단계</th></tr>
+      <tr><th>Priority</th><th>Area</th><th>Remaining work</th><th>Recommended phase</th></tr>
       <tr>
         <td>1</td>
-        <td>보안/권한</td>
-        <td><code>SecurityConfig</code>의 개발용 <code>permitAll</code> 제거, <code>/admin/**</code>와 <code>/applications/**</code> 접근 제어, 401/403 JSON 응답</td>
-        <td>Phase 03e-2, 03e-3, 03e-4 순서로 구현</td>
+        <td>Interview evaluation</td>
+        <td><code>InterviewEvaluation</code>, interviewer draft/submit, admin read, StageResult integration policy.</td>
+        <td>Phase 05</td>
       </tr>
       <tr>
         <td>2</td>
-        <td>관리자 identity</td>
-        <td>StageResult update/correction의 <code>SYSTEM</code> actor를 실제 임직원/admin loginId 또는 audit actor로 교체</td>
-        <td><code>CurrentEmployeeService</code> 또는 <code>CurrentAdminService</code> 추가</td>
+        <td>Messaging</td>
+        <td><code>MessageBatch</code>, <code>MessageSendLog</code>, SMS/Email/Alimtalk adapter boundary.</td>
+        <td>Phase 06</td>
       </tr>
       <tr>
         <td>3</td>
-        <td>LDAP/운영 설정</td>
-        <td>운영 profile 기준 LDAP property 외부화, role mapping 값 확인, public endpoint allowlist 확정</td>
-        <td>보안 hardening 구현 전 설정 정책 확정</td>
+        <td>Export/PDF/statistics</td>
+        <td>Application and result export, application PDF, recruitment statistics.</td>
+        <td>Phase 07</td>
       </tr>
       <tr>
         <td>4</td>
-        <td>면접/평가</td>
-        <td>면접 일정/조, 면접 참여자, 면접관 평가, 평가 결과와 StageResult 연동</td>
-        <td>Interview vertical slice 설계/구현</td>
+        <td>Privacy/audit/retention</td>
+        <td>Retention policy, purge history, access/change audit, trace/correlation policy.</td>
+        <td>Phase 08</td>
       </tr>
       <tr>
         <td>5</td>
-        <td>메시지/알림</td>
-        <td>합격/불합격 안내, 정정 알림, SMS/Email/알림톡 발송 이력</td>
-        <td>MessageBatch/MessageSendLog 구현</td>
-      </tr>
-      <tr>
-        <td>6</td>
-        <td>파일 실물 처리</td>
-        <td>현재 첨부파일은 metadata 중심이며, 실제 multipart 업로드/다운로드/저장소 연동은 남음</td>
-        <td>Attachment storage phase 분리</td>
-      </tr>
-      <tr>
-        <td>7</td>
-        <td>엑셀/PDF/통계</td>
-        <td>지원자 목록/전형결과 엑셀, 지원서 PDF, 지원율/합격률 통계</td>
-        <td>core CRUD 안정화 후 별도 reporting/export phase</td>
-      </tr>
-      <tr>
-        <td>8</td>
-        <td>개인정보 파기/감사</td>
-        <td>지원자 개인정보 파기 정책, 접근 감사 로그, 민감정보 masking/권한 세분화</td>
-        <td>보안 hardening 이후 audit/privacy phase</td>
+        <td>CommonCode and school master</td>
+        <td>Common code management, school master import/search, application-level validation.</td>
+        <td>Phase 09</td>
       </tr>
     </table>
   </section>
 
   <section class="section">
-    <h2>권장 로드맵</h2>
-    <div class="two">
-      <div class="card">
-        <h3>바로 다음에 할 일</h3>
-        <ol class="list">
-          <li>Phase 03e-2: current employee/admin identity resolver 추가</li>
-          <li>StageResult update/correction에 실제 actor 전달</li>
-          <li>관련 service/controller 테스트 보강</li>
-          <li>지원자 응답에 actor/history가 노출되지 않는지 회귀 검증</li>
-        </ol>
-      </div>
-      <div class="card">
-        <h3>그 다음에 할 일</h3>
-        <ol class="list">
-          <li>Phase 03e-3: URL authorization 적용</li>
-          <li>Phase 03e-4: 401/403 <code>ApiResponse.fail</code> 처리</li>
-          <li>면접/평가 vertical slice 착수</li>
-          <li>메시지/알림 및 reporting/export 기능 분리 구현</li>
-        </ol>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <h2>검증 상태</h2>
-    <table>
-      <tr><th>항목</th><th>상태</th><th>비고</th></tr>
-      <tr>
-        <td>최근 전체 테스트</td>
-        <td><span class="badge done">성공</span></td>
-        <td>Phase 03d-5 완료 시점에 <code>.\gradlew.bat clean test --no-daemon</code> 성공 기록이 있음</td>
-      </tr>
-      <tr>
-        <td>Phase 03e-1</td>
-        <td><span class="badge pending">테스트 미실행</span></td>
-        <td>설계 문서 전용 작업이라 테스트를 실행하지 않음</td>
-      </tr>
-      <tr>
-        <td>이 현황 문서</td>
-        <td><span class="badge pending">테스트 미실행</span></td>
-        <td>HTML 문서 생성만 수행</td>
-      </tr>
-    </table>
-  </section>
-
-  <section class="section">
-    <h2>주의 사항</h2>
+    <h2>Recent Verification</h2>
     <div class="card">
-      <ul class="list">
-        <li>현재 작업트리에는 여러 Phase의 미커밋 변경이 함께 존재합니다. 이 문서는 그 상태를 기준으로 작성한 현황 요약입니다.</li>
-        <li>운영 전에는 반드시 SecurityConfig hardening과 실제 관리자 identity 전파를 먼저 완료해야 합니다.</li>
-        <li>지원자에게 노출되는 결과 API는 내부 점수, 코멘트, 결정자, 정정 이력을 노출하지 않는 정책을 유지해야 합니다.</li>
-      </ul>
+      <p>Latest known full verification from implementation records:</p>
+      <p><code>AES_SECRET_KEY=&lt;test-example-key&gt; .\gradlew.bat clean test --no-daemon</code> - <span class="badge done">BUILD SUCCESSFUL</span> on 2026-05-22.</p>
+      <p>Phase 04a verification used targeted tests only. Full <code>test</code> and <code>clean test</code> were intentionally not run because <code>instruction.md</code> forbids full suite execution for that slice.</p>
+      <p>Phase 04a targeted entity, repository, and minimal related regression tests all passed on 2026-05-26.</p>
+      <p>Phase 04b targeted service, controller, and repository tests passed on 2026-05-26. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> limited this slice to targeted verification.</p>
+      <p>Phase 04c targeted service, controller, repository, and admin scheduling regression tests passed on 2026-05-26. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> limited this slice to targeted verification.</p>
+      <p>Phase 04d targeted service, controller, repository, applicant-read regression, admin scheduling regression, and current employee resolver tests passed on 2026-05-26. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> limited this slice to targeted verification.</p>
+      <p>Phase 04e targeted stabilization, admin authorization matrix, applicant/interviewer regression, repository, scheduling service, and current employee resolver tests passed on 2026-05-26. Initial sandbox execution failed because Gradle wrapper network download was blocked; the same targeted command passed after approved escalation. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> limited Phase 04 work to targeted verification.</p>
     </div>
   </section>
 </main>

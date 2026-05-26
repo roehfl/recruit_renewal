@@ -55,6 +55,9 @@ class JobPostingControllerTest {
                 .andExpect(jsonPath("$.data.receptionStatus").exists())
                 .andExpect(jsonPath("$.data.accepting").exists())
                 .andExpect(jsonPath("$.data.positionCount").value(2))
+                .andExpect(jsonPath("$.data.applicationFormConfig.useEducation").value(true))
+                .andExpect(jsonPath("$.data.applicationFormConfig.requireEducation").value(true))
+                .andExpect(jsonPath("$.data.applicationFormConfig.requireCertificate").value(false))
                 .andExpect(jsonPath("$.data.jobPositions[1].applicationType").value("EXPERIENCED"))
                 .andExpect(jsonPath("$.data.jobPositions[1].jobGroup").value("IT"))
                 .andExpect(jsonPath("$.data.jobPositions[1].jobTitle").value("Backend Engineer"))
@@ -107,6 +110,8 @@ class JobPostingControllerTest {
                 .andExpect(jsonPath("$.data.visible").value(true))
                 .andExpect(jsonPath("$.data.pinned").value(false))
                 .andExpect(jsonPath("$.data.displayOrder").value(2))
+                .andExpect(jsonPath("$.data.applicationFormConfig.useCareer").value(false))
+                .andExpect(jsonPath("$.data.applicationFormConfig.requireCareer").value(false))
                 .andExpect(jsonPath("$.data.jobPositions[0].employmentType").value("INTERN"));
     }
 
@@ -130,6 +135,113 @@ class JobPostingControllerTest {
         mockMvc.perform(post("/admin/job-postings")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createJobPostingJson().replace("\"sortOrder\": 1", "\"sortOrder\": 0")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void attachment_requirement_get_and_replace_success() throws Exception {
+        String response = mockMvc.perform(post("/admin/job-postings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createJobPostingJson()))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long id = Long.parseLong(response.replaceAll(".*\"data\":(\\d+).*", "$1"));
+
+        mockMvc.perform(post("/admin/job-postings/{id}/attachment-requirements", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "requirements": [
+                                    {
+                                      "attachmentType": "RESUME",
+                                      "sectionType": "APPLICATION",
+                                      "required": true,
+                                      "minCount": 1,
+                                      "sortOrder": 0,
+                                      "displayName": "Resume",
+                                      "description": "Upload resume."
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].attachmentType").value("RESUME"))
+                .andExpect(jsonPath("$.data[0].sectionType").value("APPLICATION"))
+                .andExpect(jsonPath("$.data[0].required").value(true))
+                .andExpect(jsonPath("$.data[0].minCount").value(1))
+                .andExpect(jsonPath("$.data[0].storagePath").doesNotExist())
+                .andExpect(jsonPath("$.data[0].physicalFileStatus").doesNotExist());
+
+        mockMvc.perform(get("/admin/job-postings/{id}/attachment-requirements", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].displayName").value("Resume"));
+    }
+
+    @Test
+    void invalid_attachment_requirement_returns_bad_request() throws Exception {
+        String response = mockMvc.perform(post("/admin/job-postings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createJobPostingJson()))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long id = Long.parseLong(response.replaceAll(".*\"data\":(\\d+).*", "$1"));
+
+        mockMvc.perform(post("/admin/job-postings/{id}/attachment-requirements", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "requirements": [
+                                    {
+                                      "attachmentType": "RESUME",
+                                      "sectionType": "APPLICATION",
+                                      "required": true,
+                                      "minCount": 0,
+                                      "sortOrder": 0,
+                                      "displayName": "Resume"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void published_posting_attachment_requirement_replace_returns_bad_request() throws Exception {
+        String response = mockMvc.perform(post("/admin/job-postings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createJobPostingJson()))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long id = Long.parseLong(response.replaceAll(".*\"data\":(\\d+).*", "$1"));
+        mockMvc.perform(post("/admin/job-postings/{id}/publish", id))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/admin/job-postings/{id}/attachment-requirements", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "requirements": [
+                                    {
+                                      "attachmentType": "RESUME",
+                                      "sectionType": "APPLICATION",
+                                      "required": true,
+                                      "minCount": 1,
+                                      "sortOrder": 0,
+                                      "displayName": "Resume"
+                                    }
+                                  ]
+                                }
+                                """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
     }

@@ -351,6 +351,111 @@ class JobPostingServiceTest {
     }
 
     @Test
+    void application_form_required_defaults_are_applied_when_omitted() {
+        Long id = jobPostingService.create(createRequest(new ApplicationFormConfigRequest(
+                true,
+                null,
+                true,
+                null,
+                true,
+                null,
+                true,
+                null,
+                true,
+                null,
+                true,
+                null,
+                true,
+                null
+        )));
+
+        JobPostingDetailResponse detail = jobPostingService.getJobPosting(id);
+
+        assertThat(detail.applicationFormConfig().requireEducation()).isTrue();
+        assertThat(detail.applicationFormConfig().requireCareer()).isTrue();
+        assertThat(detail.applicationFormConfig().requireMilitary()).isTrue();
+        assertThat(detail.applicationFormConfig().requireCertificate()).isFalse();
+        assertThat(detail.applicationFormConfig().requireLanguage()).isFalse();
+        assertThat(detail.applicationFormConfig().requireAward()).isFalse();
+        assertThat(detail.applicationFormConfig().requireGapPeriod()).isFalse();
+    }
+
+    @Test
+    void application_form_required_update_preserves_omitted_values_when_section_stays_enabled() {
+        Long id = jobPostingService.create(createRequest(new ApplicationFormConfigRequest(
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+        )));
+
+        jobPostingService.update(id, updateRequest(new ApplicationFormConfigRequest(true, true, false, false, false, false, false)));
+
+        JobPostingDetailResponse detail = jobPostingService.getJobPosting(id);
+        assertThat(detail.applicationFormConfig().requireEducation()).isTrue();
+        assertThat(detail.applicationFormConfig().requireCareer()).isFalse();
+    }
+
+    @Test
+    void application_form_required_update_resets_omitted_value_when_section_is_disabled() {
+        Long id = jobPostingService.create(createRequest(new ApplicationFormConfigRequest(
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+        )));
+
+        jobPostingService.update(id, updateRequest(new ApplicationFormConfigRequest(true, false, false, false, false, false, false)));
+
+        JobPostingDetailResponse detail = jobPostingService.getJobPosting(id);
+        assertThat(detail.applicationFormConfig().useCareer()).isFalse();
+        assertThat(detail.applicationFormConfig().requireCareer()).isFalse();
+    }
+
+    @Test
+    void application_form_required_cannot_be_true_when_section_is_disabled() {
+        JobPostingCreateRequest request = createRequest(new ApplicationFormConfigRequest(
+                true,
+                true,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+        ));
+
+        assertThatThrownBy(() -> jobPostingService.create(request))
+                .isInstanceOf(InvalidJobPostingException.class);
+    }
+
+    @Test
     void 관리자_목록_페이지_요청값이_잘못되면_예외() {
         assertThatThrownBy(() -> jobPostingService.getJobPostings(-1, 10))
                 .isInstanceOf(InvalidJobPostingException.class);
@@ -451,13 +556,28 @@ class JobPostingServiceTest {
     }
 
     private JobPostingCreateRequest createRequest() {
+        return createRequest(new ApplicationFormConfigRequest(true, true, true, true, true, true, true));
+    }
+
+    private JobPostingCreateRequest createRequest(ApplicationFormConfigRequest applicationFormConfig) {
         return new JobPostingCreateRequest(
                 "2026 상반기 채용",
                 "<p>내용</p>",
                 LocalDateTime.of(2026, 6, 1, 9, 0),
                 LocalDateTime.of(2026, 6, 2, 18, 0),
                 List.of(new JobPositionRequest("백엔드", 2, 1)),
-                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+                applicationFormConfig
+        );
+    }
+
+    private JobPostingUpdateRequest updateRequest(ApplicationFormConfigRequest applicationFormConfig) {
+        return new JobPostingUpdateRequest(
+                "수정",
+                "<p>수정</p>",
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 2, 18, 0),
+                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                applicationFormConfig
         );
     }
 

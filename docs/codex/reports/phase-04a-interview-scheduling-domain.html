@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 04a Interview Scheduling Domain</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f4f7fb; line-height: 1.55; }
+    header { background: #123047; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 22px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d8e1eb; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e7edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #edf2f7; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #f8fafc; padding: 14px; border-radius: 8px; overflow: auto; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .pending { background: #fff0c2; color: #765300; }
+    .muted { background: #e8edf2; color: #536171; }
+    .blocked { background: #f4d7da; color: #842029; }
+    .warn { background: #ffe4b5; color: #7a4b00; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d8e1eb; border-radius: 8px; padding: 16px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .section { margin-top: 24px; }
+    .small { font-size: 13px; color: #526173; }
+    @media (max-width: 860px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>Shinyoung Recruit Backend</div>
+  <h1>Phase 04a - Interview Scheduling Domain</h1>
+  <span class="badge done">Completed</span>
+  <span class="badge muted">Generated: 2026-05-26</span>
+</header>
+
+<main>
+  <section class="summary">
+    <div class="card">
+      <h2>Executive Summary</h2>
+      <p>Phase 04a added the domain foundation for interview schedule groups and participant assignments.</p>
+      <p>The slice includes enums, entities, repositories, and targeted entity/repository tests only.</p>
+      <p>No service, controller, DTO, API, migration file, frontend, message sending, calendar integration, or interview evaluation was added.</p>
+      <p><code>StageResult</code> remains non-mutated by interview scheduling.</p>
+    </div>
+    <div class="card">
+      <h2>Status</h2>
+      <p><span class="badge done">Domain complete</span></p>
+      <p><span class="badge done">Repository complete</span></p>
+      <p><span class="badge done">Targeted tests passed</span></p>
+      <p><span class="badge pending">Service/API deferred</span></p>
+      <p><span class="badge warn">Migration deferred</span></p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Scope</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Completed Scope</h3>
+        <ul class="list">
+          <li><code>Interview</code> entity</li>
+          <li><code>InterviewParticipant</code> entity</li>
+          <li>four interview enums</li>
+          <li><code>InterviewRepository</code></li>
+          <li><code>InterviewParticipantRepository</code></li>
+          <li>entity validation tests</li>
+          <li>repository save/query tests</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Not Implemented</h3>
+        <ul class="list">
+          <li>admin interview APIs</li>
+          <li>applicant interview APIs</li>
+          <li>interviewer interview APIs</li>
+          <li>request/response DTOs</li>
+          <li>service commands</li>
+          <li><code>InterviewEvaluation</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Deferred</h3>
+        <ul class="list">
+          <li>confirmation guard</li>
+          <li>candidate eligibility checks</li>
+          <li>time collision checks</li>
+          <li>message sending</li>
+          <li>Excel/PDF/calendar</li>
+          <li>DB migration file</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Changed Files</h2>
+    <table>
+      <tr><th>File</th><th>Purpose</th></tr>
+      <tr><td><code>InterviewMethod.java</code></td><td>Interview method enum.</td></tr>
+      <tr><td><code>InterviewStatus.java</code></td><td>Interview lifecycle enum.</td></tr>
+      <tr><td><code>InterviewParticipantRole.java</code></td><td>Candidate/interviewer role enum.</td></tr>
+      <tr><td><code>InterviewParticipantStatus.java</code></td><td>Participant assignment status enum.</td></tr>
+      <tr><td><code>Interview.java</code></td><td>Interview schedule/group root entity.</td></tr>
+      <tr><td><code>InterviewParticipant.java</code></td><td>Candidate/interviewer participant assignment entity.</td></tr>
+      <tr><td><code>InterviewRepository.java</code></td><td>Minimal schedule repository queries.</td></tr>
+      <tr><td><code>InterviewParticipantRepository.java</code></td><td>Minimal participant repository queries and duplicate-check candidates.</td></tr>
+      <tr><td><code>InterviewTest.java</code></td><td>Domain validation tests.</td></tr>
+      <tr><td><code>InterviewParticipantTest.java</code></td><td>Participant validation tests.</td></tr>
+      <tr><td><code>InterviewRepositoryTest.java</code></td><td>Repository schedule persistence/query tests.</td></tr>
+      <tr><td><code>InterviewParticipantRepositoryTest.java</code></td><td>Repository participant persistence/query tests.</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Domain Structure</h2>
+    <div class="two">
+      <div class="card">
+        <h3>Entity Relationships</h3>
+        <pre>JobPosting 1 - N Interview
+Stage      1 - N Interview
+
+Interview 1 - N InterviewParticipant
+
+InterviewParticipant(CANDIDATE)   N - 1 JobApplication
+InterviewParticipant(INTERVIEWER) N - 1 Employee</pre>
+      </div>
+      <div class="card">
+        <h3>Ownership Rules</h3>
+        <ul class="list">
+          <li><code>Interview</code> belongs to one posting and one stage.</li>
+          <li><code>Stage.jobPosting</code> must match <code>Interview.jobPosting</code>.</li>
+          <li>Candidate rows require <code>JobApplication</code> and no <code>Employee</code>.</li>
+          <li>Interviewer rows require <code>Employee</code> and no <code>JobApplication</code>.</li>
+          <li>Participant rows do not reference <code>User</code> directly.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>API List</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Status</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+      <tr>
+        <td colspan="6"><span class="badge pending">No API added in Phase 04a</span> Admin/applicant/interviewer APIs are deferred to Phase 04b and later slices.</td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Validation Rules</h2>
+    <table>
+      <tr><th>Area</th><th>Implemented Rule</th><th>Status</th></tr>
+      <tr><td>Interview required fields</td><td>posting, stage, group name, start, end, and method are required.</td><td><span class="badge done">Completed</span></td></tr>
+      <tr><td>Time range</td><td><code>endDateTime</code> must be after <code>startDateTime</code>.</td><td><span class="badge done">Completed</span></td></tr>
+      <tr><td>Method details</td><td><code>IN_PERSON</code>/<code>HYBRID</code> require location. <code>ONLINE</code>/<code>HYBRID</code> require URL.</td><td><span class="badge done">Completed</span></td></tr>
+      <tr><td>Default status</td><td>New interviews default to <code>DRAFT</code>.</td><td><span class="badge done">Completed</span></td></tr>
+      <tr><td>Participant role</td><td>Candidate and interviewer rows enforce mutually exclusive required FK fields.</td><td><span class="badge done">Completed</span></td></tr>
+      <tr><td>Confirmation guard</td><td>minimum participants, stage status, stage type, eligibility, duplicates, and collisions.</td><td><span class="badge pending">Deferred to 04b</span></td></tr>
+      <tr><td>Applicant/interviewer visibility</td><td>hide drafts and return only assigned schedules.</td><td><span class="badge pending">Deferred</span></td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>StageResult Policy</h2>
+    <div class="card">
+      <p><span class="badge done">Non-mutating policy kept</span></p>
+      <p>Phase 04a did not modify <code>StageResult</code>, <code>StageResultRepository</code>, <code>StageResultService</code>, <code>StageResultController</code>, or correction history classes.</p>
+      <p>Interview scheduling still must not create, update, announce, or correct stage results. Candidate eligibility and result visibility checks are deferred to service/API slices.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>StageType Check</h2>
+    <div class="card">
+      <p>Actual enum values checked on 2026-05-26:</p>
+      <pre>DOCUMENT
+FIRST_INTERVIEW
+SECOND_INTERVIEW
+FINAL_INTERVIEW
+ETC</pre>
+      <p>Phase 04a did not modify <code>StageType</code>. Phase 04b should allow interview scheduling only for <code>FIRST_INTERVIEW</code>, <code>SECOND_INTERVIEW</code>, and <code>FINAL_INTERVIEW</code>.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Test Results</h2>
+    <table>
+      <tr><th>Command</th><th>Result</th><th>Notes</th></tr>
+      <tr>
+        <td><code>.\gradlew.bat test --tests com.shinyoung.recruit.domain.entity.InterviewTest --tests com.shinyoung.recruit.domain.entity.InterviewParticipantTest --no-daemon</code></td>
+        <td><span class="badge done">BUILD SUCCESSFUL</span></td>
+        <td>Entity/domain validation tests.</td>
+      </tr>
+      <tr>
+        <td><code>.\gradlew.bat test --tests com.shinyoung.recruit.domain.repository.InterviewRepositoryTest --tests com.shinyoung.recruit.domain.repository.InterviewParticipantRepositoryTest --no-daemon</code></td>
+        <td><span class="badge done">BUILD SUCCESSFUL</span></td>
+        <td>H2/JPA repository tests.</td>
+      </tr>
+      <tr>
+        <td><code>.\gradlew.bat test --tests com.shinyoung.recruit.service.StageServiceTest --tests com.shinyoung.recruit.service.StageResultServiceTest --tests com.shinyoung.recruit.service.JobApplicationServiceTest --no-daemon</code></td>
+        <td><span class="badge done">BUILD SUCCESSFUL</span></td>
+        <td>Minimal related regression tests.</td>
+      </tr>
+      <tr>
+        <td><code>.\gradlew.bat test</code> / <code>.\gradlew.bat clean test</code></td>
+        <td><span class="badge muted">Not run</span></td>
+        <td>Full test runs are explicitly forbidden by <code>instruction.md</code> for this slice.</td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Remaining Issues</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Service Rules</h3>
+        <ul class="list">
+          <li>Stage type allowlist.</li>
+          <li>Stage status guards.</li>
+          <li>minimum participant checks.</li>
+          <li>same posting validation.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Visibility</h3>
+        <ul class="list">
+          <li>applicant ownership guard.</li>
+          <li>draft hiding.</li>
+          <li>admin memo hiding for applicants/interviewers.</li>
+          <li>previous-result visibility guard.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Operations</h3>
+        <ul class="list">
+          <li>manual MariaDB schema through the deployment process.</li>
+          <li>authorization role names.</li>
+          <li>confirmed schedule amendment policy.</li>
+          <li>message trigger policy.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Next Phase</h2>
+    <div class="card">
+      <p><span class="badge info">Phase 04b - Admin Interview Schedule Management</span></p>
+      <p>Recommended next scope: admin schedule create/update/read, participant replace for draft schedules, confirm/cancel commands, stage type/status guards, candidate eligibility checks, duplicate assignment checks, and confirmed-schedule collision checks.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

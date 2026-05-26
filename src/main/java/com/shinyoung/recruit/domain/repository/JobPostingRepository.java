@@ -27,8 +27,23 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
                    jobPosting.summary as summary,
                    jobPosting.receptionStartDateTime as receptionStartDateTime,
                    jobPosting.receptionEndDateTime as receptionEndDateTime,
-                   jobPosting.pinned as pinned
+                   jobPosting.pinned as pinned,
+                   applicationFormConfig.useEducation as useEducation,
+                   applicationFormConfig.requireEducation as requireEducation,
+                   applicationFormConfig.useCareer as useCareer,
+                   applicationFormConfig.requireCareer as requireCareer,
+                   applicationFormConfig.useCertificate as useCertificate,
+                   applicationFormConfig.requireCertificate as requireCertificate,
+                   applicationFormConfig.useLanguage as useLanguage,
+                   applicationFormConfig.requireLanguage as requireLanguage,
+                   applicationFormConfig.useMilitary as useMilitary,
+                   applicationFormConfig.requireMilitary as requireMilitary,
+                   applicationFormConfig.useAward as useAward,
+                   applicationFormConfig.requireAward as requireAward,
+                   applicationFormConfig.useGapPeriod as useGapPeriod,
+                   applicationFormConfig.requireGapPeriod as requireGapPeriod
             from JobPosting jobPosting
+            left join jobPosting.applicationFormConfig applicationFormConfig
             where jobPosting.status = :status
               and jobPosting.visible = true
               and (jobPosting.displayStartDateTime is null or jobPosting.displayStartDateTime <= :now)

@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Phase 03k-2 - Application Form Required Policy</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; color: #172033; background: #f6f8fb; }
+    header { background: #10233f; color: #fff; padding: 28px 36px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px; }
+    h1, h2, h3 { margin: 0 0 12px; }
+    h2 { margin-top: 28px; color: #10233f; }
+    p { line-height: 1.55; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .completed { background: #d7f8e5; color: #0f6b3e; }
+    .pending { background: #edf1f6; color: #526070; }
+    .out { background: #fde2e1; color: #9b2c2c; }
+    .warn { background: #fff3cd; color: #8a5a00; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .card { background: #fff; border: 1px solid #dfe5ee; border-radius: 8px; padding: 18px; box-shadow: 0 1px 2px rgba(16,35,63,.05); }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #dfe5ee; }
+    th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid #e7ecf3; }
+    th { background: #edf3fb; color: #10233f; }
+    code { background: #eef2f7; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #0f172a; color: #e5edf9; padding: 16px; overflow: auto; border-radius: 8px; }
+    ul { line-height: 1.65; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    @media (max-width: 900px) { .grid, .summary { grid-template-columns: 1fr; } main { padding: 18px; } }
+  </style>
+</head>
+<body>
+<header>
+  <div>Shinyoung Recruit Backend Renewal</div>
+  <h1>Phase 03k-2 - Application Form Required Policy</h1>
+  <span class="badge completed">Completed</span>
+  <span class="badge pending">Generated 2026-05-22</span>
+</header>
+<main>
+  <section class="summary">
+    <div class="card">
+      <h2>Executive Summary</h2>
+      <p>Phase 03k-2 implements the end-to-end split between section visibility and submit-required policy. <code>ApplicationFormConfig</code> now stores explicit <code>requireXxx</code> fields, admin/public detail responses expose both use and require values, and public list policy still hides the raw config.</p>
+      <p>Submit validation and dashboard readiness now use the same rule: a form section blocks submit only when <code>useXxx</code> and <code>requireXxx</code> are both true. Attachment required enforcement remains deferred.</p>
+    </div>
+    <div class="card">
+      <h2>Status</h2>
+      <p><span class="badge completed">Code implemented</span></p>
+      <p><span class="badge completed">Targeted tests passed</span></p>
+      <p><span class="badge warn">Manual DB DDL required for MariaDB</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Scope Cards</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Implemented</h3>
+        <ul>
+          <li>Seven persisted <code>requireXxx</code> fields.</li>
+          <li>Nullable request flags with backward-compatible constructor.</li>
+          <li>Create defaults and update preservation/reset semantics.</li>
+          <li>Submit validator and dashboard readiness conversion.</li>
+          <li>Public required policy based on explicit flags.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Not Implemented</h3>
+        <ul>
+          <li>Migration framework integration.</li>
+          <li>Attachment required enforcement.</li>
+          <li>Frontend or static resource changes.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Deferred</h3>
+        <ul>
+          <li>Formal production migration mechanism.</li>
+          <li>Attachment policy extension.</li>
+          <li>Optional-section frontend presentation review.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Changed Files</h2>
+    <table>
+      <tr><th>Area</th><th>Files</th></tr>
+      <tr><td>Domain</td><td><code>ApplicationFormConfig</code>, <code>JobPosting</code></td></tr>
+      <tr><td>DTO</td><td><code>ApplicationFormConfigRequest</code>, config responses, public required policy responses</td></tr>
+      <tr><td>Repository</td><td><code>JobPostingRepository</code>, <code>JobPostingPublicListProjection</code></td></tr>
+      <tr><td>Service</td><td><code>JobPostingService</code>, <code>ApplicationSubmitValidator</code>, <code>ApplicationCompletionReadChecker</code></td></tr>
+      <tr><td>Tests</td><td>Job posting, public policy, submit validator, dashboard, section access, policy DTO tests</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Architecture &amp; Domain</h2>
+    <div class="card">
+      <p><code>JobPosting</code> owns one <code>ApplicationFormConfig</code>. The existing <code>useXxx</code> fields continue to represent visibility and applicant section access. New <code>requireXxx</code> fields represent final-submit blocking and dashboard required-readiness only.</p>
+      <p>Public list responses still do not expose <code>applicationFormConfig</code>. Instead, the list projection includes nullable use/require fields and returns the normalized <code>applicationFormRequiredPolicy</code>.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>API List</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+      <tr><td>POST</td><td><code>/admin/job-postings</code></td><td>Create posting</td><td>Accepts nullable <code>requireXxx</code></td><td>Created id unchanged</td></tr>
+      <tr><td>POST</td><td><code>/admin/job-postings/{id}</code></td><td>Update posting</td><td>Omitted <code>requireXxx</code> follows preservation/reset rules</td><td>Updated id unchanged</td></tr>
+      <tr><td>GET</td><td><code>/admin/job-postings/{id}</code></td><td>Admin detail</td><td>None</td><td>Config includes use and require flags</td></tr>
+      <tr><td>GET</td><td><code>/job-postings</code></td><td>Public list</td><td>None</td><td>Raw config hidden; policy uses explicit flags</td></tr>
+      <tr><td>GET</td><td><code>/job-postings/{id}</code></td><td>Public detail</td><td>None</td><td>Config and policy include explicit required behavior</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Validation &amp; Policy</h2>
+    <table>
+      <tr><th>Rule</th><th>Status</th></tr>
+      <tr><td><code>requireXxx=true</code> requires matching <code>useXxx=true</code></td><td><span class="badge completed">Enforced</span></td></tr>
+      <tr><td>Create omitted education, career, military required flags default to matching use flag</td><td><span class="badge completed">Enforced</span></td></tr>
+      <tr><td>Create omitted certificate, language, award, gap required flags default to false</td><td><span class="badge completed">Enforced</span></td></tr>
+      <tr><td>Update omitted required flag preserves existing value while enabled</td><td><span class="badge completed">Enforced</span></td></tr>
+      <tr><td>Update omitted required flag resets to false when disabled</td><td><span class="badge completed">Enforced</span></td></tr>
+      <tr><td>Attachment required policy</td><td><span class="badge pending">Deferred</span></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Manual MariaDB DDL</h2>
+    <p>No migration framework is active. Use the manual DDL and backfill below before deploying to a persistent MariaDB database. Deploying the Java change without these columns will break runtime reads/writes, and existing rows need education, career, and military backfill to preserve previous submit-required behavior.</p>
+    <pre><code>ALTER TABLE application_form_config
+    ADD COLUMN require_education BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN require_career BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN require_certificate BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN require_language BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN require_military BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN require_award BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN require_gap_period BOOLEAN NOT NULL DEFAULT FALSE;
+
+UPDATE application_form_config
+SET require_education = use_education,
+    require_career = use_career,
+    require_military = use_military;</code></pre>
+  </section>
+
+  <section>
+    <h2>Test Results</h2>
+    <table>
+      <tr><th>Command</th><th>Result</th></tr>
+      <tr><td><code>.\gradlew.bat test --tests JobPostingServiceTest --tests ApplicationSubmitValidatorTest --tests ApplicationDashboardServiceTest --tests ApplicationSectionAccessServiceTest --tests ApplicationFormPolicyResponseTest --no-daemon</code></td><td><span class="badge completed">BUILD SUCCESSFUL</span></td></tr>
+      <tr><td><code>.\gradlew.bat test --tests JobPostingPublicServiceTest --tests JobPostingPublicControllerTest --tests JobPostingControllerTest --no-daemon</code></td><td><span class="badge completed">BUILD SUCCESSFUL</span></td></tr>
+      <tr><td><code>.\gradlew.bat test --tests ApplicationDashboardServiceTest --no-daemon</code></td><td><span class="badge completed">BUILD SUCCESSFUL after optional wording fix</span></td></tr>
+      <tr><td><code>.\gradlew.bat clean test --no-daemon</code></td><td><span class="badge completed">BUILD SUCCESSFUL in 15m 4s</span></td></tr>
+      <tr><td>Initial sandbox run</td><td><span class="badge warn">Blocked by Gradle download network restriction</span></td></tr>
+      <tr><td>Intermediate rerun</td><td><span class="badge warn">Stale Gradle test output lock resolved with <code>.\gradlew.bat --stop</code></span></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Remaining Issues</h2>
+    <ul>
+      <li><span class="badge warn">Open</span> Persistent database migration remains manual.</li>
+      <li><span class="badge pending">Deferred</span> Attachment required policy is not enforced.</li>
+      <li><span class="badge pending">Deferred</span> Frontend presentation of optional incomplete sections can still be reviewed in the UI phase.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Next Phase Recommendation</h2>
+    <div class="card">
+      <p>If attachments become submit-blocking, extend this same visibility-plus-required policy model to attachment metadata and dashboard readiness.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

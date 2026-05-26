@@ -1,20 +1,32 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
+import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
 import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.ApplicationMilitary;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosting;
+import com.shinyoung.recruit.domain.entity.JobPostingAttachmentRequirement;
 import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationGapPeriodRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationLanguageRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationMilitaryRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingAttachmentRequirementRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
+import com.shinyoung.recruit.enumeration.ApplicationSectionType;
+import com.shinyoung.recruit.enumeration.AttachmentDeleteActorType;
+import com.shinyoung.recruit.enumeration.AttachmentType;
 import com.shinyoung.recruit.enumeration.CareerType;
 import com.shinyoung.recruit.enumeration.MilitarySubjectType;
+import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.RETURNS_DEFAULTS;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,10 +66,28 @@ class ApplicationSubmitValidatorTest {
     private ApplicationMilitaryRepository militaryRepository;
 
     @Mock
+    private ApplicationCertificateRepository certificateRepository;
+
+    @Mock
+    private ApplicationLanguageRepository languageRepository;
+
+    @Mock
+    private ApplicationAwardRepository awardRepository;
+
+    @Mock
+    private ApplicationGapPeriodRepository gapPeriodRepository;
+
+    @Mock
     private JobPostingQuestionRepository jobPostingQuestionRepository;
 
     @Mock
     private ApplicationAnswerRepository applicationAnswerRepository;
+
+    @Mock
+    private JobPostingAttachmentRequirementRepository attachmentRequirementRepository;
+
+    @Mock
+    private ApplicationAttachmentRepository attachmentRepository;
 
     @InjectMocks
     private ApplicationSubmitValidator validator;
@@ -66,6 +97,10 @@ class ApplicationSubmitValidatorTest {
         lenient().when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of());
         lenient().when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
+                .thenReturn(List.of());
+        lenient().when(attachmentRequirementRepository.findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of());
+        lenient().when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
                 .thenReturn(List.of());
     }
 
@@ -255,6 +290,100 @@ class ApplicationSubmitValidatorTest {
     }
 
     @Test
+    void education_career_military_optional_do_not_block_submit_validation() {
+        ApplicationFormConfig config = config();
+        when(config.isUseEducation()).thenReturn(true);
+        when(config.isRequireEducation()).thenReturn(false);
+        when(config.isUseCareer()).thenReturn(true);
+        when(config.isRequireCareer()).thenReturn(false);
+        when(config.isUseMilitary()).thenReturn(true);
+        when(config.isRequireMilitary()).thenReturn(false);
+
+        assertThatCode(() -> validator.validate(application(config)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void optional_domain_sections_required_fail_when_rows_are_missing() {
+        assertRequiredSimpleSectionFails("certificate");
+        assertRequiredSimpleSectionFails("language");
+        assertRequiredSimpleSectionFails("award");
+        assertRequiredSimpleSectionFails("gapPeriod");
+    }
+
+    @Test
+    void optional_domain_sections_required_pass_when_rows_exist() {
+        ApplicationFormConfig config = config();
+        when(config.isUseCertificate()).thenReturn(true);
+        when(config.isRequireCertificate()).thenReturn(true);
+        when(config.isUseLanguage()).thenReturn(true);
+        when(config.isRequireLanguage()).thenReturn(true);
+        when(config.isUseAward()).thenReturn(true);
+        when(config.isRequireAward()).thenReturn(true);
+        when(config.isUseGapPeriod()).thenReturn(true);
+        when(config.isRequireGapPeriod()).thenReturn(true);
+        when(certificateRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(true);
+        when(languageRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(true);
+        when(awardRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(true);
+        when(gapPeriodRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(true);
+
+        assertThatCode(() -> validator.validate(application(config)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void required_attachment_missing_fails_submit() {
+        when(attachmentRequirementRepository.findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")));
+
+        assertThatThrownBy(() -> validator.validate(application(config())))
+                .isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
+    void matching_stored_attachment_allows_submit() {
+        when(attachmentRequirementRepository.findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")));
+        when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
+                .thenReturn(List.of(attachment(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, false)));
+
+        assertThatCode(() -> validator.validate(application(config())))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void wrong_type_wrong_section_and_deleted_attachment_do_not_satisfy_requirement() {
+        when(attachmentRequirementRepository.findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")));
+        when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
+                .thenReturn(List.of(
+                        attachment(AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, false),
+                        attachment(AttachmentType.RESUME, ApplicationSectionType.CAREER, false),
+                        attachment(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, true)
+                ));
+
+        assertThatThrownBy(() -> validator.validate(application(config())))
+                .isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
+    void required_min_count_requires_enough_matching_stored_files() {
+        when(attachmentRequirementRepository.findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(requirement(true, 2, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")));
+        when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
+                .thenReturn(List.of(attachment(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, false)));
+
+        assertThatThrownBy(() -> validator.validate(application(config())))
+                .isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
+    void optional_attachment_missing_does_not_fail_submit() {
+        assertThatCode(() -> validator.validate(application(config())))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void answer_validation_passes_when_active_questions_are_missing() {
         assertThatCode(() -> validator.validate(application(config())))
                 .doesNotThrowAnyException();
@@ -405,7 +534,12 @@ class ApplicationSubmitValidatorTest {
     }
 
     private ApplicationFormConfig config() {
-        return mock(ApplicationFormConfig.class);
+        return mock(ApplicationFormConfig.class, invocation -> switch (invocation.getMethod().getName()) {
+            case "isRequireEducation" -> ((ApplicationFormConfig) invocation.getMock()).isUseEducation();
+            case "isRequireCareer" -> ((ApplicationFormConfig) invocation.getMock()).isUseCareer();
+            case "isRequireMilitary" -> ((ApplicationFormConfig) invocation.getMock()).isUseMilitary();
+            default -> RETURNS_DEFAULTS.answer(invocation);
+        });
     }
 
     private ApplicationCareerProfile profile(CareerType careerType) {
@@ -442,6 +576,36 @@ class ApplicationSubmitValidatorTest {
                 .isInstanceOf(InvalidJobApplicationException.class);
     }
 
+    private void assertRequiredSimpleSectionFails(String section) {
+        ApplicationFormConfig config = config();
+        switch (section) {
+            case "certificate" -> {
+                when(config.isUseCertificate()).thenReturn(true);
+                when(config.isRequireCertificate()).thenReturn(true);
+                when(certificateRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(false);
+            }
+            case "language" -> {
+                when(config.isUseLanguage()).thenReturn(true);
+                when(config.isRequireLanguage()).thenReturn(true);
+                when(languageRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(false);
+            }
+            case "award" -> {
+                when(config.isUseAward()).thenReturn(true);
+                when(config.isRequireAward()).thenReturn(true);
+                when(awardRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(false);
+            }
+            case "gapPeriod" -> {
+                when(config.isUseGapPeriod()).thenReturn(true);
+                when(config.isRequireGapPeriod()).thenReturn(true);
+                when(gapPeriodRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(false);
+            }
+            default -> throw new IllegalArgumentException("Unknown section: " + section);
+        }
+
+        assertThatThrownBy(() -> validator.validate(application(config)))
+                .isInstanceOf(InvalidJobApplicationException.class);
+    }
+
     private JobPostingQuestion question(Long id, boolean required, QuestionAnswerType answerType, Integer maxLength) {
         JobPostingQuestion question = mock(JobPostingQuestion.class);
         lenient().when(question.getId()).thenReturn(id);
@@ -456,5 +620,52 @@ class ApplicationSubmitValidatorTest {
         when(answer.getJobPostingQuestion()).thenReturn(question);
         lenient().when(answer.getAnswerText()).thenReturn(answerText);
         return answer;
+    }
+
+    private JobPostingAttachmentRequirement requirement(
+            boolean required,
+            int minCount,
+            AttachmentType attachmentType,
+            ApplicationSectionType sectionType,
+            String displayName
+    ) {
+        return JobPostingAttachmentRequirement.create(
+                null,
+                attachmentType,
+                sectionType,
+                required,
+                minCount,
+                0,
+                displayName,
+                null
+        );
+    }
+
+    private ApplicationAttachment attachment(
+            AttachmentType attachmentType,
+            ApplicationSectionType sectionType,
+            boolean deleted
+    ) {
+        ApplicationAttachment attachment = ApplicationAttachment.createStored(
+                null,
+                attachmentType,
+                sectionType,
+                null,
+                "test.pdf",
+                "stored.pdf",
+                "/test/stored.pdf",
+                "application/pdf",
+                100L,
+                0
+        );
+        if (deleted) {
+            attachment.markDeleted(
+                    "test",
+                    AttachmentDeleteActorType.APPLICANT,
+                    "test delete",
+                    java.time.LocalDateTime.of(2026, 6, 2, 0, 0)
+            );
+        }
+        return attachment;
     }
 }
