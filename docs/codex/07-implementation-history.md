@@ -54,6 +54,24 @@
     - applicant/admin soft delete
     - storage health scan dry-run
     - required attachment policy integrated with public policy, dashboard, and submit validator
+  - Application form page layout domain:
+    - `ApplicationSectionType` layout values and explicit layout subset
+    - `ApplicationFormPage` and `ApplicationFormPageItem` entities
+    - page/item repositories
+    - layout validator, effective section policy helper, and default layout factory
+    - targeted entity/repository/validator/helper tests
+  - Application form page layout applicant read:
+    - applicant-owned `GET /applications/{applicationId:[0-9]+}/form-page`
+    - selected single `JobPosition` response
+    - `ApplicationFormConfig` flag response
+    - effective enabled/required section layout response
+    - default/stored layout validation and targeted service/controller tests
+  - Admin layout management:
+    - admin layout read with stored/default fallback and `availableSections` metadata
+    - admin layout save with replace-all semantics and full validation
+    - admin applicant-facing preview projection with page structure
+    - state guard: CLOSED and reception-started block save
+    - targeted service unit tests and controller integration tests
   - Interview scheduling domain:
     - `Interview` schedule/group entity
     - `InterviewParticipant` candidate/interviewer assignment entity
@@ -101,12 +119,20 @@
     - `InterviewParticipant` candidate/interviewer assignment design.
     - admin, applicant, and interviewer API draft.
     - visibility, candidate eligibility, stage status, participant lifecycle, confirmation, collision, and `StageResult` non-mutation policies.
+  - Phase 05 Application Form Page Layout:
+    - `ApplicationFormPage` and `ApplicationFormPageItem` design.
+    - admin layout read/save/preview API contract.
+    - applicant-owned layout read API contract.
+    - use/require/layout consistency validation policy.
+    - attachment requirement and application required policy relationship.
+    - default layout, fallback, publish guard, and slice breakdown.
 - Current remaining major work:
-  - Phase 05 candidate: interview evaluation.
-  - Phase 06 candidate: message batch/send log and provider adapter boundary.
+  - Phase 05 implementation slices: publish guard, stabilization.
+  - Phase 06 candidate: interview evaluation.
   - Phase 07 candidate: Excel/PDF/statistics.
-  - Phase 08 candidate: privacy purge, retention, and activity audit.
-  - Separate candidate: CommonCode and School master data.
+  - Phase 08 candidate: CommonCode and School master data.
+  - Backlog candidate: message batch/send log and provider adapter boundary.
+  - Backlog candidate: privacy purge, retention, and activity audit.
 - Consistency note:
   - The previous roadmap treated JobPosting, Stage, Application, application detail sections, and attachment file handling as pending.
   - As of this snapshot, those areas are implemented and documented under `docs/codex/implementation/`.
@@ -116,11 +142,207 @@
   - Result: `BUILD SUCCESSFUL`
   - Date recorded: 2026-05-22
 
+## Phase 05c - Admin Layout Management
+
+- Date: 2026-05-27
+- Work type: admin layout read/save/preview API, service, DTOs, controller, targeted tests, and documentation.
+- Goal: implement admin-facing layout management APIs for configuring the page arrangement of applicant application forms.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/dto/request/ApplicationFormLayoutSaveRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminApplicationFormLayoutResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormLayoutPreviewResponse.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationFormLayoutService.java`
+  - `src/main/java/com/shinyoung/recruit/controller/AdminApplicationFormLayoutController.java`
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutServiceTest.java`
+  - `src/test/java/com/shinyoung/recruit/controller/AdminApplicationFormLayoutControllerTest.java`
+  - `docs/codex/implementation/phase-05c-admin-layout-management.md`
+  - `docs/codex/reports/phase-05c-admin-layout-management.html`
+- Modified:
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+- APIs added:
+  - `GET /admin/job-postings/{jobPostingId}/application-form-layout`
+  - `POST /admin/job-postings/{jobPostingId}/application-form-layout`
+  - `GET /admin/job-postings/{jobPostingId}/application-form-layout/preview`
+- Test:
+  - Command: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*ApplicationFormLayout*" --no-daemon`
+  - Result: BUILD SUCCESSFUL (24 tests passed: 13 service + 11 controller)
+- Notes:
+  - Admin read returns stored layout or deterministic default with `availableSections` metadata.
+  - Save validates state guard (CLOSED/reception-started blocks), form config existence, and full layout structure.
+  - Preview filters disabled sections and returns page-structured applicant-facing projection.
+  - No existing source files were modified (all Phase 05a infrastructure was already in place).
+  - Publish guard integration remains Phase 05d scope.
+
+## Phase 05b - Application Form Page Layout Backend Slice
+
+- Date: 2026-05-26
+- Work type: backend read model, DTO, service, repository support, controller endpoint, targeted test, and documentation implementation slice.
+- Goal: implement the applicant-owned application form-page bootstrap API without changing application creation, section save, submit, or attachment policies.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormPageResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormSectionResponse.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationFormPageService.java`
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormPageServiceTest.java`
+  - `docs/codex/implementation/phase-05b-application-form-page-layout.md`
+  - `docs/codex/reports/phase-05b-application-form-page-layout.html`
+- Updated:
+  - `src/main/java/com/shinyoung/recruit/controller/ApplicationController.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobApplicationRepository.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingQuestionRepository.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingAttachmentRequirementRepository.java`
+  - `src/main/java/com/shinyoung/recruit/exception/GlobalExceptionHandler.java`
+  - `src/test/java/com/shinyoung/recruit/controller/ApplicationControllerTest.java`
+  - `docs/codex/07-implementation-history.md`
+- Implemented:
+  - Added `GET /applications/{applicationId:[0-9]+}/form-page`.
+  - Added `ApiResponse<ApplicationFormPageResponse>` response contract.
+  - Added applicant-owned fetch method `JobApplicationRepository.findFormPageByIdAndApplicantId`.
+  - Added active/required active question existence checks.
+  - Added attachment requirement existence check.
+  - Added form-page service that resolves the current applicant-owned application, verifies selected job position ownership by posting, and builds response data.
+  - Reused Phase 05a effective section policy, default layout factory, and layout validator.
+  - Returned selected single `jobPositionId` and `jobPositionName`.
+  - Calculated `accepting` as `JobPosting.status == PUBLISHED` and current time inside reception period.
+  - Calculated `editable` as `DRAFT + accepting`.
+  - Returned only enabled sections and derived required flags from existing policies.
+  - Added `InvalidApplicationFormLayoutException` HTTP mapping to `400 + ApiResponse.fail(...)`.
+- Preserved:
+  - Existing Application create/update/submit/withdraw behavior.
+  - Existing applicant dashboard/list/stage-result response shapes.
+  - Existing section save APIs.
+  - Existing `/applications/**` applicant security policy.
+  - Existing submit validator and attachment required policy.
+  - DB schema and migration state.
+- Explicitly excluded:
+  - frontend/static resources.
+  - admin layout read/save/preview APIs.
+  - application page-level save API.
+  - job position change feature after application creation.
+  - submit validator changes.
+  - attachment upload/download or required policy changes.
+  - StageResult, message, notification, audit, and Swagger changes.
+- Tests:
+  - Initial sandbox commands failed because the Gradle wrapper distribution download requires network access.
+  - Initial targeted service test failed because the test fixture expected `requireMilitary=false` while the short-form config factory defaults required to enabled; fixture was corrected.
+  - Final service command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.ApplicationFormPageServiceTest --no-daemon`
+  - Service result: `BUILD SUCCESSFUL`
+  - Final controller command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.controller.ApplicationControllerTest --no-daemon`
+  - Controller result: `BUILD SUCCESSFUL`
+  - Full `test` and `clean test` were intentionally not run per Phase 5b targeted-test instruction.
+- Next recommended phase:
+  - Admin layout management or publish/layout guard integration.
+
+## Phase 05a - Application Form Layout Domain
+
+- Date: 2026-05-26
+- Work type: domain, repository, validator/helper, targeted test, and documentation implementation slice.
+- Goal: implement the backend domain foundation for page-level arrangement of applicant application form sections without adding APIs or changing existing section save behavior.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/domain/entity/ApplicationFormPage.java`
+  - `src/main/java/com/shinyoung/recruit/domain/entity/ApplicationFormPageItem.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/ApplicationFormPageRepository.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/ApplicationFormPageItemRepository.java`
+  - `src/main/java/com/shinyoung/recruit/exception/InvalidApplicationFormLayoutException.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationFormLayoutValidator.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationFormLayoutSectionPolicy.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationFormLayoutDefaultFactory.java`
+  - `src/test/java/com/shinyoung/recruit/domain/entity/ApplicationFormPageTest.java`
+  - `src/test/java/com/shinyoung/recruit/domain/entity/ApplicationFormPageItemTest.java`
+  - `src/test/java/com/shinyoung/recruit/domain/repository/ApplicationFormPageRepositoryTest.java`
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutValidatorTest.java`
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutSectionPolicyTest.java`
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutDefaultFactoryTest.java`
+  - `docs/codex/implementation/phase-05a-application-form-layout-domain.md`
+  - `docs/codex/reports/phase-05a-application-form-layout-domain.html`
+- Updated:
+  - `src/main/java/com/shinyoung/recruit/enumeration/ApplicationSectionType.java`
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+- Implemented:
+  - Added layout section values `BASIC_INFO`, `QUESTION_ANSWER`, and `ATTACHMENT`.
+  - Kept existing `APPLICATION` attachment metadata semantics unchanged.
+  - Added explicit layout subset helpers and rejected `APPLICATION`/`ETC` as layout items.
+  - Added `ApplicationFormPage` as a `JobPosting` child entity.
+  - Added `ApplicationFormPageItem` as a page-owned section placement entity.
+  - Added repositories for page aggregate and optional direct item lookup.
+  - Added `ApplicationFormLayoutValidator` for stored layout shape and effective section consistency.
+  - Added review fix validation so `ApplicationFormLayoutValidator` rejects effective enabled/required section sets that do not contain `BASIC_INFO`.
+  - Added `ApplicationFormLayoutSectionPolicy` to compute effective enabled/required sets from `ApplicationFormConfig`, attachment policy flags, and question policy flags.
+  - Added `ApplicationFormLayoutDefaultFactory` with default groups:
+    - Page 1: `BASIC_INFO`, `MILITARY`
+    - Page 2: `EDUCATION`, `CAREER`
+    - Page 3: `CERTIFICATE`, `LANGUAGE`, `AWARD`, `GAP_PERIOD`
+    - Page 4: `QUESTION_ANSWER`
+    - Page 5: `ATTACHMENT`
+- Explicitly excluded:
+  - admin layout API.
+  - applicant layout API.
+  - publish guard integration.
+  - page-level application save API.
+  - existing section save API refactoring.
+  - attachment required policy changes.
+  - question/answer logic changes.
+  - frontend/static resources.
+  - migration files and production DDL.
+- Tests:
+  - Initial sandbox command failed because Gradle wrapper network access was blocked.
+  - A later run failed because a previous timed-out Gradle process held `build/test-results/test/binary/output.bin`; `.\gradlew.bat --stop` cleared it.
+  - Final command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.domain.entity.ApplicationFormPageTest --tests com.shinyoung.recruit.domain.entity.ApplicationFormPageItemTest --tests com.shinyoung.recruit.domain.repository.ApplicationFormPageRepositoryTest --tests com.shinyoung.recruit.service.ApplicationFormLayoutValidatorTest --tests com.shinyoung.recruit.service.ApplicationFormLayoutSectionPolicyTest --tests com.shinyoung.recruit.service.ApplicationFormLayoutDefaultFactoryTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Review fix command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.ApplicationFormLayoutValidatorTest --no-daemon --rerun-tasks`
+  - Review fix result: `BUILD SUCCESSFUL`
+  - Full `test` and `clean test` were not run because `instruction.md` forbids full-suite execution for Phase 05a due current development PC full-suite timeout concerns.
+- Next recommended phase:
+  - `Phase 05b - Admin Layout Management`
+
+## Phase 05 - Application Form Page Layout Design
+
+- Date: 2026-05-26
+- Work type: documentation-only design phase.
+- Goal: define backend domain and API policy for page-level arrangement of applicant application form sections without changing existing application section persistence.
+- Created:
+  - `docs/codex/design/phase-05-application-form-page-layout-design.md`
+  - `docs/codex/reports/phase-05-application-form-page-layout-design.html`
+- Updated:
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+- Designed:
+  - `ApplicationFormPage` as a `JobPosting`-owned page aggregate candidate.
+  - `ApplicationFormPageItem` as the section placement row.
+  - reuse and extension of existing `ApplicationSectionType` with layout values such as `BASIC_INFO`, `QUESTION_ANSWER`, and `ATTACHMENT`.
+  - effective enabled section set from `BASIC_INFO`, `ApplicationFormConfig.useXxx`, active `JobPostingQuestion`, and attachment requirement rows.
+  - effective required section set from `BASIC_INFO`, `ApplicationFormConfig.requireXxx`, active required `JobPostingQuestion`, and required attachment rows.
+  - `BASIC_INFO` save contract through the current root application draft update endpoint, with a note that broader basic-info fields need a future endpoint or request expansion.
+  - 05a enum compatibility caution because current `ApplicationSectionType` does not contain `QUESTION_ANSWER` or `ATTACHMENT`.
+  - admin layout read/save/preview API candidates.
+  - applicant-owned layout read API candidate.
+  - page/item validation matrix and reception-start mutation guard.
+  - default/fallback layout and publish guard policy.
+  - Phase 05 slices: 05a domain, 05b admin management, 05c applicant read, 05d publish guard, 05e stabilization.
+- Explicitly excluded:
+  - frontend Vue implementation.
+  - drag and drop UI.
+  - field-level form builder.
+  - page-level application save API.
+  - application section command API refactoring.
+  - attachment required policy redesign.
+  - runtime Java/API behavior changes.
+- Tests:
+  - Gradle tests were not run because this phase changed documentation only.
+  - Phase 05 implementation guidance now recommends targeted tests only by default because the current development PC has full-suite timeout issues.
+  - Documentation verification: targeted `git diff --check -- <changed docs>` passed.
+  - Full `git diff --check` was not clean because pre-existing `instruction.md` local changes contain trailing whitespace.
+- Next recommended phase:
+  - `Phase 05a - Application Form Layout Domain`
+
 ## Phase 04e - Interview Scheduling Stabilization / Test Hardening
 
 - Date: 2026-05-26
 - Work type: stabilization and targeted regression slice.
-- Goal: close Phase 04 by hardening cross-slice scheduling behavior and documenting the authorization matrix before Phase 05 interview evaluation.
+- Goal: close Phase 04 by hardening cross-slice scheduling behavior and documenting the authorization matrix before the next roadmap phase.
 - Created:
   - `src/test/java/com/shinyoung/recruit/service/InterviewSchedulingStabilizationServiceTest.java`
   - `docs/codex/implementation/phase-04e-interview-scheduling-stabilization.md`
@@ -154,7 +376,7 @@
   - admin evaluation read.
   - message, Excel, PDF, calendar, frontend, and migration files.
 - Next recommended phase:
-  - `Phase 05 - Interview Evaluation`
+  - `Phase 05 - Application Form Page Layout`
 
 ## Phase 04d - Interviewer Interview Read
 
@@ -262,7 +484,7 @@
   - message, Excel, PDF, calendar, frontend, and migration files.
 - Next recommended phase:
   - Completed by `Phase 04d - Interviewer Interview Read`.
-  - Current next phase is `Phase 05 - Interview Evaluation`.
+  - Current next phase is `Phase 05 - Application Form Page Layout`.
 
 ## Phase 04b - Admin Interview Schedule Management
 
@@ -337,7 +559,7 @@
   - message, Excel, PDF, calendar, frontend, and migration files.
 - Next recommended phase:
   - Completed by `Phase 04c - Applicant Interview Read`.
-  - Current next phase is `Phase 05 - Interview Evaluation`.
+  - Current next phase is `Phase 05 - Application Form Page Layout`.
 
 ## Phase 04a - Interview Scheduling Domain
 
@@ -402,7 +624,7 @@
   - message, Excel, PDF, calendar, frontend, and migration files.
 - Next recommended phase:
   - Completed by `Phase 04b - Admin Interview Schedule Management`.
-  - Current next phase is `Phase 05 - Interview Evaluation`.
+  - Current next phase is `Phase 05 - Application Form Page Layout`.
 
 ## Phase 04 - Interview Scheduling Design
 
@@ -469,7 +691,7 @@
   - Excel/PDF/calendar/frontend work.
 - Next recommended phase:
   - Superseded by the completed `Phase 04a - Interview Scheduling Domain` and `Phase 04b - Admin Interview Schedule Management` entries above.
-  - Current next phase is `Phase 05 - Interview Evaluation`.
+  - Current next phase is `Phase 05 - Application Form Page Layout`.
 
 ## Phase 03i-5-2 - Attachment Required Policy Implementation
 

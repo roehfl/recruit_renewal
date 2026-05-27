@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Phase 05b - Application Form Page Layout Backend Slice</title>
+  <style>
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #1f2937; background: #f4f7fb; line-height: 1.55; }
+    header { background: #0f766e; color: #fff; padding: 28px 36px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 48px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin-top: 34px; padding-bottom: 8px; border-bottom: 2px solid #dbeafe; color: #0f172a; }
+    h3 { margin-top: 22px; color: #134e4a; }
+    .meta { color: #d9f99d; font-size: 14px; }
+    .badge { display: inline-block; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; margin-right: 6px; }
+    .completed { background: #dcfce7; color: #166534; }
+    .pending { background: #fef3c7; color: #92400e; }
+    .out { background: #fee2e2; color: #991b1b; }
+    .info { background: #dbeafe; color: #1e40af; }
+    .warning { background: #fef3c7; color: #92400e; }
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 16px; }
+    .card { background: #fff; border: 1px solid #dbe3ef; border-radius: 8px; padding: 18px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+    .summary { background: #fff; border-left: 5px solid #0f766e; border-radius: 8px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; background: #fff; border-radius: 8px; overflow: hidden; }
+    th, td { border: 1px solid #dbe3ef; padding: 10px 12px; text-align: left; vertical-align: top; }
+    th { background: #e0f2fe; color: #0f172a; }
+    code { background: #e5e7eb; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #0f172a; color: #e5e7eb; padding: 16px; border-radius: 8px; overflow: auto; }
+    ul { padding-left: 20px; }
+    .small { font-size: 13px; color: #475569; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Recruit Backend - Phase 05b</h1>
+  <div>Application Form Page Layout Backend Slice</div>
+  <div class="meta"><span class="badge completed">Completed</span>Generated/Updated: 2026-05-26</div>
+</header>
+<main>
+  <section class="summary">
+    <h2>Executive Summary</h2>
+    <p>Phase 05b implemented the applicant-owned form-page bootstrap API for already-created applications.</p>
+    <p>The API returns posting, selected position, application status, reception/action flags, form config, and enabled layout sections.</p>
+    <p>The slice is read-only and preserves existing application creation, draft update, submit, withdraw, section-save, and dashboard behavior.</p>
+    <p><span class="badge completed">Can move forward</span> Targeted service and controller tests passed.</p>
+  </section>
+
+  <section>
+    <h2>Scope Cards</h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3><span class="badge completed">Implemented</span></h3>
+        <ul>
+          <li><code>GET /applications/{applicationId:[0-9]+}/form-page</code></li>
+          <li><code>ApplicationFormPageResponse</code></li>
+          <li><code>ApplicationFormSectionResponse</code></li>
+          <li><code>ApplicationFormPageService</code></li>
+          <li>Applicant ownership and selected-position consistency checks</li>
+          <li>Default/stored layout read and validation</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge out">Not Implemented</span></h3>
+        <ul>
+          <li>Frontend, Vue, Pinia, or static resources</li>
+          <li>DB schema or migration changes</li>
+          <li>Application creation policy changes</li>
+          <li>Post-create job position change feature</li>
+          <li>Submit validator or attachment required policy changes</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge pending">Deferred</span></h3>
+        <ul>
+          <li>Admin layout read/save/preview APIs</li>
+          <li>Publish/layout guard integration</li>
+          <li>Page-level application save API</li>
+          <li>Layout versioning and audit trail</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Architecture / Domain</h2>
+    <div class="card">
+      <pre>JobApplication N --- 1 JobPosting
+JobApplication N --- 1 JobPosition
+JobPosition N --- 1 JobPosting
+JobPosting 1 --- 1 ApplicationFormConfig
+JobPosting 1 --- N ApplicationFormPage
+ApplicationFormPage 1 --- N ApplicationFormPageItem</pre>
+      <p>Service invariant: <code>JobApplication.jobPosition.jobPosting.id == JobApplication.jobPosting.id</code>.</p>
+    </div>
+
+    <table>
+      <thead>
+      <tr><th>Class</th><th>Type</th><th>Responsibility</th></tr>
+      </thead>
+      <tbody>
+      <tr><td><code>ApplicationFormPageService</code></td><td>Service</td><td>Builds applicant-safe form-page read model.</td></tr>
+      <tr><td><code>ApplicationFormPageResponse</code></td><td>Response DTO</td><td>Top-level application/posting/position/form-config/action response.</td></tr>
+      <tr><td><code>ApplicationFormSectionResponse</code></td><td>Response DTO</td><td>Enabled section metadata with label, required flag, and sort order.</td></tr>
+      <tr><td><code>JobApplicationRepository</code></td><td>Repository</td><td>Loads applicant-owned form page graph.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>API List</h2>
+    <table>
+      <thead>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/applications/{applicationId:[0-9]+}/form-page</code></td>
+        <td>Read applicant-owned form-page bootstrap metadata.</td>
+        <td>Path: <code>applicationId</code>. No <code>applicantId</code>.</td>
+        <td><code>ApiResponse&lt;ApplicationFormPageResponse&gt;</code></td>
+      </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Changed Files</h2>
+    <table>
+      <thead>
+      <tr><th>File</th><th>Change</th></tr>
+      </thead>
+      <tbody>
+      <tr><td><code>ApplicationController.java</code></td><td>Added form-page GET endpoint.</td></tr>
+      <tr><td><code>JobApplicationRepository.java</code></td><td>Added applicant-owned fetch graph method.</td></tr>
+      <tr><td><code>JobPostingQuestionRepository.java</code></td><td>Added active/required question existence methods.</td></tr>
+      <tr><td><code>JobPostingAttachmentRequirementRepository.java</code></td><td>Added posting-scoped existence method.</td></tr>
+      <tr><td><code>GlobalExceptionHandler.java</code></td><td>Mapped invalid layout to bad request.</td></tr>
+      <tr><td><code>ApplicationFormPageServiceTest.java</code></td><td>Added service tests.</td></tr>
+      <tr><td><code>ApplicationControllerTest.java</code></td><td>Added controller/security/ownership tests.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Validation / Policy</h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3><span class="badge info">Access</span></h3>
+        <ul>
+          <li>Current applicant id comes from <code>CurrentApplicantService</code>.</li>
+          <li>Other applicant applications return hidden 404.</li>
+          <li>Anonymous requests return JSON 401 through existing security handlers.</li>
+          <li>Employee/admin requests return JSON 403 through existing security policy.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge info">Action Flags</span></h3>
+        <ul>
+          <li><code>accepting</code>: <code>PUBLISHED</code> and current time inside reception period.</li>
+          <li><code>editable</code>: <code>DRAFT</code> and <code>accepting=true</code>.</li>
+          <li>No submit or withdraw flags are added in this slice.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge info">Sections</span></h3>
+        <ul>
+          <li><code>BASIC_INFO</code> is always enabled and required.</li>
+          <li><code>ApplicationFormConfig.useXxx</code> controls enabled config sections.</li>
+          <li><code>requireXxx</code> controls required config sections.</li>
+          <li>Active questions expose <code>QUESTION_ANSWER</code>.</li>
+          <li>Attachment requirement rows expose <code>ATTACHMENT</code>.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Field Exposure</h2>
+    <div class="card">
+      <p><span class="badge completed">Protected</span> The new response does not expose the following forbidden fields:</p>
+      <p><code>applicantId</code>, <code>stageResultId</code>, <code>score</code>, <code>comment</code>, <code>decidedBy</code>, <code>correctedBy</code>, <code>storagePath</code>, <code>storedFileName</code>, correction history, CI/encryption internals, or other applicants' personal data.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Test Results</h2>
+    <table>
+      <thead>
+      <tr><th>Command</th><th>Result</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td><code>$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests com.shinyoung.recruit.service.ApplicationFormPageServiceTest --no-daemon</code></td>
+        <td><span class="badge completed">BUILD SUCCESSFUL</span></td>
+        <td>Service policy and exposure tests passed.</td>
+      </tr>
+      <tr>
+        <td><code>$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests com.shinyoung.recruit.controller.ApplicationControllerTest --no-daemon</code></td>
+        <td><span class="badge completed">BUILD SUCCESSFUL</span></td>
+        <td>Controller wrapper, 401/403/404, method, and route tests passed.</td>
+      </tr>
+      <tr>
+        <td><code>.\gradlew.bat clean test --no-daemon</code></td>
+        <td><span class="badge pending">Not run</span></td>
+        <td>Intentionally skipped per Phase 5b targeted-test instruction.</td>
+      </tr>
+      </tbody>
+    </table>
+    <p class="small">Initial sandbox runs failed because Gradle wrapper distribution download requires network access. Final targeted runs were executed with approval.</p>
+  </section>
+
+  <section>
+    <h2>Remaining Issues</h2>
+    <ul>
+      <li>Admin layout management APIs remain unimplemented.</li>
+      <li>Stored default layout creation remains separate from this applicant read slice.</li>
+      <li>Publish/layout guard integration remains deferred.</li>
+      <li>Page-level save remains out of scope.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Next Phase</h2>
+    <div class="card">
+      <p>Recommended next phase: implement admin layout management or publish/layout guard integration. The applicant bootstrap read model is now available without changing section save APIs.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

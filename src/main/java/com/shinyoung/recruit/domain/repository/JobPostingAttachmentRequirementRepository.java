@@ -15,6 +15,8 @@ public interface JobPostingAttachmentRequirementRepository
 
     List<JobPostingAttachmentRequirement> findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(Long jobPostingId);
 
+    boolean existsByJobPostingId(Long jobPostingId);
+
     boolean existsByJobPostingIdAndRequiredTrue(Long jobPostingId);
 
     List<JobPostingAttachmentRequirement> findByJobPostingIdIn(Collection<Long> jobPostingIds);

@@ -21,6 +21,10 @@ public interface JobPostingQuestionRepository extends JpaRepository<JobPostingQu
 
     boolean existsByJobPostingIdAndActiveTrueAndSortOrderAndIdNot(Long jobPostingId, Integer sortOrder, Long id);
 
+    boolean existsByJobPostingIdAndActiveTrue(Long jobPostingId);
+
+    boolean existsByJobPostingIdAndActiveTrueAndRequiredTrue(Long jobPostingId);
+
     long countByJobPostingIdAndActiveTrue(Long jobPostingId);
 
     @Query("""

@@ -53,8 +53,8 @@
     <div class="card">
       <h2>Summary</h2>
       <p>The backend has moved beyond scaffold work. Job postings, stages, applications, detailed application sections, questions/answers, stage results, attachments, and required attachment policy are implemented and documented.</p>
-      <p>Phase 04 Interview Scheduling is complete through stabilization. The design, Phase 04a domain/repository implementation, Phase 04b admin schedule management, Phase 04c applicant read, Phase 04d interviewer read, and Phase 04e stabilization/test hardening are complete.</p>
-      <p>The next implementation slice is Phase 05, focused on interview evaluation.</p>
+      <p>Phase 04 Interview Scheduling is complete through stabilization. Phase 05 design is complete, and Phase 05a Application Form Layout Domain is now implemented.</p>
+      <p>The next implementation slice is Phase 05b, focused on admin layout management APIs.</p>
     </div>
     <div class="card">
       <h2>Overall State</h2>
@@ -67,6 +67,7 @@
       <p><span class="badge done">Phase 04c applicant read complete</span></p>
       <p><span class="badge done">Phase 04d interviewer read complete</span></p>
       <p><span class="badge done">Phase 04e stabilization complete</span></p>
+      <p><span class="badge done">Phase 05a layout domain complete</span></p>
       <p><span class="badge partial">Auth/authorization partially hardened</span></p>
     </div>
   </section>
@@ -140,6 +141,12 @@
         <td><span class="badge done">Complete</span></td>
         <td>Per-posting attachment requirements, DRAFT-only replace-all, public safe exposure, dashboard/submit integration.</td>
         <td><code>/admin/job-postings/{id}/attachment-requirements</code>, <code>phase-03i-5-2</code></td>
+      </tr>
+      <tr>
+        <td>Application form page layout domain</td>
+        <td><span class="badge done">05a complete</span></td>
+        <td><code>ApplicationFormPage</code>, <code>ApplicationFormPageItem</code>, layout section enum values, repositories, validator, section policy helper, and default factory.</td>
+        <td><code>phase-05a-application-form-layout-domain</code></td>
       </tr>
       <tr>
         <td>Interview scheduling domain</td>
@@ -225,7 +232,7 @@
           <li>Cross-slice API and response consistency.</li>
           <li>Cancelled schedule and participant lifecycle edge-case tests.</li>
           <li>Admin/applicant/employee/interviewer authorization matrix review.</li>
-          <li>Clean handoff to <code>Phase 05 - Interview Evaluation</code>.</li>
+          <li>Clean handoff to <code>Phase 05 - Application Form Page Layout</code>.</li>
         </ul>
       </div>
     </div>
@@ -270,14 +277,14 @@
       <tr><th>Priority</th><th>Area</th><th>Remaining work</th><th>Recommended phase</th></tr>
       <tr>
         <td>1</td>
-        <td>Interview evaluation</td>
-        <td><code>InterviewEvaluation</code>, interviewer draft/submit, admin read, StageResult integration policy.</td>
-        <td>Phase 05</td>
+        <td>Application form page layout</td>
+        <td>Admin layout management, applicant layout read, publish/layout guard, stabilization. Phase 05a domain is complete.</td>
+        <td>Phase 05b</td>
       </tr>
       <tr>
         <td>2</td>
-        <td>Messaging</td>
-        <td><code>MessageBatch</code>, <code>MessageSendLog</code>, SMS/Email/Alimtalk adapter boundary.</td>
+        <td>Interview evaluation</td>
+        <td><code>InterviewEvaluation</code>, interviewer draft/submit, admin read, StageResult integration policy.</td>
         <td>Phase 06</td>
       </tr>
       <tr>
@@ -288,15 +295,15 @@
       </tr>
       <tr>
         <td>4</td>
-        <td>Privacy/audit/retention</td>
-        <td>Retention policy, purge history, access/change audit, trace/correlation policy.</td>
+        <td>CommonCode and school master</td>
+        <td>Common code management, school master import/search, application-level validation.</td>
         <td>Phase 08</td>
       </tr>
       <tr>
-        <td>5</td>
-        <td>CommonCode and school master</td>
-        <td>Common code management, school master import/search, application-level validation.</td>
-        <td>Phase 09</td>
+        <td>Backlog</td>
+        <td>Messaging and privacy/audit/retention</td>
+        <td><code>MessageBatch</code>, <code>MessageSendLog</code>, provider adapter boundary, retention policy, purge history, access/change audit.</td>
+        <td>Unnumbered backlog</td>
       </tr>
     </table>
   </section>
@@ -312,6 +319,7 @@
       <p>Phase 04c targeted service, controller, repository, and admin scheduling regression tests passed on 2026-05-26. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> limited this slice to targeted verification.</p>
       <p>Phase 04d targeted service, controller, repository, applicant-read regression, admin scheduling regression, and current employee resolver tests passed on 2026-05-26. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> limited this slice to targeted verification.</p>
       <p>Phase 04e targeted stabilization, admin authorization matrix, applicant/interviewer regression, repository, scheduling service, and current employee resolver tests passed on 2026-05-26. Initial sandbox execution failed because Gradle wrapper network download was blocked; the same targeted command passed after approved escalation. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> limited Phase 04 work to targeted verification.</p>
+      <p>Phase 05a targeted entity, repository, validator, section policy, and default factory tests passed on 2026-05-26. Initial sandbox execution failed because Gradle wrapper network download was blocked, and one retry was blocked by a stale Gradle test output lock from the timeout; the final targeted command passed after clearing the daemon. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> forbids full-suite execution for Phase 05a.</p>
     </div>
   </section>
 </main>

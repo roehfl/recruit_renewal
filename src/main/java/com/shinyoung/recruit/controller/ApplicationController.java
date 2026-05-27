@@ -5,10 +5,12 @@ import com.shinyoung.recruit.dto.request.ApplicationUpdateRequest;
 import com.shinyoung.recruit.dto.response.ApiResponse;
 import com.shinyoung.recruit.dto.response.ApplicationDashboardResponse;
 import com.shinyoung.recruit.dto.response.ApplicationDetailResponse;
+import com.shinyoung.recruit.dto.response.ApplicationFormPageResponse;
 import com.shinyoung.recruit.dto.response.MyApplicationResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.ApplicationDashboardService;
+import com.shinyoung.recruit.service.ApplicationFormPageService;
 import com.shinyoung.recruit.service.CurrentApplicantService;
 import com.shinyoung.recruit.service.JobApplicationService;
 import jakarta.validation.Valid;
@@ -28,6 +30,7 @@ public class ApplicationController {
 
     private final JobApplicationService jobApplicationService;
     private final ApplicationDashboardService applicationDashboardService;
+    private final ApplicationFormPageService applicationFormPageService;
     private final CurrentApplicantService currentApplicantService;
 
     @PostMapping("/applications")
@@ -65,6 +68,15 @@ public class ApplicationController {
     ) {
         Long applicantId = currentApplicantService.getCurrentApplicantId(userDetails);
         return ResponseEntity.ok(ApiResponse.success(applicationDashboardService.getDashboard(applicantId, applicationId)));
+    }
+
+    @GetMapping("/applications/{applicationId:[0-9]+}/form-page")
+    public ResponseEntity<ApiResponse<ApplicationFormPageResponse>> getFormPage(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long applicationId
+    ) {
+        Long applicantId = currentApplicantService.getCurrentApplicantId(userDetails);
+        return ResponseEntity.ok(ApiResponse.success(applicationFormPageService.getFormPage(applicantId, applicationId)));
     }
 
     @PostMapping("/applications/{applicationId:[0-9]+}")

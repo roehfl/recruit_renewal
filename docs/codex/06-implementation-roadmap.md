@@ -140,6 +140,9 @@
 | `POST` | `/admin/question-templates/{templateId}/deactivate` | 구현 |
 | `GET` | `/admin/job-postings/{jobPostingId}/attachment-requirements` | 구현 |
 | `POST` | `/admin/job-postings/{jobPostingId}/attachment-requirements` | 구현 |
+| `GET` | `/admin/job-postings/{jobPostingId}/application-form-layout` | 구현 |
+| `POST` | `/admin/job-postings/{jobPostingId}/application-form-layout` | 구현 |
+| `GET` | `/admin/job-postings/{jobPostingId}/application-form-layout/preview` | 구현 |
 
 ### 2.3 Stage / StageResult
 
@@ -183,6 +186,7 @@
 | `GET/POST` | `/applications/{applicationId}/gap-periods` | 구현 |
 | `GET` | `/applications/{applicationId}/questions` | 구현 |
 | `POST` | `/applications/{applicationId}/answers` | 구현 |
+| `GET` | `/applications/{applicationId}/form-page` | 구현 |
 
 ### 2.5 Attachment / Admin Application Read
 
@@ -249,6 +253,15 @@
 ## 4. 앞으로의 권장 로드맵
 
 기존 로드맵의 Phase 01~03k는 대부분 완료되었다. 이후는 현재 코드의 빈 영역을 기준으로 아래 순서를 권장한다.
+
+Roadmap revision note - 2026-05-26:
+
+- The numbered next-phase sequence is now:
+  - Phase 05 - Application Form Page Layout
+  - Phase 06 - Interview Evaluation
+  - Phase 07 - Export, PDF, Statistics
+  - Phase 08 - CommonCode And School Master
+- Messaging and privacy/audit/retention remain valid backlog domains but are not numbered phases in this revision.
 
 ### Phase 04 - Interview Scheduling
 
@@ -337,9 +350,97 @@ Implementation outputs:
 - participant lifecycle regression confirms cancel keeps candidate/interviewer rows `ASSIGNED`
 - `StageResult` non-mutation regression confirms scheduling cancel/read flows do not change result state
 - authorization matrix review covers admin, applicant, employee/interviewer, and anonymous boundaries
-- Phase 04 is ready to hand off to `Phase 05 - Interview Evaluation`
+- Phase 04 is ready to hand off to `Phase 05 - Application Form Page Layout`
 
-### Phase 05 - Interview Evaluation
+### Phase 05 - Application Form Page Layout
+
+Status:
+
+| Slice | Status | Scope |
+| --- | --- | --- |
+| 05 design - Application Form Page Layout | Completed | Page layout design, API contract, validation rules, slice breakdown |
+| 05a - Application Form Layout Domain | Completed | `ApplicationFormPage`, `ApplicationFormPageItem`, section enum extension, repositories, validator, policy helper, default factory |
+| 05b - Applicant Layout Read | Completed | Applicant-owned form-page bootstrap API with effective section response |
+| 05c - Admin Layout Management | Completed | Admin layout read/save/preview APIs, available section response, state guard, replace-all save |
+| 05d - Publish/Layout Guard Integration | Pending | Layout validation during publish and default/fallback policy |
+| 05e - Layout Stabilization / Test Hardening | Pending | Validation matrix, fallback edge cases, policy regression |
+
+Purpose:
+
+- Design and implement backend support for page-level arrangement of applicant application form sections.
+
+Scope:
+
+- `ApplicationFormPage`
+- `ApplicationFormPageItem`
+- `ApplicationSectionType` layout section values
+- `ApplicationFormLayoutValidator`
+- `ApplicationFormLayoutSectionPolicy`
+- `ApplicationFormLayoutDefaultFactory`
+- Admin layout read/save/preview contract
+- Applicant layout read contract
+- use/require/layout consistency validation
+- question/answer page placement using active `JobPostingQuestion`
+- default layout and fallback policy
+- publish/reception-start guard policy
+
+Out of scope:
+
+- Frontend Vue implementation
+- field-level form builder
+- page-level application save API
+- section command API refactoring
+- attachment required policy redesign
+- application required policy redesign
+
+Design outputs:
+
+- `docs/codex/design/phase-05-application-form-page-layout-design.md`
+- `docs/codex/reports/phase-05-application-form-page-layout-design.html`
+
+Implementation outputs:
+
+- `docs/codex/implementation/phase-05a-application-form-layout-domain.md`
+- `docs/codex/reports/phase-05a-application-form-layout-domain.html`
+- `docs/codex/implementation/phase-05b-application-form-page-layout.md`
+- `docs/codex/reports/phase-05b-application-form-page-layout.html`
+- `docs/codex/implementation/phase-05c-admin-layout-management.md`
+- `docs/codex/reports/phase-05c-admin-layout-management.html`
+
+05a completed scope:
+
+- `ApplicationSectionType` now includes `BASIC_INFO`, `QUESTION_ANSWER`, and `ATTACHMENT`.
+- `APPLICATION` and `ETC` are not allowed as layout items.
+- `ApplicationFormPage` and `ApplicationFormPageItem` persist a JobPosting-owned page layout.
+- `ApplicationFormPageRepository` and `ApplicationFormPageItemRepository` provide persistence access.
+- `ApplicationFormLayoutValidator` validates stored layout shape and effective section consistency.
+- `ApplicationFormLayoutSectionPolicy` calculates enabled/required layout sections from existing policy inputs.
+- `ApplicationFormLayoutDefaultFactory` creates the default 5-group layout without saving it.
+- No API, frontend, existing section save API refactoring, attachment policy change, submit policy change, or migration file was added.
+
+05b completed scope:
+
+- Applicant-owned `GET /applications/{applicationId:[0-9]+}/form-page` bootstrap API.
+- Application/posting/position/form-config/action metadata response.
+- Effective enabled/required section layout response using Phase 05a policy and factory helpers.
+- Default/stored layout validation.
+- Targeted service and controller tests.
+
+05c completed scope:
+
+- Admin layout read API with stored/default fallback and `availableSections` metadata.
+- Admin layout save API with replace-all semantics and full validation.
+- Admin applicant-facing preview projection with page structure.
+- State guard: CLOSED and reception-started block save.
+- Request DTO with Bean Validation and nested page/item records.
+- Response DTOs with nested records for admin layout, preview, and section availability.
+- Targeted service unit tests (13) and controller integration tests (11).
+
+Next slice:
+
+- `Phase 05d - Publish/Layout Guard Integration`
+
+### Phase 06 - Interview Evaluation
 
 목적:
 
@@ -358,7 +459,7 @@ Out of scope:
 - 대량 엑셀 평가 업로드
 - 메시지 발송
 
-### Phase 06 - Messaging History
+### Backlog - Messaging History
 
 목적:
 
@@ -393,7 +494,7 @@ Out of scope:
 
 - 개인정보 파기
 
-### Phase 08 - Privacy, Audit, Retention
+### Backlog - Privacy, Audit, Retention
 
 목적:
 
@@ -411,7 +512,7 @@ Out of scope:
 
 - 통계/엑셀 신규 기능
 
-### Phase 09 - CommonCode And School Master
+### Phase 08 - CommonCode And School Master
 
 목적:
 

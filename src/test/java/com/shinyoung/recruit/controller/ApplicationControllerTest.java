@@ -573,6 +573,100 @@ class ApplicationControllerTest {
     }
 
     @Test
+    void get_application_form_page_returns_api_response() throws Exception {
+        Applicant applicant = createApplicant("api-form-page", "Api Form Page");
+        Long jobPostingId = createPublishedJobPosting(new ApplicationFormConfigRequest(
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false
+        ));
+        Long applicationId = createApplication(applicant, jobPostingId);
+
+        securedMockMvc().perform(get("/applications/{applicationId}/form-page", applicationId)
+                        .with(authentication(applicantAuthentication(applicant))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.data.applicationId").value(applicationId))
+                .andExpect(jsonPath("$.data.jobPostingId").value(jobPostingId))
+                .andExpect(jsonPath("$.data.jobPostingTitle").value("2026 recruitment"))
+                .andExpect(jsonPath("$.data.jobPostingStatus").value("PUBLISHED"))
+                .andExpect(jsonPath("$.data.jobPositionId").isNumber())
+                .andExpect(jsonPath("$.data.jobPositionName").value("Backend"))
+                .andExpect(jsonPath("$.data.applicationStatus").value("DRAFT"))
+                .andExpect(jsonPath("$.data.receptionStartDateTime").exists())
+                .andExpect(jsonPath("$.data.receptionEndDateTime").exists())
+                .andExpect(jsonPath("$.data.accepting").value(true))
+                .andExpect(jsonPath("$.data.editable").value(true))
+                .andExpect(jsonPath("$.data.formConfig.useEducation").value(true))
+                .andExpect(jsonPath("$.data.formConfig.requireEducation").value(true))
+                .andExpect(jsonPath("$.data.formConfig.useMilitary").value(true))
+                .andExpect(jsonPath("$.data.formConfig.requireMilitary").value(false))
+                .andExpect(jsonPath("$.data.sections[0].sectionType").value("BASIC_INFO"))
+                .andExpect(jsonPath("$.data.sections[0].label").value("Basic Info"))
+                .andExpect(jsonPath("$.data.sections[0].enabled").value(true))
+                .andExpect(jsonPath("$.data.sections[0].required").value(true))
+                .andExpect(jsonPath("$.data.sections[0].sortOrder").value(0))
+                .andExpect(jsonPath("$.data.sections[1].sectionType").value("MILITARY"))
+                .andExpect(jsonPath("$.data.sections[1].required").value(false))
+                .andExpect(jsonPath("$.data.sections[2].sectionType").value("EDUCATION"))
+                .andExpect(jsonPath("$.data.sections[2].required").value(true))
+                .andExpect(jsonPath("$.data.applicantId").doesNotExist())
+                .andExpect(jsonPath("$.data.stageResultId").doesNotExist())
+                .andExpect(jsonPath("$.data.score").doesNotExist())
+                .andExpect(jsonPath("$.data.comment").doesNotExist())
+                .andExpect(jsonPath("$.data.decidedBy").doesNotExist())
+                .andExpect(jsonPath("$.data.correctedBy").doesNotExist())
+                .andExpect(jsonPath("$.data.storagePath").doesNotExist())
+                .andExpect(jsonPath("$.data.storedFileName").doesNotExist());
+    }
+
+    @Test
+    void get_application_form_page_blocks_employee_admin_and_anonymous() throws Exception {
+        Applicant applicant = createApplicant("api-form-page-security", "Api Form Page Security");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        MockMvc securedMockMvc = securedMockMvc();
+
+        securedMockMvc.perform(get("/applications/{applicationId}/form-page", applicationId)
+                        .with(authentication(employeeAuthentication("employee-form-page", "ROLE_ADMIN"))))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Access is denied."));
+
+        securedMockMvc.perform(get("/applications/{applicationId}/form-page", applicationId)
+                        .with(anonymous()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Authentication is required."));
+    }
+
+    @Test
+    void get_application_form_page_hides_other_applicants_application() throws Exception {
+        Applicant owner = createApplicant("api-form-page-owner", "Api Form Page Owner");
+        Applicant other = createApplicant("api-form-page-other", "Api Form Page Other");
+        Long applicationId = createApplication(owner, createPublishedJobPosting());
+
+        securedMockMvc().perform(get("/applications/{applicationId}/form-page", applicationId)
+                        .with(authentication(applicantAuthentication(other))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
     void get_my_applications_returns_empty_page_for_applicant_without_applications() throws Exception {
         Applicant applicant = createApplicant("api-my-list-empty", "Api My List Empty");
 
@@ -650,6 +744,32 @@ class ApplicationControllerTest {
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
         securedMockMvc.perform(delete("/applications/{applicationId}/dashboard", applicationId)
+                        .with(authentication(applicantAuthentication(applicant))))
+                .andExpect(status().isMethodNotAllowed());
+    }
+
+    @Test
+    void unsupported_methods_are_not_added_for_application_form_page() throws Exception {
+        Applicant applicant = createApplicant("api-form-page-method", "Api Form Page Method");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        MockMvc securedMockMvc = securedMockMvc();
+
+        securedMockMvc.perform(post("/applications/{applicationId}/form-page", applicationId)
+                        .with(authentication(applicantAuthentication(applicant)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isMethodNotAllowed());
+        securedMockMvc.perform(put("/applications/{applicationId}/form-page", applicationId)
+                        .with(authentication(applicantAuthentication(applicant)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isMethodNotAllowed());
+        securedMockMvc.perform(patch("/applications/{applicationId}/form-page", applicationId)
+                        .with(authentication(applicantAuthentication(applicant)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isMethodNotAllowed());
+        securedMockMvc.perform(delete("/applications/{applicationId}/form-page", applicationId)
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isMethodNotAllowed());
     }
