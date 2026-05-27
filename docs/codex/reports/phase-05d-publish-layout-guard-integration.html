@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Phase 05d - Publish/Layout Guard Integration</title>
+  <style>
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #1f2937; background: #f4f7fb; line-height: 1.55; }
+    header { background: #0f766e; color: #fff; padding: 28px 36px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 48px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin-top: 34px; padding-bottom: 8px; border-bottom: 2px solid #dbeafe; color: #0f172a; }
+    h3 { margin-top: 22px; color: #134e4a; }
+    .meta { color: #d9f99d; font-size: 14px; }
+    .badge { display: inline-block; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; margin-right: 6px; }
+    .completed { background: #dcfce7; color: #166534; }
+    .pending { background: #fef3c7; color: #92400e; }
+    .out { background: #fee2e2; color: #991b1b; }
+    .info { background: #dbeafe; color: #1e40af; }
+    .warning { background: #fef3c7; color: #92400e; }
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 16px; }
+    .card { background: #fff; border: 1px solid #dbe3ef; border-radius: 8px; padding: 18px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+    .summary { background: #fff; border-left: 5px solid #0f766e; border-radius: 8px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; background: #fff; border-radius: 8px; overflow: hidden; }
+    th, td { border: 1px solid #dbe3ef; padding: 10px 12px; text-align: left; vertical-align: top; }
+    th { background: #e0f2fe; color: #0f172a; }
+    code { background: #e5e7eb; padding: 2px 5px; border-radius: 4px; font-size: 13px; }
+    pre { background: #0f172a; color: #e5e7eb; padding: 16px; border-radius: 8px; overflow: auto; }
+    ul { padding-left: 20px; }
+    .small { font-size: 13px; color: #475569; }
+    .stats { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px; }
+    .stat-card { background: #fff; border: 1px solid #dbe3ef; border-radius: 8px; padding: 16px 20px; text-align: center; min-width: 140px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+    .stat-card .number { font-size: 28px; font-weight: 700; color: #0f766e; }
+    .stat-card .label { font-size: 13px; color: #475569; margin-top: 4px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Recruit Backend - Phase 05d</h1>
+  <div>Publish/Layout Guard Integration</div>
+  <div class="meta"><span class="badge completed">Completed</span>Generated/Updated: 2026-05-27</div>
+</header>
+<main>
+  <section class="summary">
+    <h2>Executive Summary</h2>
+    <p>Phase 05d integrated layout validation into the job posting publish workflow. A posting can no longer be published with a stale or invalid layout configuration.</p>
+    <p>The publish guard validates stored layouts against the current effective section set. When no stored layout exists, a deterministic fallback is generated and validated (always passes for migration compatibility).</p>
+    <p>Two existing service classes were modified and 3 new tests were added to <code>JobPostingServiceTest</code>.</p>
+    <p><span class="badge completed">Can move forward</span> All targeted tests passed including layout regression tests.</p>
+  </section>
+
+  <section>
+    <h2>Quick Stats</h2>
+    <div class="stats">
+      <div class="stat-card">
+        <div class="number">0</div>
+        <div class="label">New API Endpoints</div>
+      </div>
+      <div class="stat-card">
+        <div class="number">2</div>
+        <div class="label">Modified Source Files</div>
+      </div>
+      <div class="stat-card">
+        <div class="number">1</div>
+        <div class="label">Modified Test Files</div>
+      </div>
+      <div class="stat-card">
+        <div class="number">3</div>
+        <div class="label">New Tests Added</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Scope Cards</h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3><span class="badge completed">Implemented</span></h3>
+        <ul>
+          <li><code>validateLayoutForPublish()</code> in <code>ApplicationFormLayoutService</code></li>
+          <li>Layout validation call in <code>JobPostingService.publish()</code></li>
+          <li>Stored layout validation against current config</li>
+          <li>Deterministic fallback acceptance when no stored layout</li>
+          <li>Exception wrapping for consistent publish API contract</li>
+          <li>3 integration tests for publish guard scenarios</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge out">Out of Scope</span></h3>
+        <ul>
+          <li>Auto-creation of default layout on posting create/update</li>
+          <li>Stored-only layout requirement (fallback still accepted)</li>
+          <li>Layout versioning or change audit trail</li>
+          <li>Force-publish override</li>
+          <li>Frontend/Vue/static resources</li>
+          <li>DB migration files</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge pending">Deferred to 05e</span></h3>
+        <ul>
+          <li>Validation matrix hardening</li>
+          <li>Existing posting fallback edge cases</li>
+          <li>Attachment/application required policy regression verification</li>
+          <li>Per-field error detail in validation response</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Architecture / Domain</h2>
+    <h3>Publish Flow Integration</h3>
+    <table>
+      <tr>
+        <th>Step</th>
+        <th>Component</th>
+        <th>Action</th>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td><code>JobPostingService.publish()</code></td>
+        <td>Status check (not CLOSED, not already PUBLISHED)</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><code>JobPostingService.publish()</code></td>
+        <td>Reception period validation</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><code>JobPostingService.publish()</code></td>
+        <td>Job positions validation</td>
+      </tr>
+      <tr>
+        <td>4 <span class="badge completed">NEW</span></td>
+        <td><code>ApplicationFormLayoutService</code></td>
+        <td>Layout validation (stored or fallback) against effective sections</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td><code>JobPosting.publish()</code></td>
+        <td>Status transition to PUBLISHED</td>
+      </tr>
+    </table>
+
+    <h3>Validation Decision Flow</h3>
+    <table>
+      <tr>
+        <th>Condition</th>
+        <th>Action</th>
+        <th>Result</th>
+      </tr>
+      <tr>
+        <td>No ApplicationFormConfig</td>
+        <td>Throw exception</td>
+        <td>Publish blocked</td>
+      </tr>
+      <tr>
+        <td>Stored layout exists and valid</td>
+        <td>Validate stored layout</td>
+        <td>Publish allowed</td>
+      </tr>
+      <tr>
+        <td>Stored layout exists but stale</td>
+        <td>Validate stored layout</td>
+        <td>Publish blocked</td>
+      </tr>
+      <tr>
+        <td>No stored layout</td>
+        <td>Generate fallback, validate</td>
+        <td>Publish allowed (fallback always valid)</td>
+      </tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Changed Files</h2>
+    <table>
+      <tr><th>File</th><th>Change</th><th>Purpose</th></tr>
+      <tr>
+        <td><code>ApplicationFormLayoutService.java</code></td>
+        <td>Added method</td>
+        <td><code>validateLayoutForPublish(JobPosting)</code> - encapsulates layout validation for publish guard</td>
+      </tr>
+      <tr>
+        <td><code>JobPostingService.java</code></td>
+        <td>Added dependency + method</td>
+        <td>Injected <code>ApplicationFormLayoutService</code>; added <code>validateLayoutForPublish()</code> call in <code>publish()</code></td>
+      </tr>
+      <tr>
+        <td><code>JobPostingServiceTest.java</code></td>
+        <td>Added 3 tests + helpers</td>
+        <td>Publish guard integration tests for valid layout, stale layout, and fallback layout scenarios</td>
+      </tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Validation Rules</h2>
+    <h3>Layout Validation at Publish Time</h3>
+    <table>
+      <tr><th>#</th><th>Rule</th><th>Failure Message</th></tr>
+      <tr><td>1</td><td>ApplicationFormConfig must exist</td><td>지원서 항목 설정이 없는 채용공고는 게시할 수 없습니다.</td></tr>
+      <tr><td>2</td><td>At least one page must exist</td><td>Layout must contain at least one page.</td></tr>
+      <tr><td>3</td><td>Each page must have at least one item</td><td>Layout page must contain at least one item.</td></tr>
+      <tr><td>4</td><td>No duplicate page numbers</td><td>Duplicate page number: {n}</td></tr>
+      <tr><td>5</td><td>No duplicate page sort orders</td><td>Duplicate page sort order: {n}</td></tr>
+      <tr><td>6</td><td>No duplicate item sort orders within a page</td><td>Duplicate item sort order in page: {n}</td></tr>
+      <tr><td>7</td><td>No duplicate section types across layout</td><td>Duplicate layout section type: {type}</td></tr>
+      <tr><td>8</td><td>No disabled section placed</td><td>Disabled section cannot be placed in layout: {type}</td></tr>
+      <tr><td>9</td><td>Every enabled section must be placed</td><td>Enabled section is missing from layout: {type}</td></tr>
+      <tr><td>10</td><td>Every required section must be placed</td><td>Required section is missing from layout: {type}</td></tr>
+    </table>
+    <p class="small">All validation messages are prefixed with "레이아웃 검증 실패: " when surfaced through the publish API.</p>
+
+    <h3>Stale Layout Detection</h3>
+    <table>
+      <tr><th>Config Change</th><th>Effect on Layout</th></tr>
+      <tr><td><code>useXxx</code> set to <code>true</code></td><td>New section must be placed; stored layout fails if missing</td></tr>
+      <tr><td><code>useXxx</code> set to <code>false</code></td><td>Section must not be placed; stored layout fails if present</td></tr>
+      <tr><td>Question added/activated</td><td>QUESTION_ANSWER must be placed</td></tr>
+      <tr><td>All questions removed/deactivated</td><td>QUESTION_ANSWER must not be placed</td></tr>
+      <tr><td>Attachment requirement added</td><td>ATTACHMENT must be placed</td></tr>
+      <tr><td>All attachment requirements removed</td><td>ATTACHMENT must not be placed</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Test Results</h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3><span class="badge completed">JobPostingServiceTest</span></h3>
+        <ul>
+          <li>All existing tests passed (including <code>DRAFT에서_PUBLISHED_전환_성공</code>)</li>
+          <li>3 new publish guard tests passed</li>
+          <li><code>게시_시_저장된_유효한_레이아웃이_있으면_성공</code></li>
+          <li><code>게시_시_저장된_레이아웃이_현재_설정과_불일치하면_실패</code></li>
+          <li><code>게시_시_폴백_레이아웃이_유효하면_성공</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge completed">Layout Regression</span></h3>
+        <ul>
+          <li><code>ApplicationFormLayoutServiceTest</code> - 13 tests passed</li>
+          <li><code>AdminApplicationFormLayoutControllerTest</code> - 11 tests passed</li>
+          <li>No regression from adding <code>validateLayoutForPublish</code></li>
+        </ul>
+      </div>
+    </div>
+    <h3>Test Commands</h3>
+    <pre>$env:AES_SECRET_KEY='22791194512954214612461221261067'
+.\gradlew.bat test --tests "*JobPostingServiceTest" --no-daemon
+# Result: BUILD SUCCESSFUL
+
+.\gradlew.bat test --tests "*ApplicationFormLayout*" --no-daemon
+# Result: BUILD SUCCESSFUL</pre>
+    <p class="small">Full <code>clean test</code> was not run per Phase 05 targeted-test instruction (local timeout concerns).</p>
+  </section>
+
+  <section>
+    <h2>Remaining Issues</h2>
+    <table>
+      <tr><th>Issue</th><th>Status</th><th>Notes</th></tr>
+      <tr>
+        <td>Fallback layout still accepted at publish</td>
+        <td><span class="badge warning">Open</span></td>
+        <td>After migration, consider requiring stored layout only</td>
+      </tr>
+      <tr>
+        <td>No auto-creation of default layout</td>
+        <td><span class="badge warning">Open</span></td>
+        <td>Admin must manually save layout or rely on fallback</td>
+      </tr>
+      <tr>
+        <td>No per-field error detail</td>
+        <td><span class="badge pending">Deferred</span></td>
+        <td>First validation error message is returned</td>
+      </tr>
+      <tr>
+        <td>Layout versioning / audit trail</td>
+        <td><span class="badge pending">Deferred</span></td>
+        <td>Only BaseEntity audit fields exist</td>
+      </tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Next Phase Recommendation</h2>
+    <div class="summary">
+      <p><strong>Phase 05e - Layout Stabilization / Test Hardening</strong></p>
+      <p>Harden validation matrix, cover existing posting fallback edge cases, and verify attachment/application required policy regression safety.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

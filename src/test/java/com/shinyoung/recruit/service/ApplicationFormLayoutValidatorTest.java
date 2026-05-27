@@ -176,6 +176,185 @@ class ApplicationFormLayoutValidatorTest {
         ));
     }
 
+    @Test
+    void pageNo가_null이면_실패() {
+        ApplicationFormPageItem mockItem = item(ApplicationSectionType.BASIC_INFO, 0);
+        ApplicationFormPage page = mock(ApplicationFormPage.class);
+        when(page.getPageNo()).thenReturn(null);
+        when(page.getSortOrder()).thenReturn(0);
+        when(page.getTitle()).thenReturn("Page 1");
+        when(page.getItems()).thenReturn(List.of(mockItem));
+
+        assertInvalid(() -> validator.validate(
+                List.of(page),
+                Set.of(ApplicationSectionType.BASIC_INFO),
+                Set.of(ApplicationSectionType.BASIC_INFO)
+        ));
+    }
+
+    @Test
+    void page_sortOrder가_null이면_실패() {
+        ApplicationFormPageItem mockItem = item(ApplicationSectionType.BASIC_INFO, 0);
+        ApplicationFormPage page = mock(ApplicationFormPage.class);
+        when(page.getPageNo()).thenReturn(1);
+        when(page.getSortOrder()).thenReturn(null);
+        when(page.getTitle()).thenReturn("Page 1");
+        when(page.getItems()).thenReturn(List.of(mockItem));
+
+        assertInvalid(() -> validator.validate(
+                List.of(page),
+                Set.of(ApplicationSectionType.BASIC_INFO),
+                Set.of(ApplicationSectionType.BASIC_INFO)
+        ));
+    }
+
+    @Test
+    void item_sectionType이_null이면_실패() {
+        ApplicationFormPageItem mockItem = item(null, 0);
+        ApplicationFormPage page = mock(ApplicationFormPage.class);
+        when(page.getPageNo()).thenReturn(1);
+        when(page.getSortOrder()).thenReturn(0);
+        when(page.getTitle()).thenReturn("Page 1");
+        when(page.getItems()).thenReturn(List.of(mockItem));
+
+        assertInvalid(() -> validator.validate(
+                List.of(page),
+                Set.of(ApplicationSectionType.BASIC_INFO),
+                Set.of(ApplicationSectionType.BASIC_INFO)
+        ));
+    }
+
+    @Test
+    void item_sortOrder가_null이면_실패() {
+        ApplicationFormPageItem mockItem = item(ApplicationSectionType.BASIC_INFO, null);
+        ApplicationFormPage page = mock(ApplicationFormPage.class);
+        when(page.getPageNo()).thenReturn(1);
+        when(page.getSortOrder()).thenReturn(0);
+        when(page.getTitle()).thenReturn("Page 1");
+        when(page.getItems()).thenReturn(List.of(mockItem));
+
+        assertInvalid(() -> validator.validate(
+                List.of(page),
+                Set.of(ApplicationSectionType.BASIC_INFO),
+                Set.of(ApplicationSectionType.BASIC_INFO)
+        ));
+    }
+
+    @Test
+    void pageNo가_0이면_실패() {
+        ApplicationFormPageItem mockItem = item(ApplicationSectionType.BASIC_INFO, 0);
+        ApplicationFormPage page = mock(ApplicationFormPage.class);
+        when(page.getPageNo()).thenReturn(0);
+        when(page.getSortOrder()).thenReturn(0);
+        when(page.getTitle()).thenReturn("Page 1");
+        when(page.getItems()).thenReturn(List.of(mockItem));
+
+        assertInvalid(() -> validator.validate(
+                List.of(page),
+                Set.of(ApplicationSectionType.BASIC_INFO),
+                Set.of(ApplicationSectionType.BASIC_INFO)
+        ));
+    }
+
+    @Test
+    void page_sortOrder가_음수이면_실패() {
+        ApplicationFormPageItem mockItem = item(ApplicationSectionType.BASIC_INFO, 0);
+        ApplicationFormPage page = mock(ApplicationFormPage.class);
+        when(page.getPageNo()).thenReturn(1);
+        when(page.getSortOrder()).thenReturn(-1);
+        when(page.getTitle()).thenReturn("Page 1");
+        when(page.getItems()).thenReturn(List.of(mockItem));
+
+        assertInvalid(() -> validator.validate(
+                List.of(page),
+                Set.of(ApplicationSectionType.BASIC_INFO),
+                Set.of(ApplicationSectionType.BASIC_INFO)
+        ));
+    }
+
+    @Test
+    void item_sortOrder가_음수이면_실패() {
+        ApplicationFormPageItem mockItem = item(ApplicationSectionType.BASIC_INFO, -1);
+        ApplicationFormPage page = mock(ApplicationFormPage.class);
+        when(page.getPageNo()).thenReturn(1);
+        when(page.getSortOrder()).thenReturn(0);
+        when(page.getTitle()).thenReturn("Page 1");
+        when(page.getItems()).thenReturn(List.of(mockItem));
+
+        assertInvalid(() -> validator.validate(
+                List.of(page),
+                Set.of(ApplicationSectionType.BASIC_INFO),
+                Set.of(ApplicationSectionType.BASIC_INFO)
+        ));
+    }
+
+    @Test
+    void page_title이_100자_초과시_실패() {
+        ApplicationFormPageItem mockItem = item(ApplicationSectionType.BASIC_INFO, 0);
+        ApplicationFormPage page = mock(ApplicationFormPage.class);
+        when(page.getPageNo()).thenReturn(1);
+        when(page.getSortOrder()).thenReturn(0);
+        when(page.getTitle()).thenReturn("a".repeat(101));
+        when(page.getItems()).thenReturn(List.of(mockItem));
+
+        assertInvalid(() -> validator.validate(
+                List.of(page),
+                Set.of(ApplicationSectionType.BASIC_INFO),
+                Set.of(ApplicationSectionType.BASIC_INFO)
+        ));
+    }
+
+    @Test
+    void page_title이_blank이면_실패() {
+        ApplicationFormPageItem mockItem = item(ApplicationSectionType.BASIC_INFO, 0);
+        ApplicationFormPage page = mock(ApplicationFormPage.class);
+        when(page.getPageNo()).thenReturn(1);
+        when(page.getSortOrder()).thenReturn(0);
+        when(page.getTitle()).thenReturn("   ");
+        when(page.getItems()).thenReturn(List.of(mockItem));
+
+        assertInvalid(() -> validator.validate(
+                List.of(page),
+                Set.of(ApplicationSectionType.BASIC_INFO),
+                Set.of(ApplicationSectionType.BASIC_INFO)
+        ));
+    }
+
+    @Test
+    void page_description이_500자_초과시_실패() {
+        ApplicationFormPageItem mockItem = item(ApplicationSectionType.BASIC_INFO, 0);
+        ApplicationFormPage page = mock(ApplicationFormPage.class);
+        when(page.getPageNo()).thenReturn(1);
+        when(page.getSortOrder()).thenReturn(0);
+        when(page.getTitle()).thenReturn("Page 1");
+        when(page.getDescription()).thenReturn("a".repeat(501));
+        when(page.getItems()).thenReturn(List.of(mockItem));
+
+        assertInvalid(() -> validator.validate(
+                List.of(page),
+                Set.of(ApplicationSectionType.BASIC_INFO),
+                Set.of(ApplicationSectionType.BASIC_INFO)
+        ));
+    }
+
+    @Test
+    void ETC_enum은_레이아웃에서_거부() {
+        assertInvalid(() -> validator.validate(
+                List.of(mockPageWithItem(ApplicationSectionType.ETC)),
+                Set.of(ApplicationSectionType.BASIC_INFO),
+                Set.of(ApplicationSectionType.BASIC_INFO)
+        ));
+    }
+
+    @Test
+    void 추가_배치된_섹션이_있으면_실패() {
+        assertInvalid(() -> validator.validate(
+                List.of(page(1, 0, ApplicationSectionType.BASIC_INFO, ApplicationSectionType.MILITARY)),
+                Set.of(ApplicationSectionType.BASIC_INFO),
+                Set.of(ApplicationSectionType.BASIC_INFO)
+        ));
+    }
+
     private void assertInvalid(Runnable runnable) {
         assertThatThrownBy(runnable::run)
                 .isInstanceOf(InvalidApplicationFormLayoutException.class);
@@ -199,7 +378,7 @@ class ApplicationFormLayoutValidatorTest {
         return page;
     }
 
-    private ApplicationFormPageItem item(ApplicationSectionType sectionType, int sortOrder) {
+    private ApplicationFormPageItem item(ApplicationSectionType sectionType, Integer sortOrder) {
         ApplicationFormPageItem item = mock(ApplicationFormPageItem.class);
         when(item.getSectionType()).thenReturn(sectionType);
         when(item.getSortOrder()).thenReturn(sortOrder);

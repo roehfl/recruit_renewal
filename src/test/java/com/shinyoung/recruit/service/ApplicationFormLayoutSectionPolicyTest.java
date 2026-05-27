@@ -51,6 +51,45 @@ class ApplicationFormLayoutSectionPolicyTest {
     }
 
     @Test
+    void config_null이고_질문_첨부_활성이면_BASIC_INFO와_외부_섹션만() {
+        Set<ApplicationSectionType> enabled = ApplicationFormLayoutSectionPolicy.enabledSections(null, true, true);
+        assertThat(enabled).containsExactlyInAnyOrder(
+                ApplicationSectionType.BASIC_INFO,
+                ApplicationSectionType.QUESTION_ANSWER,
+                ApplicationSectionType.ATTACHMENT
+        );
+
+        Set<ApplicationSectionType> required = ApplicationFormLayoutSectionPolicy.requiredSections(null, true, true);
+        assertThat(required).containsExactlyInAnyOrder(
+                ApplicationSectionType.BASIC_INFO,
+                ApplicationSectionType.QUESTION_ANSWER,
+                ApplicationSectionType.ATTACHMENT
+        );
+    }
+
+    @Test
+    void 모든_config_false이고_외부_정책_없으면_BASIC_INFO만() {
+        ApplicationFormConfig config = ApplicationFormConfig.create(
+                false, false, false, false, false, false, false, false, false, false, false, false, false, false
+        );
+
+        Set<ApplicationSectionType> enabled = ApplicationFormLayoutSectionPolicy.enabledSections(config, false, false);
+        assertThat(enabled).containsExactly(ApplicationSectionType.BASIC_INFO);
+
+        Set<ApplicationSectionType> required = ApplicationFormLayoutSectionPolicy.requiredSections(config, false, false);
+        assertThat(required).containsExactly(ApplicationSectionType.BASIC_INFO);
+    }
+
+    @Test
+    void 질문_활성이지만_필수_아닌_경우_enabled에만_포함() {
+        Set<ApplicationSectionType> enabled = ApplicationFormLayoutSectionPolicy.enabledSections(null, false, true);
+        assertThat(enabled).contains(ApplicationSectionType.QUESTION_ANSWER);
+
+        Set<ApplicationSectionType> required = ApplicationFormLayoutSectionPolicy.requiredSections(null, false, false);
+        assertThat(required).doesNotContain(ApplicationSectionType.QUESTION_ANSWER);
+    }
+
+    @Test
     void required_sections_follow_required_flags_and_external_policies() {
         ApplicationFormConfig config = ApplicationFormConfig.create(
                 true,

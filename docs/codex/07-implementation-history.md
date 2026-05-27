@@ -126,8 +126,20 @@
     - use/require/layout consistency validation policy.
     - attachment requirement and application required policy relationship.
     - default layout, fallback, publish guard, and slice breakdown.
+  - Layout stabilization / test hardening:
+    - validation matrix fully covered (boundary values, negative numbers, max lengths, enum filtering)
+    - `validateLayoutForPublish()` unit tests (fallback, valid stored, stale stored, question/attachment missing)
+    - attachment/question required policy regression tests (enabled-but-not-required)
+    - default factory edge cases (null guards, sparse section page numbering)
+    - section policy edge cases (null config + externals, minimal config)
+    - 27 new tests added + 2 existing tests strengthened, total layout tests: 72
+  - Publish/layout guard integration:
+    - layout validation integrated into `JobPostingService.publish()` workflow
+    - stored layout validated against current effective enabled/required sections
+    - deterministic fallback accepted when no stored layout exists
+    - `InvalidApplicationFormLayoutException` wrapped as `InvalidJobPostingException` for consistent publish API contract
+    - targeted publish guard tests added to `JobPostingServiceTest`
 - Current remaining major work:
-  - Phase 05 implementation slices: publish guard, stabilization.
   - Phase 06 candidate: interview evaluation.
   - Phase 07 candidate: Excel/PDF/statistics.
   - Phase 08 candidate: CommonCode and School master data.
@@ -141,6 +153,70 @@
   - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat clean test --no-daemon`
   - Result: `BUILD SUCCESSFUL`
   - Date recorded: 2026-05-22
+
+## Phase 05e - Layout Stabilization / Test Hardening
+
+- Date: 2026-05-27
+- Work type: test hardening, no production code changes, documentation.
+- Goal: harden validation matrix, cover fallback edge cases, verify attachment/question required policy regression, add `validateLayoutForPublish()` unit tests.
+- Modified:
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutValidatorTest.java` (+8 tests)
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutServiceTest.java` (+8 tests)
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutDefaultFactoryTest.java` (+4 tests)
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutSectionPolicyTest.java` (+3 tests)
+  - `docs/codex/07-implementation-history.md`
+- Created:
+  - `docs/codex/implementation/phase-05e-layout-stabilization-test-hardening.md`
+  - `docs/codex/reports/phase-05e-layout-stabilization-test-hardening.html`
+- Tests added: 27 new tests across 4 test classes, 2 existing tests strengthened.
+- Test:
+  - Command: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*ApplicationFormLayout*" --tests "*JobPostingServiceTest" --no-daemon`
+  - Result: BUILD SUCCESSFUL (99 tests, 0 failures)
+  - Layout tests: 72 total (validator 22, service 26, factory 7, policy 6, controller 11)
+  - JobPostingServiceTest: 27 tests
+- Notes:
+  - No production source code was modified.
+  - Validation matrix is now fully covered (21/21 rules).
+  - `validateLayoutForPublish()` has dedicated unit tests.
+  - Attachment/question required policy regression verified.
+  - Phase 05 (Application Form Page Layout) is now complete.
+- Next recommended phase:
+  - Phase 06 - Interview Evaluation
+
+## Phase 05d - Publish/Layout Guard Integration
+
+- Date: 2026-05-27
+- Work type: service integration, targeted tests, and documentation.
+- Goal: integrate layout validation into the job posting publish workflow so a posting cannot be published with a stale or invalid layout.
+- Modified:
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationFormLayoutService.java`
+  - `src/main/java/com/shinyoung/recruit/service/JobPostingService.java`
+  - `src/test/java/com/shinyoung/recruit/service/JobPostingServiceTest.java`
+  - `docs/codex/07-implementation-history.md`
+- Created:
+  - `docs/codex/implementation/phase-05d-publish-layout-guard-integration.md`
+  - `docs/codex/reports/phase-05d-publish-layout-guard-integration.html`
+- Implemented:
+  - Added `validateLayoutForPublish(JobPosting)` to `ApplicationFormLayoutService`.
+  - Modified `JobPostingService.publish()` to call layout validation after existing status/reception/position checks.
+  - Stored layout is validated against current effective enabled/required sections.
+  - Deterministic fallback is accepted when no stored layout exists (migration compatibility).
+  - `InvalidApplicationFormLayoutException` is wrapped as `InvalidJobPostingException` for consistent publish API contract.
+  - Added 3 tests to `JobPostingServiceTest`:
+    - publish with valid stored layout succeeds
+    - publish with stale layout (config changed after layout save) fails
+    - publish with fallback layout (no stored layout) succeeds
+- Test:
+  - Command: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*JobPostingServiceTest" --no-daemon`
+  - Result: BUILD SUCCESSFUL
+  - Layout regression: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*ApplicationFormLayout*" --no-daemon`
+  - Result: BUILD SUCCESSFUL
+- Notes:
+  - No new API endpoints added. Existing publish command behavior was extended.
+  - Fallback layout is still accepted. After migration, consider requiring stored layout only.
+  - Auto-creation of default layout on posting create/update is not implemented.
+- Next recommended phase:
+  - Phase 05e - Layout Stabilization / Test Hardening
 
 ## Phase 05c - Admin Layout Management
 
@@ -166,12 +242,13 @@
   - `GET /admin/job-postings/{jobPostingId}/application-form-layout/preview`
 - Test:
   - Command: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*ApplicationFormLayout*" --no-daemon`
-  - Result: BUILD SUCCESSFUL (24 tests passed: 13 service + 11 controller)
+  - Result: BUILD SUCCESSFUL (43 tests passed: 32 service-layer + 11 controller)
 - Notes:
   - Admin read returns stored layout or deterministic default with `availableSections` metadata.
   - Save validates state guard (CLOSED/reception-started blocks), form config existence, and full layout structure.
   - Preview filters disabled sections and returns page-structured applicant-facing projection.
   - No existing source files were modified (all Phase 05a infrastructure was already in place).
+  - HTTP method POST로 확정 (프로젝트 command/update API 정책에 따름).
   - Publish guard integration remains Phase 05d scope.
 
 ## Phase 05b - Application Form Page Layout Backend Slice

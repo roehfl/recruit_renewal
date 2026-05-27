@@ -250,16 +250,10 @@ Recommended endpoints:
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/admin/job-postings/{jobPostingId}/application-form-layout` | Read stored layout or default/fallback layout plus available sections. |
-| `PUT` | `/admin/job-postings/{jobPostingId}/application-form-layout` | Replace the full layout. |
+| `POST` | `/admin/job-postings/{jobPostingId}/application-form-layout` | Replace the full layout. |
 | `GET` | `/admin/job-postings/{jobPostingId}/application-form-layout/preview` | Read the applicant-facing preview projection. |
 
-If the codebase keeps POST-style command updates, implementation may use:
-
-```text
-POST /admin/job-postings/{jobPostingId}/application-form-layout
-```
-
-The design preference is replace-all semantics regardless of HTTP verb.
+HTTP method confirmed as `POST` in Phase 05c implementation. The project uses POST-style command updates consistently. Replace-all semantics apply regardless of verb.
 
 ## Admin Layout Response
 
@@ -859,7 +853,7 @@ This mapping must not be persisted or returned by the backend.
 | Method | Path | Purpose | Status |
 | --- | --- | --- | --- |
 | `GET` | `/admin/job-postings/{jobPostingId}/application-form-layout` | Admin layout read with available sections. | Designed |
-| `PUT` or `POST` | `/admin/job-postings/{jobPostingId}/application-form-layout` | Replace full layout. | Designed |
+| `POST` | `/admin/job-postings/{jobPostingId}/application-form-layout` | Replace full layout. | Confirmed (POST) |
 | `GET` | `/admin/job-postings/{jobPostingId}/application-form-layout/preview` | Admin applicant-facing preview projection. | Designed |
 | `GET` | `/applicant/applications/{applicationId}/form-layout` | Applicant-owned layout read. | Designed |
 

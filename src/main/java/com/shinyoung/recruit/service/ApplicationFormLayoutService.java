@@ -79,6 +79,24 @@ public class ApplicationFormLayoutService {
         return buildAdminResponse(jobPostingId, true, true, newPages, enabledSections, requiredSections, placedSections);
     }
 
+    public void validateLayoutForPublish(JobPosting jobPosting) {
+        ApplicationFormConfig formConfig = jobPosting.getApplicationFormConfig();
+        if (formConfig == null) {
+            throw new InvalidApplicationFormLayoutException("지원서 항목 설정이 없는 채용공고는 게시할 수 없습니다.");
+        }
+
+        Long jobPostingId = jobPosting.getId();
+        Set<ApplicationSectionType> enabledSections = calculateEnabledSections(jobPostingId, formConfig);
+        Set<ApplicationSectionType> requiredSections = calculateRequiredSections(jobPostingId, formConfig);
+
+        List<ApplicationFormPage> storedPages = applicationFormPageRepository.findByJobPostingIdWithItems(jobPostingId);
+        List<ApplicationFormPage> pages = !storedPages.isEmpty()
+                ? storedPages
+                : defaultFactory.createDefaultLayout(jobPosting, enabledSections);
+
+        layoutValidator.validate(pages, enabledSections, requiredSections);
+    }
+
     public ApplicationFormLayoutPreviewResponse getPreview(Long jobPostingId) {
         JobPosting jobPosting = findJobPosting(jobPostingId);
         ApplicationFormConfig formConfig = requireFormConfig(jobPosting);

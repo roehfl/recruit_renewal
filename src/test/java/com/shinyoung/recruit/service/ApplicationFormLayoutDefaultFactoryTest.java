@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ApplicationFormLayoutDefaultFactoryTest {
 
@@ -81,6 +82,43 @@ class ApplicationFormLayoutDefaultFactoryTest {
         assertThat(pages).hasSize(3);
         assertThat(sectionTypes(pages.get(0))).containsExactly(ApplicationSectionType.BASIC_INFO);
         assertThat(sectionTypes(pages.get(1))).containsExactly(ApplicationSectionType.QUESTION_ANSWER);
+        assertThat(sectionTypes(pages.get(2))).containsExactly(ApplicationSectionType.ATTACHMENT);
+    }
+
+    @Test
+    void jobPosting_null이면_IllegalArgumentException() {
+        assertThatThrownBy(() -> factory.createDefaultLayout(null, Set.of(ApplicationSectionType.BASIC_INFO)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void effectiveEnabledSections_null이면_IllegalArgumentException() {
+        assertThatThrownBy(() -> factory.createDefaultLayout(jobPosting(), null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void effectiveEnabledSections_빈_집합이면_IllegalArgumentException() {
+        assertThatThrownBy(() -> factory.createDefaultLayout(jobPosting(), Set.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void 부분_그룹만_활성이면_페이지_번호가_연속된다() {
+        List<ApplicationFormPage> pages = factory.createDefaultLayout(
+                jobPosting(),
+                EnumSet.of(
+                        ApplicationSectionType.BASIC_INFO,
+                        ApplicationSectionType.CERTIFICATE,
+                        ApplicationSectionType.ATTACHMENT
+                )
+        );
+
+        assertThat(pages).hasSize(3);
+        assertThat(pages).extracting(ApplicationFormPage::getPageNo).containsExactly(1, 2, 3);
+        assertThat(pages).extracting(ApplicationFormPage::getSortOrder).containsExactly(0, 1, 2);
+        assertThat(sectionTypes(pages.get(0))).containsExactly(ApplicationSectionType.BASIC_INFO);
+        assertThat(sectionTypes(pages.get(1))).containsExactly(ApplicationSectionType.CERTIFICATE);
         assertThat(sectionTypes(pages.get(2))).containsExactly(ApplicationSectionType.ATTACHMENT);
     }
 

@@ -17,6 +17,7 @@ import com.shinyoung.recruit.enumeration.EmploymentType;
 import com.shinyoung.recruit.enumeration.JobPositionApplicationType;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.enumeration.JobPostingType;
+import com.shinyoung.recruit.exception.InvalidApplicationFormLayoutException;
 import com.shinyoung.recruit.exception.InvalidJobPostingException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,7 @@ public class JobPostingService {
 
     private final JobPostingRepository jobPostingRepository;
     private final JobPositionRepository jobPositionRepository;
+    private final ApplicationFormLayoutService applicationFormLayoutService;
     private final Clock clock;
 
     public PageResponse<JobPostingListResponse> getJobPostings(int page, int size) {
@@ -132,6 +134,7 @@ public class JobPostingService {
         }
         validateReceptionPeriod(jobPosting.getReceptionStartDateTime(), jobPosting.getReceptionEndDateTime());
         validateJobPositions(jobPosting.getJobPositions());
+        validateLayoutForPublish(jobPosting);
 
         jobPosting.publish(LocalDateTime.now(clock));
         return jobPosting.getId();
@@ -147,6 +150,14 @@ public class JobPostingService {
 
         jobPosting.close(LocalDateTime.now(clock));
         return jobPosting.getId();
+    }
+
+    private void validateLayoutForPublish(JobPosting jobPosting) {
+        try {
+            applicationFormLayoutService.validateLayoutForPublish(jobPosting);
+        } catch (InvalidApplicationFormLayoutException e) {
+            throw new InvalidJobPostingException("레이아웃 검증 실패: " + e.getMessage());
+        }
     }
 
     private JobPosting findJobPosting(Long id) {

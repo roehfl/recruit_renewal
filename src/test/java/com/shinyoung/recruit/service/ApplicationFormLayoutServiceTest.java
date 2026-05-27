@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -186,6 +187,7 @@ class ApplicationFormLayoutServiceTest {
                 .findFirst().orElseThrow();
         assertThat(qa.enabled()).isTrue();
         assertThat(qa.required()).isTrue();
+        assertThat(qa.placed()).isTrue();
         assertThat(qa.source()).isEqualTo("QUESTION");
 
         AdminApplicationFormLayoutResponse.SectionAvailability att = response.availableSections().stream()
@@ -193,7 +195,13 @@ class ApplicationFormLayoutServiceTest {
                 .findFirst().orElseThrow();
         assertThat(att.enabled()).isTrue();
         assertThat(att.required()).isTrue();
+        assertThat(att.placed()).isTrue();
         assertThat(att.source()).isEqualTo("ATTACHMENT_REQUIREMENT");
+
+        assertThat(response.pages().stream()
+                .flatMap(p -> p.items().stream())
+                .map(AdminApplicationFormLayoutResponse.ItemResponse::sectionType))
+                .contains(ApplicationSectionType.QUESTION_ANSWER, ApplicationSectionType.ATTACHMENT);
     }
 
     @Test
@@ -233,6 +241,18 @@ class ApplicationFormLayoutServiceTest {
         AdminApplicationFormLayoutResponse response = layoutService.getLayout(JOB_POSTING_ID);
 
         assertThat(response.editable()).isTrue();
+    }
+
+    @Test
+    void getLayout_formConfig_없으면_실패() {
+        JobPosting posting = posting(JobPostingStatus.DRAFT, null,
+                LocalDateTime.of(2026, 7, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 30, 18, 0));
+        stubPosting(posting);
+
+        assertThatThrownBy(() -> layoutService.getLayout(JOB_POSTING_ID))
+                .isInstanceOf(InvalidApplicationFormLayoutException.class)
+                .hasMessageContaining("항목 설정");
     }
 
     @Test
@@ -332,6 +352,20 @@ class ApplicationFormLayoutServiceTest {
 
         assertThatThrownBy(() -> layoutService.saveLayout(JOB_POSTING_ID, request))
                 .isInstanceOf(InvalidApplicationFormLayoutException.class);
+        verify(applicationFormPageRepository, never()).deleteByJobPostingId(any());
+        verify(applicationFormPageRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void getPreview_formConfig_없으면_실패() {
+        JobPosting posting = posting(JobPostingStatus.DRAFT, null,
+                LocalDateTime.of(2026, 7, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 30, 18, 0));
+        stubPosting(posting);
+
+        assertThatThrownBy(() -> layoutService.getPreview(JOB_POSTING_ID))
+                .isInstanceOf(InvalidApplicationFormLayoutException.class)
+                .hasMessageContaining("항목 설정");
     }
 
     @Test
@@ -444,6 +478,136 @@ class ApplicationFormLayoutServiceTest {
                 .toList();
         assertThat(previewSections2).contains(ApplicationSectionType.BASIC_INFO);
         assertThat(previewSections2).doesNotContain(ApplicationSectionType.EDUCATION);
+    }
+
+    @Test
+    void validateLayoutForPublish_유효한_폴백이면_통과() {
+        ApplicationFormConfig config = config(true, false, false, false, true, false, false);
+        JobPosting posting = posting(JobPostingStatus.DRAFT, config,
+                LocalDateTime.of(2026, 7, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 30, 18, 0));
+
+        assertThatCode(() -> layoutService.validateLayoutForPublish(posting))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void validateLayoutForPublish_formConfig_없으면_실패() {
+        JobPosting posting = posting(JobPostingStatus.DRAFT, null,
+                LocalDateTime.of(2026, 7, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 30, 18, 0));
+
+        assertThatThrownBy(() -> layoutService.validateLayoutForPublish(posting))
+                .isInstanceOf(InvalidApplicationFormLayoutException.class)
+                .hasMessageContaining("항목 설정");
+    }
+
+    @Test
+    void validateLayoutForPublish_저장된_레이아웃이_유효하면_통과() {
+        ApplicationFormConfig config = config(true, false, false, false, false, false, false);
+        JobPosting posting = posting(JobPostingStatus.DRAFT, config,
+                LocalDateTime.of(2026, 7, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 30, 18, 0));
+
+        ApplicationFormPage page = ApplicationFormPage.create(posting, 1, "Page 1", null, 0);
+        page.addItem(ApplicationSectionType.BASIC_INFO, 0);
+        page.addItem(ApplicationSectionType.EDUCATION, 1);
+        when(applicationFormPageRepository.findByJobPostingIdWithItems(JOB_POSTING_ID))
+                .thenReturn(List.of(page));
+
+        assertThatCode(() -> layoutService.validateLayoutForPublish(posting))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void validateLayoutForPublish_저장된_레이아웃이_부실하면_실패() {
+        ApplicationFormConfig config = config(true, true, false, false, true, false, false);
+        JobPosting posting = posting(JobPostingStatus.DRAFT, config,
+                LocalDateTime.of(2026, 7, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 30, 18, 0));
+
+        ApplicationFormPage page = ApplicationFormPage.create(posting, 1, "Page 1", null, 0);
+        page.addItem(ApplicationSectionType.BASIC_INFO, 0);
+        when(applicationFormPageRepository.findByJobPostingIdWithItems(JOB_POSTING_ID))
+                .thenReturn(List.of(page));
+
+        assertThatThrownBy(() -> layoutService.validateLayoutForPublish(posting))
+                .isInstanceOf(InvalidApplicationFormLayoutException.class)
+                .hasMessageContaining("missing");
+    }
+
+    @Test
+    void validateLayoutForPublish_질문_활성인데_레이아웃에_없으면_실패() {
+        ApplicationFormConfig config = config(false, false, false, false, false, false, false);
+        JobPosting posting = posting(JobPostingStatus.DRAFT, config,
+                LocalDateTime.of(2026, 7, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 30, 18, 0));
+        when(jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrue(JOB_POSTING_ID)).thenReturn(true);
+
+        ApplicationFormPage page = ApplicationFormPage.create(posting, 1, "Page 1", null, 0);
+        page.addItem(ApplicationSectionType.BASIC_INFO, 0);
+        when(applicationFormPageRepository.findByJobPostingIdWithItems(JOB_POSTING_ID))
+                .thenReturn(List.of(page));
+
+        assertThatThrownBy(() -> layoutService.validateLayoutForPublish(posting))
+                .isInstanceOf(InvalidApplicationFormLayoutException.class)
+                .hasMessageContaining("QUESTION_ANSWER");
+    }
+
+    @Test
+    void validateLayoutForPublish_첨부_활성인데_레이아웃에_없으면_실패() {
+        ApplicationFormConfig config = config(false, false, false, false, false, false, false);
+        JobPosting posting = posting(JobPostingStatus.DRAFT, config,
+                LocalDateTime.of(2026, 7, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 30, 18, 0));
+        when(attachmentRequirementRepository.existsByJobPostingId(JOB_POSTING_ID)).thenReturn(true);
+
+        ApplicationFormPage page = ApplicationFormPage.create(posting, 1, "Page 1", null, 0);
+        page.addItem(ApplicationSectionType.BASIC_INFO, 0);
+        when(applicationFormPageRepository.findByJobPostingIdWithItems(JOB_POSTING_ID))
+                .thenReturn(List.of(page));
+
+        assertThatThrownBy(() -> layoutService.validateLayoutForPublish(posting))
+                .isInstanceOf(InvalidApplicationFormLayoutException.class)
+                .hasMessageContaining("ATTACHMENT");
+    }
+
+    @Test
+    void getLayout_질문_활성_필수아닌_경우_required_false로_표시() {
+        ApplicationFormConfig config = config(false, false, false, false, false, false, false);
+        JobPosting posting = posting(JobPostingStatus.DRAFT, config,
+                LocalDateTime.of(2026, 7, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 30, 18, 0));
+        stubPosting(posting);
+        when(jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrue(JOB_POSTING_ID)).thenReturn(true);
+        when(jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrueAndRequiredTrue(JOB_POSTING_ID)).thenReturn(false);
+
+        AdminApplicationFormLayoutResponse response = layoutService.getLayout(JOB_POSTING_ID);
+
+        AdminApplicationFormLayoutResponse.SectionAvailability qa = response.availableSections().stream()
+                .filter(s -> s.sectionType() == ApplicationSectionType.QUESTION_ANSWER)
+                .findFirst().orElseThrow();
+        assertThat(qa.enabled()).isTrue();
+        assertThat(qa.required()).isFalse();
+    }
+
+    @Test
+    void getLayout_첨부_활성_필수아닌_경우_required_false로_표시() {
+        ApplicationFormConfig config = config(false, false, false, false, false, false, false);
+        JobPosting posting = posting(JobPostingStatus.DRAFT, config,
+                LocalDateTime.of(2026, 7, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 30, 18, 0));
+        stubPosting(posting);
+        when(attachmentRequirementRepository.existsByJobPostingId(JOB_POSTING_ID)).thenReturn(true);
+        when(attachmentRequirementRepository.existsByJobPostingIdAndRequiredTrue(JOB_POSTING_ID)).thenReturn(false);
+
+        AdminApplicationFormLayoutResponse response = layoutService.getLayout(JOB_POSTING_ID);
+
+        AdminApplicationFormLayoutResponse.SectionAvailability att = response.availableSections().stream()
+                .filter(s -> s.sectionType() == ApplicationSectionType.ATTACHMENT)
+                .findFirst().orElseThrow();
+        assertThat(att.enabled()).isTrue();
+        assertThat(att.required()).isFalse();
     }
 
     private void stubPosting(JobPosting posting) {

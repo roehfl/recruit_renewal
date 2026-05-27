@@ -24,7 +24,7 @@ Provide admin users with APIs to:
 ### Implemented
 
 - Added `GET /admin/job-postings/{jobPostingId}/application-form-layout` for admin layout read with available sections.
-- Added `POST /admin/job-postings/{jobPostingId}/application-form-layout` for replace-all layout save.
+- Added `POST /admin/job-postings/{jobPostingId}/application-form-layout` for replace-all layout save. HTTP method POST로 확정 (프로젝트 command/update API 정책에 따름).
 - Added `GET /admin/job-postings/{jobPostingId}/application-form-layout/preview` for applicant-facing preview projection.
 - Added `AdminApplicationFormLayoutResponse` with nested `PageResponse`, `ItemResponse`, and `SectionAvailability` records.
 - Added `ApplicationFormLayoutPreviewResponse` with nested `PageResponse` and `ItemResponse` records.
@@ -337,8 +337,10 @@ ApplicationFormPageItem.applicationFormPage -> ApplicationFormPage
 
 | Test Class | Test Count | Coverage |
 | --- | --- | --- |
-| `ApplicationFormLayoutServiceTest` | 13 | Default layout read, stored layout read, available sections completeness, question/attachment section policy, editable flag for CLOSED/reception-started/before-reception, missing posting 404, successful save, CLOSED save rejection, reception-started save rejection, missing config rejection, disabled section placement rejection, preview enabled-only filtering, preview required flag propagation, preview disabled section hiding. |
+| `ApplicationFormLayoutServiceTest` | 16 | Default layout read, stored layout read, available sections completeness, question/attachment section policy, editable flag for CLOSED/reception-started/before-reception, missing posting 404, successful save, CLOSED save rejection, reception-started save rejection, missing config rejection (save/getLayout/getPreview), disabled section placement rejection, preview enabled-only filtering, preview required flag propagation, preview disabled section hiding. |
 | `AdminApplicationFormLayoutControllerTest` | 11 | Default layout GET success, available sections GET, save POST success, round-trip save-then-read, CLOSED posting save 400, reception-started save 400, disabled section save 400, invalid request body 400, preview GET structure, missing posting 404, unsupported methods 405. |
+
+Note: running `*ApplicationFormLayout*` includes Phase 05a tests (validator, section policy, default factory) for a combined total of 43 tests (32 service-layer + 11 controller).
 
 ### Test Commands
 
@@ -351,8 +353,8 @@ $env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tes
 Result:
 
 - `BUILD SUCCESSFUL`
-- Service: 13 tests passed
-- Controller: 11 tests passed
+- Total: 43 tests passed (32 service-layer + 11 controller)
+- Service-layer includes Phase 05a validator/policy/factory tests and Phase 05c service tests.
 
 Notes:
 

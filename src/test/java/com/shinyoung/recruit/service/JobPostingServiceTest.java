@@ -1,11 +1,13 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
+import com.shinyoung.recruit.dto.request.ApplicationFormLayoutSaveRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.dto.request.JobPostingUpdateRequest;
 import com.shinyoung.recruit.dto.response.JobPostingDetailResponse;
 import com.shinyoung.recruit.dto.response.JobPostingListResponse;
+import com.shinyoung.recruit.enumeration.ApplicationSectionType;
 import com.shinyoung.recruit.enumeration.EmploymentType;
 import com.shinyoung.recruit.enumeration.JobPositionApplicationType;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
@@ -25,6 +27,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,6 +44,9 @@ class JobPostingServiceTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private ApplicationFormLayoutService applicationFormLayoutService;
 
     @Test
     void JobPosting_생성_성공() {
@@ -555,6 +561,66 @@ class JobPostingServiceTest {
         assertThat(listItem.positionCount()).isEqualTo(1);
     }
 
+    @Test
+    void 게시_시_저장된_유효한_레이아웃이_있으면_성공() {
+        Long id = jobPostingService.create(createFutureReceptionRequest(
+                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+        ));
+        applicationFormLayoutService.saveLayout(id, buildLayoutRequest(
+                ApplicationSectionType.BASIC_INFO,
+                ApplicationSectionType.EDUCATION,
+                ApplicationSectionType.CAREER,
+                ApplicationSectionType.CERTIFICATE,
+                ApplicationSectionType.LANGUAGE,
+                ApplicationSectionType.MILITARY,
+                ApplicationSectionType.AWARD,
+                ApplicationSectionType.GAP_PERIOD
+        ));
+
+        jobPostingService.publish(id);
+
+        assertThat(jobPostingService.getJobPosting(id).status()).isEqualTo(JobPostingStatus.PUBLISHED);
+    }
+
+    @Test
+    void 게시_시_저장된_레이아웃이_현재_설정과_불일치하면_실패() {
+        Long id = jobPostingService.create(createFutureReceptionRequest(
+                new ApplicationFormConfigRequest(true, true, true, true, true, true, false)
+        ));
+        applicationFormLayoutService.saveLayout(id, buildLayoutRequest(
+                ApplicationSectionType.BASIC_INFO,
+                ApplicationSectionType.EDUCATION,
+                ApplicationSectionType.CAREER,
+                ApplicationSectionType.CERTIFICATE,
+                ApplicationSectionType.LANGUAGE,
+                ApplicationSectionType.MILITARY,
+                ApplicationSectionType.AWARD
+        ));
+        jobPostingService.update(id, new JobPostingUpdateRequest(
+                "수정",
+                "<p>수정</p>",
+                LocalDateTime.of(2026, 7, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 2, 18, 0),
+                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+        ));
+
+        assertThatThrownBy(() -> jobPostingService.publish(id))
+                .isInstanceOf(InvalidJobPostingException.class)
+                .hasMessageContaining("레이아웃 검증 실패");
+    }
+
+    @Test
+    void 게시_시_폴백_레이아웃이_유효하면_성공() {
+        Long id = jobPostingService.create(createFutureReceptionRequest(
+                new ApplicationFormConfigRequest(true, false, true, false, false, false, false)
+        ));
+
+        jobPostingService.publish(id);
+
+        assertThat(jobPostingService.getJobPosting(id).status()).isEqualTo(JobPostingStatus.PUBLISHED);
+    }
+
     private JobPostingCreateRequest createRequest() {
         return createRequest(new ApplicationFormConfigRequest(true, true, true, true, true, true, true));
     }
@@ -601,6 +667,27 @@ class JobPostingServiceTest {
                 jobPositions,
                 new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
         );
+    }
+
+    private JobPostingCreateRequest createFutureReceptionRequest(ApplicationFormConfigRequest config) {
+        return new JobPostingCreateRequest(
+                "2026 하반기 채용",
+                "<p>내용</p>",
+                LocalDateTime.of(2026, 7, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 2, 18, 0),
+                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                config
+        );
+    }
+
+    private ApplicationFormLayoutSaveRequest buildLayoutRequest(ApplicationSectionType... sections) {
+        List<ApplicationFormLayoutSaveRequest.ItemRequest> items = new ArrayList<>();
+        for (int i = 0; i < sections.length; i++) {
+            items.add(new ApplicationFormLayoutSaveRequest.ItemRequest(sections[i], i));
+        }
+        return new ApplicationFormLayoutSaveRequest(List.of(
+                new ApplicationFormLayoutSaveRequest.PageRequest(1, "Page 1", null, 0, items)
+        ));
     }
 
     @TestConfiguration
