@@ -1,5 +1,7 @@
 # Phase 03j - JobPosting Domain Display & Position Metadata Expansion Design
 
+> **갱신 노트 (2026-05-28):** `JobPosition.headcount` 필드는 불필요하다고 판단되어 이후 제거되었다. 아래 문서에서 `headcount` 관련 필드/검증/표시 정책은 더 이상 유효하지 않으며, 역사적 설계 기록으로만 남긴다. 권위 있는 현재 상태는 `docs/codex/07-implementation-history.md`의 "JobPosition headcount 필드 제거" 항목을 참조한다.
+
 ## 1. 개요
 
 Phase 03j는 채용공고(`JobPosting`)와 모집분야(`JobPosition`) 도메인을 지원자 화면 표시, 관리자 검색/정렬, 공고 노출 제어에 맞게 확장하기 위한 설계 전용 Phase다.
@@ -15,7 +17,7 @@ Phase 03j는 채용공고(`JobPosting`)와 모집분야(`JobPosition`) 도메인
 | 관리자 API | `GET /admin/job-postings`, `GET /admin/job-postings/{id}`, `POST /admin/job-postings`, `POST /admin/job-postings/{id}`, `POST /admin/job-postings/{id}/publish`, `POST /admin/job-postings/{id}/close` |
 | 공개 API | `GET /job-postings`, `GET /job-postings/{id}` |
 | `JobPosting` | `title`, `contentHtml`, `receptionStartDateTime`, `receptionEndDateTime`, `status`, `publishedAt`, `closedAt`, `jobPositions`, `applicationFormConfig` |
-| `JobPosition` | `positionName`, `headcount`, `sortOrder` |
+| `JobPosition` | `positionName`, `sortOrder` |
 | 공개 목록 조회 | `JobPostingPublicListProjection`으로 `id`, `title`, 접수기간만 조회 |
 | 공개 상세 조회 | `id + PUBLISHED` 조건과 `@EntityGraph`로 모집분야와 지원서 항목 설정 조회 |
 | 접수 가능 여부 | `accepting` boolean을 응답에서 계산 |

@@ -259,7 +259,6 @@ class JobPostingPublicControllerTest {
                                 "Analyst",
                                 "Seoul",
                                 EmploymentType.FULL_TIME,
-                                1,
                                 1
                         )
                 ),

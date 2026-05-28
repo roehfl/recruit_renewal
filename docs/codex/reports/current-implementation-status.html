@@ -45,7 +45,7 @@
   <div>Shinyoung Recruit Backend</div>
   <h1>Current Implementation Status</h1>
   <span class="badge done">Status Snapshot</span>
-  <span class="badge muted">Generated: 2026-05-26</span>
+  <span class="badge muted">Generated: 2026-05-27</span>
 </header>
 
 <main>
@@ -53,8 +53,8 @@
     <div class="card">
       <h2>Summary</h2>
       <p>The backend has moved beyond scaffold work. Job postings, stages, applications, detailed application sections, questions/answers, stage results, attachments, and required attachment policy are implemented and documented.</p>
-      <p>Phase 04 Interview Scheduling is complete through stabilization. Phase 05 design is complete, and Phase 05a Application Form Layout Domain is now implemented.</p>
-      <p>The next implementation slice is Phase 05b, focused on admin layout management APIs.</p>
+      <p>Phase 04 Interview Scheduling is complete through stabilization. Phase 05 Application Form Page Layout is complete through all 5 slices (05a~05e).</p>
+      <p>Phase 06 Interview Evaluation design is complete. Phase 06a (InterviewEvaluation domain: entity, enums, repository, 27 tests) is implemented. The next step is Phase 06b (admin initialize + interviewer evaluation write).</p>
     </div>
     <div class="card">
       <h2>Overall State</h2>
@@ -67,7 +67,8 @@
       <p><span class="badge done">Phase 04c applicant read complete</span></p>
       <p><span class="badge done">Phase 04d interviewer read complete</span></p>
       <p><span class="badge done">Phase 04e stabilization complete</span></p>
-      <p><span class="badge done">Phase 05a layout domain complete</span></p>
+      <p><span class="badge done">Phase 05 layout complete (all slices)</span></p>
+      <p><span class="badge done">Phase 06 evaluation design complete</span></p>
       <p><span class="badge partial">Auth/authorization partially hardened</span></p>
     </div>
   </section>
@@ -277,24 +278,18 @@
       <tr><th>Priority</th><th>Area</th><th>Remaining work</th><th>Recommended phase</th></tr>
       <tr>
         <td>1</td>
-        <td>Application form page layout</td>
-        <td>Admin layout management, applicant layout read, publish/layout guard, stabilization. Phase 05a domain is complete.</td>
-        <td>Phase 05b</td>
+        <td>Interview evaluation</td>
+        <td>06a domain complete (<code>InterviewEvaluation</code> entity, enums, repository, 27 tests). Remaining: interviewer save/submit, admin initialize/read/reopen, StageResult non-mutation guarantee (06b~06e).</td>
+        <td>Phase 06b</td>
       </tr>
       <tr>
         <td>2</td>
-        <td>Interview evaluation</td>
-        <td><code>InterviewEvaluation</code>, interviewer draft/submit, admin read, StageResult integration policy.</td>
-        <td>Phase 06</td>
-      </tr>
-      <tr>
-        <td>3</td>
         <td>Export/PDF/statistics</td>
         <td>Application and result export, application PDF, recruitment statistics.</td>
         <td>Phase 07</td>
       </tr>
       <tr>
-        <td>4</td>
+        <td>3</td>
         <td>CommonCode and school master</td>
         <td>Common code management, school master import/search, application-level validation.</td>
         <td>Phase 08</td>
@@ -320,6 +315,8 @@
       <p>Phase 04d targeted service, controller, repository, applicant-read regression, admin scheduling regression, and current employee resolver tests passed on 2026-05-26. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> limited this slice to targeted verification.</p>
       <p>Phase 04e targeted stabilization, admin authorization matrix, applicant/interviewer regression, repository, scheduling service, and current employee resolver tests passed on 2026-05-26. Initial sandbox execution failed because Gradle wrapper network download was blocked; the same targeted command passed after approved escalation. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> limited Phase 04 work to targeted verification.</p>
       <p>Phase 05a targeted entity, repository, validator, section policy, and default factory tests passed on 2026-05-26. Initial sandbox execution failed because Gradle wrapper network download was blocked, and one retry was blocked by a stale Gradle test output lock from the timeout; the final targeted command passed after clearing the daemon. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> forbids full-suite execution for Phase 05a.</p>
+      <p>Phase 05b~05e targeted tests passed on 2026-05-27. Phase 05 (Application Form Page Layout) is now complete through all 5 slices. Layout tests: 72 total. JobPostingServiceTest publish guard tests added.</p>
+      <p>Phase 06 Interview Evaluation design completed on 2026-05-27. Documentation only; no Gradle tests required.</p>
     </div>
   </section>
 </main>

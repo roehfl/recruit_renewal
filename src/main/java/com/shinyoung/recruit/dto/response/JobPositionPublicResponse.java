@@ -12,7 +12,6 @@ public record JobPositionPublicResponse(
         String jobTitle,
         String workLocation,
         EmploymentType employmentType,
-        Integer headcount,
         Integer sortOrder
 ) {
     public static JobPositionPublicResponse from(JobPosition jobPosition) {
@@ -24,7 +23,6 @@ public record JobPositionPublicResponse(
                 jobPosition.getJobTitle(),
                 jobPosition.getWorkLocation(),
                 jobPosition.getEmploymentType(),
-                jobPosition.getHeadcount(),
                 jobPosition.getSortOrder()
         );
     }

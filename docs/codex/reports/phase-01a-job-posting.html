@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8">
@@ -228,7 +228,7 @@ tr:last-child td { border-bottom: 0; }
 <td><code>com.shinyoung.recruit.domain.entity</code></td>
 <td><code>JobPosition</code></td>
 <td>공고별 모집분야</td>
-<td><code>jobPosting</code>, <code>positionName</code>, <code>headcount</code>, <code>sortOrder</code>, <code>create</code>, <code>assignJobPosting</code></td>
+<td><code>jobPosting</code>, <code>positionName</code>, <code>sortOrder</code>, <code>create</code>, <code>assignJobPosting</code></td>
 <td><code>JobPosting</code></td>
 <td><code>JobPosting</code>과 N:1, LAZY</td>
 </tr>
@@ -300,7 +300,7 @@ tr:last-child td { border-bottom: 0; }
 <td><code>com.shinyoung.recruit.dto.request</code></td>
 <td><code>JobPositionRequest</code></td>
 <td>모집분야 요청</td>
-<td><code>positionName</code>, <code>headcount</code>, <code>sortOrder</code></td>
+<td><code>positionName</code>, <code>sortOrder</code></td>
 <td><code>JobPostingCreateRequest</code>, <code>JobPostingUpdateRequest</code></td>
 <td><code>sortOrder</code>는 <code>@NotNull @Min(0)</code></td>
 </tr>
@@ -336,7 +336,7 @@ tr:last-child td { border-bottom: 0; }
 <td><code>com.shinyoung.recruit.dto.response</code></td>
 <td><code>JobPositionResponse</code></td>
 <td>관리자 모집분야 응답</td>
-<td><code>id</code>, <code>positionName</code>, <code>headcount</code>, <code>sortOrder</code>, <code>from</code></td>
+<td><code>id</code>, <code>positionName</code>, <code>sortOrder</code>, <code>from</code></td>
 <td><code>JobPosition</code></td>
 <td>관리자 DTO</td>
 </tr>

@@ -224,7 +224,7 @@ class InterviewServiceTest {
                 start().minusDays(1),
                 start().plusDays(10)
         );
-        jobPosting.replaceJobPositions(List.of(JobPosition.create("Sales", 1, 1)));
+        jobPosting.replaceJobPositions(List.of(JobPosition.create("Sales", 1)));
         return jobPostingRepository.saveAndFlush(jobPosting);
     }
 

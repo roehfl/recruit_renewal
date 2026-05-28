@@ -287,9 +287,6 @@ public class JobPostingService {
         validateMaxLength(request.jobGroup(), JOB_POSITION_TEXT_MAX_LENGTH, "직군");
         validateMaxLength(request.jobTitle(), JOB_POSITION_TEXT_MAX_LENGTH, "담당 직무명");
         validateMaxLength(request.workLocation(), JOB_POSITION_TEXT_MAX_LENGTH, "근무지");
-        if (request.headcount() == null || request.headcount() < 1) {
-            throw new InvalidJobPostingException("모집 인원은 1 이상이어야 합니다.");
-        }
         if (request.sortOrder() == null || request.sortOrder() < 0) {
             throw new InvalidJobPostingException("모집분야 정렬 순서는 0 이상이어야 합니다.");
         }
@@ -320,7 +317,6 @@ public class JobPostingService {
                         it.jobTitle(),
                         it.workLocation(),
                         defaultEmploymentType(it.employmentType()),
-                        it.headcount(),
                         it.sortOrder()
                 ))
                 .toList();

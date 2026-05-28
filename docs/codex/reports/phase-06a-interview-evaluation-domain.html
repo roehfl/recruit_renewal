@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 06a 면접 평가 도메인</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>신영증권 채용 Renewal 백엔드</div>
+  <h1>Phase 06a - 면접 평가 도메인</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge muted">작성일: 2026-05-28</span>
+</header>
+
+<main>
+
+  <!-- 요약 + 현황 -->
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>Phase 06a는 <strong>면접 평가</strong> 도메인의 영속성 모델을 구현합니다. 한 면접관이 한 면접에서 한 후보자에 대해 수행한 평가를 <code>InterviewEvaluation</code> 엔티티로 표현합니다.</p>
+      <p>등급 체계(<code>EvaluationGrade</code>) 결정을 반영했으며, 평가 근거 자료로서 <code>StageResult</code>를 어디서도 참조하지 않습니다.</p>
+      <p>이번 slice는 엔티티 · enum · 리포지토리 · 대상 테스트만 추가합니다. API/서비스/컨트롤러는 06b 이후에 추가됩니다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">엔티티 구현</span></p>
+      <p><span class="badge done">enum 3종 구현</span></p>
+      <p><span class="badge done">리포지토리 구현</span></p>
+      <p><span class="badge done">테스트 27건 통과</span></p>
+      <p><span class="badge out">StageResult 비참조</span></p>
+    </div>
+  </section>
+
+  <!-- 범위 -->
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li><code>EvaluationStatus</code> enum (DRAFT, SUBMITTED)</li>
+          <li><code>EvaluationGrade</code> enum (F, G_MINUS, G, G_PLUS, VG)</li>
+          <li><code>EvaluationRecommendation</code> enum</li>
+          <li><code>InterviewEvaluation</code> 엔티티 (FK, 비정규화, 유니크 제약, 인덱스)</li>
+          <li>엔티티 검증 및 상태 전이 (initialize/updateContent/submit/reopen)</li>
+          <li><code>InterviewEvaluationRepository</code></li>
+          <li>엔티티 테스트 23건 + 리포지토리 테스트 4건</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현 (다음 slice)</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>관리자 초기화 커맨드/API (06b)</li>
+          <li>면접관 저장/제출/목록/상세 API (06b)</li>
+          <li>관리자 조회 API · 요약 집계 (06c)</li>
+          <li>재개 API 엔드포인트 (06d)</li>
+          <li><code>GradeDistribution</code> 등 응답 DTO (06c)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>StageResult 변경/반영</li>
+          <li>DB 마이그레이션 / DDL</li>
+          <li>Excel/PDF/통계</li>
+          <li>메시지/알림</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 도메인 모델 -->
+  <section>
+    <h2>도메인 모델</h2>
+    <div class="two">
+      <div class="card">
+        <h3>InterviewEvaluation</h3>
+        <p><span class="badge done">엔티티</span></p>
+        <p>한 면접관이 한 면접에서 한 후보자에 대해 수행한 평가. <code>BaseEntity</code> 상속.</p>
+        <table>
+          <tr><th>필드</th><th>타입</th><th>규칙</th></tr>
+          <tr><td><code>id</code></td><td>Long</td><td>PK, identity 생성</td></tr>
+          <tr><td><code>interview</code></td><td>Interview</td><td>필수, lazy ManyToOne</td></tr>
+          <tr><td><code>candidateParticipant</code></td><td>InterviewParticipant</td><td>필수, role=CANDIDATE</td></tr>
+          <tr><td><code>interviewerParticipant</code></td><td>InterviewParticipant</td><td>필수, role=INTERVIEWER</td></tr>
+          <tr><td><code>jobApplication</code></td><td>JobApplication</td><td>필수, 비정규화 (initialize 시 설정)</td></tr>
+          <tr><td><code>stage</code></td><td>Stage</td><td>필수, 비정규화 (initialize 시 설정)</td></tr>
+          <tr><td><code>grade</code></td><td>EvaluationGrade</td><td>DRAFT 시 nullable, SUBMIT 시 필수</td></tr>
+          <tr><td><code>recommendation</code></td><td>EvaluationRecommendation</td><td>DRAFT 시 nullable, SUBMIT 시 필수</td></tr>
+          <tr><td><code>comment</code></td><td>String(2000)</td><td>항상 선택</td></tr>
+          <tr><td><code>status</code></td><td>EvaluationStatus</td><td>기본값 DRAFT</td></tr>
+          <tr><td><code>submittedAt</code></td><td>LocalDateTime</td><td>제출 시 설정, 재개 시 초기화</td></tr>
+        </table>
+        <p><strong>유니크 제약조건:</strong> <code>(interview_id, candidate_participant_id, interviewer_participant_id)</code></p>
+      </div>
+      <div class="card">
+        <h3>관계 구조</h3>
+        <p><span class="badge info">엔티티 그래프</span></p>
+        <pre>
+Interview
+  ├── InterviewParticipant (CANDIDATE) ──► JobApplication
+  ├── InterviewParticipant (INTERVIEWER) ──► Employee
+  └── InterviewEvaluation
+       ├── candidateParticipant ──► InterviewParticipant
+       ├── interviewerParticipant ──► InterviewParticipant
+       ├── jobApplication ──► JobApplication (비정규화)
+       └── stage ──► Stage (비정규화)</pre>
+        <h3 style="margin-top:16px;">인덱스</h3>
+        <ul class="list">
+          <li><code>idx_evaluation_interview</code> (interview_id)</li>
+          <li><code>idx_evaluation_stage</code> (stage_id)</li>
+          <li><code>idx_evaluation_job_application</code> (job_application_id)</li>
+          <li><code>idx_evaluation_interviewer_participant</code> (interviewer_participant_id)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Enum -->
+  <section>
+    <h2>Enum 설계</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>EvaluationStatus</h3>
+        <table>
+          <tr><th>값</th><th>설명</th></tr>
+          <tr><td><code>DRAFT</code></td><td>작성 중, 수정 가능</td></tr>
+          <tr><td><code>SUBMITTED</code></td><td>제출 완료, 재개 전까지 수정 불가</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>EvaluationGrade</h3>
+        <table>
+          <tr><th>값</th><th>설명</th></tr>
+          <tr><td><code>VG</code></td><td>최고 등급</td></tr>
+          <tr><td><code>G_PLUS</code></td><td>우수</td></tr>
+          <tr><td><code>G</code></td><td>양호</td></tr>
+          <tr><td><code>G_MINUS</code></td><td>보통</td></tr>
+          <tr><td><code>F</code></td><td>미흡</td></tr>
+        </table>
+        <p class="small">enum 선언 순서는 F → VG (낮은 등급 → 높은 등급).</p>
+      </div>
+      <div class="card">
+        <h3>EvaluationRecommendation</h3>
+        <table>
+          <tr><th>값</th><th>설명</th></tr>
+          <tr><td><code>STRONG_YES</code></td><td>강력 추천</td></tr>
+          <tr><td><code>YES</code></td><td>추천</td></tr>
+          <tr><td><code>NEUTRAL</code></td><td>중립</td></tr>
+          <tr><td><code>NO</code></td><td>비추천</td></tr>
+          <tr><td><code>STRONG_NO</code></td><td>강력 비추천</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 상태 전이 -->
+  <section>
+    <h2>상태 전이</h2>
+    <div class="card">
+      <h3>EvaluationStatus 생애주기</h3>
+      <div class="transition">
+        <span class="action">(initialize)</span>
+        <span class="arrow">&rarr;</span>
+        <span class="state">DRAFT</span>
+        <span class="arrow">&rarr;</span>
+        <span class="action">(updateContent)</span>
+        <span class="arrow">&rarr;</span>
+        <span class="state">DRAFT</span>
+        <span class="arrow">&rarr;</span>
+        <span class="action">(submit)</span>
+        <span class="arrow">&rarr;</span>
+        <span class="state">SUBMITTED</span>
+      </div>
+      <div class="transition">
+        <span class="state">SUBMITTED</span>
+        <span class="arrow">&rarr;</span>
+        <span class="action">(reopen)</span>
+        <span class="arrow">&rarr;</span>
+        <span class="state">DRAFT</span>
+      </div>
+      <p class="small"><code>submit</code>는 grade + recommendation이 모두 있어야 하며 <code>submittedAt</code>을 설정한다. <code>reopen</code>은 <code>submittedAt</code>을 초기화한다. <code>updateContent</code>와 <code>submit</code>은 DRAFT에서만, <code>reopen</code>은 SUBMITTED에서만 가능하다.</p>
+    </div>
+  </section>
+
+  <!-- 검증 규칙 -->
+  <section>
+    <h2>검증 및 비즈니스 규칙</h2>
+    <table>
+      <tr><th>#</th><th>규칙</th></tr>
+      <tr><td>1</td><td>후보자/면접관 모두 <code>InterviewParticipant</code>로 참조</td></tr>
+      <tr><td>2</td><td><code>candidateParticipant.role</code> = CANDIDATE, <code>interviewerParticipant.role</code> = INTERVIEWER</td></tr>
+      <tr><td>3</td><td>두 참가자는 해당 평가의 interview에 속해야 함</td></tr>
+      <tr><td>4</td><td><code>jobApplication</code>/<code>stage</code>는 initialize 시 파생되며 이후 불변</td></tr>
+      <tr><td>5</td><td><code>grade</code>/<code>recommendation</code>은 DRAFT 시 nullable, submit 시 필수</td></tr>
+      <tr><td>6</td><td><code>comment</code>는 선택, 최대 2000자</td></tr>
+      <tr><td>7</td><td>DRAFT만 updateContent/submit 가능</td></tr>
+      <tr><td>8</td><td>SUBMITTED만 reopen 가능, reopen 시 <code>submittedAt</code> 초기화</td></tr>
+      <tr><td>9</td><td>엔티티는 <code>StageResult</code>를 어디서도 참조하지 않음</td></tr>
+    </table>
+  </section>
+
+  <!-- 변경 파일 -->
+  <section>
+    <h2>변경 파일</h2>
+    <h3>신규 파일</h3>
+    <table>
+      <tr><th>파일</th><th>타입</th></tr>
+      <tr><td><code>enumeration/EvaluationStatus.java</code></td><td>Enum</td></tr>
+      <tr><td><code>enumeration/EvaluationGrade.java</code></td><td>Enum</td></tr>
+      <tr><td><code>enumeration/EvaluationRecommendation.java</code></td><td>Enum</td></tr>
+      <tr><td><code>domain/entity/InterviewEvaluation.java</code></td><td>Entity</td></tr>
+      <tr><td><code>domain/repository/InterviewEvaluationRepository.java</code></td><td>Repository</td></tr>
+      <tr><td><code>test/.../domain/entity/InterviewEvaluationTest.java</code></td><td>Test</td></tr>
+      <tr><td><code>test/.../domain/repository/InterviewEvaluationRepositoryTest.java</code></td><td>Test</td></tr>
+    </table>
+    <h3>수정 파일</h3>
+    <table>
+      <tr><th>파일</th><th>변경</th></tr>
+      <tr><td><code>docs/codex/07-implementation-history.md</code></td><td>06a 구현 이력 추가</td></tr>
+      <tr><td><code>docs/codex/06-implementation-roadmap.md</code></td><td>06a 상태 Completed로 갱신</td></tr>
+    </table>
+  </section>
+
+  <!-- 테스트 결과 -->
+  <section>
+    <h2>테스트 결과</h2>
+    <div class="card">
+      <p>명령어: <code>$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*InterviewEvaluation*" --no-daemon</code></p>
+      <p>결과: <span class="badge done">BUILD SUCCESSFUL</span> (27 tests, 0 failures, 0 skipped)</p>
+      <table>
+        <tr><th>테스트 클래스</th><th>건수</th><th>상태</th></tr>
+        <tr><td><code>InterviewEvaluationTest</code></td><td>23</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>InterviewEvaluationRepositoryTest</code></td><td>4</td><td><span class="badge done">통과</span></td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- 남은 이슈 -->
+  <section>
+    <h2>남은 이슈</h2>
+    <table>
+      <tr><th>이슈</th><th>상태</th></tr>
+      <tr><td>서비스/API 레이어 없음 (프로그램적으로만 생성 가능)</td><td><span class="badge pending">06b</span></td></tr>
+      <tr><td>리포지토리 쿼리 최소 (관리자/면접관/단계/지원서 조회 미구현)</td><td><span class="badge pending">06b/06c</span></td></tr>
+      <tr><td>DB 마이그레이션 파일 없음 (테스트는 H2 생성 스키마)</td><td><span class="badge muted">보류</span></td></tr>
+    </table>
+  </section>
+
+  <!-- 다음 Phase -->
+  <section>
+    <h2>다음 Phase 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>Phase 06b - 관리자 초기화 + 면접관 평가 입력</strong></p>
+      <p>관리자 초기화 커맨드와 면접관 저장/제출/목록/상세 API, 소유권/CONFIRMED/ASSIGNED 가드, SUBMITTED 불변성, 면접관 정보 격리를 구현합니다.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

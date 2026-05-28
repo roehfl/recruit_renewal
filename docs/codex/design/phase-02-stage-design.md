@@ -48,7 +48,7 @@ Phase 01a/01b에서 현재 구현된 구조는 다음과 같다.
 - `JobPosition`
   - `JobPosting` N:1
   - 공고별 모집분야
-  - `positionName`, `headcount`, `sortOrder`
+  - `positionName`, `sortOrder`
 - `ApplicationFormConfig`
   - `JobPosting` 1:1
   - 지원서 항목 사용 여부 flag

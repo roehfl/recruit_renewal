@@ -805,7 +805,6 @@ class JobPostingPublicServiceTest {
                                 "Backend Developer",
                                 "Busan",
                                 EmploymentType.CONTRACT,
-                                2,
                                 2
                         ),
                         new JobPositionRequest(
@@ -815,7 +814,6 @@ class JobPostingPublicServiceTest {
                                 "Equity Analyst",
                                 "Seoul",
                                 EmploymentType.FULL_TIME,
-                                1,
                                 1
                         )
                 ),

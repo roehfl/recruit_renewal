@@ -144,6 +144,10 @@
   </header>
 
   <main>
+    <section class="summary" style="border-left: 4px solid #b54708; background: #fff7ed;">
+      <h2>갱신 노트 (2026-05-28)</h2>
+      <p><code>JobPosition.headcount</code> 필드는 불필요하다고 판단되어 이후 제거되었다. 이 문서의 <code>headcount</code> 관련 필드/검증/표시 정책은 더 이상 유효하지 않으며, 역사적 설계 기록으로만 남긴다. 현재 상태는 <code>docs/codex/07-implementation-history.md</code>의 "JobPosition headcount 필드 제거" 항목을 참조한다.</p>
+    </section>
     <section class="summary">
       <h2>Executive Summary</h2>
       <p>이번 설계는 기존 최소 CRUD 수준의 <code>JobPosting</code>, <code>JobPosition</code>을 지원자 공고 목록/상세와 관리자 공고 관리 화면에 맞게 확장하는 방향을 정리했다.</p>
@@ -204,7 +208,7 @@
             </tr>
             <tr>
               <td><code>JobPosition</code></td>
-              <td><code>positionName</code>, <code>headcount</code>, <code>sortOrder</code> 중심</td>
+              <td><code>positionName</code>, <code>sortOrder</code> 중심</td>
               <td>지원구분, 직군, 세부 직무, 근무지, 고용형태를 분리할 수 없어 검색/필터/태그/통계 확장에 불리하다.</td>
             </tr>
             <tr>
@@ -368,7 +372,7 @@
             <tr>
               <td><code>job_position</code></td>
               <td><code>application_type</code>, <code>job_group</code>, <code>job_title</code>, <code>work_location</code>, <code>employment_type</code></td>
-              <td>기존 <code>positionName</code>, <code>headcount</code>, <code>sortOrder</code>는 유지한다. <code>jobGroup</code>, <code>workLocation</code>은 초기 nullable로 두고 임시 문자열을 저장하지 않는다.</td>
+              <td>기존 <code>positionName</code>, <code>sortOrder</code>는 유지한다. <code>jobGroup</code>, <code>workLocation</code>은 초기 nullable로 두고 임시 문자열을 저장하지 않는다.</td>
             </tr>
           </tbody>
         </table>

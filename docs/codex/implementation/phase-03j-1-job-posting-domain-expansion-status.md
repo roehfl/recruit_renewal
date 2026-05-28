@@ -1,5 +1,7 @@
 # Phase 03j-1 - Job Posting Domain Expansion Status
 
+> **갱신 노트 (2026-05-28):** `JobPosition.headcount` 필드는 불필요하다고 판단되어 이후 제거되었다. 아래 본문의 `headcount` 검증/필드 언급은 역사적 기록이며 현재 코드와 일치하지 않는다. 현재 상태는 `docs/codex/07-implementation-history.md`의 "JobPosition headcount 필드 제거" 항목을 참조한다.
+
 ## Phase Summary
 
 Phase 03j-1 implements the internal and admin-side domain expansion for job postings and job positions.

@@ -238,7 +238,7 @@ class JobPostingQuestionControllerTest {
                 "<p>content</p>",
                 LocalDateTime.of(2026, 6, 1, 9, 0),
                 LocalDateTime.of(2026, 6, 30, 18, 0),
-                List.of(new JobPositionRequest("Backend", 2, 1)),
+                List.of(new JobPositionRequest("Backend", 1)),
                 new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
         ));
     }

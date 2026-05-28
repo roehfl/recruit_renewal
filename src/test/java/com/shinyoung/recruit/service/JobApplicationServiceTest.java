@@ -241,7 +241,7 @@ class JobApplicationServiceTest {
                 LocalDateTime.of(2026, 6, 1, 9, 0),
                 LocalDateTime.of(2026, 6, 30, 18, 0)
         );
-        jobPosting.replaceJobPositions(List.of(JobPosition.create("Backend", 1, 0)));
+        jobPosting.replaceJobPositions(List.of(JobPosition.create("Backend", 0)));
         jobPosting.publish(NOW);
         Long jobPostingId = jobPostingRepository.save(jobPosting).getId();
 
@@ -1101,8 +1101,8 @@ class JobApplicationServiceTest {
                 start,
                 end,
                 List.of(
-                        new JobPositionRequest("Backend", 2, 0),
-                        new JobPositionRequest("Frontend", 1, 1)
+                        new JobPositionRequest("Backend", 0),
+                        new JobPositionRequest("Frontend", 1)
                 ),
                 formConfig
         );

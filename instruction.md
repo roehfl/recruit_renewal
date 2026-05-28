@@ -1,54 +1,74 @@
-보완 필요
-1. “not null” 검증은 실제로 커버됐다고 보기 어렵다
+확인 필요: JobPosition.create 시그니처 정합성
 
-문서의 Validation Matrix에서는 다음 항목을 커버했다고 적고 있다.
+첨부된 InterviewEvaluationTest와 InterviewEvaluationRepositoryTest에서는 아직 아래 형태를 사용한다.
 
-pageNo not null/duplicated
-page sortOrder not null/duplicated
-item sectionType not null
-item sortOrder not null
+JobPosition.create("본사영업", 1)
 
-그런데 실제 테스트를 보면 duplicate_page_number_or_sort_order_fails()는 중복만 검증하고, unsupported_or_disabled_section_fails()는 unsupported/disabled enum만 검증한다. getPageNo() == null, getSortOrder() == null, item.getSectionType() == null, item.getSortOrder() == null을 직접 만드는 테스트는 없다.
+그런데 같은 첨부 묶음의 07-implementation-history.md에는 JobPosition headcount 필드 제거 작업이 기록되어 있고, JobPosition.create 인자에서도 headcount를 제거했다고 되어 있다.
 
-따라서 문서의 21/21 fully covered 표현은 현재 테스트 코드 기준으로는 과장이다. 둘 중 하나로 정리해야 한다.
+즉 둘 중 하나다.
 
-@Test
-void pageNo가_null이면_실패() { ... }
+현재 실제 소스에는 아직 JobPosition.create(String, int)가 남아 있다.
+→ 그러면 history의 headcount 제거 기록이 실제 코드와 안 맞는다.
+현재 실제 소스는 JobPosition.create(String)로 바뀌었다.
+→ 그러면 첨부된 06a 테스트 파일은 최신 코드 기준으로 컴파일 실패한다.
 
-@Test
-void page_sortOrder가_null이면_실패() { ... }
+이건 문서/테스트 정합성 이슈다. 06a 자체 설계보다 더 현실적인 문제라, 다음 작업 전에 반드시 최신 브랜치에서 아래를 확인해야 한다.
 
-@Test
-void item_sectionType이_null이면_실패() { ... }
+$env:AES_SECRET_KEY='22791194512954214612461221261067'
+.\gradlew.bat test --tests "*InterviewEvaluation*" --no-daemon
 
-@Test
-void item_sortOrder가_null이면_실패() { ... }
+가능하면 전체 테스트도 한 번 돌리는 게 맞다.
 
-또는 실제 Entity/DTO 구조상 null이 불가능하다면 문서에서 not null 항목을 제거하고 duplicated만 검증한다고 바꿔야 한다.
+보완 권장 1: 엔티티 검증 테스트가 아직 얇다
 
-2. invalid saveLayout이 기존 레이아웃을 삭제하지 않는지 검증이 없다
+엔티티 코드에는 null/동일 interview/role 검증이 들어가 있다. 그런데 테스트는 role 오류와 interview == null 정도만 직접 커버한다.
 
-saveLayout_비활성_섹션_배치시_검증_실패()는 예외 발생만 확인한다. 그런데 이 케이스에서 진짜 중요한 건 검증 실패 시 replace-all delete가 수행되지 않는 것이다. 지금 테스트는 구현이 실수로 deleteByJobPostingId()를 먼저 호출하고 이후 validator에서 실패해도 잡아내지 못한다.
+아래 테스트는 추가하는 게 좋다.
 
-아래 검증을 추가하는 게 맞다.
+initialize시_candidateParticipant가_null이면_실패한다
+initialize시_interviewerParticipant가_null이면_실패한다
+initialize시_interview_stage가_null이면_실패한다
+initialize시_candidateParticipant의_jobApplication이_null이면_실패한다
+initialize시_candidateParticipant가_다른_interview에_속하면_실패한다
+initialize시_interviewerParticipant가_다른_interview에_속하면_실패한다
+submit시_submittedAt이_null이면_실패한다
+comment_2000자는_허용한다
+blank_comment는_null로_정규화된다
 
-verify(applicationFormPageRepository, never()).deleteByJobPostingId(any());
-verify(applicationFormPageRepository, never()).saveAll(anyList());
+지금도 코드에는 방어 로직이 있지만, 테스트가 없어서 06b/06c 리팩토링 중 빠져도 빨리 못 잡는다.
 
-이건 비차단이지만, 저장 API의 데이터 손실 방어 관점에서는 꽤 중요한 테스트다.
+보완 권장 2: 06b에서 필요한 Repository 조회가 아직 없다
 
-3. question/attachment “placed” 검증이 문서보다 약하다
+현재 InterviewEvaluationRepository는 findByInterviewId와 유니크키 존재 조회만 있다.
+06a 범위라면 괜찮지만, 06b에서 면접관 평가 목록/상세를 구현하려면 최소한 다음 조회가 필요해질 가능성이 높다.
 
-문서에는 question/attachment enabled 케이스에서 “Both placed in layout”이라고 되어 있다. 그런데 getLayout_질문_첨부_활성_시_섹션_포함()은 availableSections의 enabled/required/source만 확인하고, 실제 pages.items()에 QUESTION_ANSWER, ATTACHMENT가 배치됐는지는 직접 확인하지 않는다.
+findByInterviewIdAndInterviewerParticipantId(...)
+findByInterviewIdAndInterviewerParticipantEmployeeId(...)
+findByIdAndInterviewerParticipantEmployeeId(...)
+findByInterviewIdOrderByCandidateParticipantSortOrderAscInterviewerParticipantSortOrderAsc(...)
 
-최소한 아래 정도는 추가하는 게 맞다.
+특히 면접관 API에서는 path/body로 employeeId를 받으면 안 되고, 현재 로그인한 employee 기준으로만 접근해야 한다. 이건 기존 Phase 04d interviewer read 정책과도 맞다.
 
-assertThat(qa.placed()).isTrue();
-assertThat(att.placed()).isTrue();
+보완 권장 3: CONFIRMED / ASSIGNED guard는 06b에서 반드시 막아야 한다
 
-assertThat(response.pages().stream()
-        .flatMap(p -> p.items().stream())
-        .map(AdminApplicationFormLayoutResponse.ItemResponse::sectionType))
-        .contains(ApplicationSectionType.QUESTION_ANSWER, ApplicationSectionType.ATTACHMENT);
+현재 InterviewEvaluation.initialize()는 role과 동일 interview 소속은 검증하지만, Interview.status == CONFIRMED나 InterviewParticipant.status == ASSIGNED는 검증하지 않는다.
 
-특히 availableSections.enabled=true인데 default layout 생성이 누락되는 버그는 지금 테스트로는 완전히 막지 못한다.
+이건 06a의 결함이라기보다는 06b 서비스 책임으로 남긴 것으로 보인다. 로드맵도 06b 범위에 CONFIRMED/ASSIGNED guard를 명시하고 있다.
+
+따라서 06b에서는 반드시 막아야 한다.
+
+DRAFT interview        → initialize/save/submit 불가
+CANCELLED interview    → initialize/save/submit 불가
+CANCELLED candidate    → initialize/save/submit 불가
+CANCELLED interviewer  → initialize/save/submit 불가
+SUBMITTED evaluation   → save/submit 불가
+보완 권장 4: 문서 일부가 stale 상태
+
+current-implementation-status.html은 06a domain complete와 남은 06b~06e를 제대로 적고 있다.
+
+그런데 07-implementation-history.md의 Current remaining major work 쪽에는 아직 Phase 06 implementation: interview evaluation (design completed, Java pending)이라고 되어 있다. 06a Java 구현이 이미 추가된 상태와 맞지 않는다.
+
+이 문구는 이렇게 바꾸는 게 맞다.
+
+Phase 06 implementation: 06a domain completed; 06b~06e pending.

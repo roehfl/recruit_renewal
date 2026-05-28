@@ -111,7 +111,7 @@ class InterviewRepositoryTest {
 
     private JobPosting saveJobPosting() {
         JobPosting jobPosting = JobPosting.create("공고", "내용", start().minusDays(1), start().plusDays(10));
-        jobPosting.replaceJobPositions(List.of(JobPosition.create("본사영업", 1, 1)));
+        jobPosting.replaceJobPositions(List.of(JobPosition.create("본사영업", 1)));
         return jobPostingRepository.saveAndFlush(jobPosting);
     }
 

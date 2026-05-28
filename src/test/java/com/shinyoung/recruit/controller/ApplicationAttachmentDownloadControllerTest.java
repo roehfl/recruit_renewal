@@ -433,7 +433,7 @@ class ApplicationAttachmentDownloadControllerTest {
                 "<p>content</p>",
                 LocalDateTime.of(2026, 6, 1, 9, 0),
                 LocalDateTime.of(2026, 6, 30, 18, 0),
-                List.of(new JobPositionRequest("Backend", 2, 0)),
+                List.of(new JobPositionRequest("Backend", 0)),
                 new ApplicationFormConfigRequest(false, false, false, false, false, false, false)
         ));
         jobPostingService.publish(jobPostingId);

@@ -41,9 +41,6 @@ public class JobPosition {
     private EmploymentType employmentType;
 
     @Column(nullable = false)
-    private Integer headcount;
-
-    @Column(nullable = false)
     private Integer sortOrder;
 
     private JobPosition(
@@ -53,7 +50,6 @@ public class JobPosition {
             String jobTitle,
             String workLocation,
             EmploymentType employmentType,
-            Integer headcount,
             Integer sortOrder
     ) {
         this.positionName = positionName;
@@ -62,12 +58,11 @@ public class JobPosition {
         this.jobTitle = jobTitle;
         this.workLocation = workLocation;
         this.employmentType = defaultEmploymentType(employmentType);
-        this.headcount = headcount;
         this.sortOrder = sortOrder;
     }
 
-    public static JobPosition create(String positionName, Integer headcount, Integer sortOrder) {
-        return new JobPosition(positionName, null, null, null, null, null, headcount, sortOrder);
+    public static JobPosition create(String positionName, Integer sortOrder) {
+        return new JobPosition(positionName, null, null, null, null, null, sortOrder);
     }
 
     public static JobPosition create(
@@ -77,7 +72,6 @@ public class JobPosition {
             String jobTitle,
             String workLocation,
             EmploymentType employmentType,
-            Integer headcount,
             Integer sortOrder
     ) {
         return new JobPosition(
@@ -87,7 +81,6 @@ public class JobPosition {
                 jobTitle,
                 workLocation,
                 employmentType,
-                headcount,
                 sortOrder
         );
     }

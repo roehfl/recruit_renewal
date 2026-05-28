@@ -78,7 +78,6 @@ class JobPostingServiceTest {
                         "Equity Analyst",
                         "Seoul",
                         EmploymentType.CONTRACT,
-                        3,
                         0
                 )),
                 new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
@@ -128,7 +127,7 @@ class JobPostingServiceTest {
                 "<p>내용</p>",
                 LocalDateTime.of(2026, 6, 2, 9, 0),
                 LocalDateTime.of(2026, 6, 1, 18, 0),
-                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                List.of(new JobPositionRequest("백엔드", 1)),
                 new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
         );
 
@@ -163,7 +162,7 @@ class JobPostingServiceTest {
                 null,
                 null,
                 null,
-                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                List.of(new JobPositionRequest("백엔드", 1)),
                 new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
         );
         assertThatThrownBy(() -> jobPostingService.create(create)).isInstanceOf(InvalidJobPostingException.class);
@@ -181,7 +180,7 @@ class JobPostingServiceTest {
                 null,
                 null,
                 null,
-                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                List.of(new JobPositionRequest("백엔드", 1)),
                 new ApplicationFormConfigRequest(true, false, false, false, false, false, false)
         );
         assertThatThrownBy(() -> jobPostingService.update(id, update)).isInstanceOf(InvalidJobPostingException.class);
@@ -201,7 +200,7 @@ class JobPostingServiceTest {
                 null,
                 null,
                 null,
-                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                List.of(new JobPositionRequest("백엔드", 1)),
                 new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
         );
         assertThatThrownBy(() -> jobPostingService.create(create)).isInstanceOf(InvalidJobPostingException.class);
@@ -219,7 +218,7 @@ class JobPostingServiceTest {
                 null,
                 null,
                 null,
-                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                List.of(new JobPositionRequest("백엔드", 1)),
                 new ApplicationFormConfigRequest(true, false, false, false, false, false, false)
         );
         assertThatThrownBy(() -> jobPostingService.update(id, update)).isInstanceOf(InvalidJobPostingException.class);
@@ -233,8 +232,8 @@ class JobPostingServiceTest {
                 LocalDateTime.of(2026, 6, 1, 9, 0),
                 LocalDateTime.of(2026, 6, 2, 18, 0),
                 List.of(
-                        new JobPositionRequest("백엔드", 2, 1),
-                        new JobPositionRequest("프론트엔드", 1, 1)
+                        new JobPositionRequest("백엔드", 1),
+                        new JobPositionRequest("프론트엔드", 1)
                 ),
                 new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
         );
@@ -244,10 +243,10 @@ class JobPostingServiceTest {
 
     @Test
     void service_직접호출시_공고_확장필드_검증을_수행한다() {
-        assertThatThrownBy(() -> jobPostingService.create(createExtendedRequest("a".repeat(501), null, List.of(new JobPositionRequest("백엔드", 2, 1)))))
+        assertThatThrownBy(() -> jobPostingService.create(createExtendedRequest("a".repeat(501), null, List.of(new JobPositionRequest("백엔드", 1)))))
                 .isInstanceOf(InvalidJobPostingException.class);
 
-        assertThatThrownBy(() -> jobPostingService.create(createExtendedRequest("요약", -1, List.of(new JobPositionRequest("백엔드", 2, 1)))))
+        assertThatThrownBy(() -> jobPostingService.create(createExtendedRequest("요약", -1, List.of(new JobPositionRequest("백엔드", 1)))))
                 .isInstanceOf(InvalidJobPostingException.class);
     }
 
@@ -255,17 +254,13 @@ class JobPostingServiceTest {
     void service_직접호출시_모집분야_필드_검증을_수행한다() {
         String tooLong = "a".repeat(101);
 
-        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest("", 1, 0))))
+        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest("", 0))))
                 .isInstanceOf(InvalidJobPostingException.class);
-        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest(tooLong, 1, 0))))
+        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest(tooLong, 0))))
                 .isInstanceOf(InvalidJobPostingException.class);
-        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest("백엔드", null, 0))))
+        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest("백엔드", null))))
                 .isInstanceOf(InvalidJobPostingException.class);
-        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest("백엔드", 0, 0))))
-                .isInstanceOf(InvalidJobPostingException.class);
-        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest("백엔드", 1, null))))
-                .isInstanceOf(InvalidJobPostingException.class);
-        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest("백엔드", 1, -1))))
+        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest("백엔드", -1))))
                 .isInstanceOf(InvalidJobPostingException.class);
         assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest(
                 "백엔드",
@@ -274,7 +269,6 @@ class JobPostingServiceTest {
                 "Backend",
                 "Seoul",
                 EmploymentType.FULL_TIME,
-                1,
                 0
         )))).isInstanceOf(InvalidJobPostingException.class);
         assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest(
@@ -284,7 +278,6 @@ class JobPostingServiceTest {
                 tooLong,
                 "Seoul",
                 EmploymentType.FULL_TIME,
-                1,
                 0
         )))).isInstanceOf(InvalidJobPostingException.class);
         assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest(
@@ -294,7 +287,6 @@ class JobPostingServiceTest {
                 "Backend",
                 tooLong,
                 EmploymentType.FULL_TIME,
-                1,
                 0
         )))).isInstanceOf(InvalidJobPostingException.class);
     }
@@ -506,7 +498,6 @@ class JobPostingServiceTest {
                         "Backend Intern",
                         "Seoul",
                         EmploymentType.INTERN,
-                        1,
                         0
                 )),
                 new ApplicationFormConfigRequest(true, false, false, false, false, false, false)
@@ -533,7 +524,7 @@ class JobPostingServiceTest {
                 "<p>내용</p>",
                 LocalDateTime.of(2026, 6, 2, 9, 0),
                 LocalDateTime.of(2026, 6, 3, 18, 0),
-                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                List.of(new JobPositionRequest("백엔드", 1)),
                 new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
         ));
         Long closedByTimeId = jobPostingService.create(new JobPostingCreateRequest(
@@ -541,7 +532,7 @@ class JobPostingServiceTest {
                 "<p>내용</p>",
                 LocalDateTime.of(2026, 5, 1, 9, 0),
                 LocalDateTime.of(2026, 5, 2, 18, 0),
-                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                List.of(new JobPositionRequest("백엔드", 1)),
                 new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
         ));
 
@@ -601,7 +592,7 @@ class JobPostingServiceTest {
                 "<p>수정</p>",
                 LocalDateTime.of(2026, 7, 1, 9, 0),
                 LocalDateTime.of(2026, 7, 2, 18, 0),
-                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                List.of(new JobPositionRequest("백엔드", 1)),
                 new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
         ));
 
@@ -631,7 +622,7 @@ class JobPostingServiceTest {
                 "<p>내용</p>",
                 LocalDateTime.of(2026, 6, 1, 9, 0),
                 LocalDateTime.of(2026, 6, 2, 18, 0),
-                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                List.of(new JobPositionRequest("백엔드", 1)),
                 applicationFormConfig
         );
     }
@@ -642,7 +633,7 @@ class JobPostingServiceTest {
                 "<p>수정</p>",
                 LocalDateTime.of(2026, 6, 1, 9, 0),
                 LocalDateTime.of(2026, 6, 2, 18, 0),
-                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                List.of(new JobPositionRequest("백엔드", 1)),
                 applicationFormConfig
         );
     }
@@ -675,7 +666,7 @@ class JobPostingServiceTest {
                 "<p>내용</p>",
                 LocalDateTime.of(2026, 7, 1, 9, 0),
                 LocalDateTime.of(2026, 7, 2, 18, 0),
-                List.of(new JobPositionRequest("백엔드", 2, 1)),
+                List.of(new JobPositionRequest("백엔드", 1)),
                 config
         );
     }

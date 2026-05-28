@@ -76,7 +76,7 @@ Phase 01a: 관리자 채용공고 관리
 | 구분 | 패키지 | 클래스 | 역할 | 주요 필드/메서드 | 연관 클래스 | 비고 |
 |---|---|---|---|---|---|---|
 | Entity | `com.shinyoung.recruit.domain.entity` | `JobPosting` | 채용공고 aggregate root | `title`, `contentHtml`, `receptionStartDateTime`, `receptionEndDateTime`, `status`, `publishedAt`, `closedAt`, `create`, `updateBasicInfo`, `replaceJobPositions`, `updateApplicationFormConfig`, `publish`, `close` | `JobPosition`, `ApplicationFormConfig`, `JobPostingStatus` | 생성 시 `DRAFT`; 상태 변경은 별도 메서드로만 수행 |
-| Entity | `com.shinyoung.recruit.domain.entity` | `JobPosition` | 공고별 모집분야 | `jobPosting`, `positionName`, `headcount`, `sortOrder`, `create`, `assignJobPosting` | `JobPosting` | `JobPosting`과 N:1, LAZY |
+| Entity | `com.shinyoung.recruit.domain.entity` | `JobPosition` | 공고별 모집분야 | `jobPosting`, `positionName`, `sortOrder`, `create`, `assignJobPosting` | `JobPosting` | `JobPosting`과 N:1, LAZY |
 | Entity | `com.shinyoung.recruit.domain.entity` | `ApplicationFormConfig` | 공고별 지원서 항목 사용 설정 | `useEducation`, `useCareer`, `useCertificate`, `useLanguage`, `useMilitary`, `useAward`, `useGapPeriod`, `create`, `assignJobPosting` | `JobPosting` | `JobPosting`과 1:1, `job_posting_id` unique |
 | Repository | `com.shinyoung.recruit.domain.repository` | `JobPostingRepository` | JobPosting 저장/조회 | `findAllByOrderByCreatedAtDesc(Pageable)`, `findDetailById(Long)` | `JobPosting` | pageable 목록에는 collection fetch 없음; 상세 전용 조회에만 `@EntityGraph` 사용 |
 | Enum | `com.shinyoung.recruit.enumeration` | `JobPostingStatus` | 공고 상태 값 | `DRAFT`, `PUBLISHED`, `CLOSED` | `JobPosting`, `JobPostingService` | 엔티티에서는 `EnumType.STRING` 저장 |
@@ -84,11 +84,11 @@ Phase 01a: 관리자 채용공고 관리
 | Controller | `com.shinyoung.recruit.controller` | `JobPostingController` | 관리자 REST API entrypoint | `getJobPostings`, `getJobPosting`, `create`, `update`, `publish`, `close` | `JobPostingService`, `ApiResponse`, `PageResponse` | 일반 수정은 `POST /admin/job-postings/{id}` |
 | Request DTO | `com.shinyoung.recruit.dto.request` | `JobPostingCreateRequest` | 공고 생성 요청 | `title`, `contentHtml`, `receptionStartDateTime`, `receptionEndDateTime`, `jobPositions`, `applicationFormConfig` | `JobPositionRequest`, `ApplicationFormConfigRequest` | status 필드 없음; `jobPositions`는 `@NotEmpty` |
 | Request DTO | `com.shinyoung.recruit.dto.request` | `JobPostingUpdateRequest` | 공고 일반 수정 요청 | `title`, `contentHtml`, `receptionStartDateTime`, `receptionEndDateTime`, `jobPositions`, `applicationFormConfig` | `JobPositionRequest`, `ApplicationFormConfigRequest` | status 필드 없음 |
-| Request DTO | `com.shinyoung.recruit.dto.request` | `JobPositionRequest` | 모집분야 요청 | `positionName`, `headcount`, `sortOrder` | `JobPostingCreateRequest`, `JobPostingUpdateRequest` | `sortOrder`는 `@NotNull @Min(0)` |
+| Request DTO | `com.shinyoung.recruit.dto.request` | `JobPositionRequest` | 모집분야 요청 | `positionName`, `sortOrder` | `JobPostingCreateRequest`, `JobPostingUpdateRequest` | `sortOrder`는 `@NotNull @Min(0)` |
 | Request DTO | `com.shinyoung.recruit.dto.request` | `ApplicationFormConfigRequest` | 지원서 항목 설정 요청 | `useEducation`, `useCareer`, `useCertificate`, `useLanguage`, `useMilitary`, `useAward`, `useGapPeriod` | 생성/수정 요청 DTO | boolean flag 범위 |
 | Response DTO | `com.shinyoung.recruit.dto.response` | `JobPostingListResponse` | 관리자 목록 응답 | `id`, `title`, reception period, `status`, `publishedAt`, `closedAt`, `from` | `JobPosting` | `PageResponse<JobPostingListResponse>`로 반환 |
 | Response DTO | `com.shinyoung.recruit.dto.response` | `JobPostingDetailResponse` | 관리자 상세 응답 | 공고 본문, 상태, 모집분야 목록, 지원서 항목 설정, `from` | `JobPosting`, `JobPositionResponse`, `ApplicationFormConfigResponse` | 모집분야는 `sortOrder` 기준 정렬 |
-| Response DTO | `com.shinyoung.recruit.dto.response` | `JobPositionResponse` | 관리자 모집분야 응답 | `id`, `positionName`, `headcount`, `sortOrder`, `from` | `JobPosition` | 관리자 DTO |
+| Response DTO | `com.shinyoung.recruit.dto.response` | `JobPositionResponse` | 관리자 모집분야 응답 | `id`, `positionName`, `sortOrder`, `from` | `JobPosition` | 관리자 DTO |
 | Response DTO | `com.shinyoung.recruit.dto.response` | `ApplicationFormConfigResponse` | 관리자 지원서 항목 설정 응답 | 7개 `use*` flag, `from` | `ApplicationFormConfig` | 관리자 DTO |
 | Response DTO | `com.shinyoung.recruit.dto.response` | `PageResponse` | 페이징 응답 공통 모델 | `content`, `page`, `size`, `totalElements`, `totalPages`, `last`, `from` | Spring Data `Page` | 관리자 목록에서 사용 |
 | Exception | `com.shinyoung.recruit.exception` | `JobPostingNotFoundException` | 공고 없음 예외 | 생성자 | `JobPostingService`, `GlobalExceptionHandler` | 404로 매핑 |

@@ -604,7 +604,7 @@ class StageServiceTest {
                 "<p>content</p>",
                 LocalDateTime.of(2026, 5, 1, 9, 0),
                 LocalDateTime.of(2026, 5, 30, 18, 0),
-                List.of(new JobPositionRequest("Backend", 2, 1)),
+                List.of(new JobPositionRequest("Backend", 1)),
                 new ApplicationFormConfigRequest(false, false, false, false, false, false, false)
         ));
     }

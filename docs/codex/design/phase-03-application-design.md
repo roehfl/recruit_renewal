@@ -767,7 +767,6 @@ Phase 03의 목적은 지원자가 공개된 채용공고에 대해 지원서를
 - `JobPosition`
   - `jobPosting`
   - `positionName`
-  - `headcount`
   - `sortOrder`
 - `ApplicationFormConfig`
   - `jobPosting`

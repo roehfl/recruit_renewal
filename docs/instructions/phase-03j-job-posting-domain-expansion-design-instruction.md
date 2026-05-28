@@ -126,7 +126,6 @@
 현재 `JobPosition`은 대략 다음 필드 중심이다.
 
 - `positionName`
-- `headcount`
 - `sortOrder`
 
 이 구조만으로는 다음 정보를 분리해서 표현하기 어렵다.

@@ -362,8 +362,8 @@ Status:
 | 05a - Application Form Layout Domain | Completed | `ApplicationFormPage`, `ApplicationFormPageItem`, section enum extension, repositories, validator, policy helper, default factory |
 | 05b - Applicant Layout Read | Completed | Applicant-owned form-page bootstrap API with effective section response |
 | 05c - Admin Layout Management | Completed | Admin layout read/save/preview APIs, available section response, state guard, replace-all save |
-| 05d - Publish/Layout Guard Integration | Pending | Layout validation during publish and default/fallback policy |
-| 05e - Layout Stabilization / Test Hardening | Pending | Validation matrix, fallback edge cases, policy regression |
+| 05d - Publish/Layout Guard Integration | Completed | Layout validation during publish and default/fallback policy |
+| 05e - Layout Stabilization / Test Hardening | Completed | Validation matrix, fallback edge cases, policy regression |
 
 Purpose:
 
@@ -442,22 +442,49 @@ Next slice:
 
 ### Phase 06 - Interview Evaluation
 
+Status:
+
+| Slice | Status | Scope |
+| --- | --- | --- |
+| 06 design - Interview Evaluation | Completed | Entity design, enum design, API candidates, validation rules, StageResult boundary, slice breakdown |
+| 06a - InterviewEvaluation Domain | Completed | Entity, enums (EvaluationStatus/EvaluationGrade/EvaluationRecommendation), repository, unique constraint, entity validation, status transition (initialize/updateContent/submit/reopen), 27 targeted tests |
+| 06b - Admin Initialize + Interviewer Evaluation Write | Pending | Admin initialize command, interviewer list/detail/save/submit, ownership guard, CONFIRMED/ASSIGNED guard, SUBMITTED immutability |
+| 06c - Admin Evaluation Read | Pending | Interview/stage/application-level evaluation read, candidate-grouped response, summary aggregation, GradeDistribution, RecommendationDistribution |
+| 06d - Reopen + StageResult Boundary | Pending | Admin reopen command, ActivityLog history, StageResult non-mutation guarantee enforcement |
+| 06e - Stabilization / Test Hardening | Pending | N x M matrix regression, cancelled guard, SUBMITTED immutability, reopen cycle, non-assigned guard, StageResult non-mutation regression |
+
 목적:
 
 - 면접관 평가 작성/임시저장/제출과 관리자 조회를 구현한다.
+- StageResult는 면접관 평가와 완전히 분리하여, 관리자 수동 확정 워크플로우를 기본으로 한다.
 
 범위:
 
-- `InterviewEvaluation`
-- 면접관 본인 배정 건 조회
-- 평가 임시저장/제출
-- 관리자 평가 조회
-- StageResult 반영 정책 초안
+- `InterviewEvaluation` entity
+- `EvaluationStatus` enum (DRAFT, SUBMITTED)
+- `EvaluationGrade` enum (F, G_MINUS, G, G_PLUS, VG)
+- `EvaluationRecommendation` enum (STRONG_YES, YES, NEUTRAL, NO, STRONG_NO)
+- Admin evaluation initialize command
+- Interviewer evaluation save/submit/list/detail
+- Admin evaluation read (interview/stage/application level)
+- Admin evaluation reopen command
+- Candidate-grouped summary with GradeDistribution and RecommendationDistribution
+- StageResult non-mutation guarantee
 
 Out of scope:
 
+- StageResult reflection/sync command (deferred to future phase)
 - 대량 엑셀 평가 업로드
 - 메시지 발송
+- 평가표 템플릿 관리
+- 가중치/세부 등급
+- 자동 합격/불합격 판정
+- 평가 row admin memo
+
+Design outputs:
+
+- `docs/codex/design/phase-06-interview-evaluation-design.md`
+- `docs/codex/reports/phase-06-interview-evaluation-design.html`
 
 ### Backlog - Messaging History
 

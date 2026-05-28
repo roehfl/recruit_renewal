@@ -14,10 +14,9 @@ public record JobPositionRequest(
         @Size(max = 100) String jobTitle,
         @Size(max = 100) String workLocation,
         EmploymentType employmentType,
-        @NotNull @Min(1) Integer headcount,
         @NotNull @Min(0) Integer sortOrder
 ) {
-    public JobPositionRequest(String positionName, Integer headcount, Integer sortOrder) {
-        this(positionName, null, null, null, null, null, headcount, sortOrder);
+    public JobPositionRequest(String positionName, Integer sortOrder) {
+        this(positionName, null, null, null, null, null, sortOrder);
     }
 }

@@ -222,8 +222,8 @@ class ApplicationCertificateControllerTest {
                 LocalDateTime.of(2026, 6, 1, 9, 0),
                 LocalDateTime.of(2026, 6, 30, 18, 0),
                 List.of(
-                        new JobPositionRequest("Backend", 2, 0),
-                        new JobPositionRequest("Frontend", 1, 1)
+                        new JobPositionRequest("Backend", 0),
+                        new JobPositionRequest("Frontend", 1)
                 ),
                 new ApplicationFormConfigRequest(false, false, useCertificate, false, false, false, false)
         ));

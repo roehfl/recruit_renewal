@@ -250,7 +250,7 @@ class AdminApplicationFormLayoutControllerTest {
                 "<p>content</p>",
                 LocalDateTime.of(2026, 7, 1, 9, 0),
                 LocalDateTime.of(2026, 7, 30, 18, 0),
-                List.of(new JobPositionRequest("Backend", 2, 0)),
+                List.of(new JobPositionRequest("Backend", 0)),
                 new ApplicationFormConfigRequest(useEducation, useCareer, false, false, useMilitary, false, false)
         ));
     }
@@ -261,7 +261,7 @@ class AdminApplicationFormLayoutControllerTest {
                 "<p>content</p>",
                 LocalDateTime.of(2026, 5, 1, 9, 0),
                 LocalDateTime.of(2026, 5, 30, 18, 0),
-                List.of(new JobPositionRequest("Backend", 1, 0)),
+                List.of(new JobPositionRequest("Backend", 0)),
                 new ApplicationFormConfigRequest(false, false, false, false, false, false, false)
         ));
         jobPostingService.publish(id);
@@ -275,7 +275,7 @@ class AdminApplicationFormLayoutControllerTest {
                 "<p>content</p>",
                 LocalDateTime.of(2026, 6, 1, 9, 0),
                 LocalDateTime.of(2026, 6, 30, 18, 0),
-                List.of(new JobPositionRequest("Backend", 1, 0)),
+                List.of(new JobPositionRequest("Backend", 0)),
                 new ApplicationFormConfigRequest(false, false, false, false, false, false, false)
         ));
         jobPostingService.publish(id);

@@ -1,5 +1,68 @@
 # 07. Implementation History
 
+## Phase 06a - InterviewEvaluation Domain
+
+- Date: 2026-05-28
+- Work type: 도메인/enum/리포지토리 구현 slice + 대상 테스트.
+- Goal: Phase 04 면접 일정 인프라 위에 면접 평가 도메인의 영속성 모델을 구현한다. API/서비스/컨트롤러는 추가하지 않는다.
+- Created (source):
+  - `src/main/java/com/shinyoung/recruit/enumeration/EvaluationStatus.java` (DRAFT, SUBMITTED)
+  - `src/main/java/com/shinyoung/recruit/enumeration/EvaluationGrade.java` (F, G_MINUS, G, G_PLUS, VG)
+  - `src/main/java/com/shinyoung/recruit/enumeration/EvaluationRecommendation.java` (STRONG_YES, YES, NEUTRAL, NO, STRONG_NO)
+  - `src/main/java/com/shinyoung/recruit/domain/entity/InterviewEvaluation.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewEvaluationRepository.java`
+- Created (test):
+  - `src/test/java/com/shinyoung/recruit/domain/entity/InterviewEvaluationTest.java` (23 tests)
+  - `src/test/java/com/shinyoung/recruit/domain/repository/InterviewEvaluationRepositoryTest.java` (4 tests)
+- Created (docs):
+  - `docs/codex/implementation/phase-06a-interview-evaluation-domain.md`
+  - `docs/codex/reports/phase-06a-interview-evaluation-domain.html`
+- Modified (docs):
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/06-implementation-roadmap.md`
+- Implemented:
+  - `InterviewEvaluation` 엔티티: interview/candidateParticipant/interviewerParticipant FK, jobApplication/stage 비정규화, grade/recommendation/comment/status/submittedAt 필드.
+  - 유니크 제약 `(interview_id, candidate_participant_id, interviewer_participant_id)` + 4개 인덱스.
+  - 검증: 참가자 role 체크, 동일 interview 소속 체크, comment 최대 2000자, submit 시 grade+recommendation 필수.
+  - 상태 전이: `initialize` → DRAFT, `updateContent` (DRAFT만), `submit` (DRAFT→SUBMITTED), `reopen` (SUBMITTED→DRAFT, submittedAt 초기화).
+  - 등급 체계(`EvaluationGrade`)를 반영. 점수(BigDecimal) 대신 enum 등급 사용.
+  - 엔티티는 `StageResult`를 어디서도 참조하지 않음 (경계 정책 준수).
+- StageResult policy:
+  - Phase 06a는 `StageResultRepository`/`StageResultService`를 주입하거나 호출하지 않는다.
+- Tests:
+  - Command: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*InterviewEvaluation*" --no-daemon`
+  - Result: BUILD SUCCESSFUL (27 tests, 0 failures, 0 skipped)
+- Deferred:
+  - 관리자 초기화 커맨드/API, 면접관 저장/제출/조회 API (06b)
+  - 관리자 조회 API, GradeDistribution/RecommendationDistribution 요약 (06c)
+  - 재개 API 엔드포인트 (06d)
+  - DB 마이그레이션 파일
+- Next recommended phase:
+  - Phase 06b - Admin Initialize + Interviewer Evaluation Write
+
+## JobPosition headcount 필드 제거
+
+- Date: 2026-05-28
+- Work type: 도메인 필드 제거, 관련 코드/문서 정리.
+- Goal: 불필요하다고 판단된 `JobPosition.headcount` 필드를 제거한다. 프론트엔드 호환성과 DB 마이그레이션은 이번 범위에서 고려하지 않는다.
+- Modified (source):
+  - `src/main/java/com/shinyoung/recruit/domain/entity/JobPosition.java` (headcount 필드, 생성자/팩토리 인자 제거)
+  - `src/main/java/com/shinyoung/recruit/dto/request/JobPositionRequest.java` (headcount 필드 및 @NotNull @Min(1) 검증 제거, 단축 생성자 시그니처 변경)
+  - `src/main/java/com/shinyoung/recruit/dto/response/JobPositionResponse.java` (headcount 필드 제거)
+  - `src/main/java/com/shinyoung/recruit/dto/response/JobPositionPublicResponse.java` (headcount 필드 제거)
+  - `src/main/java/com/shinyoung/recruit/service/JobPostingService.java` (headcount 검증 블록 및 JobPosition.create 인자 제거)
+- Modified (test): `JobPositionRequest`/`JobPosition.create` 호출과 JSON fixture에서 headcount 인자를 제거 (약 50개 테스트 파일). `JobPostingServiceTest`의 headcount 검증 케이스 2건 제거.
+- Modified (docs): phase-01a, phase-01b, phase-02, phase-03, phase-03j 계열 설계/구현/리포트 문서에서 headcount 참조 제거 또는 갱신 노트 추가.
+- Behavior change:
+  - 모집분야(`JobPosition`)에서 채용 인원 정보를 더 이상 저장/응답하지 않는다.
+  - 모집분야 단위 채용 인원 개념 자체가 제거되었다.
+- Out of scope:
+  - 프론트엔드 변경.
+  - 운영 DB 컬럼 drop 마이그레이션.
+- Tests:
+  - Command: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --no-daemon`
+  - Result: BUILD SUCCESSFUL (전체 테스트 통과, 회귀 없음)
+
 ## Current Progress Snapshot - 2026-05-26
 
 - Purpose: align implementation history with the actual codebase and the updated roadmap.
@@ -139,8 +202,19 @@
     - deterministic fallback accepted when no stored layout exists
     - `InvalidApplicationFormLayoutException` wrapped as `InvalidJobPostingException` for consistent publish API contract
     - targeted publish guard tests added to `JobPostingServiceTest`
+- Current completed design groups (continued):
+  - Phase 06 Interview Evaluation:
+    - `InterviewEvaluation` entity design with `InterviewParticipant` FK references.
+    - `EvaluationStatus` (DRAFT, SUBMITTED), `EvaluationGrade` (F, G_MINUS, G, G_PLUS, VG), and `EvaluationRecommendation` (5-level) enum design.
+    - Admin initialize command, interviewer save/submit, admin read (interview/stage/application level) API candidates.
+    - Admin reopen command design.
+    - StageResult non-mutation guarantee policy.
+    - Cancelled interview/participant handling: write blocked, data preserved.
+    - Interviewer information isolation policy.
+    - Summary aggregation with GradeDistribution and RecommendationDistribution (enum-based, no arithmetic average).
+    - 5-slice implementation plan: 06a domain, 06b write, 06c admin read, 06d reopen+boundary, 06e stabilization.
 - Current remaining major work:
-  - Phase 06 candidate: interview evaluation.
+  - Phase 06 implementation: 06a domain completed; 06b~06e pending.
   - Phase 07 candidate: Excel/PDF/statistics.
   - Phase 08 candidate: CommonCode and School master data.
   - Backlog candidate: message batch/send log and provider adapter boundary.
@@ -153,6 +227,96 @@
   - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat clean test --no-daemon`
   - Result: `BUILD SUCCESSFUL`
   - Date recorded: 2026-05-22
+
+## Phase 05x - Applicant Sign-Up API
+
+- Date: 2026-05-27
+- Work type: frontend integration support / temporary applicant signup API.
+- Goal: implement a minimal applicant sign-up API (`POST /auth/applicants/sign-up`) for frontend development. NICE identity verification is not in scope.
+- Important: temporary signup API; production identity verification flow must replace client-provided ci.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/dto/request/ApplicantSignUpRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicantSignUpResponse.java`
+  - `src/main/java/com/shinyoung/recruit/exception/InvalidApplicantSignUpException.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicantSignUpService.java`
+  - `src/main/java/com/shinyoung/recruit/controller/ApplicantSignUpController.java`
+  - `src/test/java/com/shinyoung/recruit/service/ApplicantSignUpServiceTest.java`
+  - `src/test/java/com/shinyoung/recruit/controller/ApplicantSignUpControllerTest.java`
+  - `docs/codex/implementation/phase-05x-applicant-sign-up.md`
+  - `docs/codex/reports/phase-05x-applicant-sign-up.html`
+- Modified:
+  - `src/main/java/com/shinyoung/recruit/domain/repository/ApplicantRepository.java` (added existsByLoginId, existsByEmail, existsByCiHash)
+  - `src/main/java/com/shinyoung/recruit/exception/GlobalExceptionHandler.java` (added InvalidApplicantSignUpException handler)
+  - `src/main/java/com/shinyoung/recruit/config/SecurityConfig.java` (added /auth/applicants/sign-up to permitAll)
+  - `docs/codex/07-implementation-history.md`
+- Implemented:
+  - `POST /auth/applicants/sign-up` with validation, duplicate checks (loginId, email, ciHash), BCrypt password encoding, SHA-256 CI hashing.
+  - Response returns applicantId, loginId, name only. No password, ci, ciHash, phoneNumber, email exposed.
+  - No auto-login or session creation after signup.
+  - email is optional (nullable). Blank/whitespace normalized to null.
+  - All string inputs trimmed.
+- Tests:
+  - Command: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*ApplicantSignUp*" --no-daemon`
+  - Result: BUILD SUCCESSFUL (10 tests: 6 service + 4 controller)
+  - Related auth/application regression: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*Auth*" --tests "*ApplicationControllerTest" --no-daemon`
+  - Result: BUILD SUCCESSFUL
+- Deferred:
+  - NICE identity verification integration
+  - Email/SMS verification
+  - Password strength policy
+  - Rate limiting / CAPTCHA
+- Next recommended phase:
+  - Phase 06a - InterviewEvaluation Domain (or production auth hardening)
+
+## Phase 06 - Interview Evaluation Design
+
+- Date: 2026-05-27
+- Work type: documentation-only design phase.
+- Goal: define the backend design for interviewer evaluation capture, admin evaluation read, and StageResult boundary policy on top of the existing interview scheduling infrastructure.
+- Created:
+  - `docs/codex/design/phase-06-interview-evaluation-design.md`
+  - `docs/codex/reports/phase-06-interview-evaluation-design.html`
+- Updated:
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+- Key design decisions:
+  - `InterviewEvaluation` is evaluation evidence; `StageResult` remains the final decision record.
+  - Interviewer `submit` never creates, updates, announces, or corrects `StageResult`.
+  - Unique constraint: `(interview_id, candidate_participant_id, interviewer_participant_id)`.
+  - Both candidate and interviewer FKs reference `InterviewParticipant`, not `Employee` directly.
+  - `jobApplication` and `stage` denormalized on entity for query performance.
+  - Grade: `EvaluationGrade` enum (F, G_MINUS, G, G_PLUS, VG), nullable in DRAFT, required on SUBMIT. Changed from `BigDecimal` score (1~100) to enum-based grade on 2026-05-28.
+  - Recommendation: 5-level enum (STRONG_YES, YES, NEUTRAL, NO, STRONG_NO), nullable in DRAFT, required on SUBMIT.
+  - Comment: optional always, max 2000 characters.
+  - Status: DRAFT and SUBMITTED only. No CANCELLED status.
+  - Admin explicit initialize command (not lazy creation). Same pattern as StageResult initialize.
+  - Initialize separate from interview confirm.
+  - Admin reopen command (SUBMITTED -> DRAFT) included in Phase 06 (06d slice).
+  - No reopen-specific fields on entity. ActivityLog for history.
+  - Summary aggregation uses `GradeDistribution` (grade count per level) and `RecommendationDistribution` as typed DTOs. No averageScore or scoreSum (arithmetic aggregation not applicable to enum grades).
+  - StageResult reflect command excluded from Phase 06.
+  - Cancelled interview/participant: write blocked, data preserved.
+  - Interviewer cannot see other interviewers' evaluations (evaluation independence).
+  - Admin memo on evaluation rows deferred to future phase.
+- Slice plan:
+  - 06a: InterviewEvaluation Domain (entity, enums, repository, constraints, tests)
+  - 06b: Admin Initialize + Interviewer Evaluation Write (initialize, save, submit, guards)
+  - 06c: Admin Evaluation Read (interview/stage/application level, summary)
+  - 06d: Reopen + StageResult Boundary (reopen command, non-mutation guarantee)
+  - 06e: Stabilization / Test Hardening (regression matrix)
+- Tests:
+  - Gradle tests were not run because this phase changed documentation only.
+- Deferred:
+  - Java implementation, tests, schema, and runtime API behavior.
+  - StageResult reflection command.
+  - Excel/PDF/statistics.
+  - Evaluation template management.
+  - Weighted grading.
+  - Automatic pass/fail determination.
+  - Message delivery.
+- Next recommended phase:
+  - Phase 06a - InterviewEvaluation Domain
 
 ## Phase 05e - Layout Stabilization / Test Hardening
 

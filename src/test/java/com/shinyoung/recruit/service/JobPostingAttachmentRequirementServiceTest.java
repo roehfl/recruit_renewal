@@ -205,7 +205,6 @@ class JobPostingAttachmentRequirementServiceTest {
                         "Backend Engineer",
                         "Seoul",
                         EmploymentType.FULL_TIME,
-                        1,
                         0
                 )),
                 new ApplicationFormConfigRequest(true, false, true, false, true, false, false)

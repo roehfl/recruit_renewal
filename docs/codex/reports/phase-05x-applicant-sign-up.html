@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 05x - Applicant Sign-Up API</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #1a1a2e; line-height: 1.6; padding: 2rem; }
+  .container { max-width: 1100px; margin: 0 auto; }
+  header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #fff; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; }
+  header h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+  header p { opacity: 0.85; font-size: 0.95rem; }
+  .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-left: 8px; vertical-align: middle; }
+  .badge-completed { background: #27ae60; color: #fff; }
+  .badge-warning { background: #f39c12; color: #fff; }
+  .badge-deferred { background: #95a5a6; color: #fff; }
+  .badge-danger { background: #c0392b; color: #fff; }
+  .card { background: #fff; border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .card h2 { font-size: 1.3rem; margin-bottom: 1rem; color: #16213e; border-bottom: 2px solid #e8ecf1; padding-bottom: 0.5rem; }
+  .card h3 { font-size: 1.05rem; margin: 1rem 0 0.5rem; color: #2c3e50; }
+  .warning-box { background: #fff3cd; border-left: 4px solid #f39c12; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.95rem; }
+  table { width: 100%; border-collapse: collapse; margin: 0.8rem 0; font-size: 0.9rem; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e8ecf1; }
+  th { background: #f0f3f7; font-weight: 600; color: #34495e; }
+  tr:hover { background: #fafbfd; }
+  .scope-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+  .scope-item { border-radius: 8px; padding: 1rem; }
+  .scope-implemented { background: #e8f8f0; border-left: 4px solid #27ae60; }
+  .scope-deferred { background: #fef5e7; border-left: 4px solid #f39c12; }
+  .scope-excluded { background: #fdecea; border-left: 4px solid #c0392b; }
+  .scope-item h4 { margin-bottom: 0.5rem; font-size: 0.95rem; }
+  .scope-item ul { padding-left: 1.2rem; font-size: 0.9rem; }
+  .scope-item li { margin-bottom: 0.25rem; }
+  .api-method { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 700; font-family: monospace; }
+  .method-post { background: #27ae60; color: #fff; }
+  .api-path { font-family: monospace; font-size: 0.9rem; color: #2980b9; }
+  code { background: #f0f3f7; padding: 2px 6px; border-radius: 4px; font-size: 0.88rem; }
+  pre { background: #1a1a2e; color: #e8e8e8; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.85rem; margin: 0.8rem 0; }
+  .test-pass { color: #27ae60; font-weight: 600; }
+  .meta-row { display: flex; gap: 2rem; flex-wrap: wrap; margin-top: 0.5rem; font-size: 0.9rem; opacity: 0.9; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Phase 05x - Applicant Sign-Up API <span class="badge badge-completed">Completed</span></h1>
+  <p>신영증권 채용 Renewal Backend</p>
+  <div class="meta-row">
+    <span>Date: 2026-05-27</span>
+    <span>Type: Frontend Integration Support</span>
+  </div>
+</header>
+
+<div class="card">
+  <h2>Executive Summary</h2>
+  <p>프론트엔드 개발 지원을 위한 최소 지원자 회원가입 API를 구현했습니다.
+     <code>POST /auth/applicants/sign-up</code> 엔드포인트를 통해 지원자 계정을 생성할 수 있으며,
+     로그인은 기존 <code>/auth/login</code>을 통해 별도로 수행합니다.</p>
+  <div class="warning-box">
+    <strong>⚠ Temporary API:</strong> ci 필드가 클라이언트 요청에서 직접 전달됩니다.
+    운영 환경에서는 NICE 본인인증 연동으로 교체해야 합니다.
+  </div>
+</div>
+
+<div class="card">
+  <h2>Scope</h2>
+  <div class="scope-grid">
+    <div class="scope-item scope-implemented">
+      <h4>✅ Implemented</h4>
+      <ul>
+        <li>POST /auth/applicants/sign-up endpoint</li>
+        <li>Request validation (loginId, password, name, phoneNumber, email, ci)</li>
+        <li>loginId / email / ciHash 중복 검사</li>
+        <li>Password BCrypt 인코딩</li>
+        <li>CI SHA-256 해싱</li>
+        <li>응답에서 민감정보 제외</li>
+        <li>SecurityConfig permitAll 설정</li>
+        <li>GlobalExceptionHandler 매핑</li>
+        <li>Service 단위 테스트 6건</li>
+        <li>Controller 통합 테스트 4건</li>
+      </ul>
+    </div>
+    <div class="scope-item scope-excluded">
+      <h4>🚫 Out of Scope</h4>
+      <ul>
+        <li>NICE 본인인증 연동</li>
+        <li>이메일 인증</li>
+        <li>비밀번호 강도 정책</li>
+        <li>이용약관 동의</li>
+        <li>CAPTCHA / Rate Limiting</li>
+        <li>SMS 인증</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>API</h2>
+  <table>
+    <thead>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Auth</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="api-method method-post">POST</span></td>
+        <td class="api-path">/auth/applicants/sign-up</td>
+        <td>지원자 회원가입</td>
+        <td>permitAll</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Request Body</h3>
+  <pre>{
+  "loginId": "applicant01",
+  "password": "Password1234!",
+  "name": "홍길동",
+  "phoneNumber": "01012345678",
+  "email": "applicant01@example.com",
+  "ci": "test-ci-applicant01"
+}</pre>
+
+  <h3>Success Response (200)</h3>
+  <pre>{
+  "success": true,
+  "data": {
+    "applicantId": 1,
+    "loginId": "applicant01",
+    "name": "홍길동"
+  },
+  "message": "정상 처리되었습니다."
+}</pre>
+
+  <h3>Failure Response (400)</h3>
+  <pre>{
+  "success": false,
+  "data": null,
+  "message": "이미 사용 중인 아이디입니다."
+}</pre>
+</div>
+
+<div class="card">
+  <h2>Domain / Entity</h2>
+  <p>기존 <code>Applicant</code> 엔티티를 그대로 사용합니다. 새 엔티티는 추가하지 않았습니다.</p>
+  <table>
+    <thead>
+      <tr><th>Entity</th><th>변경</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>Applicant</code></td><td>변경 없음 (기존 생성자 활용)</td></tr>
+      <tr><td><code>ApplicantRepository</code></td><td>existsByLoginId, existsByEmail, existsByCiHash 추가</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Validation &amp; Business Rules</h2>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Rule</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>loginId: NotBlank, max 100, unique</td></tr>
+      <tr><td>2</td><td>password: NotBlank, min 8, max 100, BCrypt encoded</td></tr>
+      <tr><td>3</td><td>name: NotBlank, max 100</td></tr>
+      <tr><td>4</td><td>phoneNumber: NotBlank, max 30</td></tr>
+      <tr><td>5</td><td>email: @Email, max 255, optional (nullable)</td></tr>
+      <tr><td>6</td><td>ci: NotBlank, max 255, SHA-256 hashed</td></tr>
+      <tr><td>7</td><td>All string inputs trimmed</td></tr>
+      <tr><td>8</td><td>Blank/whitespace email normalized to null</td></tr>
+      <tr><td>9</td><td>loginId uniqueness checked</td></tr>
+      <tr><td>10</td><td>email uniqueness checked (only when not null)</td></tr>
+      <tr><td>11</td><td>ciHash uniqueness checked</td></tr>
+      <tr><td>12</td><td>No auto-login or session creation</td></tr>
+      <tr><td>13</td><td>Response excludes password, ci, ciHash, phoneNumber, email</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Changed Files</h2>
+  <h3>New Files</h3>
+  <table>
+    <thead>
+      <tr><th>File</th><th>Type</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>dto/request/ApplicantSignUpRequest.java</code></td><td>Request DTO</td></tr>
+      <tr><td><code>dto/response/ApplicantSignUpResponse.java</code></td><td>Response DTO</td></tr>
+      <tr><td><code>exception/InvalidApplicantSignUpException.java</code></td><td>Exception</td></tr>
+      <tr><td><code>service/ApplicantSignUpService.java</code></td><td>Service</td></tr>
+      <tr><td><code>controller/ApplicantSignUpController.java</code></td><td>Controller</td></tr>
+      <tr><td><code>service/ApplicantSignUpServiceTest.java</code></td><td>Service Test</td></tr>
+      <tr><td><code>controller/ApplicantSignUpControllerTest.java</code></td><td>Controller Test</td></tr>
+    </tbody>
+  </table>
+  <h3>Modified Files</h3>
+  <table>
+    <thead>
+      <tr><th>File</th><th>Change</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>domain/repository/ApplicantRepository.java</code></td><td>Added exists methods</td></tr>
+      <tr><td><code>exception/GlobalExceptionHandler.java</code></td><td>Added exception handler</td></tr>
+      <tr><td><code>config/SecurityConfig.java</code></td><td>Added permitAll for signup</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Test Results</h2>
+  <h3>ApplicantSignUp Tests</h3>
+  <p>Command: <code>$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*ApplicantSignUp*" --no-daemon</code></p>
+  <p>Result: <span class="test-pass">BUILD SUCCESSFUL</span></p>
+
+  <h3>Related Auth/Application Tests</h3>
+  <p>Command: <code>$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*Auth*" --tests "*ApplicationControllerTest" --no-daemon</code></p>
+  <p>Result: <span class="test-pass">BUILD SUCCESSFUL</span></p>
+
+  <h3>Service Tests (6 cases)</h3>
+  <table>
+    <thead><tr><th>Test</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>회원가입_성공</td><td><span class="badge badge-completed">Pass</span></td></tr>
+      <tr><td>loginId_중복이면_실패</td><td><span class="badge badge-completed">Pass</span></td></tr>
+      <tr><td>email_중복이면_실패</td><td><span class="badge badge-completed">Pass</span></td></tr>
+      <tr><td>ciHash_중복이면_실패</td><td><span class="badge badge-completed">Pass</span></td></tr>
+      <tr><td>password가_인코딩되어_저장된다</td><td><span class="badge badge-completed">Pass</span></td></tr>
+      <tr><td>응답에_민감정보가_없다</td><td><span class="badge badge-completed">Pass</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Controller Tests (4 cases)</h3>
+  <table>
+    <thead><tr><th>Test</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>회원가입_성공</td><td><span class="badge badge-completed">Pass</span></td></tr>
+      <tr><td>validation_실패_시_400</td><td><span class="badge badge-completed">Pass</span></td></tr>
+      <tr><td>loginId_중복_시_400</td><td><span class="badge badge-completed">Pass</span></td></tr>
+      <tr><td>GET_요청은_405</td><td><span class="badge badge-completed">Pass</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Remaining Issues</h2>
+  <table>
+    <thead><tr><th>Issue</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>NICE 본인인증 연동 (ci 클라이언트 제공 → 서버 검증)</td><td><span class="badge badge-warning">Production Required</span></td></tr>
+      <tr><td>이메일 인증 플로우</td><td><span class="badge badge-deferred">Deferred</span></td></tr>
+      <tr><td>비밀번호 강도 정책</td><td><span class="badge badge-deferred">Deferred</span></td></tr>
+      <tr><td>Rate Limiting / CAPTCHA</td><td><span class="badge badge-deferred">Deferred</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Next Phase Recommendation</h2>
+  <p>운영 배포 전 NICE 본인인증 연동, 이메일/SMS 인증 플로우, 비밀번호 강도 정책, Rate Limiting을 구현해야 합니다.</p>
+</div>
+
+</div>
+</body>
+</html>

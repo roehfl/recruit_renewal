@@ -268,12 +268,10 @@ class JobPostingControllerTest {
                       "jobTitle": "Backend Engineer",
                       "workLocation": "Seoul",
                       "employmentType": "FULL_TIME",
-                      "headcount": 2,
                       "sortOrder": 1
                     },
                     {
                       "positionName": "Frontend",
-                      "headcount": 1,
                       "sortOrder": 0
                     }
                   ],
@@ -312,7 +310,6 @@ class JobPostingControllerTest {
                       "jobTitle": "Backend Intern",
                       "workLocation": "Seoul",
                       "employmentType": "INTERN",
-                      "headcount": 1,
                       "sortOrder": 0
                     }
                   ],

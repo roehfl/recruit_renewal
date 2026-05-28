@@ -174,7 +174,6 @@ Included:
 - `jobTitle`
 - `workLocation`
 - `employmentType`
-- `headcount`
 - `sortOrder`
 
 ## Entity Relationship Summary
