@@ -87,7 +87,7 @@ class ApplicationCertificateControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(get("/applications/{applicationId}/certificates", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/certificates", applicationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -100,7 +100,7 @@ class ApplicationCertificateControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/certificates", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/certificates", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validCertificateJson()))
                 .andExpect(status().isOk())
@@ -115,7 +115,7 @@ class ApplicationCertificateControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/certificates", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/certificates", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -133,7 +133,7 @@ class ApplicationCertificateControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(false));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/certificates", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/certificates", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validCertificateJson()))
                 .andExpect(status().isBadRequest())
@@ -148,12 +148,12 @@ class ApplicationCertificateControllerTest {
         Long applicationId = createApplication(owner, createPublishedJobPosting(true));
         authenticate(other);
 
-        mockMvc.perform(get("/applications/{applicationId}/certificates", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/certificates", applicationId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(post("/applications/{applicationId}/certificates", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/certificates", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validCertificateJson()))
                 .andExpect(status().isNotFound())
@@ -168,7 +168,7 @@ class ApplicationCertificateControllerTest {
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/certificates", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/certificates", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validCertificateJson()))
                 .andExpect(status().isBadRequest())
@@ -178,12 +178,12 @@ class ApplicationCertificateControllerTest {
 
     @Test
     void put_and_delete_methods_are_not_supported() throws Exception {
-        mockMvc.perform(put("/applications/{applicationId}/certificates", 1L)
+        mockMvc.perform(put("/api/applications/{applicationId}/certificates", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
 
-        mockMvc.perform(delete("/applications/{applicationId}/certificates", 1L))
+        mockMvc.perform(delete("/api/applications/{applicationId}/certificates", 1L))
                 .andExpect(status().isMethodNotAllowed());
     }
 

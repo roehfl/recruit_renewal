@@ -114,7 +114,7 @@ class ApplicationControllerTest {
         Long jobPostingId = createPublishedJobPosting();
         Long jobPositionId = firstJobPositionId(jobPostingId);
 
-        mockMvc.perform(post("/applications")
+        mockMvc.perform(post("/api/applications")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createApplicationJson(jobPostingId, jobPositionId)))
                 .andExpect(status().isOk())
@@ -128,7 +128,7 @@ class ApplicationControllerTest {
         Applicant applicant = createApplicant("api-create-validation", "Api Create Validation");
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications")
+        mockMvc.perform(post("/api/applications")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -150,7 +150,7 @@ class ApplicationControllerTest {
         Long jobPostingId = createPublishedJobPosting();
         Long jobPositionId = firstJobPositionId(jobPostingId);
 
-        mockMvc.perform(post("/applications")
+        mockMvc.perform(post("/api/applications")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createApplicationJson(jobPostingId, jobPositionId)))
                 .andExpect(status().isBadRequest())
@@ -165,7 +165,7 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(applicant, jobPostingId);
         authenticate(applicant);
 
-        mockMvc.perform(get("/applications/{applicationId}", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}", applicationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -179,7 +179,7 @@ class ApplicationControllerTest {
         Applicant applicant = createApplicant("api-get-not-found", "Api Get Not Found");
         authenticate(applicant);
 
-        mockMvc.perform(get("/applications/{applicationId}", 99999L))
+        mockMvc.perform(get("/api/applications/{applicationId}", 99999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -192,7 +192,7 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(owner, createPublishedJobPosting());
         authenticate(other);
 
-        mockMvc.perform(get("/applications/{applicationId}", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}", applicationId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -206,7 +206,7 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(applicant, jobPostingId, jobPositionIds.get(0));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateApplicationJson(jobPositionIds.get(1))))
                 .andExpect(status().isOk())
@@ -221,7 +221,7 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -242,7 +242,7 @@ class ApplicationControllerTest {
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateApplicationJson(jobPositionIds.get(1))))
                 .andExpect(status().isBadRequest())
@@ -259,7 +259,7 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(owner, jobPostingId, jobPositionIds.get(0));
         authenticate(other);
 
-        mockMvc.perform(post("/applications/{applicationId}", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateApplicationJson(jobPositionIds.get(1))))
                 .andExpect(status().isNotFound())
@@ -273,7 +273,7 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/submit", applicationId))
+        mockMvc.perform(post("/api/applications/{applicationId}/submit", applicationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -287,7 +287,7 @@ class ApplicationControllerTest {
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/submit", applicationId))
+        mockMvc.perform(post("/api/applications/{applicationId}/submit", applicationId))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -308,7 +308,7 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(applicant, jobPostingId);
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/submit", applicationId))
+        mockMvc.perform(post("/api/applications/{applicationId}/submit", applicationId))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -331,7 +331,7 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(applicant, jobPostingId);
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/submit", applicationId))
+        mockMvc.perform(post("/api/applications/{applicationId}/submit", applicationId))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -344,7 +344,7 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(owner, createPublishedJobPosting());
         authenticate(other);
 
-        mockMvc.perform(post("/applications/{applicationId}/submit", applicationId))
+        mockMvc.perform(post("/api/applications/{applicationId}/submit", applicationId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -357,7 +357,7 @@ class ApplicationControllerTest {
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/withdraw", applicationId))
+        mockMvc.perform(post("/api/applications/{applicationId}/withdraw", applicationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -370,7 +370,7 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/withdraw", applicationId))
+        mockMvc.perform(post("/api/applications/{applicationId}/withdraw", applicationId))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -384,7 +384,7 @@ class ApplicationControllerTest {
         jobApplicationService.submit(owner.getId(), applicationId);
         authenticate(other);
 
-        mockMvc.perform(post("/applications/{applicationId}/withdraw", applicationId))
+        mockMvc.perform(post("/api/applications/{applicationId}/withdraw", applicationId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -397,7 +397,7 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(applicant, jobPostingId);
         authenticate(applicant);
 
-        mockMvc.perform(get("/job-postings/{jobPostingId}/application", jobPostingId))
+        mockMvc.perform(get("/api/job-postings/{jobPostingId}/application", jobPostingId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -411,7 +411,7 @@ class ApplicationControllerTest {
         Long jobPostingId = createPublishedJobPosting();
         authenticate(applicant);
 
-        mockMvc.perform(get("/job-postings/{jobPostingId}/application", jobPostingId))
+        mockMvc.perform(get("/api/job-postings/{jobPostingId}/application", jobPostingId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -427,7 +427,7 @@ class ApplicationControllerTest {
         decideAndAnnounce(jobPostingId, stageId, StageResultStatus.PASSED);
         MockMvc securedMockMvc = securedMockMvc();
 
-        securedMockMvc.perform(get("/applications/me")
+        securedMockMvc.perform(get("/api/applications/me")
                         .param("page", "0")
                         .param("size", "20")
                         .with(authentication(applicantAuthentication(applicant))))
@@ -476,7 +476,7 @@ class ApplicationControllerTest {
         decideAndAnnounce(jobPostingId, stageId, StageResultStatus.PASSED);
         MockMvc securedMockMvc = securedMockMvc();
 
-        securedMockMvc.perform(get("/applications/{applicationId}/dashboard", applicationId)
+        securedMockMvc.perform(get("/api/applications/{applicationId}/dashboard", applicationId)
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -527,7 +527,7 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(applicant, jobPostingId);
         MockMvc securedMockMvc = securedMockMvc();
 
-        securedMockMvc.perform(get("/applications/{applicationId}/dashboard", applicationId)
+        securedMockMvc.perform(get("/api/applications/{applicationId}/dashboard", applicationId)
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.editable").value(true))
@@ -544,14 +544,14 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         MockMvc securedMockMvc = securedMockMvc();
 
-        securedMockMvc.perform(get("/applications/{applicationId}/dashboard", applicationId)
+        securedMockMvc.perform(get("/api/applications/{applicationId}/dashboard", applicationId)
                         .with(authentication(employeeAuthentication("employee-dashboard", "ROLE_ADMIN"))))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Access is denied."));
 
-        securedMockMvc.perform(get("/applications/{applicationId}/dashboard", applicationId)
+        securedMockMvc.perform(get("/api/applications/{applicationId}/dashboard", applicationId)
                         .with(anonymous()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -565,7 +565,7 @@ class ApplicationControllerTest {
         Applicant other = createApplicant("api-dashboard-other", "Api Dashboard Other");
         Long applicationId = createApplication(owner, createPublishedJobPosting());
 
-        securedMockMvc().perform(get("/applications/{applicationId}/dashboard", applicationId)
+        securedMockMvc().perform(get("/api/applications/{applicationId}/dashboard", applicationId)
                         .with(authentication(applicantAuthentication(other))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
@@ -593,7 +593,7 @@ class ApplicationControllerTest {
         ));
         Long applicationId = createApplication(applicant, jobPostingId);
 
-        securedMockMvc().perform(get("/applications/{applicationId}/form-page", applicationId)
+        securedMockMvc().perform(get("/api/applications/{applicationId}/form-page", applicationId)
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -638,14 +638,14 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         MockMvc securedMockMvc = securedMockMvc();
 
-        securedMockMvc.perform(get("/applications/{applicationId}/form-page", applicationId)
+        securedMockMvc.perform(get("/api/applications/{applicationId}/form-page", applicationId)
                         .with(authentication(employeeAuthentication("employee-form-page", "ROLE_ADMIN"))))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Access is denied."));
 
-        securedMockMvc.perform(get("/applications/{applicationId}/form-page", applicationId)
+        securedMockMvc.perform(get("/api/applications/{applicationId}/form-page", applicationId)
                         .with(anonymous()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -659,7 +659,7 @@ class ApplicationControllerTest {
         Applicant other = createApplicant("api-form-page-other", "Api Form Page Other");
         Long applicationId = createApplication(owner, createPublishedJobPosting());
 
-        securedMockMvc().perform(get("/applications/{applicationId}/form-page", applicationId)
+        securedMockMvc().perform(get("/api/applications/{applicationId}/form-page", applicationId)
                         .with(authentication(applicantAuthentication(other))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
@@ -670,7 +670,7 @@ class ApplicationControllerTest {
     void get_my_applications_returns_empty_page_for_applicant_without_applications() throws Exception {
         Applicant applicant = createApplicant("api-my-list-empty", "Api My List Empty");
 
-        securedMockMvc().perform(get("/applications/me")
+        securedMockMvc().perform(get("/api/applications/me")
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -682,14 +682,14 @@ class ApplicationControllerTest {
     void get_my_applications_blocks_employee_admin_and_anonymous() throws Exception {
         MockMvc securedMockMvc = securedMockMvc();
 
-        securedMockMvc.perform(get("/applications/me")
+        securedMockMvc.perform(get("/api/applications/me")
                         .with(authentication(employeeAuthentication("employee-admin", "ROLE_ADMIN"))))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Access is denied."));
 
-        securedMockMvc.perform(get("/applications/me")
+        securedMockMvc.perform(get("/api/applications/me")
                         .with(anonymous()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -702,22 +702,22 @@ class ApplicationControllerTest {
         Applicant applicant = createApplicant("api-my-list-method", "Api My List Method");
         MockMvc securedMockMvc = securedMockMvc();
 
-        securedMockMvc.perform(post("/applications/me")
+        securedMockMvc.perform(post("/api/applications/me")
                         .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
-        securedMockMvc.perform(put("/applications/me")
+        securedMockMvc.perform(put("/api/applications/me")
                         .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
-        securedMockMvc.perform(patch("/applications/me")
+        securedMockMvc.perform(patch("/api/applications/me")
                         .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
-        securedMockMvc.perform(delete("/applications/me")
+        securedMockMvc.perform(delete("/api/applications/me")
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isMethodNotAllowed());
     }
@@ -728,22 +728,22 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         MockMvc securedMockMvc = securedMockMvc();
 
-        securedMockMvc.perform(post("/applications/{applicationId}/dashboard", applicationId)
+        securedMockMvc.perform(post("/api/applications/{applicationId}/dashboard", applicationId)
                         .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
-        securedMockMvc.perform(put("/applications/{applicationId}/dashboard", applicationId)
+        securedMockMvc.perform(put("/api/applications/{applicationId}/dashboard", applicationId)
                         .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
-        securedMockMvc.perform(patch("/applications/{applicationId}/dashboard", applicationId)
+        securedMockMvc.perform(patch("/api/applications/{applicationId}/dashboard", applicationId)
                         .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
-        securedMockMvc.perform(delete("/applications/{applicationId}/dashboard", applicationId)
+        securedMockMvc.perform(delete("/api/applications/{applicationId}/dashboard", applicationId)
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isMethodNotAllowed());
     }
@@ -754,29 +754,29 @@ class ApplicationControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         MockMvc securedMockMvc = securedMockMvc();
 
-        securedMockMvc.perform(post("/applications/{applicationId}/form-page", applicationId)
+        securedMockMvc.perform(post("/api/applications/{applicationId}/form-page", applicationId)
                         .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
-        securedMockMvc.perform(put("/applications/{applicationId}/form-page", applicationId)
+        securedMockMvc.perform(put("/api/applications/{applicationId}/form-page", applicationId)
                         .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
-        securedMockMvc.perform(patch("/applications/{applicationId}/form-page", applicationId)
+        securedMockMvc.perform(patch("/api/applications/{applicationId}/form-page", applicationId)
                         .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
-        securedMockMvc.perform(delete("/applications/{applicationId}/form-page", applicationId)
+        securedMockMvc.perform(delete("/api/applications/{applicationId}/form-page", applicationId)
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isMethodNotAllowed());
     }
 
     @Test
     void put_method_is_not_supported_for_application_update() throws Exception {
-        mockMvc.perform(put("/applications/{applicationId}", 1L)
+        mockMvc.perform(put("/api/applications/{applicationId}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
@@ -784,7 +784,7 @@ class ApplicationControllerTest {
 
     @Test
     void delete_http_method_is_not_supported_for_application_delete() throws Exception {
-        mockMvc.perform(delete("/applications/{applicationId}", 1L))
+        mockMvc.perform(delete("/api/applications/{applicationId}", 1L))
                 .andExpect(status().isMethodNotAllowed());
     }
 

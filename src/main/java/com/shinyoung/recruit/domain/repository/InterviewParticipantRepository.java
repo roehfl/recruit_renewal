@@ -35,6 +35,12 @@ public interface InterviewParticipantRepository extends JpaRepository<InterviewP
             InterviewParticipantStatus status
     );
 
+    List<InterviewParticipant> findByInterviewIdAndRoleAndParticipantStatusOrderBySortOrderAscIdAsc(
+            Long interviewId,
+            InterviewParticipantRole role,
+            InterviewParticipantStatus status
+    );
+
     List<InterviewParticipant> findByEmployeeIdAndRoleAndParticipantStatus(
             Long employeeId,
             InterviewParticipantRole role,

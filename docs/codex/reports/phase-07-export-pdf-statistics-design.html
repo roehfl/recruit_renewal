@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 07 - Export, PDF, Statistics Design Report</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --card:#ffffff; --ink:#1f2933; --muted:#6b7280; --line:#e5e7eb;
+    --blue:#2563eb; --green:#15803d; --amber:#b45309; --red:#b91c1c; --gray:#6b7280;
+    --blue-bg:#e8f0fe; --green-bg:#e6f4ea; --amber-bg:#fef3e2; --red-bg:#fde8e8; --gray-bg:#eef0f2;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI","Malgun Gothic",system-ui,sans-serif;line-height:1.6;font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 20px 64px}
+  header.page{background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;border-radius:14px;padding:28px 30px;box-shadow:0 6px 20px rgba(37,99,235,.25)}
+  header.page h1{margin:0 0 6px;font-size:24px}
+  header.page .sub{opacity:.92;font-size:14px}
+  header.page .meta{margin-top:14px;font-size:13px;opacity:.9}
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.2px}
+  .b-blue{background:var(--blue-bg);color:var(--blue)} .b-green{background:var(--green-bg);color:var(--green)}
+  .b-amber{background:var(--amber-bg);color:var(--amber)} .b-red{background:var(--red-bg);color:var(--red)}
+  .b-gray{background:var(--gray-bg);color:var(--gray)}
+  .hdr-badge{background:rgba(255,255,255,.18);color:#fff}
+  section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin-top:20px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  h2{font-size:18px;margin:0 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+  h3{font-size:15px;margin:18px 0 8px;color:#374151}
+  p{margin:8px 0}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#f3f4f6;font-weight:700}
+  code{background:#f1f5f9;padding:1px 6px;border-radius:5px;font-family:"Consolas","D2Coding",monospace;font-size:12.5px;color:#0f172a}
+  pre{background:#0f172a;color:#e2e8f0;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:12.5px;font-family:"Consolas",monospace}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:6px}
+  .card{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:#fcfcfd}
+  .card h4{margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:8px}
+  .card ul{margin:6px 0 0;padding-left:18px} .card li{margin:3px 0;font-size:13px}
+  ul.tight{margin:6px 0;padding-left:20px} ul.tight li{margin:4px 0}
+  .pill{font-size:11px;padding:1px 7px;border-radius:6px;font-weight:700}
+  .kvs{font-size:13px;color:var(--muted)}
+  .note{background:var(--amber-bg);border-left:4px solid var(--amber);padding:10px 14px;border-radius:6px;font-size:13.5px;margin:10px 0}
+  .ok{background:var(--green-bg);border-left:4px solid var(--green);padding:10px 14px;border-radius:6px;font-size:13.5px;margin:10px 0}
+  footer{margin-top:26px;text-align:center;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page">
+    <h1>Phase 07 — Export, PDF, Statistics</h1>
+    <div class="sub">신영증권 채용 Renewal 백엔드 · 설계 단계 리포트</div>
+    <div class="meta">
+      <span class="badge hdr-badge">DESIGN COMPLETED</span>
+      &nbsp;·&nbsp; Work type: documentation-only design phase
+      &nbsp;·&nbsp; Date: 2026-05-29
+      &nbsp;·&nbsp; Implementation: not started
+    </div>
+  </header>
+
+  <!-- 2. Executive Summary -->
+  <section>
+    <h2>Executive Summary</h2>
+    <p>Phase 07은 운영자가 admin 데이터를 다루는 reporting 계층을 설계한다. 네 기둥은
+      <b>Excel download</b>(읽기), <b>Statistics funnel</b>(읽기), <b>Excel upload</b>(쓰기, <code>StageResult</code> 한정),
+      <b>Application PDF</b>(읽기)다. 리스크가 낮은 read-only를 먼저, 위험한 쓰기와 무거운 PDF 의존성을 뒤로 배치한다.</p>
+    <ul class="tight">
+      <li>13개 핵심 결정 + instruction.md 10항목 리뷰 반영(총 20 Decision Log). 4-critic adversarial 리뷰로 보정.</li>
+      <li>새 entity/table/migration 없음 — export/statistics/PDF는 read-only, upload는 기존 <code>StageResultService</code> 재사용.</li>
+      <li><code>InterviewEvaluation</code> upload은 Phase 06 경계(배정 면접관만 평가 작성)상 영구 제외.</li>
+      <li><code>ci</code>/<code>ciHash</code>/<code>password</code>는 어떤 export/PDF/statistics에도 노출하지 않음.</li>
+    </ul>
+    <div class="ok"><b>Phase 진행 가능</b>: 설계 확정. 다음은 07a(Excel export 인프라 + applications download) 구현.</div>
+  </section>
+
+  <!-- 3. Scope Cards -->
+  <section>
+    <h2>Scope</h2>
+    <div class="cards">
+      <div class="card">
+        <h4><span class="badge b-blue">DESIGNED</span> 설계 확정</h4>
+        <ul>
+          <li>POI SXSSF export 인프라 + row cap</li>
+          <li>4 dataset list-parity download</li>
+          <li>applications export 연락처 확장</li>
+          <li>전형 funnel(전체/분야별), 7-bucket 분포</li>
+          <li>Excel upload(StageResult) preview/commit</li>
+          <li>Application PDF(admin, Thymeleaf+openhtmltopdf)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4><span class="badge b-red">OUT OF SCOPE</span> 제외</h4>
+        <ul>
+          <li><b>InterviewEvaluation upload</b> (Phase 06 경계)</li>
+          <li>학교별 통계 (School master 부재)</li>
+          <li>지원자 본인 PDF / batch·zip PDF</li>
+          <li>비동기 export job / staging 영속</li>
+          <li>Java/test/migration/프론트엔드</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4><span class="badge b-amber">DEFERRED</span> 연기/후속</h4>
+        <ul>
+          <li>자격별 dimension(free-text, 07 후속 또는 P08)</li>
+          <li>stage/interview export 연락처 확장</li>
+          <li>영속 <code>ActivityLog</code> audit 이관</li>
+          <li>StageResult reflect 커맨드</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Architecture / Domain -->
+  <section>
+    <h2>Architecture / Domain</h2>
+    <div class="note"><b>Data ownership · No new entities.</b> Phase 07은 새 entity/table/migration이 없다.
+      export/statistics/PDF는 read-only이며, 유일한 쓰기 경로는 Excel upload → <code>StageResultService.bulkUpdateResults</code>로
+      기존 <code>StageResult</code> 불변식(IN_PROGRESS guard, PENDING 금지, 정정 이력)을 그대로 상속한다.</div>
+    <h3>슬라이스별 컴포넌트 후보</h3>
+    <table>
+      <tr><th>Slice</th><th>컴포넌트 후보</th><th>type</th><th>책임</th></tr>
+      <tr><td>07a</td><td><code>ExcelExportWriter</code></td><td>Service(infra)</td><td>SXSSF 시트 작성, row cap 적용</td></tr>
+      <tr><td>07a</td><td><code>AdminExportController</code> / <code>ExportAuditLogger</code></td><td>Controller / Service</td><td>export 엔드포인트 + SLF4J audit</td></tr>
+      <tr><td>07b</td><td>(07a 인프라 재사용)</td><td>—</td><td>stage results / interviews / evaluations 컬럼 spec</td></tr>
+      <tr><td>07c</td><td><code>AdminStatisticsController</code> / <code>FunnelStatisticsService</code></td><td>Controller / Service</td><td>P 코호트·7-bucket 분포·두 비율·dimension</td></tr>
+      <tr><td>07c</td><td><code>FunnelResponse</code> / <code>StageFunnelResponse</code> / <code>StageDistribution</code></td><td>Response DTO</td><td>funnel 응답 구조</td></tr>
+      <tr><td>07d</td><td><code>StageResultUploadController</code> / <code>StageResultUploadService</code></td><td>Controller / Service</td><td>xlsx 파싱·3중 교차검증·all-or-nothing·위임</td></tr>
+      <tr><td>07d</td><td><code>StageResultUploadRowRequest</code> / <code>...PreviewResponse</code> / <code>...CommitResponse</code></td><td>Request/Response DTO</td><td>행 모델(echo) · 검증/diff · commit 결과</td></tr>
+      <tr><td>07e</td><td><code>ApplicationPdfController</code> / <code>ApplicationPdfService</code> / <code>application-pdf.html</code></td><td>Controller / Service / Template</td><td>지원서 → XHTML → PDF 렌더, PDF audit</td></tr>
+    </table>
+  </section>
+
+  <!-- 5. API Section -->
+  <section>
+    <h2>API List</h2>
+    <p class="kvs">모든 엔드포인트는 <code>/admin/**</code> 권한. interviewer/applicant 경로 없음.</p>
+    <h3>Export (read-only)</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+      <tr><td>GET</td><td><code>/admin/applications/export</code></td><td>전체 지원서 xlsx</td><td>jobPostingId, jobPositionId, status (page 무시)</td><td>xlsx (ResponseEntity&lt;Resource&gt;, temp file)</td></tr>
+      <tr><td>GET</td><td><code>/admin/job-postings/{jobPostingId}/applications/export</code></td><td>공고별 지원서 xlsx</td><td>jobPositionId, status</td><td>xlsx</td></tr>
+      <tr><td>GET</td><td><code>/admin/stages/{stageId}/results/export</code></td><td>전형 결과 xlsx</td><td>—</td><td>xlsx</td></tr>
+      <tr><td>GET</td><td><code>/admin/job-postings/{jobPostingId}/interviews/export</code></td><td>면접 일정 xlsx</td><td>stageId, status, from, to</td><td>xlsx</td></tr>
+      <tr><td>GET</td><td><code>/admin/stages/{stageId}/interview-evaluations/export</code></td><td>면접 평가 xlsx(읽기)</td><td>—</td><td>xlsx</td></tr>
+    </table>
+    <h3>Statistics (read-only)</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+      <tr><td>GET</td><td><code>/admin/job-postings/{jobPostingId}/statistics/funnel</code></td><td>전형 funnel(overall/dimension)</td><td>dimension?(POSITION), topN?</td><td><code>ApiResponse&lt;FunnelResponse&gt;</code></td></tr>
+    </table>
+    <h3>Excel Upload (write — StageResult only)</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+      <tr><td>GET</td><td><code>/admin/stages/{stageId}/results/upload-template</code></td><td>upload 템플릿 xlsx(echo 컬럼)</td><td>—</td><td>xlsx</td></tr>
+      <tr><td>POST</td><td><code>/admin/stages/{stageId}/results/upload/preview</code></td><td>검증·diff(미적용)</td><td>multipart file</td><td><code>ApiResponse&lt;StageResultUploadPreviewResponse&gt;</code></td></tr>
+      <tr><td>POST</td><td><code>/admin/stages/{stageId}/results/upload/commit</code></td><td>적용(all-or-nothing)</td><td>multipart file</td><td><code>ApiResponse&lt;StageResultUploadCommitResponse&gt;</code></td></tr>
+    </table>
+    <h3>Application PDF (read-only)</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+      <tr><td>GET</td><td><code>/admin/applications/{applicationId}/pdf</code></td><td>지원서 1건 PDF</td><td>—</td><td>application/pdf (byte[])</td></tr>
+    </table>
+  </section>
+
+  <!-- 6. Validation / Policy -->
+  <section>
+    <h2>Validation &amp; Policy</h2>
+    <h3>전형 funnel 단계 분포 (합 = |P|)</h3>
+    <pre>P = { app | app.submittedAt != null }   (현재 status 무관, 코호트 고정 → 재현 가능)
+
+stage k 분포 (raw 7 버킷, 합 = |P|):
+  PASSED | FAILED | ABSENT | HOLD | PENDING | WITHDRAWN | NO_RESULT
+  PENDING   = StageResult row 있음, 결정 전
+  NO_RESULT = row 자체 없음(미초기화/미도달) — 응답 전용 synthetic, enum/upload 입력값 아님
+  distribution.withdrawn(=stage result status) ≠ population.withdrawnCount(=application status)
+
+순차 통과 집합:  S0 = P ,  Sk = S(k-1) ∩ {stage k == PASSED}
+비율(funnelPassedCount 기준): 누적 = |Sk| / |P| ,  전환 = |Sk| / |S(k-1)|</pre>
+    <h3>Excel Upload 규칙</h3>
+    <table>
+      <tr><th>규칙</th><th>설명</th></tr>
+      <tr><td>대상</td><td><code>StageResult</code>만</td></tr>
+      <tr><td>업로드 소스</td><td><b><code>upload-template</code>만</b> — applications/stage results export는 소스 아님. row에 <code>stageId</code> 컬럼 없음(path 판단)</td></tr>
+      <tr><td>행 매칭</td><td><code>stageResultId</code> + <code>applicationId</code> + path <code>{stageId}</code> 3중 교차검증(service에서 StageResult 조회)</td></tr>
+      <tr><td>낙관적 동시성</td><td><code>stageResultUpdatedAt</code>(ISO-8601 string) normalize 후 현재 <code>StageResult.updatedAt</code>와 비교, 불일치 → <code>STALE_ROW</code> 전체 거부(409). 토큰 셀 date/numeric/formula면 row error</td></tr>
+      <tr><td>파일 방어</td><td><code>.xlsx</code>만(.xls/.csv/.xlsm 거부), 첫 sheet, header signature/version 검증, formula cell 거부, duplicate <code>stageResultId</code> 거부, maxUploadRows/Size</td></tr>
+      <tr><td>허용 resultStatus</td><td><code>StageResultStatus</code> − <code>PENDING</code> = {PASSED, FAILED, ABSENT, HOLD, WITHDRAWN}. <code>NO_RESULT</code> 불가</td></tr>
+      <tr><td>빈칸 정책</td><td>resultStatus blank → row error; score/comment blank → null clear; 변경 없는 row는 commit 제외(stale check도 변경 row만); template은 현재값 prefill</td></tr>
+      <tr><td>부분 성공</td><td>없음. 하나라도 실패 시 update 0건(단일 transaction)</td></tr>
+      <tr><td>적용 경로</td><td>기존 <code>StageResultService.bulkUpdateResults</code> 경유, 공유 DTO 불변, IN_PROGRESS guard 상속</td></tr>
+    </table>
+    <h3>Export &amp; Row Cap</h3>
+    <ul class="tight">
+      <li>대응 list와 동일 필터, page/size 무시(전체 행 export).</li>
+      <li>생성 전 count 선검증 → <code>count &gt; maxRows</code>(기본 50,000)이면 workbook 미생성, <code>400 EXPORT_ROW_LIMIT_EXCEEDED</code>.</li>
+      <li>전 export · PDF · upload commit에 SLF4J 구조적 audit.</li>
+    </ul>
+    <div class="note"><b>PII 정책.</b> <code>ci</code>/<code>ciHash</code>/<code>password</code>는 어떤 export/PDF/statistics에도 절대 미포함.
+      <code>name</code>/<code>phoneNumber</code>/<code>email</code>은 applications export + PDF에서 평문 노출(운영 연락), 노출 시 audit.
+      Statistics는 집계값만(audit 없음). PDF는 가장 집중된 PII surface라 생성 시 audit(<code>actor</code>/<code>applicationId</code>/<code>jobPostingId</code>/<code>jobPositionId</code>/<code>timestamp</code>) 필수.</div>
+    <div class="note"><b>보안 보강(instruction.md 리뷰).</b>
+      Excel formula injection 방어(export string cell + 위험 prefix escaping, upload formula cell 거부) ·
+      PDF 템플릿 <code>th:utext</code> 금지 + 외부 resource load 금지 + 줄바꿈 CSS <code>pre-wrap</code> ·
+      audit schema 표준화(공통/ export/ PDF/ upload commit 필드, PII 직접 기록 금지) ·
+      권한 정책 상수 <code>EXPORT_APPLICATION_PII</code> 여지(향후 role matrix 분리용).</div>
+  </section>
+
+  <!-- 7. Test Section -->
+  <section>
+    <h2>Test</h2>
+    <p><b>Test result:</b> <span class="badge b-gray">N/A</span> documentation-only 설계 단계 — Java/test 미구현·미실행. 아래는 구현 슬라이스(07a~07f) 계획.</p>
+    <pre>$env:AES_SECRET_KEY='&lt;example-key&gt;'; .\gradlew.bat test --tests "*Export*" --tests "*Statistics*" --tests "*Upload*" --tests "*Pdf*" --no-daemon</pre>
+    <ul class="tight">
+      <li><b>Export</b>: POI read-back으로 header/행수(=필터 count), <code>phoneNumber</code>/<code>email</code> 존재 + <code>ci</code>/<code>ciHash</code>/<code>password</code> 부재, formula prefix escaping, no-store/nosniff/Content-Disposition 헤더.</li>
+      <li><b>Row cap</b>: count &gt; maxRows → 400, workbook 실제 미생성.</li>
+      <li><b>Statistics</b>: 코호트 분포 합 = |P|, NO_RESULT 정확, funnelPassedCount/두 비율, distribution.withdrawn ≠ population.withdrawnCount, 분야별 distinct.</li>
+      <li><b>Upload</b>: preview 오류 검출(잘못된 id/applicationId·stage mismatch/PENDING·NO_RESULT/길이/blank resultStatus error/blank score·comment clear), <b>STALE_ROW(update 0)</b>, duplicate/formula cell/.xls·.csv·.xlsm/header 불일치/maxRows·Size 거부, commit all-or-nothing, IN_PROGRESS guard, rollback. (STALE_ROW=07d 핵심)</li>
+      <li><b>PDF</b>: PDFBox로 한글 <code>name</code> 포함 + <code>ci</code> 부재 + 섹션 헤더, <code>th:utext</code> 미사용 검사, 외부 resource 차단, no-store/nosniff 헤더, audit 호출.</li>
+    </ul>
+  </section>
+
+  <!-- 8. Remaining Issues -->
+  <section>
+    <h2>Remaining Issues</h2>
+    <table>
+      <tr><th>#</th><th>Open Question</th><th>현재 입장</th><th>상태</th></tr>
+      <tr><td>1</td><td>POI / openhtmltopdf 정확 버전·라이선스</td><td>5.x / LGPL 계열, 추가 시 재확인</td><td><span class="badge b-amber">Open</span></td></tr>
+      <tr><td>2</td><td>자격별 dimension 07 후속 vs P08</td><td>free-text 한계 명시 후 07 내 후속 가능</td><td><span class="badge b-amber">Open</span></td></tr>
+      <tr><td>3</td><td>stage/interview export 연락처 추가</td><td>일단 list-parity, 수요 확인 후</td><td><span class="badge b-amber">Open</span></td></tr>
+      <tr><td>4</td><td>대용량 비동기 export</td><td>row cap이 동기 bound</td><td><span class="badge b-green">Decided: 동기</span></td></tr>
+      <tr><td>5</td><td>evaluation export 레벨</td><td>stage 레벨 1행=1평가</td><td><span class="badge b-amber">Open(07b)</span></td></tr>
+      <tr><td>6</td><td>applications export route</td><td>global + per-posting 둘 다</td><td><span class="badge b-green">Decided</span></td></tr>
+    </table>
+  </section>
+
+  <!-- 9. Next Phase Recommendation -->
+  <section>
+    <h2>Next Phase Recommendation</h2>
+    <ul class="tight">
+      <li><b>07a 구현 착수</b>: POI SXSSF writer + row cap + applications export + export audit.</li>
+      <li><b>Phase 08(School master)</b> 이후 학교별 dimension 정확도 확보 → funnel 학교 축 활성화.</li>
+      <li><b>Backlog(Privacy/Audit/Retention)</b>: SLF4J export/PDF/upload audit를 영속 <code>ActivityLog</code>로 이관.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Source of truth: <code>docs/codex/design/phase-07-export-pdf-statistics-design.md</code> ·
+    이 리포트는 해당 markdown에서 생성된 self-contained 상태 페이지다.
+  </footer>
+
+</div>
+</body>
+</html>

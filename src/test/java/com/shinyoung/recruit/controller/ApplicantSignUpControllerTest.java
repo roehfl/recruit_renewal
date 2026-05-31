@@ -39,7 +39,7 @@ class ApplicantSignUpControllerTest {
 
     @Test
     void 회원가입_성공() throws Exception {
-        mockMvc.perform(post("/auth/applicants/sign-up")
+        mockMvc.perform(post("/api/auth/applicants/sign-up")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -65,7 +65,7 @@ class ApplicantSignUpControllerTest {
 
     @Test
     void validation_실패_시_400() throws Exception {
-        mockMvc.perform(post("/auth/applicants/sign-up")
+        mockMvc.perform(post("/api/auth/applicants/sign-up")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -91,7 +91,7 @@ class ApplicantSignUpControllerTest {
         existing.setPhoneNumber("01000000000");
         applicantRepository.save(existing);
 
-        mockMvc.perform(post("/auth/applicants/sign-up")
+        mockMvc.perform(post("/api/auth/applicants/sign-up")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -109,7 +109,7 @@ class ApplicantSignUpControllerTest {
 
     @Test
     void GET_요청은_405() throws Exception {
-        mockMvc.perform(get("/auth/applicants/sign-up"))
+        mockMvc.perform(get("/api/auth/applicants/sign-up"))
                 .andExpect(status().isMethodNotAllowed());
     }
 }

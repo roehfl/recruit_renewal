@@ -43,7 +43,7 @@ class QuestionTemplateControllerTest {
     void get_question_templates_success() throws Exception {
         createTemplate();
 
-        mockMvc.perform(get("/admin/question-templates")
+        mockMvc.perform(get("/api/admin/question-templates")
                         .param("page", "0")
                         .param("size", "20")
                         .param("active", "true"))
@@ -56,7 +56,7 @@ class QuestionTemplateControllerTest {
     void get_question_template_success() throws Exception {
         QuestionTemplateResponse template = createTemplate();
 
-        mockMvc.perform(get("/admin/question-templates/{templateId}", template.templateId()))
+        mockMvc.perform(get("/api/admin/question-templates/{templateId}", template.templateId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.templateId").value(template.templateId()))
@@ -65,7 +65,7 @@ class QuestionTemplateControllerTest {
 
     @Test
     void create_question_template_success() throws Exception {
-        mockMvc.perform(post("/admin/question-templates")
+        mockMvc.perform(post("/api/admin/question-templates")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createJson()))
                 .andExpect(status().isOk())
@@ -78,7 +78,7 @@ class QuestionTemplateControllerTest {
     void update_question_template_success() throws Exception {
         QuestionTemplateResponse template = createTemplate();
 
-        mockMvc.perform(post("/admin/question-templates/{templateId}", template.templateId())
+        mockMvc.perform(post("/api/admin/question-templates/{templateId}", template.templateId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -101,7 +101,7 @@ class QuestionTemplateControllerTest {
     void deactivate_question_template_success() throws Exception {
         QuestionTemplateResponse template = createTemplate();
 
-        mockMvc.perform(post("/admin/question-templates/{templateId}/deactivate", template.templateId()))
+        mockMvc.perform(post("/api/admin/question-templates/{templateId}/deactivate", template.templateId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.active").value(false));
@@ -109,7 +109,7 @@ class QuestionTemplateControllerTest {
 
     @Test
     void validation_failure_returns_api_response() throws Exception {
-        mockMvc.perform(post("/admin/question-templates")
+        mockMvc.perform(post("/api/admin/question-templates")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -128,7 +128,7 @@ class QuestionTemplateControllerTest {
 
     @Test
     void invalid_enum_returns_api_response() throws Exception {
-        mockMvc.perform(post("/admin/question-templates")
+        mockMvc.perform(post("/api/admin/question-templates")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -147,7 +147,7 @@ class QuestionTemplateControllerTest {
 
     @Test
     void question_template_not_found_returns_api_response() throws Exception {
-        mockMvc.perform(get("/admin/question-templates/{templateId}", 99999L))
+        mockMvc.perform(get("/api/admin/question-templates/{templateId}", 99999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -155,12 +155,12 @@ class QuestionTemplateControllerTest {
 
     @Test
     void put_and_delete_methods_are_not_supported() throws Exception {
-        mockMvc.perform(put("/admin/question-templates/{templateId}", 1L)
+        mockMvc.perform(put("/api/admin/question-templates/{templateId}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
 
-        mockMvc.perform(delete("/admin/question-templates/{templateId}", 1L))
+        mockMvc.perform(delete("/api/admin/question-templates/{templateId}", 1L))
                 .andExpect(status().isMethodNotAllowed());
     }
 

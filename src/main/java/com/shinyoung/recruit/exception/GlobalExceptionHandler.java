@@ -65,6 +65,18 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler(InterviewEvaluationNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInterviewEvaluationNotFound(InterviewEvaluationNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidInterviewEvaluationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidInterviewEvaluation(InvalidInterviewEvaluationException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(QuestionTemplateNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleQuestionTemplateNotFound(QuestionTemplateNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

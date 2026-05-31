@@ -31,7 +31,7 @@ class JobPostingControllerTest {
 
     @Test
     void create_and_get_job_posting_success() throws Exception {
-        String response = mockMvc.perform(post("/admin/job-postings")
+        String response = mockMvc.perform(post("/api/admin/job-postings")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createJobPostingJson()))
                 .andExpect(status().isOk())
@@ -43,7 +43,7 @@ class JobPostingControllerTest {
 
         String id = response.replaceAll(".*\"data\":(\\d+).*", "$1");
 
-        mockMvc.perform(get("/admin/job-postings/{id}", Long.parseLong(id)))
+        mockMvc.perform(get("/api/admin/job-postings/{id}", Long.parseLong(id)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.title").value("2026 recruitment"))
@@ -67,12 +67,12 @@ class JobPostingControllerTest {
 
     @Test
     void get_job_postings_success() throws Exception {
-        mockMvc.perform(post("/admin/job-postings")
+        mockMvc.perform(post("/api/admin/job-postings")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createJobPostingJson()))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/admin/job-postings")
+        mockMvc.perform(get("/api/admin/job-postings")
                         .param("page", "0")
                         .param("size", "10"))
                 .andExpect(status().isOk())
@@ -88,7 +88,7 @@ class JobPostingControllerTest {
 
     @Test
     void update_job_posting_with_extended_fields_success() throws Exception {
-        String response = mockMvc.perform(post("/admin/job-postings")
+        String response = mockMvc.perform(post("/api/admin/job-postings")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createJobPostingJson()))
                 .andExpect(status().isOk())
@@ -97,13 +97,13 @@ class JobPostingControllerTest {
                 .getContentAsString();
         String id = response.replaceAll(".*\"data\":(\\d+).*", "$1");
 
-        mockMvc.perform(post("/admin/job-postings/{id}", Long.parseLong(id))
+        mockMvc.perform(post("/api/admin/job-postings/{id}", Long.parseLong(id))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateJobPostingJson()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
 
-        mockMvc.perform(get("/admin/job-postings/{id}", Long.parseLong(id)))
+        mockMvc.perform(get("/api/admin/job-postings/{id}", Long.parseLong(id)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.postingType").value("INTERN_RECRUITMENT"))
                 .andExpect(jsonPath("$.data.summary").value("Intern recruitment"))
@@ -117,13 +117,13 @@ class JobPostingControllerTest {
 
     @Test
     void invalid_extended_fields_return_bad_request() throws Exception {
-        mockMvc.perform(post("/admin/job-postings")
+        mockMvc.perform(post("/api/admin/job-postings")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createJobPostingJson().replace("Experienced recruitment", "<b>bad</b>")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
 
-        mockMvc.perform(post("/admin/job-postings")
+        mockMvc.perform(post("/api/admin/job-postings")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createJobPostingJson().replace(
                                 "\"displayStartDateTime\": \"2026-05-25T09:00:00\"",
@@ -132,7 +132,7 @@ class JobPostingControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
 
-        mockMvc.perform(post("/admin/job-postings")
+        mockMvc.perform(post("/api/admin/job-postings")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createJobPostingJson().replace("\"sortOrder\": 1", "\"sortOrder\": 0")))
                 .andExpect(status().isBadRequest())
@@ -141,7 +141,7 @@ class JobPostingControllerTest {
 
     @Test
     void attachment_requirement_get_and_replace_success() throws Exception {
-        String response = mockMvc.perform(post("/admin/job-postings")
+        String response = mockMvc.perform(post("/api/admin/job-postings")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createJobPostingJson()))
                 .andExpect(status().isOk())
@@ -150,7 +150,7 @@ class JobPostingControllerTest {
                 .getContentAsString();
         long id = Long.parseLong(response.replaceAll(".*\"data\":(\\d+).*", "$1"));
 
-        mockMvc.perform(post("/admin/job-postings/{id}/attachment-requirements", id)
+        mockMvc.perform(post("/api/admin/job-postings/{id}/attachment-requirements", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -176,7 +176,7 @@ class JobPostingControllerTest {
                 .andExpect(jsonPath("$.data[0].storagePath").doesNotExist())
                 .andExpect(jsonPath("$.data[0].physicalFileStatus").doesNotExist());
 
-        mockMvc.perform(get("/admin/job-postings/{id}/attachment-requirements", id))
+        mockMvc.perform(get("/api/admin/job-postings/{id}/attachment-requirements", id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].displayName").value("Resume"));
@@ -184,7 +184,7 @@ class JobPostingControllerTest {
 
     @Test
     void invalid_attachment_requirement_returns_bad_request() throws Exception {
-        String response = mockMvc.perform(post("/admin/job-postings")
+        String response = mockMvc.perform(post("/api/admin/job-postings")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createJobPostingJson()))
                 .andExpect(status().isOk())
@@ -193,7 +193,7 @@ class JobPostingControllerTest {
                 .getContentAsString();
         long id = Long.parseLong(response.replaceAll(".*\"data\":(\\d+).*", "$1"));
 
-        mockMvc.perform(post("/admin/job-postings/{id}/attachment-requirements", id)
+        mockMvc.perform(post("/api/admin/job-postings/{id}/attachment-requirements", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -215,7 +215,7 @@ class JobPostingControllerTest {
 
     @Test
     void published_posting_attachment_requirement_replace_returns_bad_request() throws Exception {
-        String response = mockMvc.perform(post("/admin/job-postings")
+        String response = mockMvc.perform(post("/api/admin/job-postings")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createJobPostingJson()))
                 .andExpect(status().isOk())
@@ -223,10 +223,10 @@ class JobPostingControllerTest {
                 .getResponse()
                 .getContentAsString();
         long id = Long.parseLong(response.replaceAll(".*\"data\":(\\d+).*", "$1"));
-        mockMvc.perform(post("/admin/job-postings/{id}/publish", id))
+        mockMvc.perform(post("/api/admin/job-postings/{id}/publish", id))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(post("/admin/job-postings/{id}/attachment-requirements", id)
+        mockMvc.perform(post("/api/admin/job-postings/{id}/attachment-requirements", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {

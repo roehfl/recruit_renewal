@@ -171,55 +171,55 @@ class AdminApplicationSectionControllerTest {
         JobApplication application = createApplication("admin-section-api-success");
         seedAllSections(application);
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/educations", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/educations", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].schoolName").value("Shinyoung University"))
                 .andExpect(jsonPath("$.data[0].semesterGrades[0].schoolYear").value(1));
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/careers", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/careers", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.careerType").value("EXPERIENCED"))
                 .andExpect(jsonPath("$.data.careers[0].companyName").value("Shinyoung Securities"));
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/certificates", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/certificates", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].certificateName").value("SQLD"))
                 .andExpect(jsonPath("$.data[0].certificateNumberMasked").value("ABC***"))
                 .andExpect(jsonPath("$.data[0].certificateNumber").doesNotExist());
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/languages", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/languages", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].languageName").value("English"));
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/military", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/military", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.militarySubjectType").value("EXEMPTED"))
                 .andExpect(jsonPath("$.data.exemptionReasonMasked").value("***"))
                 .andExpect(jsonPath("$.data.exemptionReason").doesNotExist());
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/awards", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/awards", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].awardName").value("Best Project"));
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/gap-periods", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/gap-periods", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].gapType").value("OTHER"));
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/attachments", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/attachments", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].originalFileName").value("resume.pdf"))
                 .andExpect(jsonPath("$.data[0].storedFileName").doesNotExist())
                 .andExpect(jsonPath("$.data[0].storagePath").doesNotExist());
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/answers", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/answers", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].questionText").value("Self introduction"))
@@ -230,27 +230,27 @@ class AdminApplicationSectionControllerTest {
     void empty_admin_sections_return_expected_shapes() throws Exception {
         JobApplication application = createApplication("admin-section-api-empty");
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/educations", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/educations", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data").isEmpty());
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/careers", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/careers", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.careerType").value("NOT_SELECTED"))
                 .andExpect(jsonPath("$.data.careers").isArray())
                 .andExpect(jsonPath("$.data.careers").isEmpty());
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/military", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/military", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").doesNotExist());
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/attachments", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/attachments", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data").isEmpty());
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/answers", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/answers", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data").isEmpty());
@@ -261,14 +261,14 @@ class AdminApplicationSectionControllerTest {
         JobApplication application = createApplication("admin-section-api-answer");
         JobPostingQuestion question = question(application.getJobPosting(), "Unanswered Question", 0, true);
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/answers", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/answers", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].questionId").value(question.getId()))
                 .andExpect(jsonPath("$.data[0].answerId").doesNotExist())
                 .andExpect(jsonPath("$.data[0].answerText").doesNotExist());
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/answers", 99999L))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/answers", 99999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -288,7 +288,7 @@ class AdminApplicationSectionControllerTest {
                 "SYSTEM"
         );
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/stage-results", application.getId()))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/stage-results", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].stageId").value(first.getId()))
@@ -315,12 +315,12 @@ class AdminApplicationSectionControllerTest {
 
     @Test
     void missing_application_returns_not_found_api_response() throws Exception {
-        mockMvc.perform(get("/admin/applications/{applicationId}/educations", 99999L))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/educations", 99999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/stage-results", 99999L))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/stage-results", 99999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -329,16 +329,16 @@ class AdminApplicationSectionControllerTest {
     @Test
     void admin_section_write_methods_are_not_supported() throws Exception {
         String[] paths = {
-                "/admin/applications/1/educations",
-                "/admin/applications/1/careers",
-                "/admin/applications/1/certificates",
-                "/admin/applications/1/languages",
-                "/admin/applications/1/military",
-                "/admin/applications/1/awards",
-                "/admin/applications/1/gap-periods",
-                "/admin/applications/1/attachments",
-                "/admin/applications/1/answers",
-                "/admin/applications/1/stage-results"
+                "/api/admin/applications/1/educations",
+                "/api/admin/applications/1/careers",
+                "/api/admin/applications/1/certificates",
+                "/api/admin/applications/1/languages",
+                "/api/admin/applications/1/military",
+                "/api/admin/applications/1/awards",
+                "/api/admin/applications/1/gap-periods",
+                "/api/admin/applications/1/attachments",
+                "/api/admin/applications/1/answers",
+                "/api/admin/applications/1/stage-results"
         };
 
         for (String path : paths) {

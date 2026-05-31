@@ -78,14 +78,14 @@ public class SecurityConfig {
                 .authenticationEntryPoint(authenticationEntryPoint)
                 .accessDeniedHandler(accessDeniedHandler));
         http.authorizeHttpRequests(authorizeRequests -> authorizeRequests
-                .requestMatchers("/auth/login", "/auth/logout", "/auth/applicants/sign-up").permitAll()
-                .requestMatchers("/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**", "/h2-console/**", "/menu/tree").permitAll()
-                .requestMatchers(HttpMethod.GET, "/job-postings/{jobPostingId}/application").hasAuthority("ROLE_APPLICANT")
-                .requestMatchers(HttpMethod.GET, "/job-postings/**").permitAll()
-                .requestMatchers("/admin/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_RECRUIT_ADMIN")
-                .requestMatchers("/applicant/**").hasAuthority("ROLE_APPLICANT")
-                .requestMatchers("/interviewer/**").hasAnyAuthority("ROLE_EMPLOYEE", "ROLE_ADMIN", "ROLE_RECRUIT_ADMIN", "ROLE_INTERVIEWER")
-                .requestMatchers("/applications/**").hasAuthority("ROLE_APPLICANT")
+                .requestMatchers("/api/auth/login", "/api/auth/logout", "/api/auth/applicants/sign-up").permitAll()
+                .requestMatchers("/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**", "/h2-console/**", "/api/menu/tree").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/job-postings/{jobPostingId}/application").hasAuthority("ROLE_APPLICANT")
+                .requestMatchers(HttpMethod.GET, "/api/job-postings/**").permitAll()
+                .requestMatchers("/api/admin/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_RECRUIT_ADMIN")
+                .requestMatchers("/api/applicant/**").hasAuthority("ROLE_APPLICANT")
+                .requestMatchers("/api/interviewer/**").hasAnyAuthority("ROLE_EMPLOYEE", "ROLE_ADMIN", "ROLE_RECRUIT_ADMIN", "ROLE_INTERVIEWER")
+                .requestMatchers("/api/applications/**").hasAuthority("ROLE_APPLICANT")
                 .anyRequest().permitAll());
         http.authenticationManager(authenticationManager);
 

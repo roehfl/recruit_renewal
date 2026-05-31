@@ -88,7 +88,7 @@ class ApplicantInterviewControllerTest {
         saveCandidate(confirmed, application, 1);
         saveCandidate(draft, application, 1);
 
-        mockMvc.perform(get("/applicant/interviews")
+        mockMvc.perform(get("/api/applicant/interviews")
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -116,13 +116,13 @@ class ApplicantInterviewControllerTest {
         Interview confirmed = saveInterview(jobPosting, stage, "Group A", start(), InterviewStatus.CONFIRMED);
         saveCandidate(confirmed, application, 1);
 
-        mockMvc.perform(get("/applicant/applications/{applicationId}/interviews", application.getId())
+        mockMvc.perform(get("/api/applicant/applications/{applicationId}/interviews", application.getId())
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].interviewId").value(confirmed.getId()));
 
-        mockMvc.perform(get("/applicant/applications/{applicationId}/interviews", otherApplication.getId())
+        mockMvc.perform(get("/api/applicant/applications/{applicationId}/interviews", otherApplication.getId())
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
@@ -142,7 +142,7 @@ class ApplicantInterviewControllerTest {
         saveCandidate(draft, application, 1);
         saveCandidate(other, otherApplication, 1);
 
-        mockMvc.perform(get("/applicant/interviews/{interviewId}", cancelled.getId())
+        mockMvc.perform(get("/api/applicant/interviews/{interviewId}", cancelled.getId())
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -155,11 +155,11 @@ class ApplicantInterviewControllerTest {
                 .andExpect(jsonPath("$.data.stageResultId").doesNotExist())
                 .andExpect(jsonPath("$.data.histories").doesNotExist());
 
-        mockMvc.perform(get("/applicant/interviews/{interviewId}", draft.getId())
+        mockMvc.perform(get("/api/applicant/interviews/{interviewId}", draft.getId())
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
-        mockMvc.perform(get("/applicant/interviews/{interviewId}", other.getId())
+        mockMvc.perform(get("/api/applicant/interviews/{interviewId}", other.getId())
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
@@ -169,13 +169,13 @@ class ApplicantInterviewControllerTest {
     void invalidStatusAndDateRangeReturnBadRequest() throws Exception {
         Applicant applicant = saveApplicant();
 
-        mockMvc.perform(get("/applicant/interviews")
+        mockMvc.perform(get("/api/applicant/interviews")
                         .param("status", "DRAFT")
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
 
-        mockMvc.perform(get("/applicant/interviews")
+        mockMvc.perform(get("/api/applicant/interviews")
                         .param("from", "2026-06-01T10:00:00")
                         .param("to", "2026-06-01T10:00:00")
                         .with(authentication(applicantAuthentication(applicant))))
@@ -187,19 +187,19 @@ class ApplicantInterviewControllerTest {
     void applicantInterviewApisRequireApplicantAuthentication() throws Exception {
         Applicant applicant = saveApplicant();
 
-        mockMvc.perform(get("/applicant/interviews")
+        mockMvc.perform(get("/api/applicant/interviews")
                         .with(authentication(employeeAuthentication())))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.success").value(false));
 
-        mockMvc.perform(get("/applicant/interviews")
+        mockMvc.perform(get("/api/applicant/interviews")
                         .with(anonymous()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.success").value(false));
 
-        mockMvc.perform(get("/applicant/interviews")
+        mockMvc.perform(get("/api/applicant/interviews")
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isOk());
     }

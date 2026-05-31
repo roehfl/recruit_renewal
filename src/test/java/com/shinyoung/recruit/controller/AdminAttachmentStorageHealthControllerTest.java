@@ -70,7 +70,7 @@ class AdminAttachmentStorageHealthControllerTest {
         Files.createDirectories(orphan.getParent());
         Files.writeString(orphan, "orphan", StandardCharsets.UTF_8);
 
-        mockMvc.perform(post("/admin/attachments/storage-health/scan")
+        mockMvc.perform(post("/api/admin/attachments/storage-health/scan")
                         .with(authentication(employeeAuthentication("admin-health", "ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -86,7 +86,7 @@ class AdminAttachmentStorageHealthControllerTest {
 
     @Test
     void recruit_admin_can_scan_storage_health() throws Exception {
-        mockMvc.perform(post("/admin/attachments/storage-health/scan")
+        mockMvc.perform(post("/api/admin/attachments/storage-health/scan")
                         .with(authentication(employeeAuthentication("recruit-admin-health", "ROLE_RECRUIT_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -97,12 +97,12 @@ class AdminAttachmentStorageHealthControllerTest {
     void applicant_and_anonymous_requests_are_blocked() throws Exception {
         Applicant applicant = createApplicant("health-applicant", "Health Applicant");
 
-        mockMvc.perform(post("/admin/attachments/storage-health/scan")
+        mockMvc.perform(post("/api/admin/attachments/storage-health/scan")
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false));
 
-        mockMvc.perform(post("/admin/attachments/storage-health/scan")
+        mockMvc.perform(post("/api/admin/attachments/storage-health/scan")
                         .with(anonymous()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false));

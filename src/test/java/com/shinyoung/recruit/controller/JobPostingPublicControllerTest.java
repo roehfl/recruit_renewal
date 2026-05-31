@@ -70,7 +70,7 @@ class JobPostingPublicControllerTest {
     void public_list_exposes_applicant_fields_and_hides_internal_fields() throws Exception {
         createPublishedPosting(publicRequest("public posting", true, displayStart(), displayEnd(), true));
 
-        mockMvc.perform(get("/job-postings")
+        mockMvc.perform(get("/api/job-postings")
                         .param("page", "0")
                         .param("size", "10"))
                 .andExpect(status().isOk())
@@ -108,7 +108,7 @@ class JobPostingPublicControllerTest {
     void public_detail_exposes_detail_fields_and_hides_internal_fields() throws Exception {
         Long id = createPublishedPosting(publicRequest("detail posting", true, displayStart(), displayEnd(), true));
 
-        mockMvc.perform(get("/job-postings/{id}", id))
+        mockMvc.perform(get("/api/job-postings/{id}", id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.title").value("detail posting"))
@@ -144,7 +144,7 @@ class JobPostingPublicControllerTest {
         createQuestion(id, 1, false);
         jobPostingService.publish(id);
 
-        mockMvc.perform(get("/job-postings/{id}", id))
+        mockMvc.perform(get("/api/job-postings/{id}", id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.requiredQuestionCount").value(1))
@@ -175,7 +175,7 @@ class JobPostingPublicControllerTest {
         );
         jobPostingService.publish(id);
 
-        mockMvc.perform(get("/job-postings/{id}", id))
+        mockMvc.perform(get("/api/job-postings/{id}", id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.attachmentRequired").value(true))
@@ -201,10 +201,10 @@ class JobPostingPublicControllerTest {
                 false
         ));
 
-        mockMvc.perform(get("/job-postings/{id}", hiddenId))
+        mockMvc.perform(get("/api/job-postings/{id}", hiddenId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
-        mockMvc.perform(get("/job-postings/{id}", futureDisplayId))
+        mockMvc.perform(get("/api/job-postings/{id}", futureDisplayId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
     }

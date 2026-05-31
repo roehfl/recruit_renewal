@@ -91,7 +91,7 @@ class ApplicationEducationControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(false));
         authenticate(applicant);
 
-        mockMvc.perform(get("/applications/{applicationId}/educations", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/educations", applicationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -104,7 +104,7 @@ class ApplicationEducationControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/educations", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/educations", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validEducationJson()))
                 .andExpect(status().isOk())
@@ -120,7 +120,7 @@ class ApplicationEducationControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/educations", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/educations", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -138,7 +138,7 @@ class ApplicationEducationControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/educations", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/educations", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -164,7 +164,7 @@ class ApplicationEducationControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(false));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/educations", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/educations", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validEducationJson()))
                 .andExpect(status().isBadRequest())
@@ -179,12 +179,12 @@ class ApplicationEducationControllerTest {
         Long applicationId = createApplication(owner, createPublishedJobPosting(true));
         authenticate(other);
 
-        mockMvc.perform(get("/applications/{applicationId}/educations", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/educations", applicationId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(post("/applications/{applicationId}/educations", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/educations", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validEducationJson()))
                 .andExpect(status().isNotFound())
@@ -199,7 +199,7 @@ class ApplicationEducationControllerTest {
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/educations", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/educations", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validEducationJson()))
                 .andExpect(status().isBadRequest())
@@ -209,12 +209,12 @@ class ApplicationEducationControllerTest {
 
     @Test
     void put_and_delete_methods_are_not_supported() throws Exception {
-        mockMvc.perform(put("/applications/{applicationId}/educations", 1L)
+        mockMvc.perform(put("/api/applications/{applicationId}/educations", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
 
-        mockMvc.perform(delete("/applications/{applicationId}/educations", 1L))
+        mockMvc.perform(delete("/api/applications/{applicationId}/educations", 1L))
                 .andExpect(status().isMethodNotAllowed());
     }
 

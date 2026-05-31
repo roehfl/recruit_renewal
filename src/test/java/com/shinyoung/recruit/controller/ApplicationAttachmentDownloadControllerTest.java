@@ -119,7 +119,7 @@ class ApplicationAttachmentDownloadControllerTest {
         byte[] bytes = "resume-bytes".getBytes(StandardCharsets.UTF_8);
         Long attachmentId = upload(applicant, applicationId, "resume.pdf", "application/pdf", bytes);
 
-        mockMvc.perform(get("/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
+        mockMvc.perform(get("/api/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/pdf"))
@@ -144,7 +144,7 @@ class ApplicationAttachmentDownloadControllerTest {
                 "korean".getBytes(StandardCharsets.UTF_8)
         );
 
-        mockMvc.perform(get("/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
+        mockMvc.perform(get("/api/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("filename*=UTF-8''")))
@@ -158,7 +158,7 @@ class ApplicationAttachmentDownloadControllerTest {
         byte[] bytes = "admin-bytes".getBytes(StandardCharsets.UTF_8);
         Long attachmentId = upload(applicant, applicationId, "admin.pdf", "application/pdf", bytes);
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
                         .with(authentication(employeeAuthentication("admin-download", "ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/pdf"))
@@ -188,7 +188,7 @@ class ApplicationAttachmentDownloadControllerTest {
                 .orElseThrow()
                 .getId();
 
-        mockMvc.perform(get("/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, metadataOnlyAttachmentId)
+        mockMvc.perform(get("/api/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, metadataOnlyAttachmentId)
                         .with(authentication(applicantAuthentication(owner))))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -196,7 +196,7 @@ class ApplicationAttachmentDownloadControllerTest {
                 .andExpect(jsonPath("$.message").exists())
                 .andExpect(content().string(not(containsString("metadata-only/"))));
 
-        mockMvc.perform(get("/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, storedAttachmentId)
+        mockMvc.perform(get("/api/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, storedAttachmentId)
                         .with(authentication(applicantAuthentication(owner))))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -204,7 +204,7 @@ class ApplicationAttachmentDownloadControllerTest {
                 .andExpect(content().string(not(containsString("build/test-attachments"))))
                 .andExpect(content().string(not(containsString("applications/"))));
 
-        mockMvc.perform(get("/applications/{applicationId}/attachments/{attachmentId}/download", otherApplicationId, storedAttachmentId)
+        mockMvc.perform(get("/api/applications/{applicationId}/attachments/{attachmentId}/download", otherApplicationId, storedAttachmentId)
                         .with(authentication(applicantAuthentication(other))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
@@ -217,14 +217,14 @@ class ApplicationAttachmentDownloadControllerTest {
         Long otherApplicationId = createApplication(applicant, createPublishedJobPosting());
         Long attachmentId = upload(applicant, applicationId, "admin.pdf", "application/pdf", "admin".getBytes(StandardCharsets.UTF_8));
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/attachments/{attachmentId}/download", 99999L, attachmentId)
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/attachments/{attachmentId}/download", 99999L, attachmentId)
                         .with(authentication(employeeAuthentication("admin-404", "ROLE_ADMIN"))))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(content().string(not(containsString("storagePath"))));
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/attachments/{attachmentId}/download", otherApplicationId, attachmentId)
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/attachments/{attachmentId}/download", otherApplicationId, attachmentId)
                         .with(authentication(employeeAuthentication("admin-mismatch", "ROLE_RECRUIT_ADMIN"))))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -238,28 +238,28 @@ class ApplicationAttachmentDownloadControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         Long attachmentId = upload(applicant, applicationId, "security.pdf", "application/pdf", "security".getBytes(StandardCharsets.UTF_8));
 
-        mockMvc.perform(get("/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
+        mockMvc.perform(get("/api/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
                         .with(authentication(employeeAuthentication("employee-applicant-path", "ROLE_ADMIN"))))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Access is denied."));
 
-        mockMvc.perform(get("/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
+        mockMvc.perform(get("/api/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
                         .with(anonymous()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Authentication is required."));
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Access is denied."));
 
-        mockMvc.perform(get("/admin/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
+        mockMvc.perform(get("/api/admin/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
                         .with(anonymous()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -273,7 +273,7 @@ class ApplicationAttachmentDownloadControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         Long attachmentId = upload(applicant, applicationId, "delete.pdf", "application/pdf", "delete".getBytes(StandardCharsets.UTF_8));
 
-        mockMvc.perform(post("/applications/{applicationId}/attachments/{attachmentId}/delete", applicationId, attachmentId)
+        mockMvc.perform(post("/api/applications/{applicationId}/attachments/{attachmentId}/delete", applicationId, attachmentId)
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -286,7 +286,7 @@ class ApplicationAttachmentDownloadControllerTest {
                 .andExpect(jsonPath("$.data.physicalFileStatus").doesNotExist())
                 .andExpect(jsonPath("$.data.downloadAvailable").doesNotExist());
 
-        mockMvc.perform(post("/applications/{applicationId}/attachments/{attachmentId}/delete", applicationId, attachmentId)
+        mockMvc.perform(post("/api/applications/{applicationId}/attachments/{attachmentId}/delete", applicationId, attachmentId)
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
@@ -298,12 +298,12 @@ class ApplicationAttachmentDownloadControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         Long attachmentId = upload(applicant, applicationId, "security.pdf", "application/pdf", "security".getBytes(StandardCharsets.UTF_8));
 
-        mockMvc.perform(post("/applications/{applicationId}/attachments/{attachmentId}/delete", applicationId, attachmentId)
+        mockMvc.perform(post("/api/applications/{applicationId}/attachments/{attachmentId}/delete", applicationId, attachmentId)
                         .with(authentication(employeeAuthentication("employee-delete-applicant-path", "ROLE_ADMIN"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false));
 
-        mockMvc.perform(post("/applications/{applicationId}/attachments/{attachmentId}/delete", applicationId, attachmentId)
+        mockMvc.perform(post("/api/applications/{applicationId}/attachments/{attachmentId}/delete", applicationId, attachmentId)
                         .with(anonymous()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false));
@@ -315,7 +315,7 @@ class ApplicationAttachmentDownloadControllerTest {
         Long adminApplicationId = createApplication(adminApplicant, createPublishedJobPosting());
         Long adminAttachmentId = upload(adminApplicant, adminApplicationId, "admin.pdf", "application/pdf", "admin".getBytes(StandardCharsets.UTF_8));
 
-        mockMvc.perform(post("/admin/applications/{applicationId}/attachments/{attachmentId}/delete", adminApplicationId, adminAttachmentId)
+        mockMvc.perform(post("/api/admin/applications/{applicationId}/attachments/{attachmentId}/delete", adminApplicationId, adminAttachmentId)
                         .with(authentication(employeeAuthentication("admin-delete", "ROLE_ADMIN")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -335,7 +335,7 @@ class ApplicationAttachmentDownloadControllerTest {
         Long recruitAdminApplicationId = createApplication(recruitAdminApplicant, createPublishedJobPosting());
         Long recruitAdminAttachmentId = upload(recruitAdminApplicant, recruitAdminApplicationId, "recruit-admin.pdf", "application/pdf", "recruit".getBytes(StandardCharsets.UTF_8));
 
-        mockMvc.perform(post("/admin/applications/{applicationId}/attachments/{attachmentId}/delete", recruitAdminApplicationId, recruitAdminAttachmentId)
+        mockMvc.perform(post("/api/admin/applications/{applicationId}/attachments/{attachmentId}/delete", recruitAdminApplicationId, recruitAdminAttachmentId)
                         .with(authentication(employeeAuthentication("recruit-admin-delete", "ROLE_RECRUIT_ADMIN")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -350,7 +350,7 @@ class ApplicationAttachmentDownloadControllerTest {
         Long validationApplicationId = createApplication(validationApplicant, createPublishedJobPosting());
         Long validationAttachmentId = upload(validationApplicant, validationApplicationId, "validation.pdf", "application/pdf", "validation".getBytes(StandardCharsets.UTF_8));
 
-        mockMvc.perform(post("/admin/applications/{applicationId}/attachments/{attachmentId}/delete", validationApplicationId, validationAttachmentId)
+        mockMvc.perform(post("/api/admin/applications/{applicationId}/attachments/{attachmentId}/delete", validationApplicationId, validationAttachmentId)
                         .with(authentication(employeeAuthentication("admin-delete-blank", "ROLE_ADMIN")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -368,7 +368,7 @@ class ApplicationAttachmentDownloadControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         Long attachmentId = upload(applicant, applicationId, "security.pdf", "application/pdf", "security".getBytes(StandardCharsets.UTF_8));
 
-        mockMvc.perform(post("/admin/applications/{applicationId}/attachments/{attachmentId}/delete", applicationId, attachmentId)
+        mockMvc.perform(post("/api/admin/applications/{applicationId}/attachments/{attachmentId}/delete", applicationId, attachmentId)
                         .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -379,7 +379,7 @@ class ApplicationAttachmentDownloadControllerTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false));
 
-        mockMvc.perform(post("/admin/applications/{applicationId}/attachments/{attachmentId}/delete", applicationId, attachmentId)
+        mockMvc.perform(post("/api/admin/applications/{applicationId}/attachments/{attachmentId}/delete", applicationId, attachmentId)
                         .with(anonymous())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

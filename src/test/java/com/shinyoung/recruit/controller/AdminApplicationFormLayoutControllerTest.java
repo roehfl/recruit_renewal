@@ -61,7 +61,7 @@ class AdminApplicationFormLayoutControllerTest {
     void GET_레이아웃_조회_기본_레이아웃_반환() throws Exception {
         Long jobPostingId = createDraftJobPosting(true, true, false);
 
-        mockMvc.perform(get("/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId))
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.jobPostingId").value(jobPostingId))
@@ -77,7 +77,7 @@ class AdminApplicationFormLayoutControllerTest {
     void GET_레이아웃_조회_availableSections에_전체_레이아웃_섹션_포함() throws Exception {
         Long jobPostingId = createDraftJobPosting(true, false, false);
 
-        mockMvc.perform(get("/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId))
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.availableSections[?(@.sectionType == 'BASIC_INFO')].enabled").value(true))
                 .andExpect(jsonPath("$.data.availableSections[?(@.sectionType == 'BASIC_INFO')].required").value(true))
@@ -101,7 +101,7 @@ class AdminApplicationFormLayoutControllerTest {
                 ))
         ));
 
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId)
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -129,12 +129,12 @@ class AdminApplicationFormLayoutControllerTest {
                 ))
         ));
 
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId)
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId))
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.layoutStored").value(true))
                 .andExpect(jsonPath("$.data.pages.length()").value(1))
@@ -151,7 +151,7 @@ class AdminApplicationFormLayoutControllerTest {
                 ))
         ));
 
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId)
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -169,7 +169,7 @@ class AdminApplicationFormLayoutControllerTest {
                 ))
         ));
 
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId)
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -187,7 +187,7 @@ class AdminApplicationFormLayoutControllerTest {
                 ))
         ));
 
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId)
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -198,7 +198,7 @@ class AdminApplicationFormLayoutControllerTest {
     void POST_잘못된_요청_body_400() throws Exception {
         Long jobPostingId = createDraftJobPosting(false, false, false);
 
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId)
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"pages\": []}"))
                 .andExpect(status().isBadRequest())
@@ -209,7 +209,7 @@ class AdminApplicationFormLayoutControllerTest {
     void GET_preview_페이지_구조_응답() throws Exception {
         Long jobPostingId = createDraftJobPosting(true, true, true);
 
-        mockMvc.perform(get("/admin/job-postings/{jobPostingId}/application-form-layout/preview", jobPostingId))
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/application-form-layout/preview", jobPostingId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.jobPostingId").value(jobPostingId))
@@ -226,7 +226,7 @@ class AdminApplicationFormLayoutControllerTest {
 
     @Test
     void GET_존재하지_않는_공고_404() throws Exception {
-        mockMvc.perform(get("/admin/job-postings/{jobPostingId}/application-form-layout", 99999L))
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/application-form-layout", 99999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
     }
@@ -235,12 +235,12 @@ class AdminApplicationFormLayoutControllerTest {
     void 지원되지_않는_HTTP_메서드_405() throws Exception {
         Long jobPostingId = createDraftJobPosting(false, false, false);
 
-        mockMvc.perform(put("/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId)
+        mockMvc.perform(put("/api/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
 
-        mockMvc.perform(delete("/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId))
+        mockMvc.perform(delete("/api/admin/job-postings/{jobPostingId}/application-form-layout", jobPostingId))
                 .andExpect(status().isMethodNotAllowed());
     }
 

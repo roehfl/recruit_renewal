@@ -87,7 +87,7 @@ class ApplicationMilitaryControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(false));
         authenticate(applicant);
 
-        mockMvc.perform(get("/applications/{applicationId}/military", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/military", applicationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -100,7 +100,7 @@ class ApplicationMilitaryControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/military", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/military", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -119,7 +119,7 @@ class ApplicationMilitaryControllerTest {
         Long completedApplicationId = createApplication(completedApplicant, createPublishedJobPosting(true));
         authenticate(completedApplicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/military", completedApplicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/military", completedApplicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -139,7 +139,7 @@ class ApplicationMilitaryControllerTest {
         Long exemptedApplicationId = createApplication(exemptedApplicant, createPublishedJobPosting(true));
         authenticate(exemptedApplicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/military", exemptedApplicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/military", exemptedApplicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -158,7 +158,7 @@ class ApplicationMilitaryControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/military", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/military", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -169,7 +169,7 @@ class ApplicationMilitaryControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(post("/applications/{applicationId}/military", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/military", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -187,7 +187,7 @@ class ApplicationMilitaryControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(false));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/military", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/military", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -206,12 +206,12 @@ class ApplicationMilitaryControllerTest {
         Long applicationId = createApplication(owner, createPublishedJobPosting(true));
         authenticate(other);
 
-        mockMvc.perform(get("/applications/{applicationId}/military", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/military", applicationId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(post("/applications/{applicationId}/military", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/military", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -230,7 +230,7 @@ class ApplicationMilitaryControllerTest {
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/military", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/military", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -244,12 +244,12 @@ class ApplicationMilitaryControllerTest {
 
     @Test
     void put_and_delete_methods_are_not_supported() throws Exception {
-        mockMvc.perform(put("/applications/{applicationId}/military", 1L)
+        mockMvc.perform(put("/api/applications/{applicationId}/military", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
 
-        mockMvc.perform(delete("/applications/{applicationId}/military", 1L))
+        mockMvc.perform(delete("/api/applications/{applicationId}/military", 1L))
                 .andExpect(status().isMethodNotAllowed());
     }
 

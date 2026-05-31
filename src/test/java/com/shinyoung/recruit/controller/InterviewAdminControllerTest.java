@@ -92,7 +92,7 @@ class InterviewAdminControllerTest {
         JobPosting jobPosting = saveJobPosting();
         Stage interviewStage = saveStage(jobPosting, StageType.FIRST_INTERVIEW, 1);
 
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/interviews", jobPosting.getId())
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/interviews", jobPosting.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -110,7 +110,7 @@ class InterviewAdminControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").isNumber());
 
-        mockMvc.perform(get("/admin/job-postings/{jobPostingId}/interviews", jobPosting.getId())
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/interviews", jobPosting.getId())
                         .param("status", "DRAFT"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -139,19 +139,19 @@ class InterviewAdminControllerTest {
                 )
         );
 
-        mockMvc.perform(get("/admin/interviews/{interviewId}", interviewId))
+        mockMvc.perform(get("/api/admin/interviews/{interviewId}", interviewId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.candidates[0].jobApplicationId").value(application.getId()))
                 .andExpect(jsonPath("$.data.interviewers[0].employeeId").value(employee.getId()));
 
-        mockMvc.perform(post("/admin/interviews/{interviewId}/confirm", interviewId)
+        mockMvc.perform(post("/api/admin/interviews/{interviewId}/confirm", interviewId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
 
-        mockMvc.perform(post("/admin/interviews/{interviewId}/cancel", interviewId)
+        mockMvc.perform(post("/api/admin/interviews/{interviewId}/cancel", interviewId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk())
@@ -163,17 +163,17 @@ class InterviewAdminControllerTest {
         JobPosting jobPosting = saveJobPosting();
         Applicant applicant = saveApplicant();
 
-        mockMvc.perform(get("/admin/job-postings/{jobPostingId}/interviews", jobPosting.getId())
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/interviews", jobPosting.getId())
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false));
 
-        mockMvc.perform(get("/admin/job-postings/{jobPostingId}/interviews", jobPosting.getId())
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/interviews", jobPosting.getId())
                         .with(anonymous()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false));
 
-        mockMvc.perform(get("/admin/job-postings/{jobPostingId}/interviews", jobPosting.getId()))
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/interviews", jobPosting.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }

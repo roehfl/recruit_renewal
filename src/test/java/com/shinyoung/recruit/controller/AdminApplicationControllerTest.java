@@ -76,7 +76,7 @@ class AdminApplicationControllerTest {
         Long jobPostingId = createPublishedJobPosting("Admin Api List Posting");
         Long applicationId = createApplication(applicant, jobPostingId);
 
-        mockMvc.perform(get("/admin/applications")
+        mockMvc.perform(get("/api/admin/applications")
                         .param("page", "0")
                         .param("size", "20"))
                 .andExpect(status().isOk())
@@ -99,19 +99,19 @@ class AdminApplicationControllerTest {
         Long submittedApplicationId = createApplication(submittedApplicant, jobPostingId, jobPositionIds.get(1));
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
-        mockMvc.perform(get("/admin/applications")
+        mockMvc.perform(get("/api/admin/applications")
                         .param("status", " draft "))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.content[0].applicationId").value(draftApplicationId));
 
-        mockMvc.perform(get("/admin/applications")
+        mockMvc.perform(get("/api/admin/applications")
                         .param("jobPostingId", String.valueOf(jobPostingId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.totalElements").value(2));
 
-        mockMvc.perform(get("/admin/applications")
+        mockMvc.perform(get("/api/admin/applications")
                         .param("jobPositionId", String.valueOf(jobPositionIds.get(1))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -124,7 +124,7 @@ class AdminApplicationControllerTest {
         Long jobPostingId = createPublishedJobPosting("Admin Api Detail Posting");
         Long applicationId = createApplication(applicant, jobPostingId);
 
-        mockMvc.perform(get("/admin/applications/{applicationId}", applicationId))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}", applicationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -136,7 +136,7 @@ class AdminApplicationControllerTest {
 
     @Test
     void get_admin_application_detail_not_found_returns_api_response() throws Exception {
-        mockMvc.perform(get("/admin/applications/{applicationId}", 99999L))
+        mockMvc.perform(get("/api/admin/applications/{applicationId}", 99999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -153,7 +153,7 @@ class AdminApplicationControllerTest {
         createApplication(secondApplicant, jobPostingId);
         createApplication(otherApplicant, otherJobPostingId);
 
-        mockMvc.perform(get("/admin/job-postings/{jobPostingId}/applications", jobPostingId)
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/applications", jobPostingId)
                         .param("page", "0")
                         .param("size", "20"))
                 .andExpect(status().isOk())
@@ -165,25 +165,25 @@ class AdminApplicationControllerTest {
 
     @Test
     void invalid_admin_application_query_returns_api_response() throws Exception {
-        mockMvc.perform(get("/admin/applications")
+        mockMvc.perform(get("/api/admin/applications")
                         .param("page", "-1"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(get("/admin/applications")
+        mockMvc.perform(get("/api/admin/applications")
                         .param("size", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(get("/admin/applications")
+        mockMvc.perform(get("/api/admin/applications")
                         .param("size", "101"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(get("/admin/applications")
+        mockMvc.perform(get("/api/admin/applications")
                         .param("status", "UNKNOWN"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
@@ -192,15 +192,15 @@ class AdminApplicationControllerTest {
 
     @Test
     void admin_application_write_methods_are_not_supported() throws Exception {
-        mockMvc.perform(put("/admin/applications/{applicationId}", 1L)
+        mockMvc.perform(put("/api/admin/applications/{applicationId}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
 
-        mockMvc.perform(delete("/admin/applications/{applicationId}", 1L))
+        mockMvc.perform(delete("/api/admin/applications/{applicationId}", 1L))
                 .andExpect(status().isMethodNotAllowed());
 
-        mockMvc.perform(post("/admin/applications/{applicationId}", 1L)
+        mockMvc.perform(post("/api/admin/applications/{applicationId}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());

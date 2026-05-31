@@ -87,7 +87,7 @@ class ApplicationGapPeriodControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(get("/applications/{applicationId}/gap-periods", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/gap-periods", applicationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -100,7 +100,7 @@ class ApplicationGapPeriodControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/gap-periods", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/gap-periods", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validGapPeriodJson()))
                 .andExpect(status().isOk())
@@ -115,7 +115,7 @@ class ApplicationGapPeriodControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/gap-periods", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/gap-periods", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -126,7 +126,7 @@ class ApplicationGapPeriodControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(post("/applications/{applicationId}/gap-periods", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/gap-periods", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -152,7 +152,7 @@ class ApplicationGapPeriodControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(false));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/gap-periods", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/gap-periods", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validGapPeriodJson()))
                 .andExpect(status().isBadRequest())
@@ -167,12 +167,12 @@ class ApplicationGapPeriodControllerTest {
         Long applicationId = createApplication(owner, createPublishedJobPosting(true));
         authenticate(other);
 
-        mockMvc.perform(get("/applications/{applicationId}/gap-periods", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/gap-periods", applicationId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(post("/applications/{applicationId}/gap-periods", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/gap-periods", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validGapPeriodJson()))
                 .andExpect(status().isNotFound())
@@ -187,7 +187,7 @@ class ApplicationGapPeriodControllerTest {
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/gap-periods", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/gap-periods", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validGapPeriodJson()))
                 .andExpect(status().isBadRequest())
@@ -197,12 +197,12 @@ class ApplicationGapPeriodControllerTest {
 
     @Test
     void put_and_delete_methods_are_not_supported() throws Exception {
-        mockMvc.perform(put("/applications/{applicationId}/gap-periods", 1L)
+        mockMvc.perform(put("/api/applications/{applicationId}/gap-periods", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
 
-        mockMvc.perform(delete("/applications/{applicationId}/gap-periods", 1L))
+        mockMvc.perform(delete("/api/applications/{applicationId}/gap-periods", 1L))
                 .andExpect(status().isMethodNotAllowed());
     }
 

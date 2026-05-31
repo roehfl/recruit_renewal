@@ -94,7 +94,7 @@ class InterviewerInterviewControllerTest {
         saveCandidate(confirmed, application, 1);
         saveInterviewer(draft, employee, 1);
 
-        mockMvc.perform(get("/interviewer/interviews")
+        mockMvc.perform(get("/api/interviewer/interviews")
                         .with(authentication(employeeAuthentication(employee))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -125,7 +125,7 @@ class InterviewerInterviewControllerTest {
         cancelledCandidateParticipant.cancel();
         participantRepository.saveAndFlush(cancelledCandidateParticipant);
 
-        mockMvc.perform(get("/interviewer/interviews/{interviewId}", cancelled.getId())
+        mockMvc.perform(get("/api/interviewer/interviews/{interviewId}", cancelled.getId())
                         .with(authentication(employeeAuthentication(employee))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -155,25 +155,25 @@ class InterviewerInterviewControllerTest {
         saveInterviewer(draft, employee, 1);
         saveInterviewer(other, otherEmployee, 1);
 
-        mockMvc.perform(get("/interviewer/interviews")
+        mockMvc.perform(get("/api/interviewer/interviews")
                         .param("status", "DRAFT")
                         .with(authentication(employeeAuthentication(employee))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
 
-        mockMvc.perform(get("/interviewer/interviews")
+        mockMvc.perform(get("/api/interviewer/interviews")
                         .param("from", "2026-06-01T10:00:00")
                         .param("to", "2026-06-01T10:00:00")
                         .with(authentication(employeeAuthentication(employee))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
 
-        mockMvc.perform(get("/interviewer/interviews/{interviewId}", draft.getId())
+        mockMvc.perform(get("/api/interviewer/interviews/{interviewId}", draft.getId())
                         .with(authentication(employeeAuthentication(employee))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
 
-        mockMvc.perform(get("/interviewer/interviews/{interviewId}", other.getId())
+        mockMvc.perform(get("/api/interviewer/interviews/{interviewId}", other.getId())
                         .with(authentication(employeeAuthentication(employee))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
@@ -184,19 +184,19 @@ class InterviewerInterviewControllerTest {
         Employee employee = saveEmployee();
         Applicant applicant = saveApplicant();
 
-        mockMvc.perform(get("/interviewer/interviews")
+        mockMvc.perform(get("/api/interviewer/interviews")
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.success").value(false));
 
-        mockMvc.perform(get("/interviewer/interviews")
+        mockMvc.perform(get("/api/interviewer/interviews")
                         .with(anonymous()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.success").value(false));
 
-        mockMvc.perform(get("/interviewer/interviews")
+        mockMvc.perform(get("/api/interviewer/interviews")
                         .with(authentication(employeeAuthentication(employee))))
                 .andExpect(status().isOk());
     }

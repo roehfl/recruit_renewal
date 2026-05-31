@@ -1,5 +1,236 @@
 # 07. Implementation History
 
+## Phase 07 - Export, PDF, Statistics Design
+
+- Date: 2026-05-29
+- Work type: documentation-only design phase (grill-with-docs 세션 기반).
+- Goal: 운영자 reporting 계층(Excel download/upload, Application PDF, 전형 funnel 통계)의 백엔드 범위·API·검증 규칙·슬라이스를 확정한다. 구현/테스트/migration은 하지 않는다.
+- Created:
+  - `docs/codex/design/phase-07-export-pdf-statistics-design.md`
+  - `docs/codex/reports/phase-07-export-pdf-statistics-design.html`
+  - `docs/adr/0001-application-pdf-openhtmltopdf-avoid-itext-agpl.md`
+  - `docs/adr/0002-phase07-export-readonly-upload-stageresult-only.md`
+- Modified:
+  - `CONTEXT.md` (Excel upload 범위를 StageResult로 축소, 모집단 P 코호트 정의, `funnel 단계 분포`/`NO_RESULT` 용어 추가, `password` 제외 보강)
+  - `docs/codex/06-implementation-roadmap.md` (Phase 07 슬라이스 분할/설계 결정/산출물)
+  - `docs/codex/07-implementation-history.md`
+- Key design decisions (13 + refinements):
+  - 4개 기둥 모두 Phase 07, 읽기(export/statistics) 먼저 · 쓰기(upload) · PDF 나중. 슬라이스 07a~07f.
+  - Excel = Apache POI + SXSSF(streaming) + 하드 row cap(생성 전 count 선검증, 초과 시 `400 EXPORT_ROW_LIMIT_EXCEEDED`, 조용한 truncation 금지).
+  - download 전부 list-parity(1:N 평탄화 없음). applications export만 `name`/`phoneNumber`/`email` 연락처 확장 — export가 admin이 phone/email을 보는 최초 surface.
+  - 모집단 P = `submittedAt != null` 코호트(현재 status 무관, 재현 가능). `withdraw()`가 submittedAt 보존함을 코드로 확인.
+  - funnel 단계 분포 = 7-bucket(6 `StageResultStatus` + 응답 전용 synthetic `NO_RESULT`), 합 = |P|. `NO_RESULT`는 DB enum/ upload 입력값 아님. PASSED 기준 누적·전환 두 비율.
+  - dimension = 전체+분야별(FK) 먼저. 학교별 Phase 08 이후, 자격별 free-text는 07 후속 또는 P08(미확정). topN 기본 10 + 기타.
+  - Excel upload = `StageResult`만. `InterviewEvaluation`은 Phase 06 경계(배정 면접관만 평가 작성, 평가 독립성)로 영구 제외.
+  - upload = stateless preview/commit(새 테이블 없음), all-or-nothing, `stageResultId`+`applicationId`+path `stageId` 3중 교차검증, 기존 `StageResultService.bulkUpdateResults` 경유(공유 `StageResultBulkUpdateItemRequest` 불변, echo 필드는 upload row DTO에만).
+  - PDF = Thymeleaf + openhtmltopdf(PDFBox) + CJK 폰트 임베드, iText(AGPL) 회피, admin 전용, 1 지원자 1 PDF, 생성 시 audit.
+  - `ci`/`ciHash`/`password`는 어떤 export/PDF/statistics에도 절대 미포함. statistics는 집계값만(audit 없음).
+  - 새 entity/table/migration 없음(read-only 또는 기존 명령 재사용).
+- Design review:
+  - 4-critic adversarial 리뷰(consistency / completeness / PII·security / code-grounding) 실행, 17 findings.
+  - 반영: Changed Files·Test Results·Component Summary 섹션 추가, PDF audit 명시, upload 3중매칭을 upload row DTO+service 교차검증으로 정리(공유 DTO 불변), `password` 누락 3곳 보강, CERTIFICATE dimension을 07c 미확정으로 명시, API 표 Purpose/DTO 타입 보강, dimension enum 매핑 문서화.
+  - 코드 근거 확인: `StageResultService.bulkUpdateResults(stageId, request, actor)`, `StageResultStatus{PENDING,PASSED,FAILED,ABSENT,WITHDRAWN,HOLD}`, `AdminApplicationSummaryResponse`에 phone/email 부재, `JobApplication.submittedAt` 철회 후 보존 — 모두 실재 확인.
+- Review 반영 (instruction.md, 10 findings):
+  - (High) upload 소스를 stage results export / `upload-template`로 제한, applications export는 소스 아님으로 명시(stage-specific하지 않아 `stageResultId` 미보장). upload-template 엔드포인트 추가.
+  - (High) stateless lost update 방어: upload row에 `stageResultUpdatedAt` 토큰 추가 → commit 시 현재 `StageResult.updatedAt`와 불일치하면 `STALE_ROW`로 전체 거부(409).
+  - (High) export streaming 트랜잭션 경계 고정: temp file 선생성(read-only tx + projection DTO) 채택, JPA entity/lazy를 writer에 넘기지 않음.
+  - (High) funnel raw 분포(`distribution`, 합=|P|)와 순차 통과 집합(`funnelPassedCount`, S0=P, Sk=S(k-1)∩PASSED) 분리, 비율은 후자 기준.
+  - (Med) Excel formula injection 방어(export string cell/escaping, upload formula cell 거부), upload 파일 레벨 방어(.xlsx만/첫 sheet/header 검증/duplicate 거부/maxUploadRows·Size).
+  - (Med) PDF 템플릿 보안(`th:text`만·`th:utext` 금지, 외부 resource 차단, CSS pre-wrap, attachment embed 범위 밖, no-store 헤더).
+  - (Med) audit schema 구체화(§14.1: 공통/export/PDF/upload commit 필드, PII 직접 기록 금지).
+  - (Med) statistics `distribution.withdrawn`(stage result status) ≠ `population.withdrawnCount`(application status) 분리·덮어쓰기 금지 명시.
+  - (Low) `EXPORT_APPLICATION_PII` 권한 정책 상수 여지 명시(SecurityConfig 세분화는 보류).
+  - Decision Log 15~20 추가, HTML 리포트 funnel/upload/보안 구획 동기화.
+- Review 반영 2 (instruction.md, 7 findings):
+  - (Major) upload 소스를 `upload-template` **하나로만** 한정(stage results export도 소스에서 제외) — 목록 export와 upload sheet 분리, 컬럼 계약 충돌 제거. §9.3 row 모델 표로 정리.
+  - (Major) upload 빈칸 의미 확정: resultStatus blank=row error, score/comment blank=null clear, 변경 없는 row는 commit 제외(stale check도 변경 row만), template은 현재값 prefill.
+  - (Major) `stageResultUpdatedAt` = ISO-8601 **string cell**, normalize 후 비교, date/numeric/formula면 row error, read-only token 표시. (옵션) HMAC opaque token → Open Q#7.
+  - (Med) upload row에 `stageId` 컬럼 제거 — stageId는 path로만 판단(3중 검증 유지).
+  - (Med) export 응답 = `ResponseEntity<Resource>`로 정정(API/HTML 일치), temp 삭제는 controller 전송 후 finally(service finally 금지).
+  - (Med) Test Strategy 보강: STALE_ROW(핵심)/formula cell/파일타입/header/maxRows·Size/blank 정책/헤더/th:utext/외부 resource 차단.
+  - (Low) audit `filtersSafeJson` allowlist 기반 + PII성 필터 마스킹/제외 명시.
+  - Decision Log 15 수정 + 21~25 추가, Open Q#7 추가, HTML 리포트 동기화.
+- Tests:
+  - documentation-only 단계라 Gradle 테스트 미실행.
+- Deferred:
+  - Java 구현/테스트/schema, 자격별 dimension 정규화, stage/interview export 연락처 확장, 영속 ActivityLog.
+- Next recommended phase:
+  - Phase 07a - Excel Export Infra + Applications Download.
+
+## Phase 06e - Stabilization / Test Hardening
+
+- Date: 2026-05-29
+- Work type: 회귀/안정화 테스트 slice (테스트 전용, 운영 코드 변경 없음).
+- Goal: 면접 평가 기능을 교차 경로 회귀 테스트로 하드닝하고, StageResult 비변경 보장을 실행 가능한 회귀 테스트로 고정한다. Phase 06 종료.
+- Created (test):
+  - `src/test/java/com/shinyoung/recruit/service/InterviewEvaluationStabilizationTest.java` (5 tests)
+- Created (docs):
+  - `docs/codex/implementation/phase-06e-stabilization-test-hardening.md`
+  - `docs/codex/reports/phase-06e-stabilization-test-hardening.html`
+- Modified (docs):
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/06-implementation-roadmap.md`
+- Implemented (테스트):
+  - N×M 매트릭스: 3 후보자 × 4 면접관 → 12 평가 생성, 관리자 면접 조회의 후보자 그룹/요약 집계 검증(SUBMITTED 전용 분포 합산).
+  - reopen → 재제출 사이클: interviewer submit → admin reopen(DRAFT) → interviewer 재제출(SUBMITTED, 신규 값) end-to-end.
+  - StageResult 비변경 회귀(06d 리뷰 항목): 실제 PENDING StageResult row 생성 후 submit/reopen/조회(면접·단계·지원서) 수행 → StageResult 불변(resultStatus=PENDING, score/comment/decidedAt/decidedBy=null, row count=1) 단언.
+  - 기존 가드(취소 면접/참가자, 가시성, SUBMITTED 불변성, 비참가자 차단)는 06a~06d 스위트로 재검증.
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*Evaluation*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL (70 tests, 0 failures, 0 skipped) — 06e 신규 5건 + 06a~06d 회귀.
+  - 요청에 따라 평가 관련 패키지만 부분 실행(전체 스위트 미실행).
+- Phase 06 (Interview Evaluation) 06a~06e 완료.
+- Deferred (Phase 06 범위 외 후속):
+  - ActivityLog 도메인 루트 → 재개 감사 이관.
+  - StageResult 반영(reflect) 커맨드(점수화 기준 정의 시).
+  - 평가 데이터 Excel/PDF 내보내기(통계/리포팅 phase).
+
+## Phase 06d - Reopen + StageResult Boundary
+
+- Date: 2026-05-29
+- Work type: 관리자 커맨드 구현 slice + 대상 테스트.
+- Goal: 관리자 평가 재개(SUBMITTED→DRAFT) 커맨드를 추가하고, 감사 로그로 기록하며, StageResult 비변경 보장을 enforce/문서화한다.
+- Modified (source):
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewEvaluationRepository.java` (`findAdminDetailByIdAndInterviewId`)
+  - `src/main/java/com/shinyoung/recruit/service/InterviewEvaluationAdminService.java` (`reopen` + validateActor, Clock·logger)
+  - `src/main/java/com/shinyoung/recruit/controller/InterviewEvaluationAdminController.java` (reopen POST, CurrentEmployeeService 주입)
+- Modified (test):
+  - `src/test/java/com/shinyoung/recruit/service/InterviewEvaluationAdminServiceTest.java` (3건 추가 → 10건)
+  - `src/test/java/com/shinyoung/recruit/controller/InterviewEvaluationAdminControllerTest.java` (2건 추가 → 8건)
+- Created (docs):
+  - `docs/codex/implementation/phase-06d-reopen-stageresult-boundary.md`
+  - `docs/codex/reports/phase-06d-reopen-stageresult-boundary.html`
+- Modified (docs):
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/06-implementation-roadmap.md`
+- APIs:
+  - `POST /admin/interviews/{interviewId}/evaluations/{evaluationId}/reopen`
+- Business rules:
+  - 평가가 경로 면접 소속이어야 함(아니면 404), SUBMITTED만 재개 가능(DRAFT→400).
+  - 재개 대상 재제출 가능 상태 보장: interview CONFIRMED + 후보자/면접관 ASSIGNED, 아니면 400.
+  - 재개 시 status=DRAFT, submittedAt 초기화, 등급/추천/코멘트 보존. 재개 후 면접관 재작성/재제출 가능(06b).
+  - actor 필수(인증 관리자에서 추출), 재개는 감사 로그 기록. 재개 응답은 06c `AdminEvaluationItemResponse` 재사용.
+  - 평가 도메인은 `StageResult`를 어디서도 참조/주입/변경하지 않음(구조적 보장). reflect 커맨드는 보류.
+- Review 반영 (instruction.md):
+  - (보완) reopen에 interview CONFIRMED + 후보자/면접관 ASSIGNED 가드 추가. cancelled 상태로 reopen하면 06b write 가드 때문에 재제출 불가한 DRAFT가 생기는 문제 차단.
+  - `findAdminDetailByIdAndInterviewId` 쿼리에 candidateParticipant fetch join 추가.
+  - 가드 테스트 3건 추가(cancelled interview / candidate / interviewer).
+  - StageResult 비변경 회귀 테스트(reopen/submit/read 전후 StageResult 불변)와 영속 ActivityLog는 리뷰 합의대로 06e/후속으로 유지.
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*Evaluation*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL (65 tests, 0 failures, 0 skipped) — 06d 신규 8건 + 06a~06c 회귀.
+  - 요청에 따라 평가 관련 패키지만 부분 실행(전체 스위트 미실행).
+- Deferred:
+  - 영속 ActivityLog 도메인 — 재개 이력은 현재 SLF4J 감사 로그에 기록, 도메인 구현 시 이관.
+  - StageResult 반영(reflect) 커맨드(점수화 기준 미정).
+  - N×M 매트릭스/가드 회귀 하드닝 (06e).
+- Next recommended phase: Phase 06e - 안정화 / 테스트 하드닝.
+
+## Phase 06c - Admin Evaluation Read
+
+- Date: 2026-05-29
+- Work type: 조회 API / 응답 DTO 구현 slice + 대상 테스트.
+- Goal: 관리자 면접 평가 조회를 면접/단계/지원서 세 레벨로 제공하고, 후보자별 그룹 응답과 요약 집계를 구현한다.
+- Created (source):
+  - `src/main/java/com/shinyoung/recruit/dto/response/GradeDistribution.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/RecommendationDistribution.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminEvaluationItemResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminEvaluationSummaryResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminEvaluationCandidateResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminInterviewEvaluationResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminApplicationEvaluationResponse.java`
+- Modified (source):
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewEvaluationRepository.java` (admin 조회 쿼리 3종)
+  - `src/main/java/com/shinyoung/recruit/service/InterviewEvaluationAdminService.java` (조회 메서드 3종 + groupByInterview, Stage/JobApplication 리포지토리 주입)
+  - `src/main/java/com/shinyoung/recruit/controller/InterviewEvaluationAdminController.java` (클래스 base 매핑 제거, GET 3종 추가)
+- Modified (test):
+  - `src/test/java/com/shinyoung/recruit/service/InterviewEvaluationAdminServiceTest.java` (4건 추가 → 7건)
+  - `src/test/java/com/shinyoung/recruit/controller/InterviewEvaluationAdminControllerTest.java` (3건 추가 → 6건)
+- Created (docs):
+  - `docs/codex/implementation/phase-06c-admin-evaluation-read.md`
+  - `docs/codex/reports/phase-06c-admin-evaluation-read.html`
+- Modified (docs):
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/06-implementation-roadmap.md`
+- APIs:
+  - `GET /admin/interviews/{interviewId}/evaluations`
+  - `GET /admin/stages/{stageId}/interview-evaluations`
+  - `GET /admin/applications/{applicationId}/interview-evaluations`
+- Business rules:
+  - interview/stage/application 미존재 시 404.
+  - 면접 레벨은 후보자 participant 기준 그룹화, 후보자별 요약 포함.
+  - `submittedCount`=SUBMITTED 수, `totalEvaluatorCount`=DRAFT+SUBMITTED 전체. 등급/추천 분포는 SUBMITTED만 집계(DRAFT는 목록 포함, 분포 제외).
+  - 분포 DTO는 항상 5개 필드 포함(없으면 0). 관리자 view는 interviewerName 노출.
+  - 단계/지원서 조회는 평가 행이 있는 면접만 노출. 06a 비정규화 FK(stage/jobApplication)로 직접 인덱스 쿼리.
+  - `StageResult`를 어디서도 참조/주입/변경하지 않음.
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*Evaluation*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL (57 tests, 0 failures, 0 skipped) — 06c 신규 7건 + 06b/06a 회귀.
+  - 요청에 따라 평가 관련 패키지만 부분 실행(전체 스위트 미실행).
+- Deferred:
+  - 관리자 재개(reopen) API · ActivityLog (06d)
+  - StageResult 비변경 보장 명시 강화 (06d)
+  - N×M 매트릭스/가드 회귀 하드닝 (06e)
+- Next recommended phase: Phase 06d - 재개(reopen) + StageResult 경계.
+
+## Phase 06b - Admin Initialize + Interviewer Evaluation Write
+
+- Date: 2026-05-29
+- Work type: 서비스/컨트롤러/DTO 구현 slice + 대상 테스트.
+- Goal: Phase 06a `InterviewEvaluation` 도메인 위에 관리자 평가 초기화 커맨드와 면접관 평가 목록/상세/저장/제출 API를 추가한다.
+- Created (source):
+  - `src/main/java/com/shinyoung/recruit/service/InterviewEvaluationAdminService.java`
+  - `src/main/java/com/shinyoung/recruit/service/InterviewerEvaluationService.java`
+  - `src/main/java/com/shinyoung/recruit/controller/InterviewEvaluationAdminController.java`
+  - `src/main/java/com/shinyoung/recruit/controller/InterviewerEvaluationController.java`
+  - `src/main/java/com/shinyoung/recruit/dto/request/InterviewEvaluationSaveRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/InterviewEvaluationInitializeResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/InterviewerEvaluationListResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/InterviewerEvaluationSummaryResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/InterviewerEvaluationDetailResponse.java`
+  - `src/main/java/com/shinyoung/recruit/exception/InterviewEvaluationNotFoundException.java`
+  - `src/main/java/com/shinyoung/recruit/exception/InvalidInterviewEvaluationException.java`
+- Created (test):
+  - `src/test/java/com/shinyoung/recruit/service/InterviewEvaluationAdminServiceTest.java` (3 tests)
+  - `src/test/java/com/shinyoung/recruit/service/InterviewerEvaluationServiceTest.java` (13 tests)
+  - `src/test/java/com/shinyoung/recruit/controller/InterviewEvaluationAdminControllerTest.java` (3 tests)
+  - `src/test/java/com/shinyoung/recruit/controller/InterviewerEvaluationControllerTest.java` (4 tests)
+- Modified (source):
+  - `src/main/java/com/shinyoung/recruit/exception/GlobalExceptionHandler.java` (404/400 핸들러 2종 추가)
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewEvaluationRepository.java` (면접관 목록/상세 조회 쿼리 2종)
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepository.java` (interview+role+status 조회 쿼리)
+- Created (docs):
+  - `docs/codex/implementation/phase-06b-admin-initialize-interviewer-evaluation-write.md`
+  - `docs/codex/reports/phase-06b-admin-initialize-interviewer-evaluation-write.html`
+- Modified (docs):
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/06-implementation-roadmap.md`
+- APIs:
+  - `POST /admin/interviews/{interviewId}/evaluations/initialize`
+  - `GET /interviewer/interviews/{interviewId}/evaluations`
+  - `GET /interviewer/interviews/{interviewId}/evaluations/{evaluationId}`
+  - `POST /interviewer/interviews/{interviewId}/evaluations/{evaluationId}`
+  - `POST /interviewer/interviews/{interviewId}/evaluations/{evaluationId}/submit`
+- Business rules:
+  - 초기화는 CONFIRMED 면접에서만 가능, ASSIGNED 후보자×면접관 조합만 생성, 순차 호출 기준 멱등.
+  - 면접관 조회/저장/제출은 먼저 visible(CONFIRMED/CANCELLED) ASSIGNED 면접관 participant를 찾고, 그 participant id로 평가를 조회 → cancelled/비참가자는 404.
+  - 저장/제출은 CONFIRMED + 양측 ASSIGNED + DRAFT 가드, 제출은 grade/recommendation 필수 + `submittedAt` 설정, 이후 수정 불가(reopen은 06d). 제출 body 미전달 시 기존 저장값 사용.
+  - 면접관 정보 격리: 목록·상세 모두 participant id 기준, 본인 평가만 노출. cancelled 면접관은 본인 과거 평가 상세도 조회 불가.
+  - `StageResult`를 어디서도 참조/주입/변경하지 않음.
+- Review 반영 (instruction.md):
+  - (Blocking) `getMyEvaluationDetail`/save/submit가 visible/assigned participant 검증을 우회하던 문제 수정. employeeId 소유권 검사 대신 `findVisibleInterviewer` → participant id 기준 조회로 통일.
+  - Repository 메서드를 participant id 기준으로 교체(`findByInterviewIdAndInterviewerParticipantId`, `findDetailByIdAndInterviewIdAndInterviewerParticipantId`).
+  - 동시 initialize 멱등성은 known limitation으로 명시(보강안: interview row 비관적 락 또는 위반 예외 캐치).
+  - 누락 테스트 6건 추가(cancelled 면접관 상세 404, DRAFT 면접 상세 404, cancelled 면접관 목록 404, body 없는 제출 정상/필수값 400, candidate cancelled 저장 400).
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*Evaluation*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL (50 tests, 0 failures, 0 skipped) — 06b 신규 23건 + 06a 회귀 27건.
+  - 요청에 따라 평가 관련 패키지만 부분 실행(전체 스위트 미실행).
+- Deferred:
+  - 관리자 조회 API · 후보자별 요약 집계 · GradeDistribution/RecommendationDistribution (06c)
+  - 관리자 재개(reopen) API · ActivityLog (06d)
+- Next recommended phase: Phase 06c - 관리자 평가 조회.
+
 ## Phase 06a - InterviewEvaluation Domain
 
 - Date: 2026-05-28

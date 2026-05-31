@@ -90,7 +90,7 @@ class ApplicationAttachmentControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         authenticate(applicant);
 
-        mockMvc.perform(get("/applications/{applicationId}/attachments", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/attachments", applicationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -103,7 +103,7 @@ class ApplicationAttachmentControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/attachments", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/attachments", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validAttachmentJson()))
                 .andExpect(status().isOk())
@@ -122,7 +122,7 @@ class ApplicationAttachmentControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         authenticate(applicant);
 
-        mockMvc.perform(multipart("/applications/{applicationId}/attachments/files", applicationId)
+        mockMvc.perform(multipart("/api/applications/{applicationId}/attachments/files", applicationId)
                         .file(file("resume.pdf", "application/pdf", "resume"))
                         .param("attachmentType", "RESUME")
                         .param("sectionType", "APPLICATION"))
@@ -143,7 +143,7 @@ class ApplicationAttachmentControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         authenticate(applicant);
 
-        mockMvc.perform(multipart("/applications/{applicationId}/attachments/files", applicationId)
+        mockMvc.perform(multipart("/api/applications/{applicationId}/attachments/files", applicationId)
                         .file(file("resume.pdf", "application/pdf", "resume"))
                         .param("attachmentType", "RESUME")
                         .param("sectionType", "APPLICATION")
@@ -152,7 +152,7 @@ class ApplicationAttachmentControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(multipart("/applications/{applicationId}/attachments/files", applicationId)
+        mockMvc.perform(multipart("/api/applications/{applicationId}/attachments/files", applicationId)
                         .file(file("resume.pdf", "application/pdf", "resume"))
                         .param("attachmentType", "RESUME")
                         .param("sectionType", "APPLICATION")
@@ -168,7 +168,7 @@ class ApplicationAttachmentControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/attachments", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/attachments", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -179,7 +179,7 @@ class ApplicationAttachmentControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(post("/applications/{applicationId}/attachments", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/attachments", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -208,7 +208,7 @@ class ApplicationAttachmentControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/attachments", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/attachments", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -237,12 +237,12 @@ class ApplicationAttachmentControllerTest {
         Long applicationId = createApplication(owner, createPublishedJobPosting());
         authenticate(other);
 
-        mockMvc.perform(get("/applications/{applicationId}/attachments", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/attachments", applicationId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(post("/applications/{applicationId}/attachments", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/attachments", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validAttachmentJson()))
                 .andExpect(status().isNotFound())
@@ -257,7 +257,7 @@ class ApplicationAttachmentControllerTest {
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/attachments", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/attachments", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validAttachmentJson()))
                 .andExpect(status().isBadRequest())
@@ -267,12 +267,12 @@ class ApplicationAttachmentControllerTest {
 
     @Test
     void put_and_delete_methods_are_not_supported() throws Exception {
-        mockMvc.perform(put("/applications/{applicationId}/attachments", 1L)
+        mockMvc.perform(put("/api/applications/{applicationId}/attachments", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
 
-        mockMvc.perform(delete("/applications/{applicationId}/attachments", 1L))
+        mockMvc.perform(delete("/api/applications/{applicationId}/attachments", 1L))
                 .andExpect(status().isMethodNotAllowed());
     }
 

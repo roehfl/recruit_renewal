@@ -114,7 +114,7 @@ class StageResultControllerTest {
         Long applicationId = createSubmittedApplication("stage-result-api-init", jobPostingId);
         Long stageId = createStage(jobPostingId);
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/initialize", stageId))
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/initialize", stageId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -132,7 +132,7 @@ class StageResultControllerTest {
         Long stageId = createStage(jobPostingId);
         stageResultService.initialize(stageId);
 
-        mockMvc.perform(get("/admin/stages/{stageId}/results", stageId))
+        mockMvc.perform(get("/api/admin/stages/{stageId}/results", stageId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -152,7 +152,7 @@ class StageResultControllerTest {
         Long resultId = initializeAndFirstResultId(stageId);
         authenticateEmployee("employee01");
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -181,7 +181,7 @@ class StageResultControllerTest {
         List<Long> resultIds = initializeResultIds(stageId);
         authenticateEmployee("employee01");
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/bulk", stageId)
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/bulk", stageId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -218,7 +218,7 @@ class StageResultControllerTest {
         Long resultId = createAnnouncedResult(jobPostingId, stageId);
         authenticateEmployee("employee01");
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -246,7 +246,7 @@ class StageResultControllerTest {
         Long resultId = createAnnouncedResult(jobPostingId, stageId);
         authenticateEmployee("employee01");
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -258,7 +258,7 @@ class StageResultControllerTest {
                                 """))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/admin/stages/{stageId}/results/{resultId}/histories", stageId, resultId))
+        mockMvc.perform(get("/api/admin/stages/{stageId}/results/{resultId}/histories", stageId, resultId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -285,7 +285,7 @@ class StageResultControllerTest {
         Long resultId = createAnnouncedResult(jobPostingId, stageId);
         authenticateEmployee("employee01");
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -309,7 +309,7 @@ class StageResultControllerTest {
         Long resultId = initializeAndFirstResultId(stageId);
         authenticateEmployee("employee01");
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -333,7 +333,7 @@ class StageResultControllerTest {
         Long resultId = initializeAndFirstResultId(stageId);
         authenticateEmployee("employee01");
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -354,7 +354,7 @@ class StageResultControllerTest {
         stageService.start(jobPostingId, stageId);
         authenticateEmployee("employee01");
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", stageId, 99999L)
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/{resultId}", stageId, 99999L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -377,7 +377,7 @@ class StageResultControllerTest {
         stageService.start(jobPostingId, stageId);
         Long resultId = initializeAndFirstResultId(stageId);
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
                         .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -392,7 +392,7 @@ class StageResultControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Access is denied."));
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
                         .with(anonymous())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -416,7 +416,7 @@ class StageResultControllerTest {
         stageService.start(jobPostingId, stageId);
         Long resultId = initializeAndFirstResultId(stageId);
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/{resultId}", stageId, resultId)
                         .with(authentication(employeeAuthentication("employee02", "ROLE_EMPLOYEE")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -440,7 +440,7 @@ class StageResultControllerTest {
         Long stageId = createStage(jobPostingId);
         Long resultId = createAnnouncedResult(jobPostingId, stageId);
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
                         .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -456,7 +456,7 @@ class StageResultControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Access is denied."));
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/{resultId}/correct", stageId, resultId)
                         .with(anonymous())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -475,7 +475,7 @@ class StageResultControllerTest {
 
     @Test
     void stage_not_found_returns_api_response() throws Exception {
-        mockMvc.perform(get("/admin/stages/{stageId}/results", 99999L))
+        mockMvc.perform(get("/api/admin/stages/{stageId}/results", 99999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -487,7 +487,7 @@ class StageResultControllerTest {
         Long announcedStageId = createStage(announcedPostingId);
         setStageStatus(announcedStageId, StageStatus.RESULT_ANNOUNCED);
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/initialize", announcedStageId))
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/initialize", announcedStageId))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -496,7 +496,7 @@ class StageResultControllerTest {
         Long closedStageId = createStage(closedPostingId);
         setStageStatus(closedStageId, StageStatus.CLOSED);
 
-        mockMvc.perform(post("/admin/stages/{stageId}/results/initialize", closedStageId))
+        mockMvc.perform(post("/api/admin/stages/{stageId}/results/initialize", closedStageId))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
@@ -504,17 +504,17 @@ class StageResultControllerTest {
 
     @Test
     void unsupported_methods_are_not_added() throws Exception {
-        mockMvc.perform(put("/admin/stages/{stageId}/results", 1L))
+        mockMvc.perform(put("/api/admin/stages/{stageId}/results", 1L))
                 .andExpect(status().isMethodNotAllowed());
-        mockMvc.perform(delete("/admin/stages/{stageId}/results", 1L))
+        mockMvc.perform(delete("/api/admin/stages/{stageId}/results", 1L))
                 .andExpect(status().isMethodNotAllowed());
-        mockMvc.perform(patch("/admin/stages/{stageId}/results/{resultId}", 1L, 1L))
+        mockMvc.perform(patch("/api/admin/stages/{stageId}/results/{resultId}", 1L, 1L))
                 .andExpect(status().isMethodNotAllowed());
-        mockMvc.perform(put("/admin/stages/{stageId}/results/{resultId}/correct", 1L, 1L))
+        mockMvc.perform(put("/api/admin/stages/{stageId}/results/{resultId}/correct", 1L, 1L))
                 .andExpect(status().isMethodNotAllowed());
-        mockMvc.perform(patch("/admin/stages/{stageId}/results/{resultId}/correct", 1L, 1L))
+        mockMvc.perform(patch("/api/admin/stages/{stageId}/results/{resultId}/correct", 1L, 1L))
                 .andExpect(status().isMethodNotAllowed());
-        mockMvc.perform(delete("/admin/stages/{stageId}/results/{resultId}/histories", 1L, 1L))
+        mockMvc.perform(delete("/api/admin/stages/{stageId}/results/{resultId}/histories", 1L, 1L))
                 .andExpect(status().isMethodNotAllowed());
     }
 

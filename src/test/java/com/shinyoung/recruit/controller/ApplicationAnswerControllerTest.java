@@ -104,7 +104,7 @@ class ApplicationAnswerControllerTest {
         Long applicationId = createApplication(applicant, jobPostingId);
         authenticate(applicant);
 
-        mockMvc.perform(get("/applications/{applicationId}/questions", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/questions", applicationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -121,7 +121,7 @@ class ApplicationAnswerControllerTest {
         Long applicationId = createApplication(applicant, jobPostingId);
         authenticate(applicant);
 
-        mockMvc.perform(get("/applications/{applicationId}/questions", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/questions", applicationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").isArray())
@@ -140,7 +140,7 @@ class ApplicationAnswerControllerTest {
         )));
         authenticate(applicant);
 
-        mockMvc.perform(get("/applications/{applicationId}/questions", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/questions", applicationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].answerId").isNumber())
@@ -156,7 +156,7 @@ class ApplicationAnswerControllerTest {
         Long applicationId = createApplication(applicant, jobPostingId);
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/answers", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/answers", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(answerJson(question.questionId(), "new answer")))
                 .andExpect(status().isOk())
@@ -178,7 +178,7 @@ class ApplicationAnswerControllerTest {
         )));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/answers", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/answers", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -199,7 +199,7 @@ class ApplicationAnswerControllerTest {
         Long applicationId = createApplication(applicant, jobPostingId);
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/answers", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/answers", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -210,7 +210,7 @@ class ApplicationAnswerControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(post("/applications/{applicationId}/answers", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/answers", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -226,7 +226,7 @@ class ApplicationAnswerControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(post("/applications/{applicationId}/answers", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/answers", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(answerJson(99999L, "answer")))
                 .andExpect(status().isBadRequest())
@@ -244,12 +244,12 @@ class ApplicationAnswerControllerTest {
         Long applicationId = createApplication(owner, jobPostingId);
         authenticate(other);
 
-        mockMvc.perform(get("/applications/{applicationId}/questions", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/questions", applicationId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(post("/applications/{applicationId}/answers", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/answers", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(answerJson(question.questionId(), "answer")))
                 .andExpect(status().isNotFound())
@@ -267,7 +267,7 @@ class ApplicationAnswerControllerTest {
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/answers", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/answers", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(answerJson(question.questionId(), "answer")))
                 .andExpect(status().isBadRequest())
@@ -277,18 +277,18 @@ class ApplicationAnswerControllerTest {
 
     @Test
     void unsupported_methods_and_paths_are_not_supported() throws Exception {
-        mockMvc.perform(put("/applications/{applicationId}/answers", 1L)
+        mockMvc.perform(put("/api/applications/{applicationId}/answers", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
 
-        mockMvc.perform(delete("/applications/{applicationId}/answers", 1L))
+        mockMvc.perform(delete("/api/applications/{applicationId}/answers", 1L))
                 .andExpect(status().isMethodNotAllowed());
 
-        mockMvc.perform(get("/applications/{applicationId}/answers", 1L))
+        mockMvc.perform(get("/api/applications/{applicationId}/answers", 1L))
                 .andExpect(status().isMethodNotAllowed());
 
-        mockMvc.perform(post("/applications/{applicationId}/questions", 1L)
+        mockMvc.perform(post("/api/applications/{applicationId}/questions", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());

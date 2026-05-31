@@ -91,7 +91,7 @@ class ApplicationCareerControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(false));
         authenticate(applicant);
 
-        mockMvc.perform(get("/applications/{applicationId}/careers", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/careers", applicationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -105,7 +105,7 @@ class ApplicationCareerControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/careers", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/careers", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -126,7 +126,7 @@ class ApplicationCareerControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/careers", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/careers", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validExperiencedCareerJson()))
                 .andExpect(status().isOk())
@@ -142,7 +142,7 @@ class ApplicationCareerControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/careers", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/careers", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -161,7 +161,7 @@ class ApplicationCareerControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/careers", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/careers", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -180,7 +180,7 @@ class ApplicationCareerControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(false));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/careers", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/careers", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -200,12 +200,12 @@ class ApplicationCareerControllerTest {
         Long applicationId = createApplication(owner, createPublishedJobPosting(true));
         authenticate(other);
 
-        mockMvc.perform(get("/applications/{applicationId}/careers", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/careers", applicationId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(post("/applications/{applicationId}/careers", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/careers", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -225,7 +225,7 @@ class ApplicationCareerControllerTest {
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/careers", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/careers", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -240,12 +240,12 @@ class ApplicationCareerControllerTest {
 
     @Test
     void put_and_delete_methods_are_not_supported() throws Exception {
-        mockMvc.perform(put("/applications/{applicationId}/careers", 1L)
+        mockMvc.perform(put("/api/applications/{applicationId}/careers", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
 
-        mockMvc.perform(delete("/applications/{applicationId}/careers", 1L))
+        mockMvc.perform(delete("/api/applications/{applicationId}/careers", 1L))
                 .andExpect(status().isMethodNotAllowed());
     }
 

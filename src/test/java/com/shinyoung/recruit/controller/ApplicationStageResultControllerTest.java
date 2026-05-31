@@ -109,7 +109,7 @@ class ApplicationStageResultControllerTest {
         Long stageId = createStage(jobPostingId, 0, true, LocalDateTime.of(2026, 7, 1, 10, 0));
         decideAndAnnounce(jobPostingId, stageId, StageResultStatus.PASSED);
 
-        mockMvc.perform(get("/applications/{applicationId}/stage-results", applicationId)
+        mockMvc.perform(get("/api/applications/{applicationId}/stage-results", applicationId)
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -134,7 +134,7 @@ class ApplicationStageResultControllerTest {
         Applicant applicant = createApplicant("applicant-result-api-draft", "Applicant Result Api Draft");
         Long applicationId = createApplication(applicant, jobPostingId);
 
-        mockMvc.perform(get("/applications/{applicationId}/stage-results", applicationId)
+        mockMvc.perform(get("/api/applications/{applicationId}/stage-results", applicationId)
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
@@ -150,7 +150,7 @@ class ApplicationStageResultControllerTest {
         Long stageId = createStage(jobPostingId, 0, true, LocalDateTime.of(2026, 7, 1, 10, 0));
         decideAndAnnounce(jobPostingId, stageId, StageResultStatus.PASSED);
 
-        mockMvc.perform(get("/applications/{applicationId}/stage-results", applicationId)
+        mockMvc.perform(get("/api/applications/{applicationId}/stage-results", applicationId)
                         .with(authentication(applicantAuthentication(other))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
@@ -161,22 +161,22 @@ class ApplicationStageResultControllerTest {
     void unsupported_methods_are_not_added() throws Exception {
         Applicant applicant = createApplicant("applicant-result-api-method", "Applicant Result Api Method");
 
-        mockMvc.perform(post("/applications/{applicationId}/stage-results", 1L)
+        mockMvc.perform(post("/api/applications/{applicationId}/stage-results", 1L)
                         .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
-        mockMvc.perform(put("/applications/{applicationId}/stage-results", 1L)
+        mockMvc.perform(put("/api/applications/{applicationId}/stage-results", 1L)
                         .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
-        mockMvc.perform(patch("/applications/{applicationId}/stage-results", 1L)
+        mockMvc.perform(patch("/api/applications/{applicationId}/stage-results", 1L)
                         .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
-        mockMvc.perform(delete("/applications/{applicationId}/stage-results", 1L)
+        mockMvc.perform(delete("/api/applications/{applicationId}/stage-results", 1L)
                         .with(authentication(applicantAuthentication(applicant))))
                 .andExpect(status().isMethodNotAllowed());
     }
@@ -187,21 +187,21 @@ class ApplicationStageResultControllerTest {
         Applicant applicant = createApplicant("applicant-result-api-auth", "Applicant Result Api Auth");
         Long applicationId = createSubmittedApplication(applicant, jobPostingId);
 
-        mockMvc.perform(get("/applications/{applicationId}/stage-results", applicationId)
+        mockMvc.perform(get("/api/applications/{applicationId}/stage-results", applicationId)
                         .with(authentication(employeeAuthentication("employee01", "ROLE_ADMIN"))))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Access is denied."));
 
-        mockMvc.perform(get("/applications/{applicationId}/stage-results", applicationId)
+        mockMvc.perform(get("/api/applications/{applicationId}/stage-results", applicationId)
                         .with(authentication(employeeAuthentication("employee02", "ROLE_EMPLOYEE"))))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Access is denied."));
 
-        mockMvc.perform(get("/applications/{applicationId}/stage-results", applicationId)
+        mockMvc.perform(get("/api/applications/{applicationId}/stage-results", applicationId)
                         .with(anonymous()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))

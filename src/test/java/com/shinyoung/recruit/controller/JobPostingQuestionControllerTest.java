@@ -60,7 +60,7 @@ class JobPostingQuestionControllerTest {
         Long jobPostingId = createJobPosting();
         JobPostingQuestionResponse question = createQuestion(jobPostingId, 0);
 
-        mockMvc.perform(get("/admin/job-postings/{jobPostingId}/questions", jobPostingId))
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/questions", jobPostingId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].questionId").value(question.questionId()))
@@ -71,7 +71,7 @@ class JobPostingQuestionControllerTest {
     void create_direct_question_success() throws Exception {
         Long jobPostingId = createJobPosting();
 
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/questions", jobPostingId)
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/questions", jobPostingId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(directJson(0)))
                 .andExpect(status().isOk())
@@ -86,7 +86,7 @@ class JobPostingQuestionControllerTest {
         Long jobPostingId = createJobPosting();
         QuestionTemplateResponse template = createTemplate();
 
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/questions", jobPostingId)
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/questions", jobPostingId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -105,7 +105,7 @@ class JobPostingQuestionControllerTest {
         Long jobPostingId = createJobPosting();
         JobPostingQuestionResponse question = createQuestion(jobPostingId, 0);
 
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/questions/{questionId}", jobPostingId, question.questionId())
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/questions/{questionId}", jobPostingId, question.questionId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateJson(0)))
                 .andExpect(status().isOk())
@@ -120,7 +120,7 @@ class JobPostingQuestionControllerTest {
         JobPostingQuestionResponse first = createQuestion(jobPostingId, 0);
         JobPostingQuestionResponse second = createQuestion(jobPostingId, 1);
 
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/questions/reorder", jobPostingId)
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/questions/reorder", jobPostingId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -147,7 +147,7 @@ class JobPostingQuestionControllerTest {
         Long jobPostingId = createJobPosting();
         JobPostingQuestionResponse question = createQuestion(jobPostingId, 0);
 
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/questions/{questionId}/delete", jobPostingId, question.questionId()))
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/questions/{questionId}/delete", jobPostingId, question.questionId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.active").value(false));
@@ -155,7 +155,7 @@ class JobPostingQuestionControllerTest {
 
     @Test
     void validation_failure_returns_api_response() throws Exception {
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/questions", 1L)
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/questions", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -174,7 +174,7 @@ class JobPostingQuestionControllerTest {
 
     @Test
     void invalid_enum_returns_api_response() throws Exception {
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/questions", 1L)
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/questions", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -196,7 +196,7 @@ class JobPostingQuestionControllerTest {
         Long jobPostingId = createJobPosting();
         jobPostingService.publish(jobPostingId);
 
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/questions", jobPostingId)
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/questions", jobPostingId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(directJson(0)))
                 .andExpect(status().isBadRequest())
@@ -208,12 +208,12 @@ class JobPostingQuestionControllerTest {
     void not_found_cases_return_api_response() throws Exception {
         Long jobPostingId = createJobPosting();
 
-        mockMvc.perform(get("/admin/job-postings/{jobPostingId}/questions", 99999L))
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/questions", 99999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(post("/admin/job-postings/{jobPostingId}/questions/{questionId}", jobPostingId, 99999L)
+        mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/questions/{questionId}", jobPostingId, 99999L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateJson(0)))
                 .andExpect(status().isNotFound())
@@ -223,12 +223,12 @@ class JobPostingQuestionControllerTest {
 
     @Test
     void put_and_delete_methods_are_not_supported() throws Exception {
-        mockMvc.perform(put("/admin/job-postings/{jobPostingId}/questions/{questionId}", 1L, 1L)
+        mockMvc.perform(put("/api/admin/job-postings/{jobPostingId}/questions/{questionId}", 1L, 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
 
-        mockMvc.perform(delete("/admin/job-postings/{jobPostingId}/questions/{questionId}", 1L, 1L))
+        mockMvc.perform(delete("/api/admin/job-postings/{jobPostingId}/questions/{questionId}", 1L, 1L))
                 .andExpect(status().isMethodNotAllowed());
     }
 

@@ -87,7 +87,7 @@ class ApplicationLanguageControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(get("/applications/{applicationId}/languages", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/languages", applicationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
@@ -100,7 +100,7 @@ class ApplicationLanguageControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/languages", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/languages", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validLanguageJson()))
                 .andExpect(status().isOk())
@@ -115,7 +115,7 @@ class ApplicationLanguageControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/languages", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/languages", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -133,7 +133,7 @@ class ApplicationLanguageControllerTest {
         Long applicationId = createApplication(applicant, createPublishedJobPosting(false));
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/languages", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/languages", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validLanguageJson()))
                 .andExpect(status().isBadRequest())
@@ -148,12 +148,12 @@ class ApplicationLanguageControllerTest {
         Long applicationId = createApplication(owner, createPublishedJobPosting(true));
         authenticate(other);
 
-        mockMvc.perform(get("/applications/{applicationId}/languages", applicationId))
+        mockMvc.perform(get("/api/applications/{applicationId}/languages", applicationId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
 
-        mockMvc.perform(post("/applications/{applicationId}/languages", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/languages", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validLanguageJson()))
                 .andExpect(status().isNotFound())
@@ -168,7 +168,7 @@ class ApplicationLanguageControllerTest {
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
-        mockMvc.perform(post("/applications/{applicationId}/languages", applicationId)
+        mockMvc.perform(post("/api/applications/{applicationId}/languages", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validLanguageJson()))
                 .andExpect(status().isBadRequest())
@@ -178,12 +178,12 @@ class ApplicationLanguageControllerTest {
 
     @Test
     void put_and_delete_methods_are_not_supported() throws Exception {
-        mockMvc.perform(put("/applications/{applicationId}/languages", 1L)
+        mockMvc.perform(put("/api/applications/{applicationId}/languages", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isMethodNotAllowed());
 
-        mockMvc.perform(delete("/applications/{applicationId}/languages", 1L))
+        mockMvc.perform(delete("/api/applications/{applicationId}/languages", 1L))
                 .andExpect(status().isMethodNotAllowed());
     }
 

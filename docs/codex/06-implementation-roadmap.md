@@ -448,10 +448,10 @@ Status:
 | --- | --- | --- |
 | 06 design - Interview Evaluation | Completed | Entity design, enum design, API candidates, validation rules, StageResult boundary, slice breakdown |
 | 06a - InterviewEvaluation Domain | Completed | Entity, enums (EvaluationStatus/EvaluationGrade/EvaluationRecommendation), repository, unique constraint, entity validation, status transition (initialize/updateContent/submit/reopen), 27 targeted tests |
-| 06b - Admin Initialize + Interviewer Evaluation Write | Pending | Admin initialize command, interviewer list/detail/save/submit, ownership guard, CONFIRMED/ASSIGNED guard, SUBMITTED immutability |
-| 06c - Admin Evaluation Read | Pending | Interview/stage/application-level evaluation read, candidate-grouped response, summary aggregation, GradeDistribution, RecommendationDistribution |
-| 06d - Reopen + StageResult Boundary | Pending | Admin reopen command, ActivityLog history, StageResult non-mutation guarantee enforcement |
-| 06e - Stabilization / Test Hardening | Pending | N x M matrix regression, cancelled guard, SUBMITTED immutability, reopen cycle, non-assigned guard, StageResult non-mutation regression |
+| 06b - Admin Initialize + Interviewer Evaluation Write | Completed | Admin initialize command (idempotent for sequential calls), interviewer list/detail/save/submit, participant-scoped read isolation (cancelled interviewer blocked at every entry point), CONFIRMED/ASSIGNED guard, SUBMITTED immutability, 23 targeted tests (50 with 06a regression) |
+| 06c - Admin Evaluation Read | Completed | Interview/stage/application-level evaluation read, candidate-grouped response, SUBMITTED-only summary aggregation, GradeDistribution/RecommendationDistribution, interviewerName 노출, 7 targeted tests (57 with 06a/06b regression) |
+| 06d - Reopen + StageResult Boundary | Completed | Admin reopen command (SUBMITTED→DRAFT, submittedAt 초기화), CONFIRMED+ASSIGNED 재개 가드, 감사 로그 기록(영속 ActivityLog는 보류), StageResult 비변경 보장(구조적), reflect 커맨드 보류, 8 targeted tests (65 with 06a~06c regression) |
+| 06e - Stabilization / Test Hardening | Completed | N×M matrix + 집계 회귀, reopen→재제출 사이클, StageResult 비변경 회귀(submit/reopen/read), 기존 가드 재검증, 5 targeted tests (70 evaluation tests total) |
 
 목적:
 
@@ -506,20 +506,52 @@ Out of scope:
 
 ### Phase 07 - Export, PDF, Statistics
 
+Status:
+
+| Slice | Status | Scope |
+| --- | --- | --- |
+| 07 design - Export, PDF, Statistics | Completed | 4개 기둥 범위/슬라이스 확정, 모집단 P 코호트·funnel 7-bucket·upload 경계·PDF 스택·PII 정책 |
+| 07a - Excel Export Infra + Applications Download | Pending | POI SXSSF writer, row cap, export audit, applications download(목록+연락처) |
+| 07b - Remaining Dataset Download | Pending | stage results / interviews / interview evaluations list-parity download |
+| 07c - Statistics Funnel | Pending | 전체+분야별(FK), stage별 7-bucket 분포 + 두 비율, P 코호트, NO_RESULT |
+| 07d - Excel Upload (StageResult) | Pending | stateless preview/commit, all-or-nothing, 3중 교차검증, bulkUpdateResults 재사용 |
+| 07e - Application PDF | Pending | admin 전용, Thymeleaf + openhtmltopdf(PDFBox) + CJK 폰트, PDF audit |
+| 07f - Stabilization / Test Hardening | Pending | 회귀, PII 부재 검증, row cap·upload 경계 회귀 |
+
 목적:
 
-- 운영자가 필요한 대량 조회/다운로드/출력 기능을 구현한다.
+- 운영자가 필요한 대량 조회/다운로드/출력/집계 기능을 구현한다.
 
 범위:
 
-- Excel download
-- Excel upload preview/commit
-- 지원서 PDF generation integration
-- 전형/지원 통계 query
+- Excel download (4 dataset, list-parity)
+- Excel upload preview/commit (StageResult only, stateless, all-or-nothing)
+- 지원서 PDF generation (admin 전용, Thymeleaf + openhtmltopdf)
+- 공고 단위 전형 funnel 통계 (전체/분야별 우선)
 
 Out of scope:
 
+- `InterviewEvaluation` Excel upload (Phase 06 경계로 영구 제외)
+- 학교별 통계 dimension (Phase 08 School master 이후)
 - 개인정보 파기
+- 새 entity/table/migration (전부 read-only 또는 기존 명령 재사용)
+
+핵심 설계 결정:
+
+- Excel = Apache POI + SXSSF(streaming) + 하드 row cap(기본 50,000, 초과 시 `400 EXPORT_ROW_LIMIT_EXCEEDED`, 조용한 truncation 금지).
+- download 전부 list-parity. applications export만 `name`/`phoneNumber`/`email` 연락처 확장(export가 admin의 phone/email 최초 surface).
+- 모집단 P = `submittedAt != null` 코호트(현재 status 무관, 재현 가능). funnel 단계 분포 = 7-bucket(6 resultStatus + 응답 전용 synthetic `NO_RESULT`), 합 = |P|. PASSED 기준 누적/전환 두 비율.
+- Excel upload = `StageResult`만, stateless, all-or-nothing, `stageResultId`+`applicationId`+path `stageId` 3중 교차검증, 기존 `StageResultService.bulkUpdateResults` 경유(공유 DTO 불변).
+- PDF = Thymeleaf + openhtmltopdf(PDFBox) + CJK 폰트 임베드, iText(AGPL) 회피, 생성 시 audit.
+- `ci`/`ciHash`/`password`는 어떤 export/PDF/statistics에도 절대 미포함.
+
+설계 산출물:
+
+- `docs/codex/design/phase-07-export-pdf-statistics-design.md`
+- `docs/codex/reports/phase-07-export-pdf-statistics-design.html`
+- `CONTEXT.md` (Export/Reporting glossary)
+- `docs/adr/0001-application-pdf-openhtmltopdf-avoid-itext-agpl.md`
+- `docs/adr/0002-phase07-export-readonly-upload-stageresult-only.md`
 
 ### Backlog - Privacy, Audit, Retention
 
