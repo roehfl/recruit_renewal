@@ -1,5 +1,31 @@
 # 07. Implementation History
 
+## Infra 01 - 전역 `/api` 경로 Prefix
+
+- Date: 2026-06-01
+- Work type: cross-cutting infra (routing/security/test 정렬).
+- Goal: 모든 컨트롤러 엔드포인트 앞에 공통 `/api` prefix를 부여하고, Security 매처와 컨트롤러 테스트 경로를 정렬한다.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/config/WebMvcConfig.java`
+    (`addPathPrefix("/api", HandlerTypePredicate.forBasePackage("com.shinyoung.recruit.controller"))`)
+  - `docs/codex/implementation/infra-01-api-path-prefix.md`
+  - `docs/codex/reports/infra-01-api-path-prefix.html`
+- Modified:
+  - `src/main/java/com/shinyoung/recruit/config/SecurityConfig.java`
+    (컨트롤러 대상 `requestMatchers` 8개 `/api` 정렬, swagger/api-docs/h2-console은 유지)
+  - 컨트롤러 MockMvc 테스트 28개 파일(요청 경로 리터럴 375개 `/api` 정렬)
+- Key decisions:
+  - 컨트롤러 25개를 개별 수정하지 않고 `WebMvcConfigurer.configurePathMatch`로 중앙 적용.
+  - `forBasePackage`로 우리 컨트롤러 패키지에 한정 → springdoc/H2 콘솔 엔드포인트는 prefix 미적용.
+  - 보안 인가는 의미 변화 없이 경로만 `/api`로 이동(권한 매핑 동일).
+  - H2 datasource 미변경: 메인 `application.yaml`의 `jdbc:h2:~/recruit`는 이미 파일(인디스크) 모드(`~/recruit.mv.db` 영속)라 현 설정 유지(사용자 확인). 테스트용 `jdbc:h2:mem:testdb`는 ephemeral 목적상 인메모리 유지.
+- Tests:
+  - `./gradlew.bat test`: 848 tests, 840 passed, 8 failed.
+  - 8개 실패 전부 `InvalidJobApplicationException: 접수기간 내에만 지원서를 처리할 수 있습니다`(`StageControllerTest` 2 + `StageServiceTest` 6). 시스템 날짜(2026-06-01)가 fixture 접수기간(2026-05-30)을 지나 발생한 클럭 의존 사전-실패로, `/api` 라우팅과 무관(라우팅 실패 0건; `StageServiceTest`는 HTTP 미사용 순수 서비스 테스트).
+- Deferred:
+  - 날짜 의존 fixture 안정화(고정 `Clock` 주입/동적 접수기간) — 테스트 하드닝 별도 과제.
+- Next recommended: 테스트 클럭/접수기간 fixture 안정화, 프론트엔드/프록시 base URL `/api` 정렬 확인.
+
 ## Phase 07 - Export, PDF, Statistics Design
 
 - Date: 2026-05-29

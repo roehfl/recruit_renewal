@@ -187,7 +187,18 @@
       SecurityConfig 통과.
     </p>
     <h3>전체 스위트</h3>
-    <!-- FULL_SUITE_RESULT -->
+    <p>
+      <span class="badge b-blue">848 tests</span>
+      <span class="badge b-done">840 passed</span>
+      <span class="badge b-warn">8 failed</span>
+      &nbsp; <span class="mono">./gradlew.bat test</span> · 13m 58s
+    </p>
+    <p>
+      8개 실패 <strong>전부</strong> 동일한 <span class="mono">접수기간 내에만 지원서를 처리할 수 있습니다</span>
+      예외(아래 사전-실패). 404/405/401 같은 라우팅 실패는 <strong>0건</strong>이다.
+      실패 중 <code>StageServiceTest</code> 6건은 HTTP를 쓰지 않는 순수 서비스 테스트로,
+      <code>/api</code> 라우팅과 무관함을 확정한다.
+    </p>
     <h3>사전-실패 (본 변경과 무관)</h3>
     <div class="note">
       일부 컨트롤러 테스트 fixture가 공고 접수기간(예: 2026-05-01~2026-05-30)을 사용하는데,

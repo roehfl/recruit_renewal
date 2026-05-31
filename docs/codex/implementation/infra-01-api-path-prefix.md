@@ -125,12 +125,16 @@ H2 datasource는 별도 변경하지 않는다. 메인 `application.yaml`의
   - 전체: `./gradlew.bat test` (`AES_SECRET_KEY` 예시 키 주입)
 - 라우팅 검증 결과: `/api/...` 엔드포인트 라우팅·인가 단언 전부 통과
   (StageController의 endpoint 호출, InterviewEvaluationAdmin 8/8 인가 포함, SecurityConfig 통과).
-- 사전-실패(본 변경과 무관, 시스템 클럭 의존): 일부 컨트롤러 테스트의 fixture가
+- 전체 스위트: **848 tests, 840 passed, 8 failed** (`./gradlew.bat test`, 13m 58s).
+- 8개 실패 전부 동일한 `InvalidJobApplicationException: 접수기간 내에만 지원서를 처리할 수 있습니다`
+  (404/405/401 라우팅 실패 0건):
+  - `StageControllerTest` 2건, `StageServiceTest` 6건.
+- 사전-실패(본 변경과 무관, 시스템 클럭 의존): 해당 테스트 fixture가
   공고 접수기간(예: 2026-05-01~2026-05-30)을 사용하는데, 실행 시점 시스템 날짜가
   2026-06-01이라 `JobApplicationService.create`의 접수기간 검증
-  (`접수기간 내에만 지원서를 처리할 수 있습니다`)에서 fixture 셋업이 실패한다.
-  이는 HTTP 라우팅 이전 서비스 계층 예외로, `/api` prefix와 무관하다.
-- 전체 스위트 결과 수치는 `docs/codex/reports/infra-01-api-path-prefix.html` Test 섹션에 기록.
+  (`now.isAfter(receptionEndDateTime)`)에서 fixture 셋업이 실패한다.
+  이는 HTTP 라우팅 이전 서비스 계층 예외이며, 특히 `StageServiceTest`는 HTTP를 쓰지 않는
+  순수 서비스 테스트라 `/api` prefix와 무관함이 확정된다.
 
 ## Known limitations
 
