@@ -511,9 +511,9 @@ Status:
 | Slice | Status | Scope |
 | --- | --- | --- |
 | 07 design - Export, PDF, Statistics | Completed | 4개 기둥 범위/슬라이스 확정, 모집단 P 코호트·funnel 7-bucket·upload 경계·PDF 스택·PII 정책 |
-| 07a - Excel Export Infra + Applications Download | Pending | POI SXSSF writer, row cap, export audit, applications download(목록+연락처) |
-| 07b - Remaining Dataset Download | Pending | stage results / interviews / interview evaluations list-parity download |
-| 07c - Statistics Funnel | Pending | 전체+분야별(FK), stage별 7-bucket 분포 + 두 비율, P 코호트, NO_RESULT |
+| 07a - Excel Export Infra + Applications Download | Completed | POI SXSSF writer, row cap, export audit, applications download(목록+연락처). `AdminExportController` 2개 엔드포인트, formula injection 방어, temp file 스트리밍+삭제, projection Stream. 7 tests |
+| 07b - Remaining Dataset Download | Completed | stage results / interviews / interview evaluations list-parity download. 기존 list 쿼리 재사용으로 parity 보장, 공용 `ExcelExportService`(materialize+row cap), 평가 읽기 전용(Phase 06 경계). `AdminDatasetExportService` + 3 엔드포인트. 10 tests |
+| 07c - Statistics Funnel | Completed | overall + 분야별(POSITION FK), stage별 7-bucket 분포(+synthetic NO_RESULT, 합=|P|) + 순차 통과 집합 funnelPassedCount·누적/직전 전환 비율, P=submittedAt≠null 코호트. SCHOOL/CERTIFICATE 미지원(400). `FunnelStatisticsService` + `AdminStatisticsController`. 5 tests |
 | 07d - Excel Upload (StageResult) | Pending | stateless preview/commit, all-or-nothing, 3중 교차검증, bulkUpdateResults 재사용 |
 | 07e - Application PDF | Pending | admin 전용, Thymeleaf + openhtmltopdf(PDFBox) + CJK 폰트, PDF audit |
 | 07f - Stabilization / Test Hardening | Pending | 회귀, PII 부재 검증, row cap·upload 경계 회귀 |

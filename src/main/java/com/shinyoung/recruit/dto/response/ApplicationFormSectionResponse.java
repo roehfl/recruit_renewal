@@ -7,19 +7,25 @@ public record ApplicationFormSectionResponse(
         String label,
         boolean enabled,
         boolean required,
-        Integer sortOrder
+        Integer sortOrder,
+        Integer pageNo,
+        String pageTitle
 ) {
     public static ApplicationFormSectionResponse of(
             ApplicationSectionType sectionType,
             boolean required,
-            Integer sortOrder
+            Integer sortOrder,
+            Integer pageNo,
+            String pageTitle
     ) {
         return new ApplicationFormSectionResponse(
                 sectionType,
                 labelOf(sectionType),
                 true,
                 required,
-                sortOrder
+                sortOrder,
+                pageNo,
+                pageTitle
         );
     }
 

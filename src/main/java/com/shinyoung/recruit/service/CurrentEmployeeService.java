@@ -21,7 +21,7 @@ public class CurrentEmployeeService {
             throw new InvalidStageResultException("Employee authentication is required.");
         }
         if (!CustomUserDetails.USER_TYPE_EMPLOYEE.equals(userDetails.getUserType())) {
-            throw new InvalidStageResultException("Only employee users can access admin StageResult commands.");
+            throw new InvalidStageResultException("Only employee users can access admin commands.");
         }
 
         String actor = userDetails.getUsername();

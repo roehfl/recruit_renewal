@@ -123,12 +123,14 @@ public class ApplicationFormPageService {
                         .thenComparing(ApplicationFormPage::getId, Comparator.nullsLast(Comparator.naturalOrder())))
                 .flatMap(page -> page.getItems().stream()
                         .sorted(Comparator.comparing(ApplicationFormPageItem::getSortOrder)
-                                .thenComparing(ApplicationFormPageItem::getId, Comparator.nullsLast(Comparator.naturalOrder()))))
-                .map(item -> ApplicationFormSectionResponse.of(
-                        item.getSectionType(),
-                        requiredSections.contains(item.getSectionType()),
-                        sortOrder.getAndIncrement()
-                ))
+                                .thenComparing(ApplicationFormPageItem::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                        .map(item -> ApplicationFormSectionResponse.of(
+                                item.getSectionType(),
+                                requiredSections.contains(item.getSectionType()),
+                                sortOrder.getAndIncrement(),
+                                page.getPageNo(),
+                                page.getTitle()
+                        )))
                 .toList();
     }
 }

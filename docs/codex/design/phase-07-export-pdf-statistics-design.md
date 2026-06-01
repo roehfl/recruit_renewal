@@ -108,7 +108,7 @@ Phase 07에 포함하지 않는 항목:
 ### 7.4 응답 메커니즘 및 트랜잭션 경계
 
 - 기존 `AttachmentDownloadResponseFactory`와 동일한 헤더 규약을 따른다: `Content-Type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `Content-Disposition: attachment; filename=...; filename*=UTF-8'...`, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`.
-- **(채택) temp file 선생성 방식**: service는 **read-only 트랜잭션 안에서 projection DTO를 page 단위로 읽어** SXSSF temp xlsx **생성까지만** 담당한다. controller/response layer가 그 파일을 `ResponseEntity<Resource>`로 전송하고, **전송 완료 후 `finally`에서 temp file을 삭제**한다(성공·실패·예외 모두). **service 내부 `finally`에서 먼저 삭제하지 않는다** — Resource를 내려주는데 service에서 지우면 response body write 전에 파일이 사라질 수 있다.
+- **(채택, 구현됨) temp file 선생성 + `StreamingResponseBody` 전송**: service는 **read-only 경계 안에서 projection/parity row를 읽어** SXSSF temp xlsx **생성까지만** 담당한다. controller/response layer(`ExcelExportResponseFactory`)가 그 파일을 `ResponseEntity<StreamingResponseBody>`로 전송하고, **streaming body의 `finally`에서 temp file을 삭제**한다(성공·실패·예외 모두). **service 내부 `finally`에서 먼저 삭제하지 않는다** — body write 전에 파일이 사라질 수 있다. (07a/07b 구현은 `StreamingResponseBody`를 사용하며, 초기 검토안의 `ResponseEntity<Resource>`는 채택하지 않았다.)
 - **대안(StreamingResponseBody 내부 page fetch)**: response body 내부에서 `TransactionTemplate(readOnly=true)`로 page 단위 fetch를 반복한다.
 - 두 방식 모두 **JPA entity/lazy collection을 writer에 절대 넘기지 않는다** — `ExcelExportWriter`의 value extractor는 entity가 아니라 **export row projection DTO** 기준으로 작성한다.
 - 이유: streaming 응답은 controller 반환 이후 별도 실행 흐름에서 body가 써질 수 있어, lazy association을 그대로 쓰면 `LazyInitializationException`·connection 장시간 점유·N+1·SXSSF temp file 누수가 발생할 수 있다. projection + 명확한 tx 경계로 차단한다.
@@ -572,7 +572,7 @@ $env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tes
 | 21 | upload 빈칸 정책: resultStatus blank=row error, score/comment blank=null clear, 변경 없는 row는 commit 제외(stale check도 변경 row에만), template은 현재값 prefill. | "빈칸=기존값 유지"의 실수 위험 제거, 명확성. | 2026-05-29 (review2) |
 | 22 | `stageResultUpdatedAt` = ISO-8601 **string cell**, normalize 후 비교, date/numeric/formula면 row error. (옵션) HMAC opaque token. | Excel 날짜셀 precision/timezone 깨짐·토큰 변조 방지. | 2026-05-29 (review2) |
 | 23 | upload row에 `stageId` 컬럼 없음 — stageId는 path로만 판단. | `stageResultId`+`applicationId`+path stageId면 충분, row 중복 컬럼 제거. | 2026-05-29 (review2) |
-| 24 | export 응답 = `ResponseEntity<Resource>`, temp 삭제는 controller가 전송 후 finally(service finally 금지). | service finally 삭제 시 body write 전 파일 소멸 위험. | 2026-05-29 (review2) |
+| 24 | export 응답 = `ResponseEntity<StreamingResponseBody>`(temp file 선생성 + streaming 전송), temp 삭제는 streaming body의 finally(service finally 금지). 초기 검토안 `ResponseEntity<Resource>`는 미채택. | service finally 삭제 시 body write 전 파일 소멸 위험. 07a/07b 구현이 StreamingResponseBody로 안정화됨(source of truth를 구현에 맞춤). | 2026-05-29 (review2), 2026-06-01 (07b review: 구현 반영) |
 | 25 | `filtersSafeJson`은 allowlist 기반, PII성 필터는 마스킹/제외. | audit log가 PII 로그가 되는 것 방지. | 2026-05-29 (review2) |
 
 ## 19. Next Phase Considerations

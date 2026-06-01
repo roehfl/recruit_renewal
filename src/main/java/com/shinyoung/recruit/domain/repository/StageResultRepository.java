@@ -1,6 +1,7 @@
 package com.shinyoung.recruit.domain.repository;
 
 import com.shinyoung.recruit.domain.entity.StageResult;
+import com.shinyoung.recruit.dto.response.FunnelStageResultRow;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,6 +13,17 @@ import java.util.List;
 import java.util.Optional;
 
 public interface StageResultRepository extends JpaRepository<StageResult, Long> {
+
+    @Query("""
+            select new com.shinyoung.recruit.dto.response.FunnelStageResultRow(
+                result.jobApplication.id,
+                result.stage.id,
+                result.resultStatus)
+            from StageResult result
+            where result.stage.jobPosting.id = :jobPostingId
+              and result.jobApplication.submittedAt is not null
+            """)
+    List<FunnelStageResultRow> findFunnelStageResults(@Param("jobPostingId") Long jobPostingId);
 
     boolean existsByStageIdAndJobApplicationId(Long stageId, Long jobApplicationId);
 

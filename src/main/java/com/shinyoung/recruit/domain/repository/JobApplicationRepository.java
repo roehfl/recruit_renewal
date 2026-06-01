@@ -1,6 +1,8 @@
 package com.shinyoung.recruit.domain.repository;
 
 import com.shinyoung.recruit.domain.entity.JobApplication;
+import com.shinyoung.recruit.dto.response.ApplicationExportRow;
+import com.shinyoung.recruit.dto.response.FunnelCohortRow;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -93,4 +95,57 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
     @EntityGraph(attributePaths = {"applicant", "jobPosting", "jobPosition"})
     @Query("select application from JobApplication application where application.id = :applicationId")
     Optional<JobApplication> findAdminDetailById(@Param("applicationId") Long applicationId);
+
+    @Query("""
+            select new com.shinyoung.recruit.dto.response.FunnelCohortRow(
+                application.id,
+                application.status,
+                application.jobPosition.id,
+                application.jobPosition.positionName,
+                application.jobPosition.sortOrder)
+            from JobApplication application
+            where application.jobPosting.id = :jobPostingId
+              and application.submittedAt is not null
+            """)
+    List<FunnelCohortRow> findFunnelCohort(@Param("jobPostingId") Long jobPostingId);
+
+    @Query("""
+            select count(application)
+            from JobApplication application
+            where (:jobPostingId is null or application.jobPosting.id = :jobPostingId)
+              and (:jobPositionId is null or application.jobPosition.id = :jobPositionId)
+              and (:status is null or application.status = :status)
+            """)
+    long countExportApplications(
+            @Param("jobPostingId") Long jobPostingId,
+            @Param("jobPositionId") Long jobPositionId,
+            @Param("status") JobApplicationStatus status
+    );
+
+    @Query("""
+            select new com.shinyoung.recruit.dto.response.ApplicationExportRow(
+                application.id,
+                application.applicantNameSnapshot,
+                applicant.phoneNumber,
+                applicant.email,
+                application.jobPostingTitleSnapshot,
+                application.jobPositionNameSnapshot,
+                application.status,
+                application.submittedAt,
+                application.withdrawnAt,
+                application.createdAt,
+                application.updatedAt)
+            from JobApplication application
+            join application.applicant applicant
+            where (:jobPostingId is null or application.jobPosting.id = :jobPostingId)
+              and (:jobPositionId is null or application.jobPosition.id = :jobPositionId)
+              and (:status is null or application.status = :status)
+            order by application.createdAt desc, application.id desc
+            """)
+    List<ApplicationExportRow> findExportApplications(
+            @Param("jobPostingId") Long jobPostingId,
+            @Param("jobPositionId") Long jobPositionId,
+            @Param("status") JobApplicationStatus status,
+            Pageable pageable
+    );
 }

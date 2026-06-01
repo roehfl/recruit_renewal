@@ -144,12 +144,17 @@ Provide the frontend with stable initial rendering metadata for an applicant-own
   - `enabled`
   - `required`
   - `sortOrder`
+  - `pageNo` (소속 페이지 번호, `ApplicationFormPage.pageNo`) — 2026-06-01 추가
+  - `pageTitle` (소속 페이지 제목, `ApplicationFormPage.title`) — 2026-06-01 추가
 - Related classes:
   - `ApplicationSectionType`
   - `ApplicationFormPageService`
 - Important notes:
   - The response includes only enabled sections; `enabled` is therefore always `true`.
   - Endpoint hints are intentionally not included in this slice.
+  - **(2026-06-01) `pageNo`/`pageTitle` 추가**: 평탄화된 `sections` 각 항목이 소속 페이지의 번호/제목을
+    함께 노출해 프론트가 멀티페이지 폼을 그룹핑할 수 있다. `ApplicationFormPageService.toSectionResponses`가
+    각 page의 `pageNo`/`title`을 item 매핑 시 전달한다. (섹션별 `completed` 완료 플래그는 후속 과제로 보류.)
 
 ### ApplicationFormPageService
 

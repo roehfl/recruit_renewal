@@ -37,6 +37,7 @@ dependencies {
 	implementation 'org.springframework.ldap:spring-ldap-core'
 	implementation 'org.springframework.boot:spring-boot-h2console:4.0.5'
 	implementation 'org.jsoup:jsoup:1.22.2'
+	implementation 'org.apache.poi:poi-ooxml:5.3.0'
 	runtimeOnly 'com.h2database:h2'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.mysql:mysql-connector-j'

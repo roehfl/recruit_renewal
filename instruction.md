@@ -1,130 +1,189 @@
-남은 지적사항
-1. Major — stage results export 컬럼 계약이 아직 충돌합니다
+Medium 1 — POSITION dimension 정렬/라벨 기준이 애매함
 
-문서 7.5에서는 stage results export를 “기존 AdminStageResultResponse 그대로”라고 하며 컬럼을 stageResultId, stageId, applicationId, applicantName, ... decidedAt 정도로 적고 있습니다. 그런데 9.3에서는 stage results export/upload-template이 stageResultUpdatedAt을 포함하므로 upload template으로 적합하다고 합니다.
+현재 POSITION dimension은 다음처럼 grouping합니다.
 
-이건 실제 구현 시 바로 충돌합니다. stageResultUpdatedAt이 없으면 07d의 STALE_ROW 검증을 할 수 없습니다.
+Map<Long, List<FunnelCohortRow>> byPosition = cohort.stream()
+        .collect(Collectors.groupingBy(FunnelCohortRow::jobPositionId, LinkedHashMap::new, Collectors.toList()));
 
-수정 권고:
+return byPosition.entrySet().stream()
+        .sorted(Map.Entry.comparingByKey())
 
-둘 중 하나로 확정하세요.
+그리고 groupName은 group.get(0).jobPositionName()입니다. 그런데 FunnelCohortRow의 jobPositionName은 현재 application.jobPositionNameSnapshot입니다.
 
-안 1 — stage results export도 upload source로 쓴다.
-→ stage results export 컬럼에 stageResultUpdatedAt을 반드시 추가한다.
-→ 단, 기존 list-parity보다 upload-compatible export에 가깝다는 점을 명시한다.
+문제는 두 가지입니다.
 
-안 2 — stage results export는 순수 목록용으로 둔다.
-→ upload source는 GET /admin/stages/{stageId}/results/upload-template 하나만 허용한다.
-→ 9.3의 “stage results export도 upload source” 문장을 제거한다.
+1. 정렬이 JobPosition.sortOrder가 아니라 jobPositionId 기준이다.
+2. 그룹 기준은 FK인데, 표시명은 application snapshot의 첫 번째 값이다.
 
-개인적으로는 안 2가 더 깔끔합니다.
-목록 export와 upload template은 목적이 다릅니다. 운영자가 보기 좋은 export와 시스템이 검증 가능한 upload sheet를 굳이 하나로 묶을 필요 없습니다.
+현실적으로 대부분 문제 없겠지만, 운영 화면의 “분야별 통계”라면 보통 공고에 등록된 모집분야 순서(sortOrder)대로 보여주는 게 맞습니다.
 
-2. Major — upload blank cell 의미가 정의되지 않았습니다
+권고:
 
-현재 upload 편집 가능 컬럼은 resultStatus, score, comment이고, read-only echo는 stageResultId/applicationId/applicantName/stageResultUpdatedAt입니다. 하지만 blank cell의 의미가 없습니다.
+FunnelCohortRow에 jobPositionSortOrder와 현재 jobPosition.positionName을 추가하는 편이 낫습니다.
 
-정해야 할 것:
+select new FunnelCohortRow(
+    application.id,
+    application.status,
+    application.jobPosition.id,
+    application.jobPosition.positionName,
+    application.jobPosition.sortOrder
+)
 
-resultStatus blank → 오류인가? 기존값 유지인가?
-score blank → null로 clear인가? 기존값 유지인가?
-comment blank → 빈 문자열/NULL로 clear인가? 기존값 유지인가?
-변경 없는 row → bulkUpdateResults에 넘기는가? skip하는가?
+그리고 dimension 그룹은 다음 기준으로 정렬하세요.
 
-권고 정책:
+.sorted(
+    Comparator
+        .comparing((PositionGroup group) -> group.sortOrder())
+        .thenComparing(PositionGroup::groupId)
+)
 
-- resultStatus: 필수. blank면 row error.
-- score: blank면 null clear.
-- comment: blank면 null 또는 empty clear. 둘 중 하나로 고정.
-- 변경 없는 row: diff에는 unchanged로 표시하고 commit 적용 대상에서는 제외.
-- 단, stale check는 전체 row 또는 변경 대상 row 중 어느 범위에 적용할지 명시.
+만약 snapshot 표시명을 의도적으로 쓰려는 거라면 문서에 명확히 남겨야 합니다.
 
-금융권 운영 엑셀에서는 “빈칸 = 기존값 유지”로 설계하면 오히려 실수와 오해가 늘어납니다. template에는 현재값을 채워주고, 사용자가 지우면 clear로 보는 방식이 더 명확합니다.
+POSITION dimension의 groupName은 현재 JobPosition명이 아니라 지원 당시 snapshot명을 사용한다.
 
-3. Major — stageResultUpdatedAt token의 포맷/정밀도/검증 방식이 부족합니다
+내 판단은 현재 JobPosition명 + sortOrder 정렬이 더 맞습니다.
 
-stageResultUpdatedAt을 현재 DB StageResult.updatedAt과 비교한다고 되어 있습니다. 방향은 맞지만 Excel은 날짜 셀을 건드리면 포맷, timezone, millisecond/microsecond precision이 깨질 수 있습니다.
+Medium 2 — “raw passed와 sequential passed가 달라지는 케이스” 테스트가 없음
 
-추가해야 할 규칙:
+07c 설계의 핵심은 이겁니다.
 
-- stageResultUpdatedAt은 Excel date cell이 아니라 string cell로 export한다.
-- ISO-8601 문자열로 고정한다. 예: 2026-05-29T16:30:12.123456+09:00
-- DB timestamp precision에 맞춰 normalize 후 비교한다.
-- 해당 셀이 date/numeric/formula이면 row error.
-- 사용자가 수정하지 말아야 하는 read-only token임을 header/comment로 표시한다.
+raw distribution.passed != funnelPassedCount 일 수 있다.
+비율은 raw passed가 아니라 funnelPassedCount 기준이다.
 
-더 강하게 가려면 updatedAt 원문 대신 opaque token을 쓰는 방법도 있습니다.
+그런데 현재 테스트는 stage2에서 distribution.passed == funnelPassedCount == 1인 케이스만 검증합니다.
 
-stageResultVersionToken = HMAC(stageResultId | applicationId | stageId | updatedAt)
+반드시 아래 케이스를 추가해야 합니다.
 
-이러면 사용자가 token을 임의 수정해서 stale check를 우회하는 것도 막을 수 있습니다. 필수는 아니지만, 운영 리스크를 줄이려면 고려할 만합니다.
+P = app1, app2, app3
 
-4. Medium — stageId 컬럼 처리도 정리해야 합니다
+stage1:
+- app1 PASSED
+- app2 FAILED
+- app3 NO_RESULT
 
-9.3 설명에는 stage results export/upload-template이 stageId를 포함한다고 되어 있습니다. 그런데 upload row DTO에는 stageId가 없습니다. 검증은 path {stageId}와 실제 StageResult.stage.id를 비교하는 3중 검증입니다.
+stage2:
+- app1 PASSED
+- app2 PASSED  // 비정상/보정 데이터: 이전 단계 FAILED인데 후속 PASSED
+- app3 PASSED  // 이전 단계 NO_RESULT인데 후속 PASSED
 
-이 자체는 동작합니다. 하지만 엑셀에 stageId 컬럼이 있는데 파싱/검증하지 않으면 문서와 구현이 어긋납니다.
+기대값:
+stage2.distribution.passed = 3
+stage2.funnelPassedCount = 1
+stage2.stepConversionRate = 1 / 1 = 1.0
+stage2.cumulativeRate = 1 / 3
 
-정리 방향:
+이 테스트가 없으면 07c의 가장 중요한 설계 보정이 회귀로 깨져도 못 잡습니다.
 
-안 1 — row에 stageId 컬럼을 둔다.
-→ row DTO에 stageId를 추가하고 stageResult.stage.id == row.stageId == path stageId까지 검증한다.
+Medium 3 — PENDING / ABSENT / HOLD bucket 테스트가 빠져 있음
 
-안 2 — row에는 stageId 컬럼을 두지 않는다.
-→ stageId는 파일 header metadata 또는 endpoint path로만 판단한다.
+구현은 switch로 모든 StageResultStatus를 처리하고 있어서 코드 자체는 맞습니다.
 
-권고는 안 2입니다. stageResultId + applicationId + path stageId면 충분합니다. row마다 stageId를 반복할 필요가 없습니다.
+case PASSED -> passed++;
+case FAILED -> failed++;
+case ABSENT -> absent++;
+case HOLD -> hold++;
+case PENDING -> pending++;
+case WITHDRAWN -> withdrawn++;
 
-5. Medium — export 응답 방식 문서가 일부 불일치합니다
+하지만 현재 테스트는 PASSED, FAILED, WITHDRAWN, NO_RESULT만 검증합니다.
 
-본문 7.4는 temp file 선생성 방식을 채택했다고 했습니다. 그런데 API List와 HTML report 쪽에는 /admin/applications/export 응답이 xlsx (StreamingResponseBody)로 남아 있습니다.
+07c의 7-bucket 정의를 고정하려면 아래 값도 테스트에 포함하세요.
 
-수정 권고:
+stage1:
+- app1 PENDING
+- app2 ABSENT
+- app3 HOLD
+- app4 NO_RESULT
 
-Response: xlsx Resource 또는 ResponseEntity<Resource>
+기대값:
+pending = 1
+absent = 1
+hold = 1
+noResult = 1
+sum = |P|
 
-그리고 temp file 삭제 책임을 명확히 해야 합니다.
+특히 PENDING과 NO_RESULT 구분은 설계상 중요하므로 반드시 테스트로 고정해야 합니다.
 
-- service: temp xlsx 생성까지만 담당
-- controller/response layer: 파일 전송 완료 후 finally에서 삭제
-- 실패/예외 발생 시에도 삭제
-- service 내부 finally에서 먼저 삭제하지 않음
+Medium 4 — population.withdrawnCount와 distribution.withdrawn 분리 테스트가 약함
 
-Resource로 내려주는데 service finally에서 삭제하면, 실제 response body write 전에 파일이 사라질 수 있습니다.
+현재 테스트에서는 withdrawn application이 stage result도 WITHDRAWN입니다.
 
-6. Medium — Test Strategy가 새 보강 항목을 다 커버하지 않습니다
+application status = WITHDRAWN
+stage result = WITHDRAWN
 
-Test Strategy에는 row cap, NO_RESULT, upload all-or-nothing, PDF ci 부재 등은 있습니다. 하지만 새로 추가된 핵심 보강 항목 일부가 빠져 있습니다.
+이러면 population.withdrawnCount와 distribution.withdrawn이 우연히 같은 값이 됩니다.
+하지만 설계상 둘은 다릅니다.
 
-추가해야 할 테스트:
+추가해야 할 케이스:
 
-Export
-- formula injection 위험 prefix escaping 검증
-- xlsx read-back 시 ci/ciHash/password 컬럼 부재
-- no-store/nosniff/content-disposition header 검증
-- count > maxRows 시 실제 workbook 생성 안 함
+app1: application WITHDRAWN, stage result PASSED
+app2: application SUBMITTED, stage result WITHDRAWN
 
-Upload
-- stageResultUpdatedAt 불일치 → STALE_ROW, update 0건
-- duplicate stageResultId row 거부
-- formula cell 거부
-- .xls/.csv/.xlsm 거부
-- header signature/version 불일치 거부
-- maxUploadRows/maxUploadFileSize 초과 거부
-- blank resultStatus/score/comment 정책 검증
-- stage mismatch/applicationId mismatch 검증
+기대값:
+population.withdrawnCount = 1
+distribution.withdrawn = 1
+distribution.passed = 1
 
-PDF
-- th:utext 미사용 정적 검사 또는 template convention test
-- 외부 URL resource load 차단
-- no-store/nosniff header 검증
+또는 더 명확히:
 
-특히 STALE_ROW 테스트는 07d의 핵심입니다. 빠지면 lost update 방어가 문서에만 있고 실제 보장되지 않을 수 있습니다.
+app1: application WITHDRAWN, stage result 없음
 
-7. Low — audit의 filtersSafeJson은 allowlist 기반으로 못 박는 게 좋습니다
+기대값:
+population.withdrawnCount = 1
+distribution.noResult = 1
+distribution.withdrawn = 0
 
-audit schema에 filtersHash, filtersSafeJson을 둔 것은 좋습니다. 다만 나중에 검색 필터에 이름/전화번호/email 같은 값이 들어오면 filtersSafeJson이 PII 로그가 될 수 있습니다. 현재 문서에는 PII 직접 기록 금지가 있으므로 방향은 맞지만, 구현자가 raw request map을 그대로 넣지 않도록 더 명확히 하면 좋습니다.
+이게 있어야 “application-level withdrawn”과 “stage result withdrawn”을 덮어쓰지 않는다는 보장이 생깁니다.
 
-추가 문장:
+Medium 5 — DRAFT 제외 테스트가 없음
 
-filtersSafeJson은 allowlist 기반으로 구성하며, applicantName/email/phoneNumber/comment 등 PII성 필터가 생기면 마스킹하거나 제외한다. raw request parameter map을 그대로 audit에 기록하지 않는다.
+모집단 P는 submittedAt != null입니다. 현재 repository query도 그렇게 되어 있습니다.
+
+where application.jobPosting.id = :jobPostingId
+  and application.submittedAt is not null
+
+하지만 테스트에는 DRAFT 지원서가 없습니다. P 정의를 고정하려면 DRAFT를 하나 넣고 population.p와 NO_RESULT에 포함되지 않는지 확인해야 합니다.
+
+app1 SUBMITTED
+app2 WITHDRAWN, submittedAt 있음
+app3 DRAFT, submittedAt 없음
+
+기대값:
+population.p = 2
+stage distribution sum = 2
+
+이건 07c에서 가장 기본적인 회귀 테스트입니다.
+
+Low — topN 파라미터는 받지만 07c에서는 완전히 미사용
+
+현재 controller/service 모두 topN을 받지만 POSITION에는 적용하지 않습니다. 문서에 “free-text 축 대비 파라미터”라고 적혀 있으므로 기능 오류는 아닙니다.
+
+다만 API 사용자 입장에서는 dimension=POSITION&topN=1이 무시되는 게 어색할 수 있습니다.
+
+둘 중 하나로 정리하세요.
+
+안 1. 07c에서는 topN 제거
+- SCHOOL/CERTIFICATE 활성화 시 다시 추가
+
+안 2. 유지하되 문서/API 주석에 명확히 표시
+- topN은 POSITION에서는 무시된다.
+- SCHOOL/CERTIFICATE 활성화 전까지 동작하지 않는다.
+
+현재 구현을 유지하려면 안 2로 충분합니다.
+
+Low — POSITION dimension에서 0명인 모집분야는 응답에 안 나옴
+
+현재 dimension은 P 코호트에 존재하는 jobPositionId만 group으로 생성합니다. 그래서 제출자가 0명인 모집분야는 dimensions에 없습니다.
+
+이게 수학적으로는 “P를 그룹별로 나눈다”는 정의와 맞습니다.
+다만 운영 화면에서는 “프론트엔드 분야 지원자 0명”도 보여주는 게 더 유용할 수 있습니다.
+
+정책을 정하세요.
+
+정책 A — P에 존재하는 group만 응답
+현재 구현 유지. 문서에 명시.
+
+정책 B — 공고의 모든 JobPosition을 응답
+지원자 0명인 group도 population.p=0, stages 각 분포 0으로 응답.
+
+운영 통계 화면이면 정책 B가 더 친절합니다. 단, 구현 복잡도는 조금 늘어납니다.

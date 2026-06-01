@@ -1,5 +1,147 @@
 # 07. Implementation History
 
+## Phase 07c - 공고 단위 전형 Funnel 통계
+
+- Date: 2026-06-01
+- Work type: implementation (Phase 07 세 번째 슬라이스, read-only 통계).
+- Goal: 공고 단위 전형 funnel(모집단 P, stage별 7-bucket 분포, 순차 통과 비율, 분야별 dimension).
+- Created (main):
+  - `enumeration/FunnelDimension.java`
+  - `exception/InvalidStatisticsRequestException.java`
+  - `dto/response/FunnelCohortRow.java`, `FunnelStageResultRow.java` (projection)
+  - `dto/response/FunnelPopulationResponse.java`, `StageDistributionResponse.java`, `StageFunnelResponse.java`, `DimensionFunnelResponse.java`, `FunnelResponse.java`
+  - `service/FunnelStatisticsService.java`
+  - `controller/AdminStatisticsController.java`
+- Modified (main):
+  - `domain/repository/JobApplicationRepository.java` (`findFunnelCohort`)
+  - `domain/repository/StageResultRepository.java` (`findFunnelStageResults`)
+  - `exception/GlobalExceptionHandler.java` (`InvalidStatisticsRequestException` 400)
+- Created (test):
+  - `controller/AdminStatisticsControllerTest.java` (5)
+- API:
+  - `GET /api/admin/job-postings/{jobPostingId}/statistics/funnel?dimension=POSITION&topN=`
+- Key decisions:
+  - 모집단 P = `submittedAt != null` 코호트(현재 status 무관, 재현 가능). currentlySubmitted/withdrawn 부가 카운트.
+  - stage별 raw 7-bucket(PASSED/FAILED/ABSENT/HOLD/PENDING/WITHDRAWN + 응답 전용 synthetic NO_RESULT), 합=|P|. NO_RESULT(결과 row 없음)와 PENDING(row 있음) 구분.
+  - 순차 통과 집합 `S_k = S_(k-1) ∩ {stage k PASSED}` → funnelPassedCount, cumulativeRate=|S_k|/|P|, stepConversionRate=|S_k|/|S_(k-1)|. raw distribution.passed와 분리.
+  - distribution.withdrawn(stage status) ≠ population.withdrawnCount(application status).
+  - dimension=POSITION만 활성(application 단위 distinct). SCHOOL/CERTIFICATE·잘못된 값 → 400.
+  - projection page 없이 공고 단위 in-memory 산출(bounded). 집계값만이라 audit 없음.
+- Tests:
+  - `AdminStatisticsControllerTest`(5): 응답을 FunnelResponse로 역직렬화해 population/distribution/funnelPassedCount/비율 정밀 검증(소수 isCloseTo), POSITION dimension, 400(미지원 dimension)/404, 인가(403/401).
+  - statistics 테스트는 엔티티를 repository로 직접 영속화해 클럭 의존(접수기간) 없이 안정적.
+- Documentation:
+  - `docs/codex/implementation/phase-07c-statistics-funnel.md`
+  - `docs/codex/reports/phase-07c-statistics-funnel.html`
+- Review 반영 (instruction.md, 7 findings):
+  - (Medium) POSITION dimension 정렬을 `JobPosition.sortOrder`(동률 id)로, 표시명을 현재 `JobPosition.positionName`으로 변경(`FunnelCohortRow`에 sortOrder 추가 + 쿼리 수정). raw passed ≠ funnelPassedCount 테스트, PENDING/ABSENT/HOLD/NO_RESULT 버킷 테스트, withdrawn 분리 테스트, DRAFT 제외 테스트 추가.
+  - (Low) topN은 POSITION에서 무시됨을 controller에 명시(안2). 0명 모집분야는 정책 A(P 존재 분야만) 유지·문서화.
+  - 테스트: `AdminStatisticsControllerTest` 5→9(+4), 전부 통과.
+- Deferred: SCHOOL(Phase 08 School master 이후)/CERTIFICATE dimension, 대형 공고 GROUP BY 전환, 07d(upload)/07e(PDF).
+- Next recommended: Phase 07d - Excel upload(StageResult) preview/commit.
+
+## Enhancement - form-page sections에 pageNo/pageTitle 추가
+
+- Date: 2026-06-01
+- Work type: 소규모 응답 enhancement (`/applications/{id}/form-page`).
+- Goal: 평탄화된 `sections` 각 항목에 소속 페이지의 `pageNo`/`pageTitle`을 노출(프론트 멀티페이지 그룹핑용).
+- Modified:
+  - `dto/response/ApplicationFormSectionResponse.java` (`pageNo`, `pageTitle` 컴포넌트 + `of()` 시그니처)
+  - `service/ApplicationFormPageService.java` (`toSectionResponses`에서 page의 `pageNo`/`title` 전달; flatMap 내부 map으로 page 스코프 유지)
+  - `test/.../service/ApplicationFormPageServiceTest.java` (default/stored 레이아웃에 pageNo/pageTitle 단언)
+  - `test/.../controller/ApplicationControllerTest.java` (form-page sections[*] pageNo/pageTitle jsonPath)
+- Key notes:
+  - `ApplicationFormPage`는 `pageNo`/`title`을 이미 보유 → DB/엔티티/마이그레이션 변경 없음.
+  - `ApplicationFormSectionResponse.of(...)` 호출처는 서비스 1곳뿐이라 파급 국소적. 서비스 생성자 미변경.
+  - 섹션별 `completed`(완료 플래그)는 `ApplicationCompletionReadChecker` 재사용 + 의미 결정(BASIC_INFO/optional-empty/코드 매핑)이 필요해 **후속 과제로 보류**.
+- Tests: `ApplicationFormPageServiceTest` + `ApplicationControllerTest` 통과(대상 실행).
+- Documentation: `docs/codex/implementation/phase-05b-application-form-page-layout.md` + `.../reports/phase-05b-application-form-page-layout.html` 갱신.
+
+## Phase 07b - 나머지 Dataset Export (Stage Results / Interviews / Interview Evaluations)
+
+- Date: 2026-06-01
+- Work type: implementation (Phase 07 두 번째 슬라이스, read-only, 07a 인프라 재사용).
+- Goal: stage results / interviews / interview evaluations의 list-parity xlsx download 추가.
+- Created (main):
+  - `service/ExcelExportService.java` (materialize list → row cap + writer)
+  - `service/AdminDatasetExportService.java` (3개 dataset export + 컬럼 spec)
+  - `dto/response/InterviewEvaluationExportRow.java` (평가 평탄 row)
+- Modified (main):
+  - `service/ExportRowSource.java` (`ofList(List)` 정적 팩토리)
+  - `service/ExportAuditLogger.java` (공통 `logExport(datasetType, context, filters, file)`, `logApplicationsExport` 위임)
+  - `controller/AdminExportController.java` (export 엔드포인트 3개 + dataset audit)
+- Created (test):
+  - `controller/AdminDatasetExportControllerTest.java` (8)
+  - `service/ExcelExportServiceTest.java` (2)
+- APIs:
+  - `GET /api/admin/stages/{stageId}/results/export`
+  - `GET /api/admin/job-postings/{jobPostingId}/interviews/export` (필터 stageId/status/from/to)
+  - `GET /api/admin/stages/{stageId}/interview-evaluations/export` (읽기 전용)
+- Key decisions:
+  - list-parity를 위해 각 dataset이 대응 admin list의 기존 쿼리/서비스를 재사용(필터·정렬·면접 인원 카운트 동일).
+  - 07a applications(unbounded global, count+page-fetch)와 달리 07b는 stage/posting-scoped이므로 materialize 후 row cap 적용(기존 list 엔드포인트도 materialize). size > max면 writer 미호출 = workbook 미생성.
+  - 평가 export는 읽기 전용(Phase 06 경계: 평가 작성/변경은 배정 면접관 본인만). `InterviewEvaluation` upload는 영구 제외.
+  - `ci`/`ciHash`/`password` 전 dataset 금지. 본 3개 dataset은 list-parity상 연락처 미포함.
+  - audit를 공통 `logExport`로 일반화(07a applications는 위임), 필터 allowlist + filtersHash.
+- Tests:
+  - `AdminDatasetExportControllerTest`(8) + `ExcelExportServiceTest`(2): 10 passed.
+  - 검증: dataset별 헤더 POI read-back parity, stage results 민감컬럼 부재·행수, interviews 카운트·status 필터, evaluations 평탄 행·면접관 식별, 404(unknown stage/posting), 인가(403/401), row cap writer never-called.
+  - export 테스트는 엔티티를 repository로 직접 영속화(`start()`=2026-06-01)해 클럭 의존(접수기간) 없이 안정적.
+- Documentation:
+  - `docs/codex/implementation/phase-07b-remaining-dataset-export.md`
+  - `docs/codex/reports/phase-07b-remaining-dataset-export.html`
+- Review 반영 (instruction.md, 7 findings):
+  - (Medium) `exportStageEvaluations` 조회/매핑만 `TransactionTemplate`(readOnly)으로 감싸고 xlsx 생성은 tx 밖으로. row cap의 memory bound 표현 정정 + 07f 전환 기준(특히 stage results) 문서화. 설계 §7.4/Decision #24를 `StreamingResponseBody`로 정정. interviews 필터 테스트 보강(stageId/from·to/from>to 400). interviews export N+1(list-parity 상속)을 07f count projection 전환 대상으로 문서화.
+  - (Low) interviews/evaluations 테스트에 nosniff/no-store/content-type 단언 추가. interviews `groupName` formula escape 회귀 추가.
+  - 테스트: `AdminDatasetExportControllerTest` 8→12(+4), 07b 신규 14개 전부 통과.
+- Deferred: 07c(funnel), 07d(upload), 07e(PDF). 대량 stage results page-fetch 전환은 수요 시.
+- Next recommended: Phase 07c - 공고 단위 전형 funnel statistics.
+
+## Phase 07a - Excel Export 공통 인프라 + Applications Download
+
+- Date: 2026-06-01
+- Work type: implementation (Phase 07 첫 슬라이스, read-only).
+- Goal: POI SXSSF 기반 Excel export 공통 인프라 + applications 목록 xlsx download(연락처 포함).
+- Created (main):
+  - `config/ExportProperties.java`
+  - `exception/ExportRowLimitExceededException.java`, `exception/ExportGenerationException.java`
+  - `dto/response/ApplicationExportRow.java`
+  - `service/ExportColumn.java`, `service/ExcelExportSpec.java`, `service/ExcelExportFile.java`
+  - `service/ExcelExportWriter.java`, `service/ExportAuditLogger.java`, `service/ApplicationExportService.java`
+  - `controller/ExcelExportResponseFactory.java`, `controller/AdminExportController.java`
+- Modified (main):
+  - `build.gradle` (`org.apache.poi:poi-ooxml:5.3.0`)
+  - `src/main/resources/application.yaml` (`recruit.export.max-rows`, 기본 50,000)
+  - `domain/repository/JobApplicationRepository.java` (`countExportApplications`, `streamExportApplications`)
+  - `exception/GlobalExceptionHandler.java` (export 예외 2개 핸들러: 400/500)
+- Created (test):
+  - `controller/AdminExportControllerTest.java`, `controller/AdminExportRowCapTest.java`
+- APIs:
+  - `GET /api/admin/applications/export` (필터: jobPostingId/jobPositionId/status, page 무시)
+  - `GET /api/admin/job-postings/{jobPostingId}/applications/export`
+- Key decisions:
+  - SXSSF streaming writer + 컬럼 spec 추상화(`ExcelExportSpec`/`ExportColumn`)로 07b dataset 추가 비용 최소화.
+  - row cap: 생성 전 count 선검증, 초과 시 `400 EXPORT_ROW_LIMIT_EXCEEDED`(workbook 미생성).
+  - projection DTO + `Stream` 조회로 entity/lazy를 writer에 미전달(streaming tx 경계 보호).
+  - temp file 선생성 후 controller가 `StreamingResponseBody`로 전송하고 finally에서 삭제(service 미삭제).
+  - 전 셀 string cell + formula injection 위험 prefix(`=`,`+`,`-`,`@`, tab, CR/LF) apostrophe escape.
+  - 연락처(phoneNumber/email)는 평문 저장이라 `Applicant`에서 직접 조회. `ci`/`ciHash`/`password` 영구 금지.
+  - export SLF4J 구조적 audit(필터는 allowlist 비-PII 값만, PII 값 미기록).
+- Tests:
+  - `AdminExportControllerTest`(7) + `AdminExportRowCapTest`(1) + `ApplicationExportServiceTest`(2): 10 passed.
+  - 검증: 헤더 + POI read-back header/연락처/민감컬럼 부재, status·jobPositionId 필터, per-posting 분리, 404, formula escape, 인가(403/401), row cap 400 + writer never-called 단위.
+  - export 테스트는 `JobApplication`을 repository로 직접 영속화해 클럭 의존(접수기간) 없이 안정적.
+- Review 반영 (instruction.md, 8 findings):
+  - (Major) SXSSF temp 누수 → `finally` dispose/close. JPA `Stream` → `ExportRowSource` page fetch(1,000). export 정렬을 admin list와 동일 `createdAt desc, id desc`로 parity.
+  - (Medium) audit schema 확장(`ExportAuditContext` + timestamp/authority/clientIp/userAgent/requestId/filtersHash). writer try에서 `RuntimeException`도 `ExportGenerationException` 감쌈. row cap writer never-called 단위 테스트. jobPositionId 필터 테스트.
+  - (Low) Content-Disposition 파일명 `"`→`_`. 공유 `getCurrentEmployeeActor` 오류 문구 일반화.
+  - 신규: `service/ExportRowSource.java`, `service/ExportAuditContext.java`. 수정: `CurrentEmployeeService.java`, `JobApplicationRepository`(stream→page).
+- Documentation:
+  - `docs/codex/implementation/phase-07a-excel-export-infra-applications.md`
+  - `docs/codex/reports/phase-07a-excel-export-infra-applications.html`
+- Deferred: 07b(나머지 dataset export), 07c(funnel), 07d(upload), 07e(PDF), 영속 audit, 파일명 timestamp.
+- Next recommended: Phase 07b - 동일 인프라로 stage results / interviews / interview evaluations export 추가.
+
 ## Infra 01 - 전역 `/api` 경로 Prefix
 
 - Date: 2026-06-01

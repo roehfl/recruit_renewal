@@ -179,4 +179,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.fail(e.getMessage()));
     }
+
+    @ExceptionHandler(ExportRowLimitExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleExportRowLimitExceeded(ExportRowLimitExceededException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
+    @ExceptionHandler(ExportGenerationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleExportGeneration(ExportGenerationException e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.fail("Export 파일 생성에 실패했습니다."));
+    }
+
+    @ExceptionHandler(InvalidStatisticsRequestException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidStatisticsRequest(InvalidStatisticsRequestException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
 }

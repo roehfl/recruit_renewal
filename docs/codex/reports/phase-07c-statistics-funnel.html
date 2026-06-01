@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Phase 07c - 전형 Funnel 통계</title>
+<style>
+  :root {
+    --blue: #1d4ed8; --blue-bg: #eff6ff; --green: #047857; --green-bg: #ecfdf5;
+    --amber: #b45309; --amber-bg: #fffbeb; --red: #b91c1c; --red-bg: #fef2f2;
+    --gray: #475569; --gray-bg: #f1f5f9; --ink: #0f172a; --line: #e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+    color: var(--ink); margin: 0; background: #f8fafc; line-height: 1.6; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 32px 24px 64px; }
+  header { background: linear-gradient(135deg, #4338ca, #6d28d9); color: #fff;
+    border-radius: 14px; padding: 28px 32px; box-shadow: 0 8px 24px rgba(67,56,202,.25); }
+  header h1 { margin: 0 0 6px; font-size: 23px; }
+  header .sub { opacity: .92; font-size: 14px; }
+  header .meta { margin-top: 14px; font-size: 13px; opacity: .9; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; vertical-align: middle; }
+  .b-done { background: var(--green-bg); color: var(--green); border: 1px solid #a7f3d0; }
+  .b-blue { background: var(--blue-bg); color: var(--blue); border: 1px solid #bfdbfe; }
+  .b-warn { background: var(--amber-bg); color: var(--amber); border: 1px solid #fde68a; }
+  .b-muted { background: var(--gray-bg); color: var(--gray); border: 1px solid #cbd5e1; }
+  section { background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    padding: 22px 26px; margin-top: 20px; }
+  h2 { font-size: 18px; margin: 0 0 14px; padding-bottom: 8px; border-bottom: 2px solid var(--line); }
+  h3 { font-size: 15px; margin: 18px 0 8px; }
+  p { margin: 8px 0; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; background: #fff; }
+  .card.done { border-left: 4px solid var(--green); }
+  .card.skip { border-left: 4px solid var(--gray); }
+  .card.warn { border-left: 4px solid var(--amber); }
+  .card h4 { margin: 0 0 8px; font-size: 14px; }
+  .card ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--gray-bg); font-weight: 600; }
+  code { background: var(--gray-bg); padding: 1px 6px; border-radius: 5px;
+    font-family: "SFMono-Regular", Consolas, monospace; font-size: 12.5px; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px 16px; border-radius: 10px; overflow-x: auto;
+    font-size: 12px; line-height: 1.5; }
+  .mono { font-family: "SFMono-Regular", Consolas, monospace; }
+  .note { background: var(--amber-bg); border: 1px solid #fde68a; border-radius: 10px;
+    padding: 12px 16px; font-size: 13px; color: #78350f; }
+  .ok { color: var(--green); font-weight: 600; }
+  ul.tight { margin: 6px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Phase 07c · 전형 Funnel 통계</h1>
+    <div class="sub">공고 단위 모집단 P · stage별 7-bucket 분포 · 순차 통과 비율 · 분야별 dimension (read-only)</div>
+    <div class="meta">
+      Status: <span class="badge b-done">완료</span>
+      &nbsp;·&nbsp; Generated: 2026-06-01
+      &nbsp;·&nbsp; Slice: 07c
+    </div>
+  </header>
+
+  <section>
+    <h2>Executive Summary</h2>
+    <p>
+      공고 단위 전형 funnel 통계 API를 추가했다. 모집단 <strong>P = 제출 이력(submittedAt != null) 코호트</strong>를
+      기준으로, 각 stage에서 P 전체를 <strong>raw 7-bucket</strong>(PASSED/FAILED/ABSENT/HOLD/PENDING/WITHDRAWN +
+      응답 전용 synthetic <strong>NO_RESULT</strong>)으로 분류(합=|P|)하고, <strong>순차 통과 집합</strong>
+      <code>S_k = S_(k-1) ∩ {stage k PASSED}</code>로 <code>funnelPassedCount</code>·두 비율(누적/직전 전환)을 산출한다.
+    </p>
+    <p>
+      overall은 항상, <code>dimension=POSITION</code>이면 분야별(FK) 그룹 funnel을 추가로 반환한다. 모두 read-only,
+      새 entity/table 없음, 집계값만 노출(audit 없음). SCHOOL/CERTIFICATE 축은 미지원(400).
+    </p>
+    <p><span class="ok">진행 가능:</span> 다음은 07d Excel upload(StageResult).</p>
+  </section>
+
+  <section>
+    <h2>Review 반영 (instruction.md · 7 findings)</h2>
+    <table>
+      <thead><tr><th>등급</th><th>항목</th><th>반영</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge b-warn">Medium</span></td><td>POSITION 정렬/표시명</td><td>그룹 정렬 = <code>JobPosition.sortOrder</code>(동률 id), 표시명 = 현재 <code>positionName</code>(snapshot 아님). <code>FunnelCohortRow</code>+쿼리 수정</td></tr>
+        <tr><td><span class="badge b-warn">Medium</span></td><td>raw passed ≠ funnelPassedCount 테스트</td><td>보정 데이터로 distribution.passed=3 vs funnelPassedCount=1, step=1.0, cumulative=1/3 검증 추가</td></tr>
+        <tr><td><span class="badge b-warn">Medium</span></td><td>PENDING/ABSENT/HOLD/NO_RESULT 테스트</td><td>PENDING(row)·NO_RESULT(row 없음) 구분 + 합=|P| 고정</td></tr>
+        <tr><td><span class="badge b-warn">Medium</span></td><td>withdrawn 분리 테스트</td><td>population.withdrawnCount(app) ≠ distribution.withdrawn(stage)가 서로 다른 지원서임을 검증</td></tr>
+        <tr><td><span class="badge b-warn">Medium</span></td><td>DRAFT 제외 테스트</td><td>submittedAt null → P/분포 제외(p=2) 고정</td></tr>
+        <tr><td><span class="badge b-muted">Low</span></td><td>topN 미사용</td><td>POSITION에서 무시됨을 controller javadoc/주석에 명시(안2)</td></tr>
+        <tr><td><span class="badge b-muted">Low</span></td><td>0명 모집분야</td><td>정책 A 유지(P에 존재하는 분야만 응답) — 문서 명시</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Scope</h2>
+    <div class="cards">
+      <div class="card done">
+        <h4><span class="badge b-done">구현</span></h4>
+        <ul>
+          <li>모집단 P 코호트 + population 요약</li>
+          <li>stage별 7-bucket 분포(+NO_RESULT synthetic)</li>
+          <li>순차 통과 집합 + 누적/직전 전환 비율</li>
+          <li>dimension=POSITION 분야별 breakdown</li>
+        </ul>
+      </div>
+      <div class="card skip">
+        <h4><span class="badge b-muted">범위 밖</span></h4>
+        <ul>
+          <li>SCHOOL/CERTIFICATE 축(미지원 400, Phase 08~)</li>
+          <li>Excel upload(07d) · PDF(07e)</li>
+          <li>평균/가중치/자동 합불, 비동기/캐싱</li>
+        </ul>
+      </div>
+      <div class="card warn">
+        <h4><span class="badge b-warn">유의</span></h4>
+        <ul>
+          <li>in-memory 산출(공고 단위 bounded; 대형 공고는 GROUP BY 전환 여지)</li>
+          <li>topN은 free-text 축 대비 수용(POSITION 미적용)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>API</h2>
+    <p>경로는 <code>WebMvcConfig</code>로 <code>/api</code> prefix 적용. 권한 <code>/api/admin/**</code>.</p>
+    <table>
+      <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>파라미터</th></tr></thead>
+      <tbody>
+        <tr><td>GET</td><td class="mono">/api/admin/job-postings/{jobPostingId}/statistics/funnel</td><td>공고 전형 funnel</td><td>dimension?(POSITION), topN?</td></tr>
+      </tbody>
+    </table>
+    <h3>응답 예시 (overall)</h3>
+<pre>{
+  "jobPostingId": 1, "jobPostingTitle": "2026 상반기 신입", "dimension": null,
+  "population": { "p": 5, "currentlySubmittedCount": 4, "withdrawnCount": 1 },
+  "stages": [
+    { "stageOrder": 1, "stageId": 10, "stageName": "Document", "stageType": "DOCUMENT",
+      "distribution": { "passed": 2, "failed": 1, "absent": 0, "hold": 0,
+                        "pending": 0, "withdrawn": 1, "noResult": 1 },
+      "funnelPassedCount": 2, "cumulativeRate": 0.4, "stepConversionRate": 0.4 }
+  ],
+  "dimensions": []
+}</pre>
+  </section>
+
+  <section>
+    <h2>Architecture</h2>
+    <p class="mono">
+      Controller → FunnelStatisticsService(@Transactional readOnly)
+      → 공고 검증(404) + dimension 파싱(POSITION만, else 400)
+      → stages(order) + cohort projection + stage-result projection
+      → (stageId→(appId→status)) 인덱스 → computeCohort(overall) [+ positionId 그룹별]
+    </p>
+    <p>새 entity/table/migration 없음. <code>JobApplication</code>/<code>StageResult</code>/<code>Stage</code> projection만 조회.</p>
+  </section>
+
+  <section>
+    <h2>Changed Files</h2>
+    <table>
+      <thead><tr><th>구분</th><th>파일</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">enumeration/FunnelDimension</td><td>POSITION/SCHOOL/CERTIFICATE (07c POSITION만)</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">exception/InvalidStatisticsRequestException</td><td>400</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">dto/response/FunnelCohortRow · FunnelStageResultRow</td><td>내부 projection</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">dto/response/FunnelPopulationResponse · StageDistributionResponse · StageFunnelResponse · DimensionFunnelResponse · FunnelResponse</td><td>응답 DTO</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">service/FunnelStatisticsService</td><td>P 코호트·7-bucket·순차 통과·dimension</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">controller/AdminStatisticsController</td><td>funnel 엔드포인트</td></tr>
+        <tr><td><span class="badge b-blue">Mod</span></td><td class="mono">JobApplicationRepository</td><td>findFunnelCohort</td></tr>
+        <tr><td><span class="badge b-blue">Mod</span></td><td class="mono">StageResultRepository</td><td>findFunnelStageResults</td></tr>
+        <tr><td><span class="badge b-blue">Mod</span></td><td class="mono">GlobalExceptionHandler</td><td>InvalidStatisticsRequestException(400)</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">test/.../AdminStatisticsControllerTest</td><td>5 tests</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Validation &amp; Policy</h2>
+    <table>
+      <thead><tr><th>규칙</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td>모집단 P</td><td><code>submittedAt != null</code> 코호트(현재 status 무관)</td></tr>
+        <tr><td>분포 합</td><td>각 stage raw 7-bucket 합 = |P|</td></tr>
+        <tr><td>NO_RESULT</td><td>결과 row 없는 P 멤버. 응답 전용 synthetic, PENDING과 구분</td></tr>
+        <tr><td>비율 기준</td><td><code>funnelPassedCount</code>(순차 통과) 기준. raw distribution.passed와 다를 수 있음</td></tr>
+        <tr><td>withdrawn 분리</td><td>distribution.withdrawn(stage status) ≠ population.withdrawnCount(application status)</td></tr>
+        <tr><td>dimension</td><td>POSITION만 활성(application distinct). 정렬 = <code>JobPosition.sortOrder</code>, 표시명 = 현재 positionName. SCHOOL/CERTIFICATE·잘못된 값 → 400</td></tr>
+        <tr><td>0명 분야 / topN</td><td>정책 A(P에 존재하는 분야만 응답). topN은 POSITION에서 무시(free-text 축 대비)</td></tr>
+        <tr><td>404 / Audit</td><td>없는 jobPostingId → 404. 집계값만이라 audit 없음</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Test</h2>
+    <h3>명령</h3>
+    <p class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "AdminStatisticsControllerTest"</p>
+    <h3>신규 테스트</h3>
+    <p><span class="badge b-done">9 passed</span> <code>AdminStatisticsControllerTest</code> (응답을 FunnelResponse로 역직렬화해 정밀 검증)</p>
+    <ul class="tight">
+      <li>overall: population(p=5/submitted=4/withdrawn=1), stage1·stage2 distribution(합=|P|), funnelPassedCount, 누적/직전 비율(0.4/0.4 · 0.2/0.5)</li>
+      <li>POSITION dimension: Backend/Frontend 그룹별 population·distribution·funnelPassedCount·비율</li>
+      <li><strong>raw passed ≠ funnelPassedCount</strong>(보정 데이터: distribution.passed=3, funnelPassedCount=1, step=1.0, cumulative=1/3)</li>
+      <li><strong>PENDING/ABSENT/HOLD/NO_RESULT 구분</strong>(PENDING row 있음 vs NO_RESULT row 없음, 합=|P|)</li>
+      <li><strong>withdrawn 분리</strong>(population.withdrawnCount ≠ distribution.withdrawn, 서로 다른 지원서)</li>
+      <li><strong>DRAFT 제외</strong>(submittedAt null → P/분포 제외, p=2)</li>
+      <li>dimension=SCHOOL → 400, 없는 공고 → 404, applicant 403 / anonymous 401</li>
+    </ul>
+    <h3>전체 회귀</h3>
+    <p>
+      <span class="badge b-blue">877 tests</span>
+      <span class="badge b-done">869 passed</span>
+      <span class="badge b-warn">8 failed</span>
+      &nbsp; <span class="mono">./gradlew.bat test</span> · 26m 16s
+    </p>
+    <p>
+      직전(872) 대비 <strong>+5 신규(전부 통과), 신규 회귀 0건</strong>. 실패 8건은 변동 없이 동일한
+      클럭 의존 사전-실패(<code>StageControllerTest</code> 2 + <code>StageServiceTest</code> 6, 접수기간 검증)로 본 슬라이스와 무관하다.
+    </p>
+    <div class="note">
+      기존 8건의 <span class="mono">접수기간</span> 사전-실패는 시스템 날짜(2026-06-01)가 fixture 접수기간을
+      지나 발생하는 클럭 의존 실패로 본 슬라이스와 무관하다. statistics 테스트는 엔티티를 repository로 직접
+      영속화해 클럭 의존성을 피했다.
+    </div>
+  </section>
+
+  <section>
+    <h2>Remaining Issues</h2>
+    <ul class="tight">
+      <li>대형 공고에서 결과 row가 많으면 in-memory 산출을 GROUP BY 집계로 전환 고려.</li>
+      <li>SCHOOL dimension은 Phase 08(School master) 이후, CERTIFICATE는 free-text topN+'기타'로 후속.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Next Phase</h2>
+    <ul class="tight">
+      <li><strong>07d</strong>: Excel upload(StageResult) preview/commit (stateless, all-or-nothing, 3중 교차검증).</li>
+    </ul>
+  </section>
+</div>
+</body>
+</html>

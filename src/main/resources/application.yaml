@@ -36,6 +36,8 @@ crypto:
   aes:
     key: ${AES_SECRET_KEY}
 recruit:
+  export:
+    max-rows: ${RECRUIT_EXPORT_MAX_ROWS:50000}
   attachment:
     storage-root: ${RECRUIT_ATTACHMENT_STORAGE_ROOT:attachments}
     max-file-size: ${RECRUIT_ATTACHMENT_MAX_FILE_SIZE:20MB}

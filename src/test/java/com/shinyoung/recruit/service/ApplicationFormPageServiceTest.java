@@ -126,6 +126,12 @@ class ApplicationFormPageServiceTest {
         assertThat(response.sections())
                 .extracting(ApplicationFormSectionResponse::required)
                 .containsExactly(true, false, true);
+        assertThat(response.sections())
+                .extracting(ApplicationFormSectionResponse::pageNo)
+                .containsExactly(1, 1, 2);
+        assertThat(response.sections())
+                .extracting(ApplicationFormSectionResponse::pageTitle)
+                .containsExactly("Basic Info", "Basic Info", "Education And Career");
     }
 
     @Test
@@ -152,6 +158,12 @@ class ApplicationFormPageServiceTest {
         assertThat(response.sections())
                 .extracting(ApplicationFormSectionResponse::sortOrder)
                 .containsExactly(0, 1, 2, 3);
+        assertThat(response.sections())
+                .extracting(ApplicationFormSectionResponse::pageNo)
+                .containsExactly(1, 1, 2, 2);
+        assertThat(response.sections())
+                .extracting(ApplicationFormSectionResponse::pageTitle)
+                .containsExactly("Page 1", "Page 1", "Page 2", "Page 2");
     }
 
     @Test
