@@ -1,0 +1,544 @@
+package com.shinyoung.recruit.controller;
+
+import com.shinyoung.recruit.common.hash.HashUtil;
+import com.shinyoung.recruit.domain.entity.Applicant;
+import com.shinyoung.recruit.domain.entity.JobApplication;
+import com.shinyoung.recruit.domain.entity.JobPosition;
+import com.shinyoung.recruit.domain.entity.JobPosting;
+import com.shinyoung.recruit.domain.entity.Stage;
+import com.shinyoung.recruit.domain.entity.StageResult;
+import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.domain.repository.StageRepository;
+import com.shinyoung.recruit.domain.repository.StageResultRepository;
+import com.shinyoung.recruit.dto.request.StageResultBulkUpdateItemRequest;
+import com.shinyoung.recruit.dto.request.StageResultBulkUpdateRequest;
+import com.shinyoung.recruit.enumeration.StageResultStatus;
+import com.shinyoung.recruit.enumeration.StageType;
+import com.shinyoung.recruit.security.auth.CustomUserDetails;
+import com.shinyoung.recruit.service.StageResultService;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.WebApplicationContext;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
+@Transactional
+class StageResultUploadControllerTest {
+
+    private static final List<String> HEADER = List.of(
+            "stageResultId", "applicationId", "applicantName",
+            "stageResultUpdatedAt", "resultStatus", "score", "comment");
+
+    private static final DateTimeFormatter TOKEN = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+    private static final String XLSX_CONTENT_TYPE =
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    @Autowired
+    private WebApplicationContext context;
+
+    @Autowired
+    private JobPostingRepository jobPostingRepository;
+
+    @Autowired
+    private StageRepository stageRepository;
+
+    @Autowired
+    private JobApplicationRepository jobApplicationRepository;
+
+    @Autowired
+    private ApplicantRepository applicantRepository;
+
+    @Autowired
+    private StageResultRepository stageResultRepository;
+
+    @Autowired
+    private StageResultService stageResultService;
+
+    private MockMvc mockMvc;
+
+    @BeforeEach
+    void setUp() {
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .apply(springSecurity())
+                .build();
+    }
+
+    // ---------- template ----------
+
+    @Test
+    void upload_template_returns_xlsx_with_prefilled_values_and_no_pii_columns() throws Exception {
+        Fixture fixture = fixtureWithResults("A", "B");
+
+        MvcResult result = performTemplate(fixture.stageId());
+
+        assertThat(result.getResponse().getContentType()).isEqualTo(XLSX_CONTENT_TYPE);
+        assertThat(result.getResponse().getHeader("Cache-Control")).isEqualTo("no-store");
+
+        List<List<String>> sheet = readSheet(result.getResponse().getContentAsByteArray());
+        assertThat(sheet.get(0)).isEqualTo(HEADER);
+        assertThat(sheet.get(0)).doesNotContain("ci", "ciHash", "password", "phoneNumber", "email");
+        assertThat(sheet.subList(1, sheet.size())).hasSize(2);
+        // 토큰 컬럼이 현재 updatedAt(ISO-8601)을 prefill한다.
+        assertThat(sheet.get(1).get(3)).isNotBlank();
+    }
+
+    @Test
+    void upload_template_unknown_stage_returns_not_found() throws Exception {
+        mockMvc.perform(get("/api/admin/stages/{stageId}/results/upload-template", 999999L)
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isNotFound());
+    }
+
+    // ---------- preview ----------
+
+    @Test
+    void preview_reports_changed_unchanged_and_error_rows() throws Exception {
+        Fixture fixture = fixtureWithResults("A", "B");
+        preset(fixture.stageId(), StageResultStatus.PASSED);
+        List<Current> rows = currentRows(fixture.stageId());
+
+        List<List<String>> data = new ArrayList<>();
+        data.add(HEADER);
+        data.add(rowOf(rows.get(0), "HOLD", "", ""));           // changed
+        data.add(rowOf(rows.get(1), "PASSED", "", ""));         // unchanged (already PASSED)
+        // 존재하지 않는 stageResultId → error
+        data.add(List.of("999999", String.valueOf(rows.get(0).appId()), "X", rows.get(0).token(), "FAILED", "", ""));
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalRows").value(3))
+                .andExpect(jsonPath("$.data.changedCount").value(1))
+                .andExpect(jsonPath("$.data.unchangedCount").value(1))
+                .andExpect(jsonPath("$.data.errorCount").value(1))
+                .andExpect(jsonPath("$.data.committable").value(false));
+    }
+
+    @Test
+    void preview_flags_blank_result_status_and_pending_as_error() throws Exception {
+        Fixture fixture = fixtureWithResults("A", "B");
+        preset(fixture.stageId(), StageResultStatus.PASSED);
+        List<Current> rows = currentRows(fixture.stageId());
+
+        List<List<String>> data = new ArrayList<>();
+        data.add(HEADER);
+        data.add(rowOf(rows.get(0), "", "", ""));        // blank resultStatus → error
+        data.add(rowOf(rows.get(1), "PENDING", "", "")); // PENDING not allowed → error
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.errorCount").value(2))
+                .andExpect(jsonPath("$.data.committable").value(false));
+    }
+
+    @Test
+    void preview_flags_application_id_mismatch_as_error() throws Exception {
+        Fixture fixture = fixtureWithResults("A", "B");
+        preset(fixture.stageId(), StageResultStatus.PASSED);
+        List<Current> rows = currentRows(fixture.stageId());
+
+        List<List<String>> data = new ArrayList<>();
+        data.add(HEADER);
+        // stageResultId는 맞지만 applicationId를 다른 값으로 → 교차검증 실패
+        data.add(List.of(String.valueOf(rows.get(0).srId()), "111222", "A",
+                rows.get(0).token(), "HOLD", "", ""));
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.errorCount").value(1));
+    }
+
+    @Test
+    void preview_flags_duplicate_stage_result_id_as_error() throws Exception {
+        Fixture fixture = fixtureWithResults("A", "B");
+        preset(fixture.stageId(), StageResultStatus.PASSED);
+        List<Current> rows = currentRows(fixture.stageId());
+
+        List<List<String>> data = new ArrayList<>();
+        data.add(HEADER);
+        data.add(rowOf(rows.get(0), "HOLD", "", ""));
+        data.add(rowOf(rows.get(0), "FAILED", "", "")); // 같은 stageResultId 중복
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.errorCount").value(2));
+    }
+
+    @Test
+    void preview_rejects_formula_cell_as_error() throws Exception {
+        Fixture fixture = fixtureWithResults("A");
+        preset(fixture.stageId(), StageResultStatus.PASSED);
+        List<Current> rows = currentRows(fixture.stageId());
+
+        byte[] bytes = buildXlsxWithFormulaComment(List.of(
+                HEADER,
+                rowOf(rows.get(0), "HOLD", "", "")));
+
+        mockMvc.perform(multipart("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId())
+                        .file(new MockMultipartFile("file", "upload.xlsx", XLSX_CONTENT_TYPE, bytes))
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.errorCount").value(1));
+    }
+
+    // ---------- commit ----------
+
+    @Test
+    void commit_applies_changed_rows_and_skips_unchanged() throws Exception {
+        Fixture fixture = fixtureWithResults("A", "B");
+        preset(fixture.stageId(), StageResultStatus.PASSED);
+        List<Current> rows = currentRows(fixture.stageId());
+
+        List<List<String>> data = new ArrayList<>();
+        data.add(HEADER);
+        data.add(rowOf(rows.get(0), "HOLD", "55", "재검토"));  // changed
+        data.add(rowOf(rows.get(1), "PASSED", "", ""));        // unchanged
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId(), data))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.outcome").value("APPLIED"))
+                .andExpect(jsonPath("$.data.changedCount").value(1))
+                .andExpect(jsonPath("$.data.unchangedCount").value(1));
+
+        StageResult changed = stageResultRepository.findById(rows.get(0).srId()).orElseThrow();
+        assertThat(changed.getResultStatus()).isEqualTo(StageResultStatus.HOLD);
+        assertThat(changed.getScore()).isEqualByComparingTo("55");
+        assertThat(changed.getComment()).isEqualTo("재검토");
+
+        StageResult unchanged = stageResultRepository.findById(rows.get(1).srId()).orElseThrow();
+        assertThat(unchanged.getResultStatus()).isEqualTo(StageResultStatus.PASSED);
+    }
+
+    @Test
+    void commit_clears_score_and_comment_when_blank() throws Exception {
+        Fixture fixture = fixtureWithResults("A");
+        // 현재값: PASSED + score 10 + comment "old"
+        List<Current> ignored = currentRows(fixture.stageId());
+        StageResult current = stageResultRepository.findById(ignored.get(0).srId()).orElseThrow();
+        stageResultService.bulkUpdateResults(
+                fixture.stageId(),
+                new StageResultBulkUpdateRequest(List.of(
+                        new StageResultBulkUpdateItemRequest(current.getId(), StageResultStatus.PASSED,
+                                new java.math.BigDecimal("10"), "old"))),
+                "seed-admin");
+        List<Current> rows = currentRows(fixture.stageId());
+
+        List<List<String>> data = new ArrayList<>();
+        data.add(HEADER);
+        data.add(rowOf(rows.get(0), "PASSED", "", "")); // score/comment blank → clear
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId(), data))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.outcome").value("APPLIED"))
+                .andExpect(jsonPath("$.data.changedCount").value(1));
+
+        StageResult after = stageResultRepository.findById(rows.get(0).srId()).orElseThrow();
+        assertThat(after.getScore()).isNull();
+        assertThat(after.getComment()).isNull();
+    }
+
+    @Test
+    void commit_rejects_all_when_any_row_invalid() throws Exception {
+        Fixture fixture = fixtureWithResults("A", "B");
+        preset(fixture.stageId(), StageResultStatus.PASSED);
+        List<Current> rows = currentRows(fixture.stageId());
+
+        List<List<String>> data = new ArrayList<>();
+        data.add(HEADER);
+        data.add(rowOf(rows.get(0), "HOLD", "", ""));     // valid change
+        data.add(rowOf(rows.get(1), "NOPE", "", ""));     // invalid status → whole file rejected
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId(), data))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data.outcome").value("REJECTED_VALIDATION"));
+
+        // all-or-nothing: 유효했던 행도 적용되지 않는다.
+        StageResult notApplied = stageResultRepository.findById(rows.get(0).srId()).orElseThrow();
+        assertThat(notApplied.getResultStatus()).isEqualTo(StageResultStatus.PASSED);
+    }
+
+    @Test
+    void commit_rejects_stale_rows_with_conflict() throws Exception {
+        Fixture fixture = fixtureWithResults("A");
+        preset(fixture.stageId(), StageResultStatus.PASSED);
+        List<Current> rows = currentRows(fixture.stageId());
+
+        List<List<String>> data = new ArrayList<>();
+        data.add(HEADER);
+        // 잘못된(오래된) 토큰으로 변경 시도 → STALE
+        data.add(List.of(String.valueOf(rows.get(0).srId()), String.valueOf(rows.get(0).appId()),
+                "A", "2000-01-01T00:00:00", "HOLD", "", ""));
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId(), data))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data.outcome").value("REJECTED_STALE"))
+                .andExpect(jsonPath("$.data.staleCount").value(1));
+
+        StageResult notApplied = stageResultRepository.findById(rows.get(0).srId()).orElseThrow();
+        assertThat(notApplied.getResultStatus()).isEqualTo(StageResultStatus.PASSED);
+    }
+
+    // ---------- file-level defenses ----------
+
+    @Test
+    void commit_rejects_non_xlsx_extension() throws Exception {
+        Fixture fixture = fixtureWithResults("A");
+        byte[] bytes = buildXlsx(List.of(HEADER));
+
+        mockMvc.perform(multipart("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId())
+                        .file(new MockMultipartFile("file", "upload.xls", XLSX_CONTENT_TYPE, bytes))
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void preview_rejects_wrong_header() throws Exception {
+        Fixture fixture = fixtureWithResults("A");
+        List<List<String>> data = List.of(
+                List.of("wrong", "applicationId", "applicantName",
+                        "stageResultUpdatedAt", "resultStatus", "score", "comment"));
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
+                .andExpect(status().isBadRequest());
+    }
+
+    // ---------- authorization ----------
+
+    @Test
+    void upload_endpoints_block_applicant_and_anonymous() throws Exception {
+        Fixture fixture = fixtureWithResults("A");
+        Applicant applicant = saveApplicant("Blocked");
+
+        mockMvc.perform(get("/api/admin/stages/{stageId}/results/upload-template", fixture.stageId())
+                        .with(authentication(applicantAuthentication(applicant))))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/admin/stages/{stageId}/results/upload-template", fixture.stageId())
+                        .with(anonymous()))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(multipart("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId())
+                        .file(new MockMultipartFile("file", "upload.xlsx", XLSX_CONTENT_TYPE, buildXlsx(List.of(HEADER))))
+                        .with(authentication(applicantAuthentication(applicant))))
+                .andExpect(status().isForbidden());
+    }
+
+    // ---------- helpers ----------
+
+    private MvcResult performTemplate(Long stageId) throws Exception {
+        MvcResult started = mockMvc.perform(get("/api/admin/stages/{stageId}/results/upload-template", stageId)
+                        .with(authentication(adminAuthentication())))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+        return mockMvc.perform(asyncDispatch(started)).andReturn();
+    }
+
+    private org.springframework.test.web.servlet.RequestBuilder multipartUpload(
+            String url, Long stageId, List<List<String>> rows) throws Exception {
+        return multipart(url, stageId)
+                .file(new MockMultipartFile("file", "upload.xlsx", XLSX_CONTENT_TYPE, buildXlsx(rows)))
+                .with(authentication(adminAuthentication()));
+    }
+
+    private List<String> rowOf(Current current, String status, String score, String comment) {
+        return List.of(
+                String.valueOf(current.srId()),
+                String.valueOf(current.appId()),
+                current.name(),
+                current.token(),
+                status,
+                score,
+                comment);
+    }
+
+    private void preset(Long stageId, StageResultStatus status) {
+        List<StageResultBulkUpdateItemRequest> items = stageResultRepository.findByStageIdForAdminList(stageId).stream()
+                .map(sr -> new StageResultBulkUpdateItemRequest(sr.getId(), status, null, null))
+                .toList();
+        stageResultService.bulkUpdateResults(stageId, new StageResultBulkUpdateRequest(items), "seed-admin");
+    }
+
+    private List<Current> currentRows(Long stageId) {
+        return stageResultRepository.findByStageIdForAdminList(stageId).stream()
+                .map(sr -> new Current(
+                        sr.getId(),
+                        sr.getJobApplication().getId(),
+                        sr.getJobApplication().getApplicantNameSnapshot(),
+                        sr.getUpdatedAt() == null ? "" : TOKEN.format(sr.getUpdatedAt()),
+                        sr.getResultStatus() == null ? "" : sr.getResultStatus().name(),
+                        sr.getScore() == null ? "" : sr.getScore().toPlainString(),
+                        sr.getComment() == null ? "" : sr.getComment()))
+                .toList();
+    }
+
+    private byte[] buildXlsx(List<List<String>> rows) throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("stage-result-upload");
+            for (int r = 0; r < rows.size(); r++) {
+                Row row = sheet.createRow(r);
+                List<String> cells = rows.get(r);
+                for (int c = 0; c < cells.size(); c++) {
+                    Cell cell = row.createCell(c, CellType.STRING);
+                    cell.setCellValue(cells.get(c));
+                }
+            }
+            workbook.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    private byte[] buildXlsxWithFormulaComment(List<List<String>> rows) throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("stage-result-upload");
+            for (int r = 0; r < rows.size(); r++) {
+                Row row = sheet.createRow(r);
+                List<String> cells = rows.get(r);
+                for (int c = 0; c < cells.size(); c++) {
+                    if (r > 0 && c == 6) {
+                        Cell formula = row.createCell(c, CellType.FORMULA);
+                        formula.setCellFormula("1+1");
+                    } else {
+                        Cell cell = row.createCell(c, CellType.STRING);
+                        cell.setCellValue(cells.get(c));
+                    }
+                }
+            }
+            workbook.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    private List<List<String>> readSheet(byte[] bytes) throws Exception {
+        List<List<String>> rows = new ArrayList<>();
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
+            Sheet sheet = workbook.getSheetAt(0);
+            int columnCount = sheet.getRow(0).getLastCellNum();
+            for (int r = 0; r <= sheet.getLastRowNum(); r++) {
+                Row row = sheet.getRow(r);
+                List<String> cells = new ArrayList<>();
+                for (int c = 0; c < columnCount; c++) {
+                    Cell cell = row == null ? null : row.getCell(c);
+                    cells.add(cell == null ? "" : cell.getStringCellValue());
+                }
+                rows.add(cells);
+            }
+        }
+        return rows;
+    }
+
+    private Fixture fixtureWithResults(String... applicantNames) {
+        JobPosting jobPosting = saveJobPosting();
+        Stage stage = saveStage(jobPosting);
+        for (String name : applicantNames) {
+            saveSubmittedApplication(jobPosting, name);
+        }
+        stageResultService.initialize(stage.getId());
+        stage.start();
+        stageRepository.saveAndFlush(stage);
+        return new Fixture(jobPosting.getId(), stage.getId());
+    }
+
+    private JobPosting saveJobPosting() {
+        JobPosting jobPosting = JobPosting.create(
+                "Posting " + UUID.randomUUID(),
+                "Content",
+                start().minusDays(1),
+                start().plusDays(10));
+        jobPosting.replaceJobPositions(List.of(JobPosition.create("Sales", 1)));
+        return jobPostingRepository.saveAndFlush(jobPosting);
+    }
+
+    private Stage saveStage(JobPosting jobPosting) {
+        return stageRepository.saveAndFlush(
+                Stage.create(jobPosting, "First interview", StageType.FIRST_INTERVIEW, 1, null, false));
+    }
+
+    private JobApplication saveSubmittedApplication(JobPosting jobPosting, String name) {
+        JobPosition jobPosition = jobPosting.getJobPositions().get(0);
+        JobApplication application = JobApplication.create(
+                saveApplicant(name),
+                jobPosting,
+                jobPosition,
+                name,
+                jobPosting.getTitle(),
+                jobPosition.getPositionName());
+        application.submit(start().minusHours(1));
+        return jobApplicationRepository.saveAndFlush(application);
+    }
+
+    private Applicant saveApplicant(String name) {
+        String ci = "test-ci-" + UUID.randomUUID();
+        Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
+        applicant.setLoginId("applicant-" + UUID.randomUUID());
+        applicant.setName(name);
+        applicant.setUserName(name);
+        applicant.setEmail(UUID.randomUUID() + "@example.com");
+        applicant.setPhoneNumber("01000000000");
+        return applicantRepository.saveAndFlush(applicant);
+    }
+
+    private Authentication adminAuthentication() {
+        CustomUserDetails userDetails = CustomUserDetails.fromLdap(
+                "upload-admin-" + UUID.randomUUID(),
+                "Recruit",
+                "Upload Admin",
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+    }
+
+    private Authentication applicantAuthentication(Applicant applicant) {
+        CustomUserDetails userDetails = CustomUserDetails.fromUser(
+                applicant,
+                List.of(new SimpleGrantedAuthority("ROLE_APPLICANT")));
+        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+    }
+
+    private LocalDateTime start() {
+        return LocalDateTime.of(2026, 6, 1, 10, 0);
+    }
+
+    private record Fixture(Long jobPostingId, Long stageId) {
+    }
+
+    private record Current(Long srId, Long appId, String name, String token, String status, String score, String comment) {
+    }
+}

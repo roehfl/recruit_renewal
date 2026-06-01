@@ -1,5 +1,49 @@
 # 07. Implementation History
 
+## Phase 07d - Stage Result Excel Upload (preview/commit)
+
+- Date: 2026-06-02
+- Work type: implementation (Phase 07 네 번째 슬라이스, Phase 07의 유일한 쓰기 경로).
+- Goal: 운영자가 `upload-template`으로 받은 xlsx로 `StageResult`를 bulk 변경. stateless preview/commit, all-or-nothing, 3중 교차검증, 낙관적 동시성, 기존 `bulkUpdateResults` 위임. 새 entity/table/migration 없음.
+- Created (main):
+  - `enumeration/StageResultUploadRowStatus.java`, `enumeration/StageResultUploadCommitOutcome.java`
+  - `exception/InvalidStageResultUploadException.java`
+  - `config/UploadProperties.java`
+  - `dto/request/StageResultUploadRowRequest.java`
+  - `dto/response/StageResultUploadDiff.java`, `StageResultUploadRowResult.java`, `StageResultUploadPreviewResponse.java`, `StageResultUploadCommitResponse.java`, `StageResultUploadTemplateRow.java`
+  - `service/StageResultUploadParser.java`, `service/StageResultUploadService.java`, `service/UploadAuditLogger.java`
+  - `controller/StageResultUploadController.java`
+- Modified (main):
+  - `dto/response/ApiResponse.java` (`fail(message, data)` 오버로드 — 거부 응답 body에 행 detail 동봉)
+  - `common/hash/HashUtil.java` (`sha256Bytes(byte[])` — `sha256(String)`과 오버로드 모호성 회피 위해 별도 이름; 파일 contentHash용)
+  - `exception/GlobalExceptionHandler.java` (`InvalidStageResultUploadException` 400)
+  - `src/main/resources/application.yaml` (`recruit.upload.max-rows` 10,000 / `recruit.upload.max-file-size` 5MB)
+- Created (test):
+  - `controller/StageResultUploadControllerTest.java` (14)
+- APIs:
+  - `GET  /api/admin/stages/{stageId}/results/upload-template`
+  - `POST /api/admin/stages/{stageId}/results/upload/preview`
+  - `POST /api/admin/stages/{stageId}/results/upload/commit`
+- Key decisions:
+  - 업로드 소스는 `upload-template`만(applications/stage results export는 소스 아님). `stageId`는 path로만 판단(row 컬럼 없음).
+  - 3중 교차검증(`stageResultId` 존재 + `applicationId` 일치 + path `stageId` 소속). 기존 `StageResultBulkUpdateItemRequest`는 불변 — echo/토큰 필드는 upload row DTO에만.
+  - 빈칸: resultStatus blank=행 오류, score/comment blank=null clear. 변경 없는 row=UNCHANGED → commit 제외(stale check도 변경 row에만).
+  - 낙관적 동시성: `stageResultUpdatedAt`(ISO-8601 string) ↔ 현재 `StageResult.updatedAt` normalize 후 비교, 불일치 → STALE. ERROR=400(REJECTED_VALIDATION), STALE=409(REJECTED_STALE), 전부 통과 시 변경 행만 단일 tx로 `bulkUpdateResults` 위임 → APPLIED.
+  - 파일 방어: `.xlsx`만(.xls/.csv/.xlsm 거부), maxRows/maxFileSize, 첫 sheet, header signature, formula 셀 거부, 중복 `stageResultId` 거부, 셀 string 판독(로케일 의존 제거), 빈 행 skip.
+  - commit은 기존 `bulkUpdateResults` 경유로 Stage `IN_PROGRESS` guard·PENDING 금지·comment ≤ 2000·actor 필수·정정 이력/audit 상속. `InterviewEvaluation` upload 영구 제외(Phase 06 경계).
+  - upload commit SLF4J 구조적 audit(outcome/카운트/sourceFileName/Size/contentHash; PII 값 미기록).
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*StageResultUpload*" --tests "*HashUtil*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL — `StageResultUploadControllerTest` 14건 + `HashUtilTest` 회귀 통과.
+  - 검증: template prefill/토큰/PII 컬럼 부재·404, preview changed/unchanged/error 집계·blank/PENDING·applicationId 불일치·중복 id·formula 셀·wrong header 400, commit changed 적용+unchanged 제외·blank clear·all-or-nothing 미적용·STALE 409 미적용·비-xlsx 400, 인가(403/401).
+  - 엔티티를 repository로 직접 영속화해 클럭 의존(접수기간) 없이 안정적. 부분 실행(upload + HashUtil); 전체 스위트는 본 슬라이스 범위상 미실행.
+- Documentation:
+  - `docs/codex/implementation/phase-07d-stage-result-excel-upload.md`
+  - `docs/codex/reports/phase-07d-stage-result-excel-upload.html`
+- Known limitations: 토큰은 원문 ISO-8601(HMAC opaque 미적용, Open Q#7), audit는 SLF4J(영속 ActivityLog 미도입).
+- Deferred: 07e(PDF), 07f(stabilization), HMAC 토큰, 영속 audit.
+- Next recommended: Phase 07e - Application PDF.
+
 ## Phase 07c - 공고 단위 전형 Funnel 통계
 
 - Date: 2026-06-01

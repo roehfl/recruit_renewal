@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 07d - Stage Result Excel Upload</title>
+<style>
+  :root {
+    --blue: #1d4ed8; --green: #15803d; --amber: #b45309; --red: #b91c1c;
+    --muted: #6b7280; --bg: #f8fafc; --card: #ffffff; --border: #e2e8f0; --ink: #0f172a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.6; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 64px; }
+  header.page { background: linear-gradient(135deg, #1e3a8a, #2563eb); color: #fff; border-radius: 16px;
+    padding: 28px 32px; margin-bottom: 28px; }
+  header.page h1 { margin: 0 0 6px; font-size: 24px; }
+  header.page .sub { opacity: .9; font-size: 14px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+    vertical-align: middle; }
+  .badge.done { background: #dcfce7; color: var(--green); }
+  .badge.blue { background: #dbeafe; color: var(--blue); }
+  .badge.pending { background: #f1f5f9; color: var(--muted); }
+  .badge.oos { background: #fee2e2; color: var(--red); }
+  .badge.warn { background: #fef3c7; color: var(--amber); }
+  .badge.white { background: rgba(255,255,255,.18); color: #fff; }
+  section { margin-bottom: 26px; }
+  h2 { font-size: 18px; border-left: 4px solid var(--blue); padding-left: 10px; margin: 0 0 14px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+  .card h3 { margin: 0 0 8px; font-size: 14px; }
+  .card ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+  .card.kpi { text-align: center; }
+  .card.kpi .num { font-size: 30px; font-weight: 700; color: var(--blue); }
+  .card.kpi .lbl { font-size: 12px; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #f1f5f9; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  code { background: #f1f5f9; padding: 1px 6px; border-radius: 5px; font-size: 12px; }
+  .summary { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--green);
+    border-radius: 10px; padding: 16px 20px; font-size: 14px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .note { font-size: 12px; color: var(--muted); }
+  .ok { color: var(--green); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Phase 07d · Stage Result Excel Upload <span class="badge white">완료</span></h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · preview/commit · Phase 07의 유일한 쓰기 경로 · 생성일 2026-06-02</div>
+</header>
+
+<section>
+  <h2>요약</h2>
+  <div class="summary">
+    운영자가 <code>upload-template</code>으로 받은 xlsx로 <strong>StageResult</strong>를 bulk 변경한다.
+    stateless preview/commit, all-or-nothing, 3중 교차검증, 낙관적 동시성(<code>stageResultUpdatedAt</code> 토큰)을 갖추고
+    commit은 기존 <code>StageResultService.bulkUpdateResults</code>에 위임해 기존 불변식(Stage <code>IN_PROGRESS</code> guard,
+    PENDING 금지, comment ≤ 2000, actor 필수, 정정 이력/audit)을 그대로 상속한다. 새 entity/table/migration 없음.
+    테스트 <span class="ok">BUILD SUCCESSFUL</span> — 다음 슬라이스(07e PDF)로 진행 가능.
+  </div>
+</section>
+
+<section>
+  <h2>지표</h2>
+  <div class="cards">
+    <div class="card kpi"><div class="num">3</div><div class="lbl">신규 API</div></div>
+    <div class="card kpi"><div class="num">14</div><div class="lbl">신규 클래스(main)</div></div>
+    <div class="card kpi"><div class="num">14</div><div class="lbl">테스트(통과)</div></div>
+    <div class="card kpi"><div class="num">0</div><div class="lbl">신규 테이블/마이그레이션</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>범위</h2>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="badge done">완료</span> Implemented</h3>
+      <ul>
+        <li>upload-template(현재값 prefill + 동시성 토큰)</li>
+        <li>preview(행별 검증/diff, 미적용)</li>
+        <li>commit(all-or-nothing 적용)</li>
+        <li>파일 레벨 방어(.xlsx/크기/행수/header/formula/중복)</li>
+        <li>3중 교차검증 + 빈칸 정책 + 낙관적 동시성</li>
+        <li>commit SLF4J audit(PII 미기록)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="badge oos">제외</span> Out of scope</h3>
+      <ul>
+        <li>InterviewEvaluation upload(Phase 06 경계, 영구)</li>
+        <li>staging 영속화(batchId)</li>
+        <li>RESULT_ANNOUNCED 후 correct 경로</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="badge pending">보류</span> Deferred</h3>
+      <ul>
+        <li>HMAC opaque 토큰(Open Q#7)</li>
+        <li>영속 ActivityLog 이관</li>
+        <li>07e Application PDF</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>API</h2>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td class="mono">/api/admin/stages/{stageId}/results/upload-template</td><td>현재값 prefill + 토큰 xlsx(유일 소스)</td><td>—</td><td>xlsx(stream)</td></tr>
+      <tr><td>POST</td><td class="mono">/api/admin/stages/{stageId}/results/upload/preview</td><td>검증·diff(미적용)</td><td>multipart <code>file</code></td><td>ApiResponse&lt;PreviewResponse&gt; (200)</td></tr>
+      <tr><td>POST</td><td class="mono">/api/admin/stages/{stageId}/results/upload/commit</td><td>적용(all-or-nothing)</td><td>multipart <code>file</code></td><td>ApiResponse&lt;CommitResponse&gt; (200/400/409)</td></tr>
+    </tbody>
+  </table>
+  <p class="note">업로드 컬럼: <code>stageResultId</code>, <code>applicationId</code>, <code>applicantName</code>, <code>stageResultUpdatedAt</code>(read-only 토큰), <code>resultStatus</code>, <code>score</code>, <code>comment</code>. <code>stageId</code>는 path로만 판단(컬럼 없음). <strong>ci/ciHash/password/phoneNumber/email은 어디에도 노출하지 않는다.</strong></p>
+</section>
+
+<section>
+  <h2>도메인 / 데이터 소유</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>변경 대상</h3>
+      <ul>
+        <li>신규 entity 없음 — 기존 <code>StageResult</code>만 변경</li>
+        <li>commit → <code>StageResultService.bulkUpdateResults(stageId, request, actor)</code> 위임</li>
+        <li>upload는 독립 상태 없음(stateless)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>핵심 클래스</h3>
+      <ul>
+        <li><code>StageResultUploadParser</code> — 파일 방어 + 파싱</li>
+        <li><code>StageResultUploadService</code> — 검증/diff/동시성/위임</li>
+        <li><code>StageResultUploadController</code> — outcome→HTTP 매핑</li>
+        <li><code>UploadAuditLogger</code> — commit audit</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>검증 / 정책</h2>
+  <table>
+    <thead><tr><th>항목</th><th>규칙</th></tr></thead>
+    <tbody>
+      <tr><td>업로드 소스</td><td><code>upload-template</code>만. applications/stage results export는 소스 아님.</td></tr>
+      <tr><td>3중 교차검증</td><td>stageResultId 존재(해당 stage) + applicationId 일치 + path stageId 소속을 모두 만족해야 유효.</td></tr>
+      <tr><td>resultStatus</td><td>허용값 = {PASSED, FAILED, ABSENT, HOLD, WITHDRAWN}. blank/PENDING/미허용 → 행 오류.</td></tr>
+      <tr><td>빈칸 정책</td><td>score blank → null clear, comment blank → null clear. 변경 없는 행은 commit 제외(stale check도 변경 행에만).</td></tr>
+      <tr><td>낙관적 동시성</td><td>변경 행 토큰을 현재 <code>updatedAt</code>(ISO-8601)과 비교, 불일치 → STALE.</td></tr>
+      <tr><td>all-or-nothing</td><td>ERROR/STALE 1건이라도 있으면 0건 적용. ERROR → 400(REJECTED_VALIDATION), STALE → 409(REJECTED_STALE).</td></tr>
+      <tr><td>파일 방어</td><td>.xlsx만(.xls/.csv/.xlsm 거부), 크기/행수 한도, 첫 sheet, header signature, formula 셀 거부, 중복 stageResultId 거부, 셀 string 판독.</td></tr>
+      <tr><td>상속 불변식</td><td>Stage IN_PROGRESS guard, PENDING 금지, comment ≤ 2000, actor 필수, 정정 이력/audit(<code>bulkUpdateResults</code> 경유).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>테스트</h2>
+  <div class="summary" style="border-left-color: var(--green);">
+    <div><strong>명령</strong>: <span class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*StageResultUpload*" --tests "*HashUtil*" --no-daemon</span></div>
+    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — StageResultUploadControllerTest 14건 + HashUtil 회귀 통과.</div>
+  </div>
+  <table style="margin-top:12px;">
+    <thead><tr><th>구획</th><th>커버</th></tr></thead>
+    <tbody>
+      <tr><td>template</td><td>prefill + 토큰 + PII 컬럼 부재, unknown stage 404</td></tr>
+      <tr><td>preview</td><td>changed/unchanged/error 집계, blank·PENDING 오류, applicationId 불일치, 중복 id, formula 셀 오류, wrong header 400</td></tr>
+      <tr><td>commit</td><td>changed 적용 + unchanged 제외, score/comment blank clear, all-or-nothing 거부(400, 미적용 확인), STALE 409(미적용 확인), 비-xlsx 400</td></tr>
+      <tr><td>인가</td><td>applicant 403 / anonymous 401(template GET, commit POST)</td></tr>
+    </tbody>
+  </table>
+  <p class="note">엔티티를 repository로 직접 영속화해 클럭 의존(접수기간) 없이 안정적. 부분 실행(upload + HashUtil); 전체 스위트는 본 슬라이스 범위상 미실행.</p>
+</section>
+
+<section>
+  <h2>남은 이슈</h2>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="badge warn">open</span> 토큰 위조</h3>
+      <ul><li>원문 ISO-8601 토큰 — 사용자가 정확히 위조하면 stale 우회 가능(Open Q#7, HMAC 후보).</li></ul>
+    </div>
+    <div class="card">
+      <h3><span class="badge pending">deferred</span> audit</h3>
+      <ul><li>SLF4J 구조적 로그 유지. 영속 ActivityLog 도입 시 이관.</li></ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>다음 단계</h2>
+  <div class="summary" style="border-left-color: var(--blue);">
+    <strong>Phase 07e</strong> — Application PDF(Thymeleaf + openhtmltopdf, CJK 폰트 임베드, admin 전용).
+    이후 <strong>07f</strong> Stabilization / Test Hardening(row cap·upload 경계 회귀, PII 부재 검증).
+  </div>
+</section>
+
+</div>
+</body>
+</html>

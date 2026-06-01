@@ -197,4 +197,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.fail(e.getMessage()));
     }
+
+    @ExceptionHandler(InvalidStageResultUploadException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidStageResultUpload(InvalidStageResultUploadException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
 }

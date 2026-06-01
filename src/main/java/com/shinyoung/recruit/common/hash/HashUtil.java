@@ -13,4 +13,14 @@ public class HashUtil {
             throw new IllegalArgumentException("Invalid input for hashing", e);
         }
     }
+
+    public static String sha256Bytes(byte[] input) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(input);
+            return HexFormat.of().formatHex(digest);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid input for hashing", e);
+        }
+    }
 }

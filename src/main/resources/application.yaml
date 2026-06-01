@@ -38,6 +38,9 @@ crypto:
 recruit:
   export:
     max-rows: ${RECRUIT_EXPORT_MAX_ROWS:50000}
+  upload:
+    max-rows: ${RECRUIT_UPLOAD_MAX_ROWS:10000}
+    max-file-size: ${RECRUIT_UPLOAD_MAX_FILE_SIZE:5MB}
   attachment:
     storage-root: ${RECRUIT_ATTACHMENT_STORAGE_ROOT:attachments}
     max-file-size: ${RECRUIT_ATTACHMENT_MAX_FILE_SIZE:20MB}
