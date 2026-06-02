@@ -193,6 +193,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail("Export 파일 생성에 실패했습니다."));
     }
 
+    @ExceptionHandler(PdfGenerationException.class)
+    public ResponseEntity<ApiResponse<Void>> handlePdfGeneration(PdfGenerationException e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.fail("지원서 PDF 생성에 실패했습니다."));
+    }
+
     @ExceptionHandler(InvalidStatisticsRequestException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidStatisticsRequest(InvalidStatisticsRequestException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)

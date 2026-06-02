@@ -1,5 +1,43 @@
 # 07. Implementation History
 
+## Phase 07e - Application PDF (admin)
+
+- Date: 2026-06-02
+- Work type: implementation (Phase 07 다섯 번째 슬라이스, read-only, admin 전용).
+- Goal: 지원자 1명의 지원서를 PDF 1개로 출력. Thymeleaf XHTML → jsoup 정규화 → openhtmltopdf(PDFBox) 렌더, CJK 폰트 임베드(번들 시), 생성 시 audit.
+- Created (main):
+  - `config/PdfProperties.java`
+  - `exception/PdfGenerationException.java`
+  - `dto/response/ApplicationPdfView.java` (Header/Section/RecordRow/Field generic 표시 모델)
+  - `service/ApplicationPdfDocument.java`, `service/ApplicationPdfRenderer.java`, `service/ApplicationPdfService.java`, `service/PdfAuditLogger.java`
+  - `controller/ApplicationPdfController.java`
+  - `src/main/resources/templates/application-pdf.html`
+- Modified (main):
+  - `build.gradle` (`spring-boot-starter-thymeleaf`, `com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10` → PDFBox 2.0.24)
+  - `exception/GlobalExceptionHandler.java` (`PdfGenerationException` 500)
+  - `src/main/resources/application.yaml` (`recruit.pdf.font-classpath`, `recruit.pdf.font-family`)
+- Created (test):
+  - `controller/ApplicationPdfControllerTest.java` (3)
+- API:
+  - `GET /api/admin/applications/{applicationId}/pdf` → `application/pdf` (attachment)
+- Key decisions:
+  - 렌더 스택 = Thymeleaf(Apache-2.0) → jsoup(이미 의존, well-formed XHTML 정규화) → openhtmltopdf(LGPL, AGPL 아님) + PDFBox(Apache-2.0). iText(AGPL) 미사용.
+  - 섹션 데이터는 `AdminApplicationSectionService` 재사용(자격번호/병역 면제사유 마스킹 정책 상속). 기본정보 name/phone/email은 PII surface, `ci`/`ciHash`/`password`는 미포함.
+  - 표시 모델은 generic record(label/value 평탄화) → 템플릿은 `th:text`만으로 순회(injection 차단), free-text 줄바꿈은 CSS pre-wrap, 외부 resource 미로드.
+  - 템플릿은 record accessor를 메서드 호출(`${header.applicantName()}`)로 참조해 SpEL property-accessor 버전 차이에 비의존.
+  - CJK 폰트 바이너리(.ttf)는 저장소 미포함 — `recruit.pdf.font-classpath`에 SIL OFL 폰트를 ops가 배치(없으면 임베드 생략 + 경고, ASCII는 기본 폰트).
+  - 응답 보안 헤더 `no-store`/`no-cache`/`nosniff` + attachment. 생성 시 SLF4J audit(actor/applicationId/jobPostingId/jobPositionId).
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*ApplicationPdfControllerTest" --no-daemon`
+  - 결과: BUILD SUCCESSFUL — 3건 통과. 생성(200/헤더/`%PDF-`/PDFBox 텍스트 추출로 지원자명 존재 + ci/password 부재), 404, 인가(403/401). Spring 컨텍스트 정상 기동(thymeleaf auto-config 비파괴).
+  - CJK 폰트 부재로 테스트는 ASCII 데이터 검증(한글 렌더는 폰트 배치 후 확인).
+- Documentation:
+  - `docs/codex/implementation/phase-07e-application-pdf.md`
+  - `docs/codex/reports/phase-07e-application-pdf.html`
+- Known limitations: CJK 폰트 바이너리 미포함(ops 배치 필요), 학기별 성적 요약 필드, PDF byte[] 메모리 보유(1인 단위), audit SLF4J.
+- Deferred: 07f(stabilization), 지원자 본인 PDF, attachment 목록, 폰트 ops/Dockerfile.
+- Next recommended: Phase 07f - Stabilization / Test Hardening.
+
 ## Phase 07d - Stage Result Excel Upload (preview/commit)
 
 - Date: 2026-06-02
