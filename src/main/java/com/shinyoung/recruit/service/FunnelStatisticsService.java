@@ -1,15 +1,19 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.JobPosting;
+import com.shinyoung.recruit.domain.entity.School;
 import com.shinyoung.recruit.domain.entity.Stage;
+import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.domain.repository.SchoolRepository;
 import com.shinyoung.recruit.domain.repository.StageRepository;
 import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.dto.response.DimensionFunnelResponse;
 import com.shinyoung.recruit.dto.response.FunnelCohortRow;
 import com.shinyoung.recruit.dto.response.FunnelPopulationResponse;
 import com.shinyoung.recruit.dto.response.FunnelResponse;
+import com.shinyoung.recruit.dto.response.FunnelSchoolEducationRow;
 import com.shinyoung.recruit.dto.response.FunnelStageResultRow;
 import com.shinyoung.recruit.dto.response.StageDistributionResponse;
 import com.shinyoung.recruit.dto.response.StageFunnelResponse;
@@ -46,10 +50,16 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class FunnelStatisticsService {
 
+    private static final int DEFAULT_SCHOOL_TOP_N = 10;
+    private static final int MAX_SCHOOL_TOP_N = 100;
+    private static final String SCHOOL_OTHER_GROUP_NAME = "기타";
+
     private final JobPostingRepository jobPostingRepository;
     private final StageRepository stageRepository;
     private final JobApplicationRepository jobApplicationRepository;
     private final StageResultRepository stageResultRepository;
+    private final ApplicationEducationRepository educationRepository;
+    private final SchoolRepository schoolRepository;
 
     public FunnelResponse getFunnel(Long jobPostingId, String dimensionParam, Integer topN) {
         JobPosting jobPosting = jobPostingRepository.findById(jobPostingId)
@@ -66,6 +76,8 @@ public class FunnelStatisticsService {
         List<DimensionFunnelResponse> dimensions = List.of();
         if (dimension == FunnelDimension.POSITION) {
             dimensions = computePositionDimension(stages, cohort, resultsByStage);
+        } else if (dimension == FunnelDimension.SCHOOL) {
+            dimensions = computeSchoolDimension(stages, cohort, resultsByStage, jobPostingId, topN);
         }
 
         return new FunnelResponse(
@@ -102,6 +114,94 @@ public class FunnelStatisticsService {
                     );
                 })
                 .toList();
+    }
+
+    /**
+     * 학교별 dimension: 지원자별 "최종학력(가장 높은 EducationLevel) 1교"의 {@code schoolId}로 코호트를 분할한다.
+     * 미매칭(최종학력에 schoolId 없음 또는 학력 없음)은 '기타'로 모으고, 학교 그룹은 인원 desc·schoolId asc로 정렬해
+     * topN(기본 10)만 개별 노출하며, 초과 학교 + 미매칭은 '기타' 한 그룹으로 합산한다(application 단위 distinct).
+     */
+    private List<DimensionFunnelResponse> computeSchoolDimension(
+            List<Stage> stages,
+            List<FunnelCohortRow> cohort,
+            Map<Long, Map<Long, StageResultStatus>> resultsByStage,
+            Long jobPostingId,
+            Integer topN
+    ) {
+        Map<Long, Long> schoolByApplication = finalSchoolByApplication(jobPostingId);
+
+        Map<Long, List<FunnelCohortRow>> bySchool = new LinkedHashMap<>();
+        List<FunnelCohortRow> unmatched = new ArrayList<>();
+        for (FunnelCohortRow row : cohort) {
+            Long schoolId = schoolByApplication.get(row.applicationId());
+            if (schoolId == null) {
+                unmatched.add(row);
+            } else {
+                bySchool.computeIfAbsent(schoolId, key -> new ArrayList<>()).add(row);
+            }
+        }
+
+        List<Map.Entry<Long, List<FunnelCohortRow>>> ranked = bySchool.entrySet().stream()
+                .sorted(Comparator
+                        .<Map.Entry<Long, List<FunnelCohortRow>>>comparingInt(entry -> entry.getValue().size())
+                        .reversed()
+                        .thenComparing(Map.Entry::getKey))
+                .toList();
+
+        int limit = (topN == null || topN <= 0) ? DEFAULT_SCHOOL_TOP_N : Math.min(topN, MAX_SCHOOL_TOP_N);
+        List<Map.Entry<Long, List<FunnelCohortRow>>> top = ranked.stream().limit(limit).toList();
+        List<Map.Entry<Long, List<FunnelCohortRow>>> overflow = ranked.stream().skip(limit).toList();
+
+        List<Long> topIds = top.stream().map(Map.Entry::getKey).toList();
+        Map<Long, String> nameById = topIds.isEmpty()
+                ? Map.of()
+                : schoolRepository.findAllById(topIds).stream()
+                        .collect(Collectors.toMap(School::getId, School::getSchoolName));
+
+        List<DimensionFunnelResponse> dimensions = new ArrayList<>();
+        for (Map.Entry<Long, List<FunnelCohortRow>> entry : top) {
+            CohortFunnel funnel = computeCohort(stages, entry.getValue(), resultsByStage);
+            dimensions.add(new DimensionFunnelResponse(
+                    entry.getKey(), nameById.get(entry.getKey()), funnel.population(), funnel.stages()));
+        }
+
+        List<FunnelCohortRow> other = new ArrayList<>(unmatched);
+        overflow.forEach(entry -> other.addAll(entry.getValue()));
+        if (!other.isEmpty()) {
+            CohortFunnel funnel = computeCohort(stages, other, resultsByStage);
+            dimensions.add(new DimensionFunnelResponse(
+                    null, SCHOOL_OTHER_GROUP_NAME, funnel.population(), funnel.stages()));
+        }
+        return dimensions;
+    }
+
+    /** 지원자별 최종학력 1교의 schoolId. 학력 없음/최종학력에 schoolId 없음이면 매핑 없음(미매칭). */
+    private Map<Long, Long> finalSchoolByApplication(Long jobPostingId) {
+        Map<Long, FunnelSchoolEducationRow> best = new HashMap<>();
+        for (FunnelSchoolEducationRow row : educationRepository.findFunnelSchoolEducations(jobPostingId)) {
+            best.merge(row.applicationId(), row, this::pickFinalEducation);
+        }
+        Map<Long, Long> schoolByApplication = new HashMap<>();
+        best.forEach((applicationId, row) -> schoolByApplication.put(applicationId, row.schoolId()));
+        return schoolByApplication;
+    }
+
+    /** 최종학력 선택: 더 높은 educationLevel 우선, 동률이면 schoolId 있는 쪽 우선. */
+    private FunnelSchoolEducationRow pickFinalEducation(FunnelSchoolEducationRow a, FunnelSchoolEducationRow b) {
+        int levelCompare = Integer.compare(levelRank(a), levelRank(b));
+        if (levelCompare != 0) {
+            return levelCompare > 0 ? a : b;
+        }
+        boolean aHasSchool = a.schoolId() != null;
+        boolean bHasSchool = b.schoolId() != null;
+        if (aHasSchool != bHasSchool) {
+            return aHasSchool ? a : b;
+        }
+        return a;
+    }
+
+    private int levelRank(FunnelSchoolEducationRow row) {
+        return row.educationLevel() == null ? -1 : row.educationLevel().ordinal();
     }
 
     /**
@@ -209,9 +309,9 @@ public class FunnelStatisticsService {
         } catch (IllegalArgumentException e) {
             throw new InvalidStatisticsRequestException("지원하지 않는 dimension 값입니다. dimension=" + dimensionParam);
         }
-        if (dimension != FunnelDimension.POSITION) {
+        if (dimension != FunnelDimension.POSITION && dimension != FunnelDimension.SCHOOL) {
             throw new InvalidStatisticsRequestException(
-                    "dimension=" + dimension + "은(는) 아직 지원하지 않습니다. 현재 POSITION만 지원합니다.");
+                    "dimension=" + dimension + "은(는) 아직 지원하지 않습니다. 현재 POSITION/SCHOOL만 지원합니다.");
         }
         return dimension;
     }

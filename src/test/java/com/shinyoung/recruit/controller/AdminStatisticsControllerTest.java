@@ -4,19 +4,25 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
+import com.shinyoung.recruit.domain.entity.ApplicationEducation;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
+import com.shinyoung.recruit.domain.entity.School;
 import com.shinyoung.recruit.domain.entity.Stage;
 import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.domain.repository.SchoolRepository;
 import com.shinyoung.recruit.domain.repository.StageRepository;
 import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.dto.response.DimensionFunnelResponse;
 import com.shinyoung.recruit.dto.response.FunnelResponse;
 import com.shinyoung.recruit.dto.response.StageFunnelResponse;
+import com.shinyoung.recruit.enumeration.EducationLevel;
+import com.shinyoung.recruit.enumeration.GraduationStatus;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
@@ -68,6 +74,12 @@ class AdminStatisticsControllerTest {
 
     @Autowired
     private StageResultRepository stageResultRepository;
+
+    @Autowired
+    private ApplicationEducationRepository educationRepository;
+
+    @Autowired
+    private SchoolRepository schoolRepository;
 
     private MockMvc mockMvc;
 
@@ -264,12 +276,75 @@ class AdminStatisticsControllerTest {
     void unsupported_dimension_returns_bad_request() throws Exception {
         JobPosting jobPosting = saveJobPosting("Backend");
 
+        // CERTIFICATE 는 master 부재로 여전히 미지원(SCHOOL 은 08d 로 지원됨).
         mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/statistics/funnel", jobPosting.getId())
-                        .param("dimension", "SCHOOL")
+                        .param("dimension", "CERTIFICATE")
                         .with(authentication(adminAuthentication())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void school_dimension_groups_by_final_school_with_other_bucket() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        JobPosition backend = position(jobPosting, "Backend");
+        Stage stage1 = saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
+        School alpha = saveSchool("Alpha University");
+        School beta = saveSchool("Beta University");
+
+        JobApplication app1 = submittedApplication(jobPosting, backend, "A1");
+        education(app1, EducationLevel.HIGH_SCHOOL, null, 0);   // 최종학력 아님
+        education(app1, EducationLevel.UNIVERSITY, alpha.getId(), 1); // 최종학력 = Alpha
+        JobApplication app2 = submittedApplication(jobPosting, backend, "A2");
+        education(app2, EducationLevel.UNIVERSITY, alpha.getId(), 0);
+        JobApplication app3 = submittedApplication(jobPosting, backend, "A3");
+        education(app3, EducationLevel.UNIVERSITY, beta.getId(), 0);
+        JobApplication app4 = submittedApplication(jobPosting, backend, "A4");
+        education(app4, EducationLevel.UNIVERSITY, null, 0);    // 직접입력 → 미매칭
+        submittedApplication(jobPosting, backend, "A5");        // 학력 없음 → 미매칭
+
+        result(stage1, app1, StageResultStatus.PASSED);
+        result(stage1, app2, StageResultStatus.FAILED);
+        result(stage1, app3, StageResultStatus.PASSED);
+
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), "SCHOOL", null);
+
+        assertThat(funnel.dimension().name()).isEqualTo("SCHOOL");
+        assertThat(funnel.population().p()).isEqualTo(5);
+
+        DimensionFunnelResponse alphaGroup = group(funnel, "Alpha University");
+        assertThat(alphaGroup.groupId()).isEqualTo(alpha.getId());
+        assertThat(alphaGroup.population().p()).isEqualTo(2);
+        assertThat(alphaGroup.stages().get(0).funnelPassedCount()).isEqualTo(1); // app1 PASSED, app2 FAILED
+
+        DimensionFunnelResponse betaGroup = group(funnel, "Beta University");
+        assertThat(betaGroup.population().p()).isEqualTo(1);
+
+        DimensionFunnelResponse other = group(funnel, "기타");
+        assertThat(other.groupId()).isNull();
+        assertThat(other.population().p()).isEqualTo(2); // app4(미매칭) + app5(학력없음)
+    }
+
+    @Test
+    void school_dimension_topN_folds_overflow_and_unmatched_into_other() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        JobPosition backend = position(jobPosting, "Backend");
+        saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
+        School alpha = saveSchool("Alpha University");
+        School beta = saveSchool("Beta University");
+
+        education(submittedApplication(jobPosting, backend, "A1"), EducationLevel.UNIVERSITY, alpha.getId(), 0);
+        education(submittedApplication(jobPosting, backend, "A2"), EducationLevel.UNIVERSITY, alpha.getId(), 0);
+        education(submittedApplication(jobPosting, backend, "A3"), EducationLevel.UNIVERSITY, beta.getId(), 0);
+        submittedApplication(jobPosting, backend, "A4"); // 미매칭
+
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), "SCHOOL", 1); // topN=1 → Alpha만 개별
+
+        // 개별 학교는 Alpha(인원 2) 1개, 나머지(Beta 1 + 미매칭 1)는 '기타'로 합산.
+        assertThat(funnel.dimensions()).hasSize(2);
+        assertThat(group(funnel, "Alpha University").population().p()).isEqualTo(2);
+        assertThat(group(funnel, "기타").population().p()).isEqualTo(2);
     }
 
     @Test
@@ -296,16 +371,40 @@ class AdminStatisticsControllerTest {
     // ---------- helpers ----------
 
     private FunnelResponse getFunnel(Long jobPostingId, String dimension) throws Exception {
+        return getFunnel(jobPostingId, dimension, null);
+    }
+
+    private FunnelResponse getFunnel(Long jobPostingId, String dimension, Integer topN) throws Exception {
         var request = get("/api/admin/job-postings/{jobPostingId}/statistics/funnel", jobPostingId)
                 .with(authentication(adminAuthentication()));
         if (dimension != null) {
             request = request.param("dimension", dimension);
+        }
+        if (topN != null) {
+            request = request.param("topN", String.valueOf(topN));
         }
         String body = mockMvc.perform(request)
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         JsonNode data = objectMapper.readTree(body).get("data");
         return objectMapper.treeToValue(data, FunnelResponse.class);
+    }
+
+    private DimensionFunnelResponse group(FunnelResponse funnel, String groupName) {
+        return funnel.dimensions().stream()
+                .filter(group -> groupName.equals(group.groupName()))
+                .findFirst().orElseThrow();
+    }
+
+    private School saveSchool(String name) {
+        return schoolRepository.saveAndFlush(
+                School.create(null, name, "UNIVERSITY", null, "Seoul", null, "KR", true));
+    }
+
+    private void education(JobApplication application, EducationLevel level, Long schoolId, int sortOrder) {
+        educationRepository.saveAndFlush(ApplicationEducation.create(
+                application, level, "School-" + sortOrder, null, null, null, null,
+                GraduationStatus.GRADUATED, null, null, false, "KR", schoolId, sortOrder));
     }
 
     private long distributionSum(StageFunnelResponse stage) {

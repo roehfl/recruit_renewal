@@ -1,5 +1,35 @@
 # 07. Implementation History
 
+## Phase 08d - SCHOOL Funnel Dimension
+
+- Date: 2026-06-02
+- Work type: implementation (Phase 08 네 번째 슬라이스 — 07c 보류 학교별 funnel dimension 해소).
+- Goal: 07c funnel 통계에 SCHOOL dimension 추가. 08c `ApplicationEducation.schoolId`(최종학력 매칭) 기반 학교별 funnel + 미매칭/topN 초과='기타'.
+- Created (main):
+  - `dto/response/FunnelSchoolEducationRow.java` (projection)
+- Modified (main):
+  - `service/FunnelStatisticsService.java` (`computeSchoolDimension`/`finalSchoolByApplication`/`pickFinalEducation`, `ApplicationEducationRepository`·`SchoolRepository` 주입, `parseSupportedDimension` SCHOOL 허용)
+  - `domain/repository/ApplicationEducationRepository.java` (`findFunnelSchoolEducations`)
+  - `enumeration/FunnelDimension.java`, `controller/AdminStatisticsController.java` (javadoc 갱신)
+- Modified (test):
+  - `controller/AdminStatisticsControllerTest.java` (unsupported dimension을 `CERTIFICATE`로 변경, SCHOOL 2건 추가)
+- APIs:
+  - `GET /api/admin/job-postings/{jobPostingId}/statistics/funnel?dimension=SCHOOL&topN=` (admin)
+- Key decisions:
+  - 학교 = 지원자 **최종학력(가장 높은 `EducationLevel`) 1교**의 schoolId. 그 학력 schoolId가 null이면 미매칭='기타'. application 단위 distinct.
+  - 동률 레벨이면 schoolId 보유 학력 우선(`pickFinalEducation`). 학교 그룹 정렬 인원 desc·schoolId asc, topN 기본 10(최대 100), 초과 학교 + 미매칭='기타' 1그룹(항상 마지막).
+  - 그룹별 funnel은 기존 `computeCohort` 재사용, 응답은 기존 `DimensionFunnelResponse(groupId, groupName, …)` 재사용(기타=null/"기타"). 학교명은 `SchoolRepository.findAllById`.
+  - `CERTIFICATE`는 master 부재로 미지원(400) 유지. statistics audit 없음(07c 정책).
+  - topN은 SCHOOL에서만 적용(POSITION 무시).
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*AdminStatisticsControllerTest" --no-daemon`
+  - 결과: BUILD SUCCESSFUL — 기존 funnel 회귀 + SCHOOL 2건(최종학력 1교 매칭/미매칭='기타', topN=1 합산) 통과. 통계 테스트는 엔티티 직접 영속화로 클럭 의존 없이 안정적.
+- Documentation:
+  - `docs/codex/implementation/phase-08d-school-funnel-dimension.md`
+  - `docs/codex/reports/phase-08d-school-funnel-dimension.html`
+- Known limitations: 최종학력이 free-text면 '기타'(설계 정의), dangling schoolId면 groupName null 가능, 대형 공고 GROUP BY 전환(후속), CERTIFICATE 미지원.
+- Next recommended: (선택) CERTIFICATE dimension(자격명 정규화 후) 또는 메시지 발송, 개인정보 파기/감사.
+
 ## Phase 08c - School xlsx import + ApplicationEducation.schoolId 링크
 
 - Date: 2026-06-02

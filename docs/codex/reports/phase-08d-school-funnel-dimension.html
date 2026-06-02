@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 08d - SCHOOL Funnel Dimension</title>
+<style>
+  :root { --blue:#1d4ed8; --green:#15803d; --amber:#b45309; --red:#b91c1c;
+    --muted:#6b7280; --bg:#f8fafc; --card:#fff; --border:#e2e8f0; --ink:#0f172a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.6; }
+  .wrap { max-width:1080px; margin:0 auto; padding:32px 20px 64px; }
+  header.page { background:linear-gradient(135deg,#0f766e,#0891b2); color:#fff; border-radius:16px; padding:28px 32px; margin-bottom:28px; }
+  header.page h1 { margin:0 0 6px; font-size:24px; }
+  header.page .sub { opacity:.9; font-size:14px; }
+  .badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+  .badge.done { background:#dcfce7; color:var(--green); }
+  .badge.oos { background:#fee2e2; color:var(--red); }
+  .badge.warn { background:#fef3c7; color:var(--amber); }
+  .badge.white { background:rgba(255,255,255,.18); color:#fff; }
+  section { margin-bottom:26px; }
+  h2 { font-size:18px; border-left:4px solid #0891b2; padding-left:10px; margin:0 0 14px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px 18px; }
+  .card h3 { margin:0 0 8px; font-size:14px; }
+  .card ul { margin:6px 0 0; padding-left:18px; font-size:13px; }
+  .card.kpi { text-align:center; }
+  .card.kpi .num { font-size:30px; font-weight:700; color:#0891b2; }
+  .card.kpi .lbl { font-size:12px; color:var(--muted); }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--border); border-radius:12px; overflow:hidden; font-size:13px; }
+  th,td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { background:#f1f5f9; font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  code { background:#f1f5f9; padding:1px 6px; border-radius:5px; font-size:12px; }
+  .summary { background:var(--card); border:1px solid var(--border); border-left:4px solid var(--green); border-radius:10px; padding:16px 20px; font-size:14px; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  .note { font-size:12px; color:var(--muted); }
+  .ok { color:var(--green); font-weight:600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Phase 08d · SCHOOL Funnel Dimension <span class="badge white">완료</span></h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · 07c 보류 학교별 통계 해소 · 생성일 2026-06-02</div>
+</header>
+
+<section>
+  <h2>요약</h2>
+  <div class="summary">
+    07c funnel 통계에 <strong>SCHOOL dimension</strong>을 추가했다. 08c의 <code>ApplicationEducation.schoolId</code>(최종학력 매칭)로
+    코호트 P를 학교별로 분할하고(application 단위 distinct), 미매칭 + topN 초과 학교는 <strong>'기타'</strong>로 합산한다.
+    그룹별 funnel은 기존 <code>computeCohort</code> 재사용. <code>CERTIFICATE</code>는 master 부재로 미지원(400).
+    테스트 <span class="ok">BUILD SUCCESSFUL</span>.
+  </div>
+</section>
+
+<section>
+  <h2>지표</h2>
+  <div class="cards">
+    <div class="card kpi"><div class="num">1</div><div class="lbl">활성화 dimension</div></div>
+    <div class="card kpi"><div class="num">1</div><div class="lbl">신규 클래스(main)</div></div>
+    <div class="card kpi"><div class="num">2</div><div class="lbl">신규 테스트</div></div>
+    <div class="card kpi"><div class="num">0</div><div class="lbl">신규 테이블</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>로직</h2>
+  <table>
+    <thead><tr><th>항목</th><th>규칙</th></tr></thead>
+    <tbody>
+      <tr><td>학교 산정</td><td>지원자 최종학력(가장 높은 <code>EducationLevel</code>) 1교의 schoolId. 동률이면 schoolId 보유 쪽 우선.</td></tr>
+      <tr><td>미매칭</td><td>최종학력에 schoolId 없음 또는 학력 없음 → '기타'.</td></tr>
+      <tr><td>distinct</td><td>application 단위(한 지원자는 정확히 한 그룹).</td></tr>
+      <tr><td>topN</td><td>인원 desc·schoolId asc 정렬, 기본 10(최대 100) 개별. 초과 학교 + 미매칭 = '기타' 1그룹.</td></tr>
+      <tr><td>응답</td><td>기존 <code>DimensionFunnelResponse(groupId, groupName, …)</code> 재사용. SCHOOL=schoolId/schoolName, 기타=null/"기타".</td></tr>
+      <tr><td>audit</td><td>없음(집계값만).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>API</h2>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>접근</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td class="mono">/api/admin/job-postings/{id}/statistics/funnel?dimension=SCHOOL&amp;topN=</td><td>admin</td><td>학교별 funnel(최종학력 매칭 + '기타')</td></tr>
+    </tbody>
+  </table>
+  <p class="note">dimension 미지정=overall, POSITION=분야별, SCHOOL=학교별(08d), CERTIFICATE=400. topN은 SCHOOL에서만 적용.</p>
+</section>
+
+<section>
+  <h2>테스트</h2>
+  <div class="summary" style="border-left-color:var(--green);">
+    <div><strong>명령</strong>: <span class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*AdminStatisticsControllerTest" --no-daemon</span></div>
+    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — 기존 + SCHOOL 2건 통과.</div>
+  </div>
+  <p class="note">최종학력 1교 매칭(고졸+대학→대학)/학교별 population·funnelPassedCount/미매칭='기타', topN=1 합산. unsupported는 CERTIFICATE로 변경. overall/POSITION 회귀 비파괴.</p>
+</section>
+
+<section>
+  <h2>남은 이슈 / 다음 단계</h2>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="badge warn">open</span> 한계</h3>
+      <ul><li>최종학력이 free-text면 하위 매칭 있어도 '기타', dangling schoolId면 groupName null 가능, 대형 공고 GROUP BY 전환(후속).</li></ul>
+    </div>
+    <div class="card">
+      <h3><span class="badge oos">미지원</span> CERTIFICATE</h3>
+      <ul><li>master 부재 → 자격명 정규화 후 별도. 이후 메시지 발송 / 개인정보 파기·감사.</li></ul>
+    </div>
+  </div>
+</section>
+
+</div>
+</body>
+</html>
