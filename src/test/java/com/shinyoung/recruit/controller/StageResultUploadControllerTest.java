@@ -395,13 +395,12 @@ class StageResultUploadControllerTest {
         StageResult fresh = entityManager.find(StageResult.class, id);
         fresh.updateResult(StageResultStatus.PASSED, null, "fresh", LocalDateTime.now(), "fresh-admin");
         entityManager.flush();
+        entityManager.clear();
 
-        // stale(version 0)을 나중에 반영하려 하면 @Version 충돌로 거부되어야 한다(모든 write 경로 공통).
+        // stale(version 0)을 repository 경로로 반영하면 @Version 충돌이 Spring 예외로 변환되어 거부된다(모든 write 경로 공통).
         stale.updateResult(StageResultStatus.FAILED, null, "stale", LocalDateTime.now(), "stale-admin");
-        assertThatThrownBy(() -> {
-            entityManager.merge(stale);
-            entityManager.flush();
-        }).isInstanceOf(org.springframework.orm.ObjectOptimisticLockingFailureException.class);
+        assertThatThrownBy(() -> stageResultRepository.saveAndFlush(stale))
+                .isInstanceOf(org.springframework.orm.ObjectOptimisticLockingFailureException.class);
     }
 
     // ---------- file-level defenses ----------

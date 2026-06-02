@@ -43,10 +43,15 @@
   - (Medium) 변경 0건 파일이 Stage `IN_PROGRESS`/actor guard 우회 → commit 선두에서 `StageResultService.validateBulkUpdatable(stageId, actor)` 선검증.
   - (Low) 토큰 셀이 NUMERIC일 때만 오류이던 것을 STRING/blank 외 모든 타입(NUMERIC/date/BOOLEAN 등) row error로 강화.
   - 테스트: 14→17(+3, 특수문자 시작 comment round-trip 비오염/변경 0건 비-IN_PROGRESS 거부/numeric 토큰 셀). 토큰을 template 다운로드에서 읽어 비교(normalize/precision 비의존). `ExcelExportServiceTest` 3-arg writer 매처로 갱신. upload+export+statistics+HashUtil 재실행 전부 통과.
+- Review 반영 2 (instruction.md, 동시성 판단):
+  - (지적) "lost update 자체는 `PESSIMISTIC_WRITE`로 차단"은 과한 표현. `PESSIMISTIC_WRITE`는 upload commit 내부 변경 행만 잠가 **upload-vs-upload**만 보호하고, `StageResult`에 `@Version`이 없어 기존 비-locking 수동 경로(`updateResult`/`bulkUpdateResults`)와의 lost update는 미차단.
+  - (반영, 안전 수정 채택) `StageResult`에 `@Version` 추가 → 전 write 경로 flush 버전 검사, 충돌 시 `ObjectOptimisticLockingFailureException` → 409 매핑(`GlobalExceptionHandler`). upload의 PESSIMISTIC_WRITE+토큰은 upload-vs-upload row-level STALE UX로 유지(2계층).
+  - 테스트: stale 스냅샷(version 0) 후행 반영 시 `ObjectOptimisticLockingFailureException` 회귀 추가(17→18). `@Version` 추가 후 StageResult 전 write 경로 113건 회귀 비파괴 확인(총 114 tests 통과).
+  - 잔여: HMAC opaque 토큰(Open Q#7), 영속 DB 기존 행 `version` backfill 운영 절차.
 - Documentation:
   - `docs/codex/implementation/phase-07d-stage-result-excel-upload.md`
   - `docs/codex/reports/phase-07d-stage-result-excel-upload.html`
-- Known limitations: 토큰은 원문 ISO-8601(HMAC opaque 미적용, Open Q#7) — 단 lost update는 `PESSIMISTIC_WRITE` 잠금으로 차단. audit는 SLF4J(영속 ActivityLog 미도입).
+- Known limitations: 토큰은 원문 ISO-8601(HMAC opaque 미적용, Open Q#7). lost update는 upload-vs-upload=`PESSIMISTIC_WRITE`+토큰(row-level STALE), 전 write 경로=`@Version`(409) 2계층으로 차단. audit는 SLF4J(영속 ActivityLog 미도입).
 - Deferred: 07e(PDF), 07f(stabilization), HMAC 토큰, 영속 audit.
 - Next recommended: Phase 07e - Application PDF.
 

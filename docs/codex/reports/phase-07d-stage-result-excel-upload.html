@@ -71,7 +71,7 @@
   <div class="cards">
     <div class="card kpi"><div class="num">3</div><div class="lbl">신규 API</div></div>
     <div class="card kpi"><div class="num">14</div><div class="lbl">신규 클래스(main)</div></div>
-    <div class="card kpi"><div class="num">17</div><div class="lbl">테스트(통과)</div></div>
+    <div class="card kpi"><div class="num">18</div><div class="lbl">테스트(통과)</div></div>
     <div class="card kpi"><div class="num">0</div><div class="lbl">신규 테이블/마이그레이션</div></div>
   </div>
 </section>
@@ -154,7 +154,7 @@
       <tr><td>3중 교차검증</td><td>stageResultId 존재(해당 stage) + applicationId 일치 + path stageId 소속을 모두 만족해야 유효.</td></tr>
       <tr><td>resultStatus</td><td>허용값 = {PASSED, FAILED, ABSENT, HOLD, WITHDRAWN}. blank/PENDING/미허용 → 행 오류.</td></tr>
       <tr><td>빈칸 정책</td><td>score blank → null clear, comment blank → null clear. 변경 없는 행은 commit 제외(stale check도 변경 행에만).</td></tr>
-      <tr><td>낙관적 동시성</td><td>변경 행을 <code>PESSIMISTIC_WRITE</code>로 잠그고 DB 최신값으로 refresh 후 토큰 재비교 → 불일치 STALE. 동시 commit lost update 차단(리뷰 #1).</td></tr>
+      <tr><td>낙관적 동시성</td><td>2계층: (1) upload commit은 변경 행 <code>PESSIMISTIC_WRITE</code> + 토큰 재검증 → upload-vs-upload row-level STALE(409). (2) <code>StageResult.@Version</code>은 모든 write 경로 간 backstop → 충돌 시 <code>ObjectOptimisticLockingFailureException</code> 409(리뷰 #1, 리뷰2).</td></tr>
       <tr><td>all-or-nothing</td><td>ERROR/STALE 1건이라도 있으면 0건 적용. ERROR → 400(REJECTED_VALIDATION), STALE → 409(REJECTED_STALE).</td></tr>
       <tr><td>파일 방어</td><td>.xlsx만(.xls/.csv/.xlsm 거부), 크기/행수 한도, 첫 sheet, header signature, formula 셀 거부, 중복 stageResultId 거부, 셀 string 판독, 토큰 셀 STRING/blank 외 타입 거부(리뷰 #4).</td></tr>
       <tr><td>round-trip 충실성</td><td>template은 formula-escape를 끈 비변형 string cell로 작성 → 특수문자 시작 comment 미수정 재업로드가 오판/오염되지 않음(리뷰 #2).</td></tr>
@@ -168,7 +168,7 @@
   <h2>테스트</h2>
   <div class="summary" style="border-left-color: var(--green);">
     <div><strong>명령</strong>: <span class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*StageResultUpload*" --tests "*Export*" --tests "*Statistics*" --tests "*HashUtil*" --no-daemon</span></div>
-    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — StageResultUploadControllerTest 17건 + export/statistics/HashUtil 회귀 통과(리뷰 반영 후 재실행).</div>
+    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — StageResultUploadControllerTest 18건 + StageResult 전 write 경로·export/statistics/HashUtil 회귀(114 tests) 통과. @Version 추가가 기존 경로를 깨지 않음을 확인.</div>
   </div>
   <table style="margin-top:12px;">
     <thead><tr><th>구획</th><th>커버</th></tr></thead>
@@ -176,7 +176,7 @@
       <tr><td>template</td><td>prefill + 토큰 + PII 컬럼 부재, unknown stage 404</td></tr>
       <tr><td>preview</td><td>changed/unchanged/error 집계, blank·PENDING 오류, applicationId 불일치, 중복 id, formula 셀 오류, numeric 토큰 셀 오류, wrong header 400</td></tr>
       <tr><td>commit</td><td>changed 적용 + unchanged 제외, score/comment blank clear, all-or-nothing 거부(400, 미적용 확인), STALE 409(미적용 확인), 비-xlsx 400</td></tr>
-      <tr><td>리뷰 회귀</td><td>특수문자(-) 시작 comment round-trip 비오염(#2), 변경 0건 비-IN_PROGRESS stage 거부(#3)</td></tr>
+      <tr><td>리뷰 회귀</td><td>특수문자(-) 시작 comment round-trip 비오염(#2), 변경 0건 비-IN_PROGRESS stage 거부(#3), @Version stale write 충돌 거부(리뷰2)</td></tr>
       <tr><td>인가</td><td>applicant 403 / anonymous 401(template GET, commit POST)</td></tr>
     </tbody>
   </table>
@@ -189,6 +189,7 @@
     <thead><tr><th>등급</th><th>지적</th><th>반영</th></tr></thead>
     <tbody>
       <tr><td><span class="badge oos">High</span></td><td>토큰 in-memory 비교만으론 동시 commit lost update 미차단</td><td>변경 행을 <code>PESSIMISTIC_WRITE</code>로 잠그고 DB 최신값 refresh 후 토큰 재비교(2안, migration 불필요). id 오름차순 잠금으로 deadlock 회피.</td></tr>
+      <tr><td><span class="badge oos">리뷰2</span></td><td>PESSIMISTIC은 upload-vs-upload만 보호. 기존 비-locking 수동 경로와의 lost update는 미차단(@Version 부재)</td><td><code>StageResult.@Version</code> 추가 → 모든 write 경로 flush 버전 검사, 충돌 시 <code>ObjectOptimisticLockingFailureException</code> 409 매핑. PESSIMISTIC+토큰은 row-level UX로 유지. 기존 113 테스트 비파괴 확인.</td></tr>
       <tr><td><span class="badge oos">High</span></td><td>template이 writer의 formula-escape로 comment를 변형 → round-trip 오판/오염</td><td>template은 <code>escapeFormulaPrefix=false</code>(비변형 string cell)로 작성. 토큰 포맷은 service 단일 소스로 통일.</td></tr>
       <tr><td><span class="badge warn">Medium</span></td><td>변경 0건이면 Stage/actor guard 우회</td><td>commit 선두에서 <code>validateBulkUpdatable(stageId, actor)</code>로 변경 여부 무관 선검증.</td></tr>
       <tr><td><span class="badge pending">Low</span></td><td>토큰 셀 타입 검증이 NUMERIC만</td><td>STRING/blank 외 모든 타입을 row error로 강화.</td></tr>
@@ -201,7 +202,7 @@
   <div class="cards">
     <div class="card">
       <h3><span class="badge warn">open</span> 토큰 위조</h3>
-      <ul><li>원문 ISO-8601 토큰 — 임의 위조 방지는 후속 하드닝 후보(Open Q#7, HMAC). 단, lost update 자체는 PESSIMISTIC_WRITE 잠금으로 차단.</li></ul>
+      <ul><li>원문 ISO-8601 토큰 — 임의 위조 방지는 후속 하드닝 후보(Open Q#7, HMAC). lost update는 PESSIMISTIC(upload-vs-upload)+@Version(전 경로)로 차단.</li></ul>
     </div>
     <div class="card">
       <h3><span class="badge pending">deferred</span> audit</h3>

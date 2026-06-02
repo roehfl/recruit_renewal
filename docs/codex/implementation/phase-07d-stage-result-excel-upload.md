@@ -49,15 +49,16 @@
 
 - `dto/response/ApiResponse.java` — `fail(message, data)` 오버로드 추가(거부 응답에 행 detail body 동봉용).
 - `common/hash/HashUtil.java` — `sha256Bytes(byte[])` 추가(파일 contentHash용; `sha256(String)`과 오버로드 모호성 회피 위해 별도 이름).
-- `exception/GlobalExceptionHandler.java` — `InvalidStageResultUploadException` → 400.
+- `exception/GlobalExceptionHandler.java` — `InvalidStageResultUploadException` → 400, `ObjectOptimisticLockingFailureException` → 409(리뷰2).
 - `src/main/resources/application.yaml` — `recruit.upload.max-rows`(기본 10,000), `recruit.upload.max-file-size`(기본 5MB).
 - `service/ExcelExportWriter.java` — `writeToTempFile(spec, rowSource, escapeFormulaPrefix)` 오버로드(round-trip 소스용 비-escape 경로). 리뷰 #2.
 - `service/ExcelExportService.java` — `generate(spec, rows, fileName, escapeFormulaPrefix)` 오버로드. 리뷰 #2.
 - `service/StageResultService.java` — `validateBulkUpdatable(stageId, actor)` 공개 guard(변경 0건 우회 차단). 리뷰 #3.
+- `domain/entity/StageResult.java` — `@Version` 추가(전 write 경로 lost update 방지). 리뷰2.
 
 ### Created (test)
 
-- `controller/StageResultUploadControllerTest.java` (17)
+- `controller/StageResultUploadControllerTest.java` (18)
 
 ## 5. 신규 클래스
 
@@ -83,6 +84,7 @@
 - `GlobalExceptionHandler` — 핸들러 1개 추가.
 - `ExcelExportWriter` / `ExcelExportService` — `escapeFormulaPrefix` 오버로드(기존 export 경로는 default true 유지). round-trip 템플릿만 false.
 - `StageResultService` — `validateBulkUpdatable(stageId, actor)` 공개 메서드(기존 동작 불변, 신규 진입점만 추가).
+- `StageResult` (Entity) — `@Version` 필드 추가(전 write 경로 낙관적 잠금). 충돌 시 flush에서 `ObjectOptimisticLockingFailureException` → 409.
 
 ## 7. 클래스별 설명 (핵심)
 
@@ -141,20 +143,20 @@
 
 ## 11. 테스트 커버리지
 
-- `StageResultUploadControllerTest` (17):
+- `StageResultUploadControllerTest` (18):
   - template: prefill + 토큰 + PII 컬럼 부재, unknown stage 404.
   - preview: changed/unchanged/error 집계, blank/PENDING 오류, applicationId 불일치, 중복 id, formula 셀 오류, numeric 토큰 셀 오류(리뷰 #4), wrong header 400.
   - commit: changed 적용 + unchanged 제외, score/comment blank clear, all-or-nothing 거부(400, 미적용 확인), STALE 409(미적용 확인), 비-xlsx 확장자 400.
-  - 리뷰 회귀: 특수문자(`-`) 시작 comment round-trip 비오염(#2), 변경 0건이어도 비-IN_PROGRESS stage commit 거부(#3).
+  - 리뷰 회귀: 특수문자(`-`) 시작 comment round-trip 비오염(#2), 변경 0건이어도 비-IN_PROGRESS stage commit 거부(#3), `@Version` stale write → `ObjectOptimisticLockingFailureException`(리뷰2).
   - 인가: applicant 403 / anonymous 401(template GET, commit POST).
   - 토큰은 template 다운로드에서 그대로 읽어 비교(앱 생성 문자열과 동일, normalize/precision 비의존).
 - HashUtil 회귀(`sha256(null)` 모호성 해소 확인). export 회귀(`escapeFormulaPrefix` 오버로드 후 formula-escape 유지).
 
 ## 12. 테스트 결과
 
-- 명령: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*StageResultUpload*" --tests "*Export*" --tests "*Statistics*" --tests "*HashUtil*" --no-daemon`
-- 결과: BUILD SUCCESSFUL — `StageResultUploadControllerTest` 17건 + export/statistics/HashUtil 회귀 통과(리뷰 반영 후 재실행).
-- 비고: 부분 실행(upload + 공유 코드 영향 범위). 엔티티를 repository로 직접 영속화해 클럭 의존(접수기간) 없이 안정적. 전체 스위트는 본 슬라이스 범위상 미실행(`Infra 01` 기록의 날짜 의존 사전-실패 8건은 별도 과제).
+- 명령: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*StageResult*" --tests "*Export*" --tests "*Statistics*" --tests "*HashUtil*" --tests "*Correction*" --no-daemon`
+- 결과: BUILD SUCCESSFUL — `StageResultUploadControllerTest` 18건 + StageResult 전 write 경로(`StageResultService`/correction)·export/statistics/HashUtil 회귀 통과(`@Version` 반영 후 114 tests). `@Version` 추가가 기존 StageResult 경로를 깨지 않음을 확인.
+- 비고: 부분 실행(StageResult 전 경로 + 공유 코드 영향 범위). 엔티티를 repository로 직접 영속화해 클럭 의존(접수기간) 없이 안정적. 전체 스위트는 본 슬라이스 범위상 미실행(`Infra 01` 기록의 날짜 의존 사전-실패 8건은 별도 과제).
 
 ## 13. 리뷰 반영 (instruction.md, 4 findings)
 
@@ -164,10 +166,20 @@
 - **(Low #4) 토큰 셀 타입 검증 느슨** — token 셀이 NUMERIC일 때만 오류였다. **STRING/blank를 제외한 모든 타입(NUMERIC/date/BOOLEAN 등)을 row error**로 처리하도록 parser 강화.
 - 테스트: 14 → 17(+3, round-trip 비오염/비-IN_PROGRESS 거부/numeric 토큰 셀). 토큰을 template 다운로드에서 읽어 비교해 normalize/precision 비의존. export 회귀로 formula-escape 유지 확인. 전부 통과.
 
+## 13b. 리뷰 반영 2 (instruction.md, 동시성 판단)
+
+- **지적**: "lost update 자체는 `PESSIMISTIC_WRITE` 잠금으로 차단된다"는 표현이 과하다. `PESSIMISTIC_WRITE`는 upload commit 내부의 변경 대상 row만 잠그므로 **upload-vs-upload** 경쟁만 막는다. `StageResult`에 `@Version`이 없고 기존 수동 경로(`updateResult`/`bulkUpdateResults`)가 non-locking writer라, **upload와 기존 비-locking 경로 간** lost update는 막지 못한다.
+- **반영(안전 수정 채택)**: `StageResult`에 `@Version` 추가. 모든 write 경로(수동 update / bulk / upload commit)가 flush 시 버전 검사를 거치고, 충돌하면 `ObjectOptimisticLockingFailureException` → **409**로 매핑한다. 이로써 전 write 경로 간 lost update를 차단한다.
+- **계층 구조(둘 다 유지)**: (1) upload commit은 변경 행 `PESSIMISTIC_WRITE` 잠금 + 토큰 재검증으로 **upload-vs-upload**에 row-level `STALE`(409) 피드백을 제공하고(UX), (2) `@Version`은 **모든 경로** 간 backstop으로 작동한다(409).
+- **검증**: stale 스냅샷(version 0)을 다른 트랜잭션이 먼저 갱신한 뒤 repository 경로로 반영하면 `ObjectOptimisticLockingFailureException`이 발생함을 테스트로 고정. 기존 StageResult write-path 테스트 113건 전부 회귀 통과(=`@Version` 비파괴).
+- **잔여**: HMAC opaque 토큰 미적용(Open Q#7)은 별개 항목으로 유지.
+
 ## 14. Known limitations
 
-- 토큰은 원문 ISO-8601 string(HMAC opaque 토큰 미적용) — 임의 위조 방지는 후속 하드닝 후보(Open Q#7). 단, lost update 자체는 `PESSIMISTIC_WRITE` 잠금으로 차단된다.
+- 토큰은 원문 ISO-8601 string(HMAC opaque 토큰 미적용) — 임의 위조 방지는 후속 하드닝 후보(Open Q#7).
+- lost update 방지: upload-vs-upload는 `PESSIMISTIC_WRITE` + 토큰(row-level STALE), 전 write 경로는 `@Version`(409)로 차단. 두 계층이 함께 동작한다.
 - 토큰 비교는 micro precision으로 normalize. cross-tx(실사용)에서는 양측 모두 DB 조회값이라 일관, 단일 tx 테스트는 PC를 DB와 동기화해 검증.
+- `@Version`은 `StageResult`에 nullable 컬럼으로 추가된다. 신규 schema(테스트/개발 H2)는 영향 없으나, 기존 행이 있는 영속 DB에 적용 시 컬럼 backfill(기본 0) 운영 절차가 필요할 수 있다.
 - audit는 SLF4J 구조적 로그(영속 ActivityLog 미도입).
 
 ## 15. Next phase considerations
