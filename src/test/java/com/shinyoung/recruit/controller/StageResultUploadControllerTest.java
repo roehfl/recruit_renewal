@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -377,6 +378,30 @@ class StageResultUploadControllerTest {
                         .with(authentication(adminAuthentication())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.errorCount").value(1));
+    }
+
+    @Test
+    void stale_concurrent_write_is_rejected_by_optimistic_version() throws Exception {
+        Fixture fixture = fixtureWithResults("A");
+        Long id = stageResultRepository.findByStageIdForAdminList(fixture.stageId()).get(0).getId();
+        entityManager.flush();
+        entityManager.clear();
+
+        // 동일 row의 stale 스냅샷(version 0)을 detach로 확보.
+        StageResult stale = entityManager.find(StageResult.class, id);
+        entityManager.detach(stale);
+
+        // 다른 트랜잭션이 먼저 변경한 상황을 모사: fresh 인스턴스로 update → version 증가.
+        StageResult fresh = entityManager.find(StageResult.class, id);
+        fresh.updateResult(StageResultStatus.PASSED, null, "fresh", LocalDateTime.now(), "fresh-admin");
+        entityManager.flush();
+
+        // stale(version 0)을 나중에 반영하려 하면 @Version 충돌로 거부되어야 한다(모든 write 경로 공통).
+        stale.updateResult(StageResultStatus.FAILED, null, "stale", LocalDateTime.now(), "stale-admin");
+        assertThatThrownBy(() -> {
+            entityManager.merge(stale);
+            entityManager.flush();
+        }).isInstanceOf(org.springframework.orm.ObjectOptimisticLockingFailureException.class);
     }
 
     // ---------- file-level defenses ----------

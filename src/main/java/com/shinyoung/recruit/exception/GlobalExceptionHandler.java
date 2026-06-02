@@ -4,6 +4,7 @@ import com.shinyoung.recruit.dto.response.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.validation.FieldError;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -202,5 +203,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleInvalidStageResultUpload(InvalidStageResultUploadException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.fail(e.getMessage()));
+    }
+
+    /**
+     * 낙관적 잠금(@Version) 충돌. 모든 StageResult write 경로(수동 update / Excel upload commit) 간에
+     * 다른 트랜잭션이 먼저 변경한 경우 flush에서 발생하며, 덮어쓰기를 막고 409로 응답한다.
+     */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Void>> handleOptimisticLockingFailure(ObjectOptimisticLockingFailureException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.fail("다른 사용자가 먼저 변경하여 처리하지 못했습니다. 최신 상태를 다시 확인해 주세요."));
     }
 }

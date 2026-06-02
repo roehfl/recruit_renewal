@@ -15,6 +15,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -65,6 +66,15 @@ public class StageResult extends BaseEntity {
     private LocalDateTime decidedAt;
 
     private String decidedBy;
+
+    /**
+     * 낙관적 잠금 버전. 모든 StageResult write 경로(수동 updateResult/bulkUpdateResults, Excel upload commit)
+     * 간의 lost update를 방지한다. 충돌 시 flush에서 {@code ObjectOptimisticLockingFailureException}이 발생하고
+     * 409로 매핑된다. Excel upload는 이에 더해 PESSIMISTIC_WRITE + 토큰으로 upload-vs-upload 경쟁에 row-level
+     * STALE 피드백을 제공한다.
+     */
+    @Version
+    private Long version;
 
     private StageResult(Stage stage, JobApplication jobApplication) {
         validateSameJobPosting(stage, jobApplication);
