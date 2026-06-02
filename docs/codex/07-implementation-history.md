@@ -1,5 +1,29 @@
 # 07. Implementation History
 
+## Phase 07f - Stabilization / Test Hardening
+
+- Date: 2026-06-02
+- Work type: 테스트 전용 stabilization slice (운영 코드 변경 없음). Phase 07 종료.
+- Goal: 설계 §16.2 Test Strategy 중 07a~07e에서 비어 있던 경계/보안 회귀를 채운다 — upload 파일 레벨 경계(maxUploadRows/maxUploadFileSize/확장자/header) parser 단위 회귀, Application PDF 보안 불변식(th:utext 미사용·외부 resource 차단·free-text escape·audit) 회귀.
+- Created (test):
+  - `service/StageResultUploadParserTest.java` (5) — maxUploadRows 초과 거부, maxUploadFileSize 초과 거부, `.xls` 확장자 거부, header signature 불일치 거부, 정상 파싱. (unit, no Spring)
+  - `controller/ApplicationPdfSecurityHardeningTest.java` (3) — 템플릿 `th:utext` 미사용 + 외부 resource(src/href/url http) 미참조 convention, applicant free-text HTML escape(injection 방어), PDF 생성 audit 로그 기록(logback ListAppender).
+- Modified: 없음(운영 코드 무변경).
+- Key decisions:
+  - 07f는 신규 운영 코드/엔티티/마이그레이션 없이, 이미 성립하는 불변식을 회귀 테스트로 잠그는 stabilization slice.
+  - upload 경계는 parser를 작은 `UploadProperties` 한도로 직접 생성해 컨텍스트 없이 빠르게 검증(maxRows/maxFileSize/확장자/header).
+  - PDF 외부 resource 차단은 템플릿 convention(정적 검사) + free-text escape 회귀로 보장(baseUri=null, 외부 참조 없는 입력). audit는 `recruit.audit.pdf` 로거에 ListAppender를 붙여 `eventType=APPLICATION_PDF applicationId=...` 기록 단언.
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*ApplicationPdf*" --tests "*Upload*" --tests "*Export*" --tests "*Statistics*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL — 07f 신규 8건(parser 5 + PDF 보안 3) + 07a~07e 회귀(export/upload/statistics/PDF) 전부 통과.
+  - 부분 실행(Phase 07 영역). 전체 스위트는 본 슬라이스 범위상 미실행(`Infra 01` 날짜 의존 사전-실패 8건 별도 과제).
+- Documentation:
+  - `docs/codex/implementation/phase-07f-stabilization-test-hardening.md`
+  - `docs/codex/reports/phase-07f-stabilization-test-hardening.html`
+- Known limitations: 외부 resource 차단은 convention + escape 회귀로 보장(런타임 fetch sandbox 미도입), 전체 스위트 일괄 green은 날짜 의존 fixture 안정화 이후.
+- Phase 07(Export/Upload/PDF/Statistics) 07a~07f 완료.
+- Next recommended: Phase 08(CommonCode/School master) 또는 메시지 배치/발송 이력, privacy purge/retention/activity audit.
+
 ## Phase 07e - Application PDF (admin)
 
 - Date: 2026-06-02

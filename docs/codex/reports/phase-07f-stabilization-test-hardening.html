@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 07f - Stabilization / Test Hardening</title>
+<style>
+  :root {
+    --blue: #1d4ed8; --green: #15803d; --amber: #b45309; --red: #b91c1c;
+    --muted: #6b7280; --bg: #f8fafc; --card: #ffffff; --border: #e2e8f0; --ink: #0f172a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.6; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 64px; }
+  header.page { background: linear-gradient(135deg, #14532d, #15803d); color: #fff; border-radius: 16px;
+    padding: 28px 32px; margin-bottom: 28px; }
+  header.page h1 { margin: 0 0 6px; font-size: 24px; }
+  header.page .sub { opacity: .9; font-size: 14px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .badge.done { background: #dcfce7; color: var(--green); }
+  .badge.pending { background: #f1f5f9; color: var(--muted); }
+  .badge.white { background: rgba(255,255,255,.18); color: #fff; }
+  section { margin-bottom: 26px; }
+  h2 { font-size: 18px; border-left: 4px solid var(--green); padding-left: 10px; margin: 0 0 14px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+  .card h3 { margin: 0 0 8px; font-size: 14px; }
+  .card ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+  .card.kpi { text-align: center; }
+  .card.kpi .num { font-size: 30px; font-weight: 700; color: var(--green); }
+  .card.kpi .lbl { font-size: 12px; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #f1f5f9; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  code { background: #f1f5f9; padding: 1px 6px; border-radius: 5px; font-size: 12px; }
+  .summary { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--green);
+    border-radius: 10px; padding: 16px 20px; font-size: 14px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .note { font-size: 12px; color: var(--muted); }
+  .ok { color: var(--green); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Phase 07f · Stabilization / Test Hardening <span class="badge white">완료</span></h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · 테스트 전용(운영 코드 무변경) · Phase 07 종료 · 생성일 2026-06-02</div>
+</header>
+
+<section>
+  <h2>요약</h2>
+  <div class="summary">
+    설계 §16.2 Test Strategy 중 07a~07e에서 비어 있던 <strong>경계/보안 회귀</strong>를 채운다.
+    upload 파일 레벨 경계(maxUploadRows/maxUploadFileSize/확장자/header)를 parser 단위로, Application PDF 보안 불변식
+    (<code>th:utext</code> 미사용·외부 resource 차단·free-text escape·audit)을 회귀로 고정한다.
+    <strong>운영 코드는 변경하지 않았다</strong>(불변식이 이미 성립함을 테스트로 잠금). 테스트 <span class="ok">BUILD SUCCESSFUL</span>.
+  </div>
+</section>
+
+<section>
+  <h2>지표</h2>
+  <div class="cards">
+    <div class="card kpi"><div class="num">0</div><div class="lbl">운영 코드 변경</div></div>
+    <div class="card kpi"><div class="num">8</div><div class="lbl">신규 테스트</div></div>
+    <div class="card kpi"><div class="num">2</div><div class="lbl">신규 테스트 클래스</div></div>
+    <div class="card kpi"><div class="num">0</div><div class="lbl">신규 테이블/마이그레이션</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>추가된 회귀</h2>
+  <table>
+    <thead><tr><th>클래스</th><th>커버</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">StageResultUploadParserTest (5)</td><td>maxUploadRows 초과 거부, maxUploadFileSize 초과 거부, <code>.xls</code> 확장자 거부, header signature 불일치 거부, 정상 파싱. (unit, no Spring)</td></tr>
+      <tr><td class="mono">ApplicationPdfSecurityHardeningTest (3)</td><td>템플릿 <code>th:utext</code> 미사용 + 외부 resource 미참조 convention, applicant free-text HTML escape(injection 방어), PDF 생성 audit 로그 기록(ListAppender).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>회귀로 고정한 불변식</h2>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="badge done">upload</span> 파일 경계</h3>
+      <ul>
+        <li><code>.xlsx</code>만 허용</li>
+        <li>maxUploadRows/maxUploadFileSize 초과 → 파일 전체 거부</li>
+        <li>header signature 검증</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="badge done">PDF</span> 보안</h3>
+      <ul>
+        <li><code>th:text</code>만(utext 금지)</li>
+        <li>외부 URL resource 미로드</li>
+        <li>applicant free-text escape</li>
+        <li>생성 시 audit 기록</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>테스트</h2>
+  <div class="summary" style="border-left-color: var(--green);">
+    <div><strong>명령</strong>: <span class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*ApplicationPdf*" --tests "*Upload*" --tests "*Export*" --tests "*Statistics*" --no-daemon</span></div>
+    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — 07f 신규 8건(parser 5 + PDF 보안 3) + 07a~07e 회귀(export/upload/statistics/PDF) 전부 통과.</div>
+  </div>
+  <p class="note">부분 실행(Phase 07 영역). 엔티티 직접 영속화로 클럭 의존(접수기간) 없이 안정적. 전체 스위트는 본 슬라이스 범위상 미실행.</p>
+</section>
+
+<section>
+  <h2>남은 이슈 / 다음 단계</h2>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="badge pending">deferred</span> 운영 준비</h3>
+      <ul><li>PDF 폰트 OFL.txt 동봉, 영속 DB <code>StageResult.version</code> DDL 반영, 날짜 의존 테스트 fixture 안정화.</li></ul>
+    </div>
+    <div class="card">
+      <h3><span class="badge pending">next</span> 후속 Phase</h3>
+      <ul><li>Phase 08(CommonCode/School master), 메시지 배치/발송 이력, privacy purge/retention/activity audit.</li></ul>
+    </div>
+  </div>
+</section>
+
+</div>
+</body>
+</html>
