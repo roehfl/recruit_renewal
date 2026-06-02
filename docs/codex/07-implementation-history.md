@@ -1,5 +1,15 @@
 # 07. Implementation History
 
+## Phase 09 - 개인정보 파기/감사 (예정, 설계 미착수)
+
+- Date: 2026-06-02
+- Work type: planning marker only (구현/설계 미착수).
+- Decision: Phase 08(CommonCode/School master, 08a~08e) 전체 완료에 이어, 다음 번호 Phase로 **Phase 09 - 개인정보 파기/감사 (Privacy Purge, Audit, Retention)** 를 진행하기로 결정.
+- 범위 후보(확정 아님): retention policy, bulk/single purge, 파기 이력, 영속 `ActivityLog`(접근/변경 감사), correlation/trace id 정책. — 로드맵 §3.3 우선순위 5.
+- 동기: export/PDF/upload/`@Version` 충돌 등 감사 이벤트가 현재 SLF4J 임시 로그로만 남아 영속 감사 기반이 필요.
+- 상태: **설계 미착수.** 상세 설계(grill-with-docs)와 슬라이스 분할은 별도 세션에서 수행 예정. 본 항목은 진행 방향 기록 용도이며 코드 변경 없음.
+- 참고: 메시지 발송(우선순위 3), 운영 hardening(우선순위 7)은 backlog 유지.
+
 ## Phase 08e - CERTIFICATE Funnel Dimension
 
 - Date: 2026-06-02

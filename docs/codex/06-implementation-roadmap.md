@@ -263,6 +263,15 @@ Roadmap revision note - 2026-05-26:
   - Phase 08 - CommonCode And School Master
 - Messaging and privacy/audit/retention remain valid backlog domains but are not numbered phases in this revision.
 
+Roadmap revision note - 2026-06-02:
+
+- Phase 08 (CommonCode/School master, 08a~08e 포함 — SCHOOL/CERTIFICATE funnel dimension까지)이 전체 완료되었다.
+- 다음 번호 Phase는 **Phase 09 - 개인정보 파기/감사 (Privacy Purge, Audit, Retention)** 로 진행하기로 결정했다(위 §3.3 우선순위 5 영역).
+  - 범위 후보: retention policy, bulk/single purge, 파기 이력, 영속 `ActivityLog`(접근/변경 감사), correlation/trace id 정책.
+  - 동기: export/PDF/upload/`@Version` 충돌 등 감사 이벤트가 현재 SLF4J 임시 로그로만 남고 있어 영속 감사 기반이 필요하다.
+- **설계는 아직 진행하지 않았다.** 본 노트는 다음 Phase 진행 방향만 기록한 것이며, 상세 설계(grill-with-docs)와 슬라이스 분할은 별도 세션에서 수행한다.
+- 메시지 발송(우선순위 3)과 운영 hardening(우선순위 7)은 여전히 유효한 backlog로 남는다.
+
 ### Phase 04 - Interview Scheduling
 
 Status:
