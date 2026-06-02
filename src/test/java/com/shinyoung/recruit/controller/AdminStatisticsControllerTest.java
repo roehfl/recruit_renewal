@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
+import com.shinyoung.recruit.domain.entity.ApplicationCertificate;
 import com.shinyoung.recruit.domain.entity.ApplicationEducation;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
@@ -12,6 +13,7 @@ import com.shinyoung.recruit.domain.entity.School;
 import com.shinyoung.recruit.domain.entity.Stage;
 import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
@@ -38,6 +40,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -80,6 +83,9 @@ class AdminStatisticsControllerTest {
 
     @Autowired
     private SchoolRepository schoolRepository;
+
+    @Autowired
+    private ApplicationCertificateRepository certificateRepository;
 
     private MockMvc mockMvc;
 
@@ -276,13 +282,55 @@ class AdminStatisticsControllerTest {
     void unsupported_dimension_returns_bad_request() throws Exception {
         JobPosting jobPosting = saveJobPosting("Backend");
 
-        // CERTIFICATE 는 master 부재로 여전히 미지원(SCHOOL 은 08d 로 지원됨).
+        // POSITION/SCHOOL/CERTIFICATE 외 잘못된 dimension 값은 400(SCHOOL=08d, CERTIFICATE=08e 로 지원됨).
         mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/statistics/funnel", jobPosting.getId())
-                        .param("dimension", "CERTIFICATE")
+                        .param("dimension", "NOT_A_DIMENSION")
                         .with(authentication(adminAuthentication())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void certificate_dimension_counts_distinct_holders_per_normalized_name_with_overlap() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        JobPosition backend = position(jobPosting, "Backend");
+        saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
+
+        JobApplication app1 = submittedApplication(jobPosting, backend, "A1");
+        certificate(app1, "정보처리기사");
+        certificate(app1, "TOEIC"); // app1은 두 그룹에 중복 집계
+        JobApplication app2 = submittedApplication(jobPosting, backend, "A2");
+        certificate(app2, "정보처리기사 "); // 정규화(trim) → 정보처리기사로 병합
+        JobApplication app3 = submittedApplication(jobPosting, backend, "A3");
+        certificate(app3, "TOEIC");
+        submittedApplication(jobPosting, backend, "A4"); // 자격 없음 → 어느 그룹에도 미포함
+
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), "CERTIFICATE", null);
+
+        assertThat(funnel.dimension().name()).isEqualTo("CERTIFICATE");
+        assertThat(funnel.population().p()).isEqualTo(4);
+        assertThat(group(funnel, "정보처리기사").population().p()).isEqualTo(2); // app1, app2(정규화)
+        assertThat(group(funnel, "TOEIC").population().p()).isEqualTo(2);       // app1, app3 (app1 중복)
+    }
+
+    @Test
+    void certificate_dimension_topN_folds_overflow_into_other() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        JobPosition backend = position(jobPosting, "Backend");
+        saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
+
+        certificate(submittedApplication(jobPosting, backend, "A1"), "Common");
+        certificate(submittedApplication(jobPosting, backend, "A2"), "Common");
+        certificate(submittedApplication(jobPosting, backend, "A3"), "Common");
+        certificate(submittedApplication(jobPosting, backend, "A4"), "Rare1");
+        certificate(submittedApplication(jobPosting, backend, "A5"), "Rare2");
+
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), "CERTIFICATE", 1); // topN=1 → Common만 개별
+
+        assertThat(funnel.dimensions()).hasSize(2);
+        assertThat(group(funnel, "Common").population().p()).isEqualTo(3);
+        assertThat(group(funnel, "기타").population().p()).isEqualTo(2); // Rare1 보유자 + Rare2 보유자 distinct
     }
 
     @Test
@@ -458,6 +506,11 @@ class AdminStatisticsControllerTest {
         educationRepository.saveAndFlush(ApplicationEducation.create(
                 application, level, "School-" + sortOrder, null, null, null, null,
                 GraduationStatus.GRADUATED, null, null, false, "KR", schoolId, sortOrder));
+    }
+
+    private void certificate(JobApplication application, String certificateName) {
+        certificateRepository.saveAndFlush(ApplicationCertificate.create(
+                application, certificateName, "Org", LocalDate.of(2023, 1, 1), null, null, null, 0));
     }
 
     private long distributionSum(StageFunnelResponse stage) {

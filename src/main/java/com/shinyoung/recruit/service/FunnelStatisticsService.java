@@ -3,6 +3,7 @@ package com.shinyoung.recruit.service;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.School;
 import com.shinyoung.recruit.domain.entity.Stage;
+import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
@@ -10,6 +11,7 @@ import com.shinyoung.recruit.domain.repository.SchoolRepository;
 import com.shinyoung.recruit.domain.repository.StageRepository;
 import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.dto.response.DimensionFunnelResponse;
+import com.shinyoung.recruit.dto.response.FunnelCertificateRow;
 import com.shinyoung.recruit.dto.response.FunnelCohortRow;
 import com.shinyoung.recruit.dto.response.FunnelPopulationResponse;
 import com.shinyoung.recruit.dto.response.FunnelResponse;
@@ -50,9 +52,9 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class FunnelStatisticsService {
 
-    private static final int DEFAULT_SCHOOL_TOP_N = 10;
-    private static final int MAX_SCHOOL_TOP_N = 100;
-    private static final String SCHOOL_OTHER_GROUP_NAME = "기타";
+    private static final int DEFAULT_DIMENSION_TOP_N = 10;
+    private static final int MAX_DIMENSION_TOP_N = 100;
+    private static final String OTHER_GROUP_NAME = "기타";
 
     private final JobPostingRepository jobPostingRepository;
     private final StageRepository stageRepository;
@@ -60,6 +62,7 @@ public class FunnelStatisticsService {
     private final StageResultRepository stageResultRepository;
     private final ApplicationEducationRepository educationRepository;
     private final SchoolRepository schoolRepository;
+    private final ApplicationCertificateRepository certificateRepository;
 
     public FunnelResponse getFunnel(Long jobPostingId, String dimensionParam, Integer topN) {
         JobPosting jobPosting = jobPostingRepository.findById(jobPostingId)
@@ -78,6 +81,8 @@ public class FunnelStatisticsService {
             dimensions = computePositionDimension(stages, cohort, resultsByStage);
         } else if (dimension == FunnelDimension.SCHOOL) {
             dimensions = computeSchoolDimension(stages, cohort, resultsByStage, jobPostingId, topN);
+        } else if (dimension == FunnelDimension.CERTIFICATE) {
+            dimensions = computeCertificateDimension(stages, cohort, resultsByStage, jobPostingId, topN);
         }
 
         return new FunnelResponse(
@@ -158,7 +163,7 @@ public class FunnelStatisticsService {
                         .thenComparing(Map.Entry::getKey))
                 .toList();
 
-        int limit = (topN == null || topN <= 0) ? DEFAULT_SCHOOL_TOP_N : Math.min(topN, MAX_SCHOOL_TOP_N);
+        int limit = (topN == null || topN <= 0) ? DEFAULT_DIMENSION_TOP_N : Math.min(topN, MAX_DIMENSION_TOP_N);
         List<Map.Entry<Long, List<FunnelCohortRow>>> top = ranked.stream().limit(limit).toList();
         List<Map.Entry<Long, List<FunnelCohortRow>>> overflow = ranked.stream().skip(limit).toList();
 
@@ -174,9 +179,77 @@ public class FunnelStatisticsService {
         if (!other.isEmpty()) {
             CohortFunnel funnel = computeCohort(stages, other, resultsByStage);
             dimensions.add(new DimensionFunnelResponse(
-                    null, SCHOOL_OTHER_GROUP_NAME, funnel.population(), funnel.stages()));
+                    null, OTHER_GROUP_NAME, funnel.population(), funnel.stages()));
         }
         return dimensions;
+    }
+
+    /**
+     * 자격별 dimension: 자격명(정규화: trim + 공백 압축)별 <strong>보유 지원자 distinct</strong> 그룹. SCHOOL/POSITION 과
+     * 달리 그룹이 P 의 분할이 아니라 <strong>중복 가능</strong>하다(한 지원자가 여러 자격을 보유하면 여러 그룹에 집계).
+     * 자격 보유자 수 desc·자격명 asc로 정렬해 topN(기본 10)만 개별 노출하고, 초과 자격 보유자(distinct)는 '기타'로
+     * 합산한다. 빈 자격명/무보유 지원자는 그룹에 포함하지 않는다(보유 의미). 자격명은 free-text master 가 없어 정규화로만 묶는다.
+     */
+    private List<DimensionFunnelResponse> computeCertificateDimension(
+            List<Stage> stages,
+            List<FunnelCohortRow> cohort,
+            Map<Long, Map<Long, StageResultStatus>> resultsByStage,
+            Long jobPostingId,
+            Integer topN
+    ) {
+        Map<Long, FunnelCohortRow> cohortById = cohort.stream()
+                .collect(Collectors.toMap(FunnelCohortRow::applicationId, java.util.function.Function.identity(),
+                        (existing, ignored) -> existing));
+
+        Map<String, Set<Long>> holdersByName = new LinkedHashMap<>();
+        for (FunnelCertificateRow row : certificateRepository.findFunnelCertificates(jobPostingId)) {
+            String name = normalizeCertificateName(row.certificateName());
+            if (name == null || !cohortById.containsKey(row.applicationId())) {
+                continue;
+            }
+            holdersByName.computeIfAbsent(name, key -> new HashSet<>()).add(row.applicationId());
+        }
+
+        List<Map.Entry<String, Set<Long>>> ranked = holdersByName.entrySet().stream()
+                .sorted(Comparator
+                        .<Map.Entry<String, Set<Long>>>comparingInt(entry -> entry.getValue().size())
+                        .reversed()
+                        .thenComparing(Map.Entry::getKey))
+                .toList();
+
+        int limit = (topN == null || topN <= 0) ? DEFAULT_DIMENSION_TOP_N : Math.min(topN, MAX_DIMENSION_TOP_N);
+        List<Map.Entry<String, Set<Long>>> top = ranked.stream().limit(limit).toList();
+        List<Map.Entry<String, Set<Long>>> overflow = ranked.stream().skip(limit).toList();
+
+        List<DimensionFunnelResponse> dimensions = new ArrayList<>();
+        for (Map.Entry<String, Set<Long>> entry : top) {
+            CohortFunnel funnel = computeCohort(stages, rowsOf(entry.getValue(), cohortById), resultsByStage);
+            dimensions.add(new DimensionFunnelResponse(null, entry.getKey(), funnel.population(), funnel.stages()));
+        }
+
+        if (!overflow.isEmpty()) {
+            Set<Long> otherApplicationIds = new HashSet<>();
+            overflow.forEach(entry -> otherApplicationIds.addAll(entry.getValue()));
+            CohortFunnel funnel = computeCohort(stages, rowsOf(otherApplicationIds, cohortById), resultsByStage);
+            dimensions.add(new DimensionFunnelResponse(null, OTHER_GROUP_NAME, funnel.population(), funnel.stages()));
+        }
+        return dimensions;
+    }
+
+    private List<FunnelCohortRow> rowsOf(Set<Long> applicationIds, Map<Long, FunnelCohortRow> cohortById) {
+        return applicationIds.stream()
+                .map(cohortById::get)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+    }
+
+    /** free-text 자격명을 그룹 키로 정규화: trim + 내부 공백 압축. 빈 값은 null(그룹 제외). */
+    private static String normalizeCertificateName(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim().replaceAll("\\s+", " ");
+        return normalized.isEmpty() ? null : normalized;
     }
 
     /** 지원자별 최종학력 1교의 schoolId. 학력 없음/최종학력에 schoolId 없음이면 매핑 없음(미매칭). */
@@ -312,10 +385,6 @@ public class FunnelStatisticsService {
             dimension = FunnelDimension.valueOf(dimensionParam.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             throw new InvalidStatisticsRequestException("지원하지 않는 dimension 값입니다. dimension=" + dimensionParam);
-        }
-        if (dimension != FunnelDimension.POSITION && dimension != FunnelDimension.SCHOOL) {
-            throw new InvalidStatisticsRequestException(
-                    "dimension=" + dimension + "은(는) 아직 지원하지 않습니다. 현재 POSITION/SCHOOL만 지원합니다.");
         }
         return dimension;
     }
