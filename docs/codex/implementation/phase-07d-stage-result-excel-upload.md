@@ -5,7 +5,8 @@
 - Date: 2026-06-02
 - Work type: implementation (Phase 07 네 번째 슬라이스, Phase 07의 **유일한 쓰기 경로**).
 - Goal: 운영자가 `upload-template`으로 받은 xlsx로 `StageResult`를 bulk 변경한다. stateless preview/commit, all-or-nothing, 3중 교차검증, 낙관적 동시성, 기존 `StageResultService.bulkUpdateResults` 위임.
-- 새 entity/table/migration 없음. commit은 기존 명령에 위임해 기존 불변식(Stage `IN_PROGRESS` guard, PENDING 금지, comment ≤ 2000, actor 필수, 정정 이력/audit)을 그대로 상속한다.
+- 새 entity/table 없음. commit은 기존 명령에 위임해 기존 불변식(Stage `IN_PROGRESS` guard, PENDING 금지, comment ≤ 2000, actor 필수, 정정 이력/audit)을 그대로 상속한다.
+- **단, 리뷰2 반영으로 `StageResult`에 `@Version` 컬럼 1개가 추가된다.** 신규/개발 H2(create-drop)는 Hibernate가 자동 생성하지만, 기존 데이터가 있는 영속 DB는 수동 DDL 반영이 필요하다: `docs/codex/ops/phase-07d-stage-result-version-column.sql`. (Flyway/Liquibase 미사용 프로젝트라 SQL을 ops에 남긴다.)
 
 ## 2. 구현 범위 (Implemented)
 
@@ -54,7 +55,12 @@
 - `service/ExcelExportWriter.java` — `writeToTempFile(spec, rowSource, escapeFormulaPrefix)` 오버로드(round-trip 소스용 비-escape 경로). 리뷰 #2.
 - `service/ExcelExportService.java` — `generate(spec, rows, fileName, escapeFormulaPrefix)` 오버로드. 리뷰 #2.
 - `service/StageResultService.java` — `validateBulkUpdatable(stageId, actor)` 공개 guard(변경 0건 우회 차단). 리뷰 #3.
-- `domain/entity/StageResult.java` — `@Version` 추가(전 write 경로 lost update 방지). 리뷰2.
+- `domain/entity/StageResult.java` — `@Version @Column(nullable = false)` 추가(전 write 경로 lost update 방지). 리뷰2/리뷰3.
+- `controller/StageResultUploadController.java` / `service/UploadAuditLogger.java` — 낙관적 잠금 충돌 시 `logUploadConflict`(outcome=OPTIMISTIC_LOCK_CONFLICT) audit 후 rethrow. 리뷰3 #2.
+
+### Created (docs/ops)
+
+- `docs/codex/ops/phase-07d-stage-result-version-column.sql` — `@Version` 컬럼 수동 반영 DDL(영속 DB용). 리뷰3 #1.
 
 ### Created (test)
 
@@ -160,7 +166,7 @@
 
 ## 13. 리뷰 반영 (instruction.md, 4 findings)
 
-- **(High #1) lost update 미차단** — 토큰 in-memory 비교만으로는 두 관리자의 동시 commit이 모두 stale check를 통과해 덮어쓸 수 있었다. commit에서 **변경 대상 행을 `PESSIMISTIC_WRITE`로 잠그고 DB 최신값으로 `refresh`한 뒤 토큰을 재비교**하도록 변경(2안, migration 불필요). 늦게 들어온 commit은 잠금 해제 후 갱신된 `updatedAt`을 보고 STALE 처리된다. 잠금은 id 오름차순으로 획득해 deadlock을 피한다.
+- **(High #1) lost update 미차단** — 토큰 in-memory 비교만으로는 두 관리자의 동시 commit이 모두 stale check를 통과해 덮어쓸 수 있었다. commit에서 **변경 대상 행을 `PESSIMISTIC_WRITE`로 잠그고 DB 최신값으로 `refresh`한 뒤 토큰을 재비교**하도록 변경(PESSIMISTIC 자체는 schema 변경 불필요; 단 이 변경만으로는 upload-vs-upload만 보호 → 리뷰2에서 `@Version` 추가로 전 경로 보강). 늦게 들어온 commit은 잠금 해제 후 갱신된 `updatedAt`을 보고 STALE 처리된다. 잠금은 id 오름차순으로 획득해 deadlock을 피한다.
 - **(High #2) 템플릿 round-trip 오염** — `ExcelExportWriter`의 formula-escape(`=,+,-,@`, 탭, 개행 앞 apostrophe)가 템플릿 comment 값을 변형해, 미수정 재업로드가 CHANGED로 오판되고 commit 시 값이 오염될 수 있었다. **template은 `escapeFormulaPrefix=false`(비변형 string cell)로 작성**하도록 writer/service에 오버로드 추가. 재업로드 시 parser가 formula 셀을 거부하므로 injection도 안전. 토큰 포맷은 service 단일 소스(`formatToken`)로 통일.
 - **(Medium #3) 변경 0건 guard 우회** — 전부 UNCHANGED/header-only 파일은 `bulkUpdateResults`를 호출하지 않아 Stage `IN_PROGRESS`/actor guard를 우회할 수 있었다. commit 선두에서 `StageResultService.validateBulkUpdatable(stageId, actor)`로 **변경 행 여부와 무관하게 guard 선검증**.
 - **(Low #4) 토큰 셀 타입 검증 느슨** — token 셀이 NUMERIC일 때만 오류였다. **STRING/blank를 제외한 모든 타입(NUMERIC/date/BOOLEAN 등)을 row error**로 처리하도록 parser 강화.
@@ -174,13 +180,21 @@
 - **검증**: stale 스냅샷(version 0)을 다른 트랜잭션이 먼저 갱신한 뒤 repository 경로로 반영하면 `ObjectOptimisticLockingFailureException`이 발생함을 테스트로 고정. 기존 StageResult write-path 테스트 113건 전부 회귀 통과(=`@Version` 비파괴).
 - **잔여**: HMAC opaque 토큰 미적용(Open Q#7)은 별개 항목으로 유지.
 
+## 13c. 리뷰 반영 3 (instruction.md, 2 blocking)
+
+- **(Blocking #1) `@Version` ↔ "migration 없음" 문서 모순 + 운영 DDL 부재** — `@Version`은 `version` 컬럼을 요구하는데 문서는 "migration 불필요/없음"이라 모순. 정정:
+  - 요약/리뷰 문구를 "새 entity/table 없음 + `@Version` 컬럼 1개 추가"로 수정하고, PESSIMISTIC 관련 "migration 불필요"는 PESSIMISTIC 자체에 한정함을 명시.
+  - 엔티티를 `@Version @Column(nullable = false) private Long version;`로 명확화.
+  - Flyway/Liquibase 미사용 프로젝트라 수동 반영 DDL을 `docs/codex/ops/phase-07d-stage-result-version-column.sql`에 추가(`ALTER TABLE stage_result ADD COLUMN version BIGINT NOT NULL DEFAULT 0;`). 신규/개발 H2는 자동 생성, 기존 영속 DB는 본 DDL 1회 반영.
+- **(Blocking #2) 낙관적 잠금 충돌이 upload audit에 누락** — `@Version` 충돌은 service 트랜잭션 commit 시 예외로 터져 controller의 `logUploadCommit` 라인까지 도달하지 못해 audit에 안 남았다. controller가 `ObjectOptimisticLockingFailureException`을 잡아 `UploadAuditLogger.logUploadConflict(...)`로 **`outcome=OPTIMISTIC_LOCK_CONFLICT` 실패 attempt를 audit에 남긴 뒤 rethrow**(GlobalExceptionHandler가 409 매핑)하도록 수정.
+
 ## 14. Known limitations
 
 - 토큰은 원문 ISO-8601 string(HMAC opaque 토큰 미적용) — 임의 위조 방지는 후속 하드닝 후보(Open Q#7).
 - lost update 방지: upload-vs-upload는 `PESSIMISTIC_WRITE` + 토큰(row-level STALE), 전 write 경로는 `@Version`(409)로 차단. 두 계층이 함께 동작한다.
 - 토큰 비교는 micro precision으로 normalize. cross-tx(실사용)에서는 양측 모두 DB 조회값이라 일관, 단일 tx 테스트는 PC를 DB와 동기화해 검증.
-- `@Version`은 `StageResult`에 nullable 컬럼으로 추가된다. 신규 schema(테스트/개발 H2)는 영향 없으나, 기존 행이 있는 영속 DB에 적용 시 컬럼 backfill(기본 0) 운영 절차가 필요할 수 있다.
-- audit는 SLF4J 구조적 로그(영속 ActivityLog 미도입).
+- `@Version`은 `StageResult`에 `not null` 컬럼으로 추가된다. 신규/개발 H2(create-drop)는 Hibernate 자동 생성, 기존 데이터가 있는 영속 DB는 `docs/codex/ops/phase-07d-stage-result-version-column.sql`을 1회 수동 반영해야 한다(컬럼 backfill 기본 0).
+- audit는 SLF4J 구조적 로그(영속 ActivityLog 미도입). 정상 commit은 outcome별, 낙관적 잠금 충돌은 `OPTIMISTIC_LOCK_CONFLICT`로 기록한다.
 
 ## 15. Next phase considerations
 

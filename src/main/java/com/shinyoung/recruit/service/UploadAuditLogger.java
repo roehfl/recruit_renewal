@@ -58,6 +58,27 @@ public class UploadAuditLogger {
                 contentHash(file));
     }
 
+    /**
+     * 낙관적 잠금(@Version) 충돌로 commit이 실패한 경우의 audit. 충돌은 service 트랜잭션 commit 시 예외로 터져
+     * 정상 응답이 없으므로(=정상 logUploadCommit에 도달 못 함), controller가 이 메서드로 실패 attempt를 남긴다.
+     */
+    public void logUploadConflict(ExportAuditContext context, Long stageId, MultipartFile file) {
+        log.info(
+                "upload audit eventType=STAGE_RESULT_UPLOAD_COMMIT stageId={} timestamp={} "
+                        + "actorLoginId={} authority={} clientIp={} userAgent={} requestId={} "
+                        + "outcome=OPTIMISTIC_LOCK_CONFLICT sourceFileName={} sourceFileSize={} contentHash={}",
+                stageId,
+                LocalDateTime.now(clock),
+                context.actorLoginId(),
+                context.authority(),
+                context.clientIp(),
+                context.userAgent(),
+                context.requestId(),
+                sanitize(file.getOriginalFilename()),
+                file.getSize(),
+                contentHash(file));
+    }
+
     private String contentHash(MultipartFile file) {
         try {
             return HashUtil.sha256Bytes(file.getBytes());

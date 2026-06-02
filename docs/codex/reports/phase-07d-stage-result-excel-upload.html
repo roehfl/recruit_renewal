@@ -61,7 +61,8 @@
     운영자가 <code>upload-template</code>으로 받은 xlsx로 <strong>StageResult</strong>를 bulk 변경한다.
     stateless preview/commit, all-or-nothing, 3중 교차검증, 낙관적 동시성(<code>stageResultUpdatedAt</code> 토큰)을 갖추고
     commit은 기존 <code>StageResultService.bulkUpdateResults</code>에 위임해 기존 불변식(Stage <code>IN_PROGRESS</code> guard,
-    PENDING 금지, comment ≤ 2000, actor 필수, 정정 이력/audit)을 그대로 상속한다. 새 entity/table/migration 없음.
+    PENDING 금지, comment ≤ 2000, actor 필수, 정정 이력/audit)을 그대로 상속한다. 새 entity/table 없음 —
+    단 리뷰2/리뷰3으로 <code>StageResult.@Version</code> 컬럼 1개가 추가된다(운영 DDL: <code>docs/codex/ops/phase-07d-stage-result-version-column.sql</code>).
     테스트 <span class="ok">BUILD SUCCESSFUL</span> — 다음 슬라이스(07e PDF)로 진행 가능.
   </div>
 </section>
@@ -188,8 +189,10 @@
   <table>
     <thead><tr><th>등급</th><th>지적</th><th>반영</th></tr></thead>
     <tbody>
-      <tr><td><span class="badge oos">High</span></td><td>토큰 in-memory 비교만으론 동시 commit lost update 미차단</td><td>변경 행을 <code>PESSIMISTIC_WRITE</code>로 잠그고 DB 최신값 refresh 후 토큰 재비교(2안, migration 불필요). id 오름차순 잠금으로 deadlock 회피.</td></tr>
+      <tr><td><span class="badge oos">High</span></td><td>토큰 in-memory 비교만으론 동시 commit lost update 미차단</td><td>변경 행을 <code>PESSIMISTIC_WRITE</code>로 잠그고 DB 최신값 refresh 후 토큰 재비교(PESSIMISTIC 자체는 schema 변경 불필요). id 오름차순 잠금으로 deadlock 회피.</td></tr>
       <tr><td><span class="badge oos">리뷰2</span></td><td>PESSIMISTIC은 upload-vs-upload만 보호. 기존 비-locking 수동 경로와의 lost update는 미차단(@Version 부재)</td><td><code>StageResult.@Version</code> 추가 → 모든 write 경로 flush 버전 검사, 충돌 시 <code>ObjectOptimisticLockingFailureException</code> 409 매핑. PESSIMISTIC+토큰은 row-level UX로 유지. 기존 113 테스트 비파괴 확인.</td></tr>
+      <tr><td><span class="badge oos">리뷰3</span></td><td>@Version ↔ "migration 없음" 문서 모순 + 운영 DDL 부재</td><td>요약/문구 정정(새 entity/table 없음 + @Version 컬럼 1개), 엔티티 <code>@Version @Column(nullable = false)</code> 명확화, 수동 반영 DDL <code>docs/codex/ops/phase-07d-stage-result-version-column.sql</code> 추가.</td></tr>
+      <tr><td><span class="badge oos">리뷰3</span></td><td>낙관적 잠금 충돌이 upload audit에 누락(commit-time 예외라 audit 라인 미도달)</td><td>controller가 <code>ObjectOptimisticLockingFailureException</code>을 잡아 <code>logUploadConflict</code>(outcome=OPTIMISTIC_LOCK_CONFLICT) audit 후 rethrow → 409.</td></tr>
       <tr><td><span class="badge oos">High</span></td><td>template이 writer의 formula-escape로 comment를 변형 → round-trip 오판/오염</td><td>template은 <code>escapeFormulaPrefix=false</code>(비변형 string cell)로 작성. 토큰 포맷은 service 단일 소스로 통일.</td></tr>
       <tr><td><span class="badge warn">Medium</span></td><td>변경 0건이면 Stage/actor guard 우회</td><td>commit 선두에서 <code>validateBulkUpdatable(stageId, actor)</code>로 변경 여부 무관 선검증.</td></tr>
       <tr><td><span class="badge pending">Low</span></td><td>토큰 셀 타입 검증이 NUMERIC만</td><td>STRING/blank 외 모든 타입을 row error로 강화.</td></tr>

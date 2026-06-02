@@ -72,8 +72,12 @@ public class StageResult extends BaseEntity {
      * 간의 lost update를 방지한다. 충돌 시 flush에서 {@code ObjectOptimisticLockingFailureException}이 발생하고
      * 409로 매핑된다. Excel upload는 이에 더해 PESSIMISTIC_WRITE + 토큰으로 upload-vs-upload 경쟁에 row-level
      * STALE 피드백을 제공한다.
+     *
+     * <p>이 컬럼은 신규/개발 H2(create-drop)에서는 Hibernate가 자동 생성하지만, 기존 데이터가 있는 영속 DB에는
+     * 수동 DDL 반영이 필요하다: {@code docs/codex/ops/phase-07d-stage-result-version-column.sql}.
      */
     @Version
+    @Column(nullable = false)
     private Long version;
 
     private StageResult(Stage stage, JobApplication jobApplication) {

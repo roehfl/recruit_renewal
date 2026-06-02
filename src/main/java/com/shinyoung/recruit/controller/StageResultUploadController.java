@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -77,8 +78,16 @@ public class StageResultUploadController {
             HttpServletRequest request
     ) {
         String actor = currentEmployeeService.getCurrentEmployeeActor(userDetails);
-        StageResultUploadCommitResponse response = uploadService.commit(stageId, file, actor);
-        uploadAuditLogger.logUploadCommit(auditContext(actor, userDetails, request), stageId, response, file);
+        ExportAuditContext auditContext = auditContext(actor, userDetails, request);
+        StageResultUploadCommitResponse response;
+        try {
+            response = uploadService.commit(stageId, file, actor);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            // @Version 충돌은 service 트랜잭션 commit 시 터져 정상 응답이 없으므로, 실패 attempt도 audit에 남긴다.
+            uploadAuditLogger.logUploadConflict(auditContext, stageId, file);
+            throw e; // GlobalExceptionHandler가 409로 매핑.
+        }
+        uploadAuditLogger.logUploadCommit(auditContext, stageId, response, file);
         return switch (response.outcome()) {
             case APPLIED -> ResponseEntity.ok(ApiResponse.success(response));
             case REJECTED_VALIDATION -> ResponseEntity.badRequest()

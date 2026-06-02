@@ -4,7 +4,7 @@
 
 - Date: 2026-06-02
 - Work type: implementation (Phase 07 네 번째 슬라이스, Phase 07의 유일한 쓰기 경로).
-- Goal: 운영자가 `upload-template`으로 받은 xlsx로 `StageResult`를 bulk 변경. stateless preview/commit, all-or-nothing, 3중 교차검증, 낙관적 동시성, 기존 `bulkUpdateResults` 위임. 새 entity/table/migration 없음.
+- Goal: 운영자가 `upload-template`으로 받은 xlsx로 `StageResult`를 bulk 변경. stateless preview/commit, all-or-nothing, 3중 교차검증, 낙관적 동시성, 기존 `bulkUpdateResults` 위임. 새 entity/table 없음(리뷰2/3로 `StageResult.@Version` 컬럼 1개 추가, 운영 DDL은 `docs/codex/ops/`에 수동 반영).
 - Created (main):
   - `enumeration/StageResultUploadRowStatus.java`, `enumeration/StageResultUploadCommitOutcome.java`
   - `exception/InvalidStageResultUploadException.java`
@@ -38,7 +38,7 @@
   - 검증: template prefill/토큰/PII 컬럼 부재·404, preview changed/unchanged/error 집계·blank/PENDING·applicationId 불일치·중복 id·formula 셀·wrong header 400, commit changed 적용+unchanged 제외·blank clear·all-or-nothing 미적용·STALE 409 미적용·비-xlsx 400, 인가(403/401).
   - 엔티티를 repository로 직접 영속화해 클럭 의존(접수기간) 없이 안정적. 부분 실행(upload + HashUtil); 전체 스위트는 본 슬라이스 범위상 미실행.
 - Review 반영 (instruction.md, 4 findings):
-  - (High) 토큰 in-memory 비교만으론 두 관리자 동시 commit이 모두 stale check 통과 후 덮어쓰는 lost update 발생 → commit에서 변경 행을 `PESSIMISTIC_WRITE`로 잠그고 DB 최신값으로 `refresh` 후 토큰 재비교(2안, migration 불필요). 잠금 id 오름차순으로 deadlock 회피. (`StageResultRepository` 신규 쿼리 없이 `EntityManager.refresh(entity, PESSIMISTIC_WRITE)` 사용.)
+  - (High) 토큰 in-memory 비교만으론 두 관리자 동시 commit이 모두 stale check 통과 후 덮어쓰는 lost update 발생 → commit에서 변경 행을 `PESSIMISTIC_WRITE`로 잠그고 DB 최신값으로 `refresh` 후 토큰 재비교(PESSIMISTIC 자체는 schema 변경 불필요; upload-vs-upload만 보호 → 리뷰2에서 `@Version` 보강). 잠금 id 오름차순으로 deadlock 회피. (`StageResultRepository` 신규 쿼리 없이 `EntityManager.refresh(entity, PESSIMISTIC_WRITE)` 사용.)
   - (High) `ExcelExportWriter` formula-escape가 template comment를 변형 → 미수정 재업로드가 CHANGED 오판/오염 → template은 `escapeFormulaPrefix=false`(비변형 string cell)로 작성하도록 writer/service 오버로드 추가. 토큰 포맷은 service `formatToken` 단일 소스로 통일. 일반 export 경로는 default escape=true 유지(회귀 확인).
   - (Medium) 변경 0건 파일이 Stage `IN_PROGRESS`/actor guard 우회 → commit 선두에서 `StageResultService.validateBulkUpdatable(stageId, actor)` 선검증.
   - (Low) 토큰 셀이 NUMERIC일 때만 오류이던 것을 STRING/blank 외 모든 타입(NUMERIC/date/BOOLEAN 등) row error로 강화.
@@ -48,9 +48,13 @@
   - (반영, 안전 수정 채택) `StageResult`에 `@Version` 추가 → 전 write 경로 flush 버전 검사, 충돌 시 `ObjectOptimisticLockingFailureException` → 409 매핑(`GlobalExceptionHandler`). upload의 PESSIMISTIC_WRITE+토큰은 upload-vs-upload row-level STALE UX로 유지(2계층).
   - 테스트: stale 스냅샷(version 0) 후행 반영 시 `ObjectOptimisticLockingFailureException` 회귀 추가(17→18). `@Version` 추가 후 StageResult 전 write 경로 113건 회귀 비파괴 확인(총 114 tests 통과).
   - 잔여: HMAC opaque 토큰(Open Q#7), 영속 DB 기존 행 `version` backfill 운영 절차.
+- Review 반영 3 (instruction.md, 2 blocking):
+  - (Blocking) `@Version` ↔ "migration 없음" 문서 모순 + 운영 DDL 부재 → (a) 요약/리뷰 문구를 "새 entity/table 없음 + `@Version` 컬럼 1개"로 정정, PESSIMISTIC의 "migration 불필요"는 PESSIMISTIC 자체로 한정. (b) 엔티티를 `@Version @Column(nullable = false)`로 명확화. (c) Flyway/Liquibase 미사용이라 수동 DDL을 `docs/codex/ops/phase-07d-stage-result-version-column.sql`(`ALTER TABLE stage_result ADD COLUMN version BIGINT NOT NULL DEFAULT 0;`)로 추가.
+  - (Blocking) 낙관적 잠금 충돌이 upload audit에 누락(충돌은 service tx commit 시 예외 → controller audit 라인 미도달) → controller가 `ObjectOptimisticLockingFailureException`을 잡아 `UploadAuditLogger.logUploadConflict`(outcome=OPTIMISTIC_LOCK_CONFLICT) audit 후 rethrow(GlobalExceptionHandler 409).
 - Documentation:
   - `docs/codex/implementation/phase-07d-stage-result-excel-upload.md`
   - `docs/codex/reports/phase-07d-stage-result-excel-upload.html`
+  - `docs/codex/ops/phase-07d-stage-result-version-column.sql` (신규, @Version 수동 DDL)
 - Known limitations: 토큰은 원문 ISO-8601(HMAC opaque 미적용, Open Q#7). lost update는 upload-vs-upload=`PESSIMISTIC_WRITE`+토큰(row-level STALE), 전 write 경로=`@Version`(409) 2계층으로 차단. audit는 SLF4J(영속 ActivityLog 미도입).
 - Deferred: 07e(PDF), 07f(stabilization), HMAC 토큰, 영속 audit.
 - Next recommended: Phase 07e - Application PDF.

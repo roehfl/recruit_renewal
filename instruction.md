@@ -1,36 +1,37 @@
-남은 판단 포인트: 동시성
+Blocking 문제
+1. @Version 추가와 “migration 없음”이 충돌한다
 
-현재 구현은 commit에서 변경 대상 row만 PESSIMISTIC_WRITE로 refresh/lock하고, lock 후 최신 DB 값 기준으로 token을 다시 비교한다. upload끼리 동시에 들어오는 케이스에서는 늦게 들어온 쪽이 갱신된 updatedAt을 보고 STALE이 될 가능성이 높다. 구현 방향은 이전 지적 대비 명백히 좋아졌다.
+현재 StageResult에는 @Version private Long version;이 추가됐다. 이건 DB에 version 컬럼이 필요하다는 뜻이다.
 
-하지만 이건 전체 StageResult write model의 완전한 lost update 방지는 아니다.
+그런데 문서 첫머리는 아직 “새 entity/table/migration 없음”이라고 되어 있다.
+또 리뷰 반영 항목에도 “PESSIMISTIC_WRITE 2안, migration 불필요”라는 문장이 그대로 남아 있다.
 
-이유는 기존 StageResultService.updateResult()와 bulkUpdateResults()가 여전히 일반 조회 후 엔티티를 변경하는 방식이고, StageResult 엔티티에는 @Version이 없다.
+반면 뒤쪽 Known limitations에는 기존 DB 적용 시 컬럼 backfill 운영 절차가 필요하다고 적혀 있다.
 
-즉, 아래 케이스는 아직 이론상 가능하다.
+즉 문서가 서로 모순된다.
 
-1. 기존 수동 수정 API 트랜잭션 A가 StageResult를 먼저 읽음.
-2. upload commit 트랜잭션 B가 PESSIMISTIC_WRITE lock 후 token 검증 통과.
-3. B가 update/commit.
-4. A가 오래된 엔티티 상태로 나중에 flush/commit.
-5. A가 B의 변경을 덮어쓸 수 있음. @Version이 없기 때문.
+ALTER TABLE stage_result
+ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
 
-이건 upload-vs-upload 문제가 아니라 upload와 기존 비-locking writer 간 경쟁이다. 문서에는 “lost update 자체는 PESSIMISTIC_WRITE 잠금으로 차단된다”고 적혀 있는데, 이 표현은 현재 코드 기준으로는 너무 강하다.
+최소한 이 DDL 또는 그에 준하는 운영 절차가 명시되어야 한다. Flyway/Liquibase를 안 쓰는 프로젝트라면 docs/codex/ops나 docs/sql에 수동 반영 SQL이라도 남겨야 한다.
 
-최종 판단
+그리고 엔티티에도 명시적으로 아래처럼 가는 게 낫다.
 
-Phase 7d 범위를 “Excel upload 간 동시 commit 방지”로 한정하면 PASS 가능.
+@Version
+@Column(nullable = false)
+private Long version;
 
-다만 문서/요구사항이 “StageResult에 대한 모든 관리 변경 경로와의 lost update 방지”라면 아직 FAIL이다. 그 수준까지 요구하려면 StageResult에 @Version을 추가하는 게 맞다. migration이 부담이면 최소한 기존 updateResult() / bulkUpdateResults()도 같은 locking 정책을 공유해야 한다.
+지금은 @Version만 있고 @Column(nullable = false)는 없다.
 
-권장 수정
+2. Optimistic lock 실패는 upload audit에 안 남을 가능성이 높다
 
-최소 수정은 문서 정정:
+upload commit controller는 uploadService.commit()이 정상적으로 StageResultUploadCommitResponse를 반환한 뒤에야 uploadAuditLogger.logUploadCommit(...)을 호출한다.
 
-PESSIMISTIC_WRITE는 upload commit 내부의 변경 대상 row를 잠그고 lock 후 token을 재검증해 upload-vs-upload 경쟁에서 stale overwrite를 막는다.
-다만 StageResult 엔티티에 @Version이 없고 기존 수동 update 경로는 non-locking writer이므로, 모든 StageResult write path 간의 완전한 lost update 방지는 후속 @Version 도입 전까지 보장하지 않는다.
+그런데 @Version 충돌은 service transaction commit/flush 시 예외로 터질 수 있고, 이 경우 controller의 audit 호출 라인까지 도달하지 않는다. GlobalExceptionHandler가 409는 반환하지만, upload audit outcome에는 안 남는다.
 
-더 안전한 수정은 코드 보강:
+Phase 07d가 “유일한 쓰기 경로”이고 upload commit audit을 남긴다는 요구라면, 충돌 실패도 audit 대상이다. 최소한 OPTIMISTIC_LOCK_CONFLICT 같은 outcome으로 audit을 남겨야 한다.
 
-StageResult에 @Version 필드를 추가하고 DB migration을 반영한다.
-기존 updateResult, bulkUpdateResults, upload commit 모두 OptimisticLockException/ObjectOptimisticLockingFailureException을 409 계열로 매핑한다.
-이후 PESSIMISTIC_WRITE는 제거하거나, upload 대량 처리 중 충돌 UX 개선용으로만 유지한다.
+수정 방향은 둘 중 하나다.
+
+1. controller에서 ObjectOptimisticLockingFailureException을 잡아 audit 후 다시 throw/409 응답
+2. upload audit을 AOP/필터/exception handler 쪽으로 옮겨 실패 attempt까지 기록
