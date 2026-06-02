@@ -1,5 +1,29 @@
 # 07. Implementation History
 
+## Phase 08 - CommonCode & School Master (Design)
+
+- Date: 2026-06-02
+- Work type: documentation-only 설계 단계 (grill-with-docs 세션). Java/test/migration 미구현.
+- Goal: 관리자 코드성 lookup(`CommonCode`)과 학교 자동완성/통계 기반(`School`) master 를 추가형(비파괴)으로 도입하는 백엔드 범위·API·검증·슬라이스를 확정한다.
+- Created:
+  - `docs/codex/design/phase-08-commoncode-school-master-design.md`
+  - `docs/codex/reports/phase-08-commoncode-school-master-design.html`
+  - `docs/adr/0003-commoncode-additive-no-enum-migration.md`
+  - `docs/adr/0004-school-optional-application-level-link.md`
+- Modified:
+  - `CONTEXT.md` (CommonCode/School 용어 추가, "학교별 통계" 모호성 항목을 School master 기반으로 갱신)
+- Key design decisions (grill Q1~Q10):
+  - CommonCode 추가형 도입, **기존 enum 전환 0**(카탈로그만, STAY vs CANDIDATE). 전환은 "관리자 런타임 추가" 요구 group 에 한해 별도. (ADR 0003)
+  - CommonCode 는 독립 lookup(백엔드 필드 validation 미결합), 프론트 드롭다운 소비. `groupCode`=string 컬럼, `(groupCode,code)` unique, `code` 불변 + soft delete. public read + admin CRUD.
+  - School ↔ ApplicationEducation = **optional nullable `schoolId`**(application-level 참조, 강한 FK 없음). `schoolName` free-text snapshot 유지, 자동완성 선택 시에만 매칭. (ADR 0004)
+  - School 적재 = admin CRUD + **xlsx upsert**(07d parser 재사용), 외부 API 미연동. 식별 = `schoolCode` 우선 + `(schoolName,schoolType,region)` fallback(재import 멱등).
+  - SCHOOL/CERTIFICATE funnel dimension(07c 보류)은 Phase 08 범위 밖(별도 후속).
+  - 산출물 = 설계 문서만. 슬라이스: 08a CommonCode, 08b School(검색/CRUD), 08c xlsx import + schoolId 링크.
+- 보안: `/api/codes`·`/api/schools` public read 는 `anyRequest().permitAll()`, `/api/admin/**` 자동 admin → SecurityConfig 변경 불필요.
+- Tests: documentation-only 단계라 Gradle 테스트 미실행.
+- Open questions: School import preview/commit 분리, `schoolType` 를 CommonCode group(`SCHOOL_TYPE`)으로, CommonCode seeding(무-seed vs dev data.sql).
+- Next recommended: Phase 08a - CommonCode 구현(엔티티/CRUD/public read).
+
 ## Phase 07f - Stabilization / Test Hardening
 
 - Date: 2026-06-02

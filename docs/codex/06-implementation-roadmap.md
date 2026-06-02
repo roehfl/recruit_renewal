@@ -573,20 +573,29 @@ Out of scope:
 
 ### Phase 08 - CommonCode And School Master
 
+설계 확정: `docs/codex/design/phase-08-commoncode-school-master-design.md`
+(grill-with-docs, 2026-06-02). ADR 0003/0004.
+
 목적:
 
-- 공통코드와 학교 master data를 관리한다.
+- 관리자 코드성 lookup(`CommonCode`)과 학교 자동완성/통계 기반(`School`) master 를 **추가형(비파괴)** 으로 도입한다.
 
-범위:
+범위(확정):
 
-- `CommonCode`
-- `School`
-- master data import/search
-- 공고/지원서 입력값과의 application-level validation
+- `CommonCode`: groupCode+code(불변)+displayName+sortOrder+active. public read + admin CRUD. 프론트 드롭다운 소비(백엔드 검증 미결합).
+- `School`: 검색/자동완성(public) + admin CRUD + xlsx upsert. 외부 API 미연동.
+- `ApplicationEducation` optional `schoolId`(app-level, FK 없음) 링크.
+- 기존 enum 전환 후보 카탈로그(STAY/CANDIDATE).
+
+슬라이스: 08a CommonCode / 08b School(검색·CRUD) / 08c xlsx import + schoolId 링크.
 
 Out of scope:
 
-- 면접/평가/메시지 신규 기능
+- 기존 enum → CommonCode 전환(0건, 카탈로그만).
+- CommonCode ↔ 백엔드 필드 validation 결합.
+- SCHOOL/CERTIFICATE funnel dimension(07c 보류, 별도 후속).
+- 외부 학교 API, 강한 FK, free-text 소급 매칭.
+- 면접/평가/메시지 신규 기능.
 
 ---
 

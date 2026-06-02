@@ -43,7 +43,17 @@ _Avoid_: PENDING(= StageResult row 존재, 결정 전 — NO_RESULT 와 구분)
 **Audit log (export)**:
 누가/언제/어떤 dataset을/어떤 필터로/몇 행을 export 했는지 기록. 현재는 SLF4J 구조적 로그로만 남기고, 영속 `ActivityLog` 도메인 생성 시 그쪽으로 이관한다.
 
+### Master data (Phase 08)
+
+**CommonCode**:
+관리자가 런타임에 관리(추가/수정/비활성)하는 **코드성 lookup master**. `groupCode + code` 로 식별하고 `displayName`(표시명)·정렬·활성 여부를 갖는다. "고정적이고 비즈니스 분기에 쓰이는 값"은 enum으로 두고, CommonCode 는 그렇지 않은(관리자가 목록을 늘릴 수 있는) 값에 쓴다. 기존 enum 을 CommonCode 로 바꾸는 것은 Phase 08 범위가 **아니다**(추가형 도입, 전환 0). 전환은 "관리자가 런타임에 값을 추가해야 한다"는 구체 요구가 생긴 group 에 한해 별도로 진행한다.
+_Avoid_: enum 과 CommonCode 를 같은 값에 동시에 두는 것(중복 진실원)
+
+**School (학교 master)**:
+지원자 학력 입력의 **자동완성/검색** 기준이자 **학교별 통계 grouping** 의 기준이 되는 master data. 외부 `schoolCode`(있으면) 또는 `(schoolName, schoolType, region)` 로 식별한다. `ApplicationEducation` 은 자유입력 `schoolName`(snapshot)을 그대로 유지하고, 지원자가 자동완성에서 고른 경우에만 optional `schoolId` 로 master 를 참조한다(직접입력=null=미매칭). master 는 강한 FK 가 아니라 application-level 참조다.
+_Avoid_: `schoolName`(지원서의 자유입력 표시값) 과 `School.schoolName`(master 정규명) 을 같은 것으로 취급
+
 ## Flagged ambiguities
 
 - **CI (`ci`/`ciHash`)**: NICE 본인확인의 연계정보. 민감 식별자이므로 **어떤 export(Excel/PDF)에도 절대 포함하지 않는다**. `password`·암호화키도 동일하게 절대 노출하지 않는다. `name`/`phoneNumber`/`email`은 admin 운영(연락·발송) 목적상 평문으로 export 하되 audit 로그를 남긴다.
-- **"학교별 통계"의 학교**: 현재 `ApplicationEducation.schoolName` 은 free-text 다. `School` master(Phase 08)가 없어 학교 grouping은 본질적으로 부정확하다 — 통계 설계 시 이 한계를 전제로 한다.
+- **"학교별 통계"의 학교**: Phase 08 의 `School` master + `ApplicationEducation.schoolId`(optional, 자동완성 선택 시에만) 로 **매칭된 학력**은 정확히 grouping 한다. 직접입력(미매칭)은 `schoolId == null` 이라 통계에서 **'기타'(미매칭)** 버킷으로 묶고, 과거 데이터의 free-text 는 소급 매칭하지 않는다(통계 설계 시 이 한계를 전제).
