@@ -27,7 +27,8 @@ import java.time.LocalDate;
         name = "application_education",
         indexes = {
                 @Index(name = "idx_application_education_application", columnList = "job_application_id"),
-                @Index(name = "idx_application_education_sort", columnList = "job_application_id,sort_order")
+                @Index(name = "idx_application_education_sort", columnList = "job_application_id,sort_order"),
+                @Index(name = "idx_application_education_school", columnList = "school_id")
         }
 )
 @Getter

@@ -62,7 +62,7 @@
   <div class="cards">
     <div class="card kpi"><div class="num">1</div><div class="lbl">신규 API</div></div>
     <div class="card kpi"><div class="num">5</div><div class="lbl">신규 클래스(main)</div></div>
-    <div class="card kpi"><div class="num">7</div><div class="lbl">신규 테스트</div></div>
+    <div class="card kpi"><div class="num">15</div><div class="lbl">신규 테스트</div></div>
     <div class="card kpi"><div class="num">0</div><div class="lbl">신규 테이블</div></div>
   </div>
 </section>
@@ -116,9 +116,22 @@
   <h2>테스트</h2>
   <div class="summary" style="border-left-color:var(--green);">
     <div><strong>명령</strong>: <span class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*School*" --tests "*ApplicationEducation*" --tests "*AdminApplicationSection*" --no-daemon</span></div>
-    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — School import 6 + School 12 + ApplicationEducation(신규 schoolId) + AdminApplicationSection 회귀 통과.</div>
+    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — School import 9 + parser unit 5 + School 12 + ApplicationEducation(신규 schoolId) + AdminApplicationSection 회귀 통과.</div>
   </div>
-  <p class="note">import: schoolCode insert+update, natural key fallback(중복 insert 안 함), blank skip+사유, 비-xlsx/wrong header 400, 인가. education: 선택 schoolId 저장/응답·직접입력 null. 회귀: education 응답에 schoolId 추가 비파괴.</p>
+  <p class="note">import: schoolCode insert+update, natural key fallback(중복 insert 안 함), blank/길이초과/formula/모호 skip+사유, 비-xlsx/wrong header/maxRows/maxFileSize 거부, 인가. education: 선택 schoolId 저장/응답·직접입력 null. 회귀: education 응답 schoolId 추가 비파괴.</p>
+</section>
+
+<section>
+  <h2>리뷰 반영 (instruction.md · 5건)</h2>
+  <table>
+    <thead><tr><th>등급</th><th>지적</th><th>반영</th></tr></thead>
+    <tbody>
+      <tr><td>Blocking</td><td>import 행 길이 미검증 → DB 예외로 전체 rollback 가능</td><td><code>validateRow</code>(필수+컬럼 길이) 로 초과 행만 skip+사유.</td></tr>
+      <tr><td>Blocking</td><td>natural key 중복 시 임의 첫 행 update(master 오염)</td><td>fallback 매칭 2건 이상이면 <code>ExistingMatch.ambiguous</code> 로 해당 행 skip.</td></tr>
+      <tr><td>Medium</td><td>import 방어 테스트 부족(formula/maxRows/maxFileSize/길이/모호)</td><td>controller 3건 + parser unit 5건 회귀 추가.</td></tr>
+      <tr><td>Medium</td><td>ApplicationEducation.schoolId 인덱스 없음</td><td><code>idx_application_education_school</code> 추가(SCHOOL 통계 기반).</td></tr>
+    </tbody>
+  </table>
 </section>
 
 <section>

@@ -123,6 +123,53 @@ class SchoolImportControllerTest {
     }
 
     @Test
+    void import_skips_field_length_overflow_rows() throws Exception {
+        String tooLongCountry = "X".repeat(20); // countryCode length 10 초과 → DB 예외 대신 행 skip
+        List<List<String>> rows = List.of(
+                HEADER,
+                List.of("SCV", "Valid University", "UNIVERSITY", "", "Seoul", "", "KR"),
+                List.of("SCB", "Bad University", "UNIVERSITY", "", "Seoul", "", tooLongCountry));
+
+        mockMvc.perform(multipart("/api/admin/schools/import")
+                        .file(new MockMultipartFile("file", "schools.xlsx", XLSX, xlsx(rows)))
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.inserted").value(1))
+                .andExpect(jsonPath("$.data.skipped").value(1))
+                .andExpect(jsonPath("$.data.errors[0].rowNumber").value(3));
+    }
+
+    @Test
+    void import_skips_formula_cell_rows() throws Exception {
+        mockMvc.perform(multipart("/api/admin/schools/import")
+                        .file(new MockMultipartFile("file", "schools.xlsx", XLSX, xlsxWithFormulaRow()))
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.inserted").value(0))
+                .andExpect(jsonPath("$.data.skipped").value(1));
+    }
+
+    @Test
+    void import_skips_ambiguous_natural_key_rows() throws Exception {
+        // schoolCode null 인 동일 (name,type,region) 학교가 2건 → fallback upsert 모호 → skip
+        schoolRepository.saveAll(List.of(
+                School.create(null, "Dup University", "UNIVERSITY", null, "Seoul", null, "KR", true),
+                School.create(null, "Dup University", "UNIVERSITY", null, "Seoul", null, "KR", true)));
+
+        List<List<String>> rows = List.of(
+                HEADER,
+                List.of("", "Dup University", "UNIVERSITY", "ONLINE", "Seoul", "addr", "KR"));
+
+        mockMvc.perform(multipart("/api/admin/schools/import")
+                        .file(new MockMultipartFile("file", "schools.xlsx", XLSX, xlsx(rows)))
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.inserted").value(0))
+                .andExpect(jsonPath("$.data.updated").value(0))
+                .andExpect(jsonPath("$.data.skipped").value(1));
+    }
+
+    @Test
     void import_rejects_non_xlsx_extension() throws Exception {
         mockMvc.perform(multipart("/api/admin/schools/import")
                         .file(new MockMultipartFile("file", "schools.xls", XLSX, xlsx(List.of(HEADER))))
@@ -169,6 +216,27 @@ class SchoolImportControllerTest {
                     cell.setCellValue(cells.get(c));
                 }
             }
+            workbook.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    private byte[] xlsxWithFormulaRow() throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("schools");
+            Row header = sheet.createRow(0);
+            for (int c = 0; c < HEADER.size(); c++) {
+                header.createCell(c, CellType.STRING).setCellValue(HEADER.get(c));
+            }
+            Row row = sheet.createRow(1);
+            row.createCell(0, CellType.STRING).setCellValue("SCF");
+            row.createCell(1, CellType.STRING).setCellValue("Formula University");
+            row.createCell(2, CellType.STRING).setCellValue("UNIVERSITY");
+            row.createCell(3, CellType.STRING).setCellValue("");
+            row.createCell(4, CellType.STRING).setCellValue("Seoul");
+            row.createCell(5, CellType.FORMULA).setCellFormula("1+1"); // address 셀이 formula → skip
+            row.createCell(6, CellType.STRING).setCellValue("KR");
             workbook.write(out);
             return out.toByteArray();
         }

@@ -16,8 +16,11 @@
   - `dto/response/EducationResponse.java`, `dto/response/AdminEducationResponse.java` (`schoolId` 추가)
   - `domain/repository/SchoolRepository.java` (`findBySchoolCode`, `findByNaturalKey` — null 필드 IS NULL 매칭)
   - `controller/AdminSchoolController.java` (`POST /admin/schools/import`)
+  - `domain/entity/ApplicationEducation.java` (리뷰: `idx_application_education_school` 인덱스)
+  - `service/SchoolImportService.java` (리뷰: 행 길이 검증 + natural key 모호성 skip)
 - Created (test):
-  - `controller/SchoolImportControllerTest.java` (6)
+  - `controller/SchoolImportControllerTest.java` (9)
+  - `service/SchoolImportParserTest.java` (5, 파일 방어 단위)
   - `service/ApplicationEducationServiceTest.java` (+1, schoolId)
 - APIs:
   - `POST /api/admin/schools/import` (admin, multipart `file`)
@@ -26,9 +29,14 @@
   - 비파괴: `ApplicationEducation.create` 오버로드 + `EducationRequest` back-compat 생성자(JSON 은 name 기반이라 schoolId optional, 기존 Java 호출부/테스트 그대로 컴파일).
   - import = 행 단위 upsert(전체 거부 아님). schoolCode 우선 + (name,type,region) fallback. 기존=update(active 보존), 신규=insert. blank schoolName/formula 셀 행 skip + 사유. 파일 방어(.xlsx/크기/행수/header)는 07d 패턴 재사용(`UploadProperties`), 파일 레벨 오류 400.
   - import preview/STALE 미도입(단일 commit + 요약). 라우팅 `/admin/schools/import` literal 우선.
+- Review 반영 (instruction.md, 5건):
+  - (Blocking) import 행 길이 미검증 → 컬럼 length 초과 행이 DB flush 시 `DataIntegrityViolationException` 으로 전체 rollback 가능 → `validateRow`(필수+길이)로 초과 행만 skip+사유.
+  - (Blocking) natural key 중복 시 임의 첫 행 update(조용한 master 오염) → fallback 매칭 2건 이상이면 `ExistingMatch.ambiguous` 로 해당 행 skip+사유.
+  - (Medium) import 방어 테스트 부족 → formula/길이/모호 skip(controller) + maxRows/maxFileSize/확장자/header(parser unit) 회귀 추가.
+  - (Medium) `ApplicationEducation.schoolId` 인덱스 없음 → `idx_application_education_school` 추가(SCHOOL funnel dimension 기반).
 - Tests:
   - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*School*" --tests "*ApplicationEducation*" --tests "*AdminApplicationSection*" --no-daemon`
-  - 결과: BUILD SUCCESSFUL — School import 6 + School 12 + ApplicationEducation(신규 schoolId) + AdminApplicationSection 회귀 통과(education 응답 schoolId 추가 비파괴).
+  - 결과: BUILD SUCCESSFUL — School import 9 + parser unit 5 + School 12 + ApplicationEducation(신규 schoolId) + AdminApplicationSection 회귀 통과(education 응답 schoolId 추가 비파괴).
 - Documentation:
   - `docs/codex/implementation/phase-08c-school-import-education-link.md`
   - `docs/codex/reports/phase-08c-school-import-education-link.html`
