@@ -12,7 +12,7 @@
   - `domain/repository/ApplicationEducationRepository.java` (`findFunnelSchoolEducations`)
   - `enumeration/FunnelDimension.java`, `controller/AdminStatisticsController.java` (javadoc 갱신)
 - Modified (test):
-  - `controller/AdminStatisticsControllerTest.java` (unsupported dimension을 `CERTIFICATE`로 변경, SCHOOL 2건 추가)
+  - `controller/AdminStatisticsControllerTest.java` (unsupported dimension을 `CERTIFICATE`로 변경, SCHOOL 5건 추가)
 - APIs:
   - `GET /api/admin/job-postings/{jobPostingId}/statistics/funnel?dimension=SCHOOL&topN=` (admin)
 - Key decisions:
@@ -21,13 +21,17 @@
   - 그룹별 funnel은 기존 `computeCohort` 재사용, 응답은 기존 `DimensionFunnelResponse(groupId, groupName, …)` 재사용(기타=null/"기타"). 학교명은 `SchoolRepository.findAllById`.
   - `CERTIFICATE`는 master 부재로 미지원(400) 유지. statistics audit 없음(07c 정책).
   - topN은 SCHOOL에서만 적용(POSITION 무시).
+- Review 반영 (instruction.md, 3건):
+  - (Medium) dangling schoolId(School 미존재)가 groupName=null 로 새던 문제 → 후보 schoolId 선조회로 **실재 학교만 개별 그룹**, dangling은 미매칭과 함께 '기타'로 합산(개별 그룹 groupName non-null 보장).
+  - (Low) 같은 EducationLevel tie-break 테스트(UNIVERSITY 2개 null+Alpha → Alpha 그룹핑).
+  - (Low) topN clamp 테스트(topN=0 → `limit(0)` 아니라 기본 10 동작, 폴딩 안 함).
 - Tests:
   - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*AdminStatisticsControllerTest" --no-daemon`
-  - 결과: BUILD SUCCESSFUL — 기존 funnel 회귀 + SCHOOL 2건(최종학력 1교 매칭/미매칭='기타', topN=1 합산) 통과. 통계 테스트는 엔티티 직접 영속화로 클럭 의존 없이 안정적.
+  - 결과: BUILD SUCCESSFUL — 기존 funnel 회귀 + SCHOOL 5건(최종학력 1교 매칭/미매칭='기타'/topN=1 합산 + tie-break/topN=0 clamp/dangling='기타') 통과. 통계 테스트는 엔티티 직접 영속화로 클럭 의존 없이 안정적.
 - Documentation:
   - `docs/codex/implementation/phase-08d-school-funnel-dimension.md`
   - `docs/codex/reports/phase-08d-school-funnel-dimension.html`
-- Known limitations: 최종학력이 free-text면 '기타'(설계 정의), dangling schoolId면 groupName null 가능, 대형 공고 GROUP BY 전환(후속), CERTIFICATE 미지원.
+- Known limitations: 최종학력이 free-text면 '기타'(설계 정의), dangling schoolId는 '기타'로 합산(처리됨), 대형 공고 GROUP BY 전환(후속), CERTIFICATE 미지원.
 - Next recommended: (선택) CERTIFICATE dimension(자격명 정규화 후) 또는 메시지 발송, 개인정보 파기/감사.
 
 ## Phase 08c - School xlsx import + ApplicationEducation.schoolId 링크

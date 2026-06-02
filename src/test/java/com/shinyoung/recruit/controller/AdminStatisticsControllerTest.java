@@ -348,6 +348,59 @@ class AdminStatisticsControllerTest {
     }
 
     @Test
+    void school_dimension_tie_break_prefers_education_with_school_id_at_same_level() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        JobPosition backend = position(jobPosting, "Backend");
+        saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
+        School alpha = saveSchool("Alpha University");
+
+        JobApplication app = submittedApplication(jobPosting, backend, "A1");
+        education(app, EducationLevel.UNIVERSITY, null, 0);          // 같은 레벨, schoolId 없음
+        education(app, EducationLevel.UNIVERSITY, alpha.getId(), 1); // 같은 레벨, schoolId=Alpha → 우선
+
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), "SCHOOL", null);
+
+        assertThat(funnel.dimensions()).hasSize(1);
+        assertThat(group(funnel, "Alpha University").population().p()).isEqualTo(1); // 기타 아님
+    }
+
+    @Test
+    void school_dimension_topN_zero_uses_default_and_does_not_fold() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        JobPosition backend = position(jobPosting, "Backend");
+        saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
+        School alpha = saveSchool("Alpha University");
+        School beta = saveSchool("Beta University");
+
+        education(submittedApplication(jobPosting, backend, "A1"), EducationLevel.UNIVERSITY, alpha.getId(), 0);
+        education(submittedApplication(jobPosting, backend, "A2"), EducationLevel.UNIVERSITY, beta.getId(), 0);
+
+        // topN=0 → limit(0)이 아니라 기본 10으로 clamp → 두 학교 모두 개별 노출, '기타' 없음.
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), "SCHOOL", 0);
+
+        assertThat(funnel.dimensions()).hasSize(2);
+        assertThat(group(funnel, "Alpha University").population().p()).isEqualTo(1);
+        assertThat(group(funnel, "Beta University").population().p()).isEqualTo(1);
+    }
+
+    @Test
+    void school_dimension_dangling_school_id_folds_into_other() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        JobPosition backend = position(jobPosting, "Backend");
+        saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
+
+        // School 테이블에 없는 schoolId(dangling) → 개별 그룹이 아니라 '기타'로 합산되어야 한다.
+        education(submittedApplication(jobPosting, backend, "A1"), EducationLevel.UNIVERSITY, 999999L, 0);
+
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), "SCHOOL", null);
+
+        assertThat(funnel.dimensions()).hasSize(1);
+        assertThat(group(funnel, "기타").population().p()).isEqualTo(1);
+        assertThat(funnel.dimensions()).allSatisfy(g -> assertThat(g.groupName()).isNotNull());
+        assertThat(funnel.dimensions()).noneSatisfy(g -> assertThat(g.groupId()).isEqualTo(999999L));
+    }
+
+    @Test
     void unknown_job_posting_returns_not_found() throws Exception {
         mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/statistics/funnel", 999999L)
                         .with(authentication(adminAuthentication())))

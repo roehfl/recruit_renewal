@@ -62,7 +62,7 @@
   <div class="cards">
     <div class="card kpi"><div class="num">1</div><div class="lbl">활성화 dimension</div></div>
     <div class="card kpi"><div class="num">1</div><div class="lbl">신규 클래스(main)</div></div>
-    <div class="card kpi"><div class="num">2</div><div class="lbl">신규 테스트</div></div>
+    <div class="card kpi"><div class="num">5</div><div class="lbl">신규 테스트</div></div>
     <div class="card kpi"><div class="num">0</div><div class="lbl">신규 테이블</div></div>
   </div>
 </section>
@@ -73,9 +73,9 @@
     <thead><tr><th>항목</th><th>규칙</th></tr></thead>
     <tbody>
       <tr><td>학교 산정</td><td>지원자 최종학력(가장 높은 <code>EducationLevel</code>) 1교의 schoolId. 동률이면 schoolId 보유 쪽 우선.</td></tr>
-      <tr><td>미매칭</td><td>최종학력에 schoolId 없음 또는 학력 없음 → '기타'.</td></tr>
+      <tr><td>미매칭</td><td>최종학력에 schoolId 없음/학력 없음, 또는 <strong>dangling schoolId(School 미존재, 리뷰)</strong> → '기타'. 개별 그룹 groupName 은 항상 non-null.</td></tr>
       <tr><td>distinct</td><td>application 단위(한 지원자는 정확히 한 그룹).</td></tr>
-      <tr><td>topN</td><td>인원 desc·schoolId asc 정렬, 기본 10(최대 100) 개별. 초과 학교 + 미매칭 = '기타' 1그룹.</td></tr>
+      <tr><td>topN</td><td>인원 desc·schoolId asc 정렬, 기본 10(최대 100, 0/null→10) 개별. 초과 학교 + 미매칭 + dangling = '기타' 1그룹.</td></tr>
       <tr><td>응답</td><td>기존 <code>DimensionFunnelResponse(groupId, groupName, …)</code> 재사용. SCHOOL=schoolId/schoolName, 기타=null/"기타".</td></tr>
       <tr><td>audit</td><td>없음(집계값만).</td></tr>
     </tbody>
@@ -97,9 +97,21 @@
   <h2>테스트</h2>
   <div class="summary" style="border-left-color:var(--green);">
     <div><strong>명령</strong>: <span class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*AdminStatisticsControllerTest" --no-daemon</span></div>
-    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — 기존 + SCHOOL 2건 통과.</div>
+    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — 기존 + SCHOOL 5건 통과.</div>
   </div>
-  <p class="note">최종학력 1교 매칭(고졸+대학→대학)/학교별 population·funnelPassedCount/미매칭='기타', topN=1 합산. unsupported는 CERTIFICATE로 변경. overall/POSITION 회귀 비파괴.</p>
+  <p class="note">최종학력 1교 매칭/학교별 population·funnelPassedCount/미매칭='기타'/topN=1 합산 + (리뷰) 같은레벨 tie-break/topN=0 clamp/dangling='기타'(groupName non-null). unsupported는 CERTIFICATE로 변경. overall/POSITION 회귀 비파괴.</p>
+</section>
+
+<section>
+  <h2>리뷰 반영 (instruction.md · 3건)</h2>
+  <table>
+    <thead><tr><th>등급</th><th>지적</th><th>반영</th></tr></thead>
+    <tbody>
+      <tr><td>Medium</td><td>dangling schoolId → groupName=null 로 새어나감</td><td>후보 schoolId 선조회로 실재 학교만 개별 그룹, dangling은 '기타'로 합산(groupName non-null 보장).</td></tr>
+      <tr><td>Low</td><td>같은 EducationLevel tie-break 미검증</td><td>UNIVERSITY 2개(null+Alpha) → Alpha 그룹핑 테스트 추가.</td></tr>
+      <tr><td>Low</td><td>topN clamp 경계 미검증</td><td>topN=0 → 기본 10 동작(폴딩 안 함) 테스트 추가.</td></tr>
+    </tbody>
+  </table>
 </section>
 
 <section>
@@ -107,7 +119,7 @@
   <div class="cards">
     <div class="card">
       <h3><span class="badge warn">open</span> 한계</h3>
-      <ul><li>최종학력이 free-text면 하위 매칭 있어도 '기타', dangling schoolId면 groupName null 가능, 대형 공고 GROUP BY 전환(후속).</li></ul>
+      <ul><li>최종학력이 free-text면 하위 매칭 있어도 '기타'(설계 정의), dangling schoolId는 '기타'로 합산(처리됨), 대형 공고 GROUP BY 전환(후속).</li></ul>
     </div>
     <div class="card">
       <h3><span class="badge oos">미지원</span> CERTIFICATE</h3>

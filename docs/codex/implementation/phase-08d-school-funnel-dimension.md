@@ -11,8 +11,8 @@
 
 - `GET /api/admin/job-postings/{jobPostingId}/statistics/funnel?dimension=SCHOOL&topN=` 활성화(기존 엔드포인트 확장).
 - 지원자별 **최종학력(가장 높은 `EducationLevel`) 1교**의 `schoolId`로 코호트 P를 분할(application 단위 distinct).
-- 미매칭(최종학력에 `schoolId` 없음 또는 학력 없음) + topN 초과 학교 → **'기타'** 한 그룹으로 합산.
-- 학교 그룹 정렬: 인원 desc, `schoolId` asc. topN 기본 10(최대 100). 그룹별 funnel은 기존 `computeCohort` 재사용.
+- 미매칭(최종학력에 `schoolId` 없음/학력 없음), **dangling schoolId(School 미존재, 리뷰)**, topN 초과 학교 → **'기타'** 한 그룹으로 합산. 개별 그룹은 항상 실재 학교라 groupName 이 null 이 되지 않는다.
+- 학교 그룹 정렬: 인원 desc, `schoolId` asc. topN 기본 10(최대 100, `0/null`→기본 10). 그룹별 funnel은 기존 `computeCohort` 재사용.
 - `CERTIFICATE`는 master 부재로 여전히 미지원(400).
 
 ## 3. Out of scope
@@ -37,7 +37,7 @@
 ## 5. 클래스별 설명
 
 - `FunnelStatisticsService`(수정):
-  - `computeSchoolDimension`: schoolId로 코호트 분할 → 인원 desc·id asc 정렬 → topN 개별 + (초과 학교 + 미매칭)='기타'. 학교명은 `SchoolRepository.findAllById`.
+  - `computeSchoolDimension`: 후보 schoolId를 `SchoolRepository.findAllById`로 선조회해 **실재 학교만 그룹 키로** 쓰고(dangling/미매칭은 '기타'), 인원 desc·id asc 정렬 → topN 개별 + (초과 학교 + 미매칭 + dangling)='기타'.
   - `finalSchoolByApplication`: `findFunnelSchoolEducations` 결과를 지원자별로 reduce해 최종학력 1교 schoolId 산출.
   - `pickFinalEducation`: 더 높은 `EducationLevel.ordinal()` 우선, 동률이면 schoolId 보유 쪽 우선.
 - `FunnelSchoolEducationRow`(Response/projection DTO): 집계 입력.
@@ -59,33 +59,41 @@
 ## 8. 비즈니스 규칙
 
 - 학교 = 지원자 최종학력(최고 `EducationLevel`) 1교. 그 학력의 schoolId가 null이면 미매칭='기타'.
+- **dangling schoolId(School 미존재)는 '기타'로 합산**(리뷰) — 개별 그룹 groupName 은 항상 non-null.
 - application 단위 distinct(한 지원자는 정확히 한 그룹).
-- topN(기본 10, 최대 100) 학교만 개별, 초과 학교 + 미매칭은 '기타' 합산.
+- topN(기본 10, 최대 100; `0/null`→10) 학교만 개별, 초과 학교 + 미매칭 + dangling은 '기타' 합산.
 - 그룹 정렬: 인원 desc, schoolId asc. '기타'는 항상 마지막.
 - 집계값만(개인정보 없음), audit 없음.
 
 ## 9. 테스트 커버리지
 
-- `AdminStatisticsControllerTest` (SCHOOL +2):
+- `AdminStatisticsControllerTest` (SCHOOL +5):
   - 최종학력 1교 매칭(고졸+대학 → 대학), 학교별 그룹 population/funnelPassedCount, 미매칭(직접입력 + 학력없음)='기타' p=2.
   - topN=1 → 인원 최다 학교만 개별, 초과 학교 + 미매칭이 '기타'로 합산.
+  - **같은 레벨 tie-break**(UNIVERSITY 2개 중 schoolId 보유 쪽 그룹핑), **topN=0 → 기본 10 clamp(폴딩 안 함)**, **dangling schoolId='기타'(groupName non-null)** (리뷰).
   - 기존 `unsupported_dimension_returns_bad_request`를 `CERTIFICATE`로 변경(SCHOOL 지원 반영).
 - 회귀: overall/POSITION/분포/비율/인가 등 기존 funnel 테스트 비파괴.
 
 ## 10. 테스트 결과
 
 - 명령: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*AdminStatisticsControllerTest" --no-daemon`
-- 결과: BUILD SUCCESSFUL — 기존 + SCHOOL 2건 전부 통과.
+- 결과: BUILD SUCCESSFUL — 기존 + SCHOOL 5건 전부 통과.
 - 비고: 통계 테스트는 엔티티를 repository로 직접 영속화해 클럭 의존(접수기간) 없이 안정적.
 
-## 11. Known limitations
+## 11. 리뷰 반영 (instruction.md, 3건)
+
+- **(Medium) dangling schoolId 처리** — School 테이블에 없는 schoolId는 groupName=null 로 새어나갈 수 있었음. 후보 schoolId를 선조회해 **실재 학교만 개별 그룹**으로 쓰고, dangling은 미매칭과 함께 '기타'로 합산(개별 그룹 groupName non-null 보장).
+- **(Low) 같은 EducationLevel tie-break 테스트** — UNIVERSITY 2개(null + Alpha)에서 schoolId 보유 쪽으로 그룹핑됨을 직접 검증.
+- **(Low) topN clamp 테스트** — topN=0 → `limit(0)`이 아니라 기본 10 으로 동작(두 학교 모두 개별, 폴딩 안 함)을 검증.
+
+## 12. Known limitations
 
 - "최종학력 1교"는 최고 레벨 학력의 schoolId만 사용 — 그 학력이 free-text면 하위 레벨에 매칭 학교가 있어도 '기타'(설계 정의).
-- schoolId 존재 검증 없음(08c) → dangling schoolId면 groupId는 있으나 groupName이 null일 수 있음.
-- 학교별 통계는 in-memory 집계(공고 단위, bounded). 대형 공고는 07f/후속에서 GROUP BY 전환 검토.
+- schoolId 존재 검증 없음(08c)이나, 통계에서는 dangling schoolId를 '기타'로 합산해 groupName null 을 방지.
+- 학교별 통계는 in-memory 집계(공고 단위, bounded). 대형 공고는 후속에서 GROUP BY 전환 검토.
 - CERTIFICATE는 미지원 유지.
 
-## 12. Next phase considerations
+## 13. Next phase considerations
 
 - (선택) CERTIFICATE dimension(자격명 정규화/master 후), 대형 공고 GROUP BY 전환.
 - 메시지 발송, 개인정보 파기/감사(영속 ActivityLog).

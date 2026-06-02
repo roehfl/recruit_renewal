@@ -118,8 +118,9 @@ public class FunnelStatisticsService {
 
     /**
      * 학교별 dimension: 지원자별 "최종학력(가장 높은 EducationLevel) 1교"의 {@code schoolId}로 코호트를 분할한다.
-     * 미매칭(최종학력에 schoolId 없음 또는 학력 없음)은 '기타'로 모으고, 학교 그룹은 인원 desc·schoolId asc로 정렬해
-     * topN(기본 10)만 개별 노출하며, 초과 학교 + 미매칭은 '기타' 한 그룹으로 합산한다(application 단위 distinct).
+     * 미매칭(최종학력에 schoolId 없음/학력 없음) 및 dangling schoolId(School 테이블에 없음)는 '기타'로 모으고,
+     * 학교 그룹은 인원 desc·schoolId asc로 정렬해 topN(기본 10)만 개별 노출하며, 초과 학교 + 미매칭은 '기타' 한
+     * 그룹으로 합산한다(application 단위 distinct). 개별 그룹은 항상 실재 학교라 groupName 이 null 이 되지 않는다.
      */
     private List<DimensionFunnelResponse> computeSchoolDimension(
             List<Stage> stages,
@@ -130,12 +131,21 @@ public class FunnelStatisticsService {
     ) {
         Map<Long, Long> schoolByApplication = finalSchoolByApplication(jobPostingId);
 
+        // 실재 School 만 그룹 키로 사용한다. dangling schoolId(삭제/오타 등 School 미존재)는 '기타'로 합산한다.
+        Set<Long> candidateSchoolIds = schoolByApplication.values().stream()
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, String> nameById = candidateSchoolIds.isEmpty()
+                ? Map.of()
+                : schoolRepository.findAllById(candidateSchoolIds).stream()
+                        .collect(Collectors.toMap(School::getId, School::getSchoolName));
+
         Map<Long, List<FunnelCohortRow>> bySchool = new LinkedHashMap<>();
         List<FunnelCohortRow> unmatched = new ArrayList<>();
         for (FunnelCohortRow row : cohort) {
             Long schoolId = schoolByApplication.get(row.applicationId());
-            if (schoolId == null) {
-                unmatched.add(row);
+            if (schoolId == null || !nameById.containsKey(schoolId)) {
+                unmatched.add(row); // 미매칭 또는 dangling → 기타
             } else {
                 bySchool.computeIfAbsent(schoolId, key -> new ArrayList<>()).add(row);
             }
@@ -151,12 +161,6 @@ public class FunnelStatisticsService {
         int limit = (topN == null || topN <= 0) ? DEFAULT_SCHOOL_TOP_N : Math.min(topN, MAX_SCHOOL_TOP_N);
         List<Map.Entry<Long, List<FunnelCohortRow>>> top = ranked.stream().limit(limit).toList();
         List<Map.Entry<Long, List<FunnelCohortRow>>> overflow = ranked.stream().skip(limit).toList();
-
-        List<Long> topIds = top.stream().map(Map.Entry::getKey).toList();
-        Map<Long, String> nameById = topIds.isEmpty()
-                ? Map.of()
-                : schoolRepository.findAllById(topIds).stream()
-                        .collect(Collectors.toMap(School::getId, School::getSchoolName));
 
         List<DimensionFunnelResponse> dimensions = new ArrayList<>();
         for (Map.Entry<Long, List<FunnelCohortRow>> entry : top) {
