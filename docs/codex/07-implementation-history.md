@@ -1,5 +1,40 @@
 # 07. Implementation History
 
+## Phase 08b - School (검색/자동완성 + admin CRUD)
+
+- Date: 2026-06-02
+- Work type: implementation (Phase 08 두 번째 슬라이스). 설계 §6 기준.
+- Goal: 학교 master(`School`) 추가형 도입 — public 자동완성/검색 + admin CRUD. import/링크는 08c.
+- Created (main):
+  - `domain/entity/School.java`, `domain/repository/SchoolRepository.java`
+  - `exception/SchoolNotFoundException.java`, `exception/InvalidSchoolException.java`
+  - `dto/request/SchoolCreateRequest.java`, `dto/request/SchoolUpdateRequest.java`
+  - `dto/response/SchoolResponse.java`(admin 전체), `dto/response/SchoolSearchResponse.java`(public 경량)
+  - `service/SchoolService.java`
+  - `controller/SchoolSearchController.java`(public), `controller/AdminSchoolController.java`(admin)
+- Modified (main):
+  - `exception/GlobalExceptionHandler.java` (`SchoolNotFoundException` 404, `InvalidSchoolException` 400)
+- Created (test):
+  - `controller/SchoolControllerTest.java` (10)
+- APIs:
+  - `GET /api/schools?q=&schoolType=` (permitAll, 활성 prefix 우선+contains, top-N 20)
+  - `GET /api/admin/schools?q=&schoolType=&page=&size=` (admin, 비활성 포함 페이지)
+  - `POST /api/admin/schools` / `POST /api/admin/schools/{id}` (admin; 수정 POST 컨벤션)
+- Key decisions:
+  - `School` = `schoolCode`(nullable unique, 불변)+`schoolName`+`schoolType`+`educationMode`+`region`+`address`+`countryCode`+`active`. 강한 FK 없음.
+  - public 검색은 활성만, prefix 일치 우선 정렬 후 name asc, top-N(20), blank q → 빈 목록(전건 매칭 방지). 응답 경량(id/name/type/region).
+  - `schoolCode` 식별 키 불변(수정 요청 미포함), soft delete(`active=false`). 중복 schoolCode → 선검사 + `saveAndFlush` DataIntegrityViolation→400(08a 패턴 상속).
+  - `schoolType`/`educationMode` 는 코드 문자열(표시는 프론트 CommonCode group), 백엔드 validation 미결합(설계 Q3 일관).
+  - 보안은 `anyRequest().permitAll()`/`/api/admin/**` 자동 → SecurityConfig 변경 없음. 스키마 `ddl-auto`(update) 자동 생성.
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*SchoolControllerTest" --no-daemon`
+  - 결과: BUILD SUCCESSFUL — 10건. 검색 prefix 우선/활성/타입 필터/blank q, create+중복 400/다중 null 코드/blank name 400, update+soft delete(검색 제외/schoolCode 유지), 404, admin 목록 비활성 포함(paged), 인가(403/401).
+- Documentation:
+  - `docs/codex/implementation/phase-08b-school.md`
+  - `docs/codex/reports/phase-08b-school.html`
+- Known limitations: (name,type,region) fallback 멱등은 08c(import), 검색 LIKE 특수문자 미이스케이프(경미), schoolId 미연결(08c).
+- Next recommended: Phase 08c - School xlsx import(upsert) + `ApplicationEducation.schoolId` 링크.
+
 ## Phase 08a - CommonCode
 
 - Date: 2026-06-02
