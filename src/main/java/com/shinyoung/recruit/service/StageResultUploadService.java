@@ -15,6 +15,9 @@ import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageResultUploadCommitOutcome;
 import com.shinyoung.recruit.enumeration.StageResultUploadRowStatus;
 import com.shinyoung.recruit.exception.StageNotFoundException;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +26,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -76,13 +81,25 @@ public class StageResultUploadService {
     private final StageResultService stageResultService;
     private final ExcelExportService excelExportService;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     public ExcelExportFile generateTemplate(Long stageId) {
         requireStage(stageId);
+        // 동시성 토큰을 service의 formatToken과 동일 규칙으로 만들기 위해 여기서 직접 매핑한다(단일 소스).
         List<StageResultUploadTemplateRow> rows = stageResultRepository.findByStageIdForAdminList(stageId).stream()
-                .map(StageResultUploadTemplateRow::from)
+                .map(result -> new StageResultUploadTemplateRow(
+                        String.valueOf(result.getId()),
+                        String.valueOf(result.getJobApplication().getId()),
+                        result.getJobApplication().getApplicantNameSnapshot(),
+                        formatToken(result.getUpdatedAt()),
+                        result.getResultStatus() == null ? "" : result.getResultStatus().name(),
+                        result.getScore() == null ? "" : result.getScore().toPlainString(),
+                        result.getComment() == null ? "" : result.getComment()))
                 .toList();
+        // round-trip 소스이므로 formula-escape를 끈다(comment 등 값을 변형하지 않는다).
         return excelExportService.generate(
-                TEMPLATE_SPEC, rows, "stage-result-upload-template-stage-" + stageId + ".xlsx");
+                TEMPLATE_SPEC, rows, "stage-result-upload-template-stage-" + stageId + ".xlsx", false);
     }
 
     public StageResultUploadPreviewResponse preview(Long stageId, MultipartFile file) {
@@ -100,24 +117,44 @@ public class StageResultUploadService {
     @Transactional
     public StageResultUploadCommitResponse commit(Long stageId, MultipartFile file, String actor) {
         requireStage(stageId);
+        // 변경 행이 0건이어도 actor 필수 + Stage IN_PROGRESS guard를 먼저 강제한다(bulkUpdateResults 우회 방지).
+        stageResultService.validateBulkUpdatable(stageId, actor);
+
         List<StageResultUploadRowRequest> rows = parser.parse(file);
         Map<Long, StageResult> resultMap = loadResultMap(stageId);
         Set<Long> duplicateIds = duplicateStageResultIds(rows);
 
+        // 1차 검증: 형식/허용값/교차검증 + 변경/미변경 분류(STALE은 미판정).
+        List<ValidatedUploadRow> firstPass = rows.stream()
+                .map(row -> validate(row, resultMap, duplicateIds, false))
+                .toList();
+        if (firstPass.stream().anyMatch(v -> v.result().status() == StageResultUploadRowStatus.ERROR)) {
+            return StageResultUploadCommitResponse.rejected(
+                    stageId, StageResultUploadCommitOutcome.REJECTED_VALIDATION,
+                    firstPass.stream().map(ValidatedUploadRow::result).toList());
+        }
+
+        // 변경 대상 행만 비관적 쓰기 잠금 + DB 최신값으로 refresh한다. 잠금 후 최신 updatedAt 기준으로 토큰을
+        // 재비교하므로, 다른 관리자가 동시에 commit해도 lost update(앞선 변경 덮어쓰기)를 막는다. 잠금 순서는
+        // id 오름차순으로 고정해 deadlock을 피한다.
+        firstPass.stream()
+                .filter(v -> v.result().status() == StageResultUploadRowStatus.CHANGED)
+                .map(v -> resultMap.get(v.result().stageResultId()))
+                .sorted(Comparator.comparing(StageResult::getId))
+                .forEach(entity -> entityManager.refresh(entity, LockModeType.PESSIMISTIC_WRITE));
+
+        // 2차 검증: 잠금/refresh 후 최신값 기준으로 STALE까지 판정한다.
         List<ValidatedUploadRow> validated = rows.stream()
                 .map(row -> validate(row, resultMap, duplicateIds, true))
                 .toList();
         List<StageResultUploadRowResult> results = validated.stream()
                 .map(ValidatedUploadRow::result)
                 .toList();
-
-        boolean hasError = results.stream().anyMatch(r -> r.status() == StageResultUploadRowStatus.ERROR);
-        if (hasError) {
+        if (results.stream().anyMatch(r -> r.status() == StageResultUploadRowStatus.ERROR)) {
             return StageResultUploadCommitResponse.rejected(
                     stageId, StageResultUploadCommitOutcome.REJECTED_VALIDATION, results);
         }
-        boolean hasStale = results.stream().anyMatch(r -> r.status() == StageResultUploadRowStatus.STALE);
-        if (hasStale) {
+        if (results.stream().anyMatch(r -> r.status() == StageResultUploadRowStatus.STALE)) {
             return StageResultUploadCommitResponse.rejected(
                     stageId, StageResultUploadCommitOutcome.REJECTED_STALE, results);
         }
@@ -283,7 +320,8 @@ public class StageResultUploadService {
     }
 
     private static String formatToken(LocalDateTime updatedAt) {
-        return updatedAt == null ? "" : TOKEN_FORMAT.format(updatedAt);
+        // DB precision(보통 microseconds)과 in-memory(nanoseconds) 차이로 토큰이 어긋나지 않도록 micro로 normalize한다.
+        return updatedAt == null ? "" : TOKEN_FORMAT.format(updatedAt.truncatedTo(ChronoUnit.MICROS));
     }
 
     private static Long parseLong(String raw) {

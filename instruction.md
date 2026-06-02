@@ -1,189 +1,68 @@
-Medium 1 — POSITION dimension 정렬/라벨 기준이 애매함
+1. High — stageResultUpdatedAt 동시성 토큰이 lost update를 완전히 막지 못한다
 
-현재 POSITION dimension은 다음처럼 grouping합니다.
+설계는 commit 직전 검증에서 stageResultUpdatedAt을 비교해 lost update를 막는다고 정의한다.
+그런데 실제 구현은 DB 조건부 update가 아니라, 메모리에서 currentToken.equals(rowToken)만 비교한다.
 
-Map<Long, List<FunnelCohortRow>> byPosition = cohort.stream()
-        .collect(Collectors.groupingBy(FunnelCohortRow::jobPositionId, LinkedHashMap::new, Collectors.toList()));
+문제는 그 다음 실제 변경이 bulkUpdateResults()로 넘어가면서 단순히 stageId + id in으로 다시 조회한 뒤 엔티티 필드만 변경한다는 점이다. updatedAt 조건이 WHERE에 들어가지 않고, update count 검증도 없고, @Version도 없다.
 
-return byPosition.entrySet().stream()
-        .sorted(Map.Entry.comparingByKey())
+즉 이런 레이스가 가능하다.
 
-그리고 groupName은 group.get(0).jobPositionName()입니다. 그런데 FunnelCohortRow의 jobPositionName은 현재 application.jobPositionNameSnapshot입니다.
+관리자 A, B가 같은 템플릿을 받음.
+A commit, B commit이 거의 동시에 들어옴.
+둘 다 같은 구버전 token을 읽고 stale check 통과.
+A가 먼저 update.
+B가 나중에 update하면서 A 변경을 덮어씀.
 
-문제는 두 가지입니다.
+이건 Phase 7d의 핵심 보장인 “낙관적 동시성”이 깨진다.
 
-1. 정렬이 JobPosition.sortOrder가 아니라 jobPositionId 기준이다.
-2. 그룹 기준은 FK인데, 표시명은 application snapshot의 첫 번째 값이다.
+수정 방향은 둘 중 하나다.
 
-현실적으로 대부분 문제 없겠지만, 운영 화면의 “분야별 통계”라면 보통 공고에 등록된 모집분야 순서(sortOrder)대로 보여주는 게 맞습니다.
+1안: StageResult에 @Version 컬럼을 추가하고 OptimisticLockException을 409로 매핑한다.
+2안: migration 없이 가려면 commit 시 변경 대상 StageResult를 PESSIMISTIC_WRITE로 잠근 뒤, lock 획득 후 DB 최신 updatedAt 기준으로 다시 token 비교한다.
 
-권고:
+단순히 지금처럼 조회 후 비교만 하는 방식은 부족하다.
 
-FunnelCohortRow에 jobPositionSortOrder와 현재 jobPosition.positionName을 추가하는 편이 낫습니다.
+2. High — upload-template이 기존 comment 값을 변형해서 no-op 업로드가 데이터 변경으로 오판될 수 있다
 
-select new FunnelCohortRow(
-    application.id,
-    application.status,
-    application.jobPosition.id,
-    application.jobPosition.positionName,
-    application.jobPosition.sortOrder
-)
+upload-template은 현재 StageResult.comment를 그대로 row 값으로 넣는다.
+그런데 실제 xlsx writer는 모든 문자열에 대해 formula injection 방어를 하면서 =, +, -, @, 탭, 줄바꿈으로 시작하는 값 앞에 apostrophe를 붙인다.
 
-그리고 dimension 그룹은 다음 기준으로 정렬하세요.
+이건 일반 export에서는 괜찮다. 하지만 upload-template은 round-trip source라서 문제가 된다.
 
-.sorted(
-    Comparator
-        .comparing((PositionGroup group) -> group.sortOrder())
-        .thenComparing(PositionGroup::groupId)
-)
+예를 들어 기존 comment가 아래처럼 저장되어 있다고 하자.
 
-만약 snapshot 표시명을 의도적으로 쓰려는 거라면 문서에 명확히 남겨야 합니다.
+- 보류 사유 확인 필요
 
-POSITION dimension의 groupName은 현재 JobPosition명이 아니라 지원 당시 snapshot명을 사용한다.
+템플릿 다운로드 시 writer가 이 값을 아래처럼 바꿀 수 있다.
 
-내 판단은 현재 JobPosition명 + sortOrder 정렬이 더 맞습니다.
+'- 보류 사유 확인 필요
 
-Medium 2 — “raw passed와 sequential passed가 달라지는 케이스” 테스트가 없음
+그 파일을 그대로 다시 업로드하면 서비스는 현재 DB comment와 업로드 comment를 직접 비교한다.
+결과적으로 사용자가 아무것도 바꾸지 않았는데도 CHANGED로 판정되고, commit 시 comment 앞에 '가 붙은 값으로 오염될 수 있다.
 
-07c 설계의 핵심은 이겁니다.
+이건 실제 운영에서 충분히 터진다. comment가 -, @, +, 줄바꿈으로 시작하는 케이스는 흔하다.
 
-raw distribution.passed != funnelPassedCount 일 수 있다.
-비율은 raw passed가 아니라 funnelPassedCount 기준이다.
+수정 방향:
 
-그런데 현재 테스트는 stage2에서 distribution.passed == funnelPassedCount == 1인 케이스만 검증합니다.
+upload-template에는 일반 ExcelExportWriter를 그대로 쓰지 말 것.
+round-trip용 writer를 분리하거나, parser에서 export sanitizer가 붙인 leading apostrophe를 안전하게 역정규화해야 한다.
+단, 사용자가 실제로 apostrophe로 시작하는 값을 입력한 경우와 구분해야 하므로 단순 replace는 위험하다.
+가장 안전한 방향은 upload-template writer를 별도로 두고, xlsx string cell만 사용하며 값을 변형하지 않는 것이다.
+3. Medium — 변경 행이 0건이면 Stage IN_PROGRESS guard와 actor 검증을 우회한다
 
-반드시 아래 케이스를 추가해야 합니다.
+설계는 commit 선행 검증에 Stage IN_PROGRESS guard와 actor 필수 검증이 포함된다고 되어 있다.
+하지만 현재 upload commit은 CHANGED 행만 bulkUpdateResults()로 위임하고, 변경 행이 없으면 아예 호출하지 않는다.
 
-P = app1, app2, app3
+문제는 StageResultService의 actor/stage guard가 bulkUpdateResults() 내부에 있다는 점이다.
+따라서 전부 UNCHANGED인 파일이나 header-only 파일은 stage가 CLOSED여도 APPLIED로 떨어질 수 있다.
 
-stage1:
-- app1 PASSED
-- app2 FAILED
-- app3 NO_RESULT
+데이터 변경은 없으니 치명적 오염은 아니지만, commit API 의미가 설계와 다르고 audit에도 성공처럼 남을 수 있다. 수정하려면 upload service에서 bulkUpdateResults() 호출 여부와 무관하게 actor/stage editable 검증을 먼저 수행해야 한다.
 
-stage2:
-- app1 PASSED
-- app2 PASSED  // 비정상/보정 데이터: 이전 단계 FAILED인데 후속 PASSED
-- app3 PASSED  // 이전 단계 NO_RESULT인데 후속 PASSED
+4. Low — token cell “문자열 강제”가 문서보다 느슨하다
 
-기대값:
-stage2.distribution.passed = 3
-stage2.funnelPassedCount = 1
-stage2.stepConversionRate = 1 / 1 = 1.0
-stage2.cumulativeRate = 1 / 3
+설계는 stageResultUpdatedAt이 Excel string cell이어야 하고, date/numeric/formula이면 row error라고 정의한다.
+그런데 parser는 token column이 NUMERIC일 때만 tokenNotString = true로 처리한다.
 
-이 테스트가 없으면 07c의 가장 중요한 설계 보정이 회귀로 깨져도 못 잡습니다.
+BOOLEAN, BLANK, 기타 타입은 명시적 “non-string token” 오류가 아니다. 특히 unchanged row는 stale check 대상에서도 제외되므로, token cell 타입 검증이 흐려진다. 설계대로 가려면 token column은 STRING 또는 blank 정책을 명확히 하고, 그 외 타입은 전부 row error로 처리하는 게 맞다.
 
-Medium 3 — PENDING / ABSENT / HOLD bucket 테스트가 빠져 있음
-
-구현은 switch로 모든 StageResultStatus를 처리하고 있어서 코드 자체는 맞습니다.
-
-case PASSED -> passed++;
-case FAILED -> failed++;
-case ABSENT -> absent++;
-case HOLD -> hold++;
-case PENDING -> pending++;
-case WITHDRAWN -> withdrawn++;
-
-하지만 현재 테스트는 PASSED, FAILED, WITHDRAWN, NO_RESULT만 검증합니다.
-
-07c의 7-bucket 정의를 고정하려면 아래 값도 테스트에 포함하세요.
-
-stage1:
-- app1 PENDING
-- app2 ABSENT
-- app3 HOLD
-- app4 NO_RESULT
-
-기대값:
-pending = 1
-absent = 1
-hold = 1
-noResult = 1
-sum = |P|
-
-특히 PENDING과 NO_RESULT 구분은 설계상 중요하므로 반드시 테스트로 고정해야 합니다.
-
-Medium 4 — population.withdrawnCount와 distribution.withdrawn 분리 테스트가 약함
-
-현재 테스트에서는 withdrawn application이 stage result도 WITHDRAWN입니다.
-
-application status = WITHDRAWN
-stage result = WITHDRAWN
-
-이러면 population.withdrawnCount와 distribution.withdrawn이 우연히 같은 값이 됩니다.
-하지만 설계상 둘은 다릅니다.
-
-추가해야 할 케이스:
-
-app1: application WITHDRAWN, stage result PASSED
-app2: application SUBMITTED, stage result WITHDRAWN
-
-기대값:
-population.withdrawnCount = 1
-distribution.withdrawn = 1
-distribution.passed = 1
-
-또는 더 명확히:
-
-app1: application WITHDRAWN, stage result 없음
-
-기대값:
-population.withdrawnCount = 1
-distribution.noResult = 1
-distribution.withdrawn = 0
-
-이게 있어야 “application-level withdrawn”과 “stage result withdrawn”을 덮어쓰지 않는다는 보장이 생깁니다.
-
-Medium 5 — DRAFT 제외 테스트가 없음
-
-모집단 P는 submittedAt != null입니다. 현재 repository query도 그렇게 되어 있습니다.
-
-where application.jobPosting.id = :jobPostingId
-  and application.submittedAt is not null
-
-하지만 테스트에는 DRAFT 지원서가 없습니다. P 정의를 고정하려면 DRAFT를 하나 넣고 population.p와 NO_RESULT에 포함되지 않는지 확인해야 합니다.
-
-app1 SUBMITTED
-app2 WITHDRAWN, submittedAt 있음
-app3 DRAFT, submittedAt 없음
-
-기대값:
-population.p = 2
-stage distribution sum = 2
-
-이건 07c에서 가장 기본적인 회귀 테스트입니다.
-
-Low — topN 파라미터는 받지만 07c에서는 완전히 미사용
-
-현재 controller/service 모두 topN을 받지만 POSITION에는 적용하지 않습니다. 문서에 “free-text 축 대비 파라미터”라고 적혀 있으므로 기능 오류는 아닙니다.
-
-다만 API 사용자 입장에서는 dimension=POSITION&topN=1이 무시되는 게 어색할 수 있습니다.
-
-둘 중 하나로 정리하세요.
-
-안 1. 07c에서는 topN 제거
-- SCHOOL/CERTIFICATE 활성화 시 다시 추가
-
-안 2. 유지하되 문서/API 주석에 명확히 표시
-- topN은 POSITION에서는 무시된다.
-- SCHOOL/CERTIFICATE 활성화 전까지 동작하지 않는다.
-
-현재 구현을 유지하려면 안 2로 충분합니다.
-
-Low — POSITION dimension에서 0명인 모집분야는 응답에 안 나옴
-
-현재 dimension은 P 코호트에 존재하는 jobPositionId만 group으로 생성합니다. 그래서 제출자가 0명인 모집분야는 dimensions에 없습니다.
-
-이게 수학적으로는 “P를 그룹별로 나눈다”는 정의와 맞습니다.
-다만 운영 화면에서는 “프론트엔드 분야 지원자 0명”도 보여주는 게 더 유용할 수 있습니다.
-
-정책을 정하세요.
-
-정책 A — P에 존재하는 group만 응답
-현재 구현 유지. 문서에 명시.
-
-정책 B — 공고의 모든 JobPosition을 응답
-지원자 0명인 group도 population.p=0, stages 각 분포 0으로 응답.
-
-운영 통계 화면이면 정책 B가 더 친절합니다. 단, 구현 복잡도는 조금 늘어납니다.
+좋은 점

@@ -51,10 +51,13 @@
 - `common/hash/HashUtil.java` — `sha256Bytes(byte[])` 추가(파일 contentHash용; `sha256(String)`과 오버로드 모호성 회피 위해 별도 이름).
 - `exception/GlobalExceptionHandler.java` — `InvalidStageResultUploadException` → 400.
 - `src/main/resources/application.yaml` — `recruit.upload.max-rows`(기본 10,000), `recruit.upload.max-file-size`(기본 5MB).
+- `service/ExcelExportWriter.java` — `writeToTempFile(spec, rowSource, escapeFormulaPrefix)` 오버로드(round-trip 소스용 비-escape 경로). 리뷰 #2.
+- `service/ExcelExportService.java` — `generate(spec, rows, fileName, escapeFormulaPrefix)` 오버로드. 리뷰 #2.
+- `service/StageResultService.java` — `validateBulkUpdatable(stageId, actor)` 공개 guard(변경 0건 우회 차단). 리뷰 #3.
 
 ### Created (test)
 
-- `controller/StageResultUploadControllerTest.java`
+- `controller/StageResultUploadControllerTest.java` (17)
 
 ## 5. 신규 클래스
 
@@ -78,6 +81,8 @@
 - `ApiResponse` — `fail(String, T)` 오버로드. 기존 `fail(String)`/`success(T)` 불변.
 - `HashUtil` — `sha256Bytes(byte[])`.
 - `GlobalExceptionHandler` — 핸들러 1개 추가.
+- `ExcelExportWriter` / `ExcelExportService` — `escapeFormulaPrefix` 오버로드(기존 export 경로는 default true 유지). round-trip 템플릿만 false.
+- `StageResultService` — `validateBulkUpdatable(stageId, actor)` 공개 메서드(기존 동작 불변, 신규 진입점만 추가).
 
 ## 7. 클래스별 설명 (핵심)
 
@@ -136,26 +141,36 @@
 
 ## 11. 테스트 커버리지
 
-- `StageResultUploadControllerTest`:
+- `StageResultUploadControllerTest` (17):
   - template: prefill + 토큰 + PII 컬럼 부재, unknown stage 404.
-  - preview: changed/unchanged/error 집계, blank/PENDING 오류, applicationId 불일치, 중복 id, formula 셀 오류, wrong header 400.
+  - preview: changed/unchanged/error 집계, blank/PENDING 오류, applicationId 불일치, 중복 id, formula 셀 오류, numeric 토큰 셀 오류(리뷰 #4), wrong header 400.
   - commit: changed 적용 + unchanged 제외, score/comment blank clear, all-or-nothing 거부(400, 미적용 확인), STALE 409(미적용 확인), 비-xlsx 확장자 400.
+  - 리뷰 회귀: 특수문자(`-`) 시작 comment round-trip 비오염(#2), 변경 0건이어도 비-IN_PROGRESS stage commit 거부(#3).
   - 인가: applicant 403 / anonymous 401(template GET, commit POST).
-- HashUtil 회귀(`sha256(null)` 모호성 해소 확인).
+  - 토큰은 template 다운로드에서 그대로 읽어 비교(앱 생성 문자열과 동일, normalize/precision 비의존).
+- HashUtil 회귀(`sha256(null)` 모호성 해소 확인). export 회귀(`escapeFormulaPrefix` 오버로드 후 formula-escape 유지).
 
 ## 12. 테스트 결과
 
-- 명령: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*StageResultUpload*" --tests "*HashUtil*" --no-daemon`
-- 결과: BUILD SUCCESSFUL — `StageResultUploadControllerTest` 14건 + `HashUtilTest` 회귀 통과.
-- 비고: 부분 실행(upload + HashUtil). statistics/export 슬라이스처럼 엔티티를 repository로 직접 영속화해 클럭 의존(접수기간) 없이 안정적. 전체 스위트는 본 슬라이스 범위상 미실행(`Infra 01` 기록의 날짜 의존 사전-실패 8건은 별도 과제).
+- 명령: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*StageResultUpload*" --tests "*Export*" --tests "*Statistics*" --tests "*HashUtil*" --no-daemon`
+- 결과: BUILD SUCCESSFUL — `StageResultUploadControllerTest` 17건 + export/statistics/HashUtil 회귀 통과(리뷰 반영 후 재실행).
+- 비고: 부분 실행(upload + 공유 코드 영향 범위). 엔티티를 repository로 직접 영속화해 클럭 의존(접수기간) 없이 안정적. 전체 스위트는 본 슬라이스 범위상 미실행(`Infra 01` 기록의 날짜 의존 사전-실패 8건은 별도 과제).
 
-## 13. Known limitations
+## 13. 리뷰 반영 (instruction.md, 4 findings)
 
-- 토큰은 원문 ISO-8601 string(HMAC opaque 토큰 미적용) — 사용자가 토큰을 임의로 정확히 위조하면 stale check 우회 가능(Open Q#7, 후속 하드닝 후보).
-- `StageResult.updatedAt` precision은 DB/JPA 매핑에 의존 — 같은 소스(DB 조회값)에서 양측 비교하므로 round-trip 일관성 유지.
+- **(High #1) lost update 미차단** — 토큰 in-memory 비교만으로는 두 관리자의 동시 commit이 모두 stale check를 통과해 덮어쓸 수 있었다. commit에서 **변경 대상 행을 `PESSIMISTIC_WRITE`로 잠그고 DB 최신값으로 `refresh`한 뒤 토큰을 재비교**하도록 변경(2안, migration 불필요). 늦게 들어온 commit은 잠금 해제 후 갱신된 `updatedAt`을 보고 STALE 처리된다. 잠금은 id 오름차순으로 획득해 deadlock을 피한다.
+- **(High #2) 템플릿 round-trip 오염** — `ExcelExportWriter`의 formula-escape(`=,+,-,@`, 탭, 개행 앞 apostrophe)가 템플릿 comment 값을 변형해, 미수정 재업로드가 CHANGED로 오판되고 commit 시 값이 오염될 수 있었다. **template은 `escapeFormulaPrefix=false`(비변형 string cell)로 작성**하도록 writer/service에 오버로드 추가. 재업로드 시 parser가 formula 셀을 거부하므로 injection도 안전. 토큰 포맷은 service 단일 소스(`formatToken`)로 통일.
+- **(Medium #3) 변경 0건 guard 우회** — 전부 UNCHANGED/header-only 파일은 `bulkUpdateResults`를 호출하지 않아 Stage `IN_PROGRESS`/actor guard를 우회할 수 있었다. commit 선두에서 `StageResultService.validateBulkUpdatable(stageId, actor)`로 **변경 행 여부와 무관하게 guard 선검증**.
+- **(Low #4) 토큰 셀 타입 검증 느슨** — token 셀이 NUMERIC일 때만 오류였다. **STRING/blank를 제외한 모든 타입(NUMERIC/date/BOOLEAN 등)을 row error**로 처리하도록 parser 강화.
+- 테스트: 14 → 17(+3, round-trip 비오염/비-IN_PROGRESS 거부/numeric 토큰 셀). 토큰을 template 다운로드에서 읽어 비교해 normalize/precision 비의존. export 회귀로 formula-escape 유지 확인. 전부 통과.
+
+## 14. Known limitations
+
+- 토큰은 원문 ISO-8601 string(HMAC opaque 토큰 미적용) — 임의 위조 방지는 후속 하드닝 후보(Open Q#7). 단, lost update 자체는 `PESSIMISTIC_WRITE` 잠금으로 차단된다.
+- 토큰 비교는 micro precision으로 normalize. cross-tx(실사용)에서는 양측 모두 DB 조회값이라 일관, 단일 tx 테스트는 PC를 DB와 동기화해 검증.
 - audit는 SLF4J 구조적 로그(영속 ActivityLog 미도입).
 
-## 14. Next phase considerations
+## 15. Next phase considerations
 
 - Phase 07e: Application PDF(Thymeleaf + openhtmltopdf, CJK 폰트 임베드, admin 전용).
 - Phase 07f: Stabilization / Test Hardening(row cap·upload 경계 회귀, PII 부재 검증).

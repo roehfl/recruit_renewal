@@ -142,6 +142,15 @@ public class StageResultService {
         return new StageResultBulkUpdateResponse(stageId, request.results().size(), getResults(stageId));
     }
 
+    /**
+     * bulk update가 가능한 상태인지(actor 필수 + Stage IN_PROGRESS)만 선검증한다. Excel upload commit이 변경 행이
+     * 0건이어도 stage/actor guard를 우회하지 않도록, 실제 적용 호출 여부와 무관하게 먼저 호출하기 위한 공개 진입점이다.
+     */
+    public void validateBulkUpdatable(Long stageId, String actor) {
+        validateActor(actor);
+        validateEditable(findStage(stageId));
+    }
+
     private Stage findStage(Long stageId) {
         return stageRepository.findById(stageId)
                 .orElseThrow(() -> new StageNotFoundException("Stage not found."));

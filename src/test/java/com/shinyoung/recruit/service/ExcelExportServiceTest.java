@@ -16,6 +16,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -48,7 +49,7 @@ class ExcelExportServiceTest {
                 .isInstanceOf(ExportRowLimitExceededException.class)
                 .hasMessageContaining(ExportRowLimitExceededException.CODE);
 
-        verify(excelExportWriter, never()).writeToTempFile(any(), any());
+        verify(excelExportWriter, never()).writeToTempFile(any(), any(), anyBoolean());
     }
 
     @Test
@@ -56,14 +57,14 @@ class ExcelExportServiceTest {
         Path tempFile = Files.createTempFile("excel-export-service-", ".xlsx");
         try {
             given(exportProperties.getMaxRows()).willReturn(50L);
-            given(excelExportWriter.writeToTempFile(any(), any())).willReturn(tempFile);
+            given(excelExportWriter.writeToTempFile(any(), any(), anyBoolean())).willReturn(tempFile);
 
             ExcelExportFile file = excelExportService.generate(spec, List.of("a", "b", "c"), "x.xlsx");
 
             assertThat(file.path()).isEqualTo(tempFile);
             assertThat(file.rowCount()).isEqualTo(3L);
             assertThat(file.fileName()).isEqualTo("x.xlsx");
-            verify(excelExportWriter).writeToTempFile(any(), any());
+            verify(excelExportWriter).writeToTempFile(any(), any(), anyBoolean());
         } finally {
             Files.deleteIfExists(tempFile);
         }

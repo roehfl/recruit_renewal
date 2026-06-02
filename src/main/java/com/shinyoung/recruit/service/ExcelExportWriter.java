@@ -23,6 +23,11 @@ import java.util.List;
  * 위험 prefix(`=`,`+`,`-`,`@`, tab, CR/LF)는 apostrophe로 escape한다(formula injection 방어).
  *
  * <p>JPA entity/lazy association이 아니라 projection DTO를 row로 받는다(streaming tx 경계 보호).
+ *
+ * <p>{@code escapeFormulaPrefix}로 formula injection 방어(apostrophe escape) 적용 여부를 정한다. 일반 export는
+ * true(사람이 여는 파일/CSV 변환 대비). upload-template처럼 우리 parser가 다시 읽는 round-trip 소스는 false로 써서
+ * 값을 변형하지 않는다(escape가 comment 등을 바꿔 no-op 업로드가 CHANGED로 오판/오염되는 것을 방지). round-trip은
+ * 모든 셀이 명시적 string cell이고, 재업로드 시 parser가 formula 셀을 거부하므로 injection도 안전하다.
  */
 @Component
 public class ExcelExportWriter {
@@ -33,13 +38,21 @@ public class ExcelExportWriter {
     private static final String TEMP_SUFFIX = ".xlsx";
 
     public <T> Path writeToTempFile(ExcelExportSpec<T> spec, ExportRowSource<T> rowSource) throws IOException {
+        return writeToTempFile(spec, rowSource, true);
+    }
+
+    public <T> Path writeToTempFile(
+            ExcelExportSpec<T> spec,
+            ExportRowSource<T> rowSource,
+            boolean escapeFormulaPrefix
+    ) throws IOException {
         Path tempFile = Files.createTempFile(TEMP_PREFIX, TEMP_SUFFIX);
         SXSSFWorkbook workbook = new SXSSFWorkbook(ROW_ACCESS_WINDOW);
         try (OutputStream out = Files.newOutputStream(tempFile)) {
             Sheet sheet = workbook.createSheet(spec.sheetName());
             List<ExportColumn<T>> columns = spec.columns();
 
-            writeHeader(sheet, columns);
+            writeHeader(sheet, columns, escapeFormulaPrefix);
 
             int rowIndex = 1;
             int page = 0;
@@ -51,7 +64,7 @@ public class ExcelExportWriter {
                 for (T row : batch) {
                     Row excelRow = sheet.createRow(rowIndex++);
                     for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
-                        writeStringCell(excelRow, columnIndex, columns.get(columnIndex).value(row));
+                        writeStringCell(excelRow, columnIndex, columns.get(columnIndex).value(row), escapeFormulaPrefix);
                     }
                 }
                 if (batch.size() < PAGE_SIZE) {
@@ -75,16 +88,20 @@ public class ExcelExportWriter {
         }
     }
 
-    private <T> void writeHeader(Sheet sheet, List<ExportColumn<T>> columns) {
+    private <T> void writeHeader(Sheet sheet, List<ExportColumn<T>> columns, boolean escapeFormulaPrefix) {
         Row header = sheet.createRow(0);
         for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
-            writeStringCell(header, columnIndex, columns.get(columnIndex).header());
+            writeStringCell(header, columnIndex, columns.get(columnIndex).header(), escapeFormulaPrefix);
         }
     }
 
-    private void writeStringCell(Row row, int columnIndex, String value) {
+    private void writeStringCell(Row row, int columnIndex, String value, boolean escapeFormulaPrefix) {
         Cell cell = row.createCell(columnIndex, CellType.STRING);
-        cell.setCellValue(sanitize(value));
+        cell.setCellValue(escapeFormulaPrefix ? sanitize(value) : nullSafe(value));
+    }
+
+    private String nullSafe(String value) {
+        return value == null ? "" : value;
     }
 
     /**

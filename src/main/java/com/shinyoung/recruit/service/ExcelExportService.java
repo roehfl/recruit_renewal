@@ -25,12 +25,25 @@ public class ExcelExportService {
     private final ExportProperties exportProperties;
 
     public <T> ExcelExportFile generate(ExcelExportSpec<T> spec, List<T> rows, String fileName) {
+        return generate(spec, rows, fileName, true);
+    }
+
+    /**
+     * upload-template 같은 round-trip 소스는 {@code escapeFormulaPrefix=false}로 호출해 값을 변형하지 않는다.
+     */
+    public <T> ExcelExportFile generate(
+            ExcelExportSpec<T> spec,
+            List<T> rows,
+            String fileName,
+            boolean escapeFormulaPrefix
+    ) {
         long maxRows = exportProperties.getMaxRows();
         if (rows.size() > maxRows) {
             throw new ExportRowLimitExceededException(rows.size(), maxRows);
         }
         try {
-            Path tempFile = excelExportWriter.writeToTempFile(spec, ExportRowSource.ofList(rows));
+            Path tempFile = excelExportWriter.writeToTempFile(
+                    spec, ExportRowSource.ofList(rows), escapeFormulaPrefix);
             return new ExcelExportFile(tempFile, fileName, rows.size());
         } catch (IOException | RuntimeException e) {
             throw new ExportGenerationException(fileName + " 생성 실패", e);

@@ -130,7 +130,8 @@ public class StageResultUploadParser {
                 values[c] = "";
                 continue;
             }
-            if (c == TOKEN_COLUMN && type == CellType.NUMERIC) {
+            // 토큰 셀은 STRING(또는 blank)만 허용한다. NUMERIC/date/BOOLEAN 등은 모두 비-문자열 토큰 오류로 본다.
+            if (c == TOKEN_COLUMN && type != CellType.STRING && type != CellType.BLANK) {
                 tokenNotString = true;
             }
             values[c] = readCellString(cell, type);

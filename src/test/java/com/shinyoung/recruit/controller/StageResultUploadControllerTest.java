@@ -18,6 +18,8 @@ import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.StageResultService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
@@ -40,7 +42,6 @@ import org.springframework.web.context.WebApplicationContext;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -64,7 +65,6 @@ class StageResultUploadControllerTest {
             "stageResultId", "applicationId", "applicantName",
             "stageResultUpdatedAt", "resultStatus", "score", "comment");
 
-    private static final DateTimeFormatter TOKEN = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     private static final String XLSX_CONTENT_TYPE =
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -88,6 +88,9 @@ class StageResultUploadControllerTest {
 
     @Autowired
     private StageResultService stageResultService;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     private MockMvc mockMvc;
 
@@ -315,6 +318,67 @@ class StageResultUploadControllerTest {
         assertThat(notApplied.getResultStatus()).isEqualTo(StageResultStatus.PASSED);
     }
 
+    @Test
+    void commit_does_not_corrupt_comment_with_leading_special_char() throws Exception {
+        Fixture fixture = fixtureWithResults("A");
+        // 현재 comment를 '-'로 시작하는 값으로 설정(formula-escape 위험 prefix).
+        StageResult seed = stageResultRepository.findByStageIdForAdminList(fixture.stageId()).get(0);
+        stageResultService.bulkUpdateResults(
+                fixture.stageId(),
+                new StageResultBulkUpdateRequest(List.of(
+                        new StageResultBulkUpdateItemRequest(
+                                seed.getId(), StageResultStatus.PASSED, null, "- 보류 사유 확인 필요"))),
+                "seed-admin");
+
+        // 템플릿을 미수정 상태로 재업로드 → round-trip이라 변경 없음(escape로 인한 오판/오염이 없어야 한다).
+        List<Current> rows = currentRows(fixture.stageId());
+        List<List<String>> data = new ArrayList<>();
+        data.add(HEADER);
+        data.add(rowOf(rows.get(0), rows.get(0).status(), rows.get(0).score(), rows.get(0).comment()));
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId(), data))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.outcome").value("APPLIED"))
+                .andExpect(jsonPath("$.data.changedCount").value(0))
+                .andExpect(jsonPath("$.data.unchangedCount").value(1));
+
+        StageResult after = stageResultRepository.findById(rows.get(0).srId()).orElseThrow();
+        assertThat(after.getComment()).isEqualTo("- 보류 사유 확인 필요");
+    }
+
+    @Test
+    void commit_rejects_when_stage_not_in_progress_even_with_no_changes() throws Exception {
+        Fixture fixture = fixtureWithResults("A");
+        preset(fixture.stageId(), StageResultStatus.PASSED);
+        List<Current> rows = currentRows(fixture.stageId());
+
+        Stage stage = stageRepository.findById(fixture.stageId()).orElseThrow();
+        stage.close();
+        stageRepository.saveAndFlush(stage);
+
+        // 전부 unchanged(변경 0건)여도 Stage IN_PROGRESS guard로 거부되어야 한다.
+        List<List<String>> data = new ArrayList<>();
+        data.add(HEADER);
+        data.add(rowOf(rows.get(0), "PASSED", "", ""));
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId(), data))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void preview_rejects_numeric_token_cell_as_error() throws Exception {
+        Fixture fixture = fixtureWithResults("A");
+        preset(fixture.stageId(), StageResultStatus.PASSED);
+        List<Current> rows = currentRows(fixture.stageId());
+
+        byte[] bytes = buildXlsxWithNumericToken(rows.get(0));
+        mockMvc.perform(multipart("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId())
+                        .file(new MockMultipartFile("file", "upload.xlsx", XLSX_CONTENT_TYPE, bytes))
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.errorCount").value(1));
+    }
+
     // ---------- file-level defenses ----------
 
     @Test
@@ -395,17 +459,25 @@ class StageResultUploadControllerTest {
         stageResultService.bulkUpdateResults(stageId, new StageResultBulkUpdateRequest(items), "seed-admin");
     }
 
-    private List<Current> currentRows(Long stageId) {
-        return stageResultRepository.findByStageIdForAdminList(stageId).stream()
-                .map(sr -> new Current(
-                        sr.getId(),
-                        sr.getJobApplication().getId(),
-                        sr.getJobApplication().getApplicantNameSnapshot(),
-                        sr.getUpdatedAt() == null ? "" : TOKEN.format(sr.getUpdatedAt()),
-                        sr.getResultStatus() == null ? "" : sr.getResultStatus().name(),
-                        sr.getScore() == null ? "" : sr.getScore().toPlainString(),
-                        sr.getComment() == null ? "" : sr.getComment()))
-                .toList();
+    /**
+     * 현재 행을 upload-template 다운로드에서 그대로 읽어온다. 토큰/현재값을 앱이 실제로 내보내는 문자열 그대로
+     * 얻으므로 토큰 normalize 규칙·precision에 의존하지 않는다(round-trip 충실).
+     */
+    private List<Current> currentRows(Long stageId) throws Exception {
+        // 단일 트랜잭션 테스트라 영속성 컨텍스트를 DB와 동기화한다. 그래야 템플릿이 (앱이 실제로 그러듯)
+        // DB precision의 updatedAt을 읽어 토큰을 만들고, commit의 PESSIMISTIC refresh 값과 일치한다.
+        entityManager.flush();
+        entityManager.clear();
+        MvcResult result = performTemplate(stageId);
+        List<List<String>> sheet = readSheet(result.getResponse().getContentAsByteArray());
+        List<Current> rows = new ArrayList<>();
+        for (int r = 1; r < sheet.size(); r++) {
+            List<String> c = sheet.get(r);
+            rows.add(new Current(
+                    Long.valueOf(c.get(0)), Long.valueOf(c.get(1)), c.get(2),
+                    c.get(3), c.get(4), c.get(5), c.get(6)));
+        }
+        return rows;
     }
 
     private byte[] buildXlsx(List<List<String>> rows) throws Exception {
@@ -442,6 +514,27 @@ class StageResultUploadControllerTest {
                     }
                 }
             }
+            workbook.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    private byte[] buildXlsxWithNumericToken(Current c) throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("stage-result-upload");
+            Row header = sheet.createRow(0);
+            for (int i = 0; i < HEADER.size(); i++) {
+                header.createCell(i, CellType.STRING).setCellValue(HEADER.get(i));
+            }
+            Row row = sheet.createRow(1);
+            row.createCell(0, CellType.STRING).setCellValue(String.valueOf(c.srId()));
+            row.createCell(1, CellType.STRING).setCellValue(String.valueOf(c.appId()));
+            row.createCell(2, CellType.STRING).setCellValue(c.name());
+            row.createCell(3, CellType.NUMERIC).setCellValue(45000); // 토큰을 numeric 셀로 → row error
+            row.createCell(4, CellType.STRING).setCellValue("HOLD");
+            row.createCell(5, CellType.STRING).setCellValue("");
+            row.createCell(6, CellType.STRING).setCellValue("");
             workbook.write(out);
             return out.toByteArray();
         }
