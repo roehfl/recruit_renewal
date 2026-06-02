@@ -28,12 +28,12 @@
 - `dto/response/FunnelCertificateRow.java` (projection: applicationId/certificateName)
 
 ### Modified (main)
-- `service/FunnelStatisticsService.java` — `computeCertificateDimension` + `normalizeCertificateName`/`rowsOf`, `ApplicationCertificateRepository` 주입, dimension 상수 일반화(`DEFAULT_DIMENSION_TOP_N`/`MAX_DIMENSION_TOP_N`/`OTHER_GROUP_NAME`), `parseSupportedDimension`에서 CERTIFICATE 허용(전 dimension 지원, 잘못된 값만 400).
+- `service/FunnelStatisticsService.java` — `computeCertificateDimension` + `normalizeCertificateName`/`rowsOf`, `ApplicationCertificateRepository` 주입, dimension 상수 일반화(`DEFAULT_DIMENSION_TOP_N`/`MAX_DIMENSION_TOP_N`/`OTHER_GROUP_NAME`), `parseSupportedDimension`에서 CERTIFICATE 허용(전 dimension 지원, 잘못된 값만 400), **dimension dispatch를 switch expression으로 전환(exhaustiveness 강제, 리뷰)**.
 - `domain/repository/ApplicationCertificateRepository.java` — `findFunnelCertificates`(공고 코호트 자격 projection).
 - `enumeration/FunnelDimension.java` / `controller/AdminStatisticsController.java` — javadoc 갱신(CERTIFICATE 지원).
 
 ### Modified (test)
-- `controller/AdminStatisticsControllerTest.java` — unsupported dimension을 잘못된 값(`NOT_A_DIMENSION`)으로 변경, CERTIFICATE 테스트 2건 추가.
+- `controller/AdminStatisticsControllerTest.java` — unsupported dimension을 잘못된 값(`NOT_A_DIMENSION`)으로 변경, CERTIFICATE 테스트 3건 추가(distinct/정규화/중복, topN/'기타', top↔기타 중복).
 
 ## 5. 클래스별 설명
 
@@ -66,25 +66,32 @@
 
 ## 9. 테스트 커버리지
 
-- `AdminStatisticsControllerTest` (CERTIFICATE +2):
+- `AdminStatisticsControllerTest` (CERTIFICATE +3):
   - 자격명별 보유 지원자 distinct + **정규화(trailing space 병합)** + **중복 집계**(app1이 정보처리기사·TOEIC 두 그룹), 무보유 지원자 제외.
   - topN=1 → 최다 보유 자격만 개별, 초과 자격 보유자(distinct)='기타'로 합산.
+  - **top 그룹 ↔ '기타' 중복 허용**(app1=Common+Rare1, topN=1 → Common p=2, 기타 p=1로 app1이 양쪽에 distinct 집계, 리뷰).
   - 기존 `unsupported_dimension_returns_bad_request`를 잘못된 dimension 값으로 변경.
 - 회귀: overall/POSITION/SCHOOL/분포/비율/인가 등 기존 funnel 테스트 비파괴.
 
 ## 10. 테스트 결과
 
 - 명령: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*AdminStatisticsControllerTest" --no-daemon`
-- 결과: BUILD SUCCESSFUL — 기존 + SCHOOL 5 + CERTIFICATE 2 전부 통과.
+- 결과: BUILD SUCCESSFUL — 기존 + SCHOOL 5 + CERTIFICATE 3 전부 통과.
 - 비고: 통계 테스트는 엔티티를 repository로 직접 영속화해 클럭 의존(접수기간) 없이 안정적.
 
-## 11. Known limitations
+## 11. 리뷰 반영 (instruction.md, 3건)
 
-- 자격명은 정규화(trim+공백)로만 묶어, 동의어/표기 차이("정보처리기사" vs "정보 처리 기사" 외 의미적 동치)는 다른 그룹이 된다 — 자격 master/표준화는 후속.
+- **(Medium) top 그룹 ↔ '기타' 중복 허용 테스트** — app1이 topN 자격(Common)과 overflow 자격(Rare1)을 모두 보유하면 Common(top)과 '기타' 양쪽에 distinct 집계됨을 회귀로 고정("그룹 중복 허용 + 기타도 overflow 보유자 distinct" 정의 확정).
+- **(Medium) 자격명 정규화 한계** — 동의어/표기차는 다른 그룹으로 남음(현 phase 문제 아님). **자격 master/표준화는 별도 후속 phase**로 명시(known limitation 유지).
+- **(Low) future enum allowlist** — `dimension` dispatch를 `switch expression`으로 전환해 **exhaustiveness 강제**(FunnelDimension에 값 추가 시 dispatch 누락이 컴파일 에러). 빈 dimensions 로 조용히 새는 것을 방지.
+
+## 12. Known limitations
+
+- 자격명은 정규화(trim+공백)로만 묶어, 동의어/표기 차이("정보처리기사" vs "정보 처리 기사" 외 의미적 동치)는 다른 그룹이 된다 — **자격 master/표준화 phase에서 해결**(별도 후속).
 - 그룹 중복(보유 지원자 distinct)이라 dimension population 합이 |P|와 다를 수 있음(설계 의도). overall funnel은 |P| 기준 그대로.
 - in-memory 집계(공고 단위, bounded). 대형 공고는 후속 GROUP BY 전환 검토.
 
-## 12. Next phase considerations
+## 13. Next phase considerations
 
 - (선택) 자격 master/표준화, 대형 공고 GROUP BY 전환.
 - 메시지 발송, 개인정보 파기/감사(영속 ActivityLog).

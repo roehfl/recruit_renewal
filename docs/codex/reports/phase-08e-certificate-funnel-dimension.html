@@ -62,7 +62,7 @@
   <div class="cards">
     <div class="card kpi"><div class="num">1</div><div class="lbl">활성화 dimension</div></div>
     <div class="card kpi"><div class="num">1</div><div class="lbl">신규 클래스(main)</div></div>
-    <div class="card kpi"><div class="num">2</div><div class="lbl">신규 테스트</div></div>
+    <div class="card kpi"><div class="num">3</div><div class="lbl">신규 테스트</div></div>
     <div class="card kpi"><div class="num">0</div><div class="lbl">신규 테이블</div></div>
   </div>
 </section>
@@ -97,9 +97,21 @@
   <h2>테스트</h2>
   <div class="summary" style="border-left-color:var(--green);">
     <div><strong>명령</strong>: <span class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*AdminStatisticsControllerTest" --no-daemon</span></div>
-    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — 기존 + SCHOOL 5 + CERTIFICATE 2 통과.</div>
+    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — 기존 + SCHOOL 5 + CERTIFICATE 3 통과.</div>
   </div>
-  <p class="note">자격명별 distinct + 정규화(trailing space 병합) + 중복 집계(app1=정보처리기사·TOEIC)/무보유 제외, topN=1 → '기타' 합산. unsupported는 잘못된 값으로 변경. overall/POSITION/SCHOOL 회귀 비파괴.</p>
+  <p class="note">자격명별 distinct + 정규화(trailing space 병합) + 중복 집계/무보유 제외, topN=1 → '기타' 합산, top↔'기타' 중복(app1=Common+Rare1). unsupported는 잘못된 값으로 변경. overall/POSITION/SCHOOL 회귀 비파괴.</p>
+</section>
+
+<section>
+  <h2>리뷰 반영 (instruction.md · 3건)</h2>
+  <table>
+    <thead><tr><th>등급</th><th>지적</th><th>반영</th></tr></thead>
+    <tbody>
+      <tr><td>Medium</td><td>top 그룹 ↔ '기타' 중복 허용 테스트 부재</td><td>app1=Common(top)+Rare1(overflow), topN=1 → Common p=2 + '기타' p=1(app1 양쪽 distinct) 회귀 추가.</td></tr>
+      <tr><td>Medium</td><td>자격명 정규화 한계(동의어/표기차)</td><td>현 phase 문제 아님 — 자격 master/표준화 별도 후속 phase로 명시(known limitation).</td></tr>
+      <tr><td>Low</td><td>future enum 추가 시 dispatch 누락</td><td>dimension dispatch를 switch expression으로 전환(exhaustiveness 강제, 누락 시 컴파일 에러).</td></tr>
+    </tbody>
+  </table>
 </section>
 
 <section>

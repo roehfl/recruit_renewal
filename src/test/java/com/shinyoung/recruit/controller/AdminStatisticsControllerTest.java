@@ -334,6 +334,24 @@ class AdminStatisticsControllerTest {
     }
 
     @Test
+    void certificate_dimension_allows_overlap_between_top_group_and_other() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        JobPosition backend = position(jobPosting, "Backend");
+        saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
+
+        JobApplication app1 = submittedApplication(jobPosting, backend, "A1");
+        certificate(app1, "Common");
+        certificate(app1, "Rare1"); // app1은 top(Common)과 overflow(Rare1) 모두 보유
+        certificate(submittedApplication(jobPosting, backend, "A2"), "Common");
+
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), "CERTIFICATE", 1); // topN=1 → Common 개별
+
+        // app1이 Common(top)과 기타(Rare1 overflow) 양쪽에 distinct 집계됨(그룹 중복 허용).
+        assertThat(group(funnel, "Common").population().p()).isEqualTo(2); // app1, app2
+        assertThat(group(funnel, "기타").population().p()).isEqualTo(1);   // app1
+    }
+
+    @Test
     void school_dimension_groups_by_final_school_with_other_bucket() throws Exception {
         JobPosting jobPosting = saveJobPosting("Backend");
         JobPosition backend = position(jobPosting, "Backend");

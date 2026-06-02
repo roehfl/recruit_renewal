@@ -12,7 +12,7 @@
   - `domain/repository/ApplicationCertificateRepository.java` (`findFunnelCertificates`)
   - `enumeration/FunnelDimension.java`, `controller/AdminStatisticsController.java` (javadoc)
 - Modified (test):
-  - `controller/AdminStatisticsControllerTest.java` (unsupported dimension을 잘못된 값으로 변경, CERTIFICATE 2건 추가)
+  - `controller/AdminStatisticsControllerTest.java` (unsupported dimension을 잘못된 값으로 변경, CERTIFICATE 3건 추가)
 - APIs:
   - `GET /api/admin/job-postings/{jobPostingId}/statistics/funnel?dimension=CERTIFICATE&topN=` (admin)
 - Key decisions:
@@ -21,13 +21,17 @@
   - 보유자 수 desc·이름 asc, topN 기본 10(최대 100, 0/null→10) 개별, 초과 자격 보유자 distinct='기타'. 무보유 지원자 미포함(보유 의미).
   - 응답은 기존 `DimensionFunnelResponse(groupId=null, groupName=정규화 자격명, …)`, 기타=null/"기타". 전 dimension(POSITION/SCHOOL/CERTIFICATE) 지원 → 잘못된 dimension 값만 400.
   - 자격명 비민감 → audit 없음(07c 정책).
+- Review 반영 (instruction.md, 3건):
+  - (Medium) top 그룹 ↔ '기타' 중복 허용 테스트 추가(app1=Common+Rare1, topN=1 → Common p=2 + '기타' p=1, app1이 양쪽에 distinct).
+  - (Medium) 자격명 정규화 한계(동의어/표기차)는 현 phase 문제 아님 — 자격 master/표준화 별도 후속 phase로 문서 명시.
+  - (Low) `dimension` dispatch를 `switch expression`으로 전환 → exhaustiveness 강제(FunnelDimension 값 추가 시 dispatch 누락이 컴파일 에러, 빈 dimensions 누출 방지).
 - Tests:
   - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*AdminStatisticsControllerTest" --no-daemon`
-  - 결과: BUILD SUCCESSFUL — 기존 funnel + SCHOOL 5 + CERTIFICATE 2(자격명별 distinct/정규화 병합/중복 집계/무보유 제외, topN=1 합산) 통과. 통계 테스트는 엔티티 직접 영속화로 클럭 의존 없이 안정적.
+  - 결과: BUILD SUCCESSFUL — 기존 funnel + SCHOOL 5 + CERTIFICATE 3(자격명별 distinct/정규화 병합/중복 집계/무보유 제외, topN='기타', top↔'기타' 중복) 통과. 통계 테스트는 엔티티 직접 영속화로 클럭 의존 없이 안정적.
 - Documentation:
   - `docs/codex/implementation/phase-08e-certificate-funnel-dimension.md`
   - `docs/codex/reports/phase-08e-certificate-funnel-dimension.html`
-- Known limitations: 정규화(trim+공백)만 → 동의어/표기차 분리(자격 master/표준화 후속), 그룹 중복으로 합≠|P|(설계 의도), 대형 공고 GROUP BY 전환(후속).
+- Known limitations: 정규화(trim+공백)만 → 동의어/표기차 분리(자격 master/표준화 후속 phase), 그룹 중복으로 합≠|P|(설계 의도), 대형 공고 GROUP BY 전환(후속).
 - Next recommended: (선택) 자격 master/표준화 또는 메시지 발송, 개인정보 파기/감사.
 
 ## Phase 08d - SCHOOL Funnel Dimension

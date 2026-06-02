@@ -76,14 +76,14 @@ public class FunnelStatisticsService {
 
         CohortFunnel overall = computeCohort(stages, cohort, resultsByStage);
 
-        List<DimensionFunnelResponse> dimensions = List.of();
-        if (dimension == FunnelDimension.POSITION) {
-            dimensions = computePositionDimension(stages, cohort, resultsByStage);
-        } else if (dimension == FunnelDimension.SCHOOL) {
-            dimensions = computeSchoolDimension(stages, cohort, resultsByStage, jobPostingId, topN);
-        } else if (dimension == FunnelDimension.CERTIFICATE) {
-            dimensions = computeCertificateDimension(stages, cohort, resultsByStage, jobPostingId, topN);
-        }
+        // switch expression으로 exhaustiveness를 강제한다 — FunnelDimension에 새 값이 추가되면 컴파일 에러로 dispatch 누락을 막는다.
+        List<DimensionFunnelResponse> dimensions = dimension == null
+                ? List.of()
+                : switch (dimension) {
+            case POSITION -> computePositionDimension(stages, cohort, resultsByStage);
+            case SCHOOL -> computeSchoolDimension(stages, cohort, resultsByStage, jobPostingId, topN);
+            case CERTIFICATE -> computeCertificateDimension(stages, cohort, resultsByStage, jobPostingId, topN);
+        };
 
         return new FunnelResponse(
                 jobPostingId,
