@@ -17,11 +17,14 @@
   - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*ApplicationPdf*" --tests "*Upload*" --tests "*Export*" --tests "*Statistics*" --no-daemon`
   - 결과: BUILD SUCCESSFUL — 07f 신규 8건(parser 5 + PDF 보안 3) + 07a~07e 회귀(export/upload/statistics/PDF) 전부 통과.
   - 부분 실행(Phase 07 영역). 전체 스위트는 본 슬라이스 범위상 미실행(`Infra 01` 날짜 의존 사전-실패 8건 별도 과제).
+- Review 반영 (instruction.md, locking):
+  - (Locking) 폰트 OFL.txt 누락 — 폰트 바이너리 번들 시 SIL OFL 1.1은 저작권 고지 + 라이선스 전문 동봉을 요구(현재 커밋 포함 조건). `src/main/resources/fonts/OFL.txt` 추가(NanumGothic=`Copyright (c) 2011 NHN Corporation` Reserved Font Name "Nanum"/"NanumGothic", Noto Sans KR=`Copyright (c) 2014-2021 Adobe` Reserved Font Name 'Source' — name table에서 확인 + OFL 1.1 전문). `fonts/README.md` "권장"→"동봉됨" 정정. Phase 07 종료 조건으로 폰트 라이선스 파일 포함 완료 명시.
 - Documentation:
   - `docs/codex/implementation/phase-07f-stabilization-test-hardening.md`
   - `docs/codex/reports/phase-07f-stabilization-test-hardening.html`
+  - `src/main/resources/fonts/OFL.txt` (신규, 폰트 라이선스 전문), `fonts/README.md` (정정)
 - Known limitations: 외부 resource 차단은 convention + escape 회귀로 보장(런타임 fetch sandbox 미도입), 전체 스위트 일괄 green은 날짜 의존 fixture 안정화 이후.
-- Phase 07(Export/Upload/PDF/Statistics) 07a~07f 완료.
+- Phase 07(Export/Upload/PDF/Statistics) 07a~07f 완료(폰트 라이선스 동봉 포함).
 - Next recommended: Phase 08(CommonCode/School master) 또는 메시지 배치/발송 이력, privacy purge/retention/activity audit.
 
 ## Phase 07e - Application PDF (admin)

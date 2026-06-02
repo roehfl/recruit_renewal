@@ -1,27 +1,22 @@
-Blocking 1 — CJK 폰트 임베드 요구를 만족하지 못함
+locking — 폰트 OFL.txt 누락
 
-Phase 07 설계는 CJK 폰트를 리소스로 번들해서 컨테이너 시스템 폰트가 없어도 한글이 정상 출력되도록 하라고 되어 있다.
+7e에서 CJK 폰트를 src/main/resources/fonts/에 번들하기로 했고, 7f 문서도 운영 준비 항목으로 PDF 폰트 OFL.txt 동봉을 남겨뒀다.
 
-그런데 현재 구현은 폰트가 classpath에 없으면 경고만 남기고 임베드를 생략한다.
-문서도 실제로 “CJK 폰트 바이너리 미포함, 한글 렌더는 폰트 배치 후 확인 필요”라고 인정한다.
+문제는 이미 폰트 바이너리를 resources에 넣은 상태인데, fonts/README.md는 “배포 시 OFL 라이선스 전문(OFL.txt)을 폰트와 함께 포함해야 한다”고 적고 있다.
+그런데 저장소 검색상 OFL 관련 파일은 README만 잡히고 OFL.txt는 확인되지 않는다.
 
-이 프로젝트는 한국어 지원서 PDF다. 한글 출력이 보장되지 않으면 PDF 기능의 핵심이 빠진 거다. ASCII 테스트만 통과한 상태라 운영 품질 검증이 안 됐다.
+이 상태로 “Phase 07 종료”라고 보기엔 찝찝하다. 폰트 파일을 번들한 순간 라이선스 전문 동봉은 운영 후속이 아니라 현재 커밋에 포함되어야 할 배포 산출물 조건이다.
 
-수정 방향:
+수정 지시
+Phase 07f 마무리 수정:
 
-- 저장소에 폰트 바이너리를 직접 넣지 않을 거면, 최소한 ops/Dockerfile/배포 절차로 `recruit.pdf.font-classpath` 위치에 폰트를 배치하는 작업을 7e 안에 포함한다.
-- 테스트 리소스에는 테스트용 OFL CJK 폰트를 배치하거나, 테스트 프로파일에서 확실히 classpath font를 제공한다.
-- ApplicationPdfControllerTest에 한글 이름/질문답변/경력설명 텍스트를 넣고 PDFBox 텍스트 추출 또는 렌더 성공 기준으로 한글 출력 회귀를 추가한다.
-Blocking 2 — 설계 범위를 벗어난 전형결과가 PDF에 포함됨
+1. `src/main/resources/fonts/OFL.txt`를 추가한다.
+   - NanumGothic-Regular.ttf의 원 배포 패키지에 포함된 SIL Open Font License 1.1 전문을 그대로 포함한다.
+   - NotoSansKR[wght].ttf도 함께 유지할 거면 해당 폰트 배포 패키지의 라이선스/저작권 고지도 누락 없이 포함한다.
+   - 두 폰트의 저작권 고지가 다르면 `NanumGothic-OFL.txt`, `NotoSansKR-OFL.txt`처럼 분리해도 된다.
 
-설계상 Application PDF 내용은 “지원서 양식 섹션”이다. 기본정보, 학력, 경력, 자격, 어학, 병역, 수상, 공백기간, 질문답변까지가 명시되어 있고, ci/ciHash/password 제외가 적혀 있다. 전형결과는 포함 범위에 없다.
+2. `src/main/resources/fonts/README.md`에서 “권장” 표현을 “동봉됨”으로 바꾼다.
+   - 현재 README는 동봉해야 한다고만 되어 있으므로 실제 파일 존재와 맞춘다.
 
-그런데 실제 서비스는 stageResultSection()을 추가해서 PDF에 전형명, 결과, 점수, 코멘트, 결정일시를 넣는다.
-
-이건 단순 추가가 아니다. StageResult.comment는 내부 운영/평가성 코멘트일 수 있고, “지원서 PDF”라는 이름으로 출력·공유될 때 내부 판단 정보가 같이 나갈 수 있다. admin 전용이어도 PDF는 파일로 떨어지는 순간 통제 난도가 올라간다.
-
-수정 방향:
-
-- 7e PDF에서는 `전형결과` 섹션을 제거한다.
-- 전형결과 PDF가 필요하면 별도 Admin report/PDF로 분리한다.
-- 반드시 포함하려면 설계 문서를 먼저 수정하고, 내부 코멘트 포함 여부를 별도 정책으로 확정한다.
+3. `phase-07f-stabilization-test-hardening.md`와 implementation history에 OFL.txt 추가를 기록한다.
+   - Phase 07 종료 조건으로 폰트 라이선스 파일 포함 완료를 명시한다.

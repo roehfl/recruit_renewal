@@ -24,9 +24,14 @@
 - `src/test/java/.../service/StageResultUploadParserTest.java` (5)
 - `src/test/java/.../controller/ApplicationPdfSecurityHardeningTest.java` (3)
 
+### Created (resources, 리뷰 반영)
+
+- `src/main/resources/fonts/OFL.txt` — 번들 폰트(NanumGothic, Noto Sans KR)의 저작권/Reserved Font Name 고지 + SIL OFL 1.1 전문(배포 동봉본). 저작권 고지는 각 폰트 name table에서 확인한 값 사용.
+
 ### Modified
 
-- 없음(운영 코드 무변경).
+- `src/main/resources/fonts/README.md` — "권장" → "동봉됨"으로 정정(실제 `OFL.txt` 존재와 일치), 각 폰트 저작권 고지 명시.
+- 운영 코드: 없음.
 
 ## 5. 테스트별 설명
 
@@ -61,7 +66,14 @@
 - 외부 resource 차단은 템플릿 convention(정적 검사) + free-text escape 회귀로 보장한다. 런타임 네트워크 fetch 차단을 강제하는 별도 sandbox는 도입하지 않았다(openhtmltopdf는 baseUri=null + 외부 참조 없는 입력으로 운용).
 - 전체 스위트 일괄 green은 날짜 의존 fixture 안정화(별도 과제) 이후 가능.
 
-## 9. Next phase considerations
+## 9. 리뷰 반영 (instruction.md, locking)
 
-- Phase 07 종료. 후속 후보: Phase 08(CommonCode/School master), 메시지 배치/발송 이력, privacy purge/retention/activity audit(영속 ActivityLog).
-- 운영 준비: PDF 폰트 OFL.txt 동봉, 영속 DB `StageResult.version` 컬럼 DDL(`docs/codex/ops/phase-07d-stage-result-version-column.sql`) 반영, 날짜 의존 테스트 fixture 안정화.
+- **(Locking) 폰트 OFL.txt 누락** — 폰트 바이너리를 resources에 번들한 이상 SIL OFL 1.1은 저작권 고지 + 라이선스 전문 동봉을 요구하므로, OFL.txt는 운영 후속이 아니라 현재 커밋 포함 조건이다. 반영:
+  - `src/main/resources/fonts/OFL.txt` 추가(두 폰트의 name table에서 확인한 저작권/Reserved Font Name 고지 + OFL 1.1 전문). NanumGothic=`Copyright (c) 2011 NHN Corporation`(Reserved Font Name "Nanum"/"NanumGothic"), Noto Sans KR=`Copyright (c) 2014-2021 Adobe`(Reserved Font Name 'Source').
+  - `fonts/README.md`의 "권장" 표현을 "동봉됨"으로 정정(실제 파일 존재와 일치).
+  - **Phase 07 종료 조건으로 폰트 라이선스 파일 포함 완료**를 명시.
+
+## 10. Next phase considerations
+
+- Phase 07 종료(폰트 라이선스 동봉 포함). 후속 후보: Phase 08(CommonCode/School master), 메시지 배치/발송 이력, privacy purge/retention/activity audit(영속 ActivityLog).
+- 운영 준비: 영속 DB `StageResult.version` 컬럼 DDL(`docs/codex/ops/phase-07d-stage-result-version-column.sql`) 반영, 날짜 의존 테스트 fixture 안정화.
