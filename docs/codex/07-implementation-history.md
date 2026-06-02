@@ -1,5 +1,40 @@
 # 07. Implementation History
 
+## Phase 08a - CommonCode
+
+- Date: 2026-06-02
+- Work type: implementation (Phase 08 첫 슬라이스). 설계 `docs/codex/design/phase-08-commoncode-school-master-design.md` 기준.
+- Goal: 관리자 코드성 lookup master(`CommonCode`) 추가형 도입. public read(드롭다운) + admin CRUD. 기존 enum 전환 0(ADR 0003).
+- Created (main):
+  - `domain/entity/CommonCode.java`
+  - `domain/repository/CommonCodeRepository.java`
+  - `exception/CommonCodeNotFoundException.java`, `exception/InvalidCommonCodeException.java`
+  - `dto/request/CommonCodeCreateRequest.java`, `dto/request/CommonCodeUpdateRequest.java`
+  - `dto/response/CommonCodeResponse.java`
+  - `service/CommonCodeService.java`
+  - `controller/CommonCodeController.java`(public read), `controller/AdminCommonCodeController.java`(admin CRUD)
+- Modified (main):
+  - `exception/GlobalExceptionHandler.java` (`CommonCodeNotFoundException` 404, `InvalidCommonCodeException` 400)
+- Created (test):
+  - `controller/CommonCodeControllerTest.java` (6)
+- APIs:
+  - `GET /api/codes?groupCode=` (permitAll, active+sortOrder)
+  - `GET /api/admin/codes?groupCode=` (admin, 비활성 포함)
+  - `POST /api/admin/codes` / `PUT /api/admin/codes/{id}` (admin)
+- Key decisions:
+  - `CommonCode` = `groupCode`+`code`(불변)+`displayName`+`sortOrder`+`active`+`description`, `(groupCode,code)` unique, 강한 FK 없음(application-level).
+  - code/groupCode 불변(수정 API 미포함), 삭제는 soft delete(`active=false`). 중복 생성 → 400(InvalidCommonCode, 409 미사용·컨벤션 일치).
+  - public read 는 active 만 sortOrder 순, admin read 는 비활성 포함. 보안은 `anyRequest().permitAll()`/`/api/admin/**` 로 자동 → SecurityConfig 변경 없음.
+  - 기존 enum 전환 0(카탈로그만), 백엔드 필드 validation 미결합, seeding 무-seed.
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*CommonCode*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL — 6건. public read active+정렬+비활성 제외, create+중복 400, blank 400, update+soft delete(public 제외/admin 포함), 404, 인가(403/401).
+  - JSON body 는 컨벤션대로 수기 문자열(ObjectMapper 빈 미autowire) + UTF-8 인코딩.
+- Documentation:
+  - `docs/codex/implementation/phase-08a-commoncode.md`
+  - `docs/codex/reports/phase-08a-commoncode.html`
+- Next recommended: Phase 08b - School(엔티티/검색·자동완성/admin CRUD).
+
 ## Phase 08 - CommonCode & School Master (Design)
 
 - Date: 2026-06-02

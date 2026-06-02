@@ -199,6 +199,18 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail("지원서 PDF 생성에 실패했습니다."));
     }
 
+    @ExceptionHandler(CommonCodeNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleCommonCodeNotFound(CommonCodeNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidCommonCodeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidCommonCode(InvalidCommonCodeException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(InvalidStatisticsRequestException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidStatisticsRequest(InvalidStatisticsRequestException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
