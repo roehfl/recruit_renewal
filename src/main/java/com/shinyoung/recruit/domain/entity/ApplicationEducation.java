@@ -71,6 +71,13 @@ public class ApplicationEducation extends BaseEntity {
 
     private String countryCode;
 
+    /**
+     * 선택적 {@link School} master 참조(Phase 08c). 지원자가 자동완성에서 학교를 고른 경우에만 채워지고,
+     * 직접입력(미매칭)이면 null 이다. 강한 FK 가 아니라 application-level 참조다(ADR 0004).
+     */
+    @Column(name = "school_id")
+    private Long schoolId;
+
     @Column(nullable = false)
     private Integer sortOrder;
 
@@ -87,6 +94,7 @@ public class ApplicationEducation extends BaseEntity {
             CampusType campusType,
             Boolean transfer,
             String countryCode,
+            Long schoolId,
             Integer sortOrder
     ) {
         this.jobApplication = jobApplication;
@@ -101,6 +109,7 @@ public class ApplicationEducation extends BaseEntity {
         this.campusType = campusType;
         this.transfer = transfer;
         this.countryCode = countryCode;
+        this.schoolId = schoolId;
         this.sortOrder = sortOrder;
     }
 
@@ -119,6 +128,28 @@ public class ApplicationEducation extends BaseEntity {
             String countryCode,
             Integer sortOrder
     ) {
+        return create(
+                jobApplication, educationLevel, schoolName, majorName, degreeName,
+                admissionDate, graduationDate, graduationStatus, dayNightType, campusType,
+                transfer, countryCode, null, sortOrder);
+    }
+
+    public static ApplicationEducation create(
+            JobApplication jobApplication,
+            EducationLevel educationLevel,
+            String schoolName,
+            String majorName,
+            String degreeName,
+            LocalDate admissionDate,
+            LocalDate graduationDate,
+            GraduationStatus graduationStatus,
+            DayNightType dayNightType,
+            CampusType campusType,
+            Boolean transfer,
+            String countryCode,
+            Long schoolId,
+            Integer sortOrder
+    ) {
         return new ApplicationEducation(
                 jobApplication,
                 educationLevel,
@@ -132,6 +163,7 @@ public class ApplicationEducation extends BaseEntity {
                 campusType,
                 transfer,
                 countryCode,
+                schoolId,
                 sortOrder
         );
     }

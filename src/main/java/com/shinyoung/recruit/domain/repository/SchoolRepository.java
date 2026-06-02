@@ -8,10 +8,28 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface SchoolRepository extends JpaRepository<School, Long> {
 
     boolean existsBySchoolCode(String schoolCode);
+
+    Optional<School> findBySchoolCode(String schoolCode);
+
+    /**
+     * import fallback dedup 키: (schoolName, schoolType, region). null 필드는 IS NULL 로 매칭한다.
+     */
+    @Query("""
+            select s from School s
+            where s.schoolName = :schoolName
+              and ((:schoolType is null and s.schoolType is null) or s.schoolType = :schoolType)
+              and ((:region is null and s.region is null) or s.region = :region)
+            order by s.id asc
+            """)
+    List<School> findByNaturalKey(
+            @Param("schoolName") String schoolName,
+            @Param("schoolType") String schoolType,
+            @Param("region") String region);
 
     /**
      * public 자동완성: 활성 학교만, 이름 contains(대소문자 무시). prefix 일치를 우선 정렬하고 top-N(Pageable)로 제한한다.

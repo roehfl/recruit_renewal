@@ -1,5 +1,41 @@
 # 07. Implementation History
 
+## Phase 08c - School xlsx import + ApplicationEducation.schoolId 링크
+
+- Date: 2026-06-02
+- Work type: implementation (Phase 08 세 번째 슬라이스, Phase 08 종료). 설계 §6.3/§6.4, ADR 0004.
+- Goal: (A) `ApplicationEducation` optional `schoolId`(app-level 참조) 추가, (B) School xlsx 일괄 import(upsert).
+- Created (main):
+  - `dto/request/SchoolImportRowRequest.java`
+  - `dto/response/SchoolImportRowError.java`, `dto/response/SchoolImportResponse.java`
+  - `service/SchoolImportParser.java`, `service/SchoolImportService.java`
+- Modified (main):
+  - `domain/entity/ApplicationEducation.java` (nullable `schoolId` + `create` 14-arg 오버로드; 기존 13-arg 비파괴)
+  - `dto/request/EducationRequest.java` (`schoolId` 컴포넌트 + 13-arg back-compat 생성자)
+  - `service/ApplicationEducationService.java` (`toEducation` 에서 `schoolId` 전달)
+  - `dto/response/EducationResponse.java`, `dto/response/AdminEducationResponse.java` (`schoolId` 추가)
+  - `domain/repository/SchoolRepository.java` (`findBySchoolCode`, `findByNaturalKey` — null 필드 IS NULL 매칭)
+  - `controller/AdminSchoolController.java` (`POST /admin/schools/import`)
+- Created (test):
+  - `controller/SchoolImportControllerTest.java` (6)
+  - `service/ApplicationEducationServiceTest.java` (+1, schoolId)
+- APIs:
+  - `POST /api/admin/schools/import` (admin, multipart `file`)
+- Key decisions:
+  - `ApplicationEducation.schoolId` nullable, 강한 FK 없음(app-level 참조, ADR 0004). 자동완성 선택 시에만 채움, 직접입력 null. `schoolName` free-text snapshot 유지. **존재 검증 안 함**(설계 일관).
+  - 비파괴: `ApplicationEducation.create` 오버로드 + `EducationRequest` back-compat 생성자(JSON 은 name 기반이라 schoolId optional, 기존 Java 호출부/테스트 그대로 컴파일).
+  - import = 행 단위 upsert(전체 거부 아님). schoolCode 우선 + (name,type,region) fallback. 기존=update(active 보존), 신규=insert. blank schoolName/formula 셀 행 skip + 사유. 파일 방어(.xlsx/크기/행수/header)는 07d 패턴 재사용(`UploadProperties`), 파일 레벨 오류 400.
+  - import preview/STALE 미도입(단일 commit + 요약). 라우팅 `/admin/schools/import` literal 우선.
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*School*" --tests "*ApplicationEducation*" --tests "*AdminApplicationSection*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL — School import 6 + School 12 + ApplicationEducation(신규 schoolId) + AdminApplicationSection 회귀 통과(education 응답 schoolId 추가 비파괴).
+- Documentation:
+  - `docs/codex/implementation/phase-08c-school-import-education-link.md`
+  - `docs/codex/reports/phase-08c-school-import-education-link.html`
+- Known limitations: schoolId 존재/active 검증 미수행(dangling 가능), import max-rows 는 `recruit.upload.max-rows` 재사용(대형 데이터셋 env 상향), 단일 commit(preview 없음), free-text 소급 매칭 없음.
+- Phase 08(CommonCode/School) 08a~08c 완료.
+- Next recommended: SCHOOL/CERTIFICATE funnel 통계(07c 보류, schoolId 기반) 또는 메시지 발송, 개인정보 파기/감사.
+
 ## Phase 08b - School (검색/자동완성 + admin CRUD)
 
 - Date: 2026-06-02

@@ -42,6 +42,30 @@ public record EducationRequest(
         @Min(value = 0, message = "Sort order must be greater than or equal to 0.")
         Integer sortOrder,
 
-        List<@Valid SemesterGradeRequest> semesterGrades
+        List<@Valid SemesterGradeRequest> semesterGrades,
+
+        /** 선택적 School master 참조(Phase 08c). 자동완성 선택 시에만 값, 직접입력이면 null. */
+        Long schoolId
 ) {
+
+    /** schoolId 없이 호출하던 기존 코드 호환용(Phase 08c 이전). */
+    public EducationRequest(
+            EducationLevel educationLevel,
+            String schoolName,
+            String majorName,
+            String degreeName,
+            LocalDate admissionDate,
+            LocalDate graduationDate,
+            GraduationStatus graduationStatus,
+            DayNightType dayNightType,
+            CampusType campusType,
+            Boolean transfer,
+            String countryCode,
+            Integer sortOrder,
+            List<SemesterGradeRequest> semesterGrades
+    ) {
+        this(educationLevel, schoolName, majorName, degreeName, admissionDate, graduationDate,
+                graduationStatus, dayNightType, campusType, transfer, countryCode, sortOrder,
+                semesterGrades, null);
+    }
 }

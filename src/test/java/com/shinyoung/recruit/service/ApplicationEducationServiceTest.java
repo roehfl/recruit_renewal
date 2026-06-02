@@ -105,6 +105,30 @@ class ApplicationEducationServiceTest {
     }
 
     @Test
+    void education_persists_optional_school_id_when_selected_and_null_when_freetext() {
+        Applicant applicant = createApplicant("education-schoolid", "Education SchoolId");
+        Long jobPostingId = createPublishedJobPosting(true);
+        Long applicationId = createApplication(applicant, jobPostingId);
+
+        EducationRequest linkedToMaster = new EducationRequest(
+                EducationLevel.UNIVERSITY, "Linked University", null, null,
+                LocalDate.of(2020, 3, 1), LocalDate.of(2024, 2, 1), GraduationStatus.GRADUATED,
+                DayNightType.DAY, CampusType.MAIN, false, "KR", 1, List.of(), 777L);
+        EducationRequest freeText = new EducationRequest(
+                EducationLevel.HIGH_SCHOOL, "Free Text High", null, null,
+                null, null, GraduationStatus.GRADUATED, null, null, false, "KR", 0, List.of());
+
+        List<EducationResponse> responses = applicationEducationService.replaceEducations(
+                applicant.getId(), applicationId,
+                new EducationReplaceRequest(List.of(linkedToMaster, freeText)));
+
+        EducationResponse linked = responses.stream().filter(r -> r.sortOrder() == 1).findFirst().orElseThrow();
+        EducationResponse free = responses.stream().filter(r -> r.sortOrder() == 0).findFirst().orElseThrow();
+        assertThat(linked.schoolId()).isEqualTo(777L);
+        assertThat(free.schoolId()).isNull();
+    }
+
+    @Test
     void semester_grades_are_sorted_by_school_year_semester_and_id() {
         Applicant applicant = createApplicant("education-grade-sort", "Education Grade Sort");
         Long jobPostingId = createPublishedJobPosting(true);

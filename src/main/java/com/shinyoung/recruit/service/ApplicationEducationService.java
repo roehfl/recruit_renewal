@@ -163,6 +163,7 @@ public class ApplicationEducationService {
                 request.campusType(),
                 request.transfer(),
                 request.countryCode(),
+                request.schoolId(),
                 request.sortOrder()
         );
     }

@@ -23,6 +23,7 @@ public record EducationResponse(
         CampusType campusType,
         Boolean transfer,
         String countryCode,
+        Long schoolId,
         Integer sortOrder,
         List<SemesterGradeResponse> semesterGrades
 ) {
@@ -44,6 +45,7 @@ public record EducationResponse(
                 education.getCampusType(),
                 education.getTransfer(),
                 education.getCountryCode(),
+                education.getSchoolId(),
                 education.getSortOrder(),
                 semesterGrades.stream()
                         .map(SemesterGradeResponse::from)
