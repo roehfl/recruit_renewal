@@ -22,6 +22,12 @@ spring:
   Jackson:
     deserialization:
       fail-on-unknown-properties: false
+  jpa:
+    hibernate:
+      # 스키마는 Hibernate ddl-auto 로 생성/갱신한다(별도 migration 프레임워크 없음).
+      # 신규 테이블(예: common_code)은 수동 DDL 없이 자동 생성된다. 운영(MariaDB)에서는
+      # validate/none + 관리형 DDL 로 전환하는 것을 권장한다.
+      ddl-auto: ${SPRING_JPA_DDL_AUTO:update}
 #  datasource:
 #    username: ENC()
 #    password: ENC()

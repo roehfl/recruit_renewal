@@ -92,7 +92,7 @@
     <thead><tr><th>Method</th><th>Path</th><th>접근</th><th>Purpose</th></tr></thead>
     <tbody>
       <tr><td>GET</td><td class="mono">/api/codes?groupCode=</td><td>public</td><td>active 코드 목록(sortOrder 순)</td></tr>
-      <tr><td>GET/POST/PUT</td><td class="mono">/api/admin/codes</td><td>admin</td><td>코드 관리(비활성 포함, code 불변)</td></tr>
+      <tr><td>GET/POST</td><td class="mono">/api/admin/codes[/{id}]</td><td>admin</td><td>코드 관리(생성/수정 POST, 비활성 포함, code 불변)</td></tr>
       <tr><td>GET</td><td class="mono">/api/schools?q=&amp;schoolType=</td><td>public</td><td>이름 검색 top-N(active)</td></tr>
       <tr><td>GET/POST/PUT</td><td class="mono">/api/admin/schools</td><td>admin</td><td>학교 관리</td></tr>
       <tr><td>POST</td><td class="mono">/api/admin/schools/import</td><td>admin</td><td>xlsx 일괄 upsert(07d parser 재사용)</td></tr>

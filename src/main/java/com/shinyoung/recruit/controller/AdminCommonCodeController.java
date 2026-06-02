@@ -11,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,7 +41,7 @@ public class AdminCommonCodeController {
         return ResponseEntity.ok(ApiResponse.success(commonCodeService.create(request)));
     }
 
-    @PutMapping("/admin/codes/{id}")
+    @PostMapping("/admin/codes/{id}")
     public ResponseEntity<ApiResponse<CommonCodeResponse>> updateCode(
             @PathVariable Long id,
             @Valid @RequestBody CommonCodeUpdateRequest request

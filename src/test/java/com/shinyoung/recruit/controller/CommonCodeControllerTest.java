@@ -29,7 +29,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -109,7 +108,7 @@ class CommonCodeControllerTest {
         String body = """
                 {"displayName":"강남구","sortOrder":5,"active":false,"description":"비활성화"}
                 """;
-        mockMvc.perform(jsonAdmin(put("/api/admin/codes/{id}", code.getId()), body))
+        mockMvc.perform(jsonAdmin(post("/api/admin/codes/{id}", code.getId()), body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.displayName").value("강남구"))
                 .andExpect(jsonPath("$.data.sortOrder").value(5))
@@ -130,8 +129,24 @@ class CommonCodeControllerTest {
 
     @Test
     void admin_update_unknown_returns_not_found() throws Exception {
-        mockMvc.perform(jsonAdmin(put("/api/admin/codes/{id}", 999999L), "{\"displayName\":\"x\"}"))
+        mockMvc.perform(jsonAdmin(post("/api/admin/codes/{id}", 999999L), "{\"displayName\":\"x\"}"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void admin_update_ignores_extra_code_and_group_fields_keeping_them_immutable() throws Exception {
+        String group = "IMMUT_" + uuid();
+        CommonCode code = commonCodeRepository.save(CommonCode.create(group, "ORIGINAL", "name", 1, true, null));
+
+        // 수정 body 에 code/groupCode 를 섞어 보내도 무시되고 기존 값이 유지되어야 한다(code 불변).
+        String body = """
+                {"displayName":"changed","code":"HACKED","groupCode":"OTHER","active":true}
+                """;
+        mockMvc.perform(jsonAdmin(post("/api/admin/codes/{id}", code.getId()), body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.displayName").value("changed"))
+                .andExpect(jsonPath("$.data.code").value("ORIGINAL"))
+                .andExpect(jsonPath("$.data.groupCode").value(group));
     }
 
     @Test

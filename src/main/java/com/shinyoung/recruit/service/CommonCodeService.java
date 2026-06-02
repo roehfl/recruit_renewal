@@ -8,6 +8,7 @@ import com.shinyoung.recruit.dto.response.CommonCodeResponse;
 import com.shinyoung.recruit.exception.CommonCodeNotFoundException;
 import com.shinyoung.recruit.exception.InvalidCommonCodeException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,15 +50,20 @@ public class CommonCodeService {
         if (commonCodeRepository.existsByGroupCodeAndCode(groupCode, code)) {
             throw new InvalidCommonCodeException("이미 존재하는 코드입니다. groupCode=" + groupCode + ", code=" + code);
         }
-        CommonCode saved = commonCodeRepository.save(CommonCode.create(
-                groupCode,
-                code,
-                request.displayName(),
-                request.sortOrder(),
-                request.active(),
-                request.description()
-        ));
-        return CommonCodeResponse.from(saved);
+        try {
+            // 동시 생성 race(둘 다 exists=false 통과)는 DB unique 제약으로만 잡히므로 flush 시점에 변환한다.
+            CommonCode saved = commonCodeRepository.saveAndFlush(CommonCode.create(
+                    groupCode,
+                    code,
+                    request.displayName(),
+                    request.sortOrder(),
+                    request.active(),
+                    request.description()
+            ));
+            return CommonCodeResponse.from(saved);
+        } catch (DataIntegrityViolationException e) {
+            throw new InvalidCommonCodeException("이미 존재하는 코드입니다. groupCode=" + groupCode + ", code=" + code);
+        }
     }
 
     @Transactional

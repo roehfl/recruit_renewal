@@ -61,7 +61,7 @@
   <div class="cards">
     <div class="card kpi"><div class="num">4</div><div class="lbl">신규 API</div></div>
     <div class="card kpi"><div class="num">9</div><div class="lbl">신규 클래스(main)</div></div>
-    <div class="card kpi"><div class="num">6</div><div class="lbl">테스트(통과)</div></div>
+    <div class="card kpi"><div class="num">7</div><div class="lbl">테스트(통과)</div></div>
     <div class="card kpi"><div class="num">1</div><div class="lbl">신규 테이블</div></div>
   </div>
 </section>
@@ -98,7 +98,7 @@
       <tr><td>GET</td><td class="mono">/api/codes?groupCode=</td><td>public</td><td>활성 코드(sortOrder 순)</td></tr>
       <tr><td>GET</td><td class="mono">/api/admin/codes?groupCode=</td><td>admin</td><td>비활성 포함(groupCode 선택)</td></tr>
       <tr><td>POST</td><td class="mono">/api/admin/codes</td><td>admin</td><td>코드 생성(중복 400)</td></tr>
-      <tr><td>PUT</td><td class="mono">/api/admin/codes/{id}</td><td>admin</td><td>수정 + soft delete(code 불변)</td></tr>
+      <tr><td>POST</td><td class="mono">/api/admin/codes/{id}</td><td>admin</td><td>수정 + soft delete(code 불변)</td></tr>
     </tbody>
   </table>
   <p class="note">public read 는 <code>anyRequest().permitAll()</code>, admin 은 <code>/api/admin/**</code> → SecurityConfig 변경 없음.</p>
@@ -121,9 +121,9 @@
   <h2>테스트</h2>
   <div class="summary" style="border-left-color:var(--green);">
     <div><strong>명령</strong>: <span class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*CommonCode*" --no-daemon</span></div>
-    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — 6건 통과.</div>
+    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — 7건 통과.</div>
   </div>
-  <p class="note">public read active+정렬+비활성 제외, create+중복 400, blank 400, update+soft delete(public 제외/admin 포함), 404, 인가(403/401). JSON body 수기 문자열 + UTF-8.</p>
+  <p class="note">public read active+정렬+비활성 제외, create+중복 400, blank 400, update+soft delete(public 제외/admin 포함), code 불변(extra 필드 무시), 404, 인가(403/401). 동시 생성 race 는 DataIntegrityViolation→400 변환. JSON body 수기 문자열 + UTF-8.</p>
 </section>
 
 <section>

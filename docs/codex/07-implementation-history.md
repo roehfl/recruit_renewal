@@ -15,20 +15,27 @@
   - `controller/CommonCodeController.java`(public read), `controller/AdminCommonCodeController.java`(admin CRUD)
 - Modified (main):
   - `exception/GlobalExceptionHandler.java` (`CommonCodeNotFoundException` 404, `InvalidCommonCodeException` 400)
+  - `src/main/resources/application.yaml` (`spring.jpa.hibernate.ddl-auto: ${SPRING_JPA_DDL_AUTO:update}` 명시 — 리뷰)
 - Created (test):
-  - `controller/CommonCodeControllerTest.java` (6)
+  - `controller/CommonCodeControllerTest.java` (7)
 - APIs:
   - `GET /api/codes?groupCode=` (permitAll, active+sortOrder)
   - `GET /api/admin/codes?groupCode=` (admin, 비활성 포함)
-  - `POST /api/admin/codes` / `PUT /api/admin/codes/{id}` (admin)
+  - `POST /api/admin/codes` / `POST /api/admin/codes/{id}` (admin; 수정은 admin 커맨드 컨벤션상 POST)
 - Key decisions:
   - `CommonCode` = `groupCode`+`code`(불변)+`displayName`+`sortOrder`+`active`+`description`, `(groupCode,code)` unique, 강한 FK 없음(application-level).
   - code/groupCode 불변(수정 API 미포함), 삭제는 soft delete(`active=false`). 중복 생성 → 400(InvalidCommonCode, 409 미사용·컨벤션 일치).
   - public read 는 active 만 sortOrder 순, admin read 는 비활성 포함. 보안은 `anyRequest().permitAll()`/`/api/admin/**` 로 자동 → SecurityConfig 변경 없음.
   - 기존 enum 전환 0(카탈로그만), 백엔드 필드 validation 미결합, seeding 무-seed.
+  - 스키마: 수동 DDL 없음 — `ddl-auto`(update)로 `common_code` 자동 생성.
+- Review 반영 (instruction.md, 4건):
+  - (확정) ddl-auto 사용 명시(application.yaml `spring.jpa.hibernate.ddl-auto`), 08a 문서에 "수동 DDL 없음, ddl-auto 생성" 명시.
+  - (변경) 수정 API `PUT` → `POST`(controller/test/문서 일괄).
+  - (Medium) 중복 생성 race → `create` 를 `saveAndFlush` + `DataIntegrityViolationException` catch → `InvalidCommonCodeException`(400) service-local 변환(선검사로 못 잡는 동시성 unique violation의 500 누출 방지).
+  - (Minor) code 불변 회귀 테스트 추가 — 수정 body 에 `code`/`groupCode` 가 와도 무시되고 기존 값 유지(6→7).
 - Tests:
   - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*CommonCode*" --no-daemon`
-  - 결과: BUILD SUCCESSFUL — 6건. public read active+정렬+비활성 제외, create+중복 400, blank 400, update+soft delete(public 제외/admin 포함), 404, 인가(403/401).
+  - 결과: BUILD SUCCESSFUL — 7건. public read active+정렬+비활성 제외, create+중복 400, blank 400, update+soft delete(public 제외/admin 포함), code 불변(extra 필드 무시), 404, 인가(403/401).
   - JSON body 는 컨벤션대로 수기 문자열(ObjectMapper 빈 미autowire) + UTF-8 인코딩.
 - Documentation:
   - `docs/codex/implementation/phase-08a-commoncode.md`

@@ -63,7 +63,7 @@
 | GET | `/api/codes?groupCode=` | permitAll | active 코드 목록(sortOrder 순) |
 | GET | `/api/admin/codes?groupCode=` | admin | 비활성 포함 관리용 목록 |
 | POST | `/api/admin/codes` | admin | 코드 생성 |
-| PUT | `/api/admin/codes/{id}` | admin | displayName/sortOrder/active/description 수정 |
+| POST | `/api/admin/codes/{id}` | admin | displayName/sortOrder/active/description 수정(admin 커맨드 컨벤션상 POST) |
 
 - 보안: `/api/codes` 는 SecurityConfig `anyRequest().permitAll()` 로 자동 공개, `/api/admin/codes` 는 `/api/admin/**` 로 자동 admin. **SecurityConfig 변경 불필요**.
 - 응답: `ApiResponse<List<CommonCodeResponse>>`. Request DTO 는 record + Bean Validation.
