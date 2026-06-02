@@ -1,37 +1,27 @@
-Blocking 문제
-1. @Version 추가와 “migration 없음”이 충돌한다
+Blocking 1 — CJK 폰트 임베드 요구를 만족하지 못함
 
-현재 StageResult에는 @Version private Long version;이 추가됐다. 이건 DB에 version 컬럼이 필요하다는 뜻이다.
+Phase 07 설계는 CJK 폰트를 리소스로 번들해서 컨테이너 시스템 폰트가 없어도 한글이 정상 출력되도록 하라고 되어 있다.
 
-그런데 문서 첫머리는 아직 “새 entity/table/migration 없음”이라고 되어 있다.
-또 리뷰 반영 항목에도 “PESSIMISTIC_WRITE 2안, migration 불필요”라는 문장이 그대로 남아 있다.
+그런데 현재 구현은 폰트가 classpath에 없으면 경고만 남기고 임베드를 생략한다.
+문서도 실제로 “CJK 폰트 바이너리 미포함, 한글 렌더는 폰트 배치 후 확인 필요”라고 인정한다.
 
-반면 뒤쪽 Known limitations에는 기존 DB 적용 시 컬럼 backfill 운영 절차가 필요하다고 적혀 있다.
+이 프로젝트는 한국어 지원서 PDF다. 한글 출력이 보장되지 않으면 PDF 기능의 핵심이 빠진 거다. ASCII 테스트만 통과한 상태라 운영 품질 검증이 안 됐다.
 
-즉 문서가 서로 모순된다.
+수정 방향:
 
-ALTER TABLE stage_result
-ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
+- 저장소에 폰트 바이너리를 직접 넣지 않을 거면, 최소한 ops/Dockerfile/배포 절차로 `recruit.pdf.font-classpath` 위치에 폰트를 배치하는 작업을 7e 안에 포함한다.
+- 테스트 리소스에는 테스트용 OFL CJK 폰트를 배치하거나, 테스트 프로파일에서 확실히 classpath font를 제공한다.
+- ApplicationPdfControllerTest에 한글 이름/질문답변/경력설명 텍스트를 넣고 PDFBox 텍스트 추출 또는 렌더 성공 기준으로 한글 출력 회귀를 추가한다.
+Blocking 2 — 설계 범위를 벗어난 전형결과가 PDF에 포함됨
 
-최소한 이 DDL 또는 그에 준하는 운영 절차가 명시되어야 한다. Flyway/Liquibase를 안 쓰는 프로젝트라면 docs/codex/ops나 docs/sql에 수동 반영 SQL이라도 남겨야 한다.
+설계상 Application PDF 내용은 “지원서 양식 섹션”이다. 기본정보, 학력, 경력, 자격, 어학, 병역, 수상, 공백기간, 질문답변까지가 명시되어 있고, ci/ciHash/password 제외가 적혀 있다. 전형결과는 포함 범위에 없다.
 
-그리고 엔티티에도 명시적으로 아래처럼 가는 게 낫다.
+그런데 실제 서비스는 stageResultSection()을 추가해서 PDF에 전형명, 결과, 점수, 코멘트, 결정일시를 넣는다.
 
-@Version
-@Column(nullable = false)
-private Long version;
+이건 단순 추가가 아니다. StageResult.comment는 내부 운영/평가성 코멘트일 수 있고, “지원서 PDF”라는 이름으로 출력·공유될 때 내부 판단 정보가 같이 나갈 수 있다. admin 전용이어도 PDF는 파일로 떨어지는 순간 통제 난도가 올라간다.
 
-지금은 @Version만 있고 @Column(nullable = false)는 없다.
+수정 방향:
 
-2. Optimistic lock 실패는 upload audit에 안 남을 가능성이 높다
-
-upload commit controller는 uploadService.commit()이 정상적으로 StageResultUploadCommitResponse를 반환한 뒤에야 uploadAuditLogger.logUploadCommit(...)을 호출한다.
-
-그런데 @Version 충돌은 service transaction commit/flush 시 예외로 터질 수 있고, 이 경우 controller의 audit 호출 라인까지 도달하지 않는다. GlobalExceptionHandler가 409는 반환하지만, upload audit outcome에는 안 남는다.
-
-Phase 07d가 “유일한 쓰기 경로”이고 upload commit audit을 남긴다는 요구라면, 충돌 실패도 audit 대상이다. 최소한 OPTIMISTIC_LOCK_CONFLICT 같은 outcome으로 audit을 남겨야 한다.
-
-수정 방향은 둘 중 하나다.
-
-1. controller에서 ObjectOptimisticLockingFailureException을 잡아 audit 후 다시 throw/409 응답
-2. upload audit을 AOP/필터/exception handler 쪽으로 옮겨 실패 attempt까지 기록
+- 7e PDF에서는 `전형결과` 섹션을 제거한다.
+- 전형결과 PDF가 필요하면 별도 Admin report/PDF로 분리한다.
+- 반드시 포함하려면 설계 문서를 먼저 수정하고, 내부 코멘트 포함 여부를 별도 정책으로 확정한다.

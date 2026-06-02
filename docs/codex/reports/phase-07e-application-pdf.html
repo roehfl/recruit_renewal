@@ -58,7 +58,7 @@
   <div class="summary">
     운영자가 지원자 1명의 지원서를 <strong>PDF 1개</strong>로 출력한다. Thymeleaf XHTML → jsoup 정규화 →
     openhtmltopdf(PDFBox)로 렌더하고, applicant free-text는 <code>th:text</code>만 사용(HTML injection 차단),
-    외부 resource를 로드하지 않으며 CJK 폰트는 번들 시 임베드한다. <code>ci</code>/<code>ciHash</code>/<code>password</code>는
+    외부 resource를 로드하지 않으며 CJK 폰트를 resources에 번들해 임베드한다(시스템 폰트 없이도 한글 출력). <code>ci</code>/<code>ciHash</code>/<code>password</code>는
     어디에도 포함하지 않고, 생성 시 audit를 남긴다. 테스트 <span class="ok">BUILD SUCCESSFUL</span>(3건).
   </div>
 </section>
@@ -68,7 +68,7 @@
   <div class="cards">
     <div class="card kpi"><div class="num">1</div><div class="lbl">신규 API</div></div>
     <div class="card kpi"><div class="num">8</div><div class="lbl">신규 클래스(main)</div></div>
-    <div class="card kpi"><div class="num">3</div><div class="lbl">테스트(통과)</div></div>
+    <div class="card kpi"><div class="num">4</div><div class="lbl">테스트(통과)</div></div>
     <div class="card kpi"><div class="num">0</div><div class="lbl">신규 테이블/마이그레이션</div></div>
   </div>
 </section>
@@ -80,7 +80,7 @@
       <h3><span class="badge done">완료</span> Implemented</h3>
       <ul>
         <li>admin PDF 다운로드 엔드포인트</li>
-        <li>지원서 양식 섹션 미러(학력~전형결과)</li>
+        <li>지원서 양식 섹션 미러(학력~질문답변, 전형결과 제외)</li>
         <li>AdminApplicationSectionService 재사용(마스킹 상속)</li>
         <li>th:text/pre-wrap/외부 resource 차단</li>
         <li>CJK 폰트 임베드(번들 시) + 보안 헤더</li>
@@ -96,11 +96,11 @@
       </ul>
     </div>
     <div class="card">
-      <h3><span class="badge warn">주의</span> 폰트</h3>
+      <h3><span class="badge done">완료</span> 폰트 번들</h3>
       <ul>
-        <li>.ttf 바이너리는 저장소 미포함</li>
-        <li>운영/개발에서 <code>recruit.pdf.font-classpath</code>에 SIL OFL 폰트 배치 필요</li>
-        <li>미배치 시 한글 글리프 누락 가능(경고 로그)</li>
+        <li>SIL OFL 폰트를 <code>resources/fonts/</code>에 번들(jar/classpath 배포)</li>
+        <li>기본 정적 <code>NanumGothic-Regular.ttf</code>, 고정 패밀리 <code>ApplicationPdfFont</code></li>
+        <li>한글 렌더를 PDFBox 추출로 회귀 검증</li>
       </ul>
     </div>
   </div>
@@ -122,6 +122,8 @@
     <thead><tr><th>항목</th><th>내용</th></tr></thead>
     <tbody>
       <tr><td>스택</td><td>Thymeleaf 3.1.3 → jsoup(well-formed XHTML 정규화) → openhtmltopdf 1.0.10 + PDFBox 2.0.24. iText(AGPL) 미사용.</td></tr>
+      <tr><td>폰트</td><td>SIL OFL 폰트를 <code>resources/fonts/</code>에 번들 → 고정 패밀리 <code>ApplicationPdfFont</code>로 임베드. 기본 정적 NanumGothic(변수폰트 Noto는 PDFBox 2.x 이슈로 제외).</td></tr>
+      <tr><td>범위</td><td>전형결과 섹션 제외(내부 코멘트 유출 방지, 리뷰2).</td></tr>
       <tr><td>PII</td><td><code>ci</code>/<code>ciHash</code>/<code>password</code> 미포함. name/phone/email은 export/PDF PII surface. 자격번호/병역 면제사유는 admin read 마스킹 상속.</td></tr>
       <tr><td>injection</td><td>applicant free-text는 <code>th:text</code>만(utext 금지), 줄바꿈은 CSS pre-wrap, 외부 resource(font/image) 미로드.</td></tr>
       <tr><td>헤더</td><td><code>application/pdf</code>, attachment, <code>no-store</code>/<code>no-cache</code>/<code>nosniff</code>.</td></tr>
@@ -135,25 +137,37 @@
   <h2>테스트</h2>
   <div class="summary" style="border-left-color: var(--green);">
     <div><strong>명령</strong>: <span class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*ApplicationPdfControllerTest" --no-daemon</span></div>
-    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — 3건 통과.</div>
+    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — 4건 통과.</div>
   </div>
   <table style="margin-top:12px;">
     <thead><tr><th>구획</th><th>커버</th></tr></thead>
     <tbody>
-      <tr><td>생성</td><td>200, application/pdf, Content-Disposition, no-store/nosniff, %PDF- magic bytes. PDFBox 텍스트 추출로 지원자명 존재 + ci/password 부재 단언.</td></tr>
+      <tr><td>생성(한글)</td><td>200, application/pdf, Content-Disposition, no-store/nosniff, %PDF- magic bytes. PDFBox 추출로 한글명("홍길동")+한글 섹션 제목("학력") 존재(번들 폰트 임베드) + ci/password 부재.</td></tr>
+      <tr><td>전형결과 제외</td><td>추출 텍스트에 "전형결과" 부재(리뷰2)</td></tr>
       <tr><td>404</td><td>unknown application</td></tr>
       <tr><td>인가</td><td>applicant 403 / anonymous 401</td></tr>
     </tbody>
   </table>
-  <p class="note">CJK 폰트 바이너리 부재로 테스트는 ASCII 데이터로 검증(폰트 미임베드 환경에서도 텍스트 추출 가능). 한글 렌더는 폰트 배치 후 확인 필요. Spring 컨텍스트 정상 기동 = thymeleaf auto-config 비파괴.</p>
+  <p class="note">번들 NanumGothic 임베드로 한글 렌더·추출을 실제 검증. Spring 컨텍스트 정상 기동 = thymeleaf auto-config 비파괴.</p>
+</section>
+
+<section>
+  <h2>리뷰 반영 (instruction.md · 2 blocking)</h2>
+  <table>
+    <thead><tr><th>등급</th><th>지적</th><th>반영</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge oos">Blocking</span></td><td>CJK 폰트 미번들 → 한글 출력 미보장(경고만)</td><td>SIL OFL 폰트를 <code>resources/fonts/</code>에 번들(jar 배포), 기본 정적 NanumGothic + 고정 패밀리 <code>ApplicationPdfFont</code>. 테스트를 한글 데이터로 전환해 PDFBox 추출로 한글 렌더 회귀 고정. <code>fonts/README.md</code> 안내.</td></tr>
+      <tr><td><span class="badge oos">Blocking</span></td><td>설계 범위 밖 전형결과가 PDF에 포함(내부 코멘트 유출 위험)</td><td><code>전형결과</code> 섹션 제거(<code>stageResultSection</code> 삭제). 추출 텍스트에 "전형결과" 부재 테스트로 고정. 필요 시 별도 admin report 분리.</td></tr>
+    </tbody>
+  </table>
 </section>
 
 <section>
   <h2>남은 이슈</h2>
   <div class="cards">
     <div class="card">
-      <h3><span class="badge warn">open</span> CJK 폰트</h3>
-      <ul><li>.ttf 바이너리 저장소 미포함 — ops가 <code>recruit.pdf.font-classpath</code>에 배치해야 한글 출력. Dockerfile/ops 반영 후속.</li></ul>
+      <h3><span class="badge pending">deferred</span> 폰트</h3>
+      <ul><li>변수폰트 Noto는 PDFBox 2.x 이슈로 기본값 제외(정적 NanumGothic 사용). OFL.txt 배포 동봉.</li></ul>
     </div>
     <div class="card">
       <h3><span class="badge pending">deferred</span> 상세/감사</h3>
@@ -165,7 +179,7 @@
 <section>
   <h2>다음 단계</h2>
   <div class="summary" style="border-left-color: var(--blue);">
-    <strong>Phase 07f</strong> — Stabilization / Test Hardening(row cap·upload 경계 회귀, PII 부재 교차 검증, 폰트 배치 후 한글 렌더 검증).
+    <strong>Phase 07f</strong> — Stabilization / Test Hardening(row cap·upload 경계 회귀, PII 부재 교차 검증).
   </div>
 </section>
 

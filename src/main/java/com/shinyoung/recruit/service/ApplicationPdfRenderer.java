@@ -34,6 +34,9 @@ public class ApplicationPdfRenderer {
     private static final Logger log = LoggerFactory.getLogger(ApplicationPdfRenderer.class);
     private static final String TEMPLATE_NAME = "application-pdf";
 
+    /** 번들 CJK 폰트를 등록하는 고정 패밀리명. 템플릿 CSS의 font-family와 일치해야 한다. */
+    private static final String PDF_FONT_FAMILY = "ApplicationPdfFont";
+
     private final TemplateEngine templateEngine;
     private final PdfProperties pdfProperties;
 
@@ -85,6 +88,6 @@ public class ApplicationPdfRenderer {
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
-        }, pdfProperties.getFontFamily());
+        }, PDF_FONT_FAMILY);
     }
 }

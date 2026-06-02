@@ -61,9 +61,9 @@ class ApplicationPdfControllerTest {
     }
 
     @Test
-    void generates_pdf_with_security_headers_and_applicant_name_without_ci() throws Exception {
+    void generates_pdf_with_korean_text_and_security_headers_without_ci() throws Exception {
         String ci = "secret-ci-" + UUID.randomUUID();
-        JobApplication application = saveSubmittedApplication("John Doe Applicant", ci);
+        JobApplication application = saveSubmittedApplication("홍길동", ci);
 
         MvcResult result = mockMvc.perform(get("/api/admin/applications/{id}/pdf", application.getId())
                         .with(authentication(adminAuthentication())))
@@ -81,10 +81,26 @@ class ApplicationPdfControllerTest {
         assertThat(new String(body, 0, 5)).isEqualTo("%PDF-");
 
         String text = extractText(body);
-        assertThat(text).contains("John Doe Applicant");
+        // 번들 CJK 폰트가 임베드되어 한글 이름과 한글 섹션 제목이 렌더·추출된다.
+        assertThat(text).contains("홍길동");
+        assertThat(text).contains("학력");
         // ci/password는 PDF 어디에도 노출되지 않는다.
         assertThat(text).doesNotContain(ci);
         assertThat(text).doesNotContain("password");
+    }
+
+    @Test
+    void pdf_excludes_stage_result_section() throws Exception {
+        JobApplication application = saveSubmittedApplication("김철수", "ci-" + UUID.randomUUID());
+
+        MvcResult result = mockMvc.perform(get("/api/admin/applications/{id}/pdf", application.getId())
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String text = extractText(result.getResponse().getContentAsByteArray());
+        // 전형결과는 설계 범위 밖이라 PDF에 포함하지 않는다(내부 코멘트 유출 방지).
+        assertThat(text).doesNotContain("전형결과");
     }
 
     @Test

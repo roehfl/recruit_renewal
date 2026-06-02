@@ -15,9 +15,11 @@
 - Modified (main):
   - `build.gradle` (`spring-boot-starter-thymeleaf`, `com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10` → PDFBox 2.0.24)
   - `exception/GlobalExceptionHandler.java` (`PdfGenerationException` 500)
-  - `src/main/resources/application.yaml` (`recruit.pdf.font-classpath`, `recruit.pdf.font-family`)
+  - `src/main/resources/application.yaml` (`recruit.pdf.font-classpath` 기본 `fonts/NanumGothic-Regular.ttf`)
+- Created (resources):
+  - `src/main/resources/fonts/NanumGothic-Regular.ttf`, `NotoSansKR[wght].ttf` (SIL OFL 1.1, 사용자 배치) + `fonts/README.md`
 - Created (test):
-  - `controller/ApplicationPdfControllerTest.java` (3)
+  - `controller/ApplicationPdfControllerTest.java` (4)
 - API:
   - `GET /api/admin/applications/{applicationId}/pdf` → `application/pdf` (attachment)
 - Key decisions:
@@ -25,17 +27,20 @@
   - 섹션 데이터는 `AdminApplicationSectionService` 재사용(자격번호/병역 면제사유 마스킹 정책 상속). 기본정보 name/phone/email은 PII surface, `ci`/`ciHash`/`password`는 미포함.
   - 표시 모델은 generic record(label/value 평탄화) → 템플릿은 `th:text`만으로 순회(injection 차단), free-text 줄바꿈은 CSS pre-wrap, 외부 resource 미로드.
   - 템플릿은 record accessor를 메서드 호출(`${header.applicantName()}`)로 참조해 SpEL property-accessor 버전 차이에 비의존.
-  - CJK 폰트 바이너리(.ttf)는 저장소 미포함 — `recruit.pdf.font-classpath`에 SIL OFL 폰트를 ops가 배치(없으면 임베드 생략 + 경고, ASCII는 기본 폰트).
+  - CJK 폰트를 `src/main/resources/fonts/`에 번들(jar/classpath 배포) → 시스템 폰트 없이 한글 출력. 기본 정적 `NanumGothic-Regular.ttf`, 고정 패밀리 `ApplicationPdfFont`로 등록(템플릿 CSS 일치).
   - 응답 보안 헤더 `no-store`/`no-cache`/`nosniff` + attachment. 생성 시 SLF4J audit(actor/applicationId/jobPostingId/jobPositionId).
 - Tests:
   - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*ApplicationPdfControllerTest" --no-daemon`
-  - 결과: BUILD SUCCESSFUL — 3건 통과. 생성(200/헤더/`%PDF-`/PDFBox 텍스트 추출로 지원자명 존재 + ci/password 부재), 404, 인가(403/401). Spring 컨텍스트 정상 기동(thymeleaf auto-config 비파괴).
-  - CJK 폰트 부재로 테스트는 ASCII 데이터 검증(한글 렌더는 폰트 배치 후 확인).
+  - 결과: BUILD SUCCESSFUL — 4건 통과. 생성(한글: 200/헤더/`%PDF-`/PDFBox 추출로 "홍길동"+"학력" 존재=번들 폰트 임베드 + ci/password 부재), 전형결과 제외, 404, 인가(403/401).
+- Review 반영 (instruction.md, 2 blocking):
+  - (Blocking) CJK 폰트 임베드 미보장(경고만) → SIL OFL 폰트를 resources에 번들, 기본 정적 NanumGothic + 고정 패밀리 `ApplicationPdfFont` 결합, 테스트를 한글 데이터로 전환해 PDFBox 추출로 한글 렌더 회귀 고정, `fonts/README.md` 문서화.
+  - (Blocking) 설계 범위 밖 `전형결과` 섹션 포함(StageResult.comment 내부 정보 유출 위험) → `stageResultSection` 제거, 추출 텍스트 "전형결과" 부재 테스트 고정. 필요 시 별도 admin report 분리.
 - Documentation:
   - `docs/codex/implementation/phase-07e-application-pdf.md`
   - `docs/codex/reports/phase-07e-application-pdf.html`
-- Known limitations: CJK 폰트 바이너리 미포함(ops 배치 필요), 학기별 성적 요약 필드, PDF byte[] 메모리 보유(1인 단위), audit SLF4J.
-- Deferred: 07f(stabilization), 지원자 본인 PDF, attachment 목록, 폰트 ops/Dockerfile.
+  - `src/main/resources/fonts/README.md`
+- Known limitations: 변수폰트 Noto는 PDFBox 2.x 이슈로 기본값 제외(정적 NanumGothic 사용), OFL.txt 배포 동봉, 학기별 성적 요약 필드, PDF byte[] 메모리 보유(1인 단위), audit SLF4J.
+- Deferred: 07f(stabilization), 지원자 본인 PDF, attachment 목록.
 - Next recommended: Phase 07f - Stabilization / Test Hardening.
 
 ## Phase 07d - Stage Result Excel Upload (preview/commit)

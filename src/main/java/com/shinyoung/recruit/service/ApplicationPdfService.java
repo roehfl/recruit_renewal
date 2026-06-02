@@ -4,7 +4,6 @@ import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.dto.response.AdminApplicationAnswerResponse;
-import com.shinyoung.recruit.dto.response.AdminApplicationStageResultResponse;
 import com.shinyoung.recruit.dto.response.AdminAwardResponse;
 import com.shinyoung.recruit.dto.response.AdminCareerItemResponse;
 import com.shinyoung.recruit.dto.response.AdminCareerResponse;
@@ -84,7 +83,8 @@ public class ApplicationPdfService {
         sections.add(awardSection(applicationId));
         sections.add(gapPeriodSection(applicationId));
         sections.add(answerSection(applicationId));
-        sections.add(stageResultSection(applicationId));
+        // 전형결과는 설계상 "지원서 양식 섹션" 범위 밖이고 StageResult.comment 등 내부 운영 정보가 포함될 수 있어
+        // 지원서 PDF에서는 제외한다(필요 시 별도 admin report로 분리).
         return sections;
     }
 
@@ -211,19 +211,6 @@ public class ApplicationPdfService {
                     field("답변", a.answerText()))));
         }
         return new Section("질문답변", rows, EMPTY);
-    }
-
-    private Section stageResultSection(Long applicationId) {
-        List<RecordRow> rows = new ArrayList<>();
-        for (AdminApplicationStageResultResponse s : sectionService.getStageResults(applicationId)) {
-            rows.add(new RecordRow(List.of(
-                    field("전형", s.stageName()),
-                    field("결과", s.resultStatus()),
-                    field("점수", s.score()),
-                    field("코멘트", s.comment()),
-                    field("결정일시", s.decidedAt()))));
-        }
-        return new Section("전형결과", rows, EMPTY);
     }
 
     private Field field(String label, Object value) {
