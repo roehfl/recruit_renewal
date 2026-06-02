@@ -30,6 +30,8 @@ public class SchoolService {
 
     /** public 자동완성 결과 상한(cardinality/성능). */
     private static final int SEARCH_LIMIT = 20;
+    /** admin 목록 페이지 크기 상한(과대 size 요청 방어). */
+    private static final int MAX_ADMIN_PAGE_SIZE = 200;
 
     private final SchoolRepository schoolRepository;
 
@@ -39,7 +41,7 @@ public class SchoolService {
         if (query == null) {
             return List.of();
         }
-        return schoolRepository.search(query, blankToNull(schoolType), PageRequest.of(0, SEARCH_LIMIT))
+        return schoolRepository.search(escapeLike(query), blankToNull(schoolType), PageRequest.of(0, SEARCH_LIMIT))
                 .stream()
                 .map(SchoolSearchResponse::from)
                 .toList();
@@ -47,10 +49,14 @@ public class SchoolService {
 
     /** admin: 비활성 포함 페이지 목록(q/schoolType 옵션). */
     public PageResponse<SchoolResponse> getAdminSchools(String q, String schoolType, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), MAX_ADMIN_PAGE_SIZE);
+        String query = blankToNull(q);
         Page<SchoolResponse> result = schoolRepository.adminSearch(
-                        blankToNull(q),
+                        query == null ? null : escapeLike(query),
                         blankToNull(schoolType),
-                        PageRequest.of(page, size, Sort.by("schoolName").ascending().and(Sort.by("id").ascending())))
+                        PageRequest.of(safePage, safeSize,
+                                Sort.by("schoolName").ascending().and(Sort.by("id").ascending())))
                 .map(SchoolResponse::from);
         return PageResponse.from(result);
     }
@@ -101,5 +107,16 @@ public class SchoolService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    /**
+     * LIKE 특수문자를 escape 한다(escape char = {@code \}). 쿼리는 {@code escape '\'} 를 사용하므로
+     * {@code q="%"} 같은 입력이 전체 매칭으로 새지 않는다.
+     */
+    private static String escapeLike(String value) {
+        return value
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 }

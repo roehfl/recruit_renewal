@@ -60,6 +60,7 @@
 
 - 보안: `/api/schools` permitAll(anyRequest), `/api/admin/schools` admin(`/api/admin/**`) → SecurityConfig 변경 없음.
 - 수정은 admin 커맨드 컨벤션상 POST.
+- 검색 q 는 LIKE 특수문자(`%`,`_`,`\`)를 escape(쿼리 `escape '\'`)하고, admin `size` 는 최대 200으로 clamp(리뷰).
 
 ## 7. Entity 관계 요약
 
@@ -69,24 +70,24 @@
 ## 8. 비즈니스 규칙
 
 - `schoolName` 필수. `schoolCode` 는 있으면 unique·생성 후 불변(수정 요청에 미포함, 와도 무시). 중복 schoolCode → 400(선검사 + 동시성 race 는 DataIntegrityViolation→400).
-- public 검색은 활성만, prefix 일치 우선 정렬 후 이름 asc, top-N(20). q 가 비면 빈 목록(전건 매칭 방지).
+- public 검색은 활성만, prefix 일치 우선 정렬 후 이름 asc, top-N(20). q 가 비면 빈 목록(전건 매칭 방지). q 의 LIKE 특수문자(`%`,`_`,`\`)는 escape → `q="%"` 가 전체 매칭으로 새지 않음(리뷰).
+- admin 목록 `size` 는 최대 200으로 clamp, `page` 는 최소 0(과대 요청 방어, 리뷰).
 - soft delete(`active=false`): public 검색 제외, admin 목록 포함.
 - `schoolType`/`educationMode` 는 코드 문자열(표시는 프론트가 CommonCode group 으로). 백엔드 validation 미결합.
 
 ## 9. 테스트 커버리지
 
-- `SchoolControllerTest` (10): public 검색 prefix 우선+활성만+비활성 제외, schoolType 필터, blank q 빈 목록, admin create+중복 schoolCode 400, 다중 null schoolCode 허용, blank schoolName 400, update(region/active)+soft delete 후 검색 제외+schoolCode 유지, unknown update 404, admin 목록 비활성 포함(paged totalElements), 인가(applicant 403/anonymous 401).
+- `SchoolControllerTest` (12): public 검색 prefix 우선+활성만+비활성 제외, schoolType 필터, **LIKE wildcard escape(`q="%"` → literal 매칭만)**, blank q 빈 목록, admin create+중복 schoolCode 400, 다중 null schoolCode 허용, blank schoolName 400, update(region/active)+soft delete 후 검색 제외+schoolCode 유지, **수정 body 에 schoolCode 가 와도 불변(무시)**, unknown update 404, admin 목록 비활성 포함(paged totalElements), 인가(applicant 403/anonymous 401).
 
 ## 10. 테스트 결과
 
 - 명령: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*SchoolControllerTest" --no-daemon`
-- 결과: BUILD SUCCESSFUL — 10건 통과.
+- 결과: BUILD SUCCESSFUL — 12건 통과.
 - 비고: 부분 실행(School). JSON body 수기 문자열 + UTF-8.
 
 ## 11. Known limitations
 
 - (name, type, region) fallback 멱등은 import(08c)에서 적용. 08b create 는 schoolCode unique 만 강제(동명 학교 중복 생성 가능 — 관리자 책임).
-- 검색 q 의 LIKE 특수문자(`%`,`_`) 미이스케이프(자동완성 영향 경미). 필요 시 후속.
 - `ApplicationEducation.schoolId` 미연결(08c).
 
 ## 12. Next phase considerations

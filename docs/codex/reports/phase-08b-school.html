@@ -60,7 +60,7 @@
   <div class="cards">
     <div class="card kpi"><div class="num">4</div><div class="lbl">신규 API</div></div>
     <div class="card kpi"><div class="num">10</div><div class="lbl">신규 클래스(main)</div></div>
-    <div class="card kpi"><div class="num">10</div><div class="lbl">테스트(통과)</div></div>
+    <div class="card kpi"><div class="num">12</div><div class="lbl">테스트(통과)</div></div>
     <div class="card kpi"><div class="num">1</div><div class="lbl">신규 테이블</div></div>
   </div>
 </section>
@@ -121,9 +121,21 @@
   <h2>테스트</h2>
   <div class="summary" style="border-left-color:var(--green);">
     <div><strong>명령</strong>: <span class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*SchoolControllerTest" --no-daemon</span></div>
-    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — 10건 통과.</div>
+    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — 12건 통과.</div>
   </div>
-  <p class="note">검색 prefix 우선/활성만/타입 필터/blank q, create+중복 400/다중 null 코드/blank name 400, update+soft delete(검색 제외, schoolCode 유지), 404, admin 목록 비활성 포함(paged), 인가(403/401).</p>
+  <p class="note">검색 prefix 우선/활성만/타입 필터/LIKE wildcard escape(q="%" literal)/blank q, create+중복 400/다중 null 코드/blank name 400, update+soft delete(검색 제외, schoolCode 유지)/extra schoolCode 무시(불변), 404, admin 목록 비활성 포함(paged), 인가(403/401).</p>
+</section>
+
+<section>
+  <h2>리뷰 반영 (instruction.md · 3건)</h2>
+  <table>
+    <thead><tr><th>등급</th><th>지적</th><th>반영</th></tr></thead>
+    <tbody>
+      <tr><td>Medium</td><td>검색 q 의 LIKE 특수문자(%,_) 미이스케이프 → q="%" 가 전체 매칭</td><td>service <code>escapeLike</code>(%,_,\) + 쿼리 <code>escape '\'</code>. q="%" 가 literal '%' 매칭만 하도록 회귀 테스트 추가.</td></tr>
+      <tr><td>Low</td><td>admin page size 상한 없음(size=100000 등)</td><td>service 에서 size 를 [1,200]로 clamp, page 최소 0.</td></tr>
+      <tr><td>Low</td><td>schoolCode 불변 extra-field 테스트 없음</td><td>수정 body 에 schoolCode 를 넣어도 기존 값 유지되는 회귀 테스트 추가(10→12).</td></tr>
+    </tbody>
+  </table>
 </section>
 
 <section>

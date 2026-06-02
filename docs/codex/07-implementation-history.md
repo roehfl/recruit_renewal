@@ -26,13 +26,17 @@
   - `schoolCode` 식별 키 불변(수정 요청 미포함), soft delete(`active=false`). 중복 schoolCode → 선검사 + `saveAndFlush` DataIntegrityViolation→400(08a 패턴 상속).
   - `schoolType`/`educationMode` 는 코드 문자열(표시는 프론트 CommonCode group), 백엔드 validation 미결합(설계 Q3 일관).
   - 보안은 `anyRequest().permitAll()`/`/api/admin/**` 자동 → SecurityConfig 변경 없음. 스키마 `ddl-auto`(update) 자동 생성.
+- Review 반영 (instruction.md, 3건):
+  - (Medium) 검색 q 의 LIKE 특수문자(%,_) 미이스케이프 → `SchoolService.escapeLike`(%,_,\) + 쿼리 `escape '\'`. `q="%"` 가 전체 매칭으로 새지 않고 literal '%' 매칭만 함을 회귀 테스트로 고정.
+  - (Low) admin page size 상한 없음 → service 에서 `size` 를 [1,200]로 clamp, `page` 최소 0.
+  - (Low) schoolCode 불변 extra-field 테스트 → 수정 body 에 schoolCode 를 넣어도 기존 식별 키 유지되는 회귀 추가(10→12).
 - Tests:
   - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*SchoolControllerTest" --no-daemon`
-  - 결과: BUILD SUCCESSFUL — 10건. 검색 prefix 우선/활성/타입 필터/blank q, create+중복 400/다중 null 코드/blank name 400, update+soft delete(검색 제외/schoolCode 유지), 404, admin 목록 비활성 포함(paged), 인가(403/401).
+  - 결과: BUILD SUCCESSFUL — 12건. 검색 prefix 우선/활성/타입 필터/LIKE wildcard escape/blank q, create+중복 400/다중 null 코드/blank name 400, update+soft delete(검색 제외/schoolCode 유지)/extra schoolCode 무시, 404, admin 목록 비활성 포함(paged), 인가(403/401).
 - Documentation:
   - `docs/codex/implementation/phase-08b-school.md`
   - `docs/codex/reports/phase-08b-school.html`
-- Known limitations: (name,type,region) fallback 멱등은 08c(import), 검색 LIKE 특수문자 미이스케이프(경미), schoolId 미연결(08c).
+- Known limitations: (name,type,region) fallback 멱등은 08c(import), schoolId 미연결(08c).
 - Next recommended: Phase 08c - School xlsx import(upsert) + `ApplicationEducation.schoolId` 링크.
 
 ## Phase 08a - CommonCode

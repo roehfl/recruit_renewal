@@ -1,34 +1,26 @@
-1. CommonCode table 생성은 ddl-auto 사용으로 확정
-   - application.yaml 또는 profile 설정에 ddl-auto 반영
-   - 08a 문서에 "수동 DDL 없음, ddl-auto 생성" 명시
+Medium — LIKE wildcard escape 없음
 
-2. update API는 PUT → POST로 변경
-   - controller
-   - test
-   - implementation 문서
-   - design 문서/roadmap/history API 표
+문서에도 known limitation으로 적혀 있듯이 검색 q의 %, _ 같은 LIKE 특수문자를 escape하지 않는다.
 
-Medium — 중복 생성 race가 500으로 샐 수 있다
+현재는 public 검색이 top-N 20이라 치명적이지는 않다. 다만 q=%가 사실상 전체 active 학교 top 20 조회가 될 수 있으므로, 자동완성 API 품질을 더 엄격히 보려면 08c나 08f에서 escape 처리하는 게 좋다.
 
-엔티티에는 (group_code, code) unique 제약이 있고, 서비스는 existsByGroupCodeAndCode()로 선검사 후 save한다.
+권장 수정:
 
-단일 요청에서는 괜찮다. 하지만 동시에 같은 코드를 생성하면 둘 다 exists=false를 통과하고, 하나는 DB unique violation으로 터질 수 있다. 현재 서비스는 DB constraint violation을 InvalidCommonCodeException으로 변환하지 않는다.
-
-수정 권장:
-
-@Transactional
-public CommonCodeResponse create(CommonCodeCreateRequest request) {
-    try {
-        ...
-        CommonCode saved = commonCodeRepository.saveAndFlush(...);
-        return CommonCodeResponse.from(saved);
-    } catch (DataIntegrityViolationException e) {
-        throw new InvalidCommonCodeException("이미 존재하는 코드입니다.");
-    }
+private static String escapeLike(String value) {
+    return value
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_");
 }
 
-또는 전역 handler에서 DataIntegrityViolationException을 맥락별로 처리해도 된다. 다만 전역 처리만 하면 어떤 unique violation인지 메시지가 뭉개질 수 있으니 service-local 변환이 낫다.
+그리고 JPQL에 escape '\\'를 붙이는 방식으로 정리하면 된다.
 
-Minor — code 불변 테스트는 간접적이다
+Low — admin page size 상한 없음
 
-수정 DTO에 groupCode/code가 없으니 구조상 불변은 맞다. 하지만 spring.jackson.deserialization.fail-on-unknown-properties=false라서 PUT body에 code를 넣어도 조용히 무시된다. 설계의 “code 불변(수정 거부)”을 엄격히 보려면 “extra code 필드가 들어와도 기존 code가 바뀌지 않는다” 정도의 테스트를 추가하는 게 좋다. 현재 테스트는 update 후 display/sort/active만 검증한다.
+admin 목록은 page/size를 그대로 PageRequest.of(page, size, ...)에 넣는다.
+
+admin endpoint라 blocking은 아니지만, size=100000 같은 요청을 막으려면 controller/service에서 max size를 둬라. School master는 수천 건 정도라 당장은 큰 문제는 아니다.
+
+Low — schoolCode 불변 extra-field 테스트 없음
+
+SchoolUpdateRequest에는 schoolCode가 없기 때문에 구조상 불변이다. 그래도 8a에서 CommonCode에 추가했던 것처럼, update body에 schoolCode를 넣어도 기존 값이 유지되는 회귀 테스트를 추가하면 더 좋다. 현재 테스트는 update 후 schoolCode 유지 정도만 확인한다.

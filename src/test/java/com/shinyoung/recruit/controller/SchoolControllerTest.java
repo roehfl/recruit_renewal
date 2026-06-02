@@ -88,6 +88,19 @@ class SchoolControllerTest {
     }
 
     @Test
+    void public_search_escapes_like_wildcards() throws Exception {
+        // q="%" 가 전체 매칭으로 새지 않고, 이름에 literal '%' 가 든 학교만 매칭되어야 한다(escape).
+        schoolRepository.saveAll(List.of(
+                School.create(null, "Alpha University", "UNIVERSITY", null, "Seoul", null, "KR", true),
+                School.create(null, "A%B University", "UNIVERSITY", null, "Seoul", null, "KR", true)));
+
+        mockMvc.perform(get("/api/schools").param("q", "%").with(anonymous()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].schoolName").value("A%B University"));
+    }
+
+    @Test
     void public_search_blank_q_returns_empty() throws Exception {
         schoolRepository.save(School.create(null, "Anything University", "UNIVERSITY", null, "Seoul", null, "KR", true));
 
@@ -151,6 +164,20 @@ class SchoolControllerTest {
     void admin_update_unknown_returns_not_found() throws Exception {
         mockMvc.perform(jsonAdmin(post("/api/admin/schools/{id}", 999999L), "{\"schoolName\":\"x\"}"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void admin_update_ignores_extra_school_code_keeping_it_immutable() throws Exception {
+        School school = schoolRepository.save(
+                School.create("SC200", "Immutable University", "UNIVERSITY", null, "Seoul", null, "KR", true));
+
+        // 수정 body 에 schoolCode 를 섞어 보내도 무시되고 기존 식별 키가 유지되어야 한다.
+        String body = """
+                {"schoolName":"Immutable University","schoolCode":"HACKED","active":true}
+                """;
+        mockMvc.perform(jsonAdmin(post("/api/admin/schools/{id}", school.getId()), body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.schoolCode").value("SC200"));
     }
 
     @Test
