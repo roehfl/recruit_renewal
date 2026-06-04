@@ -27,6 +27,8 @@ spring:
 crypto:
   aes:
     key: ${AES_SECRET_KEY}
+audit:
+  hmac-secret: test-audit-hmac-pepper-0001
 recruit:
   attachment:
     storage-root: build/test-attachments

@@ -41,6 +41,10 @@ spring:
 crypto:
   aes:
     key: ${AES_SECRET_KEY}
+audit:
+  # 감사 연결용 HMAC pepper(Phase 09a). 운영(prod)에서는 반드시 주입(누락 시 기동 실패),
+  # dev/test 미설정 시 AuditConfig 가 비운영 fallback 값을 사용한다(운영 금지).
+  hmac-secret: ${AUDIT_HMAC_SECRET:}
 recruit:
   export:
     max-rows: ${RECRUIT_EXPORT_MAX_ROWS:50000}

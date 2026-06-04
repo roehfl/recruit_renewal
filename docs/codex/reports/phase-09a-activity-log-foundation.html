@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 09a — ActivityLog Foundation 구현 리포트</title>
+<style>
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
+    color:#1e293b;background:#eef2f7;line-height:1.55;font-size:14px}
+  header{background:linear-gradient(135deg,#0f172a,#166534);color:#fff;padding:28px 32px}
+  header h1{margin:0 0 6px;font-size:21px}
+  header .sub{color:#cbd5e1;font-size:13px}
+  .wrap{max-width:1040px;margin:0 auto;padding:24px 20px 60px}
+  section{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px 22px;margin:18px 0;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+  h2{font-size:16px;margin:0 0 14px;padding-bottom:8px;border-bottom:2px solid #e2e8f0}
+  h3{font-size:13.5px;margin:14px 0 7px;color:#334155}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;vertical-align:middle}
+  .b-green{background:#dcfce7;color:#15803d}.b-blue{background:#dbeafe;color:#1d4ed8}.b-amber{background:#fef3c7;color:#b45309}.b-gray{background:#e2e8f0;color:#475569}.b-red{background:#fee2e2;color:#b91c1c}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .card{border:1px solid #e2e8f0;border-radius:10px;padding:14px;background:#f8fafc}
+  .card h4{margin:0 0 8px;font-size:13px}.card ul{margin:6px 0 0;padding-left:18px}.card li{margin:3px 0}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12.5px}
+  th,td{border:1px solid #e2e8f0;padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:#f1f5f9;font-weight:700}
+  code{background:#f1f5f9;padding:1px 5px;border-radius:5px;font-size:12px;color:#9333ea}
+  .pill{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px}
+  .ok{background:#f0fdf4;border-left:4px solid #16a34a;padding:10px 14px;border-radius:0 8px 8px 0;margin:10px 0}
+  .note{background:#fffbeb;border-left:4px solid #d97706;padding:10px 14px;border-radius:0 8px 8px 0;margin:10px 0}
+  .muted{color:#64748b}
+  .flow{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:8px;overflow-x:auto;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<header>
+  <h1>Phase 09a — ActivityLog Foundation</h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · 구현 리포트 ·
+    <span class="badge b-green">구현 완료</span> <span class="badge b-green">테스트 통과(19)</span> · 2026-06-04</div>
+</header>
+<div class="wrap">
+
+  <section>
+    <h2>1. 요약</h2>
+    <p>Phase 09(개인정보 파기/감사/보존)의 첫 슬라이스. 영속 감사 증적의 <b>기반</b>만 구현했다 — 영속
+      <code>ActivityLog</code>(append-only), 감사 enum 5종, append-only repository, 기록 서비스 2경로
+      (<code>recordInCurrentTx</code>/<code>recordRequiresNew</code>), <code>correlationId</code> 필터,
+      <code>applicantRefHash</code>(HMAC+pepper).</p>
+    <div class="ok"><b>업무 이벤트 계측·API·보존/파기 도메인은 이 슬라이스에 없다</b> — 기존 로거 흡수/관리자 변경 감사/read API 는 9b, 보존/파기는 9c~9e.</div>
+    <div class="note"><b>관찰</b>: 컨텍스트에 Quartz 스케줄러 존재 → 9c/9e retention 스케줄(설계상 disabled-by-default)에 <code>@Scheduled</code> 대신 Quartz 활용 가능(별도 검토).</div>
+  </section>
+
+  <section>
+    <h2>2. 범위</h2>
+    <div class="cards">
+      <div class="card"><h4><span class="badge b-green">구현</span></h4><ul>
+        <li><code>ActivityLog</code> 엔티티(append-only)</li>
+        <li>enum 5종(Actor/ActionType/ActionResult/TargetType/ReasonCode)</li>
+        <li><code>ActivityLogRepository</code>(insert+조회만)</li>
+        <li><code>ActivityLogService</code> 2경로</li>
+        <li><code>CorrelationIdFilter</code>(MDC)</li>
+        <li><code>AuditHmac</code>+<code>AuditConfig</code>(pepper)</li>
+        <li><code>AuditEvent</code>/<code>AuditMetadata</code>(marker)</li>
+      </ul></div>
+      <div class="card"><h4><span class="badge b-amber">9b+로 이월</span></h4><ul>
+        <li>Export/Pdf/Upload 로거 흡수(dual-write)</li>
+        <li>egress fail-close, 관리자 변경 계측</li>
+        <li>typed AuditMetadata 구체 record</li>
+        <li>admin audit read API + 가드</li>
+      </ul></div>
+      <div class="card"><h4><span class="badge b-gray">전제</span></h4><ul>
+        <li>ADR-0006 트랜잭션 정책</li>
+        <li><code>activity_log</code> 운영 수동 DDL</li>
+        <li><code>AUDIT_HMAC_SECRET</code> 운영 주입</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>3. 기록 트랜잭션 2경로 (ADR-0006)</h2>
+    <div class="flow">recordInCurrentTx  (REQUIRED)      커밋된 변경 성공 증적 → 비즈니스 tx 에 join(원자적, 함께 rollback)
+recordRequiresNew  (REQUIRES_NEW)  실패/거부/충돌/스킵 + 정보 반출(fail-close) → 비즈니스 rollback 무관 보존
+emission = 명시적 호출(AOP blanket 아님) · 외부(09b)에서 호출(self-invocation 회피)</div>
+    <table>
+      <tr><th>occurredAt</th><td>주입 <code>Clock</code> 기준(테스트 fixed Clock)</td></tr>
+      <tr><th>applicantRefHash</th><td><code>HMAC_SHA256(AUDIT_HMAC_SECRET, "APPLICANT:"+applicantId)</code> — 입력 applicantId 만, plain SHA-256(<code>ciHash</code>)과 분리</td></tr>
+      <tr><th>metadataJson</th><td>typed <code>AuditMetadata</code> 만, 전용 ObjectMapper 로 서비스 내부 직렬화(앱 web Jackson 분리)</td></tr>
+      <tr><th>correlationId</th><td><code>X-Request-Id</code> 또는 UUID(<code>CorrelationIdFilter</code>) → MDC → 기록</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>4. 변경 파일</h2>
+    <table>
+      <thead><tr><th>구분</th><th>파일</th></tr></thead>
+      <tbody>
+        <tr><td>Entity</td><td><code>domain/entity/ActivityLog.java</code></td></tr>
+        <tr><td>Enum (5)</td><td><code>enumeration/{ActorType,AuditActionType,AuditActionResult,AuditTargetType,AuditReasonCode}.java</code></td></tr>
+        <tr><td>Repository</td><td><code>domain/repository/ActivityLogRepository.java</code></td></tr>
+        <tr><td>Service</td><td><code>service/{ActivityLogService,AuditEvent,AuditMetadata}.java</code></td></tr>
+        <tr><td>Hash/Config</td><td><code>common/hash/AuditHmac.java</code>, <code>config/{AuditConfig,CorrelationIdFilter}.java</code></td></tr>
+        <tr><td>Exception</td><td><code>exception/InvalidActivityLogException.java</code></td></tr>
+        <tr><td>설정(수정)</td><td><code>src/main/resources/application.yaml</code>, <code>src/test/resources/application.yaml</code> (+<code>audit.hmac-secret</code>)</td></tr>
+        <tr><td>Test (5)</td><td>AuditHmacTest, CorrelationIdFilterTest, AuditConfigTest, ActivityLogRepositoryTest, ActivityLogServiceTest</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>5. 도메인/스키마</h2>
+    <p><code>ActivityLog</code> = 독립 테이블 <code>activity_log</code>, <b>FK 없음</b>. <code>jobPostingId</code>/<code>applicationId</code> 는 denormalized search key(파기 후 join 회피), <code>applicantRefHash</code> 는 가명 연결자. <b>append-only</b>(setter/update/@Version 없음). 지원자 원문 PII 미저장(단 actorId/ip/ua/applicationId/applicantRefHash 포함). enum 은 <code>@Enumerated(STRING)</code>, index 6종. dev/test 는 ddl-auto 자동 생성, 운영(MariaDB)은 수동 DDL.</p>
+  </section>
+
+  <section>
+    <h2>6. 검증 규칙</h2>
+    <ul>
+      <li>append-only — update/delete API·setter·@Version 없음. 정정은 correction event(9b+).</li>
+      <li>트랜잭션: 커밋변경=in-tx, 실패/거부/충돌/스킵·반출=REQUIRES_NEW.</li>
+      <li><code>applicantRefHash</code> 입력 applicantId 만(원문 PII 금지), HMAC≠plain SHA-256.</li>
+      <li><code>metadataJson</code> typed record 만, 직렬화 서비스 내부.</li>
+      <li><code>AUDIT_HMAC_SECRET</code> prod 누락=기동실패(fail-safe), 비운영 fallback.</li>
+      <li>필수필드(occurredAt/actorType/actionType/actionResult/targetType) 누락 → <code>InvalidActivityLogException</code>.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>7. 테스트</h2>
+    <div class="flow">$env:AES_SECRET_KEY='********'; .\gradlew.bat test --tests "*ActivityLog*" --tests "*AuditHmacTest" --tests "*AuditConfigTest" --tests "*CorrelationIdFilterTest" --no-daemon</div>
+    <p><span class="badge b-green">19 tests · 전부 통과</span></p>
+    <table>
+      <thead><tr><th>테스트</th><th>커버</th></tr></thead>
+      <tbody>
+        <tr><td>AuditHmacTest (5)</td><td>결정성, plain SHA-256 과 상이, secret/id 별 상이, null, blank 거부</td></tr>
+        <tr><td>CorrelationIdFilterTest (3)</td><td>헤더 재사용+echo, UUID 생성, blank 헤더, MDC 정리</td></tr>
+        <tr><td>AuditConfigTest (3)</td><td>secret 주입 빈, 비운영 fallback, prod blank 기동 실패</td></tr>
+        <tr><td>ActivityLogRepositoryTest (2)</td><td>저장/조회/enum/metadata, 필수필드 누락 예외</td></tr>
+        <tr><td>ActivityLogServiceTest (6)</td><td>필드매핑·occurredAt(clock), applicantRefHash=HMAC≠SHA256, metadata 직렬화/null, correlationId MDC, <b>in-tx 롤백 소멸 / REQUIRES_NEW 롤백 잔존</b></td></tr>
+      </tbody>
+    </table>
+    <p class="muted">전체 회귀 스위트(신규 필터/빈이 모든 full-context 테스트에 로드)는 별도 실행으로 확인.</p>
+  </section>
+
+  <section>
+    <h2>8. 알려진 한계 / 다음</h2>
+    <ul>
+      <li>계측이 없어 현재 ActivityLog 에 실제 데이터 미적재(9b 가 채움).</li>
+      <li><code>AuditMetadata</code> 아직 비-sealed·구체 record 없음(9b).</li>
+      <li><code>traceId</code> 항상 null(OTel deferred).</li>
+      <li>비운영 fallback pepper 는 예측 가능 — 운영 <code>AUDIT_HMAC_SECRET</code> 필수.</li>
+    </ul>
+    <p><b>다음 = 9b</b>: 로거 흡수(dual-write)+egress fail-close(temp file 누수 방지)+관리자 변경 계측+typed AuditMetadata(UploadMetadata=sourceFileNameHash+ext)+admin audit read API(권한 분리·가드).</p>
+  </section>
+
+</div>
+</body>
+</html>

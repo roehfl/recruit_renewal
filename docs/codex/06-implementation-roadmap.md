@@ -582,7 +582,7 @@ Status:
 | Slice | Status | Scope |
 | --- | --- | --- |
 | 09 design | Completed | 두 기둥(영속 감사 / 파기·보존) 설계, ADR 0005/0006/0007, glossary, 슬라이스 분할 |
-| 09a - ActivityLog Foundation | Pending | `ActivityLog` schema/enums/repo, `ActivityLogService`(recordInCurrentTx/recordRequiresNew), correlationId filter, `applicantRefHash`(HMAC) |
+| 09a - ActivityLog Foundation | Completed | `ActivityLog` schema/enums/repo, `ActivityLogService`(recordInCurrentTx/recordRequiresNew), `CorrelationIdFilter`, `AuditHmac`+`AuditConfig`(applicantRefHash), `AuditEvent`/`AuditMetadata`. 19 tests. → `docs/codex/implementation/phase-09a-activity-log-foundation.md` |
 | 09b - 로그 흡수 + 관리자 변경 audit + read API | Pending | Export/Pdf/Upload adapter(dual-write), egress fail-close, reopen·StageResult·첨부 admin 계측, audit read(마스킹/원문) |
 | 09c - Retention 모델 + eligibility scan + dry-run | Pending | RetentionPolicy(전역+override)/RetentionHold/`JobPosting.hiringEndedAt`, eligibility(Clock), dry-run PurgeBatch |
 | 09d-1 - Purge execute core | Pending | ROLE_PRIVACY_ADMIN, confirmation/sourceDryRunBatchId, 재검증, 관계형 PII tombstone/anonymize, ref-count, coarse index |

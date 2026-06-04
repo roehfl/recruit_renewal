@@ -1,5 +1,40 @@
 # 07. Implementation History
 
+## Phase 09a - ActivityLog Foundation (구현 완료)
+
+- Date: 2026-06-04
+- Work type: implementation (Phase 09 첫 슬라이스 — 영속 감사 기반).
+- Goal: 영속 `ActivityLog`(append-only) + 기록 서비스 2경로 + correlationId + applicantRefHash(HMAC) 기반 구축. 업무 이벤트 계측·API·보존/파기는 범위 밖(9b+).
+- Created (main):
+  - `domain/entity/ActivityLog.java`(append-only, BaseEntity 미상속, 자체 occurredAt, @Lob metadataJson, index 6)
+  - `enumeration/{ActorType,AuditActionType,AuditActionResult,AuditTargetType,AuditReasonCode}.java`
+  - `domain/repository/ActivityLogRepository.java`(Repository 마커 — save/findById/count 만, delete/update 미노출)
+  - `service/ActivityLogService.java`(recordInCurrentTx=REQUIRED / recordRequiresNew=REQUIRES_NEW, 전용 ObjectMapper 직렬화)
+  - `service/AuditEvent.java`(@Builder record), `service/AuditMetadata.java`(marker — 9b sealed+record)
+  - `common/hash/AuditHmac.java`(HMAC-SHA256+pepper, applicantId 입력만), `config/AuditConfig.java`(prod 누락=기동실패, 비운영 fallback)
+  - `config/CorrelationIdFilter.java`(OncePerRequestFilter, MDC correlationId, X-Request-Id echo)
+  - `exception/InvalidActivityLogException.java`
+- Modified:
+  - `src/main/resources/application.yaml`(+`audit.hmac-secret: ${AUDIT_HMAC_SECRET:}`)
+  - `src/test/resources/application.yaml`(+`audit.hmac-secret` 테스트 전용 값)
+- APIs: 없음(foundation — read API 는 9b).
+- Key decisions:
+  - 트랜잭션 2경로(ADR-0006): 커밋변경=in-tx(원자적), 실패/거부/충돌/스킵·반출=REQUIRES_NEW.
+  - `applicantRefHash` = HMAC+pepper, 입력 applicantId 만(plain SHA-256 `ciHash` 와 분리).
+  - 감사 metadata 직렬화는 **앱 web Jackson 빈에 의존하지 않고 서비스 자체 ObjectMapper** 사용(컨텍스트에 ObjectMapper 빈 부재 + 포맷 안정). typed `AuditMetadata` 만 허용.
+  - append-only: repository 가 delete/update 미노출, 엔티티 setter/@Version 없음.
+  - `AUDIT_HMAC_SECRET` fail-safe: prod 누락 시 기동 실패, 비운영 fallback(예측가능 — 운영 금지).
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*ActivityLog*" --tests "*AuditHmacTest" --tests "*AuditConfigTest" --tests "*CorrelationIdFilterTest" --no-daemon`
+  - 결과: **19 tests 전부 통과**(AuditHmac 5/CorrelationIdFilter 3/AuditConfig 3/ActivityLogRepository 2/ActivityLogService 6). 특히 recordInCurrentTx 롤백 시 소멸 / recordRequiresNew 롤백에도 잔존(REQUIRES_NEW) 검증. fixed Clock.
+  - 전체 회귀: 신규 필터/빈이 모든 full-context 테스트에 로드되므로 전체 스위트 별도 실행으로 확인(본 작업 보고 참조).
+- Documentation:
+  - `docs/codex/implementation/phase-09a-activity-log-foundation.md`
+  - `docs/codex/reports/phase-09a-activity-log-foundation.html`
+- Known limitations: 계측 없어 실데이터 미적재(9b), AuditMetadata 비-sealed, traceId null(OTel deferred), 운영 activity_log 수동 DDL.
+- 관찰: 컨텍스트에 Quartz 스케줄러 존재 → 9c/9e retention 스케줄에 활용 가능(별도 검토). 설계 문서의 "@Scheduled 없음" 가정은 정정 필요.
+- Next: 9b(로거 흡수+관리자 변경 audit+read API).
+
 ## Phase 09 - 개인정보 파기/감사/보존 (설계 완료, 구현 미착수)
 
 - Date: 2026-06-04
