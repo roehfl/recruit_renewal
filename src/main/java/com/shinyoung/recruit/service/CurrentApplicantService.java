@@ -2,6 +2,8 @@ package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.exception.AccessForbiddenException;
+import com.shinyoung.recruit.exception.AuthenticationRequiredException;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
@@ -17,10 +19,10 @@ public class CurrentApplicantService {
 
     public Long getCurrentApplicantId(CustomUserDetails userDetails) {
         if (userDetails == null) {
-            throw new InvalidJobApplicationException("Applicant authentication is required.");
+            throw new AuthenticationRequiredException("Applicant authentication is required.");
         }
         if (!CustomUserDetails.USER_TYPE_APPLICANT.equals(userDetails.getUserType())) {
-            throw new InvalidJobApplicationException("Only applicant users can access application APIs.");
+            throw new AccessForbiddenException("Only applicant users can access application APIs.");
         }
 
         return applicantRepository.findByLoginId(userDetails.getUsername())

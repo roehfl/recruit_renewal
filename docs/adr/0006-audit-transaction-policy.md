@@ -4,7 +4,7 @@ Phase 09 의 영속 `ActivityLog` 기록은 단일 트랜잭션 전략을 쓰지
 
 ## Status
 
-proposed (2026-06-04, Phase 09 design / grill-with-docs). Phase 09 구현(9a/9b) 착수 시 accepted 로 전환.
+accepted (2026-06-04, Phase 09a 구현 완료로 전환 — `ActivityLogService.recordInCurrentTx`/`recordRequiresNew` 2경로 구현됨. 최초 proposed: 2026-06-04, Phase 09 design / grill-with-docs)
 
 ## Considered Options
 

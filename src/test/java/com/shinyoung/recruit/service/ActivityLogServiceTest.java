@@ -115,6 +115,61 @@ class ActivityLogServiceTest {
     }
 
     @Test
+    void 긴_userAgent는_512자로_truncate되어_저장된다() {
+        String longUserAgent = "U".repeat(2000);
+        ActivityLog saved = activityLogService.recordRequiresNew(
+                baseEvent().userAgent(longUserAgent).build());
+
+        ActivityLog found = activityLogRepository.findById(saved.getId()).orElseThrow();
+        assertThat(found.getUserAgent())
+                .hasSize(512)
+                .isEqualTo(longUserAgent.substring(0, 512));
+    }
+
+    @Test
+    void CR_LF_포함_reasonMessage는_sanitize되어_저장된다() {
+        ActivityLog saved = activityLogService.recordRequiresNew(
+                baseEvent().reasonMessage("line1\r\nline2\tend").build());
+
+        ActivityLog found = activityLogRepository.findById(saved.getId()).orElseThrow();
+        assertThat(found.getReasonMessage())
+                .doesNotContain("\r")
+                .doesNotContain("\n")
+                .doesNotContain("\t")
+                .isEqualTo("line1  line2 end");
+    }
+
+    @Test
+    void request_derived_문자열은_컬럼_길이로_truncate되어_insert가_실패하지_않는다() {
+        ActivityLog saved = activityLogService.recordRequiresNew(baseEvent()
+                .actorId("a".repeat(300))
+                .actorRoleSnapshot("r".repeat(500))
+                .correlationId("c".repeat(300))
+                .ipAddress("i".repeat(200))
+                .reasonMessage("m".repeat(3000))
+                .build());
+
+        ActivityLog found = activityLogRepository.findById(saved.getId()).orElseThrow();
+        assertThat(found.getActorId()).hasSize(100);
+        assertThat(found.getActorRoleSnapshot()).hasSize(255);
+        assertThat(found.getCorrelationId()).hasSize(100);
+        assertThat(found.getIpAddress()).hasSize(64);
+        assertThat(found.getReasonMessage()).hasSize(1000);
+    }
+
+    @Test
+    void 공백뿐인_request_derived_문자열은_null로_저장된다() {
+        ActivityLog saved = activityLogService.recordRequiresNew(baseEvent()
+                .userAgent("\r\n\t")
+                .reasonMessage("   ")
+                .build());
+
+        ActivityLog found = activityLogRepository.findById(saved.getId()).orElseThrow();
+        assertThat(found.getUserAgent()).isNull();
+        assertThat(found.getReasonMessage()).isNull();
+    }
+
+    @Test
     void recordInCurrentTx는_비즈니스_롤백과_함께_사라진다() {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> {

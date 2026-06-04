@@ -47,7 +47,9 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_activity_log_target", columnList = "target_type,target_id"),
                 @Index(name = "idx_activity_log_application_id", columnList = "application_id"),
                 @Index(name = "idx_activity_log_job_posting_id", columnList = "job_posting_id"),
-                @Index(name = "idx_activity_log_action_type", columnList = "action_type")
+                @Index(name = "idx_activity_log_action_type", columnList = "action_type"),
+                // 9b read API 의 actionResult(FAILURE/DENIED/CONFLICT) + 기간 검색 대비(9a 리뷰 보완).
+                @Index(name = "idx_activity_log_action_result_occurred", columnList = "action_result,occurred_at")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

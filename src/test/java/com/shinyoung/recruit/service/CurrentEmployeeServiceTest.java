@@ -4,6 +4,8 @@ import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.entity.Employee;
 import com.shinyoung.recruit.domain.repository.EmployeeRepository;
+import com.shinyoung.recruit.exception.AccessForbiddenException;
+import com.shinyoung.recruit.exception.AuthenticationRequiredException;
 import com.shinyoung.recruit.exception.InvalidInterviewException;
 import com.shinyoung.recruit.exception.InvalidStageResultException;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
@@ -33,20 +35,22 @@ class CurrentEmployeeServiceTest {
     }
 
     @Test
-    void applicant_user_details_fails() {
+    void applicant_user_details_fails_with_forbidden() {
         CustomUserDetails userDetails = CustomUserDetails.fromUser(
                 applicant("applicant01"),
                 List.of(new SimpleGrantedAuthority("ROLE_APPLICANT"))
         );
 
+        // 인증은 됐지만 타입 불일치 → 403 매핑 예외
         assertThatThrownBy(() -> currentEmployeeService.getCurrentEmployeeActor(userDetails))
-                .isInstanceOf(InvalidStageResultException.class);
+                .isInstanceOf(AccessForbiddenException.class);
     }
 
     @Test
-    void null_user_details_fails() {
+    void null_user_details_fails_with_authentication_required() {
+        // 미인증 → 401 매핑 예외
         assertThatThrownBy(() -> currentEmployeeService.getCurrentEmployeeActor(null))
-                .isInstanceOf(InvalidStageResultException.class);
+                .isInstanceOf(AuthenticationRequiredException.class);
     }
 
     @Test
@@ -75,6 +79,23 @@ class CurrentEmployeeServiceTest {
 
         assertThatThrownBy(() -> currentEmployeeService.getCurrentEmployeeId(employee("missing")))
                 .isInstanceOf(InvalidInterviewException.class);
+    }
+
+    @Test
+    void null_user_details_fails_with_authentication_required_for_interviewer_api() {
+        assertThatThrownBy(() -> currentEmployeeService.getCurrentEmployeeId(null))
+                .isInstanceOf(AuthenticationRequiredException.class);
+    }
+
+    @Test
+    void applicant_user_details_fails_with_forbidden_for_interviewer_api() {
+        CustomUserDetails userDetails = CustomUserDetails.fromUser(
+                applicant("applicant02"),
+                List.of(new SimpleGrantedAuthority("ROLE_APPLICANT"))
+        );
+
+        assertThatThrownBy(() -> currentEmployeeService.getCurrentEmployeeId(userDetails))
+                .isInstanceOf(AccessForbiddenException.class);
     }
 
     private CustomUserDetails employee(String loginId) {

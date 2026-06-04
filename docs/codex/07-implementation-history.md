@@ -1,5 +1,32 @@
 # 07. Implementation History
 
+## Fix - 수동 인증/인가 상태코드 정정 400→401/403 (구현 완료)
+
+- Date: 2026-06-04
+- Work type: cross-cutting fix (Phase 외 — API 오류 상태코드 계약 정정).
+- 문제: 서비스 레이어 수동 인증 체크(`CurrentEmployeeService`/`CurrentApplicantService`)가 400 매핑 도메인 예외를 재사용해 "Authentication is required" 가 400 으로 응답. SecurityConfig `anyRequest().permitAll()` 로 미인증 요청이 컨트롤러까지 도달하는 fall-through 경로에서 발생.
+- 반영: 미인증 → `AuthenticationRequiredException`(**401**), 타입 불일치 → `AccessForbiddenException`(**403**). `GlobalExceptionHandler` 매핑 2건 추가. 메시지·ApiResponse 포맷 불변. 백엔드 redirect 없음 — 로그인 이동은 프론트(401 분기) 책임.
+- Created: `exception/{AuthenticationRequiredException,AccessForbiddenException}.java`, `service/CurrentApplicantServiceTest.java`
+- Modified: `GlobalExceptionHandler`, `CurrentEmployeeService`(2곳), `CurrentApplicantService`(1곳), `CurrentEmployeeServiceTest`(+2), `ApplicationControllerTest`(1건 400→403 정정)
+- Tests: scoped 97 tests / 0 failures (8 클래스). 전체 회귀는 사용자 지시로 미실행.
+- Documentation: `docs/codex/implementation/fix-auth-status-codes-401-403.md`, `docs/codex/reports/fix-auth-status-codes-401-403.html`
+- 미해결(별도 슬라이스): `anyRequest().permitAll()` → authenticated + allowlist 전환(공개 API 전수 확인 필요, ADR-0007 의 URL 1차 방어선 원칙 — 9b audit matcher 작업과 병합 검토).
+
+## Phase 09a-RF - ActivityLog Foundation 리뷰 보완 (구현 완료)
+
+- Date: 2026-06-04
+- Work type: review fix (9a 코드 리뷰 5건 반영 — `instruction.md`. 9b 선행 조건).
+- 반영 내역:
+  - **Major** request-derived 문자열 길이 제한/sanitize: `CorrelationIdFilter` 엄격 resolve(100자 초과/CRLF 헤더 → UUID 대체), `ActivityLogService.safe()` 저장 직전 normalize(CR/LF/TAB→공백, trim, 컬럼 길이 truncate, blank→null — actorId 100/roleSnapshot 255/reasonMessage 1000/correlationId 100/ip 64/ua 512). 외부 입력 길이로 audit insert 실패 → 비즈니스 rollback·egress fail-close 차단(9b) 전이 방지.
+  - **Medium** 운영 DDL: `docs/codex/ops/phase-09a-activity-log-ddl.sql` 신규(테이블 + 인덱스 7종).
+  - **Medium** 인덱스: `idx_activity_log_action_result_occurred (action_result, occurred_at)` 추가(9b read API actionResult+기간 검색 대비 — 단독 대신 복합 채택).
+  - **Low** ADR-0006/0007 → **accepted** 전환(본 히스토리의 "9a 착수 시 accepted" 기준 정합).
+  - **Low** fallback secret 게이트를 profile 이름 의존에서 property 기반으로: `audit.allow-fallback-secret`(env `AUDIT_ALLOW_FALLBACK_SECRET`, 기본 false=기동 실패) 명시 시에만 fallback. prod profile 은 flag 무관 거부(이중 가드). **local 개발 영향**: `AUDIT_HMAC_SECRET` 또는 `AUDIT_ALLOW_FALLBACK_SECRET=true` 필요.
+- Modified: `CorrelationIdFilter`, `ActivityLogService`, `ActivityLog`(index 7종), `AuditConfig`, `application.yaml`(main), 테스트 3종(CorrelationIdFilterTest 3→6, AuditConfigTest 3→5, ActivityLogServiceTest 6→10), ADR-0006/0007.
+- Tests: scoped 28 tests 전부 통과(BUILD SUCCESSFUL). 전체 회귀는 사용자 지시로 미실행(scoped 만). 적대적 검증 워크플로(6 agents)가 리뷰 5개 항목 반영·문서-코드 정합·회귀 위험을 전부 통과로 판정(blocker/major 0).
+- Documentation: `docs/codex/implementation/phase-09a-review-fix.md`, `docs/codex/reports/phase-09a-review-fix.html`, 9a 문서 stale 기술 보정.
+- Next: 9b(로거 흡수+관리자 변경 audit+read API) 진행 가능.
+
 ## Phase 09a - ActivityLog Foundation (구현 완료)
 
 - Date: 2026-06-04

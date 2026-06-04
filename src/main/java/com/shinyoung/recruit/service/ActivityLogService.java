@@ -27,9 +27,21 @@ import java.time.LocalDateTime;
  *
  * <p>두 메서드는 외부(09b 서비스/컨트롤러)에서 호출된다 — Spring self-invocation 프록시 함정을 피하려면
  * 같은 서비스 내부에서 호출하지 말 것.
+ *
+ * <p>request-derived 문자열(userAgent/ipAddress/reasonMessage 등)은 저장 직전에 normalize 한다(9a 리뷰 보완)
+ * — CR/LF/TAB 제거 + 컬럼 길이 truncate. 외부 입력이 길다는 이유만으로 audit insert 가 실패해
+ * 비즈니스 트랜잭션 rollback(recordInCurrentTx)이나 egress fail-close 차단(9b)이 발생하지 않게 한다.
  */
 @Service
 public class ActivityLogService {
+
+    // ActivityLog 컬럼 길이와 동일하게 유지한다(초과분은 truncate).
+    private static final int MAX_ACTOR_ID = 100;
+    private static final int MAX_ROLE_SNAPSHOT = 255;
+    private static final int MAX_REASON_MESSAGE = 1000;
+    private static final int MAX_CORRELATION_ID = 100;
+    private static final int MAX_IP_ADDRESS = 64;
+    private static final int MAX_USER_AGENT = 512;
 
     private final ActivityLogRepository activityLogRepository;
     private final Clock clock;
@@ -67,8 +79,8 @@ public class ActivityLogService {
         return ActivityLog.builder()
                 .occurredAt(LocalDateTime.now(clock))
                 .actorType(event.actorType())
-                .actorId(event.actorId())
-                .actorRoleSnapshot(event.actorRoleSnapshot())
+                .actorId(safe(event.actorId(), MAX_ACTOR_ID))
+                .actorRoleSnapshot(safe(event.actorRoleSnapshot(), MAX_ROLE_SNAPSHOT))
                 .actionType(event.actionType())
                 .actionResult(event.actionResult())
                 .targetType(event.targetType())
@@ -77,10 +89,10 @@ public class ActivityLogService {
                 .applicationId(event.applicationId())
                 .applicantRefHash(auditHmac.applicantRefHash(event.applicantId()))
                 .reasonCode(event.reasonCode())
-                .reasonMessage(event.reasonMessage())
-                .correlationId(resolveCorrelationId(event.correlationId()))
-                .ipAddress(event.ipAddress())
-                .userAgent(event.userAgent())
+                .reasonMessage(safe(event.reasonMessage(), MAX_REASON_MESSAGE))
+                .correlationId(safe(resolveCorrelationId(event.correlationId()), MAX_CORRELATION_ID))
+                .ipAddress(safe(event.ipAddress(), MAX_IP_ADDRESS))
+                .userAgent(safe(event.userAgent(), MAX_USER_AGENT))
                 .metadataJson(serializeMetadata(event.metadata()))
                 .build();
     }
@@ -90,6 +102,18 @@ public class ActivityLogService {
             return override;
         }
         return CorrelationIdFilter.currentCorrelationId();
+    }
+
+    /** CR/LF/TAB → 공백 치환 후 trim, 컬럼 길이 초과분 truncate. blank 면 null(저장 안 함). */
+    private String safe(String value, int max) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String sanitized = value.replaceAll("[\\r\\n\\t]", " ").trim();
+        if (sanitized.isBlank()) {
+            return null;
+        }
+        return sanitized.length() <= max ? sanitized : sanitized.substring(0, max);
     }
 
     private String serializeMetadata(AuditMetadata metadata) {

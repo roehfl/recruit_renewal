@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fix — 수동 인증/인가 상태코드 정정 (400 → 401/403)</title>
+<style>
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
+    color:#1e293b;background:#eef2f7;line-height:1.55;font-size:14px}
+  header{background:linear-gradient(135deg,#0f172a,#1d4ed8);color:#fff;padding:28px 32px}
+  header h1{margin:0 0 6px;font-size:21px}
+  header .sub{color:#cbd5e1;font-size:13px}
+  .wrap{max-width:1040px;margin:0 auto;padding:24px 20px 60px}
+  section{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px 22px;margin:18px 0;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+  h2{font-size:16px;margin:0 0 14px;padding-bottom:8px;border-bottom:2px solid #e2e8f0}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;vertical-align:middle}
+  .b-green{background:#dcfce7;color:#15803d}.b-blue{background:#dbeafe;color:#1d4ed8}.b-amber{background:#fef3c7;color:#b45309}.b-gray{background:#e2e8f0;color:#475569}.b-red{background:#fee2e2;color:#b91c1c}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12.5px}
+  th,td{border:1px solid #e2e8f0;padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:#f1f5f9;font-weight:700}
+  code{background:#f1f5f9;padding:1px 5px;border-radius:5px;font-size:12px;color:#9333ea}
+  .pill{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px}
+  .ok{background:#f0fdf4;border-left:4px solid #16a34a;padding:10px 14px;border-radius:0 8px 8px 0;margin:10px 0}
+  .note{background:#fffbeb;border-left:4px solid #d97706;padding:10px 14px;border-radius:0 8px 8px 0;margin:10px 0}
+  .flow{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:8px;overflow-x:auto;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<header>
+  <h1>Fix — 수동 인증/인가 상태코드 정정 (400 → 401/403)</h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · cross-cutting 수정 리포트 ·
+    <span class="badge b-green">반영 완료</span> <span class="badge b-green">테스트 97/97</span> · 2026-06-04</div>
+</header>
+<div class="wrap">
+
+  <section>
+    <h2>1. 요약</h2>
+    <p>일부 API 에서 "Authentication is required" 오류가 <b>400</b> 으로 응답되던 문제를 정정했다.
+      원인은 서비스 레이어 수동 인증 체크(<code>CurrentEmployeeService</code>/<code>CurrentApplicantService</code>)가
+      400 매핑 도메인 검증 예외를 재사용했기 때문이다. 미인증은 <b>401</b>, 인증됐지만 타입 불일치는 <b>403</b> 으로 분리했다.</p>
+    <div class="ok"><b>프론트엔드 분기 가능</b> — 401 수신 시 로그인 라우트 이동(axios interceptor). 백엔드는 redirect 하지 않는다
+      (분리형 SPA + 세션 구조에서 302 는 XHR/CORS 문제 유발 — 기존 <code>CustomAuthenticationEntryPoint</code> 401 JSON 패턴과 동일 노선).</div>
+  </section>
+
+  <section>
+    <h2>2. 상태코드 계약</h2>
+    <div class="flow">미인증 (userDetails == null)        → 401 AuthenticationRequiredException   "... authentication is required."
+타입 불일치 (employee↔applicant)   → 403 AccessForbiddenException          "Only ... users can access ..."
+도메인 검증 실패                    → 400 (기존 유지)
+Security 필터 레벨                  → 401 EntryPoint / 403 DeniedHandler (기존 유지, 변경 없음)</div>
+    <table>
+      <thead><tr><th>체크 위치</th><th>변경 전</th><th>변경 후</th></tr></thead>
+      <tbody>
+        <tr><td><code>CurrentEmployeeService.getCurrentEmployeeActor</code> (admin commands)</td><td>400 <code>InvalidStageResultException</code></td><td>401 / 403</td></tr>
+        <tr><td><code>CurrentEmployeeService.getCurrentEmployeeId</code> (interviewer APIs)</td><td>400 <code>InvalidInterviewException</code></td><td>401 / 403</td></tr>
+        <tr><td><code>CurrentApplicantService.getCurrentApplicantId</code> (application APIs)</td><td>400 <code>InvalidJobApplicationException</code></td><td>401 / 403</td></tr>
+      </tbody>
+    </table>
+    <p>응답 메시지·<code>ApiResponse</code> JSON 포맷은 불변 — 상태코드만 의미에 맞게 정정.</p>
+  </section>
+
+  <section>
+    <h2>3. 변경 파일</h2>
+    <table>
+      <thead><tr><th>구분</th><th>파일</th><th>변경</th></tr></thead>
+      <tbody>
+        <tr><td>Exception(신규)</td><td><code>exception/{AuthenticationRequiredException,AccessForbiddenException}.java</code></td><td>401/403 의미 예외</td></tr>
+        <tr><td>Handler</td><td><code>exception/GlobalExceptionHandler.java</code></td><td>+2 핸들러(401 UNAUTHORIZED / 403 FORBIDDEN)</td></tr>
+        <tr><td>Service</td><td><code>service/{CurrentEmployeeService,CurrentApplicantService}.java</code></td><td>수동 체크 3곳 예외 교체</td></tr>
+        <tr><td>Test</td><td>CurrentEmployeeServiceTest(6→8), CurrentApplicantServiceTest(신규 4), ApplicationControllerTest(1건 400→403 정정)</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>4. 테스트</h2>
+    <table>
+      <thead><tr><th>구분</th><th>명령</th><th>결과</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>scoped</td>
+          <td class="pill">gradlew test --tests "*Current*ServiceTest" --tests "*StageResult*ControllerTest" --tests "*InterviewerInterview*" --tests "*Application*ControllerTest"(주요 소비처)</td>
+          <td><span class="badge b-green">통과</span> 97 tests / 0 failures (8 클래스)</td>
+        </tr>
+        <tr>
+          <td>전체 회귀</td>
+          <td class="pill">gradlew clean test</td>
+          <td><span class="badge b-gray">미실행 — 지시에 따라 scoped 만 실행</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>5. 잔여 이슈 / 다음 단계</h2>
+    <ul>
+      <li><span class="badge b-amber">구조적 한계</span> 근본 원인 <code>SecurityConfig</code> 의 <code>anyRequest().permitAll()</code> 은 유지 —
+        URL 레벨 1차 방어선 부재. permitAll → authenticated + 공개 경로 allowlist 전환은 공개 API 전수 확인이 필요한 별도 슬라이스
+        (9b 의 audit matcher 추가와 함께 검토 권장, ADR-0007).</li>
+      <li><span class="badge b-gray">프론트 작업</span> Vue axios interceptor: 401 → 로그인 라우트, 403 → 권한 안내(프론트 저장소).</li>
+      <li><span class="badge b-gray">유지</span> blank actor·미존재 사용자 체크는 인증/인가가 아니므로 기존 400 계열 예외 유지.</li>
+    </ul>
+  </section>
+
+</div>
+</body>
+</html>

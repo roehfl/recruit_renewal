@@ -106,7 +106,7 @@ emission = 명시적 호출(AOP blanket 아님) · 외부(09b)에서 호출(self
 
   <section>
     <h2>5. 도메인/스키마</h2>
-    <p><code>ActivityLog</code> = 독립 테이블 <code>activity_log</code>, <b>FK 없음</b>. <code>jobPostingId</code>/<code>applicationId</code> 는 denormalized search key(파기 후 join 회피), <code>applicantRefHash</code> 는 가명 연결자. <b>append-only</b>(setter/update/@Version 없음). 지원자 원문 PII 미저장(단 actorId/ip/ua/applicationId/applicantRefHash 포함). enum 은 <code>@Enumerated(STRING)</code>, index 6종. dev/test 는 ddl-auto 자동 생성, 운영(MariaDB)은 수동 DDL.</p>
+    <p><code>ActivityLog</code> = 독립 테이블 <code>activity_log</code>, <b>FK 없음</b>. <code>jobPostingId</code>/<code>applicationId</code> 는 denormalized search key(파기 후 join 회피), <code>applicantRefHash</code> 는 가명 연결자. <b>append-only</b>(setter/update/@Version 없음). 지원자 원문 PII 미저장(단 actorId/ip/ua/applicationId/applicantRefHash 포함). enum 은 <code>@Enumerated(STRING)</code>, index 7종(09a-RF 에서 <code>(action_result, occurred_at)</code> 추가). dev/test 는 ddl-auto 자동 생성, 운영(MariaDB)은 수동 DDL(<code>docs/codex/ops/phase-09a-activity-log-ddl.sql</code> — 09a-RF).</p>
   </section>
 
   <section>
@@ -116,7 +116,8 @@ emission = 명시적 호출(AOP blanket 아님) · 외부(09b)에서 호출(self
       <li>트랜잭션: 커밋변경=in-tx, 실패/거부/충돌/스킵·반출=REQUIRES_NEW.</li>
       <li><code>applicantRefHash</code> 입력 applicantId 만(원문 PII 금지), HMAC≠plain SHA-256.</li>
       <li><code>metadataJson</code> typed record 만, 직렬화 서비스 내부.</li>
-      <li><code>AUDIT_HMAC_SECRET</code> prod 누락=기동실패(fail-safe), 비운영 fallback.</li>
+      <li><code>AUDIT_HMAC_SECRET</code> 누락=기본 기동실패(fail-safe, profile 무관). fallback 은 <code>audit.allow-fallback-secret=true</code> 명시 시에만(09a-RF).</li>
+      <li>request-derived 문자열은 저장 직전 sanitize+truncate — 외부 입력 길이가 audit insert 실패로 전이되지 않음(09a-RF).</li>
       <li>필수필드(occurredAt/actorType/actionType/actionResult/targetType) 누락 → <code>InvalidActivityLogException</code>.</li>
     </ul>
   </section>
@@ -130,7 +131,7 @@ emission = 명시적 호출(AOP blanket 아님) · 외부(09b)에서 호출(self
       <tbody>
         <tr><td>AuditHmacTest (5)</td><td>결정성, plain SHA-256 과 상이, secret/id 별 상이, null, blank 거부</td></tr>
         <tr><td>CorrelationIdFilterTest (3)</td><td>헤더 재사용+echo, UUID 생성, blank 헤더, MDC 정리</td></tr>
-        <tr><td>AuditConfigTest (3)</td><td>secret 주입 빈, 비운영 fallback, prod blank 기동 실패</td></tr>
+        <tr><td>AuditConfigTest (3→5, 09a-RF)</td><td>secret 주입 빈, allow-fallback=true 시 fallback, 기본값 기동 실패, prod blank 기동 실패(flag 무관)</td></tr>
         <tr><td>ActivityLogRepositoryTest (2)</td><td>저장/조회/enum/metadata, 필수필드 누락 예외</td></tr>
         <tr><td>ActivityLogServiceTest (6)</td><td>필드매핑·occurredAt(clock), applicantRefHash=HMAC≠SHA256, metadata 직렬화/null, correlationId MDC, <b>in-tx 롤백 소멸 / REQUIRES_NEW 롤백 잔존</b></td></tr>
       </tbody>

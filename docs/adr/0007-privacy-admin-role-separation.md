@@ -4,7 +4,7 @@ Phase 09 의 비가역/민감 작업은 채용 운영 권한과 **분리**한다
 
 ## Status
 
-proposed (2026-06-04, Phase 09 design / grill-with-docs). Phase 09 구현(9b/9c/9d) 착수 시 accepted 로 전환.
+accepted (2026-06-04, Phase 09a 착수 시점에 정책 확정으로 전환 — 구현 히스토리 기준 "ADR-0006/0007 은 9a 착수 시 accepted". SecurityConfig requestMatcher 구현은 9b/9c/9d 에서 수행. 최초 proposed: 2026-06-04, Phase 09 design / grill-with-docs)
 
 ## Considered Options
 

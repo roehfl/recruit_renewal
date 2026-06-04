@@ -64,4 +64,56 @@ class CorrelationIdFilterTest {
 
         assertThat(duringChain.get()).isNotBlank().isNotEqualTo("   ");
     }
+
+    @Test
+    void 길이_100_초과_헤더는_재사용하지_않고_UUID로_대체한다() throws Exception {
+        String tooLong = "x".repeat(CorrelationIdFilter.MAX_CORRELATION_ID + 1);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(CorrelationIdFilter.HEADER, tooLong);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        AtomicReference<String> duringChain = new AtomicReference<>();
+        FilterChain chain = (req, res) -> duringChain.set(MDC.get(CorrelationIdFilter.MDC_KEY));
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(duringChain.get())
+                .isNotBlank()
+                .isNotEqualTo(tooLong)
+                .hasSizeLessThanOrEqualTo(CorrelationIdFilter.MAX_CORRELATION_ID);
+        assertThat(response.getHeader(CorrelationIdFilter.HEADER)).isEqualTo(duringChain.get());
+    }
+
+    @Test
+    void 길이_100_이하_헤더는_그대로_재사용한다() throws Exception {
+        String maxAllowed = "y".repeat(CorrelationIdFilter.MAX_CORRELATION_ID);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(CorrelationIdFilter.HEADER, maxAllowed);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        AtomicReference<String> duringChain = new AtomicReference<>();
+        FilterChain chain = (req, res) -> duringChain.set(MDC.get(CorrelationIdFilter.MDC_KEY));
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(duringChain.get()).isEqualTo(maxAllowed);
+    }
+
+    @Test
+    void CR_LF_포함_헤더는_재사용하지_않고_UUID로_대체한다() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(CorrelationIdFilter.HEADER, "evil\r\nX-Injected: 1");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        AtomicReference<String> duringChain = new AtomicReference<>();
+        FilterChain chain = (req, res) -> duringChain.set(MDC.get(CorrelationIdFilter.MDC_KEY));
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(duringChain.get())
+                .isNotBlank()
+                .doesNotContain("\r")
+                .doesNotContain("\n")
+                .doesNotContain("evil");
+    }
 }

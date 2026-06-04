@@ -18,6 +18,23 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /**
+     * 미인증 요청(서비스 레이어 수동 인증 체크). 401 — 프론트엔드는 이 상태코드로 로그인 화면 라우팅을 분기한다.
+     * Security 필터 레벨 미인증(CustomAuthenticationEntryPoint)과 동일한 의미/포맷.
+     */
+    @ExceptionHandler(AuthenticationRequiredException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAuthenticationRequired(AuthenticationRequiredException e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
+    /** 인증됐지만 사용자 타입/권한 불일치. 403 — CustomAccessDeniedHandler 와 동일한 의미/포맷. */
+    @ExceptionHandler(AccessForbiddenException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessForbidden(AccessForbiddenException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(JobPostingNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleJobPostingNotFound(JobPostingNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

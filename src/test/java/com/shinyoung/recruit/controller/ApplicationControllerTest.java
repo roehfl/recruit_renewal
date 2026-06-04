@@ -150,10 +150,11 @@ class ApplicationControllerTest {
         Long jobPostingId = createPublishedJobPosting();
         Long jobPositionId = firstJobPositionId(jobPostingId);
 
+        // 인증은 됐지만 지원자 타입이 아님 → 403 (AccessForbiddenException)
         mockMvc.perform(post("/api/applications")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createApplicationJson(jobPostingId, jobPositionId)))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
     }
