@@ -53,6 +53,73 @@ _Avoid_: enum 과 CommonCode 를 같은 값에 동시에 두는 것(중복 진�
 지원자 학력 입력의 **자동완성/검색** 기준이자 **학교별 통계 grouping** 의 기준이 되는 master data. 외부 `schoolCode`(있으면) 또는 `(schoolName, schoolType, region)` 로 식별한다. `ApplicationEducation` 은 자유입력 `schoolName`(snapshot)을 그대로 유지하고, 지원자가 자동완성에서 고른 경우에만 optional `schoolId` 로 master 를 참조한다(직접입력=null=미매칭). master 는 강한 FK 가 아니라 application-level 참조다.
 _Avoid_: `schoolName`(지원서의 자유입력 표시값) 과 `School.schoolName`(master 정규명) 을 같은 것으로 취급
 
+### Privacy / Audit (Phase 09)
+
+**ActivityLog**:
+누가/언제/무엇에/어떤 행위를 했고 결과가 무엇이었는지를 남기는 **append-only 감사 증적**. **지원자 원문 PII 미저장(applicant raw PII-free)** — 단 행위자/접속/대상 식별정보(`actorId`, `ipAddress`, `userAgent`, `applicationId`, `applicantRefHash`)는 포함하므로 '완전 PII-free 테이블'이 **아니다**. 영속 DB row 가 source of truth 이고, 기존 SLF4J `recruit.audit.*` 라인은 운영 로그 보조 용도다. 정정이 필요하면 row 수정이 아니라 correction event 를 추가 기록한다.
+_Avoid_: '완전 PII-free 테이블'이라는 표현; 일반 애플리케이션 로그(SLF4J)와 혼동; 전역 접근/페이지 추적 로그.
+
+**감사 이벤트 (Audit event)**:
+ActivityLog 에 남기는 단위 행위. 대상은 **정보 반출(export/PDF/admin download)**, **핵심 관리자 상태 변경**(StageResult 변경/발표/확정, evaluation reopen, application admin 처리, retention 정책 변경, purge), **파기 lifecycle**(대상 산정/요청/성공/실패/스킵/보존 예외)에 한정한다. 전역 `VIEW_PAGE`/`ACCESS_API` blanket 추적은 감사 이벤트가 **아니다**(Phase 09 범위 밖, 후속 후보).
+
+**Egress (정보 반출)**:
+개인정보·평가자료·첨부가 시스템 밖으로 나가는 행위(Excel/PDF/다운로드). **fail-close** — 감사 기록(commit)이 성공해야 산출물을 반환한다. 기록 후 스트리밍이 깨져도 over-record(누락보다 안전)로 허용한다.
+
+**actionResult**:
+감사 행위의 결과 분류 — `SUCCESS`/`FAILURE`/`DENIED`/`SKIPPED`/`CONFLICT`. `CONFLICT`(낙관적 락/버전 충돌)는 검색·장애분석 가치를 위해 `FAILURE` 와 **분리**한다. 상태성(`STARTED`/`REQUESTED`/`COMPLETED`)은 결과가 아니라 `actionType` 으로 표현한다.
+
+**actorRoleSnapshot**:
+감사 row 의 행위자 권한을 **행위 시점에 고정 기록**한 스냅샷. 라이브 권한 조회/join 이 아니라 그때의 권한이어야 감사 무결성이 유지된다. `ADMIN`/`INTERVIEWER` 구분도 `actorType` 이 아니라 이 값으로 한다.
+
+**ActivityLog lifecycle policy (후속)**:
+ActivityLog **자체**의 보존기간·접근통제·`ipAddress`/`userAgent` 마스킹·N년 후 삭제/회전/아카이빙 정책. **Phase 09 지원자 개인정보 파기 job 범위 밖**의 후속 설계 대상이다. 지원자 파기 job 은 `applicationId`/`applicantRefHash` 를 참조하는 ActivityLog row 를 수정·삭제·마스킹하지 **않는다**(감사 증적 보존 우선).
+
+**파기 (Purge / 개인정보 파기)**:
+지원자 **원문 PII 를 비가역 소거**하고, 통계/감사 연결에 필요한 **비식별 tombstone** 만 남기는 행위. 기본 방식 = **tombstone anonymization + 첨부 바이너리 물리삭제**(ADR-0005). crypto-shred·전면 hard delete 가 아니다.
+_Avoid_: '삭제(delete)'(첨부 바이너리 외에는 row 를 지우지 않음), soft delete(첨부 lifecycle 의 `markDeleted` 와 혼동).
+
+**파기 tombstone**:
+파기 후 남는 **비식별 골격 row**. 보존 후보 = `applicationId`/`jobPostingId`/`jobPositionId`/stage·result status code/submitted date bucket/`purgedAt`/`purgeBatchId`/`purgeResult`. 원문 PII(name/email/phone/ci/address/answers/섹션 원문)는 없다.
+
+**ref-count 익명화 (Applicant)**:
+Applicant 공통 PII(`email`/`name`/`phone`/`ci`)는 그 Applicant 의 **모든** JobApplication 이 파기 대상이 됐을 때만 익명화한다. 일부 지원서만 파기됐으면 다른 살아있는 지원서가 연락처를 필요로 하므로 보존한다.
+
+**retentionAnchorAt**:
+파기 보존기간 계산의 기준 시점. **"지원 접수 마감"이 아니라 "해당 채용 프로세스가 실질적으로 종료된 시점"**이다. 공고 단위 anchor 로 기본 소스는 `JobPosting.hiringEndedAt`(신규 필드). **암묵적 `closedAt` fallback 은 하지 않는다** — `hiringEndedAt` 이 null 이면 `ANCHOR_NOT_FIXED` 로 SKIP. `closedAt` 을 기준으로 쓰려면 `RetentionPolicy.baselineType = CLOSED_AT` 을 **명시 선택**해야 한다(암묵 fallback 은 오파기 위험).
+_Avoid_: `closedAt`(공고 close 시각)을 암묵 fallback 으로 retention 기준에 끌어쓰는 것; `finalizedAt`(의미가 넓고 모호) 네이밍.
+
+**RetentionPolicy**:
+보존기간 정책. **전역 기본값 + 공고별 override** 구조. `retentionPeriod`/`baselineType`/`enabled`/`effectiveFrom`/`effectiveTo`(+ override 시 `jobPostingId`) 를 가지며, 변경은 ActivityLog 에 committed change(in-tx)로 기록한다. `baselineType` = `HIRING_ENDED_AT`(기본) / `CLOSED_AT`(명시 선택). 법정 일수는 코드에 하드코딩하지 않고 설정/정책으로 주입한다.
+
+**RetentionHold (보존 예외)**:
+파기 자동 대상에서 제외하는 보존 의무/예외. **자동 제외는 최종 입사확정/onboarded/HR 이관 완료 건만**이다. **중간 전형 PASSED 는 제외 기준이 아니다** — 불합격·전형포기·미응시·최종합격 후 입사포기·채용 미확정 종료는 retention 경과 시 모두 파기 대상이 될 수 있다. hold 건은 파기 시 `SKIPPED` + `RETENTION_HOLD` 로 감사.
+
+**terminal application status (파기 적격 전제)**:
+파기는 지원서가 **종결 상태**일 때만 적격하다. 진행 중·최종결과 미확정 지원서는 `APPLICATION_NOT_TERMINAL` 로 SKIPPED. 적격성 = `anchor 종료 + retentionPeriod 경과 + not purged + not hold + terminal`.
+
+**PurgeBatch / PurgeJobItem**:
+파기 실행의 상세 원장. **`PurgeBatch`** = dry-run 또는 execute **1회 실행 단위**(mode/criteria/counts/status). **`PurgeJobItem`** = application 별 판정·실행 결과(append-only). 둘 다 PII-free. `ActivityLog` 는 이 원장의 **coarse index** 로만 쓰고(batch 시작/완료/부분실패/실패 + 집계 metadataJson), item 결과를 중복 기록하지 않는다.
+
+**dry-run vs execute batch**:
+dry-run batch 는 `wouldPurge`/`wouldSkip`+reasonCode **예측만** 남기고 도메인을 바꾸지 않는다. execute batch 는 실제 파기 결과를 남기며 `sourceDryRunBatchId`(nullable)로 어떤 dry-run 을 보고 실행했는지 연결한다. **execute 는 dry-run item 을 그대로 믿지 않고 실행 시점에 eligibility 를 재검증한다.**
+
+**item-level atomicity (파기 트랜잭션)**:
+application 1건의 tombstone/anonymize/ref-count 판단은 **하나의 item 트랜잭션** 안에서 처리한다(all-or-nothing per application). batch 는 **비원자적 집계 컨테이너** — 한 item 실패는 그 item 만 `FAILED` 로 격리하고 batch 는 계속한다(최종 `COMPLETED`/`PARTIAL_FAILED`). batch `FAILED` 는 시작 자체 실패 또는 criteria 생성 실패에 한정한다. `ALREADY_PURGED` 는 오류가 아니라 idempotent skip.
+_Avoid_: 엑셀 upload 식 "batch 전체 all-or-nothing"(대량·비가역 sweep 에는 부적합).
+
+**PURGED (상태의 의미)**:
+**관계형 PII 제거 + 첨부 바이너리 소멸 확인까지 완료된 최종 상태**. 관계형 PII 만 지우고 파일 바이트가 남아 있으면 `PURGED` 가 **아니다**(→ `BINARY_DELETE_PENDING`/`BINARY_DELETE_FAILED`/`PARTIAL_FAILED`). **"DB 는 PURGED 인데 디스크에 파일 바이트 잔존"은 절대 불허**한다.
+
+**파기 saga (stateful saga + reconciliation)**:
+첨부 바이너리 삭제는 DB 트랜잭션과 원자화할 수 없으므로 트랜잭션이 아니라 saga 로 설계한다. ① DB tx(PII·`originalFilename` 제거, attachment/item = `BINARY_DELETE_PENDING`, `JobApplication.purgeResult = PURGE_PENDING`, commit) → ② 파일 물리 삭제(`deleteIfExists` 멱등 + 존재 재확인, 이미 없음 = `MISSING_AS_SUCCESS`) → ③ DB tx(소멸 확인 → `PURGED`/`purgedAt`, 실패 → `BINARY_DELETE_FAILED`/`PARTIAL_FAILED`, 재시도 대상). reconciliation sweep 이 pending/failed 를 재처리하고, `storage-health-scan` 은 "DB PURGED 인데 파일 존재"를 치명적 불일치로 탐지한다. "파일 소멸 + DB pending" 은 프라이버시상 안전(나중에 PURGED 승격), 역방향은 불허.
+
+**ROLE_PRIVACY_ADMIN vs ROLE_RECRUIT_ADMIN (파기/감사 권한 분리)**:
+비가역 파기·민감 작업은 채용 운영 권한과 **분리**한다. **ROLE_PRIVACY_ADMIN 전용** = purge execute, RetentionPolicy/RetentionHold 변경, ActivityLog 민감필드(`ipAddress`/`userAgent`) 원문 조회, purge batch 상세/실행결과 원문. **ROLE_RECRUIT_ADMIN 까지 허용** = retention dry-run/scan, retention 결과 조회, ActivityLog **마스킹** 목록, RetentionPolicy read-only. 두 권한 모두 `DeptRoleMapping` 파생(하드코딩 금지). narrow requestMatcher 를 broad `/api/admin/**` 보다 **먼저** 배치해야 한다.
+
+**forced purge (후속)**:
+정보주체 삭제요청 기반 **retention 미도래 우회 파기**. retention-based purge 와 다른 트리거다. **Phase 09 제외** — `triggerType` enum 슬롯(`DATA_SUBJECT_REQUEST`/`FORCED_PURGE`)만 남기고 endpoint/실행 로직은 만들지 않는다. Phase 09 파기는 **eligibility 충족 건만** 대상.
+_Avoid_: "retention 무시 즉시 purge" 로 단순 구현(법적 보존/분쟁/진행중 거부·hold 필요).
+
 ## Flagged ambiguities
 
 - **CI (`ci`/`ciHash`)**: NICE 본인확인의 연계정보. 민감 식별자이므로 **어떤 export(Excel/PDF)에도 절대 포함하지 않는다**. `password`·암호화키도 동일하게 절대 노출하지 않는다. `name`/`phoneNumber`/`email`은 admin 운영(연락·발송) 목적상 평문으로 export 하되 audit 로그를 남긴다.

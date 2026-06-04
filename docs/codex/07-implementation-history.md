@@ -1,14 +1,27 @@
 # 07. Implementation History
 
-## Phase 09 - 개인정보 파기/감사 (예정, 설계 미착수)
+## Phase 09 - 개인정보 파기/감사/보존 (설계 완료, 구현 미착수)
 
-- Date: 2026-06-02
-- Work type: planning marker only (구현/설계 미착수).
-- Decision: Phase 08(CommonCode/School master, 08a~08e) 전체 완료에 이어, 다음 번호 Phase로 **Phase 09 - 개인정보 파기/감사 (Privacy Purge, Audit, Retention)** 를 진행하기로 결정.
-- 범위 후보(확정 아님): retention policy, bulk/single purge, 파기 이력, 영속 `ActivityLog`(접근/변경 감사), correlation/trace id 정책. — 로드맵 §3.3 우선순위 5.
-- 동기: export/PDF/upload/`@Version` 충돌 등 감사 이벤트가 현재 SLF4J 임시 로그로만 남아 영속 감사 기반이 필요.
-- 상태: **설계 미착수.** 상세 설계(grill-with-docs)와 슬라이스 분할은 별도 세션에서 수행 예정. 본 항목은 진행 방향 기록 용도이며 코드 변경 없음.
-- 참고: 메시지 발송(우선순위 3), 운영 hardening(우선순위 7)은 backlog 유지.
+- Date: 2026-06-04
+- Work type: design (grill-with-docs). 코드 변경 없음 — 설계 문서/ADR/glossary 산출.
+- Decision: Phase 09 를 **감사 우선(audit-first)** 으로 설계. 두 기둥 모두 Phase 09 설계 범위에 포함하되 빌드는 ActivityLog 감사 기반 먼저, 파기/보존 다음.
+- 확정 핵심:
+  - **감사**: 영속 `ActivityLog`(append-only, 지원자 원문 PII 미저장). 기록 트랜잭션 3-way — 커밋변경=in-tx, 실패/거부/충돌/스킵=REQUIRES_NEW, 정보 반출=fail-close(ADR-0006). 기존 SLF4J Export/Pdf/Upload 로거 흡수(dual-write). emission 은 명시적 2경로(AOP blanket 제외). actionResult 5종(SUCCESS/FAILURE/DENIED/SKIPPED/CONFLICT, CONFLICT 독립). `applicantRefHash`=HMAC-SHA256+pepper.
+  - **파기**: **tombstone 익명화 + 첨부 바이너리 물리삭제**(ADR-0005). crypto-shred·전면 hard delete 기각. `PURGED` = 관계형 PII 제거 + 바이너리 소멸 확인까지 완료(stateful saga + reconciliation). "DB PURGED인데 파일 잔존" 불허. Applicant ref-count 익명화.
+  - **보존**: `RetentionPolicy`(전역+공고 override)·`RetentionHold`(onboarded/입사확정만 자동 제외)·`retentionAnchorAt`(=`JobPosting.hiringEndedAt`, 암묵 closedAt fallback 금지). eligibility=anchor 종료+retentionPeriod 경과+not purged+not hold+terminal. manual dry-run/execute(스케줄 auto-execute disabled-by-default).
+  - **원장**: `PurgeBatch` 1:N `PurgeJobItem`(2-level), item-level 원자성·batch 비원자. ActivityLog 는 batch 단위 coarse index 만.
+  - **인가**: `ROLE_PRIVACY_ADMIN` 분리(ADR-0007), narrow requestMatcher 우선 배치. execute=confirmation+bulk sourceDryRunBatchId+실행시 재검증.
+- 범위 제외: AOP blanket 접근감사, ActivityLog 자체 lifecycle, forced purge(정보주체 삭제요청, enum 슬롯만), 파기 후 통지메일(hook만), per-subject envelope key, Messaging 신규.
+- 슬라이스: **9a(ActivityLog foundation) → 9b(로그 흡수+관리자 변경 audit+read API) → 9c(retention 모델+eligibility scan+dry-run) → 9d-1(purge execute core) → 9d-2(attachment binary saga) → 9e(reconciliation+안정화)**. 9d 는 문서상 한 장이나 구현 지시문은 9d-1/9d-2 분리.
+- 스키마: 신규 5 테이블 + JobApplication/ApplicationAttachment/JobPosting 컬럼 확장 + `ROLE_PRIVACY_ADMIN`/`AUDIT_HMAC_SECRET`. migration framework 없음 → 전부 수동 DDL.
+- Documentation:
+  - `docs/codex/design/phase-09-privacy-purge-audit-retention-design.md`
+  - `docs/codex/reports/phase-09-privacy-purge-audit-retention-design.html`
+  - `docs/adr/0005-retention-purge-mode-tombstone-anonymization-binary-deletion.md`
+  - `docs/adr/0006-audit-transaction-policy.md`
+  - `docs/adr/0007-privacy-admin-role-separation.md`
+  - `CONTEXT.md` (Privacy/Audit glossary 추가)
+- 상태: **구현 미착수.** 다음 작업 = 슬라이스 9a 구현. ADR-0005/0006/0007 은 구현 착수 시 accepted 전환.
 
 ## Phase 08e - CERTIFICATE Funnel Dimension
 

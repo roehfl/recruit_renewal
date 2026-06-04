@@ -272,6 +272,12 @@ Roadmap revision note - 2026-06-02:
 - **설계는 아직 진행하지 않았다.** 본 노트는 다음 Phase 진행 방향만 기록한 것이며, 상세 설계(grill-with-docs)와 슬라이스 분할은 별도 세션에서 수행한다.
 - 메시지 발송(우선순위 3)과 운영 hardening(우선순위 7)은 여전히 유효한 backlog로 남는다.
 
+Roadmap revision note - 2026-06-04:
+
+- Phase 09 (Privacy Purge / Audit / Retention) **설계 완료**(grill-with-docs). 아래 "Phase 09 - Privacy Purge / Audit / Retention" 섹션과 `docs/codex/design/phase-09-privacy-purge-audit-retention-design.md` 참조.
+- 확정: 감사 우선 빌드, 파기 방식 = tombstone 익명화 + 첨부 바이너리 물리삭제(ADR-0005), 감사 트랜잭션 3-way(ADR-0006), ROLE_PRIVACY_ADMIN 분리(ADR-0007). 슬라이스 9a→9b→9c→9d-1→9d-2→9e.
+- 구현 미착수. 다음 작업 = 9a(ActivityLog foundation). 신규 5 테이블 + 컬럼 확장 + `AUDIT_HMAC_SECRET`/`ROLE_PRIVACY_ADMIN` 은 전부 수동 DDL/운영 설정.
+
 ### Phase 04 - Interview Scheduling
 
 Status:
@@ -562,23 +568,37 @@ Out of scope:
 - `docs/adr/0001-application-pdf-openhtmltopdf-avoid-itext-agpl.md`
 - `docs/adr/0002-phase07-export-readonly-upload-stageresult-only.md`
 
-### Backlog - Privacy, Audit, Retention
+### Phase 09 - Privacy Purge / Audit / Retention
+
+설계 확정: `docs/codex/design/phase-09-privacy-purge-audit-retention-design.md`
+(grill-with-docs, 2026-06-04). ADR 0005/0006/0007. `CONTEXT.md` Privacy/Audit glossary.
+
+Status:
+
+| Slice | Status | Scope |
+| --- | --- | --- |
+| 09 design | Completed | 두 기둥(영속 감사 / 파기·보존) 설계, ADR 0005/0006/0007, glossary, 슬라이스 분할 |
+| 09a - ActivityLog Foundation | Pending | `ActivityLog` schema/enums/repo, `ActivityLogService`(recordInCurrentTx/recordRequiresNew), correlationId filter, `applicantRefHash`(HMAC) |
+| 09b - 로그 흡수 + 관리자 변경 audit + read API | Pending | Export/Pdf/Upload adapter(dual-write), egress fail-close, reopen·StageResult·첨부 admin 계측, audit read(마스킹/원문) |
+| 09c - Retention 모델 + eligibility scan + dry-run | Pending | RetentionPolicy(전역+override)/RetentionHold/`JobPosting.hiringEndedAt`, eligibility(Clock), dry-run PurgeBatch |
+| 09d-1 - Purge execute core | Pending | ROLE_PRIVACY_ADMIN, confirmation/sourceDryRunBatchId, 재검증, 관계형 PII tombstone/anonymize, ref-count, coarse index |
+| 09d-2 - Attachment binary delete saga | Pending | physicalFileStatus 전이, 파일 물리삭제(멱등), 소멸 확인 후 최종 PURGED 승격 |
+| 09e - Reconciliation + 안정화 | Pending | storage-health-scan 확장, "PURGED인데 파일존재" 치명탐지, 회귀(PII 부재/권한/멱등/Clock) |
 
 목적:
 
-- 개인정보 파기, 접근 감사, 보관주기 정책을 구현한다.
+- 영속 `ActivityLog` 감사 기반(SLF4J 이관) + 보존기간 경과 지원자 개인정보 파기(tombstone 익명화 + 첨부 바이너리 물리삭제).
 
-범위:
+핵심 설계 결정:
 
-- `ActivityLog`
-- retention metadata
-- bulk/single purge
-- 파기 이력
-- 파기 안내 메시지 연동
+- 파기 방식 = tombstone 익명화 + 첨부 바이너리 물리삭제(ADR-0005). crypto-shred·전면 hard delete 기각. `PURGED` = 관계형 PII 제거 + 바이너리 소멸 확인까지(saga + reconciliation), "DB PURGED인데 파일 잔존" 불허.
+- 감사 트랜잭션 = 커밋변경 in-tx / 실패·거부·충돌·스킵 REQUIRES_NEW / 정보반출 fail-close(ADR-0006). ActivityLog append-only, 지원자 원문 PII 미저장.
+- retentionAnchorAt = `JobPosting.hiringEndedAt`(암묵 closedAt fallback 금지). eligibility = anchor 종료+retentionPeriod 경과+not purged+not hold+terminal. RetentionHold 자동제외=onboarded/입사확정만.
+- 인가 = ROLE_PRIVACY_ADMIN 분리(ADR-0007), narrow requestMatcher 우선. manual dry-run/execute(스케줄 auto-execute disabled-by-default).
 
 Out of scope:
 
-- 통계/엑셀 신규 기능
+- AOP blanket 접근/페이지 감사(VIEW_PAGE/ACCESS_API), ActivityLog 자체 lifecycle policy, forced purge(정보주체 삭제요청 — enum 슬롯만), 파기 후 통지메일(hook만), 스케줄 auto-execute, per-subject envelope key/crypto-shred, Messaging·통계·엑셀 신규 기능.
 
 ### Phase 08 - CommonCode And School Master
 
