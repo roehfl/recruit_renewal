@@ -30,11 +30,16 @@
 | `Applicant.userName` | true | false | RETAIN_UNTIL_REF0 → NULLIFY | ref0 후 null |
 | `Applicant.password` | true | false | RETAIN_UNTIL_REF0 → NULLIFY | ref0 후 null |
 | `Applicant.phoneNumber` | true | false | RETAIN_UNTIL_REF0 → NULLIFY | ref0 후 null |
-| `Applicant.ci` (AES @Convert) | true | false | RETAIN_UNTIL_REF0 → **HASH_ONLY** | ref0 후 암호문 삭제(ciHash 유지) |
-| `Applicant.ciHash` | **false** | **true** | **HASH_ONLY (보존)** | null 불가(NOT NULL·unique). 단방향 hash·가명 식별자라 보존 허용. 재등록 dedup 용도 |
+| `Applicant.ci` (AES @Convert) | true | false | RETAIN_UNTIL_REF0 → **NULLIFY** | ref0 후 `null`(암호문 삭제) |
+| `Applicant.ciHash` | **false** | **true** | RETAIN_UNTIL_REF0 → **OVERWRITE(sentinel)** | `"PURGED:" + UUID` 로 덮어씀(NOT NULL·unique 유지). **보존 금지** — 아래 ⚠ |
 | `Employee.deptName` | true | true | KEEP_TOMBSTONE | 임직원·조직정보(지원자 파기 대상 아님) |
 
-**주의**: `ciHash` 는 NOT NULL·unique 제약으로 null/placeholder 불가. HMAC 단방향이라 원문 복원 불가 → 가명 식별자로 보존(파기 인정에 영향 없음). 단 "완전 삭제" 정책이 추후 요구되면 ciHash 컬럼 제약(ALTER) + dedup 정책 재설계가 별도로 필요(후속).
+**⚠ ciHash Blocker (리뷰 2차 #1) — 보존 금지로 정정**: 1차 인벤토리는 ciHash 를 "HMAC 단방향, 보존" 으로 적었으나 **실제 코드와 충돌**한다.
+- `HashUtil.sha256()` 은 **plain `SHA-256`**(HMAC/salt/pepper 없음, `ApplicantRefHash` 의 HMAC+pepper 와 다름). 즉 `ciHash = SHA-256(ci)` 는 CI 로부터 **결정적으로 재계산 가능한 연결자**다.
+- `ApplicantSignUpService` 가 `existsByCiHash(HashUtil.sha256(ci))` 로 **중복 가입을 차단**한다.
+- 따라서 ref0 파기 후 ci/name/email/loginId/password 를 지워도 ciHash 를 그대로 두면 → 실제 CI 기반 연결자 잔존 + 동일인 재지원 영구 차단 = **"비가역 파기"가 아님**. **Blocker**.
+- **확정(권장안 A)**: ref0 파기 시 `ci = null`, **`ciHash = "PURGED:" + UUID`**(random)로 덮어쓴다 — NOT NULL·unique 제약 유지하면서 CI 연결 단절. (대안 B: ciHash 컬럼 nullable DDL 후 null.) **결과**: 파기된 사람은 같은 CI 로 재가입 가능해진다 — 중복가입 차단보다 **파기 우선**(Phase 9 방침).
+- `applicantRefHash`(ActivityLog 의 감사 연결용, HMAC-SHA256+pepper, 신규)와 혼동 금지 — 그건 가명 유지가 목적이고 ciHash 와 별개다.
 
 ## 3. JobApplication / ApplicationAnswer
 
@@ -59,12 +64,12 @@
 | `ApplicationEducation.schoolId`(soft link) | true | KEEP_TOMBSTONE | **SCHOOL funnel 의 비식별 grouping 키** — 보존 |
 | `ApplicationEducation.schoolName` | **false** | **PLACEHOLDER** | `"__PURGED__"`(free-text, schoolId 로 통계 대체) |
 | `ApplicationEducation.majorName` / `degreeName` / `countryCode` | true | NULLIFY | null |
-| `ApplicationEducation.admissionDate` / `graduationDate` | true | KEEP_TOMBSTONE | 코호트 분석용(연/분기 bucket) 보존 — 잔존위험 수용 |
+| `ApplicationEducation.admissionDate` / `graduationDate` | true | **GENERALIZE+NULLIFY** | 정확 날짜 **보존 금지**(리뷰 2차 #8). 파기 시 연도(`admissionYear`/`graduationYear`)로 일반화 후 원본 null, 또는 전체 null. schoolId+정확일+학점 조합 재식별 차단 |
 | `ApplicationEducationSemesterGrade.*`(year/semester/credits/gpa…) | - | KEEP_TOMBSTONE | 비식별 학업 metric(schoolName/major 소거 후 단독 비식별) |
 | `ApplicationCareer.companyName` | **false** | **PLACEHOLDER** | `"__PURGED__"` |
 | `ApplicationCareer.departmentName` / `positionTitle` / `responsibilities` / `resignationReason` | true | NULLIFY | null(자유서술 포함) |
 | `ApplicationCareer.employmentType` / `currentlyEmployed` / `sortOrder` | - | KEEP_TOMBSTONE | 비PII |
-| `ApplicationCareer.startDate` / `endDate` | false/true | KEEP_TOMBSTONE | 경력기간 분석용 보존(bucket) — 잔존위험 수용 |
+| `ApplicationCareer.startDate` / `endDate` | false/true | **GENERALIZE+NULLIFY** | 정확 날짜 **보존 금지**(리뷰 2차 #8). year-month bucket 또는 근속개월수로 일반화 후 원본 null(`startDate` NOT NULL → ALTER nullable 또는 generalize 컬럼). |
 | `ApplicationCareerProfile.careerType` | false | KEEP_TOMBSTONE | 비PII enum(funnel) |
 
 ## 5. 자격/어학/병역/수상/공백 (상세 PII 묶음)
@@ -138,7 +143,9 @@ BINARY_DELETE_FAILED : 물리 삭제 실패(재시도/ reconciliation 대상)
 
 ## 9. DDL 영향 요약 (수동 DDL 필요)
 
-**ALTER → nullable (NOT NULL date PII)**: `ApplicationCertificate.acquiredDate`, `ApplicationLanguage.examDate`, `ApplicationAward.awardDate`, `ApplicationGapPeriod.startDate`/`endDate`, `ApplicationAttachment.storagePath`.
+**ALTER → nullable (NOT NULL date PII)**: `ApplicationCertificate.acquiredDate`, `ApplicationLanguage.examDate`, `ApplicationAward.awardDate`, `ApplicationGapPeriod.startDate`/`endDate`, `ApplicationCareer.startDate`(일반화/null 위해), `ApplicationAttachment.storagePath`. (education admission/graduation 은 이미 nullable → generalize 후 null.)
+
+**ciHash overwrite(권장안 A, DDL 불요)**: ref0 파기 시 `ciHash = "PURGED:"+UUID`. 대안 B = ciHash unique+nullable DDL 후 null(H2/MariaDB unique-null 동작 확인 필요). **plain SHA-256 이라 보존 금지** — 위 §2 ⚠.
 
 **PLACEHOLDER 유지(NOT NULL String, DDL 불요)**: `applicantNameSnapshot`, `schoolName`, `companyName`, `certificateName`, `issuingOrganization`, `languageName`, `testName`, `awardName`, `awardingOrganization`, `gapPeriod.reason`, `originalFileName`. (원하면 이들도 ALTER nullable+NULLIFY 로 전환 가능 — 컬럼별 선택지로 문서화.)
 
@@ -150,10 +157,11 @@ BINARY_DELETE_FAILED : 물리 삭제 실패(재시도/ reconciliation 대상)
 
 ## 10. 판단 보류 / 확인 필요 항목
 
-- **날짜 보존 trade-off**: education(admission/graduation), career(start/end) 날짜는 funnel/코호트용으로 KEEP 했다. 이는 잔존 quasi-identifier(연도+학교코드 조합) 위험을 일부 수용한 결정 — 더 강한 파기를 원하면 연/분기 bucket 으로 절단(generalization) 후 원본 날짜 NULLIFY 로 전환 가능. **확인 필요.**
-- **PLACEHOLDER vs ALTER nullable 일괄 정책**: NOT NULL String PII 를 placeholder(기본)로 둘지, 전부 ALTER nullable+NULLIFY 로 통일할지 — 운영 DB DDL 부담과 trade-off. 기본은 placeholder.
-- **`Interview.memo` 잔존**: §7 flag — Phase 9 범위 밖. 운영 가이드(실명 금지) 또는 후속 정리.
-- **`ciHash` 보존**: 완전삭제 요구 시 별도 후속.
+- **날짜 보존 trade-off — 해소(리뷰 2차 #8)**: education(admission/graduation)·career(start/end) 정확 날짜는 **KEEP 금지**. 연도/year-month 로 일반화(또는 null)한다. "통계 편의" 보다 "재식별 가능성 제거" 우선.
+- **`ciHash` — 해소(리뷰 2차 #1)**: 보존 금지. ref0 파기 시 `"PURGED:"+UUID` 로 overwrite(권장안 A). 중복가입 차단은 파기 후 미보장(파기 우선).
+- **PLACEHOLDER vs ALTER nullable 일괄 정책**: NOT NULL String PII 를 placeholder(기본)로 둘지, 전부 ALTER nullable+NULLIFY 로 통일할지 — 운영 DB DDL 부담과 trade-off. 기본은 placeholder. **확인 필요(낮음).**
+- **semesterGrade + schoolId 결합(리뷰 2차 #8)**: `ApplicationEducationSemesterGrade.schoolYear`/gpa 등은 단독 비식별이나 `schoolId`(보존) + 학년/학점 조합 시 좁은 코호트 재식별 가능성. 정확 날짜를 이미 일반화하므로 위험은 낮으나, 필요 시 schoolId 와 결합되는 grade 상세도 generalize 검토. **확인 필요(낮음).**
+- **`Interview.memo` 잔존**: §7 flag — Phase 9 범위 밖(group 공유 행). 운영 가이드(실명 금지) 또는 후속 정리. **확인 필요.**
 
 ## 11. 9d 착수 게이트
 

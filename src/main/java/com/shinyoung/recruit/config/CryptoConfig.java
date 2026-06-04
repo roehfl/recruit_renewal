@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 public class CryptoConfig {
 
     @Bean
-    public AesCryptoUtil aesCryptoUtil(@Value("${crypto.aes.key") String key) {
+    public AesCryptoUtil aesCryptoUtil(@Value("${crypto.aes.key}") String key) {
         return new AesCryptoUtil(key);
     }
 }

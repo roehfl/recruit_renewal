@@ -21,7 +21,9 @@ proposed (2026-06-04, Phase 09 design / grill-with-docs). Phase 09 구현(9b/9c/
   .requestMatchers(HttpMethod.POST,   "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
   .requestMatchers(HttpMethod.PUT,    "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
   .requestMatchers(HttpMethod.DELETE, "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
-  .requestMatchers("/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+  .requestMatchers(HttpMethod.POST,   "/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+  .requestMatchers(HttpMethod.DELETE, "/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+  .requestMatchers(HttpMethod.POST,   "/api/admin/retention/job-postings/*/anchor").hasAuthority("ROLE_PRIVACY_ADMIN")
   .requestMatchers(HttpMethod.GET,    "/api/admin/retention/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN","ROLE_PRIVACY_ADMIN")
   .requestMatchers(HttpMethod.GET,    "/api/admin/audit/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN","ROLE_PRIVACY_ADMIN")
   // ↑ 전부 기존 .requestMatchers("/api/admin/**") 보다 위

@@ -70,10 +70,14 @@
       <span class="pill">9a → 9b → 9c → 9d-1 → 9d-2 → 9e</span> 착수 가능. 비가역 파기는 검증된 감사 기반 위에서만 실행.</div>
     <div class="crit"><b>불변 원칙</b>: "DB 는 PURGED 인데 디스크에 파일 바이트 잔존" 상태는 <b>절대 불허</b>.
       <code>PURGED</code> = 관계형 PII 제거 <b>AND</b> 첨부 바이너리 소멸 확인까지 완료된 최종 상태.</div>
-    <div class="note"><b>2026-06-04 리뷰 반영(instruction.md)</b>: ① <b>PII 필드 인벤토리</b>를 9d 선행 산출물로 격상 →
+    <div class="note"><b>2026-06-04 리뷰 1차 반영(instruction.md)</b>: ① <b>PII 필드 인벤토리</b>를 9d 선행 산출물로 격상 →
       <code>docs/codex/implementation/phase-09-pii-field-inventory.md</code>(전 application 엔티티 필드 분류). ② terminal query 구체화(실제 enum 검증).
       ③ <code>metadataJson</code> → typed <code>AuditMetadata</code>. ④ <code>PhysicalFileStatus.DELETED</code> → <code>SOFT_DELETED</code> 분리. ⑤ requestMatcher HTTP method 분기.
       ⑥ 9b read API 가드. ⑦ ADR accepted 게이트(ADR-0005 = accepted-with-implementation-gate).</div>
+    <div class="crit"><b>2026-06-04 리뷰 2차 반영(instruction.md)</b>: ① <b>Blocker — <code>ciHash</code> 보존 금지</b>(plain SHA-256 + 중복가입 차단 →
+      ref0 시 <code>ci=null</code>, <code>ciHash="PURGED:"+UUID</code> overwrite). ② upload <code>sourceFileName</code> → hash+확장자(파일명 PII). ③ export fail-close <b>temp file 누수 방지</b> 패턴.
+      ④ RetentionPolicy 선택 규칙 6개 + <code>POLICY_NOT_FOUND</code>. ⑤ <code>hiringEndedAt</code> <b>수동 anchor 명령</b>(자동 세팅 없음). ⑥ RetentionHold <b>manual only</b>.
+      ⑦ holds matcher GET/write 분기. ⑧ 학력·경력 <b>정확 날짜 보존 금지</b>(연/year-month 일반화). ⑨ storage-health-scan 상태별 정책. ⑩ PurgeBatch/Item = "delete 금지 ledger"(append-only 아님).</div>
   </section>
 
   <!-- 2. Scope Cards -->
@@ -125,10 +129,10 @@
     <h3>신규 엔티티 · 관계</h3>
     <div class="flow">RetentionPolicy (global default + per-JobPosting override)
 JobPosting.hiringEndedAt ──▶ retentionAnchorAt ──▶ eligibility(Clock)
-RetentionHold ──▶ (onboarded/입사확정/HR 이관만 자동 제외)
+RetentionHold ──▶ (Phase 9: manual hold only — onboarded 자동 hold 는 후속)
 
 PurgeBatch (DRY_RUN | EXECUTE)
-  └─ 1:N PurgeJobItem (append-only, application 별 결과)
+  └─ 1:N PurgeJobItem (delete 금지 ledger, application 별 결과)
         └─ targetType / status / reasonCode / erased counts
 
 JobApplication ─(tombstone)─ purgeBatchId · purgeResult · purgedAt
@@ -227,7 +231,7 @@ storage-health-scan  : "DB PURGED 인데 파일 존재" = 치명적 불일치 �
       <div class="card">
         <h4>RetentionHold (보존 예외)</h4>
         <ul>
-          <li>자동 제외 = <b>onboarded/입사확정/HR 이관 완료만</b></li>
+          <li><b>Phase 9 = manual hold only</b> (onboarded/HR 상태 도메인 부재 → 자동 hold 후속)</li>
           <li>중간 전형 PASSED 는 제외 기준 <b>아님</b></li>
           <li>불합격·전형포기·미응시·입사포기·미확정 종료 = retention 경과 시 파기 대상</li>
         </ul>

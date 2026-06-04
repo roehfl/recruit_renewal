@@ -82,24 +82,30 @@ _Avoid_: '삭제(delete)'(첨부 바이너리 외에는 row 를 지우지 않음
 파기 후 남는 **비식별 골격 row**. 보존 후보 = `applicationId`/`jobPostingId`/`jobPositionId`/stage·result status code/submitted date bucket/`purgedAt`/`purgeBatchId`/`purgeResult`. 원문 PII(name/email/phone/ci/address/answers/섹션 원문)는 없다.
 
 **ref-count 익명화 (Applicant)**:
-Applicant 공통 PII(`email`/`name`/`phone`/`ci`)는 그 Applicant 의 **모든** JobApplication 이 파기 대상이 됐을 때만 익명화한다. 일부 지원서만 파기됐으면 다른 살아있는 지원서가 연락처를 필요로 하므로 보존한다.
+Applicant 공통 PII(`email`/`name`/`phone`/`ci`)는 그 Applicant 의 **모든** JobApplication 이 파기 대상이 됐을 때만 익명화한다. 일부 지원서만 파기됐으면 다른 살아있는 지원서가 연락처를 필요로 하므로 보존한다. **`ciHash` 는 보존하지 않는다** — `HashUtil.sha256(ci)`(plain SHA-256, HMAC 아님)이고 회원가입이 `existsByCiHash` 로 중복가입을 막으므로, 그대로 두면 CI 연결자가 잔존해 비가역 파기가 깨진다. ref0 시 `ci=null`, `ciHash="PURGED:"+UUID` 로 overwrite(중복가입 차단은 파기 후 미보장 — 파기 우선).
+_Avoid_: `ciHash` 를 "HMAC·가명이라 보존해도 안전"하다고 보는 것(plain SHA-256 임); ActivityLog 의 `applicantRefHash`(HMAC+pepper, 감사용)와 혼동.
 
 **retentionAnchorAt**:
 파기 보존기간 계산의 기준 시점. **"지원 접수 마감"이 아니라 "해당 채용 프로세스가 실질적으로 종료된 시점"**이다. 공고 단위 anchor 로 기본 소스는 `JobPosting.hiringEndedAt`(신규 필드). **암묵적 `closedAt` fallback 은 하지 않는다** — `hiringEndedAt` 이 null 이면 `ANCHOR_NOT_FIXED` 로 SKIP. `closedAt` 을 기준으로 쓰려면 `RetentionPolicy.baselineType = CLOSED_AT` 을 **명시 선택**해야 한다(암묵 fallback 은 오파기 위험).
 _Avoid_: `closedAt`(공고 close 시각)을 암묵 fallback 으로 retention 기준에 끌어쓰는 것; `finalizedAt`(의미가 넓고 모호) 네이밍.
 
 **RetentionPolicy**:
-보존기간 정책. **전역 기본값 + 공고별 override** 구조. `retentionPeriod`/`baselineType`/`enabled`/`effectiveFrom`/`effectiveTo`(+ override 시 `jobPostingId`) 를 가지며, 변경은 ActivityLog 에 committed change(in-tx)로 기록한다. `baselineType` = `HIRING_ENDED_AT`(기본) / `CLOSED_AT`(명시 선택). 법정 일수는 코드에 하드코딩하지 않고 설정/정책으로 주입한다.
+보존기간 정책. **전역 기본값 + 공고별 override** 구조. `retentionPeriod`/`baselineType`/`enabled`/`effectiveFrom`/`effectiveTo`(+ override 시 `jobPostingId`) 를 가지며, 변경은 ActivityLog 에 committed change(in-tx)로 기록한다. `baselineType` = `HIRING_ENDED_AT`(기본) / `CLOSED_AT`(명시 선택). 법정 일수는 코드에 하드코딩하지 않고 설정/정책으로 주입한다. **선택 규칙**(dry-run 결정성): override 우선 → 없으면 global default, `effective` 는 `scanAt` 기준 평가, 같은 jobPostingId 기간 overlap 금지, global enabled 동시 1개, 없으면 `POLICY_NOT_FOUND` SKIP.
+
+**hiringEndedAt 수동 확정**:
+`retentionAnchorAt` 소스인 `JobPosting.hiringEndedAt` 은 **자동 세팅하지 않는다**(현 `close()` 는 `status`/`closedAt` 만). "공고 마감" ≠ "채용 프로세스 종료" 이므로 관리자가 `POST /api/admin/retention/job-postings/{id}/anchor`(ROLE_PRIVACY_ADMIN, 감사 `RETENTION_ANCHOR_SET`)로 수동 확정한다. 미확정 = `ANCHOR_NOT_FIXED` SKIP.
 
 **RetentionHold (보존 예외)**:
-파기 자동 대상에서 제외하는 보존 의무/예외. **자동 제외는 최종 입사확정/onboarded/HR 이관 완료 건만**이다. **중간 전형 PASSED 는 제외 기준이 아니다** — 불합격·전형포기·미응시·최종합격 후 입사포기·채용 미확정 종료는 retention 경과 시 모두 파기 대상이 될 수 있다. hold 건은 파기 시 `SKIPPED` + `RETENTION_HOLD` 로 감사.
+파기 자동 대상에서 제외하는 보존 의무/예외. **Phase 9 는 관리자 수동 hold 만(manual only)** — `StageResultStatus` 에 `HIRED`/`ONBOARDED`/`HR_TRANSFERRED` 가 없어 "onboarded 자동 제외" 의 도메인 근거가 없다(자동 onboarded-hold 는 `ApplicationHireStatus` 신규 도메인 필요 → 후속). **중간 전형 PASSED 는 제외 기준이 아니다** — 불합격·전형포기·미응시·최종합격 후 입사포기·채용 미확정 종료는 retention 경과 시 모두 파기 대상이 될 수 있다. hold 건은 파기 시 `SKIPPED` + `RETENTION_HOLD` 로 감사.
+_Avoid_: 합격/onboarded 를 코드로 자동 hold(현 도메인에 상태 없음).
 
 **terminal application status (파기 적격 전제)**:
 파기는 지원서가 **종결 상태**일 때만 적격하다. 구체 판정(9c 계약, 실제 enum 검증 완료) = `JobApplication.status == WITHDRAWN` **OR** (`Stage.finalStage==true` row 정확히 1개 + `Stage.status ∈ {RESULT_ANNOUNCED, CLOSED}` + 해당 application+finalStage `StageResult` 존재 + `resultStatus != PENDING` + `decidedAt != null`). finalStage 부재/2개 이상 = `INVALID_STAGE_CONFIGURATION`, 그 외 미충족 = `APPLICATION_NOT_TERMINAL` 로 SKIP. 적격성 = `anchor 종료 + retentionPeriod 경과 + not purged + not hold + terminal`.
 _Avoid_: "확정"을 구현자가 임의 해석하는 것(이 query 가 계약).
 
 **PurgeBatch / PurgeJobItem**:
-파기 실행의 상세 원장. **`PurgeBatch`** = dry-run 또는 execute **1회 실행 단위**(mode/criteria/counts/status). **`PurgeJobItem`** = application 별 판정·실행 결과(append-only). 둘 다 PII-free. `ActivityLog` 는 이 원장의 **coarse index** 로만 쓰고(batch 시작/완료/부분실패/실패 + 집계 metadataJson), item 결과를 중복 기록하지 않는다.
+파기 실행의 상세 원장. **`PurgeBatch`** = dry-run 또는 execute **1회 실행 단위**(mode/criteria/counts/status). **`PurgeJobItem`** = application 별 판정·실행 결과. 둘 다 PII-free. **append-only 가 아니라 "delete 금지 mutable ledger/control table"** — batch 는 `RUNNING→COMPLETED/PARTIAL_FAILED/FAILED`, item 은 pending→failed→retry→PURGED 로 상태 전이(update 허용, delete 금지). append-only 는 `ActivityLog` 에만 해당. `ActivityLog` 는 이 원장의 **coarse index** 로만 쓰고(batch 시작/완료/부분실패/실패 + 집계 metadataJson), item 결과를 중복 기록하지 않는다.
+_Avoid_: PurgeBatch/PurgeJobItem 을 append-only 라고 부르는 것(상태 전이 있음).
 
 **dry-run vs execute batch**:
 dry-run batch 는 `wouldPurge`/`wouldSkip`+reasonCode **예측만** 남기고 도메인을 바꾸지 않는다. execute batch 는 실제 파기 결과를 남기며 `sourceDryRunBatchId`(nullable)로 어떤 dry-run 을 보고 실행했는지 연결한다. **execute 는 dry-run item 을 그대로 믿지 않고 실행 시점에 eligibility 를 재검증한다.**
@@ -115,8 +121,8 @@ _Avoid_: 엑셀 upload 식 "batch 전체 all-or-nothing"(대량·비가역 sweep
 첨부 바이너리 삭제는 DB 트랜잭션과 원자화할 수 없으므로 트랜잭션이 아니라 saga 로 설계한다. ① DB tx(PII·`originalFilename` 제거, attachment/item = `BINARY_DELETE_PENDING`, `JobApplication.purgeResult = PURGE_PENDING`, commit) → ② 파일 물리 삭제(`deleteIfExists` 멱등 + 존재 재확인, 이미 없음 = `MISSING_AS_SUCCESS`) → ③ DB tx(소멸 확인 → `PURGED`/`purgedAt`, 실패 → `BINARY_DELETE_FAILED`/`PARTIAL_FAILED`, 재시도 대상). reconciliation sweep 이 pending/failed 를 재처리하고, `storage-health-scan` 은 "DB PURGED 인데 파일 존재"를 치명적 불일치로 탐지한다. "파일 소멸 + DB pending" 은 프라이버시상 안전(나중에 PURGED 승격), 역방향은 불허. `PhysicalFileStatus` 는 기존 `DELETED` 를 **`SOFT_DELETED`** 로 개명(soft-delete 와 purge 물리삭제 의미 분리)하고 `BINARY_DELETE_PENDING`/`BINARY_DELETED`/`BINARY_DELETE_FAILED` 를 추가한다 — 기존 `markDeleted()` soft-delete 와 혼동 금지.
 
 **AuditMetadata (typed)**:
-ActivityLog `metadataJson` 은 자유 `Map`/raw JSON 이 아니라 actionType 별 **sealed `AuditMetadata` typed record**(ExportMetadata/PdfMetadata/UploadMetadata/StageResultChangeMetadata/PurgeBatchMetadata…)로 고정한다. 직렬화는 `ActivityLogService` 내부에서만 수행하고 호출부는 typed record 만 넘긴다(PII-free 보장). actor/ip/ua/correlationId/occurredAt 는 metadata 가 아니라 ActivityLog 컬럼.
-_Avoid_: 호출부에서 `Map<String,Object>`/raw JSON 문자열 전달.
+ActivityLog `metadataJson` 은 자유 `Map`/raw JSON 이 아니라 actionType 별 **sealed `AuditMetadata` typed record**(ExportMetadata/PdfMetadata/UploadMetadata/StageResultChangeMetadata/PurgeBatchMetadata…)로 고정한다. 직렬화는 `ActivityLogService` 내부에서만 수행하고 호출부는 typed record 만 넘긴다(PII-free 보장). actor/ip/ua/correlationId/occurredAt 는 metadata 가 아니라 ActivityLog 컬럼. **업로드 원본 파일명은 PII 가능**(예: "홍길동_…xlsx")이라 원문 저장 금지 — `sourceFileNameHash`(SHA-256)+`sourceFileExtension` 만(ActivityLog·SLF4J 공통).
+_Avoid_: 호출부에서 `Map<String,Object>`/raw JSON 문자열 전달; 업로드 `sourceFileName` 원문 저장.
 
 **ROLE_PRIVACY_ADMIN vs ROLE_RECRUIT_ADMIN (파기/감사 권한 분리)**:
 비가역 파기·민감 작업은 채용 운영 권한과 **분리**한다. **ROLE_PRIVACY_ADMIN 전용** = purge execute, RetentionPolicy/RetentionHold 변경, ActivityLog 민감필드(`ipAddress`/`userAgent`) 원문 조회, purge batch 상세/실행결과 원문. **ROLE_RECRUIT_ADMIN 까지 허용** = retention dry-run/scan, retention 결과 조회, ActivityLog **마스킹** 목록, RetentionPolicy read-only. 두 권한 모두 `DeptRoleMapping` 파생(하드코딩 금지). narrow requestMatcher 를 broad `/api/admin/**` 보다 **먼저** 배치해야 한다.

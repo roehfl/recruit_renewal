@@ -1,179 +1,230 @@
-반드시 보완할 점
-1. Blocker — PII 필드 인벤토리가 아직 너무 약하다
+1. Blocker — ciHash 보존 설계가 현재 코드와 충돌한다
 
-설계서에 “섹션/answers PII 컬럼은 실제 엔티티/DDL 확인 후 확정”이라고 되어 있는데, 이건 “남은 이슈” 수준이 아니라 9d 착수 전 선행 산출물이어야 한다.
+PII inventory는 Applicant.ciHash를 HASH_ONLY로 보존한다고 정리했다. 문서에는 “HMAC 단방향”처럼 적혀 있지만, 실제 코드는 HMAC이 아니다. 그냥 SHA-256이다.
 
-현재 코드 기준으로 바로 문제가 보인다.
+실제 HashUtil은 단순 MessageDigest.getInstance("SHA-256")이고 salt/pepper/HMAC이 없다.
 
-JobApplication.applicantNameSnapshot은 nullable = false다. 파기 시 null 처리하려면 DDL 변경이 필요하거나, PII-free placeholder 정책이 필요하다.
+더 큰 문제는 회원가입에서 existsByCiHash(ciHash)로 중복 가입을 막고 있다는 점이다.
 
-Applicant는 email, userName, password, phoneNumber, ci, ciHash를 들고 있고, 특히 ciHash는 nullable = false, unique = true다. 단순 null 익명화가 불가능하다.
+즉, ref-count 이후 ci, name, email, loginId, password를 지워도 ciHash를 그대로 남기면:
 
-ApplicationAttachment도 originalFileName, storedFileName, storagePath, contentType, fileSize 등이 nullable = false로 잡혀 있다. 설계서의 “originalFilename 제거, storagePath 최종 purge 후 null”을 그대로 구현하려면 DDL 변경이 필요하다.
+실제 CI 기반 연결자가 남는다.
+파기 후 같은 사람이 다시 지원자 계정을 만들 수 없다.
+“비가역 파기”라고 보기 어렵다.
 
-ApplicationEducation.schoolName도 nullable = false다. 학교명은 재식별 가능성이 있으므로 소거 대상인데, null 처리할 수 없다.
+이건 설계상 Blocker다.
 
-ApplicationCareer.companyName, startDate, currentlyEmployed도 재식별성이 높은데 nullable = false가 섞여 있다.
+수정안:
 
-ApplicationCertificate.certificateName, issuingOrganization, acquiredDate도 nullable = false다. 자격 통계 때문에 일부 tombstone을 남기고 싶은 욕심이 생길 수 있는데, 개인 단위 상세 자격 이력은 재식별 리스크가 있다.
+ref0 파기 시점에는 ciHash도 그대로 보존하지 말고 아래 중 하나로 가야 한다.
 
-보완 지시:
+권장안 A:
+ci = null
+ciHash = "PURGED:" + UUID/random value
 
-9d 전에 반드시 phase-09-pii-field-inventory.md를 만들고, 모든 지원서 관련 엔티티 필드를 아래처럼 분류해야 한다.
+또는
 
-KEEP_TOMBSTONE     : 통계/감사 연결용 비식별 값
-NULLIFY            : nullable 변경 후 null
-PLACEHOLDER        : NOT NULL 유지 필요 시 "__PURGED__" 등 비식별 치환
-HASH_ONLY          : 원문 제거 후 HMAC/hash만 보존
-DELETE_ROW         : row 자체 삭제 가능
-RETAIN_UNTIL_REF0  : Applicant 공통 PII처럼 ref-count 이후 처리
+권장안 B:
+ci = null
+ciHash nullable DDL 변경 후 null
 
-이거 없으면 9d 구현은 높은 확률로 “파기했다고 표시했지만 실제 PII가 남는” 상태가 된다.
+중복 가입 방지 기능을 계속 유지하고 싶다면 그건 “파기 후에도 동일인 식별을 계속 보유하겠다”는 뜻이라, 개인정보 파기 목적과 충돌한다. Phase 9에서는 파기 우선으로 가는 게 맞다.
 
-2. High — terminal 판정이 현재 도메인과 정확히 안 맞는다
+2. High — Upload audit의 sourceFileName은 PII-free가 아니다
 
-설계서는 terminal을 WITHDRAWN 또는 “최종 stage StageResult 확정”으로 정의했다.
+설계서의 typed AuditMetadata는 좋다. 자유 Map 금지는 맞다.
 
-문제는 현재 코드상 “확정”이라는 독립 필드가 없다.
-Stage에는 finalStage, status, resultAnnouncementDateTime이 있고, StageResult에는 resultStatus, decidedAt, decidedBy, version이 있다.
+그런데 UploadMetadata에 sourceFileName을 그대로 넣는 건 위험하다. 현재 UploadAuditLogger도 업로드 원본 파일명을 audit에 남기고 있다.
 
-즉 구현자가 마음대로 해석할 여지가 있다.
+관리자가 파일명을 이렇게 올릴 수 있다.
 
-예를 들어 아래 중 무엇이 terminal인가?
+홍길동_1차면접결과.xlsx
+2026_신입공채_불합격자명단.xlsx
 
-finalStage = true AND Stage.status = RESULT_ANNOUNCED
-finalStage = true AND Stage.status = CLOSED
-finalStage = true AND StageResult.resultStatus != PENDING
-finalStage = true AND decidedAt != null
-공고 JobPosting.status = CLOSED 까지 필요?
+그러면 ActivityLog가 PII-free라는 전제가 깨진다.
 
-이걸 9c에서 확정하지 않으면 dry-run 결과가 흔들린다.
+수정안:
 
-보완 지시:
+sourceFileName 원문 저장 금지.
 
-9c 설계/구현 지시문에 terminal query를 명시해야 한다.
+record UploadMetadata(
+    long stageId,
+    String outcome,
+    long rowCount,
+    long changedCount,
+    long unchangedCount,
+    long errorCount,
+    long staleCount,
+    String sourceFileNameHash,
+    String sourceFileExtension,
+    long sourceFileSize,
+    String contentHash
+) implements AuditMetadata {}
 
-추천 기준은 보수적으로 이거다.
+원본 파일명은 SLF4J에도 남기지 않는 게 낫다. 최소한 ActivityLog에는 금지해라.
 
-terminal =
-  JobApplication.status == WITHDRAWN
-  OR
-  (
-    finalStage row exists
-    AND finalStage.status IN (RESULT_ANNOUNCED, CLOSED)
-    AND StageResult exists for application + finalStage
-    AND StageResult.resultStatus != PENDING
-    AND StageResult.decidedAt IS NOT NULL
-  )
+3. High — export fail-close 구현 시 temp file 누수 가능성이 있다
 
-그리고 finalStage가 없거나 여러 개면 APPLICATION_NOT_TERMINAL 또는 INVALID_STAGE_CONFIGURATION로 SKIP하는 게 안전하다.
+현재 export controller는 파일을 먼저 만들고, 그 다음 audit log를 남긴 뒤 response를 만든다.
 
-3. High — metadataJson allowlist가 아직 추상적이다
+현재 temp 파일 삭제는 ExcelExportResponseFactory의 StreamingResponseBody 안에서만 수행된다. 즉, response가 만들어지고 스트리밍이 시작돼야 삭제된다.
 
-설계서에는 metadataJson을 actionType별 allowlist + PII-free 검증으로 제한한다고 되어 있다. 방향은 맞다.
+Phase 9에서 ActivityLog fail-close를 적용하면 audit insert 실패 시 파일은 생성됐는데 response factory까지 도달하지 못한다. 그러면 temp xlsx가 남는다.
 
-하지만 구현 지시문 수준에서는 이 표현만으로 부족하다.
-특히 기존 export audit은 filtersSafeJson, filtersHash, rowCount, fileName, clientIp, userAgent 등을 남긴다.
+수정안:
 
-여기서 자유 Map<String, Object>를 허용하면 결국 누군가 applicantName, phoneNumber, email 같은 값을 metadata에 넣을 가능성이 생긴다.
+9b에서 export/PDF fail-close를 적용할 때 반드시 이런 형태가 필요하다.
 
-보완 지시:
-
-9b 전에 AuditMetadata를 자유 Map이 아니라 action별 typed record로 고정해야 한다.
-
-예시:
-
-public sealed interface AuditMetadata permits
-        ExportMetadata,
-        PdfMetadata,
-        StageResultChangeMetadata,
-        PurgeBatchMetadata {
+ExcelExportFile file = applicationExportService.exportApplications(...);
+try {
+    activityLogService.recordEgressFailClose(...);
+    return excelExportResponseFactory.toResponse(file);
+} catch (RuntimeException e) {
+    Files.deleteIfExists(file.path());
+    throw e;
 }
 
-public record ExportMetadata(
-        String datasetType,
-        String filtersHash,
-        Long rowCount
-) implements AuditMetadata {
-}
+PDF도 동일한 구조가 필요하다.
 
-그리고 ObjectMapper.writeValueAsString(metadata)는 ActivityLogService 내부에서만 수행하게 해야 한다.
-서비스 호출부에서 raw JSON 문자열이나 Map을 넘기게 하면 설계가 바로 무너진다.
+4. High — RetentionPolicy 선택 규칙이 부족하다
 
-4. Medium — PhysicalFileStatus.DELETED와 신규 바이너리 삭제 상태가 충돌할 수 있다
+설계서는 RetentionPolicy를 전역 기본 + 공고별 override로 둔다고 했다. retentionPeriod, baselineType, enabled, effectiveFrom, effectiveTo, jobPostingId를 둔다고 되어 있다.
 
-현재 PhysicalFileStatus는 METADATA_ONLY, STORED, MISSING, DELETED 네 개뿐이다.
+하지만 실제로 가장 중요한 게 빠졌다.
 
-그런데 현재 ApplicationAttachment.markDeleted()는 soft delete 성격의 삭제 처리에서 physicalFileStatus = DELETED로 바꾼다.
+정책이 여러 개면 어떤 것을 고르는가?
+effectiveFrom/effectiveTo는 scan 시점 기준인가, anchor 기준인가?
+전역 정책과 공고 override가 동시에 있으면 무조건 override 우선인가?
+기간이 겹치는 정책은 DB에서 막을 것인가, 서비스에서 막을 것인가?
 
-Phase 09 설계는 여기에 BINARY_DELETE_PENDING, BINARY_DELETED, BINARY_DELETE_FAILED를 추가하려고 한다.
+이게 없으면 dry-run 결과가 비결정적이 된다.
 
-문제는 기존 DELETED가 진짜 물리 파일 삭제인지, 논리 삭제인지 의미가 애매해진다는 점이다.
+수정안:
 
-보완 지시:
+9c 전에 아래 규칙을 박아야 한다.
 
-9d-2 전에 상태 의미를 정리해야 한다.
+1. jobPostingId override가 있으면 override 우선
+2. override가 없으면 global default 사용
+3. effectiveFrom/effectiveTo는 scanAt 기준으로 평가
+4. 같은 jobPostingId에 effective period overlap 금지
+5. global enabled policy도 동일 시점에 1개만 허용
+6. 없으면 POLICY_NOT_FOUND로 SKIP
+5. High — hiringEndedAt을 누가/언제 세팅하는지 없다
 
-추천은 이거다.
+retention anchor를 JobPosting.hiringEndedAt으로 잡은 건 좋다. 암묵 closedAt fallback 금지도 맞다.
 
-METADATA_ONLY        : 파일 미업로드 metadata만 존재
-STORED               : 파일 존재
-MISSING              : DB는 있으나 파일 없음
-SOFT_DELETED         : 사용자/관리자 삭제 처리됨, 파일 처리 정책은 별도
-BINARY_DELETE_PENDING
-BINARY_DELETED
-BINARY_DELETE_FAILED
+그런데 현재 JobPosting.close()는 status = CLOSED, closedAt = now만 세팅한다. hiringEndedAt은 없다.
 
-기존 DELETED를 그대로 쓰지 말고, 가능하면 SOFT_DELETED로 의미를 분리하는 게 낫다.
-지금 이름 그대로 가면 purge saga에서 상태 해석이 꼬인다.
+즉, Phase 9에서 컬럼만 추가하면 모든 공고가 ANCHOR_NOT_FIXED로 skip될 수 있다.
 
-5. Medium — requestMatcher는 path뿐 아니라 HTTP method까지 명시해야 한다
+수정안:
 
-ADR-0007은 narrow matcher를 broad /api/admin/**보다 먼저 배치해야 한다고 잘 적었다.
+9c에 명시해야 한다.
 
-그런데 API 설계상 같은 /api/admin/retention/policies 계열에서 GET은 RECRUIT_ADMIN, POST/PUT/DELETE는 PRIVACY_ADMIN이다.
+POST /api/admin/job-postings/{id}/hiring-ended
+또는
+POST /api/admin/retention/job-postings/{id}/anchor
 
-그러면 path matcher만으로는 부족하다. method까지 분기해야 한다.
+그리고 이 명령은 ActivityLog 대상이어야 한다.
 
-보완 지시:
+actionType = RETENTION_ANCHOR_SET
+targetType = JOB_POSTING
 
-SecurityConfig 구현 지시문에 아래 수준으로 박아야 한다.
+자동 세팅은 위험하다. “공고 마감”과 “채용 프로세스 종료”는 다르기 때문에 수동 확정 명령이 낫다.
 
-.requestMatchers(HttpMethod.POST, "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
-.requestMatchers(HttpMethod.PUT, "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
-.requestMatchers(HttpMethod.DELETE, "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+6. High — onboarded/HR 이관 자동 hold 근거가 현재 도메인에 없다
 
-.requestMatchers(HttpMethod.POST, "/api/admin/retention/purge-batches/execute").hasAuthority("ROLE_PRIVACY_ADMIN")
+설계서는 RetentionHold 자동 제외를 “최종 입사확정/onboarded/HR 이관 완료”로 잡았다.
 
-.requestMatchers(HttpMethod.GET, "/api/admin/retention/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN", "ROLE_PRIVACY_ADMIN")
-.requestMatchers(HttpMethod.GET, "/api/admin/audit/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN", "ROLE_PRIVACY_ADMIN")
+그런데 현재 StageResultStatus에는 PENDING, PASSED, FAILED, ABSENT, WITHDRAWN, HOLD만 있다. HIRED, ONBOARDED, HR_TRANSFERRED 같은 상태가 없다.
 
-그리고 이 matcher들은 반드시 기존 broad /api/admin/**보다 위에 있어야 한다.
+따라서 “자동 제외”를 구현할 근거가 없다.
 
-6. Medium — ActivityLog 자체 lifecycle 제외는 괜찮지만 조회 가드는 필요하다
+수정안:
 
-설계서가 ActivityLog 자체 보존/회전/아카이빙을 Phase 09 범위 밖으로 뺀 건 이해된다.
+Phase 9에서는 자동 hold를 빼고 이렇게 가는 게 안전하다.
 
-다만 ActivityLog에는 actorId, ipAddress, userAgent, applicationId, applicantRefHash가 들어간다. 설계서도 “완전 PII-free 테이블은 아니다”라고 정확히 적었다.
+Phase 9 RetentionHold = manual hold only
+자동 onboarded hold = 후속 Phase
 
-그래서 lifecycle은 후속으로 빼더라도, 9b read API에는 최소한 아래 가드가 필요하다.
+또는 신규 도메인을 추가해야 한다.
 
-page size max
-occurredAt range max
-default recent range
-ip/userAgent 마스킹 테스트
-metadataJson PII 금지 테스트
-ROLE_RECRUIT_ADMIN vs ROLE_PRIVACY_ADMIN projection 분리 테스트
+ApplicationHireStatus
+- NOT_HIRED
+- OFFERED
+- ACCEPTED
+- ONBOARDED
+- HR_TRANSFERRED
 
-이건 lifecycle policy가 아니라 read API 안전장치라서 9b 범위에 들어가야 한다.
+이걸 Phase 9에 같이 넣으면 범위가 커진다. 지금은 manual hold가 낫다.
 
-7. Low — ADR status는 9a 착수 전에 accepted로 전환
+7. Medium — RetentionHold requestMatcher가 GET까지 막는다
 
-현재 ADR 0005/0006/0007은 proposed 상태다.
+ADR-0007은 GET retention 조회를 ROLE_RECRUIT_ADMIN까지 허용한다고 했다.
 
-히스토리에도 구현 착수 시 accepted 전환이라고 되어 있다.
+그런데 구현 지시 예시는 이렇다.
 
-이건 큰 문제는 아니지만, 9a 구현 지시문에는 반드시 포함해라.
+.requestMatchers("/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")
 
-ADR-0005/0006/0007 status를 proposed → accepted로 변경한다.
-단, ADR-0005는 9d 전 PII field inventory 확정 전까지 accepted-with-implementation-gate로 명시해도 된다.
+이건 method 구분이 없다. 따라서 GET도 ROLE_PRIVACY_ADMIN만 가능해진다.
+
+수정안:
+
+.requestMatchers(HttpMethod.POST, "/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+.requestMatchers(HttpMethod.DELETE, "/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+.requestMatchers(HttpMethod.GET, "/api/admin/retention/holds/**")
+    .hasAnyAuthority("ROLE_RECRUIT_ADMIN", "ROLE_PRIVACY_ADMIN")
+8. Medium — exact date 보존은 파기 관점에서 위험하다
+
+PII inventory는 학력 입학/졸업일, 경력 시작/종료일을 KEEP_TOMBSTONE으로 두고 있다.
+
+문서도 이게 quasi-identifier 위험이라는 걸 알고 “확인 필요”로 남겼다.
+
+이 상태로 9d를 들어가면 안 된다. 학교 schoolId + 입학/졸업일 + 학점 조합은 충분히 재식별 가능성이 있다.
+
+수정안:
+
+정확한 날짜 보존 금지. 최소 bucket 처리.
+
+education.admissionDate      → admissionYear 또는 null
+education.graduationDate     → graduationYear 또는 null
+career.startDate/endDate     → year-month bucket 또는 근속개월수
+semesterGrade.schoolYear     → 보존 가능하나 schoolId와 결합 위험 검토
+
+Phase 9 파기라면 “통계 편의”보다 “재식별 가능성 제거”가 우선이다.
+
+9. Medium — storage health scan은 신규 상태와 null storagePath를 처리하도록 명시해야 한다
+
+현재 health scan은 STORED, DELETED, MISSING만 대상으로 본다.
+
+그리고 storagePath가 null이거나 invalid면 issue로 추가한다.
+
+그런데 Phase 9에서는 BINARY_DELETED 최종 상태에서 storagePath를 null로 만들 계획이다.
+
+그러면 scan 로직이 그대로면 BINARY_DELETED + storagePath null을 invalid로 볼 위험이 있다.
+
+수정안:
+
+상태별 scan 정책을 명시해야 한다.
+
+STORED                  : storagePath required, file must exist
+SOFT_DELETED            : storagePath required until cleanup, file should not exist
+MISSING                 : storagePath may exist, file absent
+BINARY_DELETE_PENDING   : storagePath required, retry target
+BINARY_DELETE_FAILED    : storagePath required, retry target
+BINARY_DELETED          : storagePath nullable, file must not exist
+METADATA_ONLY           : storagePath null allowed
+10. Low — PurgeBatch/PurgeJobItem을 append-only라고 부르는 건 애매하다
+
+설계서에는 PurgeBatch/PurgeJobItem을 append-only 원장이라고 표현한다.
+
+하지만 실제로 batch는 RUNNING → COMPLETED/PARTIAL_FAILED/FAILED 상태 전이가 필요하다. item도 pending/failed/retry를 업데이트할 가능성이 있다. 그러면 엄밀히 append-only가 아니다.
+
+수정안:
+
+용어를 분리해라.
+
+ActivityLog = append-only
+PurgeBatch/PurgeJobItem = mutable ledger/control table, delete 금지
+
+정말 append-only로 갈 거면 상태 전이를 별도 event row로 쌓아야 한다. 그건 과하다. 지금은 “delete 금지 원장” 정도가 맞다.
