@@ -4,7 +4,7 @@ Phase 09 지원자 개인정보 파기의 기본 방식은 **tombstone anonymiza
 
 ## Status
 
-proposed (2026-06-04, Phase 09 design / grill-with-docs 진행 중). Phase 09 설계 문서 확정 시 accepted 로 전환.
+accepted-with-implementation-gate (2026-06-04, Phase 09 design / grill-with-docs). 본 ADR 의 실질 안전장치인 entity 별 field-level 익명화 allowlist 는 `docs/codex/implementation/phase-09-pii-field-inventory.md` 로 산출되었다(instruction.md 리뷰 #1). 그 인벤토리의 §9 DDL 목록·§10 확인 항목(날짜 보존 trade-off 등)이 **확정**되면 `accepted` 로 전환하고 9d 구현을 시작한다.
 
 ## Considered Options
 
@@ -18,5 +18,5 @@ proposed (2026-06-04, Phase 09 design / grill-with-docs 진행 중). Phase 09 �
 - **소거/익명화 대상**: `name`, `email`, `phone`, `ci`, `address`, 자기소개서/answers 원문, 학력/경력/자격/어학/수상 등 재식별 가능 상세 섹션 원문, 첨부 바이너리, `originalFilename`, PII 가능성 있는 자유입력 reason/comment.
 - 인원 distinct 카운트는 PII 가 불필요하므로 **funnel/statistics 재현이 유지**된다(school/certificate 같은 free-text 차원은 `schoolId` 등 master 매칭분만 유지, 미매칭 free-text 는 소거되어 '기타'로 흡수 — 이미 ADR-0004 의 한계와 정렬).
 - 감사는 `applicationId`(tombstone 생존) 및 hard-delete/연결 대비 `applicantRefHash`(HMAC-SHA256 + server pepper)로 연결한다.
-- **익명화의 완전성·비가역성이 "파기" 인정 요건**이다. quasi-identifier 잔존(생년월일+학교+지역 조합 등) 이 재식별로 이어지지 않도록 entity 별 field-level allowlist 를 구현 문서에 명시한다. 이 allowlist 가 본 ADR 의 실질 안전장치다.
+- **익명화의 완전성·비가역성이 "파기" 인정 요건**이다. quasi-identifier 잔존(생년월일+학교+지역 조합 등) 이 재식별로 이어지지 않도록 entity 별 field-level allowlist 를 명시한다 — `phase-09-pii-field-inventory.md` 가 그 산출물이며 본 ADR 의 실질 안전장치다. NOT NULL String PII 는 PLACEHOLDER(`"__PURGED__"`), NOT NULL date PII 는 ALTER nullable+NULLIFY, `ci`→HASH_ONLY, `ciHash`(NOT NULL·unique)는 가명 hash 로 보존.
 - 첨부 바이너리 물리삭제는 비가역이며 스토리지 삭제 실패 시 파기를 실패/스킵으로 감사한다(`actionResult` = FAILURE/SKIPPED).

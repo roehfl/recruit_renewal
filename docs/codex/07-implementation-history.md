@@ -21,7 +21,8 @@
   - `docs/adr/0006-audit-transaction-policy.md`
   - `docs/adr/0007-privacy-admin-role-separation.md`
   - `CONTEXT.md` (Privacy/Audit glossary 추가)
-- 상태: **구현 미착수.** 다음 작업 = 슬라이스 9a 구현. ADR-0005/0006/0007 은 구현 착수 시 accepted 전환.
+- 리뷰 반영(2026-06-04, instruction.md, 7건): ① **Blocker** — PII 필드 인벤토리를 9d 선행 산출물로 격상, `docs/codex/implementation/phase-09-pii-field-inventory.md` 생성(전 application 엔티티 필드를 KEEP_TOMBSTONE/NULLIFY/PLACEHOLDER/ALTER_NULLABLE+NULLIFY/HASH_ONLY/RETAIN_UNTIL_REF0 로 분류, NOT NULL PII·`ciHash`·`createdBy` updatable=false 처리 명시). ② terminal query 구체화(실제 enum 검증: StageStatus RESULT_ANNOUNCED/CLOSED, StageResultStatus PENDING 실존 → 쿼리 satisfiable, finalStage 부재/다수=INVALID_STAGE_CONFIGURATION). ③ `metadataJson` → sealed `AuditMetadata` typed record(직렬화는 ActivityLogService 내부, raw Map 금지). ④ `PhysicalFileStatus.DELETED`→`SOFT_DELETED` 개명 + BINARY_DELETE_* 추가(기존 row 마이그레이션). ⑤ requestMatcher HTTP method 분기(GET=RECRUIT, write=PRIVACY). ⑥ 9b read API 가드(page/range/마스킹/projection 테스트). ⑦ ADR status: 9a 착수 시 0006/0007 accepted, **0005 = accepted-with-implementation-gate**(인벤토리 확정 게이트).
+- 상태: **구현 미착수.** 다음 작업 = PII 인벤토리 확정 → 슬라이스 9a 구현. ADR-0006/0007 은 9a 착수 시 accepted, ADR-0005 는 인벤토리 확정 시 accepted 전환.
 
 ## Phase 08e - CERTIFICATE Funnel Dimension
 

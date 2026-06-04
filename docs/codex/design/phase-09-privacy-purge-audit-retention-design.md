@@ -7,7 +7,10 @@
 > - `docs/adr/0005-retention-purge-mode-tombstone-anonymization-binary-deletion.md`
 > - `docs/adr/0006-audit-transaction-policy.md`
 > - `docs/adr/0007-privacy-admin-role-separation.md`
+> - **`docs/codex/implementation/phase-09-pii-field-inventory.md` — 9d 선행 산출물(필드 분류, instruction.md 리뷰 #1 반영)**
 > - HTML 리포트: `docs/codex/reports/phase-09-privacy-purge-audit-retention-design.html`
+>
+> 2026-06-04 리뷰 반영(instruction.md): PII 필드 인벤토리 선행 산출물화, terminal query 구체화, typed AuditMetadata, PhysicalFileStatus SOFT_DELETED 분리, requestMatcher method 분기, 9b read 가드, ADR accepted 게이트.
 
 ---
 
@@ -94,6 +97,23 @@ Phase 09 — Privacy Purge, Audit, Retention (개인정보 파기 / 영속 감�
 
 > `actorAuthority` 단수 네이밍 대신 `actorRoleSnapshot`(시점 스냅샷 의미) 사용.
 
+**metadataJson = typed `AuditMetadata`(자유 Map 금지, 리뷰 #3)**: 호출부에서 raw JSON 문자열/`Map<String,Object>` 를 넘기면 누군가 `applicantName`/`phone`/`email` 을 넣을 위험이 있다. 따라서 actionType 별 **sealed `AuditMetadata` typed record** 로 고정하고, `ObjectMapper.writeValueAsString(metadata)` 직렬화는 **`ActivityLogService` 내부에서만** 수행한다. 호출부는 typed record 만 전달한다.
+
+```java
+public sealed interface AuditMetadata permits
+        ExportMetadata, PdfMetadata, UploadMetadata, UploadConflictMetadata,
+        StageResultChangeMetadata, EvaluationReopenMetadata,
+        AttachmentAdminMetadata, RetentionPolicyChangeMetadata, PurgeBatchMetadata {}
+
+// 기존 로거 흡수(실측 키 기준, PII-free):
+record ExportMetadata(String datasetType, String filtersHash, String filtersSafeJson, long rowCount, String fileName) implements AuditMetadata {}
+record PdfMetadata(long applicationId, long jobPostingId, long jobPositionId) implements AuditMetadata {}
+record UploadMetadata(long stageId, String outcome, long rowCount, long changedCount, long unchangedCount, long errorCount, long staleCount, String sourceFileName, long sourceFileSize, String contentHash) implements AuditMetadata {}
+record UploadConflictMetadata(long stageId, String sourceFileName, long sourceFileSize, String contentHash) implements AuditMetadata {}
+// 신규 이벤트: StageResultChange / EvaluationReopen / AttachmentAdmin / RetentionPolicyChange / PurgeBatch (집계만, PII-free)
+```
+> actor/ip/ua/requestId/timestamp 는 `metadataJson` 이 아니라 ActivityLog **컬럼**(actorId/ipAddress/userAgent/correlationId/occurredAt)에 둔다 — metadata 와 중복 금지.
+
 ### 5.2 파기 방식 (ADR-0005)
 
 - 기본 = **tombstone anonymization + binary physical delete**. 원문 PII 비가역 소거 + 통계/감사 연결용 비식별 tombstone 보존.
@@ -107,8 +127,22 @@ Phase 09 — Privacy Purge, Audit, Retention (개인정보 파기 / 영속 감�
 
 - **retentionAnchorAt**: 공고 단위, 소스 = `JobPosting.hiringEndedAt`(신규). **암묵 closedAt fallback 금지** — null 이면 `ANCHOR_NOT_FIXED` SKIP. `closedAt` 사용은 `RetentionPolicy.baselineType = CLOSED_AT` 명시 선택 시에만.
 - **RetentionPolicy**: 전역 기본 + 공고별 override. `retentionPeriod`/`baselineType`(HIRING_ENDED_AT|CLOSED_AT)/`enabled`/`effectiveFrom`/`effectiveTo`(+override `jobPostingId`). 법정 일수 하드코딩 금지.
-- **eligibility** = `anchor 종료 + retentionPeriod 경과 + not purged + not hold + terminal`. 제외 = SKIPPED + reasonCode {RETENTION_NOT_DUE, RETENTION_HOLD, ALREADY_PURGED, ANCHOR_NOT_FIXED, APPLICATION_NOT_TERMINAL}.
-- **terminal 판정**: `WITHDRAWN` ∨ (최종 stage StageResult 확정) = terminal. 미정/진행중/판단불가 = `APPLICATION_NOT_TERMINAL`(보수적 SKIP).
+- **eligibility** = `anchor 종료 + retentionPeriod 경과 + not purged + not hold + terminal`. 제외 = SKIPPED + reasonCode {RETENTION_NOT_DUE, RETENTION_HOLD, ALREADY_PURGED, ANCHOR_NOT_FIXED, APPLICATION_NOT_TERMINAL, INVALID_STAGE_CONFIGURATION}.
+- **terminal 판정 — 구체 query (9c 확정, 실제 enum 검증 완료)**: 아래 enum 값은 실제 코드에 존재함을 확인했다(`StageStatus`={READY, IN_PROGRESS, **RESULT_ANNOUNCED**, **CLOSED**}, `StageResultStatus`={**PENDING**, PASSED, FAILED, ABSENT, WITHDRAWN, HOLD}; `Stage.finalStage`(boolean)/`Stage.status`/`StageResult.resultStatus`/`StageResult.decidedAt` 실존).
+
+  ```text
+  terminal =
+    JobApplication.status == WITHDRAWN
+    OR (
+      finalStage row 가 정확히 1개 존재 (Stage.finalStage == true)
+      AND finalStage.status IN (RESULT_ANNOUNCED, CLOSED)
+      AND 해당 application + finalStage 의 StageResult 존재
+      AND StageResult.resultStatus != PENDING
+      AND StageResult.decidedAt != null
+    )
+  ```
+  - finalStage 가 **없거나 2개 이상**이면 → SKIP `INVALID_STAGE_CONFIGURATION`.
+  - 위 조건 미충족(결과 미확정/진행중) → SKIP `APPLICATION_NOT_TERMINAL`. (구현자 임의 해석 금지 — 이 query 가 9c 의 계약.)
 - **RetentionHold**: 자동 제외는 **최종 입사확정/onboarded/HR 이관 완료만**. 중간 전형 PASSED 는 제외 기준 아님(불합격·전형포기·미응시·최종합격後 입사포기·채용 미확정 종료는 retention 경과 시 파기 대상).
 - 날짜 계산은 `Clock` bean 주입, 테스트는 fixed Clock(과거 Stage 테스트 date 의존 사전실패 전례 회피).
 
@@ -127,6 +161,19 @@ Phase 09 — Privacy Purge, Audit, Retention (개인정보 파기 / 영속 감�
 - **ROLE_PRIVACY_ADMIN 전용**: purge execute, RetentionPolicy/RetentionHold 변경, ActivityLog 민감필드(ip/ua) 원문, purge batch 상세/실행결과 원문.
 - **ROLE_RECRUIT_ADMIN 까지**: retention dry-run/scan, retention 결과 조회, ActivityLog 마스킹 목록, RetentionPolicy read-only.
 - 두 권한 모두 `DeptRoleMapping` 파생(하드코딩 금지). **narrow requestMatcher 를 broad `/api/admin/**` 보다 먼저** 배치(순서가 보안 요구사항).
+- **requestMatcher 는 path 뿐 아니라 HTTP method 까지 분기**(리뷰 #5) — 같은 `/api/admin/retention/policies/**` 라도 GET=RECRUIT, write=PRIVACY. SecurityConfig 구현 지시문에 아래 수준으로 명시(기존 broad `/api/admin/**` 보다 **위**):
+
+  ```java
+  .requestMatchers(HttpMethod.POST,   "/api/admin/retention/purge-batches/execute").hasAuthority("ROLE_PRIVACY_ADMIN")
+  .requestMatchers(HttpMethod.POST,   "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+  .requestMatchers(HttpMethod.PUT,    "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+  .requestMatchers(HttpMethod.DELETE, "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+  .requestMatchers("/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")            // write 계열
+  .requestMatchers(HttpMethod.GET,    "/api/admin/retention/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN","ROLE_PRIVACY_ADMIN")
+  .requestMatchers(HttpMethod.GET,    "/api/admin/audit/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN","ROLE_PRIVACY_ADMIN")
+  // ↑ 모두 기존 .requestMatchers("/api/admin/**").hasAnyAuthority("ROLE_ADMIN","ROLE_RECRUIT_ADMIN") 보다 먼저
+  ```
+  audit 원문(ip/ua)·purge batch 원문은 GET 통과 후 **컨트롤러/서비스에서 권한별 projection 분기**(마스킹 vs 원문)로 추가 게이팅.
 - execute: bulk = `sourceDryRunBatchId` 필수, 단건 = confirmationFlag/Token + eligibility 재검증. maxPurgeCount/batch size 가드 후보.
 
 ## 6. 슬라이스 분할 (build order)
@@ -134,7 +181,7 @@ Phase 09 — Privacy Purge, Audit, Retention (개인정보 파기 / 영속 감�
 | Slice | 범위 |
 | --- | --- |
 | **9a — ActivityLog Foundation** | `ActivityLog` schema/enums/repository, `ActivityLogService`(recordInCurrentTx/recordRequiresNew), correlationId filter(MDC), `applicantRefHash`(HMAC + `AUDIT_HMAC_SECRET`), append-only 정책. 업무 이벤트 계측은 아직 없음. |
-| **9b — 기존 로그 흡수 + 핵심 관리자 변경 audit + read API** | Export/Pdf/Upload 로거 → ActivityLogService adapter(dual-write), egress fail-close, reopen·StageResult 정정/발표/확정·첨부 admin download/delete 계측, admin audit read API(마스킹=RECRUIT_ADMIN / 원문=PRIVACY_ADMIN). |
+| **9b — 기존 로그 흡수 + 핵심 관리자 변경 audit + read API** | Export/Pdf/Upload 로거 → ActivityLogService adapter(dual-write), egress fail-close, reopen·StageResult 정정/발표/확정·첨부 admin download/delete 계측, typed `AuditMetadata` 도입, admin audit read API(마스킹=RECRUIT_ADMIN / 원문=PRIVACY_ADMIN). **read API 가드(리뷰 #6, 9b 범위)**: page size max / occurredAt range max / default recent range / ip·ua 마스킹 테스트 / metadataJson PII 금지 테스트 / RECRUIT↔PRIVACY projection 분리 테스트. |
 | **9c — Retention 모델 + eligibility scan + dry-run** | `RetentionPolicy`(전역+override)·`RetentionHold`·`JobPosting.hiringEndedAt`, eligibility(Clock), dry-run `PurgeBatch`(scan/preview, 무변경), reasonCode 산정. |
 | **9d-1 — Purge execute core** | ROLE_PRIVACY_ADMIN, confirmation/`sourceDryRunBatchId`, 실행시 eligibility 재검증, `PurgeBatch`/`PurgeJobItem` execute 상태전이, JobApplication/section/answer 관계형 PII tombstone/anonymization, Applicant ref-count 익명화, ActivityLog coarse index. **첨부 바이너리 삭제 완료 전 최종 PURGED 승격 금지.** |
 | **9d-2 — Attachment binary delete saga** | `ApplicationAttachment.physicalFileStatus` 전이(BINARY_DELETE_PENDING/BINARY_DELETED/BINARY_DELETE_FAILED), 파일 물리삭제(deleteIfExists/idempotent), 소멸 확인 후 JobApplication/PurgeJobItem **최종 PURGED 승격**, 실패 시 PARTIAL_FAILED/BINARY_DELETE_FAILED 유지. |
@@ -151,9 +198,9 @@ Phase 09 — Privacy Purge, Audit, Retention (개인정보 파기 / 영속 감�
 ### 7.2 신규 컬럼 / 변경
 
 - `JobApplication`: `purgeBatchId`, `purgeResult`(enum: `PURGE_PENDING`/`PARTIAL_PENDING`/`PARTIAL_FAILED`/`PURGED`), `purgedAt`(최종 PURGED 시점에만). `JobApplicationStatus` enum **불변**(purge 는 orthogonal marker).
-- `ApplicationAttachment`: `PhysicalFileStatus` 확장(`BINARY_DELETE_PENDING`/`BINARY_DELETED`/`BINARY_DELETE_FAILED`), `filenameHash` 추가, `originalFilename` nullable + purge 시 null, `storagePath`/`filePath`/`objectKey`(존재 시) nullable + 최종 purge 후 null(삭제 전엔 필요), `binaryDeletedAt`(or `physicalDeletedAt`) 추가 검토(최종 파일 소멸 확인 시각).
+- `ApplicationAttachment`: `PhysicalFileStatus` **재정의**(리뷰 #4) — 기존 `DELETED` → **`SOFT_DELETED` 개명**(현 `markDeleted()` soft-delete 의미와 purge 물리삭제 의미 분리) + 신규 `BINARY_DELETE_PENDING`/`BINARY_DELETED`/`BINARY_DELETE_FAILED`. 최종 = `METADATA_ONLY/STORED/MISSING/SOFT_DELETED/BINARY_DELETE_PENDING/BINARY_DELETED/BINARY_DELETE_FAILED`. **기존 DB `'DELETED'` row → `'SOFT_DELETED'` 수동 UPDATE 마이그레이션** 필요. + `filenameHash`·`binaryDeletedAt` 신규, `originalFileName`(NOT NULL) → PLACEHOLDER `"__PURGED__"`, `storagePath`(NOT NULL, len 1000) → ALTER nullable 후 최종 소멸 시 null.
 - `JobPosting`: `hiringEndedAt`(신규, retentionAnchorAt 소스). `finalizedAt` 이름은 모호하여 채택 안 함.
-- **섹션/answers PII 컬럼**: 스키마 변경 없음으로 **단정하지 않는다**. 기존 컬럼이 nullable 이면 null 처리, NOT NULL 이면 nullable 로 변경하거나 PII-free placeholder 허용 — 실제 엔티티/DDL 확인 후 수동 DDL 목록에 반영.
+- **섹션/answers PII 컬럼**: **`phase-09-pii-field-inventory.md` 에서 전 필드 분류 완료(9d 선행 산출물).** NOT NULL date PII(`acquiredDate`/`examDate`/`awardDate`/gap `startDate`·`endDate`/`storagePath`)는 ALTER nullable+NULLIFY, NOT NULL String PII(`applicantNameSnapshot`/`schoolName`/`companyName`/`certificateName`/`issuingOrganization`/`languageName`/`testName`/`awardName`/`awardingOrganization`/gap `reason`/`originalFileName`)는 PLACEHOLDER 기본. `createdBy`(@Column updatable=false)는 JPQL/native bulk update 로만 클리어.
 
 ### 7.3 권한 / 비밀
 
@@ -212,8 +259,7 @@ $env:AES_SECRET_KEY='22791194512954214612461221261067'; $env:AUDIT_HMAC_SECRET='
 
 ## 13. 남은 이슈 / 한계
 
-- 섹션/answers 의 NOT NULL PII 컬럼 nullable 화 여부는 실제 DDL 확인 후 확정.
-- field-level 익명화 allowlist 는 entity 별로 구현 시 확정(quasi-identifier 포함 정밀 검토).
+- **field-level 익명화 allowlist 는 `phase-09-pii-field-inventory.md` 에서 전 필드 분류 완료(9d 선행 산출물).** 남은 확인 항목은 그 문서 §10(날짜 보존 trade-off, PLACEHOLDER vs ALTER 일괄정책, `Interview.memo` 잔존, `ciHash` 보존).
 - ActivityLog 자체 lifecycle(보존/회전/ip·ua 마스킹)은 후속.
 - forced purge(정보주체 삭제요청)는 enum 슬롯만, 후속 설계.
 - 스케줄 auto-execute disabled-by-default, 운영검증 후 활성.
@@ -223,4 +269,4 @@ $env:AES_SECRET_KEY='22791194512954214612461221261067'; $env:AUDIT_HMAC_SECRET='
 ## 14. 다음 Phase 권고
 
 - Phase 09 완료 후: ActivityLog lifecycle policy, forced purge(정보주체 삭제요청), 스케줄 auto-execute 활성, Messaging(파기/결과 통지) 도메인.
-- 본 설계 확정 시 ADR-0005/0006/0007 을 accepted 로 전환.
+- **ADR status 전환(리뷰 #7)**: 9a 구현 지시문에 ADR-0006/0007 을 `proposed → accepted` 로 전환한다고 명시. **ADR-0005 는 `phase-09-pii-field-inventory.md`(특히 §9 DDL·§10 확인항목) 확정 전까지 `accepted-with-implementation-gate`** 로 두고, 인벤토리 확정 시 `accepted` 로 전환.

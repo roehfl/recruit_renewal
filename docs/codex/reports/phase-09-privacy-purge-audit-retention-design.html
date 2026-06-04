@@ -54,7 +54,7 @@
   <div class="sub">신영증권 채용 Renewal 백엔드 · 설계 리포트 ·
     <span class="badge b-blue">설계 확정</span>
     <span class="badge b-amber">구현 대기</span>
-    · 생성일 2026-06-04 (grill-with-docs)</div>
+    · 생성일 2026-06-04 (grill-with-docs) · rev 2026-06-04 (instruction.md 리뷰 #1~#7 반영)</div>
 </header>
 
 <div class="wrap">
@@ -70,6 +70,10 @@
       <span class="pill">9a → 9b → 9c → 9d-1 → 9d-2 → 9e</span> 착수 가능. 비가역 파기는 검증된 감사 기반 위에서만 실행.</div>
     <div class="crit"><b>불변 원칙</b>: "DB 는 PURGED 인데 디스크에 파일 바이트 잔존" 상태는 <b>절대 불허</b>.
       <code>PURGED</code> = 관계형 PII 제거 <b>AND</b> 첨부 바이너리 소멸 확인까지 완료된 최종 상태.</div>
+    <div class="note"><b>2026-06-04 리뷰 반영(instruction.md)</b>: ① <b>PII 필드 인벤토리</b>를 9d 선행 산출물로 격상 →
+      <code>docs/codex/implementation/phase-09-pii-field-inventory.md</code>(전 application 엔티티 필드 분류). ② terminal query 구체화(실제 enum 검증).
+      ③ <code>metadataJson</code> → typed <code>AuditMetadata</code>. ④ <code>PhysicalFileStatus.DELETED</code> → <code>SOFT_DELETED</code> 분리. ⑤ requestMatcher HTTP method 분기.
+      ⑥ 9b read API 가드. ⑦ ADR accepted 게이트(ADR-0005 = accepted-with-implementation-gate).</div>
   </section>
 
   <!-- 2. Scope Cards -->
@@ -171,7 +175,8 @@ storage-health-scan  : "DB PURGED 인데 파일 존재" = 치명적 불일치 �
   <!-- 5. API -->
   <section>
     <h2>5. API (계획)</h2>
-    <p class="muted">경로 prefix <code>/api</code>. <b>narrow PRIVACY 경로를 broad <code>/api/admin/**</code> matcher 보다 먼저 등록(보안 요구사항).</b></p>
+    <p class="muted">경로 prefix <code>/api</code>. <b>narrow PRIVACY 경로를 broad <code>/api/admin/**</code> matcher 보다 먼저 등록(보안 요구사항).</b>
+      requestMatcher 는 <b>HTTP method 까지 분기</b>(같은 <code>/retention/policies/**</code>: GET=RECRUIT, POST/PUT/DELETE=PRIVACY).</p>
     <table>
       <thead><tr><th>Method</th><th>Path</th><th>권한</th><th>목적</th></tr></thead>
       <tbody>
@@ -205,7 +210,8 @@ storage-health-scan  : "DB PURGED 인데 파일 존재" = 치명적 불일치 �
         <h4>파기 eligibility</h4>
         <ul>
           <li>anchor 종료 + retentionPeriod 경과 + not purged + not hold + <b>terminal</b></li>
-          <li>terminal = WITHDRAWN ∨ 최종 stage result 확정</li>
+          <li>terminal = WITHDRAWN ∨ (finalStage 1개 ∧ status∈{RESULT_ANNOUNCED,CLOSED} ∧ StageResult.resultStatus≠PENDING ∧ decidedAt≠null)</li>
+          <li>finalStage 부재/2개↑ = INVALID_STAGE_CONFIGURATION SKIP</li>
           <li>anchor 암묵 fallback 금지 → <code>ANCHOR_NOT_FIXED</code></li>
           <li>SKIP reasonCode: RETENTION_NOT_DUE / RETENTION_HOLD / ALREADY_PURGED / ANCHOR_NOT_FIXED / APPLICATION_NOT_TERMINAL</li>
         </ul>
@@ -240,7 +246,7 @@ storage-health-scan  : "DB PURGED 인데 파일 존재" = 치명적 불일치 �
       <tbody>
         <tr><td>신규 테이블 (5)</td><td><code>ActivityLog</code>, <code>RetentionPolicy</code>, <code>RetentionHold</code>, <code>PurgeBatch</code>, <code>PurgeJobItem</code></td></tr>
         <tr><td><code>JobApplication</code></td><td>+ <code>purgeBatchId</code>, <code>purgeResult</code>(PURGE_PENDING/PARTIAL_PENDING/PARTIAL_FAILED/PURGED), <code>purgedAt</code>(최종 PURGED 시점에만). <b>JobApplicationStatus enum 불변</b></td></tr>
-        <tr><td><code>ApplicationAttachment</code></td><td>PhysicalFileStatus 확장(BINARY_DELETE_PENDING/BINARY_DELETED/BINARY_DELETE_FAILED), + <code>filenameHash</code>, <code>originalFilename</code> nullable+purge 시 null, <code>storagePath/filePath/objectKey</code> 최종 null화, <code>binaryDeletedAt</code> 검토</td></tr>
+        <tr><td><code>ApplicationAttachment</code></td><td>PhysicalFileStatus <b>재정의</b>: 기존 <code>DELETED</code>→<code>SOFT_DELETED</code> 개명(soft-delete↔purge 분리) + <code>BINARY_DELETE_PENDING/BINARY_DELETED/BINARY_DELETE_FAILED</code> 추가(기존 'DELETED' row → 'SOFT_DELETED' 수동 UPDATE). + <code>filenameHash</code>·<code>binaryDeletedAt</code> 신규, <code>originalFileName</code>(NOT NULL)→PLACEHOLDER, <code>storagePath</code>(NOT NULL)→ALTER nullable 후 최종 null</td></tr>
         <tr><td><code>JobPosting</code></td><td>+ <code>hiringEndedAt</code>(retentionAnchorAt 소스, 암묵 fallback 없음)</td></tr>
         <tr><td>섹션/answers PII 컬럼</td><td>스키마 변경 없음으로 <b>단정 금지</b> — NOT NULL 이면 nullable 화/placeholder. 실제 DDL 확인 후 목록 반영</td></tr>
         <tr><td>권한 / 비밀</td><td><code>ROLE_PRIVACY_ADMIN</code>(DeptRoleMapping + SecurityConfig matcher), <code>AUDIT_HMAC_SECRET</code> pepper(env, prod 누락=기동실패, test=전용값)</td></tr>
@@ -255,7 +261,7 @@ storage-health-scan  : "DB PURGED 인데 파일 존재" = 치명적 불일치 �
       <thead><tr><th>Slice</th><th>상태</th><th>범위</th></tr></thead>
       <tbody>
         <tr><td><b>9a</b> ActivityLog Foundation</td><td><span class="badge b-amber">구현 대기</span></td><td>schema/enums/repo, ActivityLogService(2경로), correlationId filter, applicantRefHash(HMAC)</td></tr>
-        <tr><td><b>9b</b> 로그 흡수 + 관리자 변경 audit + read API</td><td><span class="badge b-amber">구현 대기</span></td><td>Export/Pdf/Upload adapter(dual-write), egress fail-close, reopen·StageResult·첨부 admin 계측, audit read(마스킹/원문)</td></tr>
+        <tr><td><b>9b</b> 로그 흡수 + 관리자 변경 audit + read API</td><td><span class="badge b-amber">구현 대기</span></td><td>Export/Pdf/Upload adapter(dual-write), egress fail-close, reopen·StageResult·첨부 admin 계측, typed AuditMetadata, audit read(마스킹/원문). read 가드: page size max / occurredAt range max / default recent range / ip·ua 마스킹·metadataJson PII 금지·projection 분리 테스트</td></tr>
         <tr><td><b>9c</b> Retention 모델 + eligibility scan + dry-run</td><td><span class="badge b-amber">구현 대기</span></td><td>RetentionPolicy/Hold, JobPosting.hiringEndedAt, eligibility(Clock), dry-run PurgeBatch</td></tr>
         <tr><td><b>9d-1</b> Purge execute core</td><td><span class="badge b-amber">구현 대기</span></td><td>PRIVACY_ADMIN, confirmation/sourceDryRunBatchId, 재검증, 관계형 PII tombstone, ref-count, coarse index. (바이너리 전 PURGED 승격 금지)</td></tr>
         <tr><td><b>9d-2</b> Attachment binary delete saga</td><td><span class="badge b-amber">구현 대기</span></td><td>physicalFileStatus 전이, 파일 물리삭제(멱등), 소멸 확인 후 최종 PURGED 승격</td></tr>
@@ -300,9 +306,10 @@ storage-health-scan  : "DB PURGED 인데 파일 존재" = 치명적 불일치 �
     <h2>11. 다음 Phase 권고</h2>
     <ul>
       <li>Phase 09 완료 후: ActivityLog lifecycle policy, forced purge(정보주체 삭제요청), 스케줄 auto-execute 활성, Messaging(파기/결과 통지) 도메인</li>
-      <li>본 설계 확정 시 <b>ADR-0005 / 0006 / 0007</b> 을 <code>accepted</code> 로 전환</li>
+      <li>9a 착수 시 <b>ADR-0006/0007</b> → <code>accepted</code>. <b>ADR-0005</b> 는 PII 인벤토리(§9 DDL·§10 확인항목) 확정 전까지 <code>accepted-with-implementation-gate</code></li>
     </ul>
     <p class="muted">관련 문서: design markdown <code>docs/codex/design/phase-09-privacy-purge-audit-retention-design.md</code>,
+      <b>PII 인벤토리 <code>docs/codex/implementation/phase-09-pii-field-inventory.md</code></b>,
       ADR-0005/0006/0007, CONTEXT.md (Privacy/Audit glossary).</p>
   </section>
 

@@ -95,7 +95,8 @@ _Avoid_: `closedAt`(공고 close 시각)을 암묵 fallback 으로 retention 기
 파기 자동 대상에서 제외하는 보존 의무/예외. **자동 제외는 최종 입사확정/onboarded/HR 이관 완료 건만**이다. **중간 전형 PASSED 는 제외 기준이 아니다** — 불합격·전형포기·미응시·최종합격 후 입사포기·채용 미확정 종료는 retention 경과 시 모두 파기 대상이 될 수 있다. hold 건은 파기 시 `SKIPPED` + `RETENTION_HOLD` 로 감사.
 
 **terminal application status (파기 적격 전제)**:
-파기는 지원서가 **종결 상태**일 때만 적격하다. 진행 중·최종결과 미확정 지원서는 `APPLICATION_NOT_TERMINAL` 로 SKIPPED. 적격성 = `anchor 종료 + retentionPeriod 경과 + not purged + not hold + terminal`.
+파기는 지원서가 **종결 상태**일 때만 적격하다. 구체 판정(9c 계약, 실제 enum 검증 완료) = `JobApplication.status == WITHDRAWN` **OR** (`Stage.finalStage==true` row 정확히 1개 + `Stage.status ∈ {RESULT_ANNOUNCED, CLOSED}` + 해당 application+finalStage `StageResult` 존재 + `resultStatus != PENDING` + `decidedAt != null`). finalStage 부재/2개 이상 = `INVALID_STAGE_CONFIGURATION`, 그 외 미충족 = `APPLICATION_NOT_TERMINAL` 로 SKIP. 적격성 = `anchor 종료 + retentionPeriod 경과 + not purged + not hold + terminal`.
+_Avoid_: "확정"을 구현자가 임의 해석하는 것(이 query 가 계약).
 
 **PurgeBatch / PurgeJobItem**:
 파기 실행의 상세 원장. **`PurgeBatch`** = dry-run 또는 execute **1회 실행 단위**(mode/criteria/counts/status). **`PurgeJobItem`** = application 별 판정·실행 결과(append-only). 둘 다 PII-free. `ActivityLog` 는 이 원장의 **coarse index** 로만 쓰고(batch 시작/완료/부분실패/실패 + 집계 metadataJson), item 결과를 중복 기록하지 않는다.
@@ -111,7 +112,11 @@ _Avoid_: 엑셀 upload 식 "batch 전체 all-or-nothing"(대량·비가역 sweep
 **관계형 PII 제거 + 첨부 바이너리 소멸 확인까지 완료된 최종 상태**. 관계형 PII 만 지우고 파일 바이트가 남아 있으면 `PURGED` 가 **아니다**(→ `BINARY_DELETE_PENDING`/`BINARY_DELETE_FAILED`/`PARTIAL_FAILED`). **"DB 는 PURGED 인데 디스크에 파일 바이트 잔존"은 절대 불허**한다.
 
 **파기 saga (stateful saga + reconciliation)**:
-첨부 바이너리 삭제는 DB 트랜잭션과 원자화할 수 없으므로 트랜잭션이 아니라 saga 로 설계한다. ① DB tx(PII·`originalFilename` 제거, attachment/item = `BINARY_DELETE_PENDING`, `JobApplication.purgeResult = PURGE_PENDING`, commit) → ② 파일 물리 삭제(`deleteIfExists` 멱등 + 존재 재확인, 이미 없음 = `MISSING_AS_SUCCESS`) → ③ DB tx(소멸 확인 → `PURGED`/`purgedAt`, 실패 → `BINARY_DELETE_FAILED`/`PARTIAL_FAILED`, 재시도 대상). reconciliation sweep 이 pending/failed 를 재처리하고, `storage-health-scan` 은 "DB PURGED 인데 파일 존재"를 치명적 불일치로 탐지한다. "파일 소멸 + DB pending" 은 프라이버시상 안전(나중에 PURGED 승격), 역방향은 불허.
+첨부 바이너리 삭제는 DB 트랜잭션과 원자화할 수 없으므로 트랜잭션이 아니라 saga 로 설계한다. ① DB tx(PII·`originalFilename` 제거, attachment/item = `BINARY_DELETE_PENDING`, `JobApplication.purgeResult = PURGE_PENDING`, commit) → ② 파일 물리 삭제(`deleteIfExists` 멱등 + 존재 재확인, 이미 없음 = `MISSING_AS_SUCCESS`) → ③ DB tx(소멸 확인 → `PURGED`/`purgedAt`, 실패 → `BINARY_DELETE_FAILED`/`PARTIAL_FAILED`, 재시도 대상). reconciliation sweep 이 pending/failed 를 재처리하고, `storage-health-scan` 은 "DB PURGED 인데 파일 존재"를 치명적 불일치로 탐지한다. "파일 소멸 + DB pending" 은 프라이버시상 안전(나중에 PURGED 승격), 역방향은 불허. `PhysicalFileStatus` 는 기존 `DELETED` 를 **`SOFT_DELETED`** 로 개명(soft-delete 와 purge 물리삭제 의미 분리)하고 `BINARY_DELETE_PENDING`/`BINARY_DELETED`/`BINARY_DELETE_FAILED` 를 추가한다 — 기존 `markDeleted()` soft-delete 와 혼동 금지.
+
+**AuditMetadata (typed)**:
+ActivityLog `metadataJson` 은 자유 `Map`/raw JSON 이 아니라 actionType 별 **sealed `AuditMetadata` typed record**(ExportMetadata/PdfMetadata/UploadMetadata/StageResultChangeMetadata/PurgeBatchMetadata…)로 고정한다. 직렬화는 `ActivityLogService` 내부에서만 수행하고 호출부는 typed record 만 넘긴다(PII-free 보장). actor/ip/ua/correlationId/occurredAt 는 metadata 가 아니라 ActivityLog 컬럼.
+_Avoid_: 호출부에서 `Map<String,Object>`/raw JSON 문자열 전달.
 
 **ROLE_PRIVACY_ADMIN vs ROLE_RECRUIT_ADMIN (파기/감사 권한 분리)**:
 비가역 파기·민감 작업은 채용 운영 권한과 **분리**한다. **ROLE_PRIVACY_ADMIN 전용** = purge execute, RetentionPolicy/RetentionHold 변경, ActivityLog 민감필드(`ipAddress`/`userAgent`) 원문 조회, purge batch 상세/실행결과 원문. **ROLE_RECRUIT_ADMIN 까지 허용** = retention dry-run/scan, retention 결과 조회, ActivityLog **마스킹** 목록, RetentionPolicy read-only. 두 권한 모두 `DeptRoleMapping` 파생(하드코딩 금지). narrow requestMatcher 를 broad `/api/admin/**` 보다 **먼저** 배치해야 한다.

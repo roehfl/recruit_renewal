@@ -572,6 +572,8 @@ Out of scope:
 
 설계 확정: `docs/codex/design/phase-09-privacy-purge-audit-retention-design.md`
 (grill-with-docs, 2026-06-04). ADR 0005/0006/0007. `CONTEXT.md` Privacy/Audit glossary.
+HTML 리포트: `docs/codex/reports/phase-09-privacy-purge-audit-retention-design.html`.
+2026-06-04 리뷰(instruction.md) 반영: **PII 필드 인벤토리 선행 산출물** `docs/codex/implementation/phase-09-pii-field-inventory.md`(9d 게이트), terminal query 구체화, typed AuditMetadata, PhysicalFileStatus `DELETED`→`SOFT_DELETED` 분리, requestMatcher HTTP method 분기, 9b read 가드, ADR-0005 accepted-with-implementation-gate.
 
 Status:
 
