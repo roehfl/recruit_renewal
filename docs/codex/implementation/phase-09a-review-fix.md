@@ -13,7 +13,7 @@
 
 ## 2. 구현 범위 (Implemented scope)
 
-- `CorrelationIdFilter`: `X-Request-Id` 가 100자 초과 또는 CR/LF 포함이면 재사용하지 않고 UUID 로 대체.
+- `CorrelationIdFilter`: `X-Request-Id` 가 100자 초과 또는 ISO 제어문자(CR/LF/TAB 등) 포함이면 재사용하지 않고 UUID 로 대체(2차 리뷰에서 CR/LF → ISO control 전체로 확대).
 - `ActivityLogService`: 저장 직전 `safe(value, max)` normalize — CR/LF/TAB → 공백, trim, 컬럼 길이 truncate, blank → null. 대상: `actorId`(100), `actorRoleSnapshot`(255), `reasonMessage`(1000), `correlationId`(100), `ipAddress`(64), `userAgent`(512).
 - `ActivityLog`: `idx_activity_log_action_result_occurred (action_result, occurred_at)` 복합 인덱스 추가(총 7종).
 - `AuditConfig`: secret 누락 시 기본 기동 실패. fallback 은 `audit.allow-fallback-secret=true`(env `AUDIT_ALLOW_FALLBACK_SECRET`) 명시 시에만 허용 + prod profile 이면 flag 무관 거부.
@@ -59,9 +59,9 @@
 
 ### `config.CorrelationIdFilter` — Filter (수정)
 - 책임: 요청 단위 correlationId 전파. **외부 헤더 불신** 추가.
-- 주요 변경: `resolve()` — null/blank → UUID(기존), `trim` 후 **100자 초과 또는 `\r`/`\n` 포함 → UUID 대체**(신규). `MAX_CORRELATION_ID = 100`(= `activity_log.correlation_id` 컬럼 길이, package-private — 테스트 참조).
+- 주요 변경: `resolve()` — null/blank → UUID(기존), `trim` 후 **100자 초과 또는 ISO 제어문자 포함(`Character::isISOControl`) → UUID 대체**. 최초 보완은 CR/LF 만 거부했으나 2차 리뷰에서 TAB 등 전체 제어문자로 확대(echo 되는 응답 헤더 값이 WAS 에서 reject 되는 것 방지). `MAX_CORRELATION_ID = 100`(= `activity_log.correlation_id` 컬럼 길이, package-private — 테스트 참조).
 - 관련 클래스: `ActivityLogService`(MDC 소비), `ActivityLog`.
-- 노트: 응답 echo 하는 값이므로 CRLF 거부는 response header injection 방어도 겸한다.
+- 노트: 응답 echo 하는 값이므로 제어문자 거부는 response header injection 방어도 겸한다.
 
 ### `service.ActivityLogService` — Service (수정)
 - 책임: 감사 기록 2경로(불변). **저장 직전 request-derived 문자열 normalize** 추가.
@@ -97,7 +97,7 @@
 
 ## 9. 비즈니스 규칙 (추가/변경)
 
-1. **외부 헤더 불신**: `X-Request-Id` 는 100자 초과·CRLF 포함 시 재사용하지 않는다(UUID 대체).
+1. **외부 헤더 불신**: `X-Request-Id` 는 100자 초과·ISO 제어문자 포함 시 재사용하지 않는다(UUID 대체).
 2. **truncate-not-fail**: request-derived 문자열은 컬럼 길이로 truncate 해 기록한다 — 외부 입력 길이가 audit insert 실패 → 비즈니스 rollback/egress 차단으로 전이되지 않게 한다.
 3. **normalize 규칙**: CR/LF/TAB → 공백, trim, blank → null. 컬럼 길이 변경 시 `ActivityLogService` 상수를 함께 변경한다.
 4. **fallback secret 게이트**: `audit.allow-fallback-secret=true` 명시 시에만 fallback 허용(기본 false = 기동 실패). prod profile 은 flag 무관 거부.
@@ -120,3 +120,10 @@
 - 9b 진행 가능. egress fail-close 가 이 normalize 를 전제로 한다(긴 UA/헤더로 export 가 막히지 않음).
 - 9b read API 의 `actionResult`+기간 검색은 `idx_activity_log_action_result_occurred` 를 타도록 쿼리 작성.
 - 운영 배포 체크리스트: `AUDIT_HMAC_SECRET` 주입 + `phase-09a-activity-log-ddl.sql` 반영(ddl-auto validate/none 환경).
+- **9b 계측 시 필수(2차 리뷰)**: `actorType = EMPLOYEE/APPLICANT 이면 actorId 필수, SYSTEM/ANONYMOUS 이면 null 허용` 검증 추가 — emitter 가 actorId 보장을 함께 구현하는 시점에 엔티티/서비스 검증으로 넣는다(9a 에서 선반영하면 emitter 부재 상태에서 insert-실패 경로만 생김).
+- 9b 계측 시 `targetId` 도 `safe(value, 100)` 적용 검토(적대 검증 nit — 설계상 'API endpoint/screen id' 도 허용되는 필드).
+
+## 13. 2차 리뷰 보완 이력
+
+- **Low — filter 제어문자 범위 확대(반영)**: CR/LF 만 거부 → `Character::isISOControl` 전체 거부. 테스트 +1(TAB 포함 헤더 → UUID 대체, echo 일치). `CorrelationIdFilterTest` 7 tests 통과.
+- **Low — EMPLOYEE/APPLICANT actorId 필수(9b 로 이연)**: 리뷰어 명시 지침("9b 계측 시점에 추가, 9a 는 허용 가능")에 따라 §12 에 9b 요구사항으로 고정.

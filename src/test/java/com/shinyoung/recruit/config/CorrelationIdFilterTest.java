@@ -116,4 +116,23 @@ class CorrelationIdFilterTest {
                 .doesNotContain("\n")
                 .doesNotContain("evil");
     }
+
+    @Test
+    void CR_LF_외_제어문자_포함_헤더도_재사용하지_않고_UUID로_대체한다() throws Exception {
+        // 값 중간의 TAB/그 외 ISO 제어문자 — 응답 헤더 echo 시 WAS reject 방지(2차 리뷰 보완)
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(CorrelationIdFilter.HEADER, "corr\tid-withcontrol");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        AtomicReference<String> duringChain = new AtomicReference<>();
+        FilterChain chain = (req, res) -> duringChain.set(MDC.get(CorrelationIdFilter.MDC_KEY));
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(duringChain.get())
+                .isNotBlank()
+                .doesNotContain("\t")
+                .doesNotContain("corr");
+        assertThat(response.getHeader(CorrelationIdFilter.HEADER)).isEqualTo(duringChain.get());
+    }
 }

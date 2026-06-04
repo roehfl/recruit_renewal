@@ -18,8 +18,9 @@ import java.util.UUID;
  * MDC 에 넣는다. ActivityLog 는 이 값을 {@code correlationId} 로 기록한다(ADR-0006). 응답 헤더로도 echo 한다.
  *
  * <p>외부 입력 헤더는 신뢰하지 않는다(9a 리뷰 보완) — {@code activity_log.correlation_id} 컬럼 길이(100)를
- * 넘거나 CR/LF 를 포함하면 재사용하지 않고 UUID 로 대체한다. 길이 초과 헤더 하나로 audit insert 가 실패해
- * egress fail-close(9b)나 비즈니스 트랜잭션이 막히는 것을 방지한다.
+ * 넘거나 ISO 제어문자(CR/LF/TAB 포함)가 있으면 재사용하지 않고 UUID 로 대체한다. 길이 초과 헤더 하나로
+ * audit insert 가 실패해 egress fail-close(9b)나 비즈니스 트랜잭션이 막히는 것을 방지하고, 이 값은
+ * 응답 헤더로 echo 되므로 제어문자가 WAS 에서 reject 되는 것도 막는다(2차 리뷰 보완).
  *
  * <p>{@code traceId}(OpenTelemetry)는 현재 deferred — OTel/Sleuth 도입 시 이 필터에서 함께 채운다.
  */
@@ -52,7 +53,7 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
         }
 
         String trimmed = headerValue.trim();
-        if (trimmed.length() > MAX_CORRELATION_ID || trimmed.contains("\r") || trimmed.contains("\n")) {
+        if (trimmed.length() > MAX_CORRELATION_ID || trimmed.chars().anyMatch(Character::isISOControl)) {
             return UUID.randomUUID().toString();
         }
 

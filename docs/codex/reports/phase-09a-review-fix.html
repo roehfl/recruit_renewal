@@ -89,9 +89,10 @@
   <section>
     <h2>3. Normalize 정책 (Major-1)</h2>
     <div class="flow">CorrelationIdFilter.resolve(X-Request-Id)
-  null/blank            → UUID 생성 (기존)
-  trim 후 100자 초과     → UUID 대체 (신규)
-  CR/LF 포함            → UUID 대체 (신규 — response echo header injection 방어 겸용)
+  null/blank                  → UUID 생성 (기존)
+  trim 후 100자 초과           → UUID 대체 (신규)
+  ISO 제어문자 포함(CR/LF/TAB…) → UUID 대체 (신규 — response echo header injection·WAS reject 방어.
+                                 최초 CR/LF 만 → 2차 리뷰에서 Character::isISOControl 전체로 확대)
 
 ActivityLogService.safe(value, max)   — 저장 직전
   [\r\n\t] → ' ' 치환 → trim → blank 면 null → max 초과분 truncate</div>
@@ -177,10 +178,32 @@ ActivityLogService.safe(value, max)   — 저장 직전
   <section>
     <h2>7. 잔여 이슈</h2>
     <ul>
-      <li><span class="badge b-amber">이연</span> <code>safe()</code> 는 CR/LF/TAB 외 제어문자는 치환하지 않음 — 표시 계층(9b read API) 이슈로 이연.</li>
+      <li><span class="badge b-amber">이연</span> <code>safe()</code>(서비스 저장 경로)는 CR/LF/TAB 외 제어문자는 치환하지 않음 — 표시 계층(9b read API) 이슈로 이연. (필터의 echo 경로는 2차 보완으로 ISO control 전체 거부.)</li>
       <li><span class="badge b-amber">이연</span> truncate 는 정보 손실 — 원문 보존 필요 사례가 생기면 metadataJson allowlist 로 이동 검토(9b).</li>
+      <li><span class="badge b-amber">9b 필수</span> <code>actorType=EMPLOYEE/APPLICANT → actorId 필수</code> 검증(2차 리뷰) — emitter 가 actorId 를 보장하는 9b 계측 시점에 추가(선반영 시 emitter 부재 상태에서 insert-실패 경로만 생김).</li>
       <li><span class="badge b-gray">운영 체크</span> 배포 시 <code>AUDIT_HMAC_SECRET</code> 주입 + <code>phase-09a-activity-log-ddl.sql</code> 반영(ddl-auto validate/none 환경).</li>
     </ul>
+  </section>
+
+  <section>
+    <h2>7-1. 2차 리뷰 보완</h2>
+    <table>
+      <thead><tr><th>심각도</th><th>지적</th><th>처리</th><th>상태</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="badge b-gray">Low</span></td>
+          <td>필터가 CR/LF 만 거부 — TAB 등 제어문자가 응답 헤더로 echo 되어 WAS reject 가능</td>
+          <td><code>Character::isISOControl</code> 전체 거부로 확대 + 테스트 1건 추가(CorrelationIdFilterTest 7 tests 통과)</td>
+          <td><span class="badge b-green">반영</span></td>
+        </tr>
+        <tr>
+          <td><span class="badge b-gray">Low</span></td>
+          <td>EMPLOYEE/APPLICANT 인데 actorId null 허용</td>
+          <td>리뷰어 지침대로 9b 계측 시점 요구사항으로 문서 고정(잔여 이슈 참조)</td>
+          <td><span class="badge b-amber">9b 이연</span></td>
+        </tr>
+      </tbody>
+    </table>
   </section>
 
   <section>

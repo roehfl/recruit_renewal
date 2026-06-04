@@ -1,5 +1,14 @@
 # 07. Implementation History
 
+## Phase 09a-RF2 - ActivityLog Foundation 2차 리뷰 보완 (구현 완료)
+
+- Date: 2026-06-04
+- Work type: review fix (09a-RF 에 대한 2차 리뷰 Low 2건 — `instruction.md`).
+- 반영: `CorrelationIdFilter.resolve()` 거부 범위 CR/LF → **ISO 제어문자 전체**(`Character::isISOControl`) 확대 — 필터가 echo 하는 응답 헤더에 TAB 등 제어문자가 실려 WAS 에서 reject 되는 것 방지. 테스트 +1(`CorrelationIdFilterTest` 7 tests 통과).
+- 이연(9b 요구사항으로 문서 고정): `actorType=EMPLOYEE/APPLICANT → actorId 필수` 검증 — 리뷰어 지침("9b 계측 시점에 추가, 9a 는 허용 가능")대로 emitter 가 actorId 를 보장하는 시점에 추가(선반영 시 emitter 부재 상태에서 insert-실패 경로만 생성).
+- Modified: `CorrelationIdFilter`, `CorrelationIdFilterTest`, 09a/09a-RF 문서·리포트 정합 갱신.
+- Tests: `--tests "*CorrelationIdFilterTest"` 통과(exit 0). 전체 회귀 미실행(사용자 지시).
+
 ## Fix - 수동 인증/인가 상태코드 정정 400→401/403 (구현 완료)
 
 - Date: 2026-06-04

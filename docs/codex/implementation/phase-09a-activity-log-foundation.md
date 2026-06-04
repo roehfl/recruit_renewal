@@ -20,7 +20,7 @@
 - `ActivityLogService`: `recordInCurrentTx`(REQUIRED, 비즈니스 tx 원자적) / `recordRequiresNew`(REQUIRES_NEW, 비즈니스 rollback 무관 보존).
 - `AuditEvent`(기록 요청 record, @Builder), `AuditMetadata`(typed metadata 마커 — 9b 에서 sealed + 구체 record).
 - `AuditHmac`(HMAC-SHA256 pepper) + `AuditConfig`(누락=기본 기동실패, fallback 은 `audit.allow-fallback-secret=true` 명시 시에만 — 09a-RF).
-- `CorrelationIdFilter`(OncePerRequestFilter, MDC `correlationId`, 응답 echo. 100자 초과/CRLF 헤더는 UUID 대체 — 09a-RF).
+- `CorrelationIdFilter`(OncePerRequestFilter, MDC `correlationId`, 응답 echo. 100자 초과/ISO 제어문자 헤더는 UUID 대체 — 09a-RF/2차).
 - 설정: `audit.hmac-secret: ${AUDIT_HMAC_SECRET:}` + `audit.allow-fallback-secret: ${AUDIT_ALLOW_FALLBACK_SECRET:false}`(main), test 전용 pepper(test yaml).
 
 **범위 밖(9b+)**: 기존 Export/Pdf/Upload 로거 흡수, egress fail-close, 관리자 변경 계측, typed AuditMetadata 구체 record, admin audit read API.
@@ -94,7 +94,7 @@
 - 책임: `AuditHmac` 빈 생성. pepper 를 `audit.hmac-secret`(=env `AUDIT_HMAC_SECRET`)에서 주입. **fail-safe(09a-RF)**: blank 면 기본 기동 실패(profile 이름 무관). fallback 은 `audit.allow-fallback-secret=true` 명시 시에만 + 경고(prod profile 은 flag 무관 거부).
 
 ### `config.CorrelationIdFilter` — Filter(@Component, HIGHEST_PRECEDENCE)
-- 책임: `X-Request-Id` 헤더 재사용/없으면 UUID 생성 → MDC `correlationId` + 응답 echo, finally 제거. `currentCorrelationId()` 정적 접근. traceId(OTel)는 deferred. **외부 헤더 불신(09a-RF)**: 100자 초과 또는 CR/LF 포함 헤더는 재사용하지 않고 UUID 대체.
+- 책임: `X-Request-Id` 헤더 재사용/없으면 UUID 생성 → MDC `correlationId` + 응답 echo, finally 제거. `currentCorrelationId()` 정적 접근. traceId(OTel)는 deferred. **외부 헤더 불신(09a-RF/2차)**: 100자 초과 또는 ISO 제어문자 포함 헤더는 재사용하지 않고 UUID 대체.
 
 ### `service.AuditMetadata` — interface(marker)
 - 책임: metadataJson 의 typed 입력. 자유 Map/raw JSON 금지. 직렬화는 ActivityLogService 내부. 09b 에서 sealed + 구체 record 추가.
@@ -149,4 +149,5 @@
 ## 11. 다음 슬라이스 (Next)
 
 - **9b**: Export/Pdf/Upload 로거 → `ActivityLogService` adapter(dual-write), egress fail-close(temp file 누수 방지 패턴), reopen·StageResult·첨부 admin 계측, typed `AuditMetadata` 구체 record(`UploadMetadata` 는 `sourceFileNameHash`+ext), admin audit read API(마스킹/원문 권한 분리 + page/range/projection 가드).
+- **9b 계측 시 필수 검증 추가(2차 리뷰)**: `actorType = EMPLOYEE/APPLICANT → actorId 필수`(SYSTEM/ANONYMOUS 는 null 허용). `targetId` 도 `safe(value, 100)` 적용 검토.
 - 관찰: 컨텍스트에 **Quartz 스케줄러**가 존재한다 — 9c/9e 의 retention 스케줄(설계는 disabled-by-default)에 `@Scheduled` 대신 Quartz 활용 가능(별도 검토).
