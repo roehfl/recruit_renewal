@@ -64,12 +64,12 @@
 | `ApplicationEducation.schoolId`(soft link) | true | KEEP_TOMBSTONE | **SCHOOL funnel 의 비식별 grouping 키** — 보존 |
 | `ApplicationEducation.schoolName` | **false** | **PLACEHOLDER** | `"__PURGED__"`(free-text, schoolId 로 통계 대체) |
 | `ApplicationEducation.majorName` / `degreeName` / `countryCode` | true | NULLIFY | null |
-| `ApplicationEducation.admissionDate` / `graduationDate` | true | **GENERALIZE+NULLIFY** | 정확 날짜 **보존 금지**(리뷰 2차 #8). 파기 시 연도(`admissionYear`/`graduationYear`)로 일반화 후 원본 null, 또는 전체 null. schoolId+정확일+학점 조합 재식별 차단 |
+| `ApplicationEducation.admissionDate` / `graduationDate` | true | **NULLIFY (안 A 확정)** | 정확 날짜 **보존 금지**. **안 A 채택(리뷰 3차 #3)**: 전부 `null`, 일반화 컬럼 추가 없음 — 현 funnel 통계(jobPosition/schoolId/certificate/stage)가 입학·졸업일을 안 쓰므로 통계 손실 0. (졸업연도 코호트 통계가 향후 필요하면 안 B로 전환: `graduationYear` 등 nullable 컬럼.) |
 | `ApplicationEducationSemesterGrade.*`(year/semester/credits/gpa…) | - | KEEP_TOMBSTONE | 비식별 학업 metric(schoolName/major 소거 후 단독 비식별) |
 | `ApplicationCareer.companyName` | **false** | **PLACEHOLDER** | `"__PURGED__"` |
 | `ApplicationCareer.departmentName` / `positionTitle` / `responsibilities` / `resignationReason` | true | NULLIFY | null(자유서술 포함) |
 | `ApplicationCareer.employmentType` / `currentlyEmployed` / `sortOrder` | - | KEEP_TOMBSTONE | 비PII |
-| `ApplicationCareer.startDate` / `endDate` | false/true | **GENERALIZE+NULLIFY** | 정확 날짜 **보존 금지**(리뷰 2차 #8). year-month bucket 또는 근속개월수로 일반화 후 원본 null(`startDate` NOT NULL → ALTER nullable 또는 generalize 컬럼). |
+| `ApplicationCareer.startDate` / `endDate` | false/true | **NULLIFY (안 A 확정)** | 정확 날짜 **보존 금지**. **안 A**: 전부 null(`startDate` NOT NULL → ALTER nullable). 일반화/근속개월 컬럼 추가 없음. (안 B 선택 시 `careerStartYearMonth`/`careerEndYearMonth` varchar(7)·`careerDurationMonths` int 추가.) |
 | `ApplicationCareerProfile.careerType` | false | KEEP_TOMBSTONE | 비PII enum(funnel) |
 
 ## 5. 자격/어학/병역/수상/공백 (상세 PII 묶음)
@@ -122,7 +122,11 @@
 | `Interview.memo` / `locationName` / `roomName` / `onlineMeetingUrl` | true | ⚠ **OUT (interview-level)** | per-application 파기 **대상 아님**(공유 행). memo 가 후보 실명 포함 시 잔존 PII — **별도 검토 필요 항목**으로 flag |
 | `Interview.groupName` | false | OUT (interview-level) | 공유, 파기 단위 밖 |
 
-**잔존 위험 flag**: `Interview.memo`(자유서술)는 group 공유라 per-application 파기로 비우지 않는다. 운영상 후보 실명이 memo 에 들어가면 파기 후에도 잔존한다. → "interview-level 자유텍스트 정리"는 별도 후속(또는 운영 가이드로 memo 에 실명 금지) 으로 분리. 본 Phase 9 범위 밖임을 명시.
+**잔존 위험 flag + 운영 가이드(리뷰 3차 #5)**: `Interview.memo`/`locationName`/`roomName`/`onlineMeetingUrl` 는 group 공유 행이라 per-application 파기로 비우지 않는다(타 후보 영향). 운영상 후보 실명이 memo 에 들어가면 파기 후 잔존 → Phase 9 범위 밖으로 인정하되 **운영 가이드를 명시**한다:
+
+> **운영 가이드**: `Interview.memo` 에는 후보 **실명·전화번호·이메일·평가성 자유서술을 입력하지 않는다**. 후보별 메모/평가는 **`InterviewEvaluation.comment` 로만** 남기고, 그 comment 는 파기 시 `NULLIFY` 된다.
+
+"interview-level 자유텍스트 정리"는 별도 후속.
 
 ## 8. PhysicalFileStatus 재정의 (리뷰 #4)
 
@@ -138,12 +142,15 @@ BINARY_DELETE_PENDING: 파기 saga ① 후, 물리 삭제 대기
 BINARY_DELETED       : 파기 saga 물리 소멸 확인 완료
 BINARY_DELETE_FAILED : 물리 삭제 실패(재시도/ reconciliation 대상)
 ```
-- 기존 `DELETED` → `SOFT_DELETED` 개명. `markDeleted()` 를 `SOFT_DELETED` 로 변경. **기존 DB 의 `'DELETED'` row 는 수동 DDL UPDATE 로 `'SOFT_DELETED'` 마이그레이션**.
+- **3단계 안전 마이그레이션(리뷰 3차 #1 — 한 번에 rename 시 운영 DB `'DELETED'` row enum 매핑 오류)**:
+  - **1단계(9d-2)**: enum 에 `DELETED` + `SOFT_DELETED` **둘 다 유지**. `markDeleted()` → `SOFT_DELETED`. health scan 은 `DELETED`·`SOFT_DELETED` **둘 다 soft-deleted 로 취급**.
+  - **2단계**: 수동 DDL `UPDATE … SET physical_file_status='SOFT_DELETED' WHERE physical_file_status='DELETED'` + 테스트로 `DELETED` 잔존 **0건 확인**.
+  - **3단계(후속 phase)**: `DELETED` enum 값 제거.
 - purge 는 `BINARY_DELETE_*` 만 사용 → soft-delete 와 의미 분리.
 
 ## 9. DDL 영향 요약 (수동 DDL 필요)
 
-**ALTER → nullable (NOT NULL date PII)**: `ApplicationCertificate.acquiredDate`, `ApplicationLanguage.examDate`, `ApplicationAward.awardDate`, `ApplicationGapPeriod.startDate`/`endDate`, `ApplicationCareer.startDate`(일반화/null 위해), `ApplicationAttachment.storagePath`. (education admission/graduation 은 이미 nullable → generalize 후 null.)
+**ALTER → nullable (NOT NULL date PII)**: `ApplicationCertificate.acquiredDate`, `ApplicationLanguage.examDate`, `ApplicationAward.awardDate`, `ApplicationGapPeriod.startDate`/`endDate`, `ApplicationCareer.startDate`(null 위해), `ApplicationAttachment.storagePath`. (education admission/graduation 은 이미 nullable → null.) **안 A 확정: 일반화용 신규 컬럼 추가 없음**(graduationYear/careerDurationMonths 등은 안 B 선택 시에만).
 
 **ciHash overwrite(권장안 A, DDL 불요)**: ref0 파기 시 `ciHash = "PURGED:"+UUID`. 대안 B = ciHash unique+nullable DDL 후 null(H2/MariaDB unique-null 동작 확인 필요). **plain SHA-256 이라 보존 금지** — 위 §2 ⚠.
 
@@ -157,7 +164,7 @@ BINARY_DELETE_FAILED : 물리 삭제 실패(재시도/ reconciliation 대상)
 
 ## 10. 판단 보류 / 확인 필요 항목
 
-- **날짜 보존 trade-off — 해소(리뷰 2차 #8)**: education(admission/graduation)·career(start/end) 정확 날짜는 **KEEP 금지**. 연도/year-month 로 일반화(또는 null)한다. "통계 편의" 보다 "재식별 가능성 제거" 우선.
+- **날짜 일반화 — 안 A 확정(리뷰 3차 #3)**: education(admission/graduation)·career(start/end) 정확 날짜는 **전부 NULLIFY, 일반화 컬럼 추가 없음**. 근거: 현 funnel 통계가 이 날짜들을 안 쓴다 → 통계 손실 0. 가역적(향후 졸업연도/근속 통계 필요 시 안 B 의 nullable 컬럼 추가). "통계 편의" 보다 "재식별 제거" 우선.
 - **`ciHash` — 해소(리뷰 2차 #1)**: 보존 금지. ref0 파기 시 `"PURGED:"+UUID` 로 overwrite(권장안 A). 중복가입 차단은 파기 후 미보장(파기 우선).
 - **PLACEHOLDER vs ALTER nullable 일괄 정책**: NOT NULL String PII 를 placeholder(기본)로 둘지, 전부 ALTER nullable+NULLIFY 로 통일할지 — 운영 DB DDL 부담과 trade-off. 기본은 placeholder. **확인 필요(낮음).**
 - **semesterGrade + schoolId 결합(리뷰 2차 #8)**: `ApplicationEducationSemesterGrade.schoolYear`/gpa 등은 단독 비식별이나 `schoolId`(보존) + 학년/학점 조합 시 좁은 코호트 재식별 가능성. 정확 날짜를 이미 일반화하므로 위험은 낮으나, 필요 시 schoolId 와 결합되는 grade 상세도 generalize 검토. **확인 필요(낮음).**

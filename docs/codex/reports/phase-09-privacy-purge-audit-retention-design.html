@@ -77,7 +77,12 @@
     <div class="crit"><b>2026-06-04 리뷰 2차 반영(instruction.md)</b>: ① <b>Blocker — <code>ciHash</code> 보존 금지</b>(plain SHA-256 + 중복가입 차단 →
       ref0 시 <code>ci=null</code>, <code>ciHash="PURGED:"+UUID</code> overwrite). ② upload <code>sourceFileName</code> → hash+확장자(파일명 PII). ③ export fail-close <b>temp file 누수 방지</b> 패턴.
       ④ RetentionPolicy 선택 규칙 6개 + <code>POLICY_NOT_FOUND</code>. ⑤ <code>hiringEndedAt</code> <b>수동 anchor 명령</b>(자동 세팅 없음). ⑥ RetentionHold <b>manual only</b>.
-      ⑦ holds matcher GET/write 분기. ⑧ 학력·경력 <b>정확 날짜 보존 금지</b>(연/year-month 일반화). ⑨ storage-health-scan 상태별 정책. ⑩ PurgeBatch/Item = "delete 금지 ledger"(append-only 아님).</div>
+      ⑦ holds matcher GET/write 분기. ⑧ 학력·경력 <b>정확 날짜 보존 금지</b>. ⑨ storage-health-scan 상태별 정책. ⑩ PurgeBatch/Item = "delete 금지 ledger"(append-only 아님).</div>
+    <div class="note"><b>2026-06-04 리뷰 3차 반영(instruction.md)</b>: ① <code>PhysicalFileStatus</code> 개명 <b>3단계 안전 마이그레이션</b>(DELETED+SOFT_DELETED 공존 → DB UPDATE → 후속 제거; 운영 row enum 매핑 오류 방지).
+      ② <code>applicantRefHash = HMAC_SHA256(pepper, "APPLICANT:"+applicantId)</code> — 입력 applicantId 만(ci/email/phone 금지).
+      ③ 학력·경력 날짜 <b>안 A 확정</b>(전부 null, 일반화 컬럼 없음 — 현 통계 미사용).
+      ④ RetentionPolicy <b>fail-safe</b>: active 2개↑ = <code>POLICY_CONFLICT</code> SKIP + policyConflictCount.
+      ⑤ <code>Interview.memo</code> 운영 가이드(실명/연락처/평가 자유서술 금지, 평가는 InterviewEvaluation.comment 로만).</div>
   </section>
 
   <!-- 2. Scope Cards -->
@@ -217,7 +222,8 @@ storage-health-scan  : "DB PURGED 인데 파일 존재" = 치명적 불일치 �
           <li>terminal = WITHDRAWN ∨ (finalStage 1개 ∧ status∈{RESULT_ANNOUNCED,CLOSED} ∧ StageResult.resultStatus≠PENDING ∧ decidedAt≠null)</li>
           <li>finalStage 부재/2개↑ = INVALID_STAGE_CONFIGURATION SKIP</li>
           <li>anchor 암묵 fallback 금지 → <code>ANCHOR_NOT_FIXED</code></li>
-          <li>SKIP reasonCode: RETENTION_NOT_DUE / RETENTION_HOLD / ALREADY_PURGED / ANCHOR_NOT_FIXED / APPLICATION_NOT_TERMINAL</li>
+          <li>SKIP reasonCode: RETENTION_NOT_DUE / RETENTION_HOLD / ALREADY_PURGED / ANCHOR_NOT_FIXED / APPLICATION_NOT_TERMINAL / INVALID_STAGE_CONFIGURATION / POLICY_NOT_FOUND / POLICY_CONFLICT</li>
+          <li>RetentionPolicy: override&gt;global, effective@scanAt, overlap 금지, active 2개↑ = POLICY_CONFLICT</li>
         </ul>
       </div>
       <div class="card">
@@ -250,9 +256,9 @@ storage-health-scan  : "DB PURGED 인데 파일 존재" = 치명적 불일치 �
       <tbody>
         <tr><td>신규 테이블 (5)</td><td><code>ActivityLog</code>, <code>RetentionPolicy</code>, <code>RetentionHold</code>, <code>PurgeBatch</code>, <code>PurgeJobItem</code></td></tr>
         <tr><td><code>JobApplication</code></td><td>+ <code>purgeBatchId</code>, <code>purgeResult</code>(PURGE_PENDING/PARTIAL_PENDING/PARTIAL_FAILED/PURGED), <code>purgedAt</code>(최종 PURGED 시점에만). <b>JobApplicationStatus enum 불변</b></td></tr>
-        <tr><td><code>ApplicationAttachment</code></td><td>PhysicalFileStatus <b>재정의</b>: 기존 <code>DELETED</code>→<code>SOFT_DELETED</code> 개명(soft-delete↔purge 분리) + <code>BINARY_DELETE_PENDING/BINARY_DELETED/BINARY_DELETE_FAILED</code> 추가(기존 'DELETED' row → 'SOFT_DELETED' 수동 UPDATE). + <code>filenameHash</code>·<code>binaryDeletedAt</code> 신규, <code>originalFileName</code>(NOT NULL)→PLACEHOLDER, <code>storagePath</code>(NOT NULL)→ALTER nullable 후 최종 null</td></tr>
+        <tr><td><code>ApplicationAttachment</code></td><td>PhysicalFileStatus <b>재정의</b>: 기존 <code>DELETED</code>→<code>SOFT_DELETED</code> 개명(soft-delete↔purge 분리) + <code>BINARY_DELETE_PENDING/BINARY_DELETED/BINARY_DELETE_FAILED</code> 추가. <b>3단계 안전 마이그레이션</b>: ①DELETED+SOFT_DELETED 공존(둘 다 soft-deleted 취급) →②DB UPDATE+잔존 0건 확인 →③후속 phase DELETED 제거. + <code>filenameHash</code>·<code>binaryDeletedAt</code> 신규, <code>originalFileName</code>(NOT NULL)→PLACEHOLDER, <code>storagePath</code>(NOT NULL)→ALTER nullable 후 최종 null</td></tr>
         <tr><td><code>JobPosting</code></td><td>+ <code>hiringEndedAt</code>(retentionAnchorAt 소스, 암묵 fallback 없음)</td></tr>
-        <tr><td>섹션/answers PII 컬럼</td><td>스키마 변경 없음으로 <b>단정 금지</b> — NOT NULL 이면 nullable 화/placeholder. 실제 DDL 확인 후 목록 반영</td></tr>
+        <tr><td>섹션/answers PII 컬럼</td><td><code>phase-09-pii-field-inventory.md</code> 전 필드 분류 완료. NOT NULL String→PLACEHOLDER, NOT NULL date→ALTER nullable+null. 학력·경력 날짜=<b>안 A(전부 null, 일반화 컬럼 없음)</b>. <code>createdBy</code>(updatable=false)=JPQL/native update</td></tr>
         <tr><td>권한 / 비밀</td><td><code>ROLE_PRIVACY_ADMIN</code>(DeptRoleMapping + SecurityConfig matcher), <code>AUDIT_HMAC_SECRET</code> pepper(env, prod 누락=기동실패, test=전용값)</td></tr>
       </tbody>
     </table>

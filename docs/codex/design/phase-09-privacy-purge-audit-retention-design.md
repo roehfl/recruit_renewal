@@ -99,8 +99,8 @@ Phase 09 — Privacy Purge, Audit, Retention (개인정보 파기 / 영속 감�
 | `targetId` | String nullable | 대상 PK |
 | `jobPostingId` | Long nullable | denormalized search key(추출 가능한 이벤트만) |
 | `applicationId` | Long nullable | |
-| `applicantRefHash` | String nullable | HMAC-SHA256 + server pepper. 단순 SHA256(id) 금지. hard-delete/파기 후 연결 증적용 |
-| `reasonCode` | enum/String nullable | VERSION_MISMATCH/AUTH_DENIED/VALIDATION_FAILED/RETENTION_NOT_DUE/RETENTION_HOLD/ALREADY_PURGED/ANCHOR_NOT_FIXED/APPLICATION_NOT_TERMINAL/INVALID_STAGE_CONFIGURATION/POLICY_NOT_FOUND/BINARY_DELETE_FAILED … |
+| `applicantRefHash` | String nullable | **`HMAC_SHA256(AUDIT_HMAC_SECRET, "APPLICANT:" + applicantId)`**(리뷰 3차 #2). 입력은 **`applicantId` 만** — `ci`/`ciHash`/`email`/`phone` 절대 입력 금지(ciHash overwrite 와도 충돌). 여러 지원서를 같은 지원자로 묶는 감사 연결자. 단순 SHA256(id) 금지 |
+| `reasonCode` | enum/String nullable | VERSION_MISMATCH/AUTH_DENIED/VALIDATION_FAILED/RETENTION_NOT_DUE/RETENTION_HOLD/ALREADY_PURGED/ANCHOR_NOT_FIXED/APPLICATION_NOT_TERMINAL/INVALID_STAGE_CONFIGURATION/POLICY_NOT_FOUND/POLICY_CONFLICT/BINARY_DELETE_FAILED … |
 | `reasonMessage` | String nullable | sanitized human-readable only |
 | `correlationId` | String nullable | X-Request-Id 또는 생성 UUID |
 | `traceId` | String nullable | OTel 있을 때만(현재 deferred) |
@@ -150,7 +150,8 @@ record UploadConflictMetadata(long stageId, String sourceFileNameHash, String so
   4. 같은 `jobPostingId` 에 effective period **overlap 금지**(서비스 검증 + 가능하면 DB 제약).
   5. global enabled policy 도 동일 시점 **1개만** 허용.
   6. 적용 정책이 없으면 `POLICY_NOT_FOUND` 로 SKIP.
-- **eligibility** = `anchor 종료 + retentionPeriod 경과 + not purged + not hold + terminal`. 제외 = SKIPPED + reasonCode {RETENTION_NOT_DUE, RETENTION_HOLD, ALREADY_PURGED, ANCHOR_NOT_FIXED, APPLICATION_NOT_TERMINAL, INVALID_STAGE_CONFIGURATION}.
+  7. **fail-safe(리뷰 3차 #4)**: overlap 검증을 우회한 운영 직접수정/과거 데이터로 active 후보가 **2개 이상**이면 → **아무것도 선택하지 않고** `SKIPPED` + `POLICY_CONFLICT`. ActivityLog/PurgeBatch summary 에 `policyConflictCount` 를 남긴다(dry-run 비결정성 차단).
+- **eligibility** = `anchor 종료 + retentionPeriod 경과 + not purged + not hold + terminal`. 제외 = SKIPPED + reasonCode {RETENTION_NOT_DUE, RETENTION_HOLD, ALREADY_PURGED, ANCHOR_NOT_FIXED, APPLICATION_NOT_TERMINAL, INVALID_STAGE_CONFIGURATION, POLICY_NOT_FOUND, POLICY_CONFLICT}.
 - **terminal 판정 — 구체 query (9c 확정, 실제 enum 검증 완료)**: 아래 enum 값은 실제 코드에 존재함을 확인했다(`StageStatus`={READY, IN_PROGRESS, **RESULT_ANNOUNCED**, **CLOSED**}, `StageResultStatus`={**PENDING**, PASSED, FAILED, ABSENT, WITHDRAWN, HOLD}; `Stage.finalStage`(boolean)/`Stage.status`/`StageResult.resultStatus`/`StageResult.decidedAt` 실존).
 
   ```text
@@ -229,6 +230,7 @@ record UploadConflictMetadata(long stageId, String sourceFileNameHash, String so
 | `METADATA_ONLY` | null 허용 | — | 정상 |
 
 → `BINARY_DELETED` + storagePath null 은 정상(오탐 금지), `BINARY_DELETED` + 파일 존재가 치명적 불일치.
+> 마이그레이션 1단계 동안 잔존하는 legacy `DELETED` 는 `SOFT_DELETED` 와 **동일 취급**(둘 다 soft-deleted). 2단계 UPDATE 후 소멸.
 
 ## 7. 스키마 / DDL 변경 (migration framework 없음 → 전부 "수동 DDL 필요")
 
@@ -239,7 +241,7 @@ record UploadConflictMetadata(long stageId, String sourceFileNameHash, String so
 ### 7.2 신규 컬럼 / 변경
 
 - `JobApplication`: `purgeBatchId`, `purgeResult`(enum: `PURGE_PENDING`/`PARTIAL_PENDING`/`PARTIAL_FAILED`/`PURGED`), `purgedAt`(최종 PURGED 시점에만). `JobApplicationStatus` enum **불변**(purge 는 orthogonal marker).
-- `ApplicationAttachment`: `PhysicalFileStatus` **재정의**(리뷰 #4) — 기존 `DELETED` → **`SOFT_DELETED` 개명**(현 `markDeleted()` soft-delete 의미와 purge 물리삭제 의미 분리) + 신규 `BINARY_DELETE_PENDING`/`BINARY_DELETED`/`BINARY_DELETE_FAILED`. 최종 = `METADATA_ONLY/STORED/MISSING/SOFT_DELETED/BINARY_DELETE_PENDING/BINARY_DELETED/BINARY_DELETE_FAILED`. **기존 DB `'DELETED'` row → `'SOFT_DELETED'` 수동 UPDATE 마이그레이션** 필요. + `filenameHash`·`binaryDeletedAt` 신규, `originalFileName`(NOT NULL) → PLACEHOLDER `"__PURGED__"`, `storagePath`(NOT NULL, len 1000) → ALTER nullable 후 최종 소멸 시 null.
+- `ApplicationAttachment`: `PhysicalFileStatus` **재정의**(리뷰 #4) — 기존 `DELETED` → **`SOFT_DELETED` 개명**(현 `markDeleted()` soft-delete 의미와 purge 물리삭제 의미 분리) + 신규 `BINARY_DELETE_PENDING`/`BINARY_DELETED`/`BINARY_DELETE_FAILED`. 최종 = `METADATA_ONLY/STORED/MISSING/SOFT_DELETED/BINARY_DELETE_PENDING/BINARY_DELETED/BINARY_DELETE_FAILED`. **3단계 안전 마이그레이션(리뷰 3차 #1 — 한 번에 rename 금지, 운영 DB 'DELETED' row enum 매핑 오류 위험)**: ①(9d-2) enum 에 `DELETED`+`SOFT_DELETED` **둘 다** 유지, `markDeleted()`→`SOFT_DELETED`, health scan 은 둘 다 soft-deleted 로 취급. ② 수동 DDL `UPDATE … SET physical_file_status='SOFT_DELETED' WHERE physical_file_status='DELETED'` + 테스트로 `DELETED` 잔존 0건 확인. ③ **후속 phase** 에서 `DELETED` enum 제거. + `filenameHash`·`binaryDeletedAt` 신규, `originalFileName`(NOT NULL) → PLACEHOLDER `"__PURGED__"`, `storagePath`(NOT NULL, len 1000) → ALTER nullable 후 최종 소멸 시 null.
 - `JobPosting`: `hiringEndedAt`(신규, retentionAnchorAt 소스). `finalizedAt` 이름은 모호하여 채택 안 함.
 - **섹션/answers PII 컬럼**: **`phase-09-pii-field-inventory.md` 에서 전 필드 분류 완료(9d 선행 산출물).** NOT NULL date PII(`acquiredDate`/`examDate`/`awardDate`/gap `startDate`·`endDate`/`storagePath`)는 ALTER nullable+NULLIFY, NOT NULL String PII(`applicantNameSnapshot`/`schoolName`/`companyName`/`certificateName`/`issuingOrganization`/`languageName`/`testName`/`awardName`/`awardingOrganization`/gap `reason`/`originalFileName`)는 PLACEHOLDER 기본. `createdBy`(@Column updatable=false)는 JPQL/native bulk update 로만 클리어.
 
