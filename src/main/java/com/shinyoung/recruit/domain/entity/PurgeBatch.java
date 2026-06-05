@@ -97,6 +97,10 @@ public class PurgeBatch extends BaseEntity {
     @Column(name = "failed_count", nullable = false)
     private long failedCount;
 
+    /** 바이너리 물리 삭제 실패 건수(9d-2 saga — 해당 item 은 PENDING 유지, attachment 는 BINARY_DELETE_FAILED). */
+    @Column(name = "binary_delete_failed_count", nullable = false)
+    private long binaryDeleteFailedCount;
+
     private PurgeBatch(
             PurgeBatchMode mode,
             PurgeTriggerType triggerType,
@@ -130,8 +134,8 @@ public class PurgeBatch extends BaseEntity {
     }
 
     /**
-     * execute 집계 완료(9d-1). item 실패가 하나라도 있으면 {@code PARTIAL_FAILED}(batch 는 비원자 컨테이너 —
-     * 설계 §5.4). {@code FAILED} 는 시작/criteria 실패 전용({@link #fail}).
+     * execute 집계 완료. item 실패 또는 바이너리 삭제 실패(9d-2 saga)가 하나라도 있으면
+     * {@code PARTIAL_FAILED}(설계 §5.4 — batch 는 비원자 컨테이너). {@code FAILED} 는 시작/criteria 실패 전용({@link #fail}).
      */
     public void completeExecute(
             long totalCount,
@@ -139,14 +143,18 @@ public class PurgeBatch extends BaseEntity {
             long pendingCount,
             long skippedCount,
             long failedCount,
+            long binaryDeleteFailedCount,
             LocalDateTime completedAt
     ) {
-        this.status = failedCount > 0 ? PurgeBatchStatus.PARTIAL_FAILED : PurgeBatchStatus.COMPLETED;
+        this.status = (failedCount > 0 || binaryDeleteFailedCount > 0)
+                ? PurgeBatchStatus.PARTIAL_FAILED
+                : PurgeBatchStatus.COMPLETED;
         this.totalCount = totalCount;
         this.purgedCount = purgedCount;
         this.pendingCount = pendingCount;
         this.skippedCount = skippedCount;
         this.failedCount = failedCount;
+        this.binaryDeleteFailedCount = binaryDeleteFailedCount;
         this.completedAt = completedAt;
     }
 

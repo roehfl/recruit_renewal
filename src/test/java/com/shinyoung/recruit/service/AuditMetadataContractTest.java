@@ -43,9 +43,9 @@ class AuditMetadataContractTest {
                     "retentionPeriodDays", "baselineType", "enabled"),
             PurgeBatchMetadata.class, Set.of("purgeBatchId", "mode", "totalCount", "eligibleCount",
                     "skippedCount", "policyConflictCount"),
-            // Phase 09d-1 — execute coarse 집계(PII-free).
+            // Phase 09d-1/09d-2 — execute coarse 집계(PII-free).
             PurgeExecuteMetadata.class, Set.of("purgeBatchId", "sourceDryRunBatchId", "totalCount",
-                    "purgedCount", "pendingCount", "skippedCount", "failedCount")
+                    "purgedCount", "pendingCount", "skippedCount", "failedCount", "binaryDeleteFailedCount")
     );
 
     @Test

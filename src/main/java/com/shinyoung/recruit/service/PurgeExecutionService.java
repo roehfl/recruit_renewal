@@ -8,6 +8,7 @@ import com.shinyoung.recruit.domain.repository.PurgeJobItemRepository;
 import com.shinyoung.recruit.dto.request.PurgeExecuteRequest;
 import com.shinyoung.recruit.dto.response.PurgeBatchDetailResponse;
 import com.shinyoung.recruit.enumeration.PurgeBatchMode;
+import com.shinyoung.recruit.enumeration.PurgeBatchStatus;
 import com.shinyoung.recruit.enumeration.PurgeItemStatus;
 import com.shinyoung.recruit.exception.InvalidRetentionRequestException;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
@@ -38,6 +39,7 @@ public class PurgeExecutionService {
     private final JobApplicationRepository jobApplicationRepository;
     private final PurgeBatchLifecycleService purgeBatchLifecycleService;
     private final PurgeItemProcessor purgeItemProcessor;
+    private final AttachmentPurgeSagaService attachmentPurgeSagaService;
 
     public PurgeBatchDetailResponse execute(PurgeExecuteRequest request, String actor) {
         actor = requireActor(actor);
@@ -52,6 +54,7 @@ public class PurgeExecutionService {
         long pending = 0;
         long skipped = 0;
         long failed = 0;
+        long binaryDeleteFailed = 0;
         try {
             for (Long applicationId : candidateApplicationIds) {
                 try {
@@ -59,7 +62,15 @@ public class PurgeExecutionService {
                             purgeItemProcessor.process(batch.getId(), applicationId, batch.getScanAt());
                     switch (outcome.status()) {
                         case PURGED -> purged++;
-                        case PENDING -> pending++;
+                        case PENDING -> {
+                            // saga ②③(9d-2): item 커밋 후 물리 삭제 → 소멸 확인 시 최종 PURGED 승격.
+                            if (completeBinaryDeletionSafely(batch.getId(), applicationId)) {
+                                purged++;
+                            } else {
+                                pending++;
+                                binaryDeleteFailed++;
+                            }
+                        }
                         case SKIPPED -> skipped++;
                         default -> failed++;
                     }
@@ -76,8 +87,32 @@ public class PurgeExecutionService {
             throw e;
         }
 
-        return purgeBatchLifecycleService.completeExecute(
-                batch.getId(), candidateApplicationIds.size(), purged, pending, skipped, failed, actor);
+        try {
+            return purgeBatchLifecycleService.completeExecute(
+                    batch.getId(), candidateApplicationIds.size(), purged, pending, skipped, failed,
+                    binaryDeleteFailed, actor);
+        } catch (RuntimeException e) {
+            // complete/audit 실패 시 batch 가 RUNNING 으로 방치되면 안 된다(9d-1 리뷰 Medium 1) —
+            // 최소한 FAILED 로 확정(베스트 에포트)하고 전파. item 들은 이미 각자 커밋된 상태(ledger 보존).
+            log.error("Purge batch complete failed. batchId={}", batch.getId(), e);
+            try {
+                purgeBatchLifecycleService.failExecute(batch.getId(), actor);
+            } catch (RuntimeException failError) {
+                log.error("Purge batch FAILED marking also failed — batch may remain RUNNING. batchId={}",
+                        batch.getId(), failError);
+            }
+            throw e;
+        }
+    }
+
+    /** saga 자체 예외도 PENDING 유지(승격 금지)로 흡수 — attachment 상태는 reconciliation(9e)이 수습한다. */
+    private boolean completeBinaryDeletionSafely(Long batchId, Long applicationId) {
+        try {
+            return attachmentPurgeSagaService.completeBinaryDeletion(batchId, applicationId);
+        } catch (RuntimeException e) {
+            log.error("Attachment purge saga failed. batchId={}, applicationId={}", batchId, applicationId, e);
+            return false;
+        }
     }
 
     private void validateRequest(PurgeExecuteRequest request) {
@@ -96,8 +131,10 @@ public class PurgeExecutionService {
         if (request.sourceDryRunBatchId() != null) {
             PurgeBatch source = purgeBatchRepository.findById(request.sourceDryRunBatchId())
                     .orElseThrow(() -> new PurgeBatchNotFoundException("근거 dry-run batch를 찾을 수 없습니다."));
-            if (source.getMode() != PurgeBatchMode.DRY_RUN) {
-                throw new InvalidRetentionRequestException("sourceDryRunBatchId는 DRY_RUN batch여야 합니다.");
+            // RUNNING/FAILED dry-run 을 근거로 실행하면 안 된다(9d-1 리뷰 Medium 2) — COMPLETED 만 허용.
+            if (source.getMode() != PurgeBatchMode.DRY_RUN
+                    || source.getStatus() != PurgeBatchStatus.COMPLETED) {
+                throw new InvalidRetentionRequestException("sourceDryRunBatchId는 COMPLETED DRY_RUN batch여야 합니다.");
             }
             return purgeJobItemRepository.findByPurgeBatchIdOrderByIdAsc(source.getId()).stream()
                     .filter(item -> item.getStatus() == PurgeItemStatus.ELIGIBLE)

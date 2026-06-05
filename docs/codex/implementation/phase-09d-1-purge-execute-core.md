@@ -6,6 +6,8 @@
 - Work type: implementation (설계: `phase-09-privacy-purge-audit-retention-design.md` §5.2/§5.4·slice 9d-1, **계약: `phase-09-pii-field-inventory.md`**, ADR-0005/0007)
 - Goal: 비가역 파기 실행의 core — execute API(안전장치), 실행 시 eligibility **재검증**, 관계형 PII tombstone(인벤토리 분류표 그대로), Applicant ref-count 익명화, `PurgeBatch`/`PurgeJobItem` execute 상태전이, coarse 감사. **첨부 바이너리 삭제 saga(물리삭제·최종 승격)는 09d-2.**
 
+> 2026-06-05 구현 리뷰 반영(instruction.md, Major 1 + Medium 2 + Low 2): ① **Major 1 — StageResult comment 계열 소거**: `StageResult.comment` NULLIFY + `StageResultCorrectionHistory`(reason PLACEHOLDER·previousComment/newComment NULLIFY·createdBy/updatedBy NULLIFY, 상태/점수/correctedBy 직원 식별자는 KEEP) bulk 쿼리 2종을 tombstone 에 포함 — PURGED marker 가 "관계형 PII 전부 제거"를 보장하도록 함. **인벤토리 §7-1 로 분류 정식 확정**(갭 해소). field-level 테스트 보강. ② **Medium 1 — RUNNING batch 방치 방지**: `completeExecute` 실패를 orchestrator 가 catch → `failExecute` 베스트 에포트 후 전파(item ledger 는 이미 커밋 보존). ③ **Medium 2 — source batch 상태 검증**: bulk 근거는 **COMPLETED DRY_RUN** 만(RUNNING/FAILED dry-run·EXECUTE batch 거부 + 테스트 2건). ④ **Low 1 — FAILED item 추적성**: `AuditReasonCode.PURGE_ITEM_FAILED` 추가, `executeFailed` 에 적용(+9e reasonMessage 컬럼 TODO 고정). ⑤ **Low 2** — 재실행 ledger 연결성은 응답의 `sourceDryRunBatchId` 로 식별(운영 UI 강조 가이드 문서화).
+
 ## Implemented Scope
 
 ### A — Execute API + 안전장치 (ADR-0007)
@@ -33,7 +35,7 @@
 ### D — 관계형 PII tombstone (인벤토리 §3~§7 계약 그대로)
 
 - **`ApplicationPiiPurgeRepository`**(전용, delete 미노출): 인벤토리 분류표를 1:1 구현한 `@Modifying` bulk JPQL 12종 + certificate 번호 scalar 조회. 전용 인터페이스로 응집한 이유 — ① `createdBy` 는 `@Column(updatable=false)` 라 **JPQL bulk 만 가능**(인벤토리 §9), ② 인벤토리와의 대조 검증 용이.
-- 처리 요약: answers(`answerText` NULLIFY) · 학력(schoolName PLACEHOLDER, major/degree/country/입학·졸업일 NULLIFY — **안 A: 정확 날짜 전부 null**) · semesterGrade(감사필드만 — metric 은 KEEP) · 경력(companyName PLACEHOLDER, 부서/직급/업무/사유/시작·종료일 NULLIFY) · careerProfile(감사필드만) · 자격(명칭/기관 PLACEHOLDER, 날짜/점수 NULLIFY, **certificateNumber = HMAC `hmacHex("CERT_NO:"+원문)` HASH_ONLY**) · 어학/병역/수상/공백(분류표 그대로) · **평가 comment NULLIFY(per-candidate 만 — Interview-level 공유 텍스트 불가침)** · JobApplication `createdBy/updatedBy` NULLIFY + `applicantNameSnapshot` 은 엔티티 `markPurge*` 가 PLACEHOLDER 처리.
+- 처리 요약: answers(`answerText` NULLIFY) · 학력(schoolName PLACEHOLDER, major/degree/country/입학·졸업일 NULLIFY — **안 A: 정확 날짜 전부 null**) · semesterGrade(감사필드만 — metric 은 KEEP) · 경력(companyName PLACEHOLDER, 부서/직급/업무/사유/시작·종료일 NULLIFY) · careerProfile(감사필드만) · 자격(명칭/기관 PLACEHOLDER, 날짜/점수 NULLIFY, **certificateNumber = HMAC `hmacHex("CERT_NO:"+원문)` HASH_ONLY**) · 어학/병역/수상/공백(분류표 그대로) · **평가 comment NULLIFY(per-candidate 만 — Interview-level 공유 텍스트 불가침)** · **StageResult.comment NULLIFY + 정정 이력 reason PLACEHOLDER/comment 스냅샷 NULLIFY(§7-1 — 리뷰 Major 1)** · JobApplication `createdBy/updatedBy` NULLIFY + `applicantNameSnapshot` 은 엔티티 `markPurge*` 가 PLACEHOLDER 처리.
 - 섹션 엔티티 비로딩(scalar/bulk only) — stale flush 위험 없음. JobApplication 엔티티 변경(marker)과 bulk(createdBy)는 컬럼이 겹치지 않음(updatable=false 라 entity flush 가 bulk 결과를 못 덮음).
 - **엔티티 nullable 완화 6필드**(인벤토리 §9): certificate.acquiredDate, language.examDate, award.awardDate, gapPeriod.startDate/endDate, career.startDate — 입력 필수는 request 검증이 계속 보장.
 
@@ -146,7 +148,9 @@ $env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tes
 3. 재실행 batch 는 동일 application 의 item 을 새로 기록(ledger 의미상 실행별 기록 — 중복 아님). FAILED 재시도 reconciliation 은 9e.
 4. orchestration 루프 자체 실패를 batch FAILED 로 분류 — 설계 "시작/criteria 실패" 의 확장 해석(명시).
 5. 파기 후 지원자 로그인 불가(loginId null) — 의도된 결과. 파기 통지는 후속(MessageBatch hook).
-6. **인벤토리 갭 flag**: `StageResult.comment`(관리자 자유서술)·`StageResultCorrectionHistory` 의 comment 스냅샷이 인벤토리에 미분류 — 설계 §5.2 "자유입력 comment 소거" 원칙과 대조 필요. **인벤토리 갱신 후 9d-2/9e 에서 처리 권고**(임의 확장하지 않고 flag).
+6. ~~인벤토리 갭(StageResult comment 계열)~~ — **리뷰 Major 1 로 해소**: 인벤토리 §7-1 분류 확정 + 본 슬라이스 tombstone 에 포함 구현.
+7. FAILED item 의 실패 원인 상세(reasonMessage)는 미보유 — `PURGE_ITEM_FAILED` reasonCode 만. 9e 에서 sanitized reasonMessage 컬럼 추가 검토(TODO 고정).
+8. 운영 UI 가이드: 같은 dry-run 재실행 시 실행별 execute batch/item 이 새로 기록된다(ledger 의미) — 목록/상세에서 `sourceDryRunBatchId` 를 강조해 연결성을 표시할 것.
 
 ## Next Phase Considerations
 

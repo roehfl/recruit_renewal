@@ -1,10 +1,13 @@
 package com.shinyoung.recruit.service;
 
+import com.shinyoung.recruit.common.hash.AuditHmac;
+import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.PurgeBatch;
 import com.shinyoung.recruit.domain.entity.Stage;
 import com.shinyoung.recruit.domain.entity.StageResult;
+import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationPiiPurgeRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.PurgeBatchRepository;
@@ -24,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -48,6 +52,8 @@ public class PurgeItemProcessor {
     private final StageRepository stageRepository;
     private final StageResultRepository stageResultRepository;
     private final RetentionHoldRepository retentionHoldRepository;
+    private final ApplicationAttachmentRepository applicationAttachmentRepository;
+    private final AuditHmac auditHmac;
     private final RetentionPolicyService retentionPolicyService;
     private final RetentionEligibilityService retentionEligibilityService;
     private final ApplicationPiiPurgeService applicationPiiPurgeService;
@@ -84,12 +90,20 @@ public class PurgeItemProcessor {
         // 관계형 PII tombstone(인벤토리 §3~§7) — 이 트랜잭션 안에서 원자적.
         applicationPiiPurgeService.purgeRelationalPii(applicationId);
 
-        // 첨부 바이너리 소멸 미확인 시 최종 PURGED 승격 금지 — 9d-2 saga 가 물리 소멸 확인 후 승격한다.
-        // STORED 외에 soft-delete(DELETED)도 포함: after-commit 물리삭제 실패 시 파일이 잔존할 수 있다
-        // ("DB PURGED + 파일 잔존" 불허, 적대 검증 반영). MISSING/METADATA_ONLY 는 파일 부재가 확인된 상태.
-        boolean binaryOutstanding = applicationPiiPurgeRepository.countAttachmentsWithStatus(
-                applicationId, List.of(PhysicalFileStatus.STORED, PhysicalFileStatus.DELETED)) > 0;
+        // saga ①(9d-2, 인벤토리 §6): 첨부 metadata PII 제거(원본 파일명 → hash 후 placeholder, 삭제 행위자/사유
+        // null) + 바이너리 소멸 미확인 상태(STORED·soft-delete·이전 saga 잔여)는 BINARY_DELETE_PENDING 마킹.
+        boolean binaryOutstanding = false;
+        for (ApplicationAttachment attachment : applicationAttachmentRepository.findByJobApplicationId(applicationId)) {
+            attachment.purgeMetadataPii(
+                    auditHmac.hmacHex("FILE_NAME:" + attachment.getOriginalFileName()));
+            if (PhysicalFileStatus.BINARY_OUTSTANDING.contains(attachment.getPhysicalFileStatus())) {
+                attachment.markBinaryDeletePending();
+                binaryOutstanding = true;
+            }
+        }
+        applicationPiiPurgeRepository.purgeAttachmentAuditFields(applicationId);
 
+        // 바이너리 소멸 미확인 시 최종 PURGED 승격 금지("DB PURGED + 파일 잔존" 불허) — saga ②③ 가 확인 후 승격.
         PurgeJobItem item;
         if (binaryOutstanding) {
             application.markPurgePending(batchId);
@@ -103,6 +117,49 @@ public class PurgeItemProcessor {
         anonymizeApplicantIfRefZero(application);
 
         return new PurgeItemOutcome(item.getStatus(), null);
+    }
+
+    /**
+     * saga ③(9d-2) — 물리 삭제 결과 확정. 성공 첨부는 BINARY_DELETED(storagePath null·binaryDeletedAt),
+     * 실패는 BINARY_DELETE_FAILED 유지(9e reconciliation 대상). <b>모든</b> 대상이 소멸 확인됐을 때만
+     * JobApplication PURGED(purgedAt) + item PENDING→PURGED 최종 승격.
+     *
+     * @return 최종 PURGED 승격 여부
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean finalizeBinaryDeletion(
+            Long batchId,
+            Long applicationId,
+            Set<Long> succeededAttachmentIds,
+            Set<Long> failedAttachmentIds
+    ) {
+        List<ApplicationAttachment> targets = applicationAttachmentRepository
+                .findByJobApplicationIdAndPhysicalFileStatusIn(applicationId, List.of(
+                        PhysicalFileStatus.BINARY_DELETE_PENDING, PhysicalFileStatus.BINARY_DELETE_FAILED));
+        LocalDateTime now = LocalDateTime.now(clock);
+        // 보수적 판정: 실패가 하나라도 있거나, 성공 확인이 없는 대상이 남으면 승격 금지.
+        boolean allCleared = failedAttachmentIds.isEmpty();
+        for (ApplicationAttachment attachment : targets) {
+            if (succeededAttachmentIds.contains(attachment.getId())) {
+                attachment.markBinaryDeleted(now);
+            } else {
+                attachment.markBinaryDeleteFailed();
+                allCleared = false;
+            }
+        }
+        if (allCleared) {
+            JobApplication application = jobApplicationRepository.findById(applicationId)
+                    .orElseThrow(() -> new IllegalStateException("JobApplication not found. id=" + applicationId));
+            application.markPurged(batchId, now);
+            // item 부재는 ledger 불변식 위반 — silent skip 금지(적대 검증 반영). 예외 시 본 tx 전체 롤백되어
+            // app PURGED 승격도 함께 취소된다(원장-마커 정합 유지).
+            purgeJobItemRepository.findByPurgeBatchIdAndApplicationId(batchId, applicationId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "PurgeJobItem not found for promotion. batchId=" + batchId
+                                    + ", applicationId=" + applicationId))
+                    .promoteToPurged();
+        }
+        return allCleared;
     }
 
     /** item 트랜잭션 실패 기록 — 비즈니스 rollback 과 무관하게 잔존해야 하므로 별도 REQUIRES_NEW. */

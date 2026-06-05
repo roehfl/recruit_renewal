@@ -12,6 +12,7 @@ public record PurgeExecuteMetadata(
         long purgedCount,
         long pendingCount,
         long skippedCount,
-        long failedCount
+        long failedCount,
+        long binaryDeleteFailedCount
 ) implements AuditMetadata {
 }

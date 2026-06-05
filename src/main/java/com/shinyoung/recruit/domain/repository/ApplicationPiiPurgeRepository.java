@@ -145,4 +145,43 @@ public interface ApplicationPiiPurgeRepository extends Repository<JobApplication
             where ev.candidateParticipant.id in (
                 select p.id from InterviewParticipant p where p.jobApplication.id = :applicationId)""")
     int purgeEvaluationComments(@Param("applicationId") Long applicationId);
+
+    /** 첨부 metadata 감사 필드(인벤토리 §6 공통 — createdBy 는 updatable=false 라 bulk 필수, 9d-2). */
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update ApplicationAttachment a
+            set a.createdBy = null, a.updatedBy = null
+            where a.jobApplication.id = :applicationId""")
+    int purgeAttachmentAuditFields(@Param("applicationId") Long applicationId);
+
+    /** saga ② 물리 삭제 대상(id, storagePath) — 엔티티 비로딩 scalar(9d-2). FAILED 는 재실행 재시도 포함. */
+    @Query("""
+            select a.id, a.storagePath from ApplicationAttachment a
+            where a.jobApplication.id = :applicationId and a.physicalFileStatus in :statuses""")
+    List<Object[]> findBinaryDeleteTargets(
+            @Param("applicationId") Long applicationId,
+            @Param("statuses") List<PhysicalFileStatus> statuses);
+
+    /**
+     * StageResult 자유서술(인벤토리 §7-1, 9d-1 리뷰 Major 1 — PURGED marker 전 소거 필수).
+     * 결과/점수/decidedBy(직원)는 KEEP_TOMBSTONE.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update StageResult r
+            set r.comment = null, r.createdBy = null, r.updatedBy = null
+            where r.jobApplication.id = :applicationId""")
+    int purgeStageResultComments(@Param("applicationId") Long applicationId);
+
+    /**
+     * 정정 이력의 자유입력(reason NOT NULL → placeholder)과 comment 전후 스냅샷(인벤토리 §7-1).
+     * 상태/점수 스냅샷·correctedBy(직원)는 KEEP_TOMBSTONE — 정정 사실 자체는 증적으로 보존.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update StageResultCorrectionHistory h
+            set h.reason = '__PURGED__', h.previousComment = null, h.newComment = null,
+                h.createdBy = null, h.updatedBy = null
+            where h.stageResult.jobApplication.id = :applicationId""")
+    int purgeStageResultCorrectionHistories(@Param("applicationId") Long applicationId);
 }

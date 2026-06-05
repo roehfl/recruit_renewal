@@ -1,5 +1,22 @@
 # 07. Implementation History
 
+## Phase 09d-2 - Attachment Binary Delete Saga (구현 완료)
+
+- Date: 2026-06-05
+- Work type: implementation. 설계 §5.4 첨부 saga·slice 9d-2, 계약 = PII 인벤토리 §6/§8(ADR-0005).
+- Implemented:
+  - **PhysicalFileStatus 재정의 + 1단계 안전 마이그레이션**(인벤토리 §8): +`SOFT_DELETED`/`BINARY_DELETE_PENDING`/`BINARY_DELETED`/`BINARY_DELETE_FAILED`(legacy `DELETED` 병존·동일 취급). `markDeleted()`→SOFT_DELETED. 전 사용처 호환 — 활성/목록 판정은 `HIDDEN_FROM_LISTING`, health scan 은 DELETED·SOFT_DELETED 동일 집계(BINARY_* 는 scan 대상 외 — BINARY_DELETED null storagePath 오탐 방지, 본격 확장 9e). 의미 집합 상수(`SOFT_DELETED_FAMILY`/`HIDDEN_FROM_LISTING`/`BINARY_OUTSTANDING`).
+  - **saga ①(item tx 통합)**: 첨부 PII §6 — `filenameHash=HMAC("FILE_NAME:"+원문)` 을 **원문 제거 전** 계산 → `originalFileName="__PURGED__"`·deletedBy/deletionReason null·createdBy/updatedBy bulk. **모든 첨부 행** 적용. 바이너리 미확인(`BINARY_OUTSTANDING`)은 `markBinaryDeletePending()`.
+  - **saga ②③**: `AttachmentPurgeSagaService` — 멱등 `deleteIfExists`+**`exists()` 존재 재확인**(이미 없음=성공, invalid/예외=실패) → `PurgeItemProcessor.finalizeBinaryDeletion`(REQUIRES_NEW) — 성공=`markBinaryDeleted`(**storagePath null·binaryDeletedAt 은 이 시점에만**), 실패=`markBinaryDeleteFailed`(경로 보존). **전부 소멸 확인 시에만** `markPurged(purgedAt)`+`promoteToPurged`(PENDING 전제, **fail-loud**). ②③ 사이 crash = "파일 소멸+DB pending"(설계 명시 안전 상태 — 9e 승격). "DB PURGED+파일 잔존" 경로 없음.
+  - **execute 통합/집계**: PENDING item 커밋 후 saga 실행(예외도 실패 흡수) — 승격=purged, 실패=pending 유지+`binary_delete_failed_count`(신규 컬럼) → batch **PARTIAL_FAILED**. metadata/응답 전파.
+- **적대적 검증(3-agent)**: 첨부 PII §6 커버리지 **confirmed**. REAL 1건 반영 — `promoteToPurged` silent skip→`orElseThrow`(item 부재=ledger 불변식 위반, tx 롤백으로 마커-원장 정합). false positive 반박(allCleared 코드 오독/동일 tx 원자성/②③ crash 안전 상태/제출검증·legacy 기처리). 관찰(9e scan 확장 시 null path 오탐 주의·직렬 전제) 문서화.
+- Tests: scoped **48 passed** — `PurgeExecutionServiceTest` 2(saga 완주: STORED·soft-deleted→최종 PURGED+BINARY_DELETED+storagePath null+filenameHash / 실패(traversal invalid)→PENDING+FAILED+PARTIAL_FAILED+집계 1 / drift·ref-count·멱등 유지) · `ApplicationAttachmentDeleteServiceTest` 12(SOFT_DELETED 전환) · health scan 4+3 · attachment controller 9 · retention 14 · PiiPurge 1 · contract 3(+binaryDeleteFailedCount). 전체 회귀 미실행(프로젝트 규칙).
+- 운영 주의: 수동 DDL `docs/codex/ops/phase-09d-2-attachment-saga-ddl.sql`(storage_path nullable·filename_hash·binary_deleted_at·집계 컬럼). **2단계 UPDATE(DELETED→SOFT_DELETED)는 1단계 코드 배포 후 별도 시점**(스크립트 주석 고정), 3단계 enum 제거는 후속 phase.
+- Documentation:
+  - `docs/codex/implementation/phase-09d-2-attachment-binary-delete-saga.md`
+  - `docs/codex/reports/phase-09d-2-attachment-binary-delete-saga.html`
+- 상태: 구현 완료. 다음 = **09e**(reconciliation sweep — PENDING/FAILED 재처리(유일 재처리 경로), scan §6.1 확장, 하드닝).
+
 ## Phase 09d-1 - Purge Execute Core (구현 완료)
 
 - Date: 2026-06-05
@@ -14,10 +31,12 @@
 - **적대적 검증(5-agent 워크플로)**: 안전장치 confirmed. REAL 1건 반영 — **soft-DELETED 를 outstanding 에 포함**(+테스트). false positive 2건 실측 반박(applicantNameSnapshot 은 markPurge* 처리 / ref-count 는 동일 영속성 컨텍스트+id-fallback). tx 관찰 3건 문서화(직렬 전제·재실행 ledger·FAILED 해석).
 - Tests: 9d-1 scoped **22 passed**(인벤토리 field-level 계약 대형 1 · 비-tx 통합 2 — drift/PENDING×2/PURGED/ref-count/멱등/단건 · controller 14 · contract 3 · dry-run 회귀 2) + 영향 영역 회귀 통과(섹션 controller 5종/ApplicantSignUp·Account/JobApplicationService 36). 전체 회귀 미실행(프로젝트 규칙).
 - 운영 주의: 수동 DDL `docs/codex/ops/phase-09d-1-purge-execute-ddl.sql`(date PII 6컬럼 nullable + purge_batch 집계 3컬럼). **인벤토리 갭 flag**: `StageResult.comment`/CorrectionHistory comment 미분류 — 인벤토리 갱신 후 처리 권고.
+- 구현 리뷰 반영(2026-06-05, instruction.md, Major 1 + Medium 2 + Low 2): ① **Major 1 — StageResult comment 계열 소거**: `StageResult.comment` NULLIFY + `StageResultCorrectionHistory`(reason `__PURGED__`/previousComment·newComment null/감사필드 null, 상태·점수·correctedBy 직원은 KEEP) bulk 2종을 tombstone 에 포함 — PURGED marker 의 완전성 보장. **인벤토리 §7-1 정식 분류**(갭 해소) + field-level 테스트 보강. ② complete/audit 실패 시 RUNNING 방치 방지 — orchestrator 가 catch 후 `failExecute` 베스트 에포트(실패 시 error 로그) 후 전파. ③ bulk 근거 = **COMPLETED DRY_RUN 만**(RUNNING dry-run/EXECUTE batch 거부 + 테스트 2건). ④ `AuditReasonCode.PURGE_ITEM_FAILED` 추가 — FAILED item 추적성(9e reasonMessage 컬럼 TODO 고정). ⑤ 재실행 ledger 연결성 = `sourceDryRunBatchId` 강조(운영 UI 가이드 문서화). 반영 후 scoped 재실행 **42 passed**(PiiPurge 1 — StageResult/이력 검증 포함 · Execution 2 — 상태 거부 포함 · StageResult 회귀 16+18+5).
 - Documentation:
   - `docs/codex/implementation/phase-09d-1-purge-execute-core.md`
   - `docs/codex/reports/phase-09d-1-purge-execute-core.html`
-- 상태: 구현 완료. 다음 = **09d-2**(첨부 바이너리 삭제 saga — PhysicalFileStatus 3단계 마이그레이션, §6 첨부 PII, 물리삭제 멱등, PENDING→PURGED 최종 승격).
+  - `docs/codex/implementation/phase-09-pii-field-inventory.md`(§7-1 추가)
+- 상태: 구현 완료(리뷰 1차 반영 포함). 다음 = **09d-2**(첨부 바이너리 삭제 saga — PhysicalFileStatus 3단계 마이그레이션, §6 첨부 PII, 물리삭제 멱등, PENDING→PURGED 최종 승격).
 
 ## Phase 09c - Retention 모델 + eligibility scan + dry-run (구현 완료)
 

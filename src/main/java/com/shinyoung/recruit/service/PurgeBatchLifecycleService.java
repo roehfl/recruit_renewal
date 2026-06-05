@@ -38,7 +38,7 @@ public class PurgeBatchLifecycleService {
         return purgeBatchRepository.save(PurgeBatch.startExecute(now, now, actor, sourceDryRunBatchId));
     }
 
-    /** execute 집계 완료(+coarse 감사, in-tx). item 실패가 있으면 PARTIAL_FAILED + FAILURE 감사. */
+    /** execute 집계 완료(+coarse 감사, in-tx). item 실패/바이너리 삭제 실패가 있으면 PARTIAL_FAILED + FAILURE 감사. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public PurgeBatchDetailResponse completeExecute(
             Long batchId,
@@ -47,11 +47,12 @@ public class PurgeBatchLifecycleService {
             long pendingCount,
             long skippedCount,
             long failedCount,
+            long binaryDeleteFailedCount,
             String actor
     ) {
         PurgeBatch batch = findBatch(batchId);
         batch.completeExecute(totalCount, purgedCount, pendingCount, skippedCount, failedCount,
-                LocalDateTime.now(clock));
+                binaryDeleteFailedCount, LocalDateTime.now(clock));
 
         AuditActorContext context = auditRequestContextResolver.resolve(actor);
         activityLogService.recordInCurrentTx(AuditEvent.builder()
@@ -66,12 +67,13 @@ public class PurgeBatchLifecycleService {
                 .targetId(String.valueOf(batchId))
                 .reasonMessage(batch.getStatus() == PurgeBatchStatus.PARTIAL_FAILED
                         ? "partial failure: failedCount=" + failedCount
+                                + ", binaryDeleteFailedCount=" + binaryDeleteFailedCount
                         : null)
                 .ipAddress(context.ipAddress())
                 .userAgent(context.userAgent())
                 .metadata(new PurgeExecuteMetadata(
                         batchId, batch.getSourceDryRunBatchId(), totalCount,
-                        purgedCount, pendingCount, skippedCount, failedCount))
+                        purgedCount, pendingCount, skippedCount, failedCount, binaryDeleteFailedCount))
                 .build());
 
         return PurgeBatchDetailResponse.of(batch, purgeJobItemRepository.findByPurgeBatchIdOrderByIdAsc(batchId));

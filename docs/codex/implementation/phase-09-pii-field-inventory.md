@@ -122,6 +122,19 @@
 | `Interview.memo` / `locationName` / `roomName` / `onlineMeetingUrl` | true | ⚠ **OUT (interview-level)** | per-application 파기 **대상 아님**(공유 행). memo 가 후보 실명 포함 시 잔존 PII — **별도 검토 필요 항목**으로 flag |
 | `Interview.groupName` | false | OUT (interview-level) | 공유, 파기 단위 밖 |
 
+### 7-1. 전형 결과 자유서술 (StageResult / StageResultCorrectionHistory) — 9d-1 리뷰 Major 1 로 추가 분류
+
+> 1차 인벤토리 누락분. 9d-1 구현 리뷰에서 "PURGED marker 전 미소거" Blocker 로 지적되어 분류를 확정하고 9d-1 에서 즉시 구현했다.
+
+| 엔티티.필드 | nullable | 분류 | 처리 |
+| --- | --- | --- | --- |
+| `StageResult.comment` | true (len 2000) | **NULLIFY** | 관리자 자유서술(지원자 실명/연락처 유입 가능) — null |
+| `StageResult.resultStatus` / `score` / `decidedAt` / `decidedBy`(직원) / FK | - | KEEP_TOMBSTONE | funnel/증적 |
+| `StageResultCorrectionHistory.reason` | **false (len 1000)** | **PLACEHOLDER** | `"__PURGED__"`(자유입력 정정 사유) |
+| `StageResultCorrectionHistory.previousComment` / `newComment` | true (len 2000) | **NULLIFY** | comment 전후 스냅샷 — null |
+| `StageResultCorrectionHistory.correctedBy`(직원) / 상태·점수·decidedAt 스냅샷 | - | KEEP_TOMBSTONE | 정정 사실 자체는 증적 보존 |
+| (공통) `createdBy` / `updatedBy` | true | NULLIFY | §3 공통 규칙 |
+
 **잔존 위험 flag + 운영 가이드(리뷰 3차 #5)**: `Interview.memo`/`locationName`/`roomName`/`onlineMeetingUrl` 는 group 공유 행이라 per-application 파기로 비우지 않는다(타 후보 영향). 운영상 후보 실명이 memo 에 들어가면 파기 후 잔존 → Phase 9 범위 밖으로 인정하되 **운영 가이드를 명시**한다:
 
 > **운영 가이드**: `Interview.memo` 에는 후보 **실명·전화번호·이메일·평가성 자유서술을 입력하지 않는다**. 후보별 메모/평가는 **`InterviewEvaluation.comment` 로만** 남기고, 그 comment 는 파기 시 `NULLIFY` 된다.
@@ -169,6 +182,7 @@ BINARY_DELETE_FAILED : 물리 삭제 실패(재시도/ reconciliation 대상)
 - **PLACEHOLDER vs ALTER nullable 일괄 정책**: NOT NULL String PII 를 placeholder(기본)로 둘지, 전부 ALTER nullable+NULLIFY 로 통일할지 — 운영 DB DDL 부담과 trade-off. 기본은 placeholder. **확인 필요(낮음).**
 - **semesterGrade + schoolId 결합(리뷰 2차 #8)**: `ApplicationEducationSemesterGrade.schoolYear`/gpa 등은 단독 비식별이나 `schoolId`(보존) + 학년/학점 조합 시 좁은 코호트 재식별 가능성. 정확 날짜를 이미 일반화하므로 위험은 낮으나, 필요 시 schoolId 와 결합되는 grade 상세도 generalize 검토. **확인 필요(낮음).**
 - **`Interview.memo` 잔존**: §7 flag — Phase 9 범위 밖(group 공유 행). 운영 가이드(실명 금지) 또는 후속 정리. **확인 필요.**
+- **StageResult comment 계열 — 해소(9d-1 리뷰 Major 1)**: §7-1 로 분류 확정 + 9d-1 tombstone 에 포함 구현.
 
 ## 11. 9d 착수 게이트
 

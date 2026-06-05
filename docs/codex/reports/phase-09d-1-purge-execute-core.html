@@ -63,6 +63,13 @@
     ④ <strong>Applicant ref-count 익명화</strong>(ciHash = <code>"PURGED:"+UUID</code> sentinel),
     ⑤ item=REQUIRES_NEW all-or-nothing / batch=비원자 집계(PARTIAL_FAILED) / <code>PURGE_EXECUTE</code> coarse 감사.
     <strong>바이너리 소멸 미확인(STORED·soft-DELETED) 시 PURGED 승격 금지</strong> — 물리삭제/최종 승격은 09d-2 saga.
+    <br><br>
+    <strong>2026-06-05 구현 리뷰 반영(Major 1 + Medium 2 + Low 2):</strong> ① <strong>StageResult.comment + 정정 이력
+    (reason placeholder/comment 스냅샷 null) 소거를 tombstone 에 포함</strong> — PURGED marker 의 "관계형 PII 전부 제거"
+    보장(인벤토리 §7-1 정식 분류 + field-level 테스트). ② complete/audit 실패 시 batch RUNNING 방치 방지(failExecute
+    베스트 에포트). ③ bulk 근거는 <strong>COMPLETED DRY_RUN 만</strong>(RUNNING/EXECUTE 거부 + 테스트).
+    ④ FAILED item 에 <code>PURGE_ITEM_FAILED</code> reasonCode(+9e reasonMessage TODO). ⑤ 재실행 연결성은
+    <code>sourceDryRunBatchId</code> 강조(운영 UI 가이드).
   </div>
   <table>
     <tr><th>계약 문서</th><td><code>phase-09-pii-field-inventory.md</code>(field-level allowlist) · 설계 §5.2/§5.4 · ADR-0005/0007</td></tr>
@@ -89,6 +96,7 @@
         <li>전용 <code>ApplicationPiiPurgeRepository</code> — bulk JPQL 12종(<code>createdBy</code> updatable=false 대응)</li>
         <li>학력·경력 정확 날짜 <strong>전부 null(안 A)</strong> · 자격번호 <strong>HMAC HASH_ONLY</strong></li>
         <li>평가 comment per-candidate 만 — Interview 공유 텍스트 불가침</li>
+        <li><strong>StageResult.comment + 정정 이력 소거</strong>(§7-1 — 리뷰 Major 1 반영)</li>
         <li>섹션 엔티티 비로딩 — stale flush 없음</li>
       </ul>
     </div>
@@ -147,7 +155,7 @@
     <thead><tr><th>구분</th><th>내용</th></tr></thead>
     <tbody>
       <tr><td><span class="badge b-amber">운영</span></td><td>수동 DDL(<code>phase-09d-1-purge-execute-ddl.sql</code>) 적용 필요 · PURGE_PENDING 의 첨부 PII(§6)는 9d-2 까지 잔존(PURGED 미표기라 계약 위반 아님)</td></tr>
-      <tr><td><span class="badge b-amber">인벤토리 갭</span></td><td><code>StageResult.comment</code>·CorrectionHistory comment 스냅샷 미분류 — 인벤토리 갱신 후 처리 권고(임의 확장 안 함)</td></tr>
+      <tr><td><span class="badge b-green">해소됨</span></td><td>~~인벤토리 갭(StageResult comment 계열)~~ — 리뷰 Major 1 로 §7-1 분류 확정 + tombstone 포함 구현</td></tr>
       <tr><td><span class="badge b-gray">문서화</span></td><td>item 직렬 실행 전제(병렬화 시 ref-count 재설계) · 재실행은 실행별 ledger 기록 · orchestration 실패=FAILED 해석 명시</td></tr>
       <tr><td><span class="badge b-navy">다음</span></td><td><strong>09d-2 — Attachment binary delete saga</strong>: PhysicalFileStatus 확장(3단계 마이그레이션), 첨부 §6 PII, 물리삭제(멱등), PENDING→<strong>PURGED 최종 승격</strong>, outstanding 집합에 BINARY_DELETE_* 추가</td></tr>
     </tbody>

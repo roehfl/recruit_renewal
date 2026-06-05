@@ -15,4 +15,7 @@ public interface PurgeJobItemRepository extends Repository<PurgeJobItem, Long> {
     List<PurgeJobItem> saveAll(Iterable<PurgeJobItem> purgeJobItems);
 
     List<PurgeJobItem> findByPurgeBatchIdOrderByIdAsc(Long purgeBatchId);
+
+    /** saga ③ 의 PENDING→PURGED 승격 대상 조회(9d-2 — batch 당 application 당 1건). */
+    java.util.Optional<PurgeJobItem> findByPurgeBatchIdAndApplicationId(Long purgeBatchId, Long applicationId);
 }

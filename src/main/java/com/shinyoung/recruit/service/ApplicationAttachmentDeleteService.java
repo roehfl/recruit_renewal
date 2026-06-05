@@ -119,10 +119,11 @@ public class ApplicationAttachmentDeleteService {
     }
 
     private ApplicationAttachment findActiveAttachment(Long applicationId, Long attachmentId) {
-        return attachmentRepository.findByIdAndJobApplicationIdAndPhysicalFileStatusNot(
+        // soft-deleted(legacy DELETED 포함)와 purge lifecycle 상태는 활성 첨부가 아니다(9d-2 1단계 호환).
+        return attachmentRepository.findByIdAndJobApplicationIdAndPhysicalFileStatusNotIn(
                 attachmentId,
                 applicationId,
-                PhysicalFileStatus.DELETED
+                PhysicalFileStatus.HIDDEN_FROM_LISTING
         ).orElseThrow(() -> new JobApplicationNotFoundException("Attachment was not found."));
     }
 

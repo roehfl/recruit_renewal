@@ -96,8 +96,21 @@ public class PurgeJobItem extends BaseEntity {
         return new PurgeJobItem(purgeBatch, applicationId, jobPostingId, PurgeItemStatus.PENDING, null);
     }
 
-    /** execute — item 트랜잭션 실패(rollback 됨). reconciliation/재시도 대상(9e). */
+    /**
+     * execute — item 트랜잭션 실패(rollback 됨). reconciliation/재시도 대상(9e).
+     * reasonCode = PURGE_ITEM_FAILED 로 추적 가능하게 한다(9d-1 리뷰 Low 1).
+     * TODO(9e): 실패 원인 상세를 담을 sanitized reasonMessage 컬럼 추가 검토.
+     */
     public static PurgeJobItem executeFailed(PurgeBatch purgeBatch, Long applicationId, Long jobPostingId) {
-        return new PurgeJobItem(purgeBatch, applicationId, jobPostingId, PurgeItemStatus.FAILED, null);
+        return new PurgeJobItem(purgeBatch, applicationId, jobPostingId, PurgeItemStatus.FAILED,
+                AuditReasonCode.PURGE_ITEM_FAILED);
+    }
+
+    /** saga ③ — 바이너리 소멸 확인 완료로 PENDING → PURGED 최종 승격(9d-2, delete 금지 ledger 의 상태 전이). */
+    public void promoteToPurged() {
+        if (this.status != PurgeItemStatus.PENDING) {
+            throw new IllegalStateException("Only PENDING purge item can be promoted to PURGED. current=" + status);
+        }
+        this.status = PurgeItemStatus.PURGED;
     }
 }

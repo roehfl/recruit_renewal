@@ -134,9 +134,12 @@ public class AttachmentStorageHealthScanService {
             Path storageRoot,
             List<AttachmentStorageHealthIssueResponse> issues
     ) {
+        // 1단계 마이그레이션(9d-2): legacy DELETED 와 SOFT_DELETED 를 동일(soft-deleted)하게 스캔한다.
+        // BINARY_* purge 상태는 본 스캔 대상이 아니다(BINARY_DELETED 의 storagePath null 오탐 방지) — 9e 에서 확장.
         List<ApplicationAttachment> attachments = attachmentRepository.findByPhysicalFileStatusIn(List.of(
                 PhysicalFileStatus.STORED,
                 PhysicalFileStatus.DELETED,
+                PhysicalFileStatus.SOFT_DELETED,
                 PhysicalFileStatus.MISSING
         ));
         List<AttachmentRowInfo> storedRows = new ArrayList<>();
@@ -150,7 +153,7 @@ public class AttachmentStorageHealthScanService {
             PhysicalFileStatus status = attachment.getPhysicalFileStatus();
             if (status == PhysicalFileStatus.STORED) {
                 storedRowCount++;
-            } else if (status == PhysicalFileStatus.DELETED) {
+            } else if (PhysicalFileStatus.SOFT_DELETED_FAMILY.contains(status)) {
                 deletedRowCount++;
             } else if (status == PhysicalFileStatus.MISSING) {
                 missingRowCount++;
@@ -179,7 +182,7 @@ public class AttachmentStorageHealthScanService {
             );
             if (status == PhysicalFileStatus.STORED) {
                 storedRows.add(row);
-            } else if (status == PhysicalFileStatus.DELETED) {
+            } else if (PhysicalFileStatus.SOFT_DELETED_FAMILY.contains(status)) {
                 deletedRows.add(row);
             } else {
                 missingRows.add(row);

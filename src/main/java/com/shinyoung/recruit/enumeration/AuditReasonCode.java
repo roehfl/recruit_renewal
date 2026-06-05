@@ -16,5 +16,7 @@ public enum AuditReasonCode {
     INVALID_STAGE_CONFIGURATION,
     POLICY_NOT_FOUND,
     POLICY_CONFLICT,
-    BINARY_DELETE_FAILED
+    BINARY_DELETE_FAILED,
+    /** purge item 트랜잭션의 예기치 못한 실패(9e reconciliation 추적용 — 9d-1 리뷰 Low 1). */
+    PURGE_ITEM_FAILED
 }

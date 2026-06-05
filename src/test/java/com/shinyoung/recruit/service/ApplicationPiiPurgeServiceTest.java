@@ -21,6 +21,8 @@ import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.Stage;
+import com.shinyoung.recruit.domain.entity.StageResult;
+import com.shinyoung.recruit.domain.entity.StageResultCorrectionHistory;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
@@ -39,6 +41,8 @@ import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.domain.repository.StageRepository;
+import com.shinyoung.recruit.domain.repository.StageResultCorrectionHistoryRepository;
+import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
@@ -59,6 +63,7 @@ import com.shinyoung.recruit.enumeration.MilitaryServiceType;
 import com.shinyoung.recruit.enumeration.MilitarySubjectType;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
 import com.shinyoung.recruit.enumeration.QuestionCategory;
+import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.service.JobApplicationService;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
@@ -104,6 +109,8 @@ class ApplicationPiiPurgeServiceTest {
     @Autowired private ApplicationAwardRepository awardRepository;
     @Autowired private ApplicationGapPeriodRepository gapPeriodRepository;
     @Autowired private StageRepository stageRepository;
+    @Autowired private StageResultRepository stageResultRepository;
+    @Autowired private StageResultCorrectionHistoryRepository stageResultCorrectionHistoryRepository;
     @Autowired private EmployeeRepository employeeRepository;
     @Autowired private InterviewRepository interviewRepository;
     @Autowired private InterviewParticipantRepository interviewParticipantRepository;
@@ -185,6 +192,18 @@ class ApplicationPiiPurgeServiceTest {
         evaluation.updateContent(EvaluationGrade.G, EvaluationRecommendation.YES, "지원자 홍길동은 인상적이었음");
         evaluation = interviewEvaluationRepository.save(evaluation);
 
+        // StageResult 자유서술 + 정정 이력(9d-1 리뷰 Major 1 — PURGED 전 소거 대상).
+        StageResult stageResult = StageResult.initialize(stage, application);
+        stageResult.updateResult(StageResultStatus.PASSED, BigDecimal.valueOf(88),
+                "홍길동 — 서류 우수, 연락처 010-1234-5678 확인", LocalDateTime.now(), "emp01");
+        stageResult = stageResultRepository.save(stageResult);
+        StageResultCorrectionHistory correction = stageResultCorrectionHistoryRepository.save(
+                StageResultCorrectionHistory.create(
+                        stageResult, LocalDateTime.now(), "emp01", "지원자 홍길동 이의제기 반영",
+                        StageResultStatus.PENDING, StageResultStatus.PASSED,
+                        null, BigDecimal.valueOf(88),
+                        "이전 코멘트 — 홍길동", "새 코멘트", null, LocalDateTime.now()));
+
         entityManager.flush();
 
         // ---- 실행 ----
@@ -265,5 +284,20 @@ class ApplicationPiiPurgeServiceTest {
         assertThat(purgedEvaluation.getGrade()).isEqualTo(EvaluationGrade.G); // KEEP
         Interview reloadedInterview = interviewRepository.findById(interview.getId()).orElseThrow();
         assertThat(reloadedInterview.getLocationName()).isEqualTo("본사"); // interview-level OUT(공유 행)
+
+        // StageResult 자유서술 NULLIFY — 결과/점수/decidedBy(직원)는 KEEP(9d-1 리뷰 Major 1).
+        StageResult purgedResult = stageResultRepository.findById(stageResult.getId()).orElseThrow();
+        assertThat(purgedResult.getComment()).isNull();
+        assertThat(purgedResult.getResultStatus()).isEqualTo(StageResultStatus.PASSED); // KEEP
+        assertThat(purgedResult.getDecidedBy()).isEqualTo("emp01"); // KEEP(직원)
+
+        // 정정 이력 — reason PLACEHOLDER, comment 전후 스냅샷 NULLIFY, 상태/점수/correctedBy 는 KEEP.
+        StageResultCorrectionHistory purgedCorrection =
+                stageResultCorrectionHistoryRepository.findById(correction.getId()).orElseThrow();
+        assertThat(purgedCorrection.getReason()).isEqualTo(PURGED);
+        assertThat(purgedCorrection.getPreviousComment()).isNull();
+        assertThat(purgedCorrection.getNewComment()).isNull();
+        assertThat(purgedCorrection.getPreviousStatus()).isEqualTo(StageResultStatus.PENDING); // KEEP
+        assertThat(purgedCorrection.getCorrectedBy()).isEqualTo("emp01"); // KEEP(직원)
     }
 }

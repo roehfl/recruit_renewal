@@ -60,8 +60,16 @@ public class ApplicationAttachment extends BaseEntity {
     @Column(nullable = false, length = 255)
     private String storedFileName;
 
-    @Column(nullable = false, length = 1000)
+    /** 파기 saga 의 물리 삭제 전까지 필요 — <b>최종 소멸(BINARY_DELETED) 시 null</b>(9d-2, 인벤토리 §6). */
+    @Column(length = 1000)
     private String storagePath;
+
+    /** 파기 시 원본 파일명 HMAC(인벤토리 §6 신규 — 원문 제거 후 dedup/추적용). */
+    @Column(length = 128)
+    private String filenameHash;
+
+    /** 물리 소멸 확인 시점(9d-2 saga 최종 단계에서만 세팅). */
+    private LocalDateTime binaryDeletedAt;
 
     @Column(nullable = false, length = 100)
     private String contentType;
@@ -174,10 +182,41 @@ public class ApplicationAttachment extends BaseEntity {
             String deletionReason,
             LocalDateTime deletedAt
     ) {
-        this.physicalFileStatus = PhysicalFileStatus.DELETED;
+        // 1단계 마이그레이션(인벤토리 §8): 신규 soft-delete 는 SOFT_DELETED 로 기록(legacy DELETED 는 조회 호환만).
+        this.physicalFileStatus = PhysicalFileStatus.SOFT_DELETED;
         this.deletedBy = deletedBy;
         this.deletedByType = deletedByType;
         this.deletionReason = deletionReason;
         this.deletedAt = deletedAt;
+    }
+
+    // ---- 파기 saga(Phase 09d-2, 설계 §5.4 / 인벤토리 §6) ----
+
+    /**
+     * saga ① — 첨부 metadata PII 제거(item 트랜잭션 내). originalFileName 원문은 hash 로 대체 후 placeholder,
+     * 삭제 행위자/사유 원문 NULLIFY. storagePath 는 물리 삭제 전까지 보존한다.
+     */
+    public void purgeMetadataPii(String filenameHash) {
+        this.filenameHash = filenameHash;
+        this.originalFileName = JobApplication.PURGED_PLACEHOLDER;
+        this.deletedBy = null;
+        this.deletionReason = null;
+    }
+
+    /** saga ① — 물리 삭제 대기 마킹(바이너리 소멸 미확인 상태 전부 대상). */
+    public void markBinaryDeletePending() {
+        this.physicalFileStatus = PhysicalFileStatus.BINARY_DELETE_PENDING;
+    }
+
+    /** saga ③ — 물리 소멸 확인 확정. storagePath 는 이 시점에 null(인벤토리 §6). */
+    public void markBinaryDeleted(LocalDateTime binaryDeletedAt) {
+        this.physicalFileStatus = PhysicalFileStatus.BINARY_DELETED;
+        this.binaryDeletedAt = binaryDeletedAt;
+        this.storagePath = null;
+    }
+
+    /** saga ③ — 물리 삭제 실패(재시도/reconciliation 대상, 9e). storagePath 보존. */
+    public void markBinaryDeleteFailed() {
+        this.physicalFileStatus = PhysicalFileStatus.BINARY_DELETE_FAILED;
     }
 }

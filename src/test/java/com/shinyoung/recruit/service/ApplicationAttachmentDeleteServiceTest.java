@@ -105,7 +105,7 @@ class ApplicationAttachmentDeleteServiceTest {
         ApplicationAttachment deleted = attachmentRepository.findById(attachmentId).orElseThrow();
         assertThat(response.deleted()).isTrue();
         assertThat(response.physicalDeleteRequested()).isTrue();
-        assertThat(deleted.getPhysicalFileStatus()).isEqualTo(PhysicalFileStatus.DELETED);
+        assertThat(deleted.getPhysicalFileStatus()).isEqualTo(PhysicalFileStatus.SOFT_DELETED);
         assertThat(deleted.getDeletedBy()).isEqualTo(String.valueOf(applicant.getId()));
         assertThat(deleted.getDeletedByType()).isEqualTo(AttachmentDeleteActorType.APPLICANT);
         assertThat(deleted.getDeletionReason()).isEqualTo("APPLICANT_SELF_DELETE");
@@ -128,7 +128,7 @@ class ApplicationAttachmentDeleteServiceTest {
 
         ApplicationAttachment deleted = attachmentRepository.findById(attachmentId).orElseThrow();
         assertThat(response.physicalDeleteRequested()).isFalse();
-        assertThat(deleted.getPhysicalFileStatus()).isEqualTo(PhysicalFileStatus.DELETED);
+        assertThat(deleted.getPhysicalFileStatus()).isEqualTo(PhysicalFileStatus.SOFT_DELETED);
     }
 
     @Test
@@ -227,7 +227,7 @@ class ApplicationAttachmentDeleteServiceTest {
 
         ApplicationAttachment submittedDeleted = attachmentRepository.findById(submittedAttachmentId).orElseThrow();
         assertThat(submittedResponse.physicalDeleteRequested()).isTrue();
-        assertThat(submittedDeleted.getPhysicalFileStatus()).isEqualTo(PhysicalFileStatus.DELETED);
+        assertThat(submittedDeleted.getPhysicalFileStatus()).isEqualTo(PhysicalFileStatus.SOFT_DELETED);
         assertThat(submittedDeleted.getDeletedBy()).isEqualTo("admin01");
         assertThat(submittedDeleted.getDeletedByType()).isEqualTo(AttachmentDeleteActorType.EMPLOYEE);
         assertThat(submittedDeleted.getDeletionReason()).isEqualTo("submitted evidence cleanup");
@@ -273,7 +273,7 @@ class ApplicationAttachmentDeleteServiceTest {
 
         assertThat(response.physicalDeleteRequested()).isTrue();
         assertThat(attachmentRepository.findById(attachmentId).orElseThrow().getPhysicalFileStatus())
-                .isEqualTo(PhysicalFileStatus.DELETED);
+                .isEqualTo(PhysicalFileStatus.SOFT_DELETED);
     }
 
     @Test
@@ -290,7 +290,7 @@ class ApplicationAttachmentDeleteServiceTest {
         assertThat(response.deleted()).isTrue();
         assertThat(response.physicalDeleteRequested()).isTrue();
         assertThat(attachmentRepository.findById(attachmentId).orElseThrow().getPhysicalFileStatus())
-                .isEqualTo(PhysicalFileStatus.DELETED);
+                .isEqualTo(PhysicalFileStatus.SOFT_DELETED);
     }
 
     @Test

@@ -1,73 +1,77 @@
-Medium 1 — Hold reason이 RECRUIT_ADMIN에게 원문 노출된다
+Major 1 — StageResult.comment / StageResultCorrectionHistory 미소거 상태에서 PURGED 가능
 
-현재 GET /api/admin/retention/**는 ROLE_RECRUIT_ADMIN도 접근 가능하다.
-그리고 GET /admin/retention/holds는 RetentionHoldResponse를 그대로 반환한다.
-그 응답에는 reason 원문이 포함된다.
+가장 큰 문제다.
 
-문제는 hold 사유가 자유 텍스트라는 점이다. 요청 DTO도 reason을 문자열로 받는다.
-운영자가 “개인 사유”, “소송”, “민원”, “질병”, “연락처”, “실명” 등을 넣을 가능성이 있다. ActivityLog에는 안 남기는 설계인데, read API에서 RECRUIT_ADMIN에게 그대로 주면 projection 설계가 깨진다.
+현재 9d-1 문서도 이걸 “인벤토리 갭 flag”로 알고 있다. StageResult.comment와 StageResultCorrectionHistory의 comment 계열이 미분류라 9d-2/9e에서 처리 권고라고 적혀 있다.
 
-둘 중 하나로 고쳐라.
+그런데 코드상 PurgeItemProcessor는 첨부 outstanding이 없으면 즉시 application.markPurged()를 호출한다. 즉, StageResult.comment나 correction history에 지원자 원문이 남아 있어도 PURGED가 될 수 있다.
 
-권장안:
-GET /admin/retention/holds 는 PRIVACY_ADMIN 전용으로 좁힌다.
+실제로 StageResult.comment는 자유 텍스트다.
+StageResultCorrectionHistory에도 reason, previousComment, newComment가 있다.
+ADR에서도 PII 가능성이 있는 자유입력 reason/comment는 소거 대상이라고 되어 있다.
 
-또는:
+이건 단순 문서 한계로 넘기면 안 된다. PURGED라는 최종 marker를 쓰는 순간 관계형 PII가 모두 제거됐다는 의미가 되기 때문이다.
 
-대안:
-RetentionHoldResponse.from(hold, includeSensitive)
-- PRIVACY_ADMIN: reason 원문
-- RECRUIT_ADMIN: "***"
+수정 방향:
 
-9d execute에서 projection을 하겠다고 미뤄놨는데, hold reason은 이미 9c에서 원문 필드가 열린 상태다. 이건 9d까지 미루지 말고 지금 막는 게 맞다.
+@Modifying(flushAutomatically = true)
+@Query("""
+    update StageResult r
+    set r.comment = null, r.createdBy = null, r.updatedBy = null
+    where r.jobApplication.id = :applicationId
+""")
+int purgeStageResultComments(Long applicationId);
+@Modifying(flushAutomatically = true)
+@Query("""
+    update StageResultCorrectionHistory h
+    set h.reason = '__PURGED__',
+        h.previousComment = null,
+        h.newComment = null,
+        h.createdBy = null,
+        h.updatedBy = null
+    where h.stageResult.jobApplication.id = :applicationId
+""")
+int purgeStageResultCorrectionHistories(Long applicationId);
 
-Medium 2 — Retention write 서비스가 actor blank를 방어하지 않는다
+reason은 nullable=false라 placeholder가 맞고, previousComment/newComment는 nullable이면 nullify가 맞다. 이걸 ApplicationPiiPurgeRepository와 ApplicationPiiPurgeService.purgeRelationalPii()에 포함시키고 field-level 테스트에 추가해라.
 
-컨트롤러에서는 CurrentEmployeeService.getCurrentEmployeeActor()를 통해 actor를 검증하고 서비스에 넘긴다. 이 경로는 괜찮다.
+Medium 1 — batch complete audit 실패 시 RUNNING batch가 남을 수 있다
 
-하지만 서비스 자체는 actor를 검증하지 않는다. 예를 들어 RetentionPolicyService.recordPolicyAudit()는 auditRequestContextResolver.resolve(actor)만 호출한다. actor가 null/blank이면 resolver가 ANONYMOUS로 떨어질 수 있다.
-RetentionHoldService, RetentionAnchorService, RetentionDryRunService도 동일 패턴이다.
+PurgeBatchLifecycleService.completeExecute()는 batch 상태 변경과 PURGE_EXECUTE ActivityLog 기록을 같은 REQUIRES_NEW 트랜잭션에서 처리한다.
+그런데 PurgeExecutionService는 item 루프가 끝난 뒤 completeExecute()를 호출하고, 이 호출은 루프 내부 try/catch 밖에 있다.
 
-Retention 정책 변경/hold/anchor/dry-run은 관리자 행위다. 서비스 직접 호출, 배치, 테스트, 미래 스케줄러 경로에서 actor가 비면 감사가 ANONYMOUS로 남을 수 있다.
+즉 item들은 이미 각각 commit됐는데, 마지막 complete/audit에서 예외가 나면 batch 상태는 RUNNING으로 남을 수 있다. 관계형 PII는 이미 지워졌는데 batch가 완료되지 않은 상태가 된다.
 
-공통 helper로 막아라.
+실제 실패 가능성은 낮아도 파기 시스템에서는 위험한 형태다. 수정 방향은 둘 중 하나다.
 
-private String requireActor(String actor) {
-    if (actor == null || actor.isBlank()) {
-        throw new InvalidRetentionPolicyException("Retention actor is required.");
-    }
-    return actor.trim();
+batch complete 상태 전이를 먼저 독립 tx로 확정하고, audit은 별도 tx로 남긴다.
+completeExecute() 실패를 orchestrator에서 catch해서 failExecute() 또는 별도 completeAuditFailed 상태/로그를 남긴다.
+
+현재 enum에 별도 상태가 없으니 최소한 completeExecute() 실패 시 batch가 RUNNING으로 방치되지 않게 해야 한다.
+
+Medium 2 — bulk execute source dry-run의 status 검증이 없다
+
+현재 bulk execute는 source batch가 존재하고 mode == DRY_RUN인지만 확인한다.
+하지만 source dry-run은 최소한 COMPLETED 상태여야 한다. RUNNING, FAILED, 미래의 PARTIAL_FAILED 같은 상태를 근거로 execute하면 안 된다.
+
+PurgeBatch는 status를 가지고 있다.
+그러니 아래 검증을 추가해라.
+
+if (source.getMode() != PurgeBatchMode.DRY_RUN || source.getStatus() != PurgeBatchStatus.COMPLETED) {
+    throw new InvalidRetentionRequestException("sourceDryRunBatchId는 COMPLETED DRY_RUN batch여야 합니다.");
 }
 
-서비스별 예외는 분리해도 된다. 핵심은 retention write/dry-run 수동 실행은 ANONYMOUS로 기록되면 안 된다는 점이다. 미래 scheduler는 별도 SYSTEM actor 정책으로 열어라.
+그리고 테스트에 DRY_RUN/RUNNING, EXECUTE/COMPLETED 둘 다 거부 케이스를 넣어라.
 
-Low 1 — active hold 중복은 race에 취약하다
+Low 1 — FAILED item에 reason 정보가 없다
 
-RetentionHoldService.set()은 existsByApplicationIdAndReleasedAtIsNull()로 active hold 중복을 막는다.
-하지만 DB unique 제약은 없다. 동시 요청 2건이 동시에 exists=false를 통과하면 active hold가 2개 생길 수 있다.
+recordFailure()는 PurgeJobItem.executeFailed()만 저장하고, reasonCode나 failure message는 없다.
+현재 PurgeJobItem 구조상 FAILED도 reasonCode를 담을 수 있는데, executeFailed()는 null로 만든다.
 
-eligibility에서는 active hold applicationId를 Set으로 모으기 때문에 파기 대상 제외 자체는 유지된다.
-그래도 운영 원장 관점에서는 중복 active hold가 생기는 게 좋지 않다.
+09e reconciliation에서 왜 실패했는지 추적하려면 최소한 reasonCode 하나는 있어야 한다. 예를 들어 VALIDATION_FAILED, BINARY_DELETE_FAILED, PURGE_ITEM_FAILED 같은 코드가 필요하다. 새 enum을 추가하기 부담되면 reasonMessage 컬럼을 09e에서 추가할 수 있도록 TODO로 고정해라.
 
-MariaDB라 partial unique가 애매하면 후속으로 아래 중 하나를 고려해라.
+Low 2 — 같은 dry-run 재실행 ledger는 의도됐지만 UI에서 혼란 가능성이 있다
 
-- generated column active_flag + unique(application_id, active_flag)
-- release 불가 중복 상태 감지/repair API
-- set 시 pessimistic lock 또는 application row lock
-Low 2 — PurgeBatch 목록 조회가 무제한이다
+같은 dry-run으로 재실행하면 새 execute batch와 새 item들이 생긴다. 테스트도 이 동작을 인정하고 ALREADY_PURGED skip을 확인한다.
 
-PurgeBatchReadService.getBatches()는 전체 batch를 전부 반환한다.
-9c 초기는 괜찮지만, dry-run이 수동으로 여러 번 실행되면 관리 화면에서 무제한 목록이 된다.
-
-9d/9e 전에 page/size를 붙이는 게 낫다.
-
-GET /admin/retention/purge-batches?page=0&size=20
-size max 100
-Low 3 — service-level validation이 Bean Validation에 과하게 의존한다
-
-RetentionPolicyRequest는 @NotNull, @Min으로 검증된다.
-컨트롤러 경로는 @Valid라 괜찮다.
-
-하지만 RetentionPolicyService.create/update()는 request.retentionPeriodDays()와 request.enabled()를 바로 사용한다. 서비스 직접 호출 시 null이면 NPE 또는 autounboxing 문제가 날 수 있다.
-
-이건 치명적이지 않지만, retention은 배치/스케줄러로 확장될 가능성이 크다. 서비스 레벨에서도 최소 방어를 추가하는 게 낫다.
+ledger 의미상 맞다. 다만 운영 UI에서는 “같은 dry-run을 여러 번 실행했다”는 연결성이 필요하다. sourceDryRunBatchId는 batch에 있으니 목록/상세에서 이걸 강조하면 된다. 이미 응답에는 sourceDryRunBatchId가 포함되어 있다.

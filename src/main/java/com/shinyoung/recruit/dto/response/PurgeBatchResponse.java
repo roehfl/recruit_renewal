@@ -23,7 +23,8 @@ public record PurgeBatchResponse(
         long policyConflictCount,
         long purgedCount,
         long pendingCount,
-        long failedCount
+        long failedCount,
+        long binaryDeleteFailedCount
 ) {
     public static PurgeBatchResponse from(PurgeBatch batch) {
         return new PurgeBatchResponse(
@@ -42,7 +43,8 @@ public record PurgeBatchResponse(
                 batch.getPolicyConflictCount(),
                 batch.getPurgedCount(),
                 batch.getPendingCount(),
-                batch.getFailedCount()
+                batch.getFailedCount(),
+                batch.getBinaryDeleteFailedCount()
         );
     }
 }

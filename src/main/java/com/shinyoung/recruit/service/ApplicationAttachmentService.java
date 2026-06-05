@@ -152,9 +152,10 @@ public class ApplicationAttachmentService {
     }
 
     private List<AttachmentResponse> getAttachmentResponses(Long applicationId) {
-        return attachmentRepository.findByJobApplicationIdAndPhysicalFileStatusNotOrderBySortOrderAscIdAsc(
+        // soft-deleted(legacy DELETED 포함) + purge lifecycle 상태 전부 비표시(9d-2 1단계 호환).
+        return attachmentRepository.findByJobApplicationIdAndPhysicalFileStatusNotInOrderBySortOrderAscIdAsc(
                         applicationId,
-                        PhysicalFileStatus.DELETED
+                        PhysicalFileStatus.HIDDEN_FROM_LISTING
                 )
                 .stream()
                 .map(AttachmentResponse::from)

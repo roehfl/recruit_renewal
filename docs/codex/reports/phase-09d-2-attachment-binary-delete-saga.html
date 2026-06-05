@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 09d-2 — Attachment Binary Delete Saga 구현 리포트</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; margin: 0; background: #f4f6f9; color: #1f2937; line-height: 1.6; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 60px; }
+  header.page { background: linear-gradient(135deg, #1e3a5f, #2c5282); color: #fff; border-radius: 12px; padding: 28px 32px; margin-bottom: 24px; }
+  header.page h1 { margin: 0 0 6px; font-size: 1.5rem; }
+  header.page .sub { opacity: .85; font-size: .95rem; }
+  .badge { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: .78rem; font-weight: 700; vertical-align: middle; }
+  .b-blue { background: #dbeafe; color: #1d4ed8; }
+  .b-green { background: #dcfce7; color: #15803d; }
+  .b-gray { background: #e5e7eb; color: #4b5563; }
+  .b-red { background: #fee2e2; color: #b91c1c; }
+  .b-amber { background: #fef3c7; color: #b45309; }
+  .b-navy { background: #e0e7ff; color: #3730a3; }
+  header.page .badge { margin-right: 8px; }
+  section { background: #fff; border-radius: 12px; padding: 24px 28px; margin-bottom: 22px; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+  section h2 { margin: 0 0 14px; font-size: 1.15rem; color: #1e3a5f; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: .9rem; }
+  th { background: #f1f5f9; text-align: left; padding: 8px 10px; border: 1px solid #e2e8f0; white-space: nowrap; }
+  td { padding: 8px 10px; border: 1px solid #e2e8f0; vertical-align: top; }
+  code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: .85em; font-family: Consolas, 'Courier New', monospace; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: .85rem; }
+  pre code { background: none; padding: 0; color: inherit; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 10px; }
+  .card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; background: #fafbfc; }
+  .card h4 { margin: 0 0 8px; font-size: .95rem; }
+  .card ul { margin: 0; padding-left: 18px; font-size: .88rem; }
+  .card li { margin-bottom: 4px; }
+  .summary-box { background: #eff6ff; border-left: 4px solid #2563eb; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  .warn-box { background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  footer { text-align: center; color: #94a3b8; font-size: .8rem; margin-top: 30px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Phase 09d-2 — Attachment Binary Delete Saga</h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · 물리 소멸 확인 + 최종 PURGED 승격 · 2026-06-05</div>
+  <div style="margin-top:12px">
+    <span class="badge b-green">구현 완료</span>
+    <span class="badge b-green">scoped 48 passed</span>
+    <span class="badge b-navy">적대 검증 3-agent 반영</span>
+  </div>
+</header>
+
+<section>
+  <h2>1. Executive Summary</h2>
+  <div class="summary-box">
+    파기의 마지막 조각 — <strong>첨부 바이너리 삭제 saga(①②③)</strong> 를 execute 흐름에 통합.
+    ① item 트랜잭션에서 첨부 PII 제거(<code>filenameHash</code> HMAC → <code>originalFileName</code> placeholder)
+    + <code>BINARY_DELETE_PENDING</code> 마킹, ② 트랜잭션 밖 <strong>멱등 물리 삭제 + 존재 재확인</strong>
+    (이미 없음 = 성공), ③ REQUIRES_NEW 확정 — 성공 = <code>BINARY_DELETED</code>(storagePath null·binaryDeletedAt),
+    <strong>전부 소멸 확인 시에만</strong> JobApplication/item <strong>최종 PURGED 승격</strong>(purgedAt).
+    실패 = <code>BINARY_DELETE_FAILED</code> 유지 + batch <code>PARTIAL_FAILED</code>(9e reconciliation 대상).
+    <code>PhysicalFileStatus</code> 재정의 <strong>1단계 안전 마이그레이션</strong>(DELETED·SOFT_DELETED 병존·동일 취급) 포함.
+  </div>
+  <table>
+    <tr><th>구현 문서</th><td><code>docs/codex/implementation/phase-09d-2-attachment-binary-delete-saga.md</code></td></tr>
+    <tr><th>운영 DDL</th><td><code>docs/codex/ops/phase-09d-2-attachment-saga-ddl.sql</code> — saga 컬럼 3 + 집계 1 + <strong>2단계 UPDATE(별도 시점)</strong></td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>2. 완료 범위</h2>
+  <div class="cards">
+    <div class="card">
+      <h4><span class="badge b-green">A</span> 상태 재정의(1단계)</h4>
+      <ul>
+        <li>+<code>SOFT_DELETED</code>·<code>BINARY_DELETE_PENDING/DELETED/FAILED</code> (legacy DELETED 병존)</li>
+        <li><code>markDeleted()</code> → SOFT_DELETED · 전 사용처 동일 취급(목록/활성/health scan)</li>
+        <li>의미 집합: <code>HIDDEN_FROM_LISTING</code> / <code>BINARY_OUTSTANDING</code></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-green">B</span> saga ① (item tx)</h4>
+      <ul>
+        <li>첨부 PII(§6): filenameHash HMAC(원문 제거 <strong>전</strong> 계산) → placeholder, deletedBy/사유 null, createdBy bulk</li>
+        <li><strong>모든 첨부 행</strong> 적용 + outstanding 은 PENDING 마킹</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-green">C</span> saga ②③ + 승격</h4>
+      <ul>
+        <li>멱등 deleteIfExists + <code>exists()</code> <strong>재확인</strong> · invalid/예외 = 실패</li>
+        <li>전부 소멸 확인 시에만 PURGED 승격(<code>promoteToPurged</code> — fail-loud)</li>
+        <li>실패: FAILED 유지(경로 보존) + <code>binaryDeleteFailedCount</code> + PARTIAL_FAILED</li>
+        <li>②③ 사이 crash = "파일 소멸+DB pending"(설계상 안전 — 9e 승격)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-green">D</span> 집계/관측</h4>
+      <ul>
+        <li>batch <code>binary_delete_failed_count</code> 컬럼 + metadata/응답 전파</li>
+        <li>coarse 감사(PURGE_EXECUTE)에 포함</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>3. 적대적 검증(3-agent) 결과</h2>
+  <table>
+    <thead><tr><th>항목</th><th>판정</th><th>조치</th></tr></thead>
+    <tbody>
+      <tr><td>첨부 PII §6 커버리지</td><td><span class="badge b-green">confirmed</span></td><td>—</td></tr>
+      <tr><td>saga 계약("DB PURGED+파일 잔존" 불허)</td><td><span class="badge b-red">REAL 1</span> + false positive 다수</td><td><strong>반영</strong>: <code>promoteToPurged</code> silent skip → orElseThrow fail-loud(item 부재 = 불변식 위반, tx 롤백으로 정합 유지). 반박: allCleared 불일치 주장(미확인 대상은 else 분기에서 이미 false — 코드 오독)·동일 tx "부분 커밋" 주장(JPA 원자성)·②③ crash(설계 명시 안전 상태)</td></tr>
+      <tr><td>1단계 마이그레이션 누락</td><td><span class="badge b-gray">관찰</span></td><td>제출검증/legacy 재시도 주장은 STORED 필터·BINARY_OUTSTANDING 마킹으로 기처리(반박). 9e scan 확장 시 BINARY_DELETED null path 오탐 주의 — 한계로 문서화</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>4. 테스트 결과</h2>
+  <p><span class="badge b-green">scoped 48 passed(+fail-loud 수정 후 재실행 통과)</span></p>
+  <table>
+    <thead><tr><th>테스트</th><th>건수</th><th>핵심 검증</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr><td><code>PurgeExecutionServiceTest</code></td><td>2</td><td><strong>saga 완주</strong>: STORED/soft-deleted 첨부 → 소멸 확인 → item PENDING→<strong>PURGED</strong>·purgedAt·BINARY_DELETED·storagePath null·filenameHash HMAC / <strong>삭제 실패</strong>(traversal invalid) → PENDING 유지+FAILED(경로 보존)+<strong>PARTIAL_FAILED</strong>+binaryDeleteFailedCount=1 / drift·ref-count·멱등 유지</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>ApplicationAttachmentDeleteServiceTest</code></td><td>12</td><td>soft-delete = <strong>SOFT_DELETED</strong> 기록(1단계)</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td>회귀 — health scan 4+3 · attachment controller 9 · retention controller 14 · PiiPurge 1 · contract 3</td><td>34</td><td>동일 취급/오탐 없음</td><td><span class="badge b-green">passed</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>5. 한계 / 다음 단계</h2>
+  <table>
+    <thead><tr><th>구분</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge b-amber">운영</span></td><td>수동 DDL 적용 + <strong>2단계 UPDATE(DELETED→SOFT_DELETED)는 1단계 코드 배포 후 별도 시점</strong>(스크립트 주석 고정) · 3단계 enum 제거는 후속 phase</td></tr>
+      <tr><td><span class="badge b-gray">9e 예약</span></td><td>PENDING/FAILED reconciliation sweep(execute 재실행은 ALREADY_PURGED skip — 9e 가 유일 재처리 경로) · scan §6.1 확장("PURGED 인데 파일 존재" 치명 탐지, BINARY_DELETED null path 오탐 방지) · FAILED reasonMessage</td></tr>
+      <tr><td><span class="badge b-navy">다음</span></td><td><strong>09e — Reconciliation + 안정화/테스트 하드닝</strong>(Phase 09 마지막 슬라이스)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>Phase 09d-2 — Attachment Binary Delete Saga 구현 리포트 · 2026-06-05</footer>
+</div>
+</body>
+</html>

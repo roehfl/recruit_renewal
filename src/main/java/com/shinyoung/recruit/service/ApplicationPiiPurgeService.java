@@ -44,6 +44,9 @@ public class ApplicationPiiPurgeService {
         purgeRepository.purgeAwards(applicationId);
         purgeRepository.purgeGapPeriods(applicationId);
         purgeRepository.purgeEvaluationComments(applicationId);
+        // StageResult 자유서술 + 정정 이력 comment 계열(9d-1 리뷰 Major 1) — PURGED marker 전 필수 소거.
+        purgeRepository.purgeStageResultComments(applicationId);
+        purgeRepository.purgeStageResultCorrectionHistories(applicationId);
         purgeRepository.purgeJobApplicationAuditFields(applicationId);
     }
 }

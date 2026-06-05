@@ -20,6 +20,18 @@ public interface ApplicationAttachmentRepository extends JpaRepository<Applicati
             PhysicalFileStatus physicalFileStatus
     );
 
+    /** soft-deleted(DELETED·SOFT_DELETED) + purge lifecycle 상태를 한 번에 제외하는 목록 조회(9d-2). */
+    List<ApplicationAttachment> findByJobApplicationIdAndPhysicalFileStatusNotInOrderBySortOrderAscIdAsc(
+            Long applicationId,
+            Collection<PhysicalFileStatus> physicalFileStatuses
+    );
+
+    /** 파기 saga ③ 확정 대상 로드(9d-2). */
+    List<ApplicationAttachment> findByJobApplicationIdAndPhysicalFileStatusIn(
+            Long applicationId,
+            Collection<PhysicalFileStatus> physicalFileStatuses
+    );
+
     List<ApplicationAttachment> findByJobApplicationIdAndPhysicalFileStatus(
             Long applicationId,
             PhysicalFileStatus physicalFileStatus
@@ -41,6 +53,12 @@ public interface ApplicationAttachmentRepository extends JpaRepository<Applicati
             Long attachmentId,
             Long jobApplicationId,
             PhysicalFileStatus physicalFileStatus
+    );
+
+    Optional<ApplicationAttachment> findByIdAndJobApplicationIdAndPhysicalFileStatusNotIn(
+            Long attachmentId,
+            Long jobApplicationId,
+            Collection<PhysicalFileStatus> physicalFileStatuses
     );
 
     void deleteByJobApplicationId(Long applicationId);
