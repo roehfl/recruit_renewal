@@ -12,6 +12,8 @@ public enum AuditActionType {
     EXPORT_STAGE_RESULTS,
     EXPORT_INTERVIEWS,
     EXPORT_EVALUATIONS,
+    /** upload-template xlsx 다운로드 — stage results 와 별개 dataset 인 egress(09b 추가). */
+    EXPORT_STAGE_RESULT_TEMPLATE,
     APPLICATION_PDF,
 
     // 핵심 관리자 변경(09b)

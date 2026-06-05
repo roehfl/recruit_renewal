@@ -158,6 +158,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler(InvalidAuditQueryException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidAuditQuery(InvalidAuditQueryException e) {
+        return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+    }
+
+    @ExceptionHandler(ActivityLogNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleActivityLogNotFound(ActivityLogNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     /**
      * DB 제약 위반(unique 등). 사전 체크를 통과한 동시 요청 race가 대표 경로이며 409로 응답한다.
      * 제약명/컬럼명/SQL 등 내부 정보는 응답에 노출하지 않는다. 다만 FK/NOT NULL 위반 같은

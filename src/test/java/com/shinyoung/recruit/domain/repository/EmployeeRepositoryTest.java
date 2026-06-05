@@ -36,4 +36,24 @@ public class EmployeeRepositoryTest {
         assertThat(found).isEqualTo(employee);
         assertThat(user).isInstanceOf(Employee.class);
     }
+
+    @Test
+    void 동일_deptName_임직원_2명을_저장할_수_있다() {
+        // 같은 부서 임직원은 여러 명일 수 있다 — deptName unique 제약 제거 후 동일 부서 JIT 생성이 막히지 않음을 검증.
+        Employee first = new Employee();
+        first.setLoginId("same-dept-1");
+        first.setName("임직원1");
+        first.setDeptName("IT센터");
+        repository.saveAndFlush(first);
+
+        Employee second = new Employee();
+        second.setLoginId("same-dept-2");
+        second.setName("임직원2");
+        second.setDeptName("IT센터");
+        repository.saveAndFlush(second);
+
+        assertThat(repository.findAll())
+                .filteredOn(e -> "IT센터".equals(e.getDeptName()))
+                .hasSize(2);
+    }
 }

@@ -12,6 +12,9 @@ import com.shinyoung.recruit.dto.response.AdminApplicationEvaluationResponse;
 import com.shinyoung.recruit.dto.response.AdminEvaluationItemResponse;
 import com.shinyoung.recruit.dto.response.AdminInterviewEvaluationResponse;
 import com.shinyoung.recruit.dto.response.InterviewEvaluationInitializeResponse;
+import com.shinyoung.recruit.enumeration.AuditActionResult;
+import com.shinyoung.recruit.enumeration.AuditActionType;
+import com.shinyoung.recruit.enumeration.AuditTargetType;
 import com.shinyoung.recruit.enumeration.InterviewParticipantRole;
 import com.shinyoung.recruit.enumeration.InterviewParticipantStatus;
 import com.shinyoung.recruit.exception.InterviewEvaluationNotFoundException;
@@ -45,6 +48,8 @@ public class InterviewEvaluationAdminService {
     private final StageRepository stageRepository;
     private final JobApplicationRepository jobApplicationRepository;
     private final Clock clock;
+    private final ActivityLogService activityLogService;
+    private final AuditRequestContextResolver auditRequestContextResolver;
 
     @Transactional
     public InterviewEvaluationInitializeResponse initialize(Long interviewId) {
@@ -152,8 +157,23 @@ public class InterviewEvaluationAdminService {
         LocalDateTime previousSubmittedAt = evaluation.getSubmittedAt();
         evaluation.reopen();
 
-        // Persistent audit (ActivityLog) is deferred until the ActivityLog domain root exists.
-        // Until then, the reopen action is recorded in the application audit log.
+        // 커밋된 변경의 성공 증적 — 비즈니스 tx 에 join(in-tx, ADR-0006 / Phase 09b). SLF4J 는 보조(dual-write).
+        AuditActorContext context = auditRequestContextResolver.resolve(actor);
+        activityLogService.recordInCurrentTx(AuditEvent.builder()
+                .actorType(context.actorType())
+                .actorId(context.actorId())
+                .actorRoleSnapshot(context.actorRoleSnapshot())
+                .actionType(AuditActionType.EVALUATION_REOPEN)
+                .actionResult(AuditActionResult.SUCCESS)
+                .targetType(AuditTargetType.INTERVIEW_EVALUATION)
+                .targetId(String.valueOf(evaluationId))
+                .ipAddress(context.ipAddress())
+                .userAgent(context.userAgent())
+                .metadata(new EvaluationReopenMetadata(
+                        interviewId,
+                        previousSubmittedAt == null ? null : previousSubmittedAt.toString()))
+                .build());
+
         log.info(
                 "InterviewEvaluation reopened: evaluationId={}, interviewId={}, actor={}, previousSubmittedAt={}, reopenedAt={}",
                 evaluationId,

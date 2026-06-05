@@ -81,7 +81,7 @@ public class RoutingAuthenticationProvider implements AuthenticationProvider {
         } catch (DataIntegrityViolationException e) {
             // 동시 JIT loginId race: 다른 요청이 먼저 같은 Employee를 생성한 경우 재조회로 복구한다.
             // LDAP 인증은 이미 성공한 상태이므로 재인증 없이 기존 ldapUser로 토큰만 만든다.
-            // loginId race가 아닌 제약 위반(deptName unique 등)은 복구하지 않고 전파한다.
+            // loginId race가 아닌 제약 위반은 복구하지 않고 전파한다.
             User existingUser = userRepository.findUserByLoginId(loginId)
                     .filter(Employee.class::isInstance)
                     .orElseThrow(() -> e);

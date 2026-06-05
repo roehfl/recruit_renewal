@@ -1,5 +1,33 @@
 # 07. Implementation History
 
+## Phase 09b - 기존 로그 흡수 + 핵심 관리자 변경 audit + read API (구현 완료)
+
+- Date: 2026-06-05
+- Work type: implementation. 설계 §6 slice 9b(ADR-0006/0007) 기준. 스키마 변경 없음(09a `activity_log` 그대로).
+- Implemented:
+  - **typed AuditMetadata sealed 전환** + 구체 record 7종(Export/Pdf/Upload/UploadConflict/StageResultChange/EvaluationReopen/AttachmentAdmin). 업로드 파일명 원문 금지(hash+확장자, SLF4J 포함). `EXPORT_STAGE_RESULT_TEMPLATE` actionType 추가. `AuditMetadataContractTest` 로 taxonomy/PII-금지 고정.
+  - **dual-write adapter**: Export/Pdf/Upload 로거가 ActivityLog 먼저 기록(DB = source of truth) 후 SLF4J 보조. **egress fail-close** — 감사 실패 시 반출물 미전송 + export 컨트롤러 5곳 temp xlsx 정리(`deleteQuietly`, 리뷰 2차 #3 패턴).
+  - **upload commit 감사를 service tx 내부로 이동**(ADR-0006): APPLIED=`recordInCurrentTx`(원자적), REJECTED_VALIDATION=FAILURE/VALIDATION_FAILED, REJECTED_STALE·낙관락=CONFLICT/VERSION_MISMATCH. 수동 정정과 이중 기록 방지(`bulkUpdateResults(..., recordAudit=false)`).
+  - **관리자 변경 in-tx 계측**: 정정(STAGE_RESULT_CORRECT, 단건+bulk) · 발표(ANNOUNCE) · 확정(close→CONFIRM) · reopen(EVALUATION_REOPEN) · 첨부 admin 삭제(ATTACHMENT_ADMIN_DELETE) · 첨부 admin 다운로드(ATTACHMENT_ADMIN_DOWNLOAD, fail-close). `AuditRequestContextResolver` 신설(SecurityContext/RequestContext 해석, 시그니처 오염 없음). APPLICANT 자가행위 비계측. `ActivityLogService`에 EMPLOYEE/APPLICANT→actorId 필수 검증 추가(9a 2차 리뷰 예고분).
+  - **read API**: `GET /api/admin/audit/activities`(+단건) — 필터/페이지네이션, **가드**(size≤100, range≤90일, default 최근 30일), **권한별 projection**(ip/ua 는 ROLE_PRIVACY_ADMIN 만 원문, RECRUIT_ADMIN 은 `***`). SecurityConfig 에 narrow matcher(`GET /api/admin/audit/**`)를 broad `/api/admin/**` 보다 먼저 등록. `ActivityLogRepository.search` JPQL finder(append-only 불변).
+- Tests: scoped **136 — 134 passed / 2 failed(기존 결함)**. 신규 22(AdminAuditController 10 · ReadService 8 · MetadataContract 3 · StageAuditInstrumentation 1) + 09a 회귀 17 + 계측 경로 통합 81 전부 통과. 실패 2건 = `StageControllerTest` announce/close — 접수기간 2026-05 하드코딩 픽스처의 **날짜 의존 사전-실패**(9b 무관, 기지 한계). 해당 계측 경로는 동적 접수기간의 신규 `StageAuditInstrumentationTest` 로 실증.
+- Documentation:
+  - `docs/codex/implementation/phase-09b-audit-instrumentation-read-api.md`
+  - `docs/codex/reports/phase-09b-audit-instrumentation-read-api.html`
+- 상태: 구현 완료. 다음 = **9c**(Retention 모델 + eligibility scan + dry-run). `ROLE_PRIVACY_ADMIN` DeptRoleMapping 운영 매핑은 운영 협의 후.
+
+## Fix - Employee.deptName unique 제약 제거 (구현 완료)
+
+- Date: 2026-06-05
+- Work type: small fix phase — Phase 05y 구현 리뷰 3차 후속 권고 처리.
+- 문제: `Employee.deptName`의 `@Column(unique = true)` 때문에 같은 부서의 다른 임직원이 최초 로그인(LDAP JIT)하면 deptName unique 충돌로 저장 실패 → 로그인 실패. 05y race 복구는 이 경우를 정확히 "복구 대상 아님"으로 전파하지만 결함은 제약 자체.
+- 수정: `deptName` 일반 컬럼화(unique 제거). JIT/인증 로직·race 복구 semantics(loginId race만 복구, 그 외 전파) 불변. `RoutingAuthenticationProvider`/테스트의 deptName unique 예시 주석 정리. `EmployeeRepositoryTest`에 동일 deptName 임직원 2명 저장 검증 추가.
+- Tests: scoped **BUILD SUCCESSFUL — 10 tests / 0 failures** (`EmployeeRepositoryTest` 2 · `RoutingAuthenticationProviderTest` 4 · `UserRepositoryTest` 4). deptName unique 의존 코드/테스트 없음 전체 검색 확인. 전체 회귀 미실행(프로젝트 규칙).
+- 운영 주의: 운영 MariaDB의 기존 unique 인덱스는 수동 제거 필요(`INFORMATION_SCHEMA.TABLE_CONSTRAINTS` 조회 → `ALTER TABLE employee DROP INDEX`). **05y `uk_users_login_id` 추가와 같은 DDL 묶음으로 처리 권장.**
+- Documentation:
+  - `docs/codex/implementation/fix-employee-dept-name-unique-removal.md`
+  - `docs/codex/reports/fix-employee-dept-name-unique-removal.html`
+
 ## Phase 05y - Applicant Account Hardening 구현 (구현 완료)
 
 - Date: 2026-06-05

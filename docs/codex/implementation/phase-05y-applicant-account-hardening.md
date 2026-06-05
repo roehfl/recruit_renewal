@@ -277,11 +277,11 @@ $env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tes
 8. `User.loginId`는 여전히 nullable
 9. 운영 MariaDB에 `uk_users_login_id` DDL 수동 적용 필요(설계 문서 §4 Scope A-6 사전 점검 절차 포함)
 10. ActivityLog 계측 보류 — 9b 이후 계측 스윕에서 `APPLICANT_PASSWORD_CHANGE` 등 추가
-11. **`Employee.deptName`의 `@Column(unique = true)`는 구조적 리스크** — 같은 부서 임직원은 여러 명일 수 있으므로, 같은 부서의 다른 임직원이 최초 로그인(JIT)하면 deptName unique 충돌로 저장이 실패한다(05y는 이 경우를 loginId race가 아닌 제약 위반으로 정확히 전파 — 복구하지 않음). 인증 안정성 관점에서 **별도 작은 Fix phase로 제약 제거 권고**(3차 리뷰).
+11. ~~`Employee.deptName`의 `@Column(unique = true)` 구조적 리스크~~ — **2026-06-05 별도 Fix phase로 제거 완료**: `docs/codex/implementation/fix-employee-dept-name-unique-removal.md` 참조.
 
 ## Next Phase Considerations
 
 - Phase 09b 진행(본 슬라이스는 audit 파이프라인 비접촉 — 영향 없음)
-- **`Employee.deptName` unique 제약 제거 Fix phase** — 동일 부서 임직원 JIT 차단 리스크 해소(9b 전 처리 권장, 3차 리뷰)
+- ~~`Employee.deptName` unique 제약 제거 Fix phase~~ — **처리 완료**(`fix-employee-dept-name-unique-removal.md`)
 - loginId 정책(이메일 vs 별도 ID) 결정 후: 안 1 = signUp `loginId=email` 대입 + email 필수화, 안 2 = check-login-id API 추가
 - 운영 배포 시 MariaDB 수동 DDL 적용(중복/collation 사전 점검 포함)

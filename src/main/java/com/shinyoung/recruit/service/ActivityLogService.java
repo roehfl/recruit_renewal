@@ -7,6 +7,8 @@ import com.shinyoung.recruit.common.hash.AuditHmac;
 import com.shinyoung.recruit.config.CorrelationIdFilter;
 import com.shinyoung.recruit.domain.entity.ActivityLog;
 import com.shinyoung.recruit.domain.repository.ActivityLogRepository;
+import com.shinyoung.recruit.enumeration.ActorType;
+import com.shinyoung.recruit.exception.InvalidActivityLogException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,6 +78,7 @@ public class ActivityLogService {
     }
 
     private ActivityLog toEntity(AuditEvent event) {
+        validateActorIdPresence(event);
         return ActivityLog.builder()
                 .occurredAt(LocalDateTime.now(clock))
                 .actorType(event.actorType())
@@ -95,6 +98,14 @@ public class ActivityLogService {
                 .userAgent(safe(event.userAgent(), MAX_USER_AGENT))
                 .metadataJson(serializeMetadata(event.metadata()))
                 .build();
+    }
+
+    /** EMPLOYEE/APPLICANT 행위자는 actorId 필수(9a 2차 리뷰 — 9b 계측 시 검증 추가). SYSTEM/ANONYMOUS 는 null 허용. */
+    private void validateActorIdPresence(AuditEvent event) {
+        if ((event.actorType() == ActorType.EMPLOYEE || event.actorType() == ActorType.APPLICANT)
+                && (event.actorId() == null || event.actorId().isBlank())) {
+            throw new InvalidActivityLogException("actorId is required for EMPLOYEE/APPLICANT actor.");
+        }
     }
 
     private String resolveCorrelationId(String override) {

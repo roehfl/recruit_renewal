@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -79,14 +81,20 @@ public class AdminExportController {
     ) {
         String actor = currentEmployeeService.getCurrentEmployeeActor(userDetails);
         ExcelExportFile file = applicationExportService.exportApplications(jobPostingId, jobPositionId, status);
-        exportAuditLogger.logApplicationsExport(
-                auditContext(actor, userDetails, request),
-                jobPostingId,
-                jobPositionId,
-                status,
-                file
-        );
-        return excelExportResponseFactory.toResponse(file);
+        // egress fail-close(Phase 09b): 감사 기록 실패 시 응답 없이 전파 — temp xlsx 누수 방지(리뷰 2차 #3).
+        try {
+            exportAuditLogger.logApplicationsExport(
+                    auditContext(actor, userDetails, request),
+                    jobPostingId,
+                    jobPositionId,
+                    status,
+                    file
+            );
+            return excelExportResponseFactory.toResponse(file);
+        } catch (RuntimeException e) {
+            deleteQuietly(file);
+            throw e;
+        }
     }
 
     @GetMapping("/admin/stages/{stageId}/results/export")
@@ -99,8 +107,13 @@ public class AdminExportController {
         ExcelExportFile file = adminDatasetExportService.exportStageResults(stageId);
         Map<String, Object> filters = new LinkedHashMap<>();
         filters.put("stageId", stageId);
-        exportAuditLogger.logExport("STAGE_RESULTS", auditContext(actor, userDetails, request), filters, file);
-        return excelExportResponseFactory.toResponse(file);
+        try {
+            exportAuditLogger.logExport("STAGE_RESULTS", auditContext(actor, userDetails, request), filters, file);
+            return excelExportResponseFactory.toResponse(file);
+        } catch (RuntimeException e) {
+            deleteQuietly(file);
+            throw e;
+        }
     }
 
     @GetMapping("/admin/job-postings/{jobPostingId}/interviews/export")
@@ -121,8 +134,13 @@ public class AdminExportController {
         filters.put("status", status == null ? null : status.name());
         filters.put("from", from == null ? null : from.toString());
         filters.put("to", to == null ? null : to.toString());
-        exportAuditLogger.logExport("INTERVIEWS", auditContext(actor, userDetails, request), filters, file);
-        return excelExportResponseFactory.toResponse(file);
+        try {
+            exportAuditLogger.logExport("INTERVIEWS", auditContext(actor, userDetails, request), filters, file);
+            return excelExportResponseFactory.toResponse(file);
+        } catch (RuntimeException e) {
+            deleteQuietly(file);
+            throw e;
+        }
     }
 
     @GetMapping("/admin/stages/{stageId}/interview-evaluations/export")
@@ -135,8 +153,22 @@ public class AdminExportController {
         ExcelExportFile file = adminDatasetExportService.exportStageEvaluations(stageId);
         Map<String, Object> filters = new LinkedHashMap<>();
         filters.put("stageId", stageId);
-        exportAuditLogger.logExport("INTERVIEW_EVALUATIONS", auditContext(actor, userDetails, request), filters, file);
-        return excelExportResponseFactory.toResponse(file);
+        try {
+            exportAuditLogger.logExport(
+                    "INTERVIEW_EVALUATIONS", auditContext(actor, userDetails, request), filters, file);
+            return excelExportResponseFactory.toResponse(file);
+        } catch (RuntimeException e) {
+            deleteQuietly(file);
+            throw e;
+        }
+    }
+
+    private void deleteQuietly(ExcelExportFile file) {
+        try {
+            Files.deleteIfExists(file.path());
+        } catch (IOException ignored) {
+            // temp 파일 정리 실패는 원인 예외 전파를 막지 않는다.
+        }
     }
 
     private ExportAuditContext auditContext(String actor, CustomUserDetails userDetails, HttpServletRequest request) {

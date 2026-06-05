@@ -109,7 +109,7 @@ class RoutingAuthenticationProviderTest {
         Authentication request = loginRequest("emp01");
         given(userRepository.findUserByLoginId("emp01"))
                 .willReturn(Optional.empty())
-                .willReturn(Optional.empty()); // 재조회도 부재 — loginId race가 아닌 제약 위반(deptName unique 등)
+                .willReturn(Optional.empty()); // 재조회도 부재 — loginId race가 아닌 제약 위반
         given(ldapProvider.authenticate(request)).willReturn(ldapSuccess("emp01"));
         DataIntegrityViolationException violation = new DataIntegrityViolationException("constraint violation");
         given(employeeRepository.save(any(Employee.class))).willThrow(violation);

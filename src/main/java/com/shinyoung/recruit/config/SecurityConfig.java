@@ -82,6 +82,9 @@ public class SecurityConfig {
                 .requestMatchers("/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**", "/h2-console/**", "/api/menu/tree").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/job-postings/{jobPostingId}/application").hasAuthority("ROLE_APPLICANT")
                 .requestMatchers(HttpMethod.GET, "/api/job-postings/**").permitAll()
+                // 감사 read API(Phase 09b, ADR-0007). narrow matcher 를 broad /api/admin/** 보다 먼저 — 순서가 보안 요구사항.
+                // ip/ua 원문 vs 마스킹은 GET 통과 후 컨트롤러에서 권한별 projection 으로 추가 게이팅한다.
+                .requestMatchers(HttpMethod.GET, "/api/admin/audit/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN", "ROLE_PRIVACY_ADMIN")
                 .requestMatchers("/api/admin/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_RECRUIT_ADMIN")
                 .requestMatchers("/api/applicant/**").hasAuthority("ROLE_APPLICANT")
                 .requestMatchers("/api/interviewer/**").hasAnyAuthority("ROLE_EMPLOYEE", "ROLE_ADMIN", "ROLE_RECRUIT_ADMIN", "ROLE_INTERVIEWER")

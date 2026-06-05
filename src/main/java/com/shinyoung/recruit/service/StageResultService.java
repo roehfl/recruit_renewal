@@ -12,6 +12,9 @@ import com.shinyoung.recruit.dto.request.StageResultUpdateRequest;
 import com.shinyoung.recruit.dto.response.AdminStageResultResponse;
 import com.shinyoung.recruit.dto.response.StageResultBulkUpdateResponse;
 import com.shinyoung.recruit.dto.response.StageResultInitializeResponse;
+import com.shinyoung.recruit.enumeration.AuditActionResult;
+import com.shinyoung.recruit.enumeration.AuditActionType;
+import com.shinyoung.recruit.enumeration.AuditTargetType;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageStatus;
@@ -40,6 +43,8 @@ public class StageResultService {
     private final JobApplicationRepository jobApplicationRepository;
     private final StageResultRepository stageResultRepository;
     private final Clock clock;
+    private final ActivityLogService activityLogService;
+    private final AuditRequestContextResolver auditRequestContextResolver;
 
     @Transactional
     public StageResultInitializeResponse initialize(Long stageId) {
@@ -103,6 +108,9 @@ public class StageResultService {
                 LocalDateTime.now(clock),
                 actor
         );
+        // 커밋된 변경의 성공 증적 — 비즈니스 tx 에 join(in-tx, ADR-0006). 전후값은 CorrectionHistory 가 보유.
+        recordCorrectAudit(stage, actor, String.valueOf(resultId),
+                stageResult.getJobApplication().getId(), new StageResultChangeMetadata(stageId, 1));
         return AdminStageResultResponse.from(stageResult);
     }
 
@@ -111,6 +119,20 @@ public class StageResultService {
             Long stageId,
             StageResultBulkUpdateRequest request,
             String actor
+    ) {
+        return bulkUpdateResults(stageId, request, actor, true);
+    }
+
+    /**
+     * @param recordAudit 수동 정정 경로는 true(STAGE_RESULT_CORRECT in-tx 감사). Excel upload commit 은
+     *                    STAGE_RESULT_UPLOAD 한 건으로 따로 감사하므로 false 로 이중 기록을 막는다(Phase 09b).
+     */
+    @Transactional
+    public StageResultBulkUpdateResponse bulkUpdateResults(
+            Long stageId,
+            StageResultBulkUpdateRequest request,
+            String actor,
+            boolean recordAudit
     ) {
         validateActor(actor);
         Stage stage = findStage(stageId);
@@ -139,7 +161,35 @@ public class StageResultService {
             );
         }
 
+        if (recordAudit) {
+            recordCorrectAudit(stage, actor, String.valueOf(stageId), null,
+                    new StageResultChangeMetadata(stageId, request.results().size()));
+        }
         return new StageResultBulkUpdateResponse(stageId, request.results().size(), getResults(stageId));
+    }
+
+    private void recordCorrectAudit(
+            Stage stage,
+            String actor,
+            String targetId,
+            Long applicationId,
+            StageResultChangeMetadata metadata
+    ) {
+        AuditActorContext context = auditRequestContextResolver.resolve(actor);
+        activityLogService.recordInCurrentTx(AuditEvent.builder()
+                .actorType(context.actorType())
+                .actorId(context.actorId())
+                .actorRoleSnapshot(context.actorRoleSnapshot())
+                .actionType(AuditActionType.STAGE_RESULT_CORRECT)
+                .actionResult(AuditActionResult.SUCCESS)
+                .targetType(AuditTargetType.STAGE_RESULT)
+                .targetId(targetId)
+                .jobPostingId(stage.getJobPosting().getId())
+                .applicationId(applicationId)
+                .ipAddress(context.ipAddress())
+                .userAgent(context.userAgent())
+                .metadata(metadata)
+                .build());
     }
 
     /**

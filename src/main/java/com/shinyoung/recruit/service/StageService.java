@@ -11,6 +11,9 @@ import com.shinyoung.recruit.dto.request.StageReorderRequest;
 import com.shinyoung.recruit.dto.request.StageUpdateRequest;
 import com.shinyoung.recruit.dto.response.StageDetailResponse;
 import com.shinyoung.recruit.dto.response.StageListResponse;
+import com.shinyoung.recruit.enumeration.AuditActionResult;
+import com.shinyoung.recruit.enumeration.AuditActionType;
+import com.shinyoung.recruit.enumeration.AuditTargetType;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageStatus;
@@ -36,6 +39,8 @@ public class StageService {
     private final StageRepository stageRepository;
     private final JobPostingRepository jobPostingRepository;
     private final StageResultRepository stageResultRepository;
+    private final ActivityLogService activityLogService;
+    private final AuditRequestContextResolver auditRequestContextResolver;
 
     public List<StageListResponse> getStages(Long jobPostingId) {
         ensureJobPostingExists(jobPostingId);
@@ -137,6 +142,8 @@ public class StageService {
         validateStageStatus(stage, StageStatus.IN_PROGRESS, "Only IN_PROGRESS stage can be announced.");
         validateStageResultsReadyForAnnounce(stageId);
         stage.announce();
+        // 발표 = 커밋된 변경의 성공 증적(in-tx, ADR-0006 / Phase 09b).
+        recordStageAudit(AuditActionType.STAGE_RESULT_ANNOUNCE, jobPostingId, stageId);
         return stage.getId();
     }
 
@@ -148,6 +155,8 @@ public class StageService {
         Stage stage = findStage(jobPostingId, stageId);
         validateStageStatus(stage, StageStatus.RESULT_ANNOUNCED, "Only RESULT_ANNOUNCED stage can be closed.");
         stage.close();
+        // 확정(close) = 커밋된 변경의 성공 증적(in-tx, ADR-0006 / Phase 09b).
+        recordStageAudit(AuditActionType.STAGE_RESULT_CONFIRM, jobPostingId, stageId);
         return stage.getId();
     }
 
@@ -160,6 +169,22 @@ public class StageService {
         validateStageStatus(stage, StageStatus.READY, "Only READY stage can be deleted.");
         stageRepository.delete(stage);
         return stageId;
+    }
+
+    private void recordStageAudit(AuditActionType actionType, Long jobPostingId, Long stageId) {
+        AuditActorContext context = auditRequestContextResolver.resolve();
+        activityLogService.recordInCurrentTx(AuditEvent.builder()
+                .actorType(context.actorType())
+                .actorId(context.actorId())
+                .actorRoleSnapshot(context.actorRoleSnapshot())
+                .actionType(actionType)
+                .actionResult(AuditActionResult.SUCCESS)
+                .targetType(AuditTargetType.STAGE_RESULT)
+                .targetId(String.valueOf(stageId))
+                .jobPostingId(jobPostingId)
+                .ipAddress(context.ipAddress())
+                .userAgent(context.userAgent())
+                .build());
     }
 
     private void ensureJobPostingExists(Long jobPostingId) {

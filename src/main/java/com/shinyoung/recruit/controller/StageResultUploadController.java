@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -57,9 +59,23 @@ public class StageResultUploadController {
         ExcelExportFile file = uploadService.generateTemplate(stageId);
         Map<String, Object> filters = new LinkedHashMap<>();
         filters.put("stageId", stageId);
-        exportAuditLogger.logExport(
-                "STAGE_RESULT_UPLOAD_TEMPLATE", auditContext(actor, userDetails, request), filters, file);
-        return excelExportResponseFactory.toResponse(file);
+        // egress fail-close(Phase 09b): 감사 기록 실패 시 응답 없이 전파 — temp xlsx 누수 방지를 위해 정리 후 던진다.
+        try {
+            exportAuditLogger.logExport(
+                    "STAGE_RESULT_UPLOAD_TEMPLATE", auditContext(actor, userDetails, request), filters, file);
+            return excelExportResponseFactory.toResponse(file);
+        } catch (RuntimeException e) {
+            deleteQuietly(file);
+            throw e;
+        }
+    }
+
+    private void deleteQuietly(ExcelExportFile file) {
+        try {
+            Files.deleteIfExists(file.path());
+        } catch (IOException ignored) {
+            // temp 파일 정리 실패는 원인 예외 전파를 막지 않는다.
+        }
     }
 
     @PostMapping("/admin/stages/{stageId}/results/upload/preview")
@@ -81,13 +97,13 @@ public class StageResultUploadController {
         ExportAuditContext auditContext = auditContext(actor, userDetails, request);
         StageResultUploadCommitResponse response;
         try {
+            // outcome 별 감사(dual-write)는 service 트랜잭션 내부에서 남긴다(APPLIED=in-tx, ADR-0006).
             response = uploadService.commit(stageId, file, actor);
         } catch (ObjectOptimisticLockingFailureException e) {
             // @Version 충돌은 service 트랜잭션 commit 시 터져 정상 응답이 없으므로, 실패 attempt도 audit에 남긴다.
             uploadAuditLogger.logUploadConflict(auditContext, stageId, file);
             throw e; // GlobalExceptionHandler가 409로 매핑.
         }
-        uploadAuditLogger.logUploadCommit(auditContext, stageId, response, file);
         return switch (response.outcome()) {
             case APPLIED -> ResponseEntity.ok(ApiResponse.success(response));
             case REJECTED_VALIDATION -> ResponseEntity.badRequest()

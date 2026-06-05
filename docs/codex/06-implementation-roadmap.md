@@ -288,7 +288,7 @@ Roadmap revision note - 2026-06-05:
 - 2026-06-05 리뷰 2차 반영(instruction.md): JIT race 복구는 `processLdap()` 재호출(LDAP 재인증) 대신 기존 ldapUser로 `buildEmployeeAuthentication()` 토큰 생성, collation 점검을 `INFORMATION_SCHEMA.COLUMNS`로 교체, 복구 범위는 loginId race 한정(deptName unique 등 기타 제약 위반은 예외 전파).
 - **2026-06-05 구현 완료** — scoped 40 tests passed. `docs/codex/implementation/phase-05y-applicant-account-hardening.md` 참조. 운영 MariaDB `uk_users_login_id` 수동 DDL 적용 항목 잔존.
 - 2026-06-05 구현 리뷰 3차 반영: `ApplicantAccountControllerTest` `springSecurity()` 적용(matcher 실검증, 7/7 통과), 07-history stale 문구 정정.
-- **후속 Fix phase 권고(3차 리뷰)**: `Employee.deptName`의 `@Column(unique = true)` 제거 — 동일 부서 임직원 JIT 최초 로그인 차단 리스크. 9b 전 처리 권장(작은 별도 슬라이스). 구현 후 9b 진행(audit 파이프라인 비접촉 — 영향 없음).
+- ~~후속 Fix phase 권고(3차 리뷰): `Employee.deptName` unique 제거~~ → **2026-06-05 처리 완료** — `docs/codex/implementation/fix-employee-dept-name-unique-removal.md` 참조(scoped 10 tests passed, 운영 unique 인덱스 수동 제거 항목 잔존). 구현 후 9b 진행(audit 파이프라인 비접촉 — 영향 없음).
 
 ### Phase 04 - Interview Scheduling
 
@@ -595,7 +595,7 @@ Status:
 | --- | --- | --- |
 | 09 design | Completed | 두 기둥(영속 감사 / 파기·보존) 설계, ADR 0005/0006/0007, glossary, 슬라이스 분할 |
 | 09a - ActivityLog Foundation | Completed | `ActivityLog` schema/enums/repo, `ActivityLogService`(recordInCurrentTx/recordRequiresNew), `CorrelationIdFilter`, `AuditHmac`+`AuditConfig`(applicantRefHash), `AuditEvent`/`AuditMetadata`. 19 tests. → `docs/codex/implementation/phase-09a-activity-log-foundation.md` |
-| 09b - 로그 흡수 + 관리자 변경 audit + read API | Pending | Export/Pdf/Upload adapter(dual-write), egress fail-close, reopen·StageResult·첨부 admin 계측, audit read(마스킹/원문) |
+| 09b - 로그 흡수 + 관리자 변경 audit + read API | **Completed (2026-06-05)** | Export/Pdf/Upload adapter(dual-write, DB=source of truth), egress fail-close+temp 정리, sealed typed AuditMetadata 7종, reopen·StageResult 정정/발표/확정·첨부 admin 계측(in-tx), `GET /api/admin/audit/activities`(가드+권한별 마스킹), narrow matcher. scoped 134 passed(+기지 날짜 의존 2 실패). → `docs/codex/implementation/phase-09b-audit-instrumentation-read-api.md` |
 | 09c - Retention 모델 + eligibility scan + dry-run | Pending | RetentionPolicy(전역+override)/RetentionHold/`JobPosting.hiringEndedAt`, eligibility(Clock), dry-run PurgeBatch |
 | 09d-1 - Purge execute core | Pending | ROLE_PRIVACY_ADMIN, confirmation/sourceDryRunBatchId, 재검증, 관계형 PII tombstone/anonymize, ref-count, coarse index |
 | 09d-2 - Attachment binary delete saga | Pending | physicalFileStatus 전이, 파일 물리삭제(멱등), 소멸 확인 후 최종 PURGED 승격 |

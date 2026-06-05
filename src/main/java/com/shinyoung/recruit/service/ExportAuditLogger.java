@@ -1,6 +1,10 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.common.hash.HashUtil;
+import com.shinyoung.recruit.enumeration.ActorType;
+import com.shinyoung.recruit.enumeration.AuditActionResult;
+import com.shinyoung.recruit.enumeration.AuditActionType;
+import com.shinyoung.recruit.enumeration.AuditTargetType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -12,12 +16,13 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Export 동작에 대한 SLF4J 구조적 audit 로그. applications export는 admin이 연락처(PII)를 보는
- * 최초 surface이고, 다른 dataset export도 운영 추적이 필요하므로 생성 시 주체/요청 메타 + 필터/행수/파일명을 남긴다.
+ * Export(정보 반출) 감사 adapter(Phase 09b dual-write). <b>영속 ActivityLog 가 source of truth</b> 이고
+ * SLF4J 구조적 로그는 보조다. ActivityLog 기록은 {@code recordRequiresNew}(별도 tx) + <b>fail-close</b> —
+ * 기록이 실패하면 예외가 전파되어 반출 응답이 나가지 않는다(ADR-0006). 호출부(컨트롤러)는 이때 temp xlsx 를
+ * 정리하고 예외를 전파해야 한다(temp file 누수 방지, 리뷰 2차 #3).
  *
- * <p>이름/전화번호/이메일 등 PII 값 자체는 audit에 직접 남기지 않는다. 필터는 allowlist 기반의
- * 비-PII 값만 기록하고, 추가로 변경 추적용 {@code filtersHash}를 함께 남긴다. 영속 {@code ActivityLog}
- * 도입 시 이관한다.
+ * <p>이름/전화번호/이메일 등 PII 값 자체는 어디에도 남기지 않는다. 필터는 allowlist 기반의 비-PII 값만
+ * 기록하고, 변경 추적용 {@code filtersHash}를 함께 남긴다.
  */
 @Component
 public class ExportAuditLogger {
@@ -25,13 +30,16 @@ public class ExportAuditLogger {
     private static final Logger log = LoggerFactory.getLogger("recruit.audit.export");
 
     private final Clock clock;
+    private final ActivityLogService activityLogService;
 
-    public ExportAuditLogger(Clock clock) {
+    public ExportAuditLogger(Clock clock, ActivityLogService activityLogService) {
         this.clock = clock;
+        this.activityLogService = activityLogService;
     }
 
     /**
      * dataset 공통 export audit. {@code filters}는 비-PII allowlist 값만 담아야 한다.
+     * ActivityLog insert 실패 시 예외 전파(fail-close) — SLF4J 보조 로그도 남지 않는다.
      */
     public void logExport(
             String datasetType,
@@ -40,6 +48,23 @@ public class ExportAuditLogger {
             ExcelExportFile file
     ) {
         String filtersSafeJson = toJson(filters);
+        String filtersHash = HashUtil.sha256(filtersSafeJson);
+
+        activityLogService.recordRequiresNew(AuditEvent.builder()
+                .actorType(ActorType.EMPLOYEE)
+                .actorId(context.actorLoginId())
+                .actorRoleSnapshot(context.authority())
+                .actionType(exportActionType(datasetType))
+                .actionResult(AuditActionResult.SUCCESS)
+                .targetType(AuditTargetType.EXPORT_DATASET)
+                .targetId(datasetType)
+                .jobPostingId(longFilter(filters, "jobPostingId"))
+                .ipAddress(context.clientIp())
+                .userAgent(context.userAgent())
+                .metadata(new ExportMetadata(
+                        datasetType, filtersHash, filtersSafeJson, file.rowCount(), file.fileName()))
+                .build());
+
         log.info(
                 "export audit eventType={}_EXPORT datasetType={} timestamp={} "
                         + "actorLoginId={} authority={} clientIp={} userAgent={} requestId={} "
@@ -52,7 +77,7 @@ public class ExportAuditLogger {
                 context.clientIp(),
                 context.userAgent(),
                 context.requestId(),
-                HashUtil.sha256(filtersSafeJson),
+                filtersHash,
                 filtersSafeJson,
                 file.rowCount(),
                 file.fileName()
@@ -71,6 +96,23 @@ public class ExportAuditLogger {
         filters.put("jobPositionId", jobPositionId);
         filters.put("status", status);
         logExport("APPLICATIONS", context, filters, file);
+    }
+
+    /** datasetType → AuditActionType 고정 매핑. 미등록 dataset 은 taxonomy 누락이므로 즉시 실패시킨다. */
+    private AuditActionType exportActionType(String datasetType) {
+        return switch (datasetType) {
+            case "APPLICATIONS" -> AuditActionType.EXPORT_APPLICATIONS;
+            case "STAGE_RESULTS" -> AuditActionType.EXPORT_STAGE_RESULTS;
+            case "INTERVIEWS" -> AuditActionType.EXPORT_INTERVIEWS;
+            case "INTERVIEW_EVALUATIONS" -> AuditActionType.EXPORT_EVALUATIONS;
+            case "STAGE_RESULT_UPLOAD_TEMPLATE" -> AuditActionType.EXPORT_STAGE_RESULT_TEMPLATE;
+            default -> throw new IllegalArgumentException("Unknown export dataset type: " + datasetType);
+        };
+    }
+
+    private Long longFilter(Map<String, Object> filters, String key) {
+        Object value = filters.get(key);
+        return value instanceof Long longValue ? longValue : null;
     }
 
     private String toJson(Map<String, Object> filters) {

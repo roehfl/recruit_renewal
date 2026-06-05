@@ -95,8 +95,9 @@ class ActivityLogServiceTest {
 
     @Test
     void metadata는_typed_record로_직렬화되고_null이면_null() {
+        // 09b 에서 AuditMetadata 가 sealed 로 좁혀져 테스트도 실제 구체 record 를 사용한다.
         ActivityLog withMeta = activityLogService.recordRequiresNew(
-                baseEvent().metadata(new SampleMeta("APPLICATIONS", 10L)).build());
+                baseEvent().metadata(new ExportMetadata("APPLICATIONS", "hash", "{}", 10L, "f.xlsx")).build());
         ActivityLog noMeta = activityLogService.recordRequiresNew(baseEvent().build());
 
         assertThat(activityLogRepository.findById(withMeta.getId()).orElseThrow().getMetadataJson())
@@ -193,6 +194,4 @@ class ActivityLogServiceTest {
         assertThat(activityLogRepository.count()).isEqualTo(1);
     }
 
-    record SampleMeta(String datasetType, long rowCount) implements AuditMetadata {
-    }
 }

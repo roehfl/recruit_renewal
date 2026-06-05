@@ -80,6 +80,8 @@ public class StageResultUploadService {
     private final StageResultUploadParser parser;
     private final StageResultService stageResultService;
     private final ExcelExportService excelExportService;
+    private final UploadAuditLogger uploadAuditLogger;
+    private final AuditRequestContextResolver auditRequestContextResolver;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -129,9 +131,9 @@ public class StageResultUploadService {
                 .map(row -> validate(row, resultMap, duplicateIds, false))
                 .toList();
         if (firstPass.stream().anyMatch(v -> v.result().status() == StageResultUploadRowStatus.ERROR)) {
-            return StageResultUploadCommitResponse.rejected(
+            return auditedCommitResponse(stageId, file, actor, StageResultUploadCommitResponse.rejected(
                     stageId, StageResultUploadCommitOutcome.REJECTED_VALIDATION,
-                    firstPass.stream().map(ValidatedUploadRow::result).toList());
+                    firstPass.stream().map(ValidatedUploadRow::result).toList()));
         }
 
         // 변경 대상 행만 비관적 쓰기 잠금 + DB 최신값으로 refresh한다. 잠금 후 최신 updatedAt 기준으로 토큰을
@@ -151,12 +153,12 @@ public class StageResultUploadService {
                 .map(ValidatedUploadRow::result)
                 .toList();
         if (results.stream().anyMatch(r -> r.status() == StageResultUploadRowStatus.ERROR)) {
-            return StageResultUploadCommitResponse.rejected(
-                    stageId, StageResultUploadCommitOutcome.REJECTED_VALIDATION, results);
+            return auditedCommitResponse(stageId, file, actor, StageResultUploadCommitResponse.rejected(
+                    stageId, StageResultUploadCommitOutcome.REJECTED_VALIDATION, results));
         }
         if (results.stream().anyMatch(r -> r.status() == StageResultUploadRowStatus.STALE)) {
-            return StageResultUploadCommitResponse.rejected(
-                    stageId, StageResultUploadCommitOutcome.REJECTED_STALE, results);
+            return auditedCommitResponse(stageId, file, actor, StageResultUploadCommitResponse.rejected(
+                    stageId, StageResultUploadCommitOutcome.REJECTED_STALE, results));
         }
 
         List<StageResultBulkUpdateItemRequest> items = validated.stream()
@@ -165,9 +167,23 @@ public class StageResultUploadService {
                         v.result().stageResultId(), v.newStatus(), v.newScore(), v.newComment()))
                 .toList();
         if (!items.isEmpty()) {
-            stageResultService.bulkUpdateResults(stageId, new StageResultBulkUpdateRequest(items), actor);
+            // upload 는 STAGE_RESULT_UPLOAD 한 건으로 감사하므로 bulkUpdateResults 의 STAGE_RESULT_CORRECT
+            // 감사는 끈다(이중 기록 방지, Phase 09b).
+            stageResultService.bulkUpdateResults(stageId, new StageResultBulkUpdateRequest(items), actor, false);
         }
-        return StageResultUploadCommitResponse.applied(stageId, results);
+        // APPLIED 는 커밋된 변경의 성공 증적 — 이 트랜잭션에 join(in-tx) 해 원자적으로 남는다(ADR-0006).
+        return auditedCommitResponse(stageId, file, actor, StageResultUploadCommitResponse.applied(stageId, results));
+    }
+
+    /** commit outcome 감사(dual-write, Phase 09b). APPLIED=in-tx, REJECTED_*=REQUIRES_NEW(adapter 내부 분기). */
+    private StageResultUploadCommitResponse auditedCommitResponse(
+            Long stageId,
+            MultipartFile file,
+            String actor,
+            StageResultUploadCommitResponse response
+    ) {
+        uploadAuditLogger.logUploadCommit(auditRequestContextResolver.resolve(actor), stageId, response, file);
+        return response;
     }
 
     private ValidatedUploadRow validate(
