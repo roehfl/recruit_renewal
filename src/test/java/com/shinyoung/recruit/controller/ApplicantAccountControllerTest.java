@@ -4,15 +4,14 @@ import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -22,10 +21,16 @@ import org.springframework.web.context.WebApplicationContext;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * springSecurity() filter chain을 적용해 /api/applicant/** SecurityConfig matcher까지 실제로 검증한다.
+ * (미인증 401 = CustomAuthenticationEntryPoint, 임직원 403 = matcher + CustomAccessDeniedHandler)
+ */
 @SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
 @Transactional
 class ApplicantAccountControllerTest {
@@ -43,13 +48,9 @@ class ApplicantAccountControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
-        SecurityContextHolder.clearContext();
-    }
-
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .apply(springSecurity())
+                .build();
     }
 
     @Test
@@ -68,9 +69,8 @@ class ApplicantAccountControllerTest {
 
     @Test
     void 임직원_인증이면_403() throws Exception {
-        authenticateEmployee();
-
         mockMvc.perform(post("/api/applicant/account/password")
+                        .with(authentication(employeeAuthentication()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -85,9 +85,9 @@ class ApplicantAccountControllerTest {
     @Test
     void 비밀번호_변경_성공() throws Exception {
         Applicant applicant = createApplicant("account-pw", "CurrentPw1234!");
-        authenticate(applicant);
 
         mockMvc.perform(post("/api/applicant/account/password")
+                        .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -105,9 +105,9 @@ class ApplicantAccountControllerTest {
     @Test
     void 비밀번호_변경_현재_비밀번호_불일치면_400() throws Exception {
         Applicant applicant = createApplicant("account-pw-wrong", "CurrentPw1234!");
-        authenticate(applicant);
 
         mockMvc.perform(post("/api/applicant/account/password")
+                        .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -123,9 +123,9 @@ class ApplicantAccountControllerTest {
     @Test
     void 비밀번호_변경_validation_위반이면_400() throws Exception {
         Applicant applicant = createApplicant("account-pw-valid", "CurrentPw1234!");
-        authenticate(applicant);
 
         mockMvc.perform(post("/api/applicant/account/password")
+                        .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -141,9 +141,9 @@ class ApplicantAccountControllerTest {
     @Test
     void 전화번호_변경_성공() throws Exception {
         Applicant applicant = createApplicant("account-phone", "CurrentPw1234!");
-        authenticate(applicant);
 
         mockMvc.perform(post("/api/applicant/account/phone-number")
+                        .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -161,9 +161,9 @@ class ApplicantAccountControllerTest {
     @Test
     void 전화번호_변경_validation_위반이면_400() throws Exception {
         Applicant applicant = createApplicant("account-phone-valid", "CurrentPw1234!");
-        authenticate(applicant);
 
         mockMvc.perform(post("/api/applicant/account/phone-number")
+                        .with(authentication(applicantAuthentication(applicant)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -187,23 +187,19 @@ class ApplicantAccountControllerTest {
         return applicantRepository.save(applicant);
     }
 
-    private void authenticate(Applicant applicant) {
+    private Authentication applicantAuthentication(Applicant applicant) {
         CustomUserDetails userDetails = CustomUserDetails.fromUser(
                 applicant,
                 List.of(new SimpleGrantedAuthority("ROLE_APPLICANT"))
         );
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities())
-        );
+        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
     }
 
-    private void authenticateEmployee() {
+    private Authentication employeeAuthentication() {
         CustomUserDetails userDetails = CustomUserDetails.fromLdap(
                 "emp01", "IT센터", "임직원",
                 List.of(new SimpleGrantedAuthority("ROLE_EMPLOYEE"))
         );
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities())
-        );
+        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
     }
 }

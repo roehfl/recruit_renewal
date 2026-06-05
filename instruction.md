@@ -1,62 +1,40 @@
-Major 1 — JIT 복구에서 processLdap()를 그대로 부르면 LDAP 인증을 두 번 한다
+Low 1 — 보안 matcher 검증 테스트는 약하다
 
-설계는 JIT save 실패 후 재조회 결과가 Employee면 processLdap(authentication, user)로 복구한다고 되어 있다.
-그런데 현재 processLdap()는 내부에서 다시 ldapProvider.authenticate(authentication)를 호출한다.
+ApplicantAccountControllerTest는 MockMvcBuilders.webAppContextSetup(context).build()만 쓰고 있고 Spring Security filter chain을 붙이지 않았다.
+그래서 미인증 401, 임직원 403 테스트는 실제 /api/applicant/** SecurityConfig matcher 검증이라기보다, 컨트롤러 진입 후 CurrentApplicantService의 심층 방어 검증에 가깝다.
 
-즉 구현자가 설계 문구 그대로 따르면 흐름이 이렇게 된다.
+운영 코드는 matcher가 들어가 있으므로 기능 결함은 아니다. SecurityConfig도 /api/applicant/**를 ROLE_APPLICANT로 보호하고 있다.
 
-LDAP 인증 성공
-→ Employee save
-→ unique race로 DataIntegrityViolationException
-→ 재조회 성공
-→ processLdap() 호출
-→ LDAP 인증을 다시 수행
-→ 토큰 생성
+그래도 9b 전에 아래 중 하나는 추가하는 게 낫다.
 
-이건 복구 설계로는 부정확하다. 이미 LDAP 인증이 성공한 상태에서 DB 저장만 실패한 것이므로, 재인증하지 말고 기존 ldapUser로 Authentication을 만들어야 한다.
+MockMvcBuilders.webAppContextSetup(context)
+    .apply(springSecurity())
+    .build();
 
-구현 지시문은 이렇게 고쳐라.
+또는 DelegatingFilterProxy("springSecurityFilterChain")를 붙인 Security 전용 테스트를 별도로 둬라.
 
-private Authentication buildEmployeeAuthentication(User user, CustomUserDetails ldapUser) {
-    CustomUserDetails finalUser = CustomUserDetails.fromUser(user, ldapUser.getAuthorities());
-    return new UsernamePasswordAuthenticationToken(finalUser, null, finalUser.getAuthorities());
-}
+Low 2 — 히스토리 문서에 stale 문구가 남아 있다
 
-그리고 processLdapAndJit() 안에서는 catch 후 processLdap()가 아니라 위 helper를 호출하게 해라. 테스트도 ldapProvider.authenticate()가 race 복구 경로에서 1회만 호출되는지 검증해야 한다.
+07-implementation-history.md 상단에는 구현 완료 항목이 정상 추가됐다.
+그런데 아래에 남아 있는 설계 항목 끝에는 아직 상태: 구현 미착수가 남아 있다.
 
-Medium 1 — collation 확인 쿼리가 틀렸다
+실제 코드는 문제 없지만 문서가 헷갈린다. 아래처럼 고쳐라.
 
-설계에 SHOW INDEX FROM users로 “기존 인덱스/제약명 충돌 확인 + collation 확인”이라고 되어 있다.
-하지만 MariaDB/MySQL의 SHOW INDEX에서 Collation은 문자열 collation이 아니라 인덱스 정렬 방향 성격이다. login_id 컬럼의 case-sensitive/case-insensitive 여부를 확인하려면 아래처럼 봐야 한다.
+상태: 설계 완료. 구현은 상단 "Phase 05y - Applicant Account Hardening 구현" 항목 참조.
+별도 후속 리스크 — Employee.deptName unique는 위험하다
 
-SELECT COLUMN_NAME, COLLATION_NAME
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = DATABASE()
-  AND TABLE_NAME = 'users'
-  AND COLUMN_NAME = 'login_id';
+5y 구현 결함은 아니지만, 이번 JIT race 검토 과정에서 계속 드러나는 구조적 리스크다. Employee.deptName에 unique 제약이 걸려 있다.
 
-또는:
+부서명이 같은 임직원은 당연히 여러 명 있을 수 있다. 현재 JIT는 LDAP에서 받은 deptName을 Employee에 저장하므로, 같은 부서의 다른 임직원이 최초 로그인하면 deptName unique 때문에 JIT 저장이 실패할 수 있다. 5y 구현은 이 경우를 loginId race가 아닌 제약 위반으로 전파하도록 정확히 처리했다.
 
-SHOW FULL COLUMNS FROM users LIKE 'login_id';
+이건 5y 범위 밖이지만, 인증 안정성 관점에서는 별도 fix로 제거해야 한다.
 
-DDL 사전 점검 쿼리에서 이 부분은 반드시 교체해라.
+// Employee.java
+// 현재
+@Column(unique = true)
+private String deptName;
 
-Medium 2 — DataIntegrityViolationException은 loginId race만 의미하지 않는다
+// 권장
+private String deptName;
 
-현재 Employee.deptName에도 @Column(unique = true)가 걸려 있다.
-따라서 JIT save 중 발생하는 DataIntegrityViolationException은 loginId race가 아니라 deptName unique 충돌일 수도 있다.
-
-설계는 “재조회 결과가 Employee면 복구, 아니면 예외 전파”라고 되어 있어서 큰 방향은 맞다.
-다만 문서의 “동시 JIT의 사용자 체감은 한 요청도 실패 없이 로그인 성공”이라는 표현은 과하다. loginId race일 때만 그렇다. deptName unique 같은 다른 제약 위반이면 실패해야 정상이다.
-
-문구를 이렇게 낮춰라.
-
-동시 JIT loginId race인 경우에는 양쪽 요청 모두 로그인 성공으로 복구한다.
-단, loginId race가 아닌 다른 DB 제약 위반은 복구하지 않고 예외를 전파한다.
-Low — history 요약 일부가 stale하다
-
-07-implementation-history.md의 설계 범위 요약에는 아직 전화번호 변경이 단순 POST /applicant/account/phone-number로만 적혀 있고, currentPassword 재확인은 바로 아래 “리뷰 1차 반영”에만 나온다.
-
-큰 문제는 아니지만, 히스토리 상단 요약도 이렇게 맞춰라.
-
-④ POST /applicant/account/phone-number(currentPassword 재확인 + phoneNumber 변경)
+이건 별도 작은 Fix phase로 빼는 게 맞다.

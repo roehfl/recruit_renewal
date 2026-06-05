@@ -286,7 +286,9 @@ Roadmap revision note - 2026-06-05:
 - 결정-의존 보류: check-login-id, 이메일 변경 API, 가입 email 필수화, 아이디 찾기.
 - 2026-06-05 리뷰 1차 반영(instruction.md): loginId 정규화 정책 명시(trim only · collation 의존 제거 후속), LDAP JIT 동시 생성 race 복구(선택 B — 재조회 후 복구), 전화번호 변경 currentPassword 재확인 채택, check-email advisory 명확화, 운영 DDL 사전 점검 3종, JIT race/복구 테스트 추가.
 - 2026-06-05 리뷰 2차 반영(instruction.md): JIT race 복구는 `processLdap()` 재호출(LDAP 재인증) 대신 기존 ldapUser로 `buildEmployeeAuthentication()` 토큰 생성, collation 점검을 `INFORMATION_SCHEMA.COLUMNS`로 교체, 복구 범위는 loginId race 한정(deptName unique 등 기타 제약 위반은 예외 전파).
-- **2026-06-05 구현 완료** — scoped 40 tests passed. `docs/codex/implementation/phase-05y-applicant-account-hardening.md` 참조. 운영 MariaDB `uk_users_login_id` 수동 DDL 적용 항목 잔존. 구현 후 9b 진행(audit 파이프라인 비접촉 — 영향 없음).
+- **2026-06-05 구현 완료** — scoped 40 tests passed. `docs/codex/implementation/phase-05y-applicant-account-hardening.md` 참조. 운영 MariaDB `uk_users_login_id` 수동 DDL 적용 항목 잔존.
+- 2026-06-05 구현 리뷰 3차 반영: `ApplicantAccountControllerTest` `springSecurity()` 적용(matcher 실검증, 7/7 통과), 07-history stale 문구 정정.
+- **후속 Fix phase 권고(3차 리뷰)**: `Employee.deptName`의 `@Column(unique = true)` 제거 — 동일 부서 임직원 JIT 최초 로그인 차단 리스크. 9b 전 처리 권장(작은 별도 슬라이스). 구현 후 9b 진행(audit 파이프라인 비접촉 — 영향 없음).
 
 ### Phase 04 - Interview Scheduling
 

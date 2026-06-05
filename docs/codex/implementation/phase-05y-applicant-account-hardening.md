@@ -4,6 +4,8 @@
 
 - Date: 2026-06-05
 - Work type: implementation (설계: `docs/codex/design/phase-05y-applicant-account-hardening-design.md`, 리뷰 2차 반영본 기준)
+
+> 2026-06-05 구현 리뷰(3차, instruction.md) 반영: ① `ApplicantAccountControllerTest`에 `springSecurity()` filter chain 적용 — 미인증 401/임직원 403이 `CurrentApplicantService` 심층 방어가 아니라 실제 `/api/applicant/**` SecurityConfig matcher(+EntryPoint/AccessDeniedHandler)를 통과해 검증되도록 전환(인증은 `with(authentication(...))` post-processor — `ApplicantInterviewControllerTest`와 동일 관례). ② 07-history 설계 항목의 stale "구현 미착수" 문구 정정. ③ `Employee.deptName` unique 제약은 **별도 Fix phase 권고**로 기록(아래 Known Limitations 11).
 - Goal: 지원자 loginId 정책(이메일=loginId vs 별도 ID) 미결정 상태에서도 유효한 **결정-독립** 계정 기능 구현 + 현재 코드에 실재하는 loginId 무결성 결함 수정. Phase 09b 착수 전 선행 슬라이스.
 
 ## Implemented Scope
@@ -185,7 +187,7 @@
 ### Tests
 
 - `ApplicantAccountServiceTest` (Test, Mockito): 비밀번호 변경 성공(인코딩 저장)/현재 비밀번호 불일치/동일 새 비밀번호/지원자 부재, 전화번호 변경 성공/trim/currentPassword 불일치 — 7건
-- `ApplicantAccountControllerTest` (Test, @SpringBootTest+MockMvc): 미인증 401, 임직원 403, 비밀번호 변경 200(+BCrypt 실저장 검증)/불일치 400/validation 400, 전화번호 변경 200(+저장 검증)/validation 400 — 7건
+- `ApplicantAccountControllerTest` (Test, @SpringBootTest+MockMvc+**springSecurity()**): 미인증 401(EntryPoint), 임직원 403(matcher+AccessDeniedHandler), 비밀번호 변경 200(+BCrypt 실저장 검증)/불일치 400/validation 400, 전화번호 변경 200(+저장 검증)/validation 400 — 7건. filter chain 적용으로 `/api/applicant/**` matcher를 실제 검증(3차 리뷰 반영)
 - `RoutingAuthenticationProviderTest` (Test, Mockito — 실제 LDAP 미연결): JIT 최초 로그인 성공, race 재조회 Employee → 복구 + **`ldapProvider.authenticate()` 정확히 1회 호출 검증**, 재조회 부재 → 예외 전파, 재조회 비-Employee(지원자 선점) → 예외 전파 — 4건
 - `ApplicantSignUpServiceTest` 보강: UserRepository 모킹 전환, 임직원 점유 loginId 실패, checkEmailAvailability 가용/점유/trim — 10건
 - `ApplicantSignUpControllerTest` 보강: check-email 200 true/200 false/400 형식/400 blank — 8건
@@ -275,9 +277,11 @@ $env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tes
 8. `User.loginId`는 여전히 nullable
 9. 운영 MariaDB에 `uk_users_login_id` DDL 수동 적용 필요(설계 문서 §4 Scope A-6 사전 점검 절차 포함)
 10. ActivityLog 계측 보류 — 9b 이후 계측 스윕에서 `APPLICANT_PASSWORD_CHANGE` 등 추가
+11. **`Employee.deptName`의 `@Column(unique = true)`는 구조적 리스크** — 같은 부서 임직원은 여러 명일 수 있으므로, 같은 부서의 다른 임직원이 최초 로그인(JIT)하면 deptName unique 충돌로 저장이 실패한다(05y는 이 경우를 loginId race가 아닌 제약 위반으로 정확히 전파 — 복구하지 않음). 인증 안정성 관점에서 **별도 작은 Fix phase로 제약 제거 권고**(3차 리뷰).
 
 ## Next Phase Considerations
 
 - Phase 09b 진행(본 슬라이스는 audit 파이프라인 비접촉 — 영향 없음)
+- **`Employee.deptName` unique 제약 제거 Fix phase** — 동일 부서 임직원 JIT 차단 리스크 해소(9b 전 처리 권장, 3차 리뷰)
 - loginId 정책(이메일 vs 별도 ID) 결정 후: 안 1 = signUp `loginId=email` 대입 + email 필수화, 안 2 = check-login-id API 추가
 - 운영 배포 시 MariaDB 수동 DDL 적용(중복/collation 사전 점검 포함)

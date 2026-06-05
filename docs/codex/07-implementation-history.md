@@ -11,6 +11,7 @@
   - **Scope E**: `DataIntegrityViolationException` → 409 generic + 원인 warn 로그(전 엔드포인트 적용), `Applicant.changePassword/changePhoneNumber` 의미 메서드(기존 @Setter 유지 — 점진 개선).
 - Tests: scoped 실행 **BUILD SUCCESSFUL — 40 tests / 0 failures** (`ApplicantSignUpServiceTest` 10 · `ApplicantSignUpControllerTest` 8 · `ApplicantAccountServiceTest` 7 · `ApplicantAccountControllerTest` 7 · `RoutingAuthenticationProviderTest` 4 — race 복구 시 `ldapProvider.authenticate()` 1회 호출 검증 포함, LDAP mock · `UserRepositoryTest` 4 — JOINED 부모 테이블 unique 충돌/null 비충돌 실증). 전체 회귀 미실행(프로젝트 규칙).
 - 운영 주의: MariaDB `uk_users_login_id` 수동 DDL 적용 필요(설계 §4 사전 점검 — 중복/null·blank/`INFORMATION_SCHEMA.COLUMNS` collation 확인 포함).
+- 구현 리뷰 3차 반영(2026-06-05, instruction.md, Low 2 + 후속 리스크 1): ① `ApplicantAccountControllerTest`에 `springSecurity()` filter chain 적용 — 미인증 401/임직원 403이 실제 `/api/applicant/**` matcher(+EntryPoint/AccessDeniedHandler)로 검증되도록 전환, 인증은 `with(authentication(...))` post-processor(기존 `ApplicantInterviewControllerTest` 관례). 재실행 7/7 통과. ② 본 히스토리 설계 항목 stale "구현 미착수" 문구 정정. ③ **`Employee.deptName` unique 제약 = 구조적 리스크 기록** — 동일 부서의 다른 임직원 최초 로그인(JIT) 시 deptName unique 충돌로 저장 실패 가능(05y는 복구하지 않고 예외 전파 — 정확한 동작). 05y 범위 밖, **별도 작은 Fix phase로 제약 제거 권고**(9b 전 처리 권장).
 - Documentation:
   - `docs/codex/implementation/phase-05y-applicant-account-hardening.md`
   - `docs/codex/reports/phase-05y-applicant-account-hardening.html`
@@ -35,7 +36,7 @@
   - `docs/codex/design/phase-05y-applicant-account-hardening-design.md`
   - `docs/codex/reports/phase-05y-applicant-account-hardening-design.html`
   - `CONTEXT.md` (Flagged ambiguities — loginId 정책 미결정 추가)
-- 상태: **구현 미착수.** 결정 후 추가 비용: 안 1 = signUp `loginId=email` + email 필수화 / 안 2 = check-login-id API 1개. loginId 정책 결정은 가입 화면 프론트 작업 전 timebox 권장.
+- 상태: **설계 완료. 구현은 상단 "Phase 05y - Applicant Account Hardening 구현" 항목 참조.** 결정 후 추가 비용: 안 1 = signUp `loginId=email` + email 필수화 / 안 2 = check-login-id API 1개. loginId 정책 결정은 가입 화면 프론트 작업 전 timebox 권장.
 
 ## Phase 09a-RF2 - ActivityLog Foundation 2차 리뷰 보완 (구현 완료)
 

@@ -62,6 +62,10 @@
     LDAP JIT race 복구), ② 가입 화면용 <strong>이메일 중복체크 API</strong>, ③ 지원자 <strong>비밀번호/전화번호 변경 API</strong>,
     ④ <strong>DB 제약 위반 409 응답 정비</strong>. 설계 문서의 리뷰 2차 반영본(LDAP 재인증 제거, 복구 범위 한정)을 그대로 구현했다.
     audit 파이프라인 비접촉 — Phase 09b 진행에 영향 없다.
+    <br><br>
+    <strong>2026-06-05 구현 리뷰(3차) 반영:</strong> <code>ApplicantAccountControllerTest</code>에 <code>springSecurity()</code>
+    filter chain 적용 — 미인증 401/임직원 403이 실제 <code>/api/applicant/**</code> SecurityConfig matcher를 통과해 검증되도록 전환.
+    07-history stale 문구 정정. <code>Employee.deptName</code> unique 제약은 별도 Fix phase 권고로 기록.
   </div>
   <table>
     <tr><th>설계 문서</th><td><code>docs/codex/design/phase-05y-applicant-account-hardening-design.md</code></td></tr>
@@ -215,7 +219,7 @@ DB 제약 위반(race 등) → 409 { "success": false, "data": null, "message": 
       <tr><td><code>ApplicantSignUpServiceTest</code></td><td>10</td><td>UserRepository 전환 · 임직원 점유 loginId 실패 · checkEmailAvailability 가용/점유/trim</td><td><span class="badge b-green">passed</span></td></tr>
       <tr><td><code>ApplicantSignUpControllerTest</code></td><td>8</td><td>check-email 200 true/false · 400 형식/blank</td><td><span class="badge b-green">passed</span></td></tr>
       <tr><td><code>ApplicantAccountServiceTest</code></td><td>7</td><td>비밀번호 변경 성공/불일치/동일 거부 · 전화번호 성공/trim/불일치</td><td><span class="badge b-green">passed</span></td></tr>
-      <tr><td><code>ApplicantAccountControllerTest</code></td><td>7</td><td>미인증 401 · 임직원 403 · 변경 200(+실저장 검증) · validation 400</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>ApplicantAccountControllerTest</code></td><td>7</td><td><strong>springSecurity() filter chain 적용</strong> — 미인증 401(EntryPoint) · 임직원 403(matcher 실검증) · 변경 200(+실저장 검증) · validation 400</td><td><span class="badge b-green">passed</span></td></tr>
       <tr><td><code>RoutingAuthenticationProviderTest</code></td><td>4</td><td>JIT 성공 · race 복구(<strong>authenticate 1회 검증</strong>) · 부재/비-Employee 전파 (LDAP mock)</td><td><span class="badge b-green">passed</span></td></tr>
       <tr><td><code>UserRepositoryTest</code></td><td>4</td><td>동일 loginId unique 충돌(교차 서브타입) · null 2건 허용 · existsByLoginId 전체 범위</td><td><span class="badge b-green">passed</span></td></tr>
     </tbody>
@@ -231,6 +235,7 @@ DB 제약 위반(race 등) → 409 { "success": false, "data": null, "message": 
     <tbody>
       <tr><td><span class="badge b-amber">보안</span></td><td>check-email enumeration 벡터(rate limiting/CAPTCHA 미적용) · currentPassword 시도 횟수 제한 없음 · 전화번호 변경 SMS 재인증/알림 없음 · CSRF 재검토 시 비밀번호 변경 우선</td></tr>
       <tr><td><span class="badge b-amber">운영</span></td><td>MariaDB <code>uk_users_login_id</code> 수동 DDL 적용 필요(중복/null·blank/collation 사전 점검 — 설계 §4)</td></tr>
+      <tr><td><span class="badge b-amber">구조 리스크</span></td><td><code>Employee.deptName</code> <code>unique</code> 제약 — 동일 부서의 다른 임직원 최초 로그인(JIT) 시 저장 실패 가능(05y는 정확히 예외 전파). <strong>별도 작은 Fix phase로 제약 제거 권고</strong>(9b 전 처리 권장)</td></tr>
       <tr><td><span class="badge b-gray">후속</span></td><td>loginId 대소문자 semantics(collation 의존 제거) · <code>nullable=false</code> · 타 세션 무효화 · ActivityLog 계측(9b 이후)</td></tr>
     </tbody>
   </table>
@@ -240,6 +245,7 @@ DB 제약 위반(race 등) → 409 { "success": false, "data": null, "message": 
   <h2>10. 다음 단계</h2>
   <ul style="font-size:.93rem">
     <li><strong>Phase 09b 진행</strong> — 본 슬라이스는 audit 파이프라인 비접촉, 영향 없음.</li>
+    <li><strong><code>Employee.deptName</code> unique 제거 Fix phase</strong> — 동일 부서 임직원 JIT 차단 리스크 해소(9b 전 권장).</li>
     <li>loginId 정책 결정 후 추가 비용: 안 1 = signUp <code>loginId=email</code> + email 필수화 / 안 2 = check-login-id API 1개.</li>
     <li>운영 배포 시 MariaDB 수동 DDL 적용.</li>
   </ul>
