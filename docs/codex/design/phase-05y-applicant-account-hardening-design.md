@@ -5,6 +5,8 @@
 - 선행 관계: Phase 05x(지원자 회원가입) 후속, **Phase 09b 착수 전 선행 슬라이스**
 - 관련 문서: `docs/codex/implementation/phase-05x-applicant-sign-up.md`, `docs/codex/implementation/fix-auth-status-codes-401-403.md`
 
+> 2026-06-05 리뷰 1차 반영(instruction.md, Major 3 + Medium 3): ① loginId 정규화 정책 명시(05y는 trim only, 대소문자 semantics는 collation 의존 제거 후속 결정), ② LDAP JIT 동시 생성 race **복구** 채택(선택 B — unique 차단에서 끝내지 않고 재조회 후 정상 로그인 복구), ③ 전화번호 변경에 currentPassword 재확인 채택(권장안), ④ check-email은 "email 입력값이 있을 때만 호출하는 advisory API"로 명확화, ⑤ 운영 DDL 사전 점검 3종 보강, ⑥ JIT race/복구 단위 테스트 추가.
+
 ## 1. 목적
 
 지원자 loginId 정책(이메일을 loginId로 쓸지, 별도 ID를 입력받을지)이 **미결정**인 상태에서, 어느 안이 채택되어도 그대로 유효한 계정 기능만 골라 먼저 구현한다. 동시에 현재 코드에 실재하는 loginId 무결성 결함을 수정한다.
@@ -64,13 +66,41 @@
 2. `UserRepository`에 `boolean existsByLoginId(String loginId)` 추가.
 3. `ApplicantSignUpService.signUp()`의 loginId 중복체크를 `userRepository.existsByLoginId()`로 교체(User 전체 범위). 실패 메시지 불변: `"이미 사용 중인 아이디입니다."`
 4. `ApplicantRepository.existsByLoginId` 제거(유일 사용처가 3번으로 이동 — 구현 시 사용처 재확인 후 제거).
-5. 운영(MariaDB) 수동 DDL:
+5. **loginId 정규화 정책(리뷰 Major 1)**:
+   - 05y에서 loginId는 **trim only**로 유지한다(가입 경로 — 현행과 동일). 로그인/JIT 경로는 입력값 그대로 사용(현행 유지).
+   - **대소문자 구분 여부는 DB collation에 의존하지 않도록 후속 phase에서 명시 결정한다.** MariaDB collation이 case-insensitive(예: `utf8mb4_general_ci`)면 `user01`/`USER01`이 유니크 충돌로 묶이고, H2 테스트(case-sensitive)와 운영 동작이 달라질 수 있다.
+   - 테스트는 H2 unique 동작만 검증하고, 운영 MariaDB collation 차이는 **DDL 적용 전 점검 항목**으로 남긴다(아래 6번 점검 쿼리).
+   - `normalizeLoginId()`를 만들어 가입/로그인/JIT 저장 경로에 동일 적용하는 안은 LDAP `sAMAccountName` 대소문자 정책에 영향을 줄 수 있어 **05y에서는 보류**한다(후속 결정과 함께).
+6. 운영(MariaDB) 수동 DDL — 적용 전 사전 점검 포함:
 
 ```sql
+-- 1) 중복 loginId 점검 (0건이어야 적용 가능)
+SELECT login_id, COUNT(*)
+FROM users
+WHERE login_id IS NOT NULL
+GROUP BY login_id
+HAVING COUNT(*) > 1;
+
+-- 2) null / blank loginId 현황 파악
+SELECT COUNT(*)
+FROM users
+WHERE login_id IS NULL OR TRIM(login_id) = '';
+
+-- 3) 기존 인덱스/제약명 충돌 확인 + collation 확인
+SHOW INDEX FROM users;
+
+-- 4) 적용
 ALTER TABLE users ADD CONSTRAINT uk_users_login_id UNIQUE (login_id);
 ```
 
-> migration framework가 없으므로 H2(ddl-auto)는 엔티티 선언으로 반영되고, 운영 DB는 위 DDL을 별도 적용한다. 적용 전 기존 데이터의 중복 loginId 존재 여부를 먼저 점검한다(`SELECT login_id, COUNT(*) FROM users GROUP BY login_id HAVING COUNT(*) > 1`).
+> migration framework가 없으므로 H2(ddl-auto)는 엔티티 선언으로 반영되고, 운영 DB는 위 DDL을 별도 적용한다. 점검 3)에서 테이블 collation이 case-insensitive로 확인되면 5번 정책(후속 명시 결정) 전까지 대소문자만 다른 loginId가 유니크 충돌로 묶이는 동작 차이를 인지하고 적용한다.
+
+7. **LDAP JIT 동시 생성 race 복구(리뷰 Major 2 — 선택 B 채택)**:
+   - 현재 JIT 경로는 `findUserByLoginId()` 부재 확인 → LDAP 인증 → 즉시 `employeeRepository.save()`라서, 동일 임직원의 동시 최초 로그인 2건이면 unique 제약 도입 후 한쪽이 `DataIntegrityViolationException`으로 실패한다. unique 제약은 "영구 중복 데이터 방지"(차단)일 뿐 "정상 로그인 보장"(복구)이 아니다.
+   - 채택: `RoutingAuthenticationProvider.processLdapAndJit()`에서 Employee save 중 `DataIntegrityViolationException` 발생 시 `userRepository.findUserByLoginId(loginId)`를 **재조회**하고:
+     - 결과가 `Employee`면 → `processLdap(authentication, user)`로 정상 로그인 복구(LDAP 인증은 이미 성공한 상태).
+     - 결과가 `Employee`가 아니거나(이론상 race에서 동일 loginId 지원자 가입이 선점한 경우) 부재면 → 예외를 전파해 인증 실패 처리.
+   - 이 복구가 있으므로 동시 JIT의 사용자 체감은 "한 요청도 실패 없이 로그인 성공"이 된다.
 
 ### Scope B — 이메일 중복체크 API (가입 화면 지원)
 
@@ -82,7 +112,7 @@ ALTER TABLE users ADD CONSTRAINT uk_users_login_id UNIQUE (login_id);
 - 파라미터 검증: 컨트롤러 클래스에 `@Validated` + `@RequestParam @NotBlank @Email @Size(max = 255)`. 위반 시 기존 `ConstraintViolationException` 핸들러가 400으로 응답(컨트롤러 파라미터 검증에 `@Validated`를 쓰는 첫 사례 — config properties 외 최초).
 - 정규화: `signUp()`의 `normalizeEmail`(trim)과 **동일한 정규화**를 거친 뒤 `existsByEmail` 판정. 정규화 불일치는 가용 판정 오류를 만들므로 같은 private 메서드를 재사용한다.
 - 응답: `ApiResponse<ApplicantEmailAvailabilityResponse>` — `{ "available": true | false }`. 가입 여부 외 어떤 정보도 노출하지 않는다.
-- 의미: **advisory(UX 사전 안내) 전용.** 최종 권위는 기존대로 signUp 시점 재검증 + `Applicant.email` DB unique. race로 사전 체크와 결과가 달라질 수 있음은 정상 동작.
+- 의미: **email 입력값이 있을 때만 호출하는 advisory(UX 사전 안내) 전용 API**(리뷰 Medium 반영). 현재 가입 정책에서 email은 optional(`@NotBlank` 없음)이므로, 프론트가 이 API를 "가입 전 필수 검증"처럼 사용하면 가입 정책과 충돌한다 — 지원자가 email을 입력한 경우에만 호출한다. email 필수 전환은 결정-의존 보류 항목(§2.2). 최종 권위는 기존대로 signUp 시점 재검증 + `Applicant.email` DB unique. race로 사전 체크와 결과가 달라질 수 있음은 정상 동작.
 - SecurityConfig: `"/api/auth/applicants/check-email"`을 permitAll 목록에 **명시 추가**. 현재 `anyRequest().permitAll()` fall-through로도 접근 가능하지만, `fix-auth-status-codes-401-403.md`에 기록된 "permitAll → authenticated + allowlist 전환" 미해결 과제가 실행될 때 깨지지 않도록 지금 명시한다(05x의 sign-up 명시 등록과 동일 관례).
 
 ### Scope C — 비밀번호 변경 API
@@ -107,8 +137,14 @@ ALTER TABLE users ADD CONSTRAINT uk_users_login_id UNIQUE (login_id);
 | --- | --- | --- |
 | POST | `/applicant/account/phone-number` | ROLE_APPLICANT |
 
-- Request: `ApplicantPhoneNumberChangeRequest(phoneNumber)` record — `@NotBlank @Size(max = 30)` (05x 가입 정책과 동일).
-- trim 후 저장. 전화번호 유니크 제약은 가입과 동일하게 두지 않는다(기존 정책 유지).
+- Request: `ApplicantPhoneNumberChangeRequest(currentPassword, phoneNumber)` record (리뷰 Major 3 — 권장안 채택).
+  - `currentPassword`: `@NotBlank`
+  - `phoneNumber`: `@NotBlank @Size(max = 30)` (05x 가입 정책과 동일)
+- 규칙:
+  1. `passwordEncoder.matches(currentPassword, 저장값)` 불일치 → 400 `"현재 비밀번호가 일치하지 않습니다."` (Scope C와 동일 메시지 — 검증 로직 공유)
+  2. 통과 시 trim 후 저장.
+- 채택 근거: 전화번호는 향후 메시지 발송(MessageBatch)/본인확인/알림 채널과 연결될 가능성이 높은 개인정보이고, 금융권·채용 시스템 성격상 세션 탈취만으로 통지 채널을 변조할 수 없도록 재확인을 둔다. SMS 재인증/변경 알림은 여전히 후속(§7).
+- 전화번호 유니크 제약은 가입과 동일하게 두지 않는다(기존 정책 유지).
 - 응답: `ApiResponse<Void>` 성공.
 
 ### Scope E — 횡단 보강
@@ -132,6 +168,7 @@ ALTER TABLE users ADD CONSTRAINT uk_users_login_id UNIQUE (login_id);
 | 가입 email `@NotBlank` 전환 | 결정-의존 — 실제 분기점 |
 | 아이디 찾기 / 비로그인 비밀번호 재설정 | 결정-의존 + NICE 본인인증 의존 |
 | email lowercase 정규화 | 기존 저장 데이터와 비교 semantics 변경 — 별도 검토(§7) |
+| loginId 대소문자 정규화(`normalizeLoginId()` 가입/로그인/JIT 공통 적용) | LDAP `sAMAccountName` 대소문자 정책 영향 — collation 의존 제거 결정과 함께 후속 phase(§4 Scope A-5) |
 | NICE 본인인증 연동, rate limiting, CAPTCHA | 05x Known Limitations 승계 |
 | name / ci 변경 API | 본인인증 산출물 — 일반 수정 API로 열지 않음 |
 | ActivityLog 계측(비밀번호/연락처 변경 감사) | 9a `AuditActionType` taxonomy가 관리자/파기 행위 중심 + typed `AuditMetadata`가 9b 작업 — 지원자 self-service 행위 유형 추가는 9b 이후 계측 스윕에서 일괄(§7에 hook 명시) |
@@ -148,7 +185,7 @@ ALTER TABLE users ADD CONSTRAINT uk_users_login_id UNIQUE (login_id);
 | `controller` | `ApplicantAccountController` | Controller | `/applicant/account` 하위 비밀번호/전화번호 변경 엔드포인트. `@AuthenticationPrincipal CustomUserDetails` → `CurrentApplicantService.getCurrentApplicantId()`로 본인 식별(401/403 일관 — fix-auth 슬라이스 정합) |
 | `service` | `ApplicantAccountService` | Service | `changePassword(applicantId, request)`, `changePhoneNumber(applicantId, request)`. `@Transactional` 변경 메서드. Applicant 조회 실패 시 `InvalidApplicantAccountException` |
 | `dto.request` | `ApplicantPasswordChangeRequest` | Request DTO (record) | currentPassword/newPassword + Bean Validation |
-| `dto.request` | `ApplicantPhoneNumberChangeRequest` | Request DTO (record) | phoneNumber + Bean Validation |
+| `dto.request` | `ApplicantPhoneNumberChangeRequest` | Request DTO (record) | currentPassword/phoneNumber + Bean Validation |
 | `dto.response` | `ApplicantEmailAvailabilityResponse` | Response DTO (record) | `available` boolean 단일 필드 |
 | `exception` | `InvalidApplicantAccountException` | Exception | 계정 변경 검증 실패(현재 비밀번호 불일치 등) → 400 |
 
@@ -164,6 +201,7 @@ ALTER TABLE users ADD CONSTRAINT uk_users_login_id UNIQUE (login_id);
 | `controller.ApplicantSignUpController` | `@Validated` + `GET /check-email` 추가 |
 | `exception.GlobalExceptionHandler` | `InvalidApplicantAccountException` → 400, `DataIntegrityViolationException` → 409 핸들러 추가 |
 | `config.SecurityConfig` | permitAll 목록에 `"/api/auth/applicants/check-email"` 명시 추가 |
+| `security.auth.RoutingAuthenticationProvider` | `processLdapAndJit()` save 시 `DataIntegrityViolationException` catch → `findUserByLoginId` 재조회 → Employee면 `processLdap` 복구, 아니면 예외 전파(§4 Scope A-7) |
 
 ### 6.3 인가 경로 분석 (SecurityConfig 변경 최소화 근거)
 
@@ -177,10 +215,11 @@ ALTER TABLE users ADD CONSTRAINT uk_users_login_id UNIQUE (login_id);
 3. 비밀번호 변경 시 타 세션 무효화 없음(세션 레지스트리 부재).
 4. 비밀번호 변경의 `currentPassword` 검증에 **시도 횟수 제한 없음** — 세션 탈취 상태에서의 비밀번호 brute-force가 이론상 가능. rate limiting 도입 시(1번과 함께) 포함 검토.
 5. CSRF disabled는 단일 filter chain 전 엔드포인트 공통의 기존 결정이며 본 슬라이스가 새 위험을 추가하지 않으나, 비밀번호 변경은 영향도가 높은 엔드포인트이므로 CSRF 정책 재검토 시 우선 대상.
-6. 전화번호 변경에 본인 재확인/변경 알림 없음 — 통지 채널 변조 가능성. MessageBatch 실발송 단계 도입 전 "연락처 변경 시 재확인 또는 변경 알림" 후속 과제로 연결.
-7. 비밀번호/전화번호 변경의 ActivityLog 계측 보류 — 계측 시 `AuditActionType`에 지원자 self-service 유형(예: `APPLICANT_PASSWORD_CHANGE`) 추가 + `ApplicantAccountService` 변경 메서드가 hook 지점.
-8. `User.loginId`는 여전히 nullable — 후속 강화 대상.
-9. 비밀번호 강도 정책은 길이(8~100)만 — 05x 한계 승계.
+6. 전화번호 변경은 currentPassword 재확인을 채택(리뷰 반영)했으나 **SMS 재인증/변경 알림은 없음** — SMS 인증/계정 복구 수단으로 phoneNumber를 사용하기 전에는 반드시 재인증 또는 변경 알림을 도입한다(MessageBatch 실발송 단계 전 후속 과제).
+7. loginId 대소문자 비교 semantics가 **DB collation 의존** 상태 — 05y는 trim only 유지, collation 의존 제거(명시 정규화 정책)는 후속 phase에서 결정(§4 Scope A-5).
+8. 비밀번호/전화번호 변경의 ActivityLog 계측 보류 — 계측 시 `AuditActionType`에 지원자 self-service 유형(예: `APPLICANT_PASSWORD_CHANGE`) 추가 + `ApplicantAccountService` 변경 메서드가 hook 지점.
+9. `User.loginId`는 여전히 nullable — 후속 강화 대상.
+10. 비밀번호 강도 정책은 길이(8~100)만 — 05x 한계 승계.
 
 ## 8. 테스트 계획
 
@@ -197,7 +236,7 @@ ALTER TABLE users ADD CONSTRAINT uk_users_login_id UNIQUE (login_id);
 ### 8.3 신규 — `ApplicantAccountServiceTest`
 
 - 비밀번호 변경 성공(인코딩 저장 검증) / 현재 비밀번호 불일치 400 / 새 비밀번호가 현재와 동일 400.
-- 전화번호 변경 성공 / trim 검증.
+- 전화번호 변경 성공 / trim 검증 / **currentPassword 불일치 400**(리뷰 반영).
 
 ### 8.4 신규 — `ApplicantAccountControllerTest`
 
@@ -206,15 +245,22 @@ ALTER TABLE users ADD CONSTRAINT uk_users_login_id UNIQUE (login_id);
 - validation 위반 → 400.
 - (가능 시) 임직원 인증 → 403.
 
-### 8.5 선택 — `UserRepository` `@DataJpaTest`
+### 8.5 신규 — `RoutingAuthenticationProvider` JIT race 복구 단위 테스트 (리뷰 Medium 반영)
 
-- 동일 loginId 2건 insert 시 `DataIntegrityViolationException`(H2 유니크 제약 동작 확인).
+- `employeeRepository.save()`가 `DataIntegrityViolationException`을 던질 때:
+  - 재조회 결과가 Employee → `processLdap` 경로로 정상 Authentication 반환(복구).
+  - 재조회 결과 부재 또는 Employee 아님 → 예외 전파(인증 실패).
+- LDAP provider는 mock — 실제 LDAP 연결 금지(CLAUDE.md §6).
+
+### 8.6 선택 — `UserRepository` `@DataJpaTest`
+
+- 동일 loginId 2건 insert 시 `DataIntegrityViolationException`(H2 유니크 제약 동작 확인 — H2는 case-sensitive이므로 대소문자 차이 케이스는 검증 범위 아님, §4 Scope A-5).
 - null loginId 2건 insert 허용 확인(NULL은 제약 비충돌).
 
-### 8.6 실행 명령 (scoped)
+### 8.7 실행 명령 (scoped)
 
 ```powershell
-$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*ApplicantSignUp*" --tests "*ApplicantAccount*" --no-daemon
+$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*ApplicantSignUp*" --tests "*ApplicantAccount*" --tests "*RoutingAuthenticationProvider*" --no-daemon
 ```
 
 전체 회귀는 사용자 명시 요청 시에만 실행한다. `User` 엔티티 변경(unique)이 있으므로 구현 시 기존 픽스처 중 **중복 loginId를 명시 사용하는 테스트**가 있는지 검색(`setLoginId` 사용처) 후 영향 보고에 포함한다.
