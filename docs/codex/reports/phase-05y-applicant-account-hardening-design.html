@@ -67,6 +67,11 @@
     LDAP JIT 동시 생성 race <strong>복구</strong> 채택(차단에서 끝내지 않고 재조회 후 정상 로그인), 전화번호 변경에
     <strong>currentPassword 재확인</strong> 채택, check-email advisory 명확화(email 입력 시에만 호출), 운영 DDL 사전 점검 3종 보강,
     JIT race/복구 단위 테스트 추가.
+    <br><br>
+    <strong>2026-06-05 리뷰 2차 반영(Major 1 + Medium 2 + Low 1):</strong> JIT race 복구 시 <code>processLdap()</code> 재호출 금지 —
+    LDAP 재인증 없이 기존 <code>ldapUser</code>로 <code>buildEmployeeAuthentication()</code> helper 토큰 생성(테스트에
+    <code>ldapProvider.authenticate()</code> 1회 호출 검증 추가), collation 점검 쿼리를 <code>INFORMATION_SCHEMA.COLUMNS</code>로 교체,
+    복구 범위 한정(<code>deptName</code> unique 등 loginId race 외 제약 위반은 예외 전파), 07-history 요약 정정.
   </div>
   <table>
     <tr><th>설계 문서</th><td><code>docs/codex/design/phase-05y-applicant-account-hardening-design.md</code></td></tr>
@@ -122,7 +127,7 @@
         <li><code>UserRepository.existsByLoginId</code> 신설</li>
         <li>signUp 중복체크 User 레벨 전환</li>
         <li>정규화 정책: <strong>trim only</strong>(대소문자 semantics는 collation 의존 제거 후속 결정)</li>
-        <li>LDAP JIT 동시 생성 race <strong>복구</strong>(DataIntegrityViolation 시 재조회 → processLdap)</li>
+        <li>LDAP JIT 동시 생성 race <strong>복구</strong>(DataIntegrityViolation 시 재조회 → 기존 ldapUser로 토큰 생성, LDAP 재인증 없음)</li>
         <li>운영 수동 DDL(사전 점검 3종 + 유니크 인덱스)</li>
         <li><code>nullable=false</code>는 후속(픽스처 영향)</li>
       </ul>
@@ -241,7 +246,7 @@
       <tr><td><code>ApplicantSignUpController</code></td><td><code>@Validated</code> + GET /check-email</td></tr>
       <tr><td><code>GlobalExceptionHandler</code></td><td>400(account) / 409(integrity) 핸들러 추가</td></tr>
       <tr><td><code>SecurityConfig</code></td><td>check-email permitAll 명시 등록</td></tr>
-      <tr><td><code>RoutingAuthenticationProvider</code></td><td>JIT save 시 DataIntegrityViolation → 재조회 후 processLdap 복구(Employee 아니면 예외 전파)</td></tr>
+      <tr><td><code>RoutingAuthenticationProvider</code></td><td>JIT save 시 DataIntegrityViolation → 재조회 후 <code>buildEmployeeAuthentication</code> 복구(LDAP 재인증 없음 · Employee 아니면 예외 전파)</td></tr>
     </tbody>
   </table>
 </section>
@@ -260,7 +265,7 @@
       <tr><td>7</td><td>새 비밀번호 8~100자, BCrypt 인코딩 저장</td><td>400 (Bean Validation)</td></tr>
       <tr><td>8</td><td>전화번호 변경도 현재 비밀번호 일치 필수(리뷰 반영) · phoneNumber NotBlank, max 30, trim 저장</td><td>400 "현재 비밀번호가 일치하지 않습니다." / 400 (Bean Validation)</td></tr>
       <tr><td>9</td><td>DB 제약 위반은 409 + generic 메시지(제약명/SQL 응답 비노출, 원인은 warn 서버 로그 기록 — 전 엔드포인트 적용이므로 구현 시 회귀 영향 점검)</td><td>409 "이미 처리되었거나 중복된 데이터입니다."</td></tr>
-      <tr><td>10</td><td>동시 JIT 중복 생성 시 unique 차단 + 재조회 복구로 정상 로그인 보장(Employee 아니면 인증 실패 전파)</td><td>—</td></tr>
+      <tr><td>10</td><td>동시 JIT <strong>loginId race</strong>는 unique 차단 + 재조회 복구로 양쪽 로그인 성공(LDAP 재인증 없이 기존 ldapUser로 토큰 생성). loginId race가 아닌 제약 위반(deptName unique 등)은 복구하지 않고 예외 전파</td><td>—</td></tr>
       <tr><td>11</td><td>name / ci는 변경 API로 열지 않음(본인인증 산출물)</td><td>—</td></tr>
     </tbody>
   </table>
@@ -274,10 +279,19 @@ GROUP BY login_id HAVING COUNT(*) &gt; 1;
 SELECT COUNT(*) FROM users
 WHERE login_id IS NULL OR TRIM(login_id) = '';
 
--- 3) 기존 인덱스/제약명 충돌 + collation 확인
+-- 3) 기존 인덱스/제약명 충돌 확인
 SHOW INDEX FROM users;
 
--- 4) 적용
+-- 4) login_id 컬럼 collation(case-sensitivity) 확인
+--    (SHOW INDEX의 Collation은 인덱스 정렬 방향이므로 사용 금지)
+SELECT COLUMN_NAME, COLLATION_NAME
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = 'users'
+  AND COLUMN_NAME = 'login_id';
+-- 또는: SHOW FULL COLUMNS FROM users LIKE 'login_id';
+
+-- 5) 적용
 ALTER TABLE users ADD CONSTRAINT uk_users_login_id UNIQUE (login_id);</code></pre>
 </section>
 
@@ -290,7 +304,7 @@ ALTER TABLE users ADD CONSTRAINT uk_users_login_id UNIQUE (login_id);</code></pr
       <tr><td><code>ApplicantSignUpControllerTest</code></td><td>보강</td><td>check-email 200 가용 / 200 비가용 / 400 형식 / 400 blank</td></tr>
       <tr><td><code>ApplicantAccountServiceTest</code></td><td>신규</td><td>비밀번호 변경 성공(인코딩 검증) · 현재 비밀번호 불일치 · 동일 새 비밀번호 거부 · 전화번호 변경/trim · 전화번호 변경 currentPassword 불일치</td></tr>
       <tr><td><code>ApplicantAccountControllerTest</code></td><td>신규</td><td>미인증 401 · 변경 200 · validation 400 · (가능 시) 임직원 403</td></tr>
-      <tr><td><code>RoutingAuthenticationProvider</code> 단위 테스트</td><td>신규</td><td>JIT save DataIntegrityViolation 시 재조회 복구(Employee → 정상 인증) · Employee 아님/부재 → 실패 전파 (LDAP mock)</td></tr>
+      <tr><td><code>RoutingAuthenticationProvider</code> 단위 테스트</td><td>신규</td><td>JIT save DataIntegrityViolation 시 재조회 복구(Employee → 정상 인증, <strong>authenticate() 1회 호출 검증</strong>) · Employee 아님/부재 → 실패 전파 (LDAP mock)</td></tr>
       <tr><td><code>UserRepository @DataJpaTest</code></td><td>선택</td><td>중복 loginId insert 실패 · null loginId 다건 허용 (H2 case-sensitive — 대소문자 케이스는 범위 외)</td></tr>
     </tbody>
   </table>

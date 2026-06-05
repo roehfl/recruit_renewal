@@ -1,11 +1,13 @@
 # Phase 05y — Applicant Account Hardening (결정-독립 슬라이스) 설계
 
 - Date: 2026-06-05
-- Work type: design (구현 미착수)
+- Work type: design (**2026-06-05 구현 완료** — `docs/codex/implementation/phase-05y-applicant-account-hardening.md` 참조)
 - 선행 관계: Phase 05x(지원자 회원가입) 후속, **Phase 09b 착수 전 선행 슬라이스**
 - 관련 문서: `docs/codex/implementation/phase-05x-applicant-sign-up.md`, `docs/codex/implementation/fix-auth-status-codes-401-403.md`
 
 > 2026-06-05 리뷰 1차 반영(instruction.md, Major 3 + Medium 3): ① loginId 정규화 정책 명시(05y는 trim only, 대소문자 semantics는 collation 의존 제거 후속 결정), ② LDAP JIT 동시 생성 race **복구** 채택(선택 B — unique 차단에서 끝내지 않고 재조회 후 정상 로그인 복구), ③ 전화번호 변경에 currentPassword 재확인 채택(권장안), ④ check-email은 "email 입력값이 있을 때만 호출하는 advisory API"로 명확화, ⑤ 운영 DDL 사전 점검 3종 보강, ⑥ JIT race/복구 단위 테스트 추가.
+>
+> 2026-06-05 리뷰 2차 반영(instruction.md, Major 1 + Medium 2 + Low 1): ① JIT race 복구 시 `processLdap()` 재호출 금지 — LDAP 재인증 없이 기존 `ldapUser`로 `buildEmployeeAuthentication()` helper 토큰 생성(테스트에 authenticate 1회 호출 검증 추가), ② collation 점검을 `SHOW INDEX`에서 `INFORMATION_SCHEMA.COLUMNS`(또는 `SHOW FULL COLUMNS`)로 교체(SHOW INDEX의 Collation은 인덱스 정렬 방향), ③ 복구 범위 한정 — `Employee.deptName` unique 등 loginId race가 아닌 제약 위반은 복구하지 않고 예외 전파("한 요청도 실패 없이" 표현 정정), ④ 07-history 상단 요약의 전화번호 변경 항목에 currentPassword 재확인 반영.
 
 ## 1. 목적
 
@@ -86,21 +88,40 @@ SELECT COUNT(*)
 FROM users
 WHERE login_id IS NULL OR TRIM(login_id) = '';
 
--- 3) 기존 인덱스/제약명 충돌 확인 + collation 확인
+-- 3) 기존 인덱스/제약명 충돌 확인
 SHOW INDEX FROM users;
 
--- 4) 적용
+-- 4) login_id 컬럼 collation(case-sensitivity) 확인
+--    주의: SHOW INDEX의 Collation 컬럼은 문자열 collation이 아니라
+--    인덱스 정렬 방향(A/D)이므로 collation 확인에 쓰지 않는다(2차 리뷰 Medium 1).
+SELECT COLUMN_NAME, COLLATION_NAME
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = 'users'
+  AND COLUMN_NAME = 'login_id';
+-- 또는: SHOW FULL COLUMNS FROM users LIKE 'login_id';
+
+-- 5) 적용
 ALTER TABLE users ADD CONSTRAINT uk_users_login_id UNIQUE (login_id);
 ```
 
-> migration framework가 없으므로 H2(ddl-auto)는 엔티티 선언으로 반영되고, 운영 DB는 위 DDL을 별도 적용한다. 점검 3)에서 테이블 collation이 case-insensitive로 확인되면 5번 정책(후속 명시 결정) 전까지 대소문자만 다른 loginId가 유니크 충돌로 묶이는 동작 차이를 인지하고 적용한다.
+> migration framework가 없으므로 H2(ddl-auto)는 엔티티 선언으로 반영되고, 운영 DB는 위 DDL을 별도 적용한다. 점검 4)에서 컬럼 collation이 case-insensitive(예: `*_ci`)로 확인되면 5번 정책(후속 명시 결정) 전까지 대소문자만 다른 loginId가 유니크 충돌로 묶이는 동작 차이를 인지하고 적용한다.
 
-7. **LDAP JIT 동시 생성 race 복구(리뷰 Major 2 — 선택 B 채택)**:
+7. **LDAP JIT 동시 생성 race 복구(리뷰 Major 2 — 선택 B 채택, 2차 리뷰 Major 1 반영)**:
    - 현재 JIT 경로는 `findUserByLoginId()` 부재 확인 → LDAP 인증 → 즉시 `employeeRepository.save()`라서, 동일 임직원의 동시 최초 로그인 2건이면 unique 제약 도입 후 한쪽이 `DataIntegrityViolationException`으로 실패한다. unique 제약은 "영구 중복 데이터 방지"(차단)일 뿐 "정상 로그인 보장"(복구)이 아니다.
    - 채택: `RoutingAuthenticationProvider.processLdapAndJit()`에서 Employee save 중 `DataIntegrityViolationException` 발생 시 `userRepository.findUserByLoginId(loginId)`를 **재조회**하고:
-     - 결과가 `Employee`면 → `processLdap(authentication, user)`로 정상 로그인 복구(LDAP 인증은 이미 성공한 상태).
+     - 결과가 `Employee`면 → 이미 인증 성공한 `ldapUser`로 Authentication을 직접 구성해 정상 로그인 복구. **`processLdap()`를 재호출하지 않는다** — `processLdap()`는 내부에서 `ldapProvider.authenticate()`를 다시 수행하므로, 그대로 부르면 LDAP 인증이 2회 일어난다(2차 리뷰 Major 1). DB 저장만 실패한 상태이므로 재인증 없이 아래 helper로 토큰만 만든다:
+
+       ```java
+       private Authentication buildEmployeeAuthentication(User user, CustomUserDetails ldapUser) {
+           CustomUserDetails finalUser = CustomUserDetails.fromUser(user, ldapUser.getAuthorities());
+           return new UsernamePasswordAuthenticationToken(finalUser, null, finalUser.getAuthorities());
+       }
+       ```
+
+       `processLdapAndJit()`의 catch 블록에서 재조회 결과가 `Employee`면 이 helper를 호출한다. (기존 `processLdap()`의 토큰 생성부도 동일 helper로 추출해 재사용 가능 — 구현 시 선택.)
      - 결과가 `Employee`가 아니거나(이론상 race에서 동일 loginId 지원자 가입이 선점한 경우) 부재면 → 예외를 전파해 인증 실패 처리.
-   - 이 복구가 있으므로 동시 JIT의 사용자 체감은 "한 요청도 실패 없이 로그인 성공"이 된다.
+   - **복구 범위의 한정(2차 리뷰 Medium 2)**: `Employee.deptName`에도 `@Column(unique = true)`가 걸려 있어, JIT save 중의 `DataIntegrityViolationException`이 loginId race가 아니라 **deptName unique 충돌**일 수도 있다. 동시 JIT **loginId race인 경우에는** 재조회가 Employee를 찾으므로 양쪽 요청 모두 로그인 성공으로 복구된다. 단, loginId race가 아닌 다른 DB 제약 위반(deptName unique 등)은 재조회가 부재(또는 비-Employee)로 떨어져 복구하지 않고 예외를 전파한다 — 이것이 정상 동작이다.
 
 ### Scope B — 이메일 중복체크 API (가입 화면 지원)
 
@@ -201,7 +222,7 @@ ALTER TABLE users ADD CONSTRAINT uk_users_login_id UNIQUE (login_id);
 | `controller.ApplicantSignUpController` | `@Validated` + `GET /check-email` 추가 |
 | `exception.GlobalExceptionHandler` | `InvalidApplicantAccountException` → 400, `DataIntegrityViolationException` → 409 핸들러 추가 |
 | `config.SecurityConfig` | permitAll 목록에 `"/api/auth/applicants/check-email"` 명시 추가 |
-| `security.auth.RoutingAuthenticationProvider` | `processLdapAndJit()` save 시 `DataIntegrityViolationException` catch → `findUserByLoginId` 재조회 → Employee면 `processLdap` 복구, 아니면 예외 전파(§4 Scope A-7) |
+| `security.auth.RoutingAuthenticationProvider` | `processLdapAndJit()` save 시 `DataIntegrityViolationException` catch → `findUserByLoginId` 재조회 → Employee면 `buildEmployeeAuthentication(user, ldapUser)` helper로 복구(**LDAP 재인증 없음**), 아니면 예외 전파(§4 Scope A-7) |
 
 ### 6.3 인가 경로 분석 (SecurityConfig 변경 최소화 근거)
 
@@ -248,7 +269,7 @@ ALTER TABLE users ADD CONSTRAINT uk_users_login_id UNIQUE (login_id);
 ### 8.5 신규 — `RoutingAuthenticationProvider` JIT race 복구 단위 테스트 (리뷰 Medium 반영)
 
 - `employeeRepository.save()`가 `DataIntegrityViolationException`을 던질 때:
-  - 재조회 결과가 Employee → `processLdap` 경로로 정상 Authentication 반환(복구).
+  - 재조회 결과가 Employee → `buildEmployeeAuthentication` 경로로 정상 Authentication 반환(복구). 이때 **`ldapProvider.authenticate()`가 정확히 1회만 호출됐는지 검증**한다(`verify(ldapProvider, times(1)).authenticate(...)`) — 복구 경로에서 LDAP 재인증이 일어나지 않음을 보장(2차 리뷰 Major 1).
   - 재조회 결과 부재 또는 Employee 아님 → 예외 전파(인증 실패).
 - LDAP provider는 mock — 실제 LDAP 연결 금지(CLAUDE.md §6).
 

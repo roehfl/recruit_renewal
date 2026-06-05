@@ -78,7 +78,7 @@ public class SecurityConfig {
                 .authenticationEntryPoint(authenticationEntryPoint)
                 .accessDeniedHandler(accessDeniedHandler));
         http.authorizeHttpRequests(authorizeRequests -> authorizeRequests
-                .requestMatchers("/api/auth/login", "/api/auth/logout", "/api/auth/applicants/sign-up").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/logout", "/api/auth/applicants/sign-up", "/api/auth/applicants/check-email").permitAll()
                 .requestMatchers("/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**", "/h2-console/**", "/api/menu/tree").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/job-postings/{jobPostingId}/application").hasAuthority("ROLE_APPLICANT")
                 .requestMatchers(HttpMethod.GET, "/api/job-postings/**").permitAll()

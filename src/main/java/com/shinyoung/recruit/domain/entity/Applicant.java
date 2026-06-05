@@ -30,4 +30,12 @@ public class Applicant extends User {
         this.ci = ci;
         this.ciHash = ciHash;
     }
+
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
+
+    public void changePhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
 }

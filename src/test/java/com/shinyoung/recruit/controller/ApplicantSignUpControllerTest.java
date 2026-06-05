@@ -112,4 +112,49 @@ class ApplicantSignUpControllerTest {
         mockMvc.perform(get("/api/auth/applicants/sign-up"))
                 .andExpect(status().isMethodNotAllowed());
     }
+
+    @Test
+    void 이메일_가용성_미점유면_available_true() throws Exception {
+        mockMvc.perform(get("/api/auth/applicants/check-email")
+                        .param("email", "free@example.com"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.available").value(true));
+    }
+
+    @Test
+    void 이메일_가용성_점유면_available_false() throws Exception {
+        Applicant existing = new Applicant("email-ci", HashUtil.sha256("email-ci"));
+        existing.setLoginId("email-holder");
+        existing.setName("기존사용자");
+        existing.setUserName("기존사용자");
+        existing.setPassword("encoded");
+        existing.setPhoneNumber("01000000000");
+        existing.setEmail("taken@example.com");
+        applicantRepository.save(existing);
+
+        mockMvc.perform(get("/api/auth/applicants/check-email")
+                        .param("email", "taken@example.com"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.available").value(false));
+    }
+
+    @Test
+    void 이메일_형식_오류는_400() throws Exception {
+        mockMvc.perform(get("/api/auth/applicants/check-email")
+                        .param("email", "not-an-email"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void 이메일_blank는_400() throws Exception {
+        mockMvc.perform(get("/api/auth/applicants/check-email")
+                        .param("email", "   "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
+    }
 }

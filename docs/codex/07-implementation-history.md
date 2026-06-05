@@ -1,6 +1,22 @@
 # 07. Implementation History
 
-## Phase 05y - Applicant Account Hardening (설계 완료, 구현 미착수)
+## Phase 05y - Applicant Account Hardening 구현 (구현 완료)
+
+- Date: 2026-06-05
+- Work type: implementation. 설계(`phase-05y-applicant-account-hardening-design.md`, 리뷰 2차 반영본) 그대로 구현.
+- Implemented:
+  - **Scope A(loginId 무결성)**: `User.loginId` `@Column(unique=true)`, `UserRepository.existsByLoginId` 신설, signUp 중복체크 User 레벨 전환(메시지 불변), `ApplicantRepository.existsByLoginId` 제거. JIT race 복구 — `processLdapAndJit()` save의 `DataIntegrityViolationException` catch → `findUserByLoginId` 재조회 → Employee면 `buildEmployeeAuthentication(user, ldapUser)`로 **LDAP 재인증 없이** 복구, 아니면(부재/비-Employee — deptName unique 등 loginId race 외 위반 포함) 원본 예외 전파. `processLdap()` 토큰 생성부도 동일 helper로 추출.
+  - **Scope B**: `GET /auth/applicants/check-email`(permitAll 명시, `@Validated` + `@NotBlank @Email @Size(255)`, signUp normalizeEmail 재사용, `{available}`만 응답).
+  - **Scope C/D**: `POST /applicant/account/password`(currentPassword 확인 + 동일 새 비밀번호 거부 + BCrypt), `POST /applicant/account/phone-number`(currentPassword 재확인 + trim). 신규 `ApplicantAccountController`/`ApplicantAccountService`/request DTO 2종/`InvalidApplicantAccountException`(→400).
+  - **Scope E**: `DataIntegrityViolationException` → 409 generic + 원인 warn 로그(전 엔드포인트 적용), `Applicant.changePassword/changePhoneNumber` 의미 메서드(기존 @Setter 유지 — 점진 개선).
+- Tests: scoped 실행 **BUILD SUCCESSFUL — 40 tests / 0 failures** (`ApplicantSignUpServiceTest` 10 · `ApplicantSignUpControllerTest` 8 · `ApplicantAccountServiceTest` 7 · `ApplicantAccountControllerTest` 7 · `RoutingAuthenticationProviderTest` 4 — race 복구 시 `ldapProvider.authenticate()` 1회 호출 검증 포함, LDAP mock · `UserRepositoryTest` 4 — JOINED 부모 테이블 unique 충돌/null 비충돌 실증). 전체 회귀 미실행(프로젝트 규칙).
+- 운영 주의: MariaDB `uk_users_login_id` 수동 DDL 적용 필요(설계 §4 사전 점검 — 중복/null·blank/`INFORMATION_SCHEMA.COLUMNS` collation 확인 포함).
+- Documentation:
+  - `docs/codex/implementation/phase-05y-applicant-account-hardening.md`
+  - `docs/codex/reports/phase-05y-applicant-account-hardening.html`
+- 상태: 구현 완료. 다음 = Phase 09b(영향 없음). loginId 정책 결정은 가입 화면 프론트 작업 전 timebox 권장.
+
+## Phase 05y - Applicant Account Hardening (설계 완료 → 구현 완료, 위 항목 참조)
 
 - Date: 2026-06-05
 - Work type: design. 코드 변경 없음 — 설계 문서/리포트 산출. **9b 착수 전 선행 슬라이스.**
@@ -9,10 +25,11 @@
   - **loginId 중복체크 범위 결함** — 로그인 해석은 `UserRepository.findUserByLoginId()`(users 전체)인데 가입 체크는 `ApplicantRepository.existsByLoginId()`(Applicant만). 임직원(LDAP JIT) loginId와 동일 값으로 가입 가능 → `findUserByLoginId` 2건 → **양쪽 모두 로그인 영구 장애**.
   - `User.loginId` DB 유니크 제약 부재(email/ciHash와 달리) — 동시 가입 race·동시 JIT 중복 Employee row 무방비.
   - `DataIntegrityViolationException` 핸들러 부재 — race 시 500 + 비-ApiResponse 포맷.
-- 설계 범위: ① `User.loginId` `unique=true` + `UserRepository.existsByLoginId` + signUp 체크 User 레벨 전환 + 운영 수동 DDL(`uk_users_login_id`), ② `GET /auth/applicants/check-email`(permitAll 명시, advisory 전용, signUp과 동일 trim 정규화, `{available}` 만 응답), ③ `POST /applicant/account/password`(현재 비밀번호 확인 + 동일 새 비밀번호 거부), ④ `POST /applicant/account/phone-number`, ⑤ `DataIntegrityViolationException`→409 generic + `Applicant.changePassword/changePhoneNumber` 의미 메서드.
+- 설계 범위: ① `User.loginId` `unique=true` + `UserRepository.existsByLoginId` + signUp 체크 User 레벨 전환 + 운영 수동 DDL(`uk_users_login_id`), ② `GET /auth/applicants/check-email`(permitAll 명시, advisory 전용, signUp과 동일 trim 정규화, `{available}` 만 응답), ③ `POST /applicant/account/password`(현재 비밀번호 확인 + 동일 새 비밀번호 거부), ④ `POST /applicant/account/phone-number`(currentPassword 재확인 + phoneNumber 변경), ⑤ `DataIntegrityViolationException`→409 generic + `Applicant.changePassword/changePhoneNumber` 의미 메서드.
 - 인가 설계: 계정 변경 API는 기존 `requestMatchers("/api/applicant/**").hasAuthority("ROLE_APPLICANT")` 보호 네임스페이스 하위(`/applicant/account/**`)에 배치 — `anyRequest().permitAll()` fall-through 에서 matcher 누락 위험을 구조적으로 제거. 심층 방어 = `CurrentApplicantService` 401/403.
 - 범위 제외(결정-의존): check-login-id, 이메일 변경 API(안 1에서 자격증명 변경), 가입 email `@NotBlank` 전환(실제 분기점), 아이디 찾기. 기타 제외: NICE 본인인증/rate limiting(05x 한계 승계), ActivityLog 계측(9b 이후 스윕 — taxonomy 충돌 방지), name/ci 변경, email lowercase 정규화(별도 검토), `nullable=false`(픽스처 영향 — 후속).
 - 리뷰 1차 반영(2026-06-05, instruction.md, Major 3 + Medium 3): ① **loginId 정규화 정책 명시** — 05y는 trim only, 대소문자 semantics는 DB collation 의존 제거를 후속 phase에서 명시 결정(MariaDB CI collation ↔ H2 CS 동작 차이 인지), `normalizeLoginId()` 공통 적용은 LDAP sAMAccountName 정책 영향으로 보류. ② **LDAP JIT 동시 생성 race 복구(선택 B 채택)** — `processLdapAndJit()` save 시 `DataIntegrityViolationException` catch → `findUserByLoginId` 재조회 → Employee면 `processLdap` 복구, 아니면 예외 전파("중복 데이터 방지"에서 "정상 로그인 복구"까지). ③ **전화번호 변경 currentPassword 재확인 채택(권장안)** — `ApplicantPhoneNumberChangeRequest(currentPassword, phoneNumber)`, 통지 채널 변조 방지. ④ check-email은 "email 입력값이 있을 때만 호출하는 advisory"로 명확화(가입 email optional 정책과 충돌 방지). ⑤ 운영 DDL 사전 점검 보강(중복 + null/blank 현황 + SHOW INDEX/collation). ⑥ 테스트 계획에 RoutingAuthenticationProvider JIT race/복구 단위 테스트 추가(LDAP mock).
+- 리뷰 2차 반영(2026-06-05, instruction.md, Major 1 + Medium 2 + Low 1): ① **JIT race 복구의 LDAP 이중 인증 제거** — 복구 시 `processLdap()` 재호출(내부에서 `ldapProvider.authenticate()` 재수행) 대신, 이미 인증 성공한 `ldapUser`로 토큰만 생성하는 `buildEmployeeAuthentication(user, ldapUser)` helper 호출로 정정. 테스트에 race 복구 경로에서 `ldapProvider.authenticate()` 1회 호출 검증 추가. ② **collation 점검 쿼리 교체** — `SHOW INDEX`의 Collation은 인덱스 정렬 방향이므로 `INFORMATION_SCHEMA.COLUMNS`(COLLATION_NAME) 또는 `SHOW FULL COLUMNS`로 교체. ③ **복구 범위 한정** — `Employee.deptName`도 unique라 JIT save의 `DataIntegrityViolationException`이 loginId race가 아닐 수 있음. loginId race만 양쪽 로그인 성공으로 복구, 그 외 제약 위반은 예외 전파("한 요청도 실패 없이" 표현 정정). ④ 본 히스토리 상단 요약 ④ 항목에 currentPassword 재확인 반영.
 - 적대적 검증(5-lens 워크플로, 48 findings): **blocker 0.** 코드 주장 10건 중 9건 confirmed(라인 번호 포함), 결함 시나리오 재현성 확정. 실증 — `@Column(unique=true)` 임시 적용 후 위험 테스트 27건 통과 + DDL `login_id` unique 생성 확인(JOINED 부모 테이블 정상), src/test `setLoginId` ~80곳 전수조사 결과 깨지는 픽스처 없음, `existsByLoginId` 프로덕션 사용처 1곳뿐(제거 안전), 500 기대 제약위반 테스트 없음(409 핸들러 안전). 반영 보정: 예외 타입 표기 `IncorrectResultSizeDataAccessException`(원인 NonUniqueResultException)으로 정정, 409 핸들러에 원인 warn 로깅+전 엔드포인트 회귀 영향 명시, School/CommonCode 로컬 catch 예외 명시, §7 한계에 brute-force 시도 제한/연락처 변경 알림/CSRF 우선 검토 추가.
 - Documentation:
   - `docs/codex/design/phase-05y-applicant-account-hardening-design.md`

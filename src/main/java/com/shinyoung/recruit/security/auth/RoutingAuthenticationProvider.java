@@ -6,6 +6,7 @@ import com.shinyoung.recruit.domain.entity.User;
 import com.shinyoung.recruit.domain.repository.EmployeeRepository;
 import com.shinyoung.recruit.domain.repository.UserRepository;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -61,9 +62,7 @@ public class RoutingAuthenticationProvider implements AuthenticationProvider {
         Authentication ldapAuth = ldapProvider.authenticate(authentication);
 
         CustomUserDetails ldapUser = (CustomUserDetails) Objects.requireNonNull(ldapAuth).getPrincipal();
-        CustomUserDetails finalUser = CustomUserDetails.fromUser(user, Objects.requireNonNull(ldapUser).getAuthorities());
-
-        return new UsernamePasswordAuthenticationToken(finalUser, null, finalUser.getAuthorities());
+        return buildEmployeeAuthentication(user, Objects.requireNonNull(ldapUser));
     }
 
     private Authentication processLdapAndJit(Authentication authentication, String loginId) {
@@ -75,9 +74,25 @@ public class RoutingAuthenticationProvider implements AuthenticationProvider {
         employee.setLoginId(loginId);
         employee.setDeptName(Objects.requireNonNull(ldapUser).getDeptName());
         employee.setName(ldapUser.getName());
-        User savedUser = employeeRepository.save(employee);
 
-        CustomUserDetails finalUser = CustomUserDetails.fromUser(savedUser, ldapUser.getAuthorities());
+        User savedUser;
+        try {
+            savedUser = employeeRepository.save(employee);
+        } catch (DataIntegrityViolationException e) {
+            // 동시 JIT loginId race: 다른 요청이 먼저 같은 Employee를 생성한 경우 재조회로 복구한다.
+            // LDAP 인증은 이미 성공한 상태이므로 재인증 없이 기존 ldapUser로 토큰만 만든다.
+            // loginId race가 아닌 제약 위반(deptName unique 등)은 복구하지 않고 전파한다.
+            User existingUser = userRepository.findUserByLoginId(loginId)
+                    .filter(Employee.class::isInstance)
+                    .orElseThrow(() -> e);
+            return buildEmployeeAuthentication(existingUser, ldapUser);
+        }
+
+        return buildEmployeeAuthentication(savedUser, ldapUser);
+    }
+
+    private Authentication buildEmployeeAuthentication(User user, CustomUserDetails ldapUser) {
+        CustomUserDetails finalUser = CustomUserDetails.fromUser(user, ldapUser.getAuthorities());
         return new UsernamePasswordAuthenticationToken(finalUser, null, finalUser.getAuthorities());
     }
 }

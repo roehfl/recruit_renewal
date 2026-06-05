@@ -1,68 +1,62 @@
-Major 보정 필요
-1. loginId 대소문자/정규화 기준이 빠져 있다
+Major 1 — JIT 복구에서 processLdap()를 그대로 부르면 LDAP 인증을 두 번 한다
 
-현재 가입은 request.loginId().trim()만 하고, 로그인/JIT도 입력 loginId를 그대로 사용한다.
+설계는 JIT save 실패 후 재조회 결과가 Employee면 processLdap(authentication, user)로 복구한다고 되어 있다.
+그런데 현재 processLdap()는 내부에서 다시 ldapProvider.authenticate(authentication)를 호출한다.
 
-설계는 email lowercase 정규화만 후속 과제로 빼놨는데, 실제 위험은 loginId 자체의 비교 semantics다. MariaDB collation이 case-insensitive면 user01/USER01이 충돌할 수 있고, H2 테스트와 운영 DB 동작이 달라질 수 있다.
+즉 구현자가 설계 문구 그대로 따르면 흐름이 이렇게 된다.
 
-구현 전 설계에 아래 중 하나를 명시해야 한다.
+LDAP 인증 성공
+→ Employee save
+→ unique race로 DataIntegrityViolationException
+→ 재조회 성공
+→ processLdap() 호출
+→ LDAP 인증을 다시 수행
+→ 토큰 생성
 
-loginId 정규화 정책:
-- 05y에서는 loginId는 trim only로 유지한다.
-- 대소문자 구분 여부는 DB collation에 의존하지 않도록 후속 phase에서 명시 결정한다.
-- 테스트는 최소한 H2 unique 동작만 검증하며, 운영 MariaDB collation 차이는 DDL 적용 전 점검 항목으로 남긴다.
+이건 복구 설계로는 부정확하다. 이미 LDAP 인증이 성공한 상태에서 DB 저장만 실패한 것이므로, 재인증하지 말고 기존 ldapUser로 Authentication을 만들어야 한다.
 
-더 낫게 가려면 normalizeLoginId()를 만들어 Applicant signup, Auth login, LDAP JIT 저장 경로에 동일 적용해야 한다. 단, LDAP sAMAccountName 대소문자 정책을 건드릴 수 있으므로 이번 5y에서 강제 lowercase까지 가는 건 보류가 맞다.
+구현 지시문은 이렇게 고쳐라.
 
-2. LDAP JIT 동시 생성 race는 “차단”이지 “복구”가 아니다
+private Authentication buildEmployeeAuthentication(User user, CustomUserDetails ldapUser) {
+    CustomUserDetails finalUser = CustomUserDetails.fromUser(user, ldapUser.getAuthorities());
+    return new UsernamePasswordAuthenticationToken(finalUser, null, finalUser.getAuthorities());
+}
 
-설계는 unique 제약이 Employee JIT 중복 생성의 backstop이 된다고 쓰고 있다. 이 말 자체는 맞다. 하지만 현재 JIT 경로는 findUserByLoginId()에서 없으면 LDAP 인증 후 바로 employeeRepository.save(employee)를 한다. 동시 최초 로그인 2건이면 하나는 unique violation으로 실패할 가능성이 높다.
+그리고 processLdapAndJit() 안에서는 catch 후 processLdap()가 아니라 위 helper를 호출하게 해라. 테스트도 ldapProvider.authenticate()가 race 복구 경로에서 1회만 호출되는지 검증해야 한다.
 
-운영 품질까지 보려면 둘 중 하나를 설계에 박아야 한다.
+Medium 1 — collation 확인 쿼리가 틀렸다
 
-선택 A - 최소안:
-동시 JIT 중복 시 한 요청은 409로 실패할 수 있으며, 재시도 시 기존 Employee를 조회해 로그인 가능하다. 본 슬라이스는 영구 중복 데이터 방지만 보장한다.
-선택 B - 권장:
-RoutingAuthenticationProvider.processLdapAndJit()에서 Employee save 중 DataIntegrityViolationException 발생 시 UserRepository.findUserByLoginId(loginId)를 재조회하고, Employee면 processLdap(authentication, user)로 복구한다.
+설계에 SHOW INDEX FROM users로 “기존 인덱스/제약명 충돌 확인 + collation 확인”이라고 되어 있다.
+하지만 MariaDB/MySQL의 SHOW INDEX에서 Collation은 문자열 collation이 아니라 인덱스 정렬 방향 성격이다. login_id 컬럼의 case-sensitive/case-insensitive 여부를 확인하려면 아래처럼 봐야 한다.
 
-이건 구현 난이도 낮다. 나는 선택 B를 권장한다. 계정 hardening이면 “중복 데이터 방지”에서 끝내지 말고 “정상 로그인 복구”까지 가는 게 맞다.
+SELECT COLUMN_NAME, COLLATION_NAME
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = 'users'
+  AND COLUMN_NAME = 'login_id';
 
-3. 전화번호 변경 API는 현재 비밀번호 재확인을 붙이는 게 낫다
+또는:
 
-비밀번호 변경은 currentPassword를 요구하는데, 전화번호 변경은 phoneNumber만 받도록 되어 있다. 설계상 전화번호는 향후 메시지/본인확인/알림 채널과 연결될 가능성이 높은 개인정보다. 현재 05x도 SMS verification/rate limiting이 빠진 임시 가입 API라는 한계를 갖고 있다.
+SHOW FULL COLUMNS FROM users LIKE 'login_id';
 
-최소한 둘 중 하나로 정리해라.
+DDL 사전 점검 쿼리에서 이 부분은 반드시 교체해라.
 
-권장안:
-ApplicantPhoneNumberChangeRequest(currentPassword, phoneNumber)
-- currentPassword 불일치 시 400
-- phoneNumber trim 후 저장
-최소안:
-전화번호 변경은 현재 비밀번호 재확인 없이 허용한다.
-단, SMS 인증/계정 복구 수단으로 phoneNumber를 사용하기 전에는 반드시 재인증 또는 변경 알림을 도입한다.
+Medium 2 — DataIntegrityViolationException은 loginId race만 의미하지 않는다
 
-금융권/채용 시스템 성격이면 권장안이 맞다.
+현재 Employee.deptName에도 @Column(unique = true)가 걸려 있다.
+따라서 JIT save 중 발생하는 DataIntegrityViolationException은 loginId race가 아니라 deptName unique 충돌일 수도 있다.
 
-Medium 보정
+설계는 “재조회 결과가 Employee면 복구, 아니면 예외 전파”라고 되어 있어서 큰 방향은 맞다.
+다만 문서의 “동시 JIT의 사용자 체감은 한 요청도 실패 없이 로그인 성공”이라는 표현은 과하다. loginId race일 때만 그렇다. deptName unique 같은 다른 제약 위반이면 실패해야 정상이다.
 
-check-email은 현재 signup 정책과 약간 어긋난다. 현재 ApplicantSignUpRequest.email은 @Email, @Size만 있고 @NotBlank가 없어 optional이다.
-그런데 5y의 check-email은 @NotBlank를 요구한다. API 자체는 문제 없지만, 프론트에서 “가입 전 필수 검증”처럼 쓰면 현재 signup과 충돌한다. 설계에 “email 입력값이 있을 때만 호출하는 advisory API”라고 명확히 써라.
+문구를 이렇게 낮춰라.
 
-운영 DDL도 보강해라. 현재 설계의 DDL은 unique 추가와 중복 loginId 조회만 있다. unique 추가 전에는 아래 점검까지 같이 넣는 게 안전하다.
+동시 JIT loginId race인 경우에는 양쪽 요청 모두 로그인 성공으로 복구한다.
+단, loginId race가 아닌 다른 DB 제약 위반은 복구하지 않고 예외를 전파한다.
+Low — history 요약 일부가 stale하다
 
--- 중복 loginId
-SELECT login_id, COUNT(*)
-FROM users
-WHERE login_id IS NOT NULL
-GROUP BY login_id
-HAVING COUNT(*) > 1;
+07-implementation-history.md의 설계 범위 요약에는 아직 전화번호 변경이 단순 POST /applicant/account/phone-number로만 적혀 있고, currentPassword 재확인은 바로 아래 “리뷰 1차 반영”에만 나온다.
 
--- null / blank loginId 현황
-SELECT COUNT(*)
-FROM users
-WHERE login_id IS NULL OR TRIM(login_id) = '';
+큰 문제는 아니지만, 히스토리 상단 요약도 이렇게 맞춰라.
 
--- 기존 인덱스/제약명 충돌 확인
-SHOW INDEX FROM users;
-
-테스트 계획에는 JIT race/복구 테스트가 빠져 있다. 최소한 RoutingAuthenticationProvider 단위 테스트로 employeeRepository.save()가 DataIntegrityViolationException을 던질 때 재조회 복구 여부를 검증해라.
+④ POST /applicant/account/phone-number(currentPassword 재확인 + phoneNumber 변경)

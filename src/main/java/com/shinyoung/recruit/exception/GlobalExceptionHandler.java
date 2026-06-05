@@ -2,6 +2,9 @@ package com.shinyoung.recruit.exception;
 
 import com.shinyoung.recruit.dto.response.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -17,6 +20,8 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /**
      * 미인증 요청(서비스 레이어 수동 인증 체크). 401 — 프론트엔드는 이 상태코드로 로그인 화면 라우팅을 분기한다.
@@ -146,6 +151,23 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidApplicantSignUpException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidApplicantSignUp(InvalidApplicantSignUpException e) {
         return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidApplicantAccountException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidApplicantAccount(InvalidApplicantAccountException e) {
+        return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+    }
+
+    /**
+     * DB 제약 위반(unique 등). 사전 체크를 통과한 동시 요청 race가 대표 경로이며 409로 응답한다.
+     * 제약명/컬럼명/SQL 등 내부 정보는 응답에 노출하지 않는다. 다만 FK/NOT NULL 위반 같은
+     * 서버측 결함이 일괄 409 매핑에 가려지지 않도록 원인 예외는 warn 로그로 남긴다.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        log.warn("Data integrity violation", e);
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.fail("이미 처리되었거나 중복된 데이터입니다."));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
