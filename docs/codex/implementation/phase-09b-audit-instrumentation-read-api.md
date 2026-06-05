@@ -4,6 +4,8 @@
 
 - Date: 2026-06-05
 - Work type: implementation (설계: `docs/codex/design/phase-09-privacy-purge-audit-retention-design.md` §6 slice 9b, ADR-0006/0007)
+
+> 2026-06-05 구현 리뷰 반영(instruction.md, Medium 2 + Low 2): ① **read API range 상한 엄밀화** — `toDays()` 절삭으로 90일 23:59가 통과하던 것을 `Duration.compareTo(Duration.ofDays(90))` 비교로 교정(+90일+1분 거부/정확히 90일 허용 테스트). ② **export audit raw status 차단** — applications export 의 audit filter 에 raw 입력 대신 `ApplicationExportService.parseStatus()`(public 전환) canonical enum name 전달 + `ExportAuditLogger.toJson()` 을 수동 문자열 조합에서 **값 sanitize(제어문자 제거) + ObjectMapper 직렬화**로 교체(escape 누락/로그 라인 위조 차단). ③ **announce/close actor 명시화** — `StageController` 가 `CurrentEmployeeService.getCurrentEmployeeActor()` 로 검증한 actor 를 `StageService.announce/close(jobPostingId, stageId, actor)` 3-arg 로 전달(2-arg 는 위임 overload 유지). 계측 테스트가 EMPLOYEE actor 기록을 검증. ④ **Stage 픽스처 날짜 의존 해소** — `StageControllerTest`/`StageServiceTest` 의 하드코딩 접수기간(2026-05)을 동적 기간(now-1d ~ now+30d)으로 전환 → 기존 사전-실패 8건 해소(StageControllerTest 16/16, StageServiceTest 46/46 통과).
 - Goal: 09a foundation 위에 ① 기존 SLF4J 감사 로거(Export/Pdf/Upload)를 `ActivityLogService` adapter 로 흡수(dual-write — **DB가 source of truth**, SLF4J 보조), ② 정보 반출 **fail-close**(temp file 누수 방지 포함), ③ 핵심 관리자 변경 계측(StageResult 정정/발표/확정, evaluation reopen, 첨부 admin download/delete), ④ typed `AuditMetadata`(sealed) 도입, ⑤ admin audit **read API**(권한별 마스킹/원문 projection + read 가드).
 
 ## Implemented Scope
@@ -164,7 +166,8 @@ $env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tes
 
 ## Test Results
 
-- Result: **scoped 136 tests — 134 passed / 2 failed(기존 결함, 9b 무관)**
+- 1차(구현 시점): scoped 136 tests — 134 passed / 2 failed(기존 날짜 의존 사전-실패).
+- **리뷰 반영 후(최종): 위 실패 원인이던 Stage 픽스처를 하드닝해 scoped 재실행 — `AdminAuditControllerTest` 10 · `AuditActivityReadServiceTest` 10(경계 2건 추가) · `StageAuditInstrumentationTest` 1(EMPLOYEE actor 검증) · `StageControllerTest` **16/16** · `StageServiceTest` **46/46** · `AdminExportControllerTest` 7 · `AdminExportRowCapTest` 1 · `ApplicationExportServiceTest` 2 · `StageResultUploadControllerTest` 18 — 전부 통과(111/111, 잔존 실패 0).**
 
 | Test class | Tests | Result |
 |------------|-------|--------|
@@ -185,7 +188,7 @@ $env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tes
 
 ## Known Limitations
 
-1. announce/close 의 기존 `StageControllerTest`/`StageServiceTest` 픽스처는 날짜 의존 사전-실패 지속 — 고정 Clock/동적 접수기간으로의 픽스처 하드닝은 별도 과제(메모리/9a 문서에 기록된 기존 한계).
+1. ~~Stage 픽스처 날짜 의존 사전-실패~~ — **리뷰 반영으로 해소**(동적 접수기간 전환, 8건 통과).
 2. `ROLE_PRIVACY_ADMIN` 부여 경로(DeptRoleMapping 데이터)는 운영 협의 후 세팅 필요 — 코드상 분기만 존재.
 3. egress fail-close 의 "감사 실패 → temp 삭제" 경로는 단위 검증(코드 경로 단순) — ActivityLogService 강제 실패 통합 테스트는 미작성(모킹 침습 대비 효익 낮음 판단).
 4. read API 의 `metadataJson` 은 저장된 JSON 문자열 그대로 반환(파싱/再구조화 없음) — PII-free 는 기록 시점 sealed allowlist 로 보장.

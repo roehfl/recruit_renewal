@@ -91,7 +91,11 @@ public class ApplicationExportService {
         return "applications-export.xlsx";
     }
 
-    private JobApplicationStatus parseStatus(String status) {
+    /**
+     * status 입력의 canonical 파싱(trim + uppercase + enum 검증). audit filter 에는 raw 입력이 아니라
+     * 이 canonical 값을 남긴다(9b 리뷰 Medium 2 — raw string 의 제어문자/변조 문자열이 audit 에 새는 것 방지).
+     */
+    public JobApplicationStatus parseStatus(String status) {
         if (status == null || status.isBlank()) {
             return null;
         }

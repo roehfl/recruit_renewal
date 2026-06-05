@@ -60,6 +60,11 @@
     ② 정보 반출 <strong>fail-close</strong>(감사 commit 전 반출물 미전송 + temp xlsx 누수 방지),
     ③ 핵심 관리자 변경 <strong>in-tx 계측</strong>(StageResult 정정·발표·확정, 평가 reopen, 첨부 admin download/delete),
     ④ <strong>sealed typed AuditMetadata</strong>(PII-free allowlist 고정), ⑤ <strong>admin audit read API</strong>(권한별 마스킹/원문 + read 가드).
+    <br><br>
+    <strong>2026-06-05 구현 리뷰 반영(Medium 2 + Low 2):</strong> range 상한을 <code>Duration</code> 비교로 엄밀화(90일+1분 거부),
+    export audit filter 에 raw status 대신 canonical enum name + <code>toJson()</code> 을 sanitize+ObjectMapper 로 교체,
+    announce/close 에 검증된 actor 명시 전달(EMPLOYEE 기록 검증), Stage 픽스처 접수기간 동적 전환으로
+    <strong>기존 날짜 의존 실패 8건 해소 — 잔존 실패 0</strong>.
   </div>
   <table>
     <tr><th>설계 기준</th><td><code>phase-09-privacy-purge-audit-retention-design.md</code> §6 slice 9b · ADR-0006(감사 tx) · ADR-0007(권한 분리)</td></tr>
@@ -157,7 +162,7 @@
 
 <section>
   <h2>6. 테스트 결과</h2>
-  <p><span class="badge b-green">scoped 136 tests — 134 passed</span> <span class="badge b-amber">2 failed = 기존 날짜 의존 사전-실패(9b 무관)</span></p>
+  <p><span class="badge b-green">최종(리뷰 반영 후): scoped 재실행 111/111 통과 — 잔존 실패 0</span> <span class="badge b-gray">1차 구현 시점: 134/136(실패 2건은 픽스처 하드닝으로 해소)</span></p>
   <table>
     <thead><tr><th>테스트</th><th>건수</th><th>결과</th></tr></thead>
     <tbody>
@@ -167,7 +172,8 @@
       <tr><td><code>StageAuditInstrumentationTest</code>(신규) — 발표/확정/정정 in-tx 실증</td><td>1</td><td><span class="badge b-green">passed</span></td></tr>
       <tr><td>09a 회귀(<code>ActivityLogService/Repository</code>·<code>AuditHmac</code>)</td><td>17</td><td><span class="badge b-green">passed</span></td></tr>
       <tr><td>계측 경로 통합(upload 18 · export 7+1 · pdf 4 · 정정 16 · reopen 8 · 첨부 10+12 · 기타 5)</td><td>81</td><td><span class="badge b-green">passed</span></td></tr>
-      <tr><td><code>StageControllerTest</code> announce/close 2건</td><td>16 중 2</td><td><span class="badge b-amber">기존 실패</span> — 접수기간 2026-05 하드코딩 픽스처(셋업 단계 throw, 9b 이전부터). 해당 계측은 신규 동적-픽스처 테스트로 실증</td></tr>
+      <tr><td><code>StageControllerTest</code> / <code>StageServiceTest</code>(리뷰 반영 — 접수기간 동적 전환)</td><td>16 / 46</td><td><span class="badge b-green">passed</span> — 기존 날짜 의존 실패 8건 해소</td></tr>
+      <tr><td><code>AuditActivityReadServiceTest</code> 경계 보강(90일+1분 거부 / 정확히 90일 허용) · <code>StageAuditInstrumentationTest</code> EMPLOYEE actor 검증</td><td>+2 / 1</td><td><span class="badge b-green">passed</span></td></tr>
     </tbody>
   </table>
   <pre><code>$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*AdminAuditControllerTest" --tests "*AuditActivityReadServiceTest" `
@@ -180,7 +186,7 @@
   <table>
     <thead><tr><th>구분</th><th>내용</th></tr></thead>
     <tbody>
-      <tr><td><span class="badge b-amber">기존 한계</span></td><td>Stage 픽스처 날짜 의존 사전-실패(announce/close) 지속 — 고정 Clock/동적 접수기간 하드닝 별도 과제</td></tr>
+      <tr><td><span class="badge b-green">해소됨</span></td><td>Stage 픽스처 날짜 의존 사전-실패 — 리뷰 반영으로 동적 접수기간 전환 완료(8건 통과)</td></tr>
       <tr><td><span class="badge b-amber">운영</span></td><td><code>ROLE_PRIVACY_ADMIN</code> DeptRoleMapping 매핑은 운영 협의 후 데이터 세팅 필요(코드 분기는 구현됨)</td></tr>
       <tr><td><span class="badge b-gray">미작성</span></td><td>감사 강제 실패 시 temp 삭제의 통합 테스트(코드 경로 단순 — 모킹 침습 대비 효익 낮음 판단)</td></tr>
       <tr><td><span class="badge b-navy">다음</span></td><td><strong>9c</strong> — RetentionPolicy/Hold/hiringEndedAt + eligibility scan + dry-run PurgeBatch(본 슬라이스 resolver/in-tx 패턴 재사용, metadata permits 확장)</td></tr>

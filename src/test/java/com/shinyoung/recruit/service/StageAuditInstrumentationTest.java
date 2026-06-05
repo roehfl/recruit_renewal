@@ -36,10 +36,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Phase 09b — StageResult 발표(announce)/확정(close)/정정(correct) in-tx 감사 계측 검증.
  *
- * <p>기존 {@code StageControllerTest}의 announce/close 픽스처는 접수기간이 2026-05로 하드코딩되어
- * 날짜 의존 사전-실패한다(알려진 한계). 본 테스트는 접수기간을 현재 기준 동적으로 잡아 계측 경로를 실증한다.
- * 직접 서비스 호출이라 SecurityContext 가 없으므로 announce/close 의 actorType 은 ANONYMOUS 로 기록된다
- * (실요청 경로에서는 admin matcher 를 통과한 EMPLOYEE).
+ * <p>접수기간을 현재 기준 동적으로 잡아 날짜 의존 사전-실패를 피하고 계측 경로를 실증한다.
+ * announce/close 는 컨트롤러가 검증한 actor 를 명시 전달하므로(9b 리뷰 Low 1) EMPLOYEE 로 기록됨을 검증한다.
  */
 @SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
 @Transactional
@@ -83,8 +81,8 @@ class StageAuditInstrumentationTest {
                     "employee01");
         }
 
-        stageService.announce(jobPostingId, stageId);
-        stageService.close(jobPostingId, stageId);
+        stageService.announce(jobPostingId, stageId, "employee01");
+        stageService.close(jobPostingId, stageId, "employee01");
 
         // 정정(updateResult) — actor 파라미터 fallback 으로 EMPLOYEE 기록 + CorrectionHistory 참조용 targetId.
         List<ActivityLog> corrects = search(AuditActionType.STAGE_RESULT_CORRECT);
@@ -95,10 +93,12 @@ class StageAuditInstrumentationTest {
         assertThat(corrects.get(0).getApplicationId()).isNotNull();
         assertThat(corrects.get(0).getMetadataJson()).contains("\"changedCount\":1");
 
-        // 발표(announce).
+        // 발표(announce) — actor 명시 전달로 EMPLOYEE 기록(9b 리뷰 Low 1).
         List<ActivityLog> announces = search(AuditActionType.STAGE_RESULT_ANNOUNCE);
         assertThat(announces).hasSize(1);
         assertThat(announces.get(0).getActionResult()).isEqualTo(AuditActionResult.SUCCESS);
+        assertThat(announces.get(0).getActorType()).isEqualTo(ActorType.EMPLOYEE);
+        assertThat(announces.get(0).getActorId()).isEqualTo("employee01");
         assertThat(announces.get(0).getTargetType()).isEqualTo(AuditTargetType.STAGE_RESULT);
         assertThat(announces.get(0).getTargetId()).isEqualTo(String.valueOf(stageId));
         assertThat(announces.get(0).getJobPostingId()).isEqualTo(jobPostingId);
@@ -106,6 +106,8 @@ class StageAuditInstrumentationTest {
         // 확정(close → STAGE_RESULT_CONFIRM).
         List<ActivityLog> confirms = search(AuditActionType.STAGE_RESULT_CONFIRM);
         assertThat(confirms).hasSize(1);
+        assertThat(confirms.get(0).getActorType()).isEqualTo(ActorType.EMPLOYEE);
+        assertThat(confirms.get(0).getActorId()).isEqualTo("employee01");
         assertThat(confirms.get(0).getTargetId()).isEqualTo(String.valueOf(stageId));
     }
 

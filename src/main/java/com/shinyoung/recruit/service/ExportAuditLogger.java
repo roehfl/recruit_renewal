@@ -1,5 +1,8 @@
 package com.shinyoung.recruit.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.enumeration.ActorType;
 import com.shinyoung.recruit.enumeration.AuditActionResult;
@@ -13,7 +16,6 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * Export(정보 반출) 감사 adapter(Phase 09b dual-write). <b>영속 ActivityLog 가 source of truth</b> 이고
@@ -31,6 +33,12 @@ public class ExportAuditLogger {
 
     private final Clock clock;
     private final ActivityLogService activityLogService;
+
+    /**
+     * filtersSafeJson 직렬화 전용 ObjectMapper. 수동 문자열 조합은 escape 누락(backslash/제어문자) 위험이
+     * 있어 audit 코드에 부적합하다(9b 리뷰 Medium 2).
+     */
+    private final ObjectMapper objectMapper = JsonMapper.builder().findAndAddModules().build();
 
     public ExportAuditLogger(Clock clock, ActivityLogService activityLogService) {
         this.clock = clock;
@@ -115,19 +123,25 @@ public class ExportAuditLogger {
         return value instanceof Long longValue ? longValue : null;
     }
 
+    /**
+     * 필터 값을 normalize(제어문자 제거 + trim)한 뒤 ObjectMapper 로 직렬화한다. 키는 코드 고정(allowlist)이고
+     * 값만 외부 유래 가능성이 있으므로 값을 sanitize 한다 — CR/LF 로 로그 라인을 위조하거나 escape 누락으로
+     * JSON 을 깨뜨릴 수 없다(9b 리뷰 Medium 2).
+     */
     private String toJson(Map<String, Object> filters) {
-        return filters.entrySet().stream()
-                .map(entry -> "\"" + entry.getKey() + "\":" + valueJson(entry.getValue()))
-                .collect(Collectors.joining(",", "{", "}"));
+        Map<String, Object> sanitized = new LinkedHashMap<>();
+        filters.forEach((key, value) -> sanitized.put(key, sanitizeValue(value)));
+        try {
+            return objectMapper.writeValueAsString(sanitized);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize export audit filters", e);
+        }
     }
 
-    private String valueJson(Object value) {
-        if (value == null) {
-            return "null";
+    private Object sanitizeValue(Object value) {
+        if (value == null || value instanceof Number || value instanceof Boolean) {
+            return value;
         }
-        if (value instanceof Number) {
-            return value.toString();
-        }
-        return "\"" + value.toString().replace("\"", "'") + "\"";
+        return value.toString().replaceAll("\\p{Cntrl}", " ").trim();
     }
 }

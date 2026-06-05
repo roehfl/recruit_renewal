@@ -1,6 +1,7 @@
 package com.shinyoung.recruit.domain.entity;
 
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
+import com.shinyoung.recruit.enumeration.PurgeResult;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -73,6 +74,21 @@ public class JobApplication extends BaseEntity {
 
     @Column(nullable = false)
     private String jobPositionNameSnapshot;
+
+    /**
+     * 파기 marker(Phase 09c 컬럼 도입 — 쓰기는 09d-1, 09c 는 eligibility 의 ALREADY_PURGED 판정에 읽기만).
+     * {@code JobApplicationStatus} 와 직교(orthogonal) — 기존 status enum 불변(설계 §7.2).
+     */
+    @Column(name = "purge_batch_id")
+    private Long purgeBatchId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purge_result", length = 30)
+    private PurgeResult purgeResult;
+
+    /** 최종 PURGED 확정 시점에만 세팅(설계 §5.4 — 바이너리 소멸 확인 전 세팅 금지). */
+    @Column(name = "purged_at")
+    private LocalDateTime purgedAt;
 
     private JobApplication(
             Applicant applicant,

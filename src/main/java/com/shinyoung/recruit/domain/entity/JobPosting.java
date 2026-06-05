@@ -48,6 +48,13 @@ public class JobPosting extends BaseEntity {
 
     private LocalDateTime closedAt;
 
+    /**
+     * retentionAnchorAt 소스(Phase 09c). "공고 마감(closedAt)" ≠ "채용 프로세스 종료" 이므로 자동 세팅하지
+     * 않고 관리자 수동 anchor 명령으로만 확정한다(설계 §5.3, 리뷰 2차 #5). null 이면 retention scan 에서
+     * {@code ANCHOR_NOT_FIXED} SKIP. {@code closedAt} 사용은 정책 {@code baselineType=CLOSED_AT} 명시 시에만.
+     */
+    private LocalDateTime hiringEndedAt;
+
     private LocalDateTime displayStartDateTime;
 
     private LocalDateTime displayEndDateTime;
@@ -220,6 +227,11 @@ public class JobPosting extends BaseEntity {
     public void close(LocalDateTime now) {
         this.status = JobPostingStatus.CLOSED;
         this.closedAt = now;
+    }
+
+    /** 채용 프로세스 종료 시점(retention anchor) 수동 확정(Phase 09c). 정정 재확정 허용. */
+    public void fixHiringEndedAt(LocalDateTime hiringEndedAt) {
+        this.hiringEndedAt = hiringEndedAt;
     }
 
     private static JobPostingType defaultPostingType(JobPostingType postingType) {

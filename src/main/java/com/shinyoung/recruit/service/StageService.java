@@ -135,6 +135,12 @@ public class StageService {
 
     @Transactional
     public Long announce(Long jobPostingId, Long stageId) {
+        return announce(jobPostingId, stageId, null);
+    }
+
+    /** @param actor 컨트롤러가 검증한 임직원 loginId(9b 리뷰 Low 1). null 이면 SecurityContext 에서 해석. */
+    @Transactional
+    public Long announce(Long jobPostingId, Long stageId, String actor) {
         JobPosting jobPosting = findJobPosting(jobPostingId);
         validateJobPostingPublishedForCommand(jobPosting);
 
@@ -143,12 +149,18 @@ public class StageService {
         validateStageResultsReadyForAnnounce(stageId);
         stage.announce();
         // 발표 = 커밋된 변경의 성공 증적(in-tx, ADR-0006 / Phase 09b).
-        recordStageAudit(AuditActionType.STAGE_RESULT_ANNOUNCE, jobPostingId, stageId);
+        recordStageAudit(AuditActionType.STAGE_RESULT_ANNOUNCE, jobPostingId, stageId, actor);
         return stage.getId();
     }
 
     @Transactional
     public Long close(Long jobPostingId, Long stageId) {
+        return close(jobPostingId, stageId, null);
+    }
+
+    /** @param actor 컨트롤러가 검증한 임직원 loginId(9b 리뷰 Low 1). null 이면 SecurityContext 에서 해석. */
+    @Transactional
+    public Long close(Long jobPostingId, Long stageId, String actor) {
         JobPosting jobPosting = findJobPosting(jobPostingId);
         validateJobPostingPublishedForCommand(jobPosting);
 
@@ -156,7 +168,7 @@ public class StageService {
         validateStageStatus(stage, StageStatus.RESULT_ANNOUNCED, "Only RESULT_ANNOUNCED stage can be closed.");
         stage.close();
         // 확정(close) = 커밋된 변경의 성공 증적(in-tx, ADR-0006 / Phase 09b).
-        recordStageAudit(AuditActionType.STAGE_RESULT_CONFIRM, jobPostingId, stageId);
+        recordStageAudit(AuditActionType.STAGE_RESULT_CONFIRM, jobPostingId, stageId, actor);
         return stage.getId();
     }
 
@@ -171,8 +183,8 @@ public class StageService {
         return stageId;
     }
 
-    private void recordStageAudit(AuditActionType actionType, Long jobPostingId, Long stageId) {
-        AuditActorContext context = auditRequestContextResolver.resolve();
+    private void recordStageAudit(AuditActionType actionType, Long jobPostingId, Long stageId, String actor) {
+        AuditActorContext context = auditRequestContextResolver.resolve(actor);
         activityLogService.recordInCurrentTx(AuditEvent.builder()
                 .actorType(context.actorType())
                 .actorId(context.actorId())

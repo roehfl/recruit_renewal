@@ -85,6 +85,16 @@ public class SecurityConfig {
                 // 감사 read API(Phase 09b, ADR-0007). narrow matcher 를 broad /api/admin/** 보다 먼저 — 순서가 보안 요구사항.
                 // ip/ua 원문 vs 마스킹은 GET 통과 후 컨트롤러에서 권한별 projection 으로 추가 게이팅한다.
                 .requestMatchers(HttpMethod.GET, "/api/admin/audit/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN", "ROLE_PRIVACY_ADMIN")
+                // Retention(Phase 09c, ADR-0007) — write 는 ROLE_PRIVACY_ADMIN 전용, GET/dry-run 은 RECRUIT 포함.
+                // method 까지 분기(설계 리뷰 #5/#7). 전부 broad /api/admin/** 보다 먼저.
+                .requestMatchers(HttpMethod.POST, "/api/admin/retention/purge-batches/dry-run").hasAnyAuthority("ROLE_RECRUIT_ADMIN", "ROLE_PRIVACY_ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/admin/retention/job-postings/*/anchor").hasAuthority("ROLE_PRIVACY_ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/admin/retention/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN", "ROLE_PRIVACY_ADMIN")
                 .requestMatchers("/api/admin/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_RECRUIT_ADMIN")
                 .requestMatchers("/api/applicant/**").hasAuthority("ROLE_APPLICANT")
                 .requestMatchers("/api/interviewer/**").hasAnyAuthority("ROLE_EMPLOYEE", "ROLE_ADMIN", "ROLE_RECRUIT_ADMIN", "ROLE_INTERVIEWER")

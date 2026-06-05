@@ -9,7 +9,7 @@ package com.shinyoung.recruit.service;
  *
  * <p>actor/ip/ua/correlationId/occurredAt 는 metadata 가 아니라 ActivityLog <b>컬럼</b>에 둔다 — 중복 금지.
  * 사용자 제공 파일명 원문 금지(리뷰 2차 #2) — {@code sourceFileNameHash} + 확장자만.
- * 보존/파기(9c~9e) metadata record 는 해당 슬라이스에서 permits 에 추가한다.
+ * 파기 실행(9d~9e) metadata record 는 해당 슬라이스에서 permits 에 추가한다.
  */
 public sealed interface AuditMetadata permits
         ExportMetadata,
@@ -18,5 +18,7 @@ public sealed interface AuditMetadata permits
         UploadConflictMetadata,
         StageResultChangeMetadata,
         EvaluationReopenMetadata,
-        AttachmentAdminMetadata {
+        AttachmentAdminMetadata,
+        RetentionPolicyChangeMetadata,
+        PurgeBatchMetadata {
 }

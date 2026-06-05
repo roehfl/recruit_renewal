@@ -93,7 +93,8 @@ public class AuditActivityReadService {
         if (from.isAfter(to)) {
             throw new InvalidAuditQueryException("occurredAt 검색 범위가 올바르지 않습니다(from > to).");
         }
-        if (Duration.between(from, to).toDays() > MAX_RANGE_DAYS) {
+        // toDays()는 소수 일수를 버려 90일 23:59도 통과시키므로 Duration 자체를 비교한다(9b 리뷰 Medium 1).
+        if (Duration.between(from, to).compareTo(Duration.ofDays(MAX_RANGE_DAYS)) > 0) {
             throw new InvalidAuditQueryException("occurredAt 검색 범위는 최대 " + MAX_RANGE_DAYS + "일입니다.");
         }
     }

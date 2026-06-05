@@ -37,7 +37,12 @@ class AuditMetadataContractTest {
                     "sourceFileSize", "contentHash"),
             StageResultChangeMetadata.class, Set.of("stageId", "changedCount"),
             EvaluationReopenMetadata.class, Set.of("interviewId", "previousSubmittedAt"),
-            AttachmentAdminMetadata.class, Set.of("physicalDeleteRequested")
+            AttachmentAdminMetadata.class, Set.of("physicalDeleteRequested"),
+            // Phase 09c — retention/purge metadata(PII-free 설정값·집계만).
+            RetentionPolicyChangeMetadata.class, Set.of("operation", "policyId", "jobPostingId",
+                    "retentionPeriodDays", "baselineType", "enabled"),
+            PurgeBatchMetadata.class, Set.of("purgeBatchId", "mode", "totalCount", "eligibleCount",
+                    "skippedCount", "policyConflictCount")
     );
 
     @Test

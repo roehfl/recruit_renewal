@@ -163,6 +163,21 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler({InvalidRetentionPolicyException.class, InvalidRetentionHoldException.class})
+    public ResponseEntity<ApiResponse<Void>> handleInvalidRetention(RuntimeException e) {
+        return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+    }
+
+    @ExceptionHandler({
+            RetentionPolicyNotFoundException.class,
+            RetentionHoldNotFoundException.class,
+            PurgeBatchNotFoundException.class
+    })
+    public ResponseEntity<ApiResponse<Void>> handleRetentionNotFound(RuntimeException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(ActivityLogNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleActivityLogNotFound(ActivityLogNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

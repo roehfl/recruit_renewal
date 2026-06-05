@@ -1,5 +1,22 @@
 # 07. Implementation History
 
+## Phase 09c - Retention 모델 + eligibility scan + dry-run (구현 완료)
+
+- Date: 2026-06-05
+- Work type: implementation. 설계 §5.3~5.4·§6 slice 9c(ADR-0005/0007) 기준. execute 는 09d-1.
+- Implemented:
+  - **Retention 도메인**: `RetentionPolicy`(전역+override, periodDays/baselineType/enabled/effective window, 같은 scope enabled **overlap 금지** 검증, 적용 대상 변경 금지) · `RetentionHold`(**manual only**, release=releasedAt 마킹, active 중복 금지, 사유 원문은 도메인만) · `JobPosting.hiringEndedAt` + 수동 anchor 명령(`POST .../anchor`, 자동 세팅·암묵 closedAt fallback 금지) · `JobApplication` 파기 marker 3컬럼(purgeBatchId/purgeResult/purgedAt — 09c 읽기 전용, 쓰기는 09d-1).
+  - **정책 선택 규칙(9c 계약)**: override 우선 → global, effective window 는 scanAt 기준, 부재=`POLICY_NOT_FOUND`, active 후보 2+ = **fail-safe `POLICY_CONFLICT`**(batch `policyConflictCount` 집계, 리뷰 3차 #4).
+  - **eligibility(`RetentionEligibilityService`)**: 판정 순서 고정(PURGED→HOLD→POLICY→ANCHOR→NOT_DUE→STAGE_CONFIG→NOT_TERMINAL). terminal = 설계 확정 query 그대로(WITHDRAWN OR finalStage 정확히 1개·RESULT_ANNOUNCED/CLOSED·StageResult 존재·≠PENDING·decidedAt≠null, finalStage 0/2+ = INVALID_STAGE_CONFIGURATION). 순수 판정 컴포넌트(시계/DB 비의존 — Clock 산출 scanAt 주입).
+  - **dry-run(무변경 preview)**: `PurgeBatch(DRY_RUN)`+`PurgeJobItem(ELIGIBLE/SKIPPED+reason)` — **delete 금지 mutable ledger**(repository 가 delete 미노출). 도메인 무변경. 감사 = batch 단위 `PURGE_SCAN` coarse index 만(in-tx + `PurgeBatchMetadata` 집계).
+  - **API/인가(ADR-0007)**: policies CRUD·holds set/release·anchor·dry-run·batch 조회. SecurityConfig 에 **HTTP method 분기 narrow matcher 8종**(write=PRIVACY_ADMIN, GET·dry-run=RECRUIT·PRIVACY)을 broad `/api/admin/**` 보다 먼저 등록. 감사 계측: `RETENTION_POLICY_UPDATE`(+typed metadata)/`RETENTION_HOLD_SET·RELEASE`/`RETENTION_ANCHOR_SET`/`PURGE_SCAN` 전부 in-tx, actor 명시 전달. `AuditMetadata` permits +2(`RetentionPolicyChangeMetadata`/`PurgeBatchMetadata` — 설계 §5.1 목록 완성).
+- Tests: 신규/보강 **34 passed**(Eligibility 10 · Policy 9 · DryRun 통합 1 · Controller 권한 매트릭스 11 · MetadataContract 3) + 영향 영역 회귀 **91 passed**(JobApplication 36/JobPosting 27+7/Audit 20/StageAudit 1). 전체 회귀 미실행(프로젝트 규칙).
+- 운영 주의: 수동 DDL `docs/codex/ops/phase-09c-retention-ddl.sql`(테이블 4 + 컬럼 4). purge ledger 테이블 운영 DELETE 권한 부여 금지 권고. `ROLE_PRIVACY_ADMIN` DeptRoleMapping 매핑은 운영 협의.
+- Documentation:
+  - `docs/codex/implementation/phase-09c-retention-model-dry-run.md`
+  - `docs/codex/reports/phase-09c-retention-model-dry-run.html`
+- 상태: 구현 완료. 다음 = **09d-1**(Purge execute core — confirmation/sourceDryRunBatchId/재검증, tombstone/ref-count, marker 쓰기. 바이너리 소멸 확인 전 PURGED 승격 금지).
+
 ## Phase 09b - 기존 로그 흡수 + 핵심 관리자 변경 audit + read API (구현 완료)
 
 - Date: 2026-06-05
@@ -11,10 +28,11 @@
   - **관리자 변경 in-tx 계측**: 정정(STAGE_RESULT_CORRECT, 단건+bulk) · 발표(ANNOUNCE) · 확정(close→CONFIRM) · reopen(EVALUATION_REOPEN) · 첨부 admin 삭제(ATTACHMENT_ADMIN_DELETE) · 첨부 admin 다운로드(ATTACHMENT_ADMIN_DOWNLOAD, fail-close). `AuditRequestContextResolver` 신설(SecurityContext/RequestContext 해석, 시그니처 오염 없음). APPLICANT 자가행위 비계측. `ActivityLogService`에 EMPLOYEE/APPLICANT→actorId 필수 검증 추가(9a 2차 리뷰 예고분).
   - **read API**: `GET /api/admin/audit/activities`(+단건) — 필터/페이지네이션, **가드**(size≤100, range≤90일, default 최근 30일), **권한별 projection**(ip/ua 는 ROLE_PRIVACY_ADMIN 만 원문, RECRUIT_ADMIN 은 `***`). SecurityConfig 에 narrow matcher(`GET /api/admin/audit/**`)를 broad `/api/admin/**` 보다 먼저 등록. `ActivityLogRepository.search` JPQL finder(append-only 불변).
 - Tests: scoped **136 — 134 passed / 2 failed(기존 결함)**. 신규 22(AdminAuditController 10 · ReadService 8 · MetadataContract 3 · StageAuditInstrumentation 1) + 09a 회귀 17 + 계측 경로 통합 81 전부 통과. 실패 2건 = `StageControllerTest` announce/close — 접수기간 2026-05 하드코딩 픽스처의 **날짜 의존 사전-실패**(9b 무관, 기지 한계). 해당 계측 경로는 동적 접수기간의 신규 `StageAuditInstrumentationTest` 로 실증.
+- 구현 리뷰 반영(2026-06-05, instruction.md, Medium 2 + Low 2): ① **range 상한 엄밀화** — `toDays()` 절삭(90일 23:59 통과)을 `Duration.compareTo(ofDays(90))` 비교로 교정 + 경계 테스트 2건(90일+1분 거부/정확히 90일 허용). ② **export audit raw status 차단** — `ApplicationExportService.parseStatus` public 전환 후 canonical enum name 을 audit filter 로 전달, `ExportAuditLogger.toJson` 을 수동 문자열 조합 → 값 sanitize(제어문자 제거)+ObjectMapper 직렬화로 교체. ③ **announce/close actor 명시화** — StageController 가 `getCurrentEmployeeActor()` actor 를 3-arg `announce/close(..., actor)` 로 전달(2-arg 위임 overload 유지), 계측 테스트가 EMPLOYEE actor 검증. ④ **Stage 픽스처 하드닝** — `StageControllerTest`/`StageServiceTest` 접수기간을 동적(now-1d~now+30d)으로 전환 → **기존 날짜 의존 사전-실패 8건 해소**(16/16·46/46). 리뷰 반영 후 scoped 재실행 111/111 통과(잔존 실패 0).
 - Documentation:
   - `docs/codex/implementation/phase-09b-audit-instrumentation-read-api.md`
   - `docs/codex/reports/phase-09b-audit-instrumentation-read-api.html`
-- 상태: 구현 완료. 다음 = **9c**(Retention 모델 + eligibility scan + dry-run). `ROLE_PRIVACY_ADMIN` DeptRoleMapping 운영 매핑은 운영 협의 후.
+- 상태: 구현 완료(리뷰 1차 반영 포함). 다음 = **9c**(Retention 모델 + eligibility scan + dry-run). `ROLE_PRIVACY_ADMIN` DeptRoleMapping 운영 매핑은 운영 협의 후.
 
 ## Fix - Employee.deptName unique 제약 제거 (구현 완료)
 

@@ -329,8 +329,10 @@ class StageControllerTest {
         return jobPostingService.create(new JobPostingCreateRequest(
                 "2026 recruitment",
                 "<p>content</p>",
-                LocalDateTime.of(2026, 5, 1, 9, 0),
-                LocalDateTime.of(2026, 5, 30, 18, 0),
+                // 접수기간을 현재 기준 동적으로 잡는다 — 하드코딩 날짜는 시스템 날짜가 지나면
+                // createSubmittedApplication 이 접수기간 검증에서 사전-실패한다(9b 리뷰 Low 2 하드닝).
+                LocalDateTime.now().minusDays(1),
+                LocalDateTime.now().plusDays(30),
                 List.of(new JobPositionRequest("Backend", 1)),
                 new ApplicationFormConfigRequest(false, false, false, false, false, false, false)
         ));

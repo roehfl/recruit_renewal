@@ -95,6 +95,27 @@ class AuditActivityReadServiceTest {
     }
 
     @Test
+    void 검색_범위_90일_1분도_400() {
+        // toDays() 절삭 우회 방지(리뷰 Medium 1) — 90일 + 1분은 거부돼야 한다.
+        assertThatThrownBy(() -> auditActivityReadService.search(
+                null, null, null, null, null, null, NOW.minusDays(90).minusMinutes(1), NOW, 0, 20, false))
+                .isInstanceOf(InvalidAuditQueryException.class);
+        verifyNoInteractions(activityLogRepository);
+    }
+
+    @Test
+    void 검색_범위_정확히_90일은_허용된다() {
+        given(activityLogRepository.search(any(), any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of()));
+
+        auditActivityReadService.search(
+                null, null, null, null, null, null, NOW.minusDays(90), NOW, 0, 20, false);
+
+        verify(activityLogRepository).search(eq(NOW.minusDays(90)), eq(NOW),
+                any(), any(), any(), any(), any(), any(), any(Pageable.class));
+    }
+
+    @Test
     void from이_to보다_뒤면_400() {
         assertThatThrownBy(() -> auditActivityReadService.search(
                 null, null, null, null, null, null, NOW, NOW.minusDays(1), 0, 20, false))

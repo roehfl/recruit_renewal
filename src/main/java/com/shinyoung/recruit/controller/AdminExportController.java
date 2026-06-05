@@ -1,6 +1,7 @@
 package com.shinyoung.recruit.controller;
 
 import com.shinyoung.recruit.enumeration.InterviewStatus;
+import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.AdminDatasetExportService;
 import com.shinyoung.recruit.service.ApplicationExportService;
@@ -80,6 +81,8 @@ public class AdminExportController {
             HttpServletRequest request
     ) {
         String actor = currentEmployeeService.getCurrentEmployeeActor(userDetails);
+        // audit filter 에는 raw status 가 아니라 canonical 값(enum name)을 남긴다(9b 리뷰 Medium 2).
+        JobApplicationStatus parsedStatus = applicationExportService.parseStatus(status);
         ExcelExportFile file = applicationExportService.exportApplications(jobPostingId, jobPositionId, status);
         // egress fail-close(Phase 09b): 감사 기록 실패 시 응답 없이 전파 — temp xlsx 누수 방지(리뷰 2차 #3).
         try {
@@ -87,7 +90,7 @@ public class AdminExportController {
                     auditContext(actor, userDetails, request),
                     jobPostingId,
                     jobPositionId,
-                    status,
+                    parsedStatus == null ? null : parsedStatus.name(),
                     file
             );
             return excelExportResponseFactory.toResponse(file);
