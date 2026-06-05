@@ -278,6 +278,14 @@ Roadmap revision note - 2026-06-04:
 - 확정: 감사 우선 빌드, 파기 방식 = tombstone 익명화 + 첨부 바이너리 물리삭제(ADR-0005), 감사 트랜잭션 3-way(ADR-0006), ROLE_PRIVACY_ADMIN 분리(ADR-0007). 슬라이스 9a→9b→9c→9d-1→9d-2→9e.
 - 구현 미착수. 다음 작업 = 9a(ActivityLog foundation). 신규 5 테이블 + 컬럼 확장 + `AUDIT_HMAC_SECRET`/`ROLE_PRIVACY_ADMIN` 은 전부 수동 DDL/운영 설정.
 
+Roadmap revision note - 2026-06-05:
+
+- **Phase 05y - Applicant Account Hardening 설계 완료**(9b 착수 전 선행 슬라이스). `docs/codex/design/phase-05y-applicant-account-hardening-design.md` 참조.
+- 배경: 지원자 loginId 정책(이메일=loginId vs 별도 ID) 미결정 → **결정-독립** 계정 작업만 분리.
+- 범위: `User.loginId` 유니크 무결성(임직원-지원자 loginId 충돌 결함 수정 포함), `GET /auth/applicants/check-email`, `POST /applicant/account/password`, `POST /applicant/account/phone-number`, `DataIntegrityViolationException`→409.
+- 결정-의존 보류: check-login-id, 이메일 변경 API, 가입 email 필수화, 아이디 찾기.
+- 구현 미착수. 구현 후 9b 진행(audit 파이프라인 비접촉 — 영향 없음).
+
 ### Phase 04 - Interview Scheduling
 
 Status:

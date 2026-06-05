@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 05y — Applicant Account Hardening (결정-독립 슬라이스) 설계 리포트</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; margin: 0; background: #f4f6f9; color: #1f2937; line-height: 1.6; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 60px; }
+  header.page { background: linear-gradient(135deg, #1e3a5f, #2c5282); color: #fff; border-radius: 12px; padding: 28px 32px; margin-bottom: 24px; }
+  header.page h1 { margin: 0 0 6px; font-size: 1.5rem; }
+  header.page .sub { opacity: .85; font-size: .95rem; }
+  .badge { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: .78rem; font-weight: 700; vertical-align: middle; }
+  .b-blue { background: #dbeafe; color: #1d4ed8; }
+  .b-green { background: #dcfce7; color: #15803d; }
+  .b-gray { background: #e5e7eb; color: #4b5563; }
+  .b-red { background: #fee2e2; color: #b91c1c; }
+  .b-amber { background: #fef3c7; color: #b45309; }
+  .b-navy { background: #e0e7ff; color: #3730a3; }
+  header.page .badge { margin-right: 8px; }
+  section { background: #fff; border-radius: 12px; padding: 24px 28px; margin-bottom: 22px; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+  section h2 { margin: 0 0 14px; font-size: 1.15rem; color: #1e3a5f; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; }
+  section h3 { margin: 18px 0 8px; font-size: 1rem; color: #2c5282; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: .9rem; }
+  th { background: #f1f5f9; text-align: left; padding: 8px 10px; border: 1px solid #e2e8f0; white-space: nowrap; }
+  td { padding: 8px 10px; border: 1px solid #e2e8f0; vertical-align: top; }
+  code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: .85em; font-family: Consolas, 'Courier New', monospace; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: .85rem; }
+  pre code { background: none; padding: 0; color: inherit; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 10px; }
+  .card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; background: #fafbfc; }
+  .card h4 { margin: 0 0 8px; font-size: .95rem; }
+  .card ul { margin: 0; padding-left: 18px; font-size: .88rem; }
+  .card li { margin-bottom: 4px; }
+  .summary-box { background: #eff6ff; border-left: 4px solid #2563eb; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  .warn-box { background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  .danger-box { background: #fef2f2; border-left: 4px solid #ef4444; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  .mono { font-family: Consolas, 'Courier New', monospace; }
+  footer { text-align: center; color: #94a3b8; font-size: .8rem; margin-top: 30px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Phase 05y — Applicant Account Hardening</h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · 결정-독립 슬라이스 설계 · 2026-06-05</div>
+  <div style="margin-top:12px">
+    <span class="badge b-blue">설계 완료</span>
+    <span class="badge b-gray">구현 미착수</span>
+    <span class="badge b-navy">Phase 09b 선행</span>
+  </div>
+</header>
+
+<section>
+  <h2>1. Executive Summary</h2>
+  <div class="summary-box">
+    지원자 loginId 정책(이메일 = loginId vs 별도 ID)이 <strong>미결정</strong>인 상태에서, 어느 안이 채택되어도 그대로 유효한
+    계정 기능만 선별해 설계했다. 핵심은 ① 현재 코드에 실재하는 <strong>loginId 무결성 결함 수정</strong>(임직원-지원자 loginId 충돌 시
+    로그인 영구 장애), ② 가입 화면용 <strong>이메일 중복체크 API</strong>, ③ 지원자 <strong>비밀번호/전화번호 변경 API</strong>다.
+    내부 인증 계약(<code>loginId + password</code>)은 두 안 모두 동일하므로 본 슬라이스는 결정과 무관하게 안전하다.
+    구현 완료 후 Phase 09b 진행에 영향이 없다.
+  </div>
+  <table>
+    <tr><th>설계 문서</th><td><code>docs/codex/design/phase-05y-applicant-account-hardening-design.md</code></td></tr>
+    <tr><th>선행 관계</th><td>Phase 05x(지원자 회원가입) 후속 · Phase 09b 착수 전 선행 슬라이스</td></tr>
+    <tr><th>다음 진행 가능 여부</th><td><span class="badge b-green">가능</span> — 단일 슬라이스 크기, 구현 순서 권장안 포함</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>2. 결정-독립성 분석</h2>
+  <p style="font-size:.92rem">두 안(이메일=loginId / 별도 ID) 모두 로그인 API, <code>findUserByLoginId</code> 조회, 세션 principal이 <code>loginId</code> 기반으로 동일하다. 분기는 가입 request 구성·중복체크 API 구성·이메일 변경 의미 세 곳뿐이다.</p>
+  <table>
+    <thead><tr><th>작업</th><th>분류</th><th>처리</th></tr></thead>
+    <tbody>
+      <tr><td><code>User.loginId</code> DB 유니크 제약</td><td><span class="badge b-green">결정-독립</span></td><td>본 슬라이스</td></tr>
+      <tr><td>signUp loginId 중복체크 User 레벨 교정</td><td><span class="badge b-green">결정-독립</span></td><td>본 슬라이스 (결함 수정)</td></tr>
+      <tr><td>이메일 중복체크 API</td><td><span class="badge b-green">결정-독립</span></td><td>본 슬라이스</td></tr>
+      <tr><td>비밀번호 변경 API</td><td><span class="badge b-green">결정-독립</span></td><td>본 슬라이스</td></tr>
+      <tr><td>전화번호 변경 API</td><td><span class="badge b-green">결정-독립</span></td><td>본 슬라이스</td></tr>
+      <tr><td>check-login-id API</td><td><span class="badge b-amber">결정-의존</span></td><td>보류 (안 2에서만 필요)</td></tr>
+      <tr><td>가입 email <code>@NotBlank</code> 전환</td><td><span class="badge b-amber">결정-의존</span></td><td>보류 (실제 분기점)</td></tr>
+      <tr><td>이메일 변경 API</td><td><span class="badge b-amber">결정-의존</span></td><td>보류 (안 1에서 자격증명 변경)</td></tr>
+      <tr><td>아이디 찾기 플로우</td><td><span class="badge b-amber">결정-의존</span></td><td>보류 (안 2 + 본인인증 의존)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>3. 수정 대상 결함 (현재 코드 실재)</h2>
+  <div class="danger-box">
+    <strong>3.1 loginId 중복체크 범위 결함.</strong> 로그인 해석은 <code>UserRepository.findUserByLoginId()</code>로 users 테이블
+    전체에서 일어나는데, 가입 중복체크는 <code>ApplicantRepository.existsByLoginId()</code>로 Applicant 서브타입만 본다.
+    지원자가 기존 임직원(LDAP JIT)의 loginId로 가입하면 체크를 통과하고, 이후 <code>findUserByLoginId</code>가 2건을 반환해
+    <strong>해당 loginId의 지원자/임직원 모두 로그인 영구 장애</strong>가 된다.
+  </div>
+  <div class="danger-box">
+    <strong>3.2 <code>User.loginId</code> DB 유니크 제약 부재.</strong> <code>email</code>/<code>ciHash</code>와 달리 loginId에는
+    DB 제약이 없어 동시 요청 race를 막지 못한다. 동시 JIT 중복 Employee row 생성 경로의 backstop도 없다.
+  </div>
+  <div class="warn-box">
+    <strong>3.3 DB 제약 위반 응답 포맷 결함.</strong> <code>DataIntegrityViolationException</code> 핸들러가 없어 race 시
+    500 + Spring 기본 에러 포맷(ApiResponse 아님)으로 응답한다. → 409 + generic 메시지로 정비.
+  </div>
+</section>
+
+<section>
+  <h2>4. Scope Cards</h2>
+  <div class="cards">
+    <div class="card">
+      <h4><span class="badge b-blue">Scope A</span> loginId 무결성</h4>
+      <ul>
+        <li><code>User.loginId</code>에 <code>unique = true</code></li>
+        <li><code>UserRepository.existsByLoginId</code> 신설</li>
+        <li>signUp 중복체크 User 레벨 전환</li>
+        <li>운영 수동 DDL(유니크 인덱스)</li>
+        <li><code>nullable=false</code>는 후속(픽스처 영향)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-blue">Scope B</span> 이메일 중복체크</h4>
+      <ul>
+        <li><code>GET /auth/applicants/check-email</code></li>
+        <li>permitAll(명시 등록) · advisory 전용</li>
+        <li>signUp과 동일 정규화(trim) 재사용</li>
+        <li>응답: <code>{ available: boolean }</code> 만</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-blue">Scope C</span> 비밀번호 변경</h4>
+      <ul>
+        <li><code>POST /applicant/account/password</code></li>
+        <li>현재 비밀번호 확인 필수</li>
+        <li>새 비밀번호 = 현재와 동일 거부</li>
+        <li>BCrypt 인코딩 · 본인 세션 유지</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-blue">Scope D</span> 전화번호 변경</h4>
+      <ul>
+        <li><code>POST /applicant/account/phone-number</code></li>
+        <li>가입과 동일 검증(NotBlank, max 30)</li>
+        <li>trim 후 저장</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-blue">Scope E</span> 횡단 보강</h4>
+      <ul>
+        <li><code>DataIntegrityViolationException</code> → 409 (응답 generic + 원인은 warn 로그)</li>
+        <li><code>Applicant.changePassword/changePhoneNumber</code> 의미 메서드</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-red">Out of Scope</span></h4>
+      <ul>
+        <li>check-login-id · 이메일 변경 · email 필수화 (결정-의존)</li>
+        <li>아이디 찾기 · NICE 본인인증 · rate limiting</li>
+        <li>ActivityLog 계측(9b 이후 스윕)</li>
+        <li>name/ci 변경 · 임직원 정보 변경</li>
+        <li>permitAll → allowlist 전환(별도 슬라이스)</li>
+        <li>email lowercase 정규화(별도 검토)</li>
+        <li><code>User.loginId</code> nullable=false(후속)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>5. API</h2>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>Auth</th><th>목적</th><th>응답</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="mono">GET</td>
+        <td class="mono">/auth/applicants/check-email?email=...</td>
+        <td><span class="badge b-gray">permitAll</span></td>
+        <td>가입 화면 이메일 가용성 사전 확인 (advisory)</td>
+        <td><code>ApiResponse&lt;{ available }&gt;</code></td>
+      </tr>
+      <tr>
+        <td class="mono">POST</td>
+        <td class="mono">/applicant/account/password</td>
+        <td><span class="badge b-navy">ROLE_APPLICANT</span></td>
+        <td>비밀번호 변경 (현재 비밀번호 확인)</td>
+        <td><code>ApiResponse&lt;Void&gt;</code></td>
+      </tr>
+      <tr>
+        <td class="mono">POST</td>
+        <td class="mono">/applicant/account/phone-number</td>
+        <td><span class="badge b-navy">ROLE_APPLICANT</span></td>
+        <td>전화번호 변경</td>
+        <td><code>ApiResponse&lt;Void&gt;</code></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3>인가 경로</h3>
+  <p style="font-size:.92rem">
+    <code>/applicant/account/**</code>는 기존 <code>requestMatchers("/api/applicant/**").hasAuthority("ROLE_APPLICANT")</code>에
+    이미 포함된다. 신규 네임스페이스를 만들면 <code>anyRequest().permitAll()</code> fall-through로 matcher 누락 시 무인증 공개되는
+    위험이 있으나, 기존 보호 네임스페이스 재사용으로 이 위험을 구조적으로 제거했다. 심층 방어로 <code>CurrentApplicantService</code>가
+    미인증 401 / 비지원자 403을 한 번 더 보장한다.
+  </p>
+</section>
+
+<section>
+  <h2>6. 클래스 구조</h2>
+  <h3>신규</h3>
+  <table>
+    <thead><tr><th>Class</th><th>Type</th><th>책임</th></tr></thead>
+    <tbody>
+      <tr><td><code>ApplicantAccountController</code></td><td>Controller</td><td>/applicant/account 비밀번호·전화번호 변경 엔드포인트</td></tr>
+      <tr><td><code>ApplicantAccountService</code></td><td>Service</td><td>changePassword / changePhoneNumber 비즈니스 로직</td></tr>
+      <tr><td><code>ApplicantPasswordChangeRequest</code></td><td>Request DTO</td><td>currentPassword / newPassword(8~100)</td></tr>
+      <tr><td><code>ApplicantPhoneNumberChangeRequest</code></td><td>Request DTO</td><td>phoneNumber(max 30)</td></tr>
+      <tr><td><code>ApplicantEmailAvailabilityResponse</code></td><td>Response DTO</td><td>available boolean 단일 필드</td></tr>
+      <tr><td><code>InvalidApplicantAccountException</code></td><td>Exception</td><td>계정 변경 검증 실패 → 400</td></tr>
+    </tbody>
+  </table>
+  <h3>변경</h3>
+  <table>
+    <thead><tr><th>Class</th><th>변경</th></tr></thead>
+    <tbody>
+      <tr><td><code>User</code></td><td>loginId <code>@Column(unique = true)</code></td></tr>
+      <tr><td><code>Applicant</code></td><td>changePassword / changePhoneNumber 의미 메서드</td></tr>
+      <tr><td><code>UserRepository</code></td><td><code>existsByLoginId</code> 추가</td></tr>
+      <tr><td><code>ApplicantRepository</code></td><td><code>existsByLoginId</code> 제거</td></tr>
+      <tr><td><code>ApplicantSignUpService</code></td><td>loginId 체크 User 레벨 전환 + <code>checkEmailAvailability</code></td></tr>
+      <tr><td><code>ApplicantSignUpController</code></td><td><code>@Validated</code> + GET /check-email</td></tr>
+      <tr><td><code>GlobalExceptionHandler</code></td><td>400(account) / 409(integrity) 핸들러 추가</td></tr>
+      <tr><td><code>SecurityConfig</code></td><td>check-email permitAll 명시 등록</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>7. Validation / 비즈니스 규칙</h2>
+  <table>
+    <thead><tr><th>#</th><th>규칙</th><th>실패 응답</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>loginId 중복체크는 users 테이블 전체(임직원 포함) 범위로 수행</td><td>400 "이미 사용 중인 아이디입니다."</td></tr>
+      <tr><td>2</td><td>check-email은 signUp과 동일 정규화(trim) 후 <code>existsByEmail</code> 판정</td><td>형식 오류 400 (ConstraintViolation)</td></tr>
+      <tr><td>3</td><td>check-email은 advisory — 최종 권위는 signUp 재검증 + DB unique</td><td>—</td></tr>
+      <tr><td>4</td><td>비밀번호 변경은 현재 비밀번호 일치 필수</td><td>400 "현재 비밀번호가 일치하지 않습니다."</td></tr>
+      <tr><td>5</td><td>새 비밀번호는 현재 비밀번호와 달라야 함</td><td>400 "새 비밀번호가 현재 비밀번호와 달라야 합니다."</td></tr>
+      <tr><td>6</td><td>새 비밀번호 8~100자, BCrypt 인코딩 저장</td><td>400 (Bean Validation)</td></tr>
+      <tr><td>7</td><td>전화번호 NotBlank, max 30, trim 저장</td><td>400 (Bean Validation)</td></tr>
+      <tr><td>8</td><td>DB 제약 위반은 409 + generic 메시지(제약명/SQL 응답 비노출, 원인은 warn 서버 로그 기록 — 전 엔드포인트 적용이므로 구현 시 회귀 영향 점검)</td><td>409 "이미 처리되었거나 중복된 데이터입니다."</td></tr>
+      <tr><td>9</td><td>name / ci는 변경 API로 열지 않음(본인인증 산출물)</td><td>—</td></tr>
+    </tbody>
+  </table>
+  <h3>운영 수동 DDL</h3>
+  <pre><code>-- 적용 전 중복 점검
+SELECT login_id, COUNT(*) FROM users GROUP BY login_id HAVING COUNT(*) &gt; 1;
+ALTER TABLE users ADD CONSTRAINT uk_users_login_id UNIQUE (login_id);</code></pre>
+</section>
+
+<section>
+  <h2>8. 테스트 계획</h2>
+  <table>
+    <thead><tr><th>대상</th><th>구분</th><th>케이스</th></tr></thead>
+    <tbody>
+      <tr><td><code>ApplicantSignUpServiceTest</code></td><td>보강</td><td>UserRepository 모킹 전환 · 임직원 점유 loginId 가입 실패 · checkEmailAvailability 가용/점유/trim</td></tr>
+      <tr><td><code>ApplicantSignUpControllerTest</code></td><td>보강</td><td>check-email 200 가용 / 200 비가용 / 400 형식 / 400 blank</td></tr>
+      <tr><td><code>ApplicantAccountServiceTest</code></td><td>신규</td><td>비밀번호 변경 성공(인코딩 검증) · 현재 비밀번호 불일치 · 동일 새 비밀번호 거부 · 전화번호 변경/trim</td></tr>
+      <tr><td><code>ApplicantAccountControllerTest</code></td><td>신규</td><td>미인증 401 · 변경 200 · validation 400 · (가능 시) 임직원 403</td></tr>
+      <tr><td><code>UserRepository @DataJpaTest</code></td><td>선택</td><td>중복 loginId insert 실패 · null loginId 다건 허용</td></tr>
+    </tbody>
+  </table>
+  <pre><code>$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*ApplicantSignUp*" --tests "*ApplicantAccount*" --no-daemon</code></pre>
+  <p style="font-size:.9rem">전체 회귀는 사용자 명시 요청 시에만 실행. 테스트 결과: <span class="badge b-gray">설계 단계 — 미실행</span></p>
+</section>
+
+<section>
+  <h2>9. Remaining Issues</h2>
+  <table>
+    <thead><tr><th>구분</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge b-amber">보안</span></td><td>check-email은 enumeration 벡터 — rate limiting/CAPTCHA 미적용(05x 한계 승계), 운영 전 검토. signUp 실패 메시지도 동일 표면을 이미 보유(신규 표면 아님)</td></tr>
+      <tr><td><span class="badge b-amber">보안</span></td><td>currentPassword 검증 시도 횟수 제한 없음 · 전화번호 변경 재확인/변경 알림 없음(MessageBatch 실발송 전 후속) · CSRF disabled는 기존 공통 posture이나 비밀번호 변경은 재검토 시 우선 대상</td></tr>
+      <tr><td><span class="badge b-amber">정규화</span></td><td>email 대소문자 구분 비교(trim만) — lowercase 도입은 기존 데이터와 함께 별도 검토</td></tr>
+      <tr><td><span class="badge b-amber">세션</span></td><td>비밀번호 변경 시 타 세션 무효화 없음(세션 레지스트리 부재)</td></tr>
+      <tr><td><span class="badge b-gray">감사</span></td><td>비밀번호/연락처 변경 ActivityLog 계측 보류 — 9b 이후 계측 스윕에서 <code>APPLICANT_PASSWORD_CHANGE</code> 등 추가</td></tr>
+      <tr><td><span class="badge b-gray">결정 대기</span></td><td>loginId 정책(이메일 vs 별도 ID) — 가입 화면 프론트 작업 전 timebox 권장</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>10. Next Phase Recommendation</h2>
+  <p style="font-size:.93rem">
+    구현 순서: <strong>Scope A + E-1(결함 수정 묶음) → B(check-email) → C/D(계정 변경) + E-2 → 문서/리포트 갱신</strong>.
+    단일 슬라이스 크기. 구현 완료 후 <strong>Phase 09b</strong>(로그 흡수 + 관리자 변경 audit + read API) 진행 — 본 슬라이스는
+    audit 파이프라인을 건드리지 않으므로 9b에 영향이 없다. loginId 정책 결정 후 추가 비용은 어느 안이든 소규모다
+    (안 1: signUp loginId=email + email 필수화 / 안 2: check-login-id API 추가).
+  </p>
+</section>
+
+<footer>recruit_backend · Phase 05y design report · generated 2026-06-05</footer>
+</div>
+</body>
+</html>

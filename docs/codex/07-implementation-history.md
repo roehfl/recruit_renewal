@@ -1,5 +1,24 @@
 # 07. Implementation History
 
+## Phase 05y - Applicant Account Hardening (설계 완료, 구현 미착수)
+
+- Date: 2026-06-05
+- Work type: design. 코드 변경 없음 — 설계 문서/리포트 산출. **9b 착수 전 선행 슬라이스.**
+- 배경: 지원자 loginId 정책(이메일=loginId vs 별도 ID) **미결정** → 어느 안이 채택돼도 유효한 **결정-독립** 계정 작업만 분리해 설계. 내부 인증 계약(`loginId+password`, `findUserByLoginId`, 세션 principal)은 두 안 모두 동일함을 확인.
+- 수정 대상 결함(코드 검증 완료):
+  - **loginId 중복체크 범위 결함** — 로그인 해석은 `UserRepository.findUserByLoginId()`(users 전체)인데 가입 체크는 `ApplicantRepository.existsByLoginId()`(Applicant만). 임직원(LDAP JIT) loginId와 동일 값으로 가입 가능 → `findUserByLoginId` 2건 → **양쪽 모두 로그인 영구 장애**.
+  - `User.loginId` DB 유니크 제약 부재(email/ciHash와 달리) — 동시 가입 race·동시 JIT 중복 Employee row 무방비.
+  - `DataIntegrityViolationException` 핸들러 부재 — race 시 500 + 비-ApiResponse 포맷.
+- 설계 범위: ① `User.loginId` `unique=true` + `UserRepository.existsByLoginId` + signUp 체크 User 레벨 전환 + 운영 수동 DDL(`uk_users_login_id`), ② `GET /auth/applicants/check-email`(permitAll 명시, advisory 전용, signUp과 동일 trim 정규화, `{available}` 만 응답), ③ `POST /applicant/account/password`(현재 비밀번호 확인 + 동일 새 비밀번호 거부), ④ `POST /applicant/account/phone-number`, ⑤ `DataIntegrityViolationException`→409 generic + `Applicant.changePassword/changePhoneNumber` 의미 메서드.
+- 인가 설계: 계정 변경 API는 기존 `requestMatchers("/api/applicant/**").hasAuthority("ROLE_APPLICANT")` 보호 네임스페이스 하위(`/applicant/account/**`)에 배치 — `anyRequest().permitAll()` fall-through 에서 matcher 누락 위험을 구조적으로 제거. 심층 방어 = `CurrentApplicantService` 401/403.
+- 범위 제외(결정-의존): check-login-id, 이메일 변경 API(안 1에서 자격증명 변경), 가입 email `@NotBlank` 전환(실제 분기점), 아이디 찾기. 기타 제외: NICE 본인인증/rate limiting(05x 한계 승계), ActivityLog 계측(9b 이후 스윕 — taxonomy 충돌 방지), name/ci 변경, email lowercase 정규화(별도 검토), `nullable=false`(픽스처 영향 — 후속).
+- 적대적 검증(5-lens 워크플로, 48 findings): **blocker 0.** 코드 주장 10건 중 9건 confirmed(라인 번호 포함), 결함 시나리오 재현성 확정. 실증 — `@Column(unique=true)` 임시 적용 후 위험 테스트 27건 통과 + DDL `login_id` unique 생성 확인(JOINED 부모 테이블 정상), src/test `setLoginId` ~80곳 전수조사 결과 깨지는 픽스처 없음, `existsByLoginId` 프로덕션 사용처 1곳뿐(제거 안전), 500 기대 제약위반 테스트 없음(409 핸들러 안전). 반영 보정: 예외 타입 표기 `IncorrectResultSizeDataAccessException`(원인 NonUniqueResultException)으로 정정, 409 핸들러에 원인 warn 로깅+전 엔드포인트 회귀 영향 명시, School/CommonCode 로컬 catch 예외 명시, §7 한계에 brute-force 시도 제한/연락처 변경 알림/CSRF 우선 검토 추가.
+- Documentation:
+  - `docs/codex/design/phase-05y-applicant-account-hardening-design.md`
+  - `docs/codex/reports/phase-05y-applicant-account-hardening-design.html`
+  - `CONTEXT.md` (Flagged ambiguities — loginId 정책 미결정 추가)
+- 상태: **구현 미착수.** 결정 후 추가 비용: 안 1 = signUp `loginId=email` + email 필수화 / 안 2 = check-login-id API 1개. loginId 정책 결정은 가입 화면 프론트 작업 전 timebox 권장.
+
 ## Phase 09a-RF2 - ActivityLog Foundation 2차 리뷰 보완 (구현 완료)
 
 - Date: 2026-06-04
