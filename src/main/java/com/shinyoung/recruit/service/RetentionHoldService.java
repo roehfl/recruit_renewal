@@ -9,6 +9,7 @@ import com.shinyoung.recruit.enumeration.AuditActionResult;
 import com.shinyoung.recruit.enumeration.AuditActionType;
 import com.shinyoung.recruit.enumeration.AuditTargetType;
 import com.shinyoung.recruit.exception.InvalidRetentionHoldException;
+import com.shinyoung.recruit.exception.InvalidRetentionRequestException;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import com.shinyoung.recruit.exception.RetentionHoldNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,14 @@ public class RetentionHoldService {
 
     @Transactional
     public RetentionHoldResponse set(RetentionHoldCreateRequest request, String actor) {
+        actor = requireActor(actor);
+        // 서비스 직접 호출(배치/스케줄러 확장) 대비 최소 방어(9c 리뷰 Low 3).
+        if (request == null || request.applicationId() == null) {
+            throw new InvalidRetentionHoldException("applicationId는 필수입니다.");
+        }
+        if (request.reason() == null || request.reason().isBlank()) {
+            throw new InvalidRetentionHoldException("reason은 필수입니다.");
+        }
         if (!jobApplicationRepository.existsById(request.applicationId())) {
             throw new JobApplicationNotFoundException("지원서를 찾을 수 없습니다.");
         }
@@ -57,6 +66,7 @@ public class RetentionHoldService {
 
     @Transactional
     public RetentionHoldResponse release(Long holdId, String actor) {
+        actor = requireActor(actor);
         RetentionHold hold = retentionHoldRepository.findById(holdId)
                 .orElseThrow(() -> new RetentionHoldNotFoundException("RetentionHold를 찾을 수 없습니다."));
         if (!hold.isActive()) {
@@ -66,6 +76,14 @@ public class RetentionHoldService {
         hold.release(actor, LocalDateTime.now(clock));
         recordHoldAudit(AuditActionType.RETENTION_HOLD_RELEASE, hold, actor);
         return RetentionHoldResponse.from(hold);
+    }
+
+    /** 관리자 행위 — actor 부재 시 ANONYMOUS 감사 차단(9c 리뷰 Medium 2). 스케줄러는 별도 SYSTEM 정책(후속). */
+    private String requireActor(String actor) {
+        if (actor == null || actor.isBlank()) {
+            throw new InvalidRetentionRequestException("Retention actor is required.");
+        }
+        return actor.trim();
     }
 
     /** hold set/release = 커밋된 변경의 성공 증적(in-tx, ADR-0006). 사유 원문 미기록. */

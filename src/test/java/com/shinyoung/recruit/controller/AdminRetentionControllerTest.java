@@ -138,6 +138,28 @@ class AdminRetentionControllerTest {
     }
 
     @Test
+    void hold_조회는_RECRUIT_ADMIN이면_403_reason_원문_차단() throws Exception {
+        // hold reason 은 자유 텍스트(민감 가능) — 조회도 PRIVACY_ADMIN 전용(9c 리뷰 Medium 1).
+        mockMvc.perform(get("/api/admin/retention/holds")
+                        .with(authentication(adminAuthentication("ROLE_RECRUIT_ADMIN"))))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/admin/retention/holds")
+                        .with(authentication(adminAuthentication("ROLE_PRIVACY_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void batch_목록_size_상한_초과는_400() throws Exception {
+        mockMvc.perform(get("/api/admin/retention/purge-batches")
+                        .param("size", "101")
+                        .with(authentication(adminAuthentication("ROLE_RECRUIT_ADMIN"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void hold_해제는_RECRUIT_ADMIN이면_403() throws Exception {
         mockMvc.perform(delete("/api/admin/retention/holds/{id}", 1L)
                         .with(authentication(adminAuthentication("ROLE_RECRUIT_ADMIN"))))
@@ -176,11 +198,13 @@ class AdminRetentionControllerTest {
     }
 
     @Test
-    void batch_목록_조회는_RECRUIT_ADMIN도_가능() throws Exception {
+    void batch_목록_조회는_RECRUIT_ADMIN도_가능하고_페이지네이션된다() throws Exception {
         mockMvc.perform(get("/api/admin/retention/purge-batches")
                         .with(authentication(adminAuthentication("ROLE_RECRUIT_ADMIN"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content").isArray())
+                .andExpect(jsonPath("$.data.size").value(20));
     }
 
     @Test

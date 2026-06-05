@@ -61,6 +61,11 @@
     ④ <code>RetentionEligibilityService</code>(설계 terminal query 계약 — 판정 순서 고정), ⑤ <strong>무변경 dry-run</strong>
     <code>PurgeBatch</code>/<code>PurgeJobItem</code>(delete 금지 ledger) + <code>PURGE_SCAN</code> coarse 감사.
     파기 실행(execute)·tombstone 은 09d-1.
+    <br><br>
+    <strong>2026-06-05 구현 리뷰 반영(Medium 2 + Low 3):</strong> hold 조회를 <strong>PRIVACY_ADMIN 전용</strong>으로
+    좁힘(자유 텍스트 reason 노출 차단 — 권장안), retention write/dry-run 4개 서비스에 <code>requireActor</code>
+    (ANONYMOUS 감사 차단), batch 목록 <strong>page/size 가드</strong>(max 100, <code>PageResponse</code> 전환),
+    서비스 레벨 null 필드 방어(Bean Validation 우회 경로 대비), active hold 중복 race 는 후속 항목으로 문서화.
   </div>
   <table>
     <tr><th>구현 문서</th><td><code>docs/codex/implementation/phase-09c-retention-model-dry-run.md</code></td></tr>
@@ -116,10 +121,10 @@
     <tbody>
       <tr><td>GET</td><td><code>/admin/retention/policies</code></td><td>RECRUIT·PRIVACY</td><td><span class="badge b-green">완료</span></td></tr>
       <tr><td>POST/PUT/DELETE</td><td><code>/admin/retention/policies/{id?}</code></td><td><strong>PRIVACY</strong></td><td><span class="badge b-green">완료</span></td></tr>
-      <tr><td>GET / POST / DELETE</td><td><code>/admin/retention/holds/{id?}</code></td><td>GET=RECRUIT·PRIVACY / write=<strong>PRIVACY</strong></td><td><span class="badge b-green">완료</span></td></tr>
+      <tr><td>GET / POST / DELETE</td><td><code>/admin/retention/holds/{id?}</code></td><td><strong>전부 PRIVACY</strong>(reason 자유 텍스트 — 리뷰 Medium 1 반영, 조회도 전용화)</td><td><span class="badge b-green">완료</span></td></tr>
       <tr><td>POST</td><td><code>/admin/retention/job-postings/{id}/anchor</code></td><td><strong>PRIVACY</strong></td><td><span class="badge b-green">완료</span></td></tr>
       <tr><td>POST</td><td><code>/admin/retention/purge-batches/dry-run</code></td><td>RECRUIT·PRIVACY</td><td><span class="badge b-green">완료</span></td></tr>
-      <tr><td>GET</td><td><code>/admin/retention/purge-batches</code>(+<code>/{id}</code>)</td><td>RECRUIT·PRIVACY</td><td><span class="badge b-green">완료</span></td></tr>
+      <tr><td>GET</td><td><code>/admin/retention/purge-batches?page&amp;size</code>(+<code>/{id}</code>)</td><td>RECRUIT·PRIVACY — 목록 size≤100 가드(리뷰 Low 2)</td><td><span class="badge b-green">완료</span></td></tr>
       <tr><td>POST</td><td><code>/admin/retention/purge-batches/execute</code></td><td>—</td><td><span class="badge b-gray">09d-1</span></td></tr>
     </tbody>
   </table>
@@ -164,7 +169,7 @@
     <thead><tr><th>구분</th><th>내용</th></tr></thead>
     <tbody>
       <tr><td><span class="badge b-amber">운영</span></td><td>수동 DDL 적용 필요(<code>phase-09c-retention-ddl.sql</code>) · purge ledger 테이블 DELETE 권한 부여 금지 권고 · <code>ROLE_PRIVACY_ADMIN</code> DeptRoleMapping 매핑 협의</td></tr>
-      <tr><td><span class="badge b-gray">후속</span></td><td>dry-run 풀스캔(페이징 후속, 09e 하드닝 후보) · batch 응답 권한별 projection(09d) · overlap DB 제약 없음(fail-safe 가 흡수) · 스케줄 auto-scan disabled-by-default</td></tr>
+      <tr><td><span class="badge b-gray">후속</span></td><td>dry-run 풀스캔(페이징 후속, 09e 하드닝 후보) · batch 응답 권한별 projection(09d) · overlap DB 제약 없음(fail-safe 가 흡수) · <strong>active hold 중복 race(리뷰 Low 1)</strong> — generated column unique/repair API/pessimistic lock 후속 검토 · 스케줄 auto-scan disabled-by-default(자동 실행은 SYSTEM actor 정책 필요)</td></tr>
       <tr><td><span class="badge b-navy">다음</span></td><td><strong>09d-1 — Purge execute core</strong>: execute(confirmation+sourceDryRunBatchId+재검증), 관계형 PII tombstone/ref-count(인벤토리 allowlist), marker 쓰기. 바이너리 소멸 확인 전 PURGED 승격 금지</td></tr>
     </tbody>
   </table>

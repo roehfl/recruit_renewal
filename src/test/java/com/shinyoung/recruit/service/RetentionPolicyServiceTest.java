@@ -8,6 +8,7 @@ import com.shinyoung.recruit.enumeration.ActorType;
 import com.shinyoung.recruit.enumeration.AuditReasonCode;
 import com.shinyoung.recruit.enumeration.RetentionBaselineType;
 import com.shinyoung.recruit.exception.InvalidRetentionPolicyException;
+import com.shinyoung.recruit.exception.InvalidRetentionRequestException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +25,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /** RetentionPolicy 선택 규칙(설계 §5.3 — 9c 계약)과 overlap 검증을 고정한다. */
 @ExtendWith(MockitoExtension.class)
@@ -172,5 +174,33 @@ class RetentionPolicyServiceTest {
 
         assertThatThrownBy(() -> retentionPolicyService.create(request, "privacy01"))
                 .isInstanceOf(InvalidRetentionPolicyException.class);
+    }
+
+    @Test
+    void actor가_blank면_거부_ANONYMOUS_감사_차단() {
+        // 관리자 행위 감사가 ANONYMOUS 로 남으면 안 된다(9c 리뷰 Medium 2).
+        RetentionPolicyRequest request = new RetentionPolicyRequest(
+                null, 30, RetentionBaselineType.HIRING_ENDED_AT, true, null, null);
+
+        assertThatThrownBy(() -> retentionPolicyService.create(request, "  "))
+                .isInstanceOf(InvalidRetentionRequestException.class);
+        assertThatThrownBy(() -> retentionPolicyService.delete(1L, null))
+                .isInstanceOf(InvalidRetentionRequestException.class);
+        verifyNoInteractions(activityLogService);
+    }
+
+    @Test
+    void 서비스_직접_호출의_null_필드도_방어한다() {
+        // Bean Validation 우회 경로(배치/스케줄러) 대비(9c 리뷰 Low 3).
+        assertThatThrownBy(() -> retentionPolicyService.create(new RetentionPolicyRequest(
+                null, null, RetentionBaselineType.HIRING_ENDED_AT, true, null, null), "privacy01"))
+                .isInstanceOf(InvalidRetentionPolicyException.class);
+        assertThatThrownBy(() -> retentionPolicyService.create(new RetentionPolicyRequest(
+                null, 30, null, true, null, null), "privacy01"))
+                .isInstanceOf(InvalidRetentionPolicyException.class);
+        assertThatThrownBy(() -> retentionPolicyService.create(new RetentionPolicyRequest(
+                null, 30, RetentionBaselineType.HIRING_ENDED_AT, null, null, null), "privacy01"))
+                .isInstanceOf(InvalidRetentionPolicyException.class);
+        verifyNoInteractions(activityLogService);
     }
 }

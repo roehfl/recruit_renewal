@@ -1,9 +1,10 @@
 package com.shinyoung.recruit.domain.repository;
 
 import com.shinyoung.recruit.domain.entity.PurgeBatch;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.Repository;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -16,5 +17,6 @@ public interface PurgeBatchRepository extends Repository<PurgeBatch, Long> {
 
     Optional<PurgeBatch> findById(Long id);
 
-    List<PurgeBatch> findAllByOrderByIdDesc();
+    /** 목록은 무제한 반환 금지 — 페이지네이션 필수(9c 리뷰 Low 2). */
+    Page<PurgeBatch> findAllByOrderByIdDesc(Pageable pageable);
 }

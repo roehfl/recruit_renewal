@@ -90,6 +90,13 @@ class RetentionDryRunServiceTest {
     private ActivityLogRepository activityLogRepository;
 
     @Test
+    void actor가_blank면_dry_run을_거부한다() {
+        // 수동 dry-run 은 관리자 행위 — ANONYMOUS 감사 차단(9c 리뷰 Medium 2).
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> retentionDryRunService.dryRun("  "))
+                .isInstanceOf(com.shinyoung.recruit.exception.InvalidRetentionRequestException.class);
+    }
+
+    @Test
     void dry_run은_eligibility를_산정해_batch와_item으로만_기록한다() {
         // posting1: anchor 확정(60일 전) + 전역 정책(30일) → due. 최종전형 확정.
         Long posting1 = createPosting();

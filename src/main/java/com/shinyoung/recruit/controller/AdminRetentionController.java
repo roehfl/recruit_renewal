@@ -4,6 +4,7 @@ import com.shinyoung.recruit.dto.request.RetentionAnchorRequest;
 import com.shinyoung.recruit.dto.request.RetentionHoldCreateRequest;
 import com.shinyoung.recruit.dto.request.RetentionPolicyRequest;
 import com.shinyoung.recruit.dto.response.ApiResponse;
+import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.dto.response.PurgeBatchDetailResponse;
 import com.shinyoung.recruit.dto.response.PurgeBatchResponse;
 import com.shinyoung.recruit.dto.response.RetentionAnchorResponse;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -134,8 +136,11 @@ public class AdminRetentionController {
     }
 
     @GetMapping("/purge-batches")
-    public ResponseEntity<ApiResponse<List<PurgeBatchResponse>>> getBatches() {
-        return ResponseEntity.ok(ApiResponse.success(purgeBatchReadService.getBatches()));
+    public ResponseEntity<ApiResponse<PageResponse<PurgeBatchResponse>>> getBatches(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(purgeBatchReadService.getBatches(page, size)));
     }
 
     @GetMapping("/purge-batches/{batchId}")

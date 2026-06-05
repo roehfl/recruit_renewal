@@ -1,48 +1,73 @@
-Medium 1 — read API range 상한 계산이 느슨하다
+Medium 1 — Hold reason이 RECRUIT_ADMIN에게 원문 노출된다
 
-AuditActivityReadService.validateRange()에서 Duration.between(from, to).toDays() > 90으로 검사하고 있다.
+현재 GET /api/admin/retention/**는 ROLE_RECRUIT_ADMIN도 접근 가능하다.
+그리고 GET /admin/retention/holds는 RetentionHoldResponse를 그대로 반환한다.
+그 응답에는 reason 원문이 포함된다.
 
-toDays()는 소수 일수를 버린다. 그래서 90일 23시간 59분도 90으로 계산되어 통과한다. 문서상 요구사항은 “range≤90일”이다.
+문제는 hold 사유가 자유 텍스트라는 점이다. 요청 DTO도 reason을 문자열로 받는다.
+운영자가 “개인 사유”, “소송”, “민원”, “질병”, “연락처”, “실명” 등을 넣을 가능성이 있다. ActivityLog에는 안 남기는 설계인데, read API에서 RECRUIT_ADMIN에게 그대로 주면 projection 설계가 깨진다.
 
-아래처럼 고쳐라.
+둘 중 하나로 고쳐라.
 
-private void validateRange(LocalDateTime from, LocalDateTime to) {
-    if (from.isAfter(to)) {
-        throw new InvalidAuditQueryException("occurredAt 검색 범위가 올바르지 않습니다(from > to).");
+권장안:
+GET /admin/retention/holds 는 PRIVACY_ADMIN 전용으로 좁힌다.
+
+또는:
+
+대안:
+RetentionHoldResponse.from(hold, includeSensitive)
+- PRIVACY_ADMIN: reason 원문
+- RECRUIT_ADMIN: "***"
+
+9d execute에서 projection을 하겠다고 미뤄놨는데, hold reason은 이미 9c에서 원문 필드가 열린 상태다. 이건 9d까지 미루지 말고 지금 막는 게 맞다.
+
+Medium 2 — Retention write 서비스가 actor blank를 방어하지 않는다
+
+컨트롤러에서는 CurrentEmployeeService.getCurrentEmployeeActor()를 통해 actor를 검증하고 서비스에 넘긴다. 이 경로는 괜찮다.
+
+하지만 서비스 자체는 actor를 검증하지 않는다. 예를 들어 RetentionPolicyService.recordPolicyAudit()는 auditRequestContextResolver.resolve(actor)만 호출한다. actor가 null/blank이면 resolver가 ANONYMOUS로 떨어질 수 있다.
+RetentionHoldService, RetentionAnchorService, RetentionDryRunService도 동일 패턴이다.
+
+Retention 정책 변경/hold/anchor/dry-run은 관리자 행위다. 서비스 직접 호출, 배치, 테스트, 미래 스케줄러 경로에서 actor가 비면 감사가 ANONYMOUS로 남을 수 있다.
+
+공통 helper로 막아라.
+
+private String requireActor(String actor) {
+    if (actor == null || actor.isBlank()) {
+        throw new InvalidRetentionPolicyException("Retention actor is required.");
     }
-    if (Duration.between(from, to).compareTo(Duration.ofDays(MAX_RANGE_DAYS)) > 0) {
-        throw new InvalidAuditQueryException("occurredAt 검색 범위는 최대 " + MAX_RANGE_DAYS + "일입니다.");
-    }
+    return actor.trim();
 }
 
-테스트도 90일 + 1분 케이스를 추가해라.
+서비스별 예외는 분리해도 된다. 핵심은 retention write/dry-run 수동 실행은 ANONYMOUS로 기록되면 안 된다는 점이다. 미래 scheduler는 별도 SYSTEM actor 정책으로 열어라.
 
-Medium 2 — export audit 보조 로그에 raw status가 남을 수 있다
+Low 1 — active hold 중복은 race에 취약하다
 
-AdminExportController.export()는 status 원문을 그대로 logApplicationsExport()로 넘긴다.
-ApplicationExportService는 status를 trim/uppercase로 파싱해서 검증하지만, audit logger에는 여전히 컨트롤러에서 받은 raw string이 들어간다.
+RetentionHoldService.set()은 existsByApplicationIdAndReleasedAtIsNull()로 active hold 중복을 막는다.
+하지만 DB unique 제약은 없다. 동시 요청 2건이 동시에 exists=false를 통과하면 active hold가 2개 생길 수 있다.
 
-ExportAuditLogger.toJson()은 ObjectMapper가 아니라 수동 문자열 조합이고, quote만 '로 바꾼다. CR/LF, backslash, control character는 처리하지 않는다. 그 값은 metadata의 filtersSafeJson뿐 아니라 SLF4J 보조 로그에도 찍힌다.
+eligibility에서는 active hold applicationId를 Set으로 모으기 때문에 파기 대상 제외 자체는 유지된다.
+그래도 운영 원장 관점에서는 중복 active hold가 생기는 게 좋지 않다.
 
-실제 export 검증은 통과하더라도 status=" SUBMITTED\nfake=1" 같은 입력은 trim 후 유효해질 수 있고, 보조 로그에는 원문 형태가 남을 수 있다.
+MariaDB라 partial unique가 애매하면 후속으로 아래 중 하나를 고려해라.
 
-수정 방향은 둘 중 하나다.
+- generated column active_flag + unique(application_id, active_flag)
+- release 불가 중복 상태 감지/repair API
+- set 시 pessimistic lock 또는 application row lock
+Low 2 — PurgeBatch 목록 조회가 무제한이다
 
-// 권장: export 서비스에서 파싱된 canonical status를 audit filter로 전달
-filters.put("status", parsedStatus == null ? null : parsedStatus.name());
+PurgeBatchReadService.getBatches()는 전체 batch를 전부 반환한다.
+9c 초기는 괜찮지만, dry-run이 수동으로 여러 번 실행되면 관리 화면에서 무제한 목록이 된다.
 
-또는 ExportAuditLogger에서 필터값을 안전하게 normalize하고 ObjectMapper로 JSON을 만들어라. 수동 JSON 조합은 audit 코드에는 부적합하다.
+9d/9e 전에 page/size를 붙이는 게 낫다.
 
-Low 1 — Stage announce/close audit actor 검증이 약하다
+GET /admin/retention/purge-batches?page=0&size=20
+size max 100
+Low 3 — service-level validation이 Bean Validation에 과하게 의존한다
 
-StageService.announce() / close()는 actor 파라미터 없이 AuditRequestContextResolver.resolve()만 사용한다.
+RetentionPolicyRequest는 @NotNull, @Min으로 검증된다.
+컨트롤러 경로는 @Valid라 괜찮다.
 
-실요청에서는 SecurityContext에 CustomUserDetails가 있으므로 EMPLOYEE로 기록될 가능성이 높다. 하지만 직접 서비스 호출이나 비표준 principal이면 ANONYMOUS로 기록된다. 실제 신규 테스트도 직접 서비스 호출이라 announce/close는 ANONYMOUS라고 주석으로 인정하고 있다.
+하지만 RetentionPolicyService.create/update()는 request.retentionPeriodDays()와 request.enabled()를 바로 사용한다. 서비스 직접 호출 시 null이면 NPE 또는 autounboxing 문제가 날 수 있다.
 
-admin 핵심 변경 audit이면 ANONYMOUS 허용은 좋지 않다. 가능하면 StageController에서 @AuthenticationPrincipal을 받고 CurrentEmployeeService.getCurrentEmployeeActor()를 호출한 뒤 서비스에 actor를 넘겨라. 최소한 StageAuditInstrumentationTest에 “실제 컨트롤러 + springSecurity + CustomUserDetails” 케이스를 하나 추가해 EMPLOYEE actor 기록을 검증해라.
-
-Low 2 — 9b 테스트 결과가 “완전 성공”은 아니다
-
-문서상 scoped 136개 중 134 passed / 2 failed다. 실패 원인은 기존 날짜 의존 fixture라고 설명되어 있고, 9b 계측 경로는 별도 테스트로 실증했다고 되어 있다.
-
-이 설명은 수용 가능하다. 다만 audit phase는 회귀 신뢰도가 중요하므로, 날짜 의존 실패를 계속 방치하면 이후 phase마다 “기존 실패”가 누적된다. 9c 전에 StageControllerTest의 하드코딩 접수기간은 고정 Clock 또는 동적 기간으로 정리하는 게 맞다.
+이건 치명적이지 않지만, retention은 배치/스케줄러로 확장될 가능성이 크다. 서비스 레벨에서도 최소 방어를 추가하는 게 낫다.

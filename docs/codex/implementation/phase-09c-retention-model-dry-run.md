@@ -6,6 +6,8 @@
 - Work type: implementation (설계: `docs/codex/design/phase-09-privacy-purge-audit-retention-design.md` §5.3~5.4·§6 slice 9c, ADR-0005/0007)
 - Goal: 보존 정책/예외/anchor 도메인과 eligibility 산정, 그리고 **무변경 dry-run** `PurgeBatch`(scan/preview)를 구현한다. 파기 실행(execute)은 09d-1.
 
+> 2026-06-05 구현 리뷰 반영(instruction.md, Medium 2 + Low 3): ① **hold reason 노출 차단(권장안)** — `GET /api/admin/retention/holds/**` 를 ROLE_PRIVACY_ADMIN 전용 narrow matcher 로 좁힘(자유 텍스트 사유의 RECRUIT_ADMIN 노출 차단 — projection 설계 정합). ② **actor blank 방어** — 4개 retention write/dry-run 서비스(policy CUD·hold set/release·anchor·dry-run) 전 write 메서드에 `requireActor`(null/blank → `InvalidRetentionRequestException` 400) — 관리자 행위 감사의 ANONYMOUS 기록 차단. 미래 스케줄러는 별도 SYSTEM actor 정책(후속). ③ **batch 목록 페이지네이션** — `GET /purge-batches?page&size`(default 20, **max 100**, 위반 400), 응답 `PageResponse` 전환, repository 무제한 finder 제거. ④ **서비스 레벨 최소 방어(Low 3)** — policy(request/periodDays/baselineType/enabled null), hold(applicationId/reason), anchor(hiringEndedAt) — Bean Validation 우회 경로(배치/스케줄러) 대비. ⑤ active hold 중복 race(Low 1)는 리뷰 분류대로 **후속 항목으로 문서화**(아래 Known Limitations).
+
 ## Implemented Scope
 
 ### A — Retention 도메인
@@ -42,11 +44,11 @@ terminal = 설계 9c 확정 query 그대로: `status == WITHDRAWN` OR (finalStag
 | --- | --- | --- |
 | GET | `/admin/retention/policies` | RECRUIT_ADMIN·PRIVACY_ADMIN |
 | POST/PUT/DELETE | `/admin/retention/policies/{id?}` | **PRIVACY_ADMIN** |
-| GET | `/admin/retention/holds` | RECRUIT_ADMIN·PRIVACY_ADMIN |
+| GET | `/admin/retention/holds` | **PRIVACY_ADMIN**(reason 자유 텍스트 — 리뷰 Medium 1 반영) |
 | POST | `/admin/retention/holds` / DELETE `/holds/{id}`(release) | **PRIVACY_ADMIN** |
 | POST | `/admin/retention/job-postings/{id}/anchor` | **PRIVACY_ADMIN** |
 | POST | `/admin/retention/purge-batches/dry-run` | RECRUIT_ADMIN·PRIVACY_ADMIN |
-| GET | `/admin/retention/purge-batches`(+`/{id}`) | RECRUIT_ADMIN·PRIVACY_ADMIN |
+| GET | `/admin/retention/purge-batches?page&size`(+`/{id}`) | RECRUIT_ADMIN·PRIVACY_ADMIN — 목록은 page/size 필수 가드(size≤100, 리뷰 Low 2) |
 
 - SecurityConfig: **HTTP method 까지 분기한 narrow matcher**(설계 리뷰 #5/#7)를 broad `/api/admin/**` 보다 먼저 등록. PRIVACY_ADMIN 단독 권한도 retention GET/dry-run 접근 가능.
 - 09c batch/item 응답은 식별자·집계·reasonCode 만(지원자 PII 없음)이라 RECRUIT/PRIVACY 동일 — execute 실패 상세 원문이 생기는 09d 에서 projection 분기 도입 예정.
@@ -159,8 +161,9 @@ $env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tes
 ## Known Limitations
 
 1. dry-run 은 전체 JobApplication 메모리 스캔 — 대규모 데이터 시 페이징/스트리밍 후속(09e 하드닝 후보).
-2. batch/item 응답의 권한별 projection(요약 vs 원문) 미분기 — 09c 데이터에 PII 가 없어 동일 응답, 09d execute 상세 도입 시 분기.
+2. batch/item 응답의 권한별 projection(요약 vs 원문) 미분기 — 09c 데이터에 PII 가 없어 동일 응답, 09d execute 상세 도입 시 분기. (hold reason 은 리뷰 반영으로 GET 자체를 PRIVACY 전용화 — projection 불요.)
 3. overlap 금지의 DB 제약 없음(서비스 검증만) — 선택 규칙의 fail-safe(POLICY_CONFLICT)가 운영 직접수정 우회를 흡수.
+3-1. **active hold 중복의 DB unique 제약 없음(리뷰 Low 1 — 후속)**: 동시 set 2건이 exists 체크를 동시 통과하면 active hold 가 2개 생길 수 있다. eligibility 는 applicationId Set 기반이라 파기 제외는 유지되지만, 원장 위생 관점에서 후속 보강 후보: generated column `active_flag` + unique(application_id, active_flag) / 중복 감지·repair API / set 시 pessimistic lock. 미래 스케줄러의 자동 실행은 별도 SYSTEM actor 정책으로 연다(requireActor 는 수동 경로 전제).
 4. `ROLE_PRIVACY_ADMIN` 운영 매핑(DeptRoleMapping) 미세팅 — 운영 협의 필요.
 5. 스케줄 auto-scan 없음(설계상 disabled-by-default — 수동 dry-run 만).
 6. 운영 DDL 수동 적용 필요(위 §운영 DDL).

@@ -163,7 +163,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
     }
 
-    @ExceptionHandler({InvalidRetentionPolicyException.class, InvalidRetentionHoldException.class})
+    @ExceptionHandler({
+            InvalidRetentionPolicyException.class,
+            InvalidRetentionHoldException.class,
+            InvalidRetentionRequestException.class
+    })
     public ResponseEntity<ApiResponse<Void>> handleInvalidRetention(RuntimeException e) {
         return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
     }

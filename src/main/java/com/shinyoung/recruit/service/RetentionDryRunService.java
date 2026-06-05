@@ -18,6 +18,7 @@ import com.shinyoung.recruit.enumeration.AuditActionResult;
 import com.shinyoung.recruit.enumeration.AuditActionType;
 import com.shinyoung.recruit.enumeration.AuditReasonCode;
 import com.shinyoung.recruit.enumeration.AuditTargetType;
+import com.shinyoung.recruit.exception.InvalidRetentionRequestException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +59,7 @@ public class RetentionDryRunService {
 
     @Transactional
     public PurgeBatchDetailResponse dryRun(String actor) {
+        actor = requireActor(actor);
         LocalDateTime now = LocalDateTime.now(clock);
         PurgeBatch batch = purgeBatchRepository.save(PurgeBatch.startDryRun(now, now, actor));
 
@@ -138,6 +140,14 @@ public class RetentionDryRunService {
                 .build());
 
         return PurgeBatchDetailResponse.of(batch, items);
+    }
+
+    /** 수동 dry-run 은 관리자 행위 — actor 부재 시 ANONYMOUS 감사 차단(9c 리뷰 Medium 2). 스케줄러는 별도 SYSTEM 정책(후속). */
+    private String requireActor(String actor) {
+        if (actor == null || actor.isBlank()) {
+            throw new InvalidRetentionRequestException("Retention actor is required.");
+        }
+        return actor.trim();
     }
 
     /** finalStage 가 정확히 1개일 때만 결과를 조회한다(0/2+ 는 INVALID_STAGE_CONFIGURATION 으로 SKIP 될 것). */

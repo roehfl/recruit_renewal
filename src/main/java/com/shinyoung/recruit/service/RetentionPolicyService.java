@@ -9,6 +9,7 @@ import com.shinyoung.recruit.enumeration.AuditActionResult;
 import com.shinyoung.recruit.enumeration.AuditActionType;
 import com.shinyoung.recruit.enumeration.AuditTargetType;
 import com.shinyoung.recruit.exception.InvalidRetentionPolicyException;
+import com.shinyoung.recruit.exception.InvalidRetentionRequestException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
 import com.shinyoung.recruit.exception.RetentionPolicyNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ public class RetentionPolicyService {
 
     @Transactional
     public RetentionPolicyResponse create(RetentionPolicyRequest request, String actor) {
+        actor = requireActor(actor);
         validateRequest(request);
         validateNoOverlap(request, null);
 
@@ -61,6 +63,7 @@ public class RetentionPolicyService {
 
     @Transactional
     public RetentionPolicyResponse update(Long policyId, RetentionPolicyRequest request, String actor) {
+        actor = requireActor(actor);
         RetentionPolicy policy = findPolicy(policyId);
         if (!Objects.equals(policy.getJobPostingId(), request.jobPostingId())) {
             throw new InvalidRetentionPolicyException("정책의 적용 대상(jobPostingId)은 변경할 수 없습니다. 새 정책을 생성하세요.");
@@ -81,6 +84,7 @@ public class RetentionPolicyService {
 
     @Transactional
     public void delete(Long policyId, String actor) {
+        actor = requireActor(actor);
         RetentionPolicy policy = findPolicy(policyId);
         recordPolicyAudit("DELETE", policy, actor);
         retentionPolicyRepository.delete(policy);
@@ -116,6 +120,19 @@ public class RetentionPolicyService {
     }
 
     private void validateRequest(RetentionPolicyRequest request) {
+        // 컨트롤러 @Valid 외 서비스 직접 호출(배치/스케줄러 확장) 대비 최소 방어(9c 리뷰 Low 3).
+        if (request == null) {
+            throw new InvalidRetentionPolicyException("RetentionPolicy 요청은 필수입니다.");
+        }
+        if (request.retentionPeriodDays() == null || request.retentionPeriodDays() < 1) {
+            throw new InvalidRetentionPolicyException("retentionPeriodDays는 1 이상이어야 합니다.");
+        }
+        if (request.baselineType() == null) {
+            throw new InvalidRetentionPolicyException("baselineType은 필수입니다.");
+        }
+        if (request.enabled() == null) {
+            throw new InvalidRetentionPolicyException("enabled는 필수입니다.");
+        }
         if (request.jobPostingId() != null && !jobPostingRepository.existsById(request.jobPostingId())) {
             throw new JobPostingNotFoundException("채용공고를 찾을 수 없습니다. id=" + request.jobPostingId());
         }
@@ -123,6 +140,17 @@ public class RetentionPolicyService {
                 && request.effectiveFrom().isAfter(request.effectiveTo())) {
             throw new InvalidRetentionPolicyException("effectiveFrom은 effectiveTo보다 늦을 수 없습니다.");
         }
+    }
+
+    /**
+     * retention write 는 관리자 행위 — actor 부재 시 감사가 ANONYMOUS 로 남는 것을 서비스 레벨에서 차단한다
+     * (9c 리뷰 Medium 2). 미래 스케줄러 자동 실행은 별도 SYSTEM actor 정책으로 연다(후속).
+     */
+    private String requireActor(String actor) {
+        if (actor == null || actor.isBlank()) {
+            throw new InvalidRetentionRequestException("Retention actor is required.");
+        }
+        return actor.trim();
     }
 
     /** 같은 scope(override jobPostingId / global) 의 enabled 정책 간 effective window overlap 금지(규칙 4/5). */
