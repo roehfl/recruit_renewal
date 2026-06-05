@@ -139,4 +139,25 @@ public class JobApplication extends BaseEntity {
         this.status = JobApplicationStatus.WITHDRAWN;
         this.withdrawnAt = withdrawnAt;
     }
+
+    /** 파기 비식별 치환값(PII 인벤토리 §1 PLACEHOLDER). */
+    public static final String PURGED_PLACEHOLDER = "__PURGED__";
+
+    /**
+     * 관계형 PII 제거 완료 + 첨부 바이너리 삭제 대기(9d-1, 설계 §5.4 saga ①).
+     * purgedAt 은 세팅하지 않는다 — 최종 PURGED 는 바이너리 소멸 확인 후(9d-2)에만.
+     */
+    public void markPurgePending(Long purgeBatchId) {
+        this.purgeBatchId = purgeBatchId;
+        this.purgeResult = PurgeResult.PURGE_PENDING;
+        this.applicantNameSnapshot = PURGED_PLACEHOLDER;
+    }
+
+    /** 최종 PURGED 확정(관계형 PII 제거 + 바이너리 소멸 확인 완료). purgedAt 은 이 시점에만 세팅. */
+    public void markPurged(Long purgeBatchId, LocalDateTime purgedAt) {
+        this.purgeBatchId = purgeBatchId;
+        this.purgeResult = PurgeResult.PURGED;
+        this.purgedAt = purgedAt;
+        this.applicantNameSnapshot = PURGED_PLACEHOLDER;
+    }
 }

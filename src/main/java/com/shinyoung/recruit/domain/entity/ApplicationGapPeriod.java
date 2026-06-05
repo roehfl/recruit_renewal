@@ -40,10 +40,9 @@ public class ApplicationGapPeriod extends BaseEntity {
     @JoinColumn(name = "job_application_id", nullable = false)
     private JobApplication jobApplication;
 
-    @Column(nullable = false)
+    // 파기(ALTER_NULLABLE+NULLIFY, PII 인벤토리 §5) 대상이라 nullable — 입력 필수는 request 검증이 보장한다(9d-1).
     private LocalDate startDate;
 
-    @Column(nullable = false)
     private LocalDate endDate;
 
     @Enumerated(EnumType.STRING)

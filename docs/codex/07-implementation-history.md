@@ -1,5 +1,24 @@
 # 07. Implementation History
 
+## Phase 09d-1 - Purge Execute Core (구현 완료)
+
+- Date: 2026-06-05
+- Work type: implementation. 설계 §5.2/§5.4·slice 9d-1, **계약 = `phase-09-pii-field-inventory.md`**(ADR-0005 게이트 산출물). 첨부 바이너리 saga 는 09d-2.
+- Implemented:
+  - **Execute API**: `POST /api/admin/retention/purge-batches/execute`(PRIVACY_ADMIN narrow matcher). 안전장치 — **confirm=true 필수**, bulk=`sourceDryRunBatchId`(DRY_RUN 검증, 그 batch 의 ELIGIBLE item 만 후보)/단건=applicationId XOR, requireActor. criteria 실패는 batch 생성 전 400/404.
+  - **실행 시 eligibility 재검증**(dry-run 불신뢰) — 9c `RetentionEligibilityService` 재사용. 재검증 탈락(drift) = SKIPPED+reasonCode, `ALREADY_PURGED` = 멱등 skip.
+  - **트랜잭션 구조**: item 1건 = REQUIRES_NEW all-or-nothing(`PurgeItemProcessor`, 실패 증적 `recordFailure` 별도 tx) / batch = 비원자 집계(`PurgeBatchLifecycleService` — RUNNING→COMPLETED·**PARTIAL_FAILED**·FAILED 각 독립 tx) / orchestrator(`PurgeExecutionService`) 무트랜잭션. 감사는 batch coarse 만(`PURGE_EXECUTE`+`PurgeExecuteMetadata`, 부분실패=FAILURE).
+  - **관계형 PII tombstone**: 전용 `ApplicationPiiPurgeRepository`(bulk JPQL 12종 — `createdBy` updatable=false 는 bulk 만 가능) + `ApplicationPiiPurgeService`. 인벤토리 §3~§7 분류표 1:1 — PLACEHOLDER `__PURGED__`/NULLIFY/자격번호 **HMAC HASH_ONLY**/학력·경력 정확 날짜 전부 null(안 A)/평가 comment per-candidate 만(Interview 공유 텍스트 불가침)/KEEP_TOMBSTONE 불가침. NOT NULL date PII 6필드 엔티티 nullable 완화.
+  - **PURGED 승격 가드**: 바이너리 소멸 미확인(`STORED`+**soft-`DELETED`** — after-commit 물리삭제 실패 시 파일 잔존 가능) 시 `markPurgePending`(purgedAt 미세팅)+item PENDING, 미보유 시 `markPurged`+purgedAt. "DB PURGED+파일 잔존" 불허.
+  - **Applicant ref-count 익명화**(§2): 모든 지원서 파기 대상일 때만 `purgePersonalData` — loginId/name/userName/email/password/phoneNumber/ci null + **ciHash=`"PURGED:"+UUID`** sentinel(리뷰 2차 #1, 재가입 허용=파기 우선).
+- **적대적 검증(5-agent 워크플로)**: 안전장치 confirmed. REAL 1건 반영 — **soft-DELETED 를 outstanding 에 포함**(+테스트). false positive 2건 실측 반박(applicantNameSnapshot 은 markPurge* 처리 / ref-count 는 동일 영속성 컨텍스트+id-fallback). tx 관찰 3건 문서화(직렬 전제·재실행 ledger·FAILED 해석).
+- Tests: 9d-1 scoped **22 passed**(인벤토리 field-level 계약 대형 1 · 비-tx 통합 2 — drift/PENDING×2/PURGED/ref-count/멱등/단건 · controller 14 · contract 3 · dry-run 회귀 2) + 영향 영역 회귀 통과(섹션 controller 5종/ApplicantSignUp·Account/JobApplicationService 36). 전체 회귀 미실행(프로젝트 규칙).
+- 운영 주의: 수동 DDL `docs/codex/ops/phase-09d-1-purge-execute-ddl.sql`(date PII 6컬럼 nullable + purge_batch 집계 3컬럼). **인벤토리 갭 flag**: `StageResult.comment`/CorrectionHistory comment 미분류 — 인벤토리 갱신 후 처리 권고.
+- Documentation:
+  - `docs/codex/implementation/phase-09d-1-purge-execute-core.md`
+  - `docs/codex/reports/phase-09d-1-purge-execute-core.html`
+- 상태: 구현 완료. 다음 = **09d-2**(첨부 바이너리 삭제 saga — PhysicalFileStatus 3단계 마이그레이션, §6 첨부 PII, 물리삭제 멱등, PENDING→PURGED 최종 승격).
+
 ## Phase 09c - Retention 모델 + eligibility scan + dry-run (구현 완료)
 
 - Date: 2026-06-05

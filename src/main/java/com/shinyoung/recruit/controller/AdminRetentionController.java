@@ -1,5 +1,6 @@
 package com.shinyoung.recruit.controller;
 
+import com.shinyoung.recruit.dto.request.PurgeExecuteRequest;
 import com.shinyoung.recruit.dto.request.RetentionAnchorRequest;
 import com.shinyoung.recruit.dto.request.RetentionHoldCreateRequest;
 import com.shinyoung.recruit.dto.request.RetentionPolicyRequest;
@@ -13,6 +14,7 @@ import com.shinyoung.recruit.dto.response.RetentionPolicyResponse;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.CurrentEmployeeService;
 import com.shinyoung.recruit.service.PurgeBatchReadService;
+import com.shinyoung.recruit.service.PurgeExecutionService;
 import com.shinyoung.recruit.service.RetentionAnchorService;
 import com.shinyoung.recruit.service.RetentionDryRunService;
 import com.shinyoung.recruit.service.RetentionHoldService;
@@ -48,6 +50,7 @@ public class AdminRetentionController {
     private final RetentionAnchorService retentionAnchorService;
     private final RetentionDryRunService retentionDryRunService;
     private final PurgeBatchReadService purgeBatchReadService;
+    private final PurgeExecutionService purgeExecutionService;
     private final CurrentEmployeeService currentEmployeeService;
 
     // ---- RetentionPolicy ----
@@ -133,6 +136,19 @@ public class AdminRetentionController {
     ) {
         String actor = currentEmployeeService.getCurrentEmployeeActor(userDetails);
         return ResponseEntity.ok(ApiResponse.success(retentionDryRunService.dryRun(actor)));
+    }
+
+    /**
+     * 비가역 파기 실행(09d-1, ROLE_PRIVACY_ADMIN 전용 matcher). confirm=true 필수,
+     * bulk 는 sourceDryRunBatchId·단건은 applicationId — 실행 시 eligibility 재검증.
+     */
+    @PostMapping("/purge-batches/execute")
+    public ResponseEntity<ApiResponse<PurgeBatchDetailResponse>> execute(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody PurgeExecuteRequest request
+    ) {
+        String actor = currentEmployeeService.getCurrentEmployeeActor(userDetails);
+        return ResponseEntity.ok(ApiResponse.success(purgeExecutionService.execute(request, actor)));
     }
 
     @GetMapping("/purge-batches")

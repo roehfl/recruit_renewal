@@ -85,4 +85,19 @@ public class PurgeJobItem extends BaseEntity {
     ) {
         return new PurgeJobItem(purgeBatch, applicationId, jobPostingId, PurgeItemStatus.SKIPPED, reasonCode);
     }
+
+    /** execute — 관계형 PII 제거 + 바이너리 미보유로 최종 PURGED 확정(9d-1). */
+    public static PurgeJobItem executePurged(PurgeBatch purgeBatch, Long applicationId, Long jobPostingId) {
+        return new PurgeJobItem(purgeBatch, applicationId, jobPostingId, PurgeItemStatus.PURGED, null);
+    }
+
+    /** execute — 관계형 PII 제거 완료, 첨부 바이너리 삭제 대기(9d-2 saga 가 최종 승격). */
+    public static PurgeJobItem executePending(PurgeBatch purgeBatch, Long applicationId, Long jobPostingId) {
+        return new PurgeJobItem(purgeBatch, applicationId, jobPostingId, PurgeItemStatus.PENDING, null);
+    }
+
+    /** execute — item 트랜잭션 실패(rollback 됨). reconciliation/재시도 대상(9e). */
+    public static PurgeJobItem executeFailed(PurgeBatch purgeBatch, Long applicationId, Long jobPostingId) {
+        return new PurgeJobItem(purgeBatch, applicationId, jobPostingId, PurgeItemStatus.FAILED, null);
+    }
 }

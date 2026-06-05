@@ -151,6 +151,26 @@ class AdminRetentionControllerTest {
     }
 
     @Test
+    void execute는_PRIVACY_ADMIN_전용이고_confirm_없으면_400() throws Exception {
+        mockMvc.perform(post("/api/admin/retention/purge-batches/execute")
+                        .with(authentication(adminAuthentication("ROLE_RECRUIT_ADMIN")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "confirm": true, "sourceDryRunBatchId": 1 }
+                                """))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/admin/retention/purge-batches/execute")
+                        .with(authentication(adminAuthentication("ROLE_PRIVACY_ADMIN")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "confirm": false, "sourceDryRunBatchId": 1 }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void batch_목록_size_상한_초과는_400() throws Exception {
         mockMvc.perform(get("/api/admin/retention/purge-batches")
                         .param("size", "101")

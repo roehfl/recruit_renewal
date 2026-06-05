@@ -84,6 +84,19 @@ public class PurgeBatch extends BaseEntity {
     @Column(name = "policy_conflict_count", nullable = false)
     private long policyConflictCount;
 
+    // ---- execute 전용 집계(9d-1). dry-run 은 0. ----
+
+    /** 최종 PURGED 확정 건수(바이너리 미보유 — 관계형 제거만으로 소멸 확인 충족). */
+    @Column(name = "purged_count", nullable = false)
+    private long purgedCount;
+
+    /** 관계형 PII 제거 완료 + 바이너리 삭제 대기(PURGE_PENDING) 건수 — 9d-2 saga 대상. */
+    @Column(name = "pending_count", nullable = false)
+    private long pendingCount;
+
+    @Column(name = "failed_count", nullable = false)
+    private long failedCount;
+
     private PurgeBatch(
             PurgeBatchMode mode,
             PurgeTriggerType triggerType,
@@ -101,6 +114,40 @@ public class PurgeBatch extends BaseEntity {
 
     public static PurgeBatch startDryRun(LocalDateTime scanAt, LocalDateTime startedAt, String requestedBy) {
         return new PurgeBatch(PurgeBatchMode.DRY_RUN, PurgeTriggerType.RETENTION, scanAt, startedAt, requestedBy);
+    }
+
+    /** execute 시작(9d-1). bulk 면 근거 dry-run batch id, 단건이면 null. */
+    public static PurgeBatch startExecute(
+            LocalDateTime scanAt,
+            LocalDateTime startedAt,
+            String requestedBy,
+            Long sourceDryRunBatchId
+    ) {
+        PurgeBatch batch = new PurgeBatch(
+                PurgeBatchMode.EXECUTE, PurgeTriggerType.RETENTION, scanAt, startedAt, requestedBy);
+        batch.sourceDryRunBatchId = sourceDryRunBatchId;
+        return batch;
+    }
+
+    /**
+     * execute 집계 완료(9d-1). item 실패가 하나라도 있으면 {@code PARTIAL_FAILED}(batch 는 비원자 컨테이너 —
+     * 설계 §5.4). {@code FAILED} 는 시작/criteria 실패 전용({@link #fail}).
+     */
+    public void completeExecute(
+            long totalCount,
+            long purgedCount,
+            long pendingCount,
+            long skippedCount,
+            long failedCount,
+            LocalDateTime completedAt
+    ) {
+        this.status = failedCount > 0 ? PurgeBatchStatus.PARTIAL_FAILED : PurgeBatchStatus.COMPLETED;
+        this.totalCount = totalCount;
+        this.purgedCount = purgedCount;
+        this.pendingCount = pendingCount;
+        this.skippedCount = skippedCount;
+        this.failedCount = failedCount;
+        this.completedAt = completedAt;
     }
 
     public void complete(

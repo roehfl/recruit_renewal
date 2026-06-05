@@ -42,7 +42,10 @@ class AuditMetadataContractTest {
             RetentionPolicyChangeMetadata.class, Set.of("operation", "policyId", "jobPostingId",
                     "retentionPeriodDays", "baselineType", "enabled"),
             PurgeBatchMetadata.class, Set.of("purgeBatchId", "mode", "totalCount", "eligibleCount",
-                    "skippedCount", "policyConflictCount")
+                    "skippedCount", "policyConflictCount"),
+            // Phase 09d-1 — execute coarse 집계(PII-free).
+            PurgeExecuteMetadata.class, Set.of("purgeBatchId", "sourceDryRunBatchId", "totalCount",
+                    "purgedCount", "pendingCount", "skippedCount", "failedCount")
     );
 
     @Test

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 09d-1 — Purge Execute Core 구현 리포트</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; margin: 0; background: #f4f6f9; color: #1f2937; line-height: 1.6; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 60px; }
+  header.page { background: linear-gradient(135deg, #1e3a5f, #2c5282); color: #fff; border-radius: 12px; padding: 28px 32px; margin-bottom: 24px; }
+  header.page h1 { margin: 0 0 6px; font-size: 1.5rem; }
+  header.page .sub { opacity: .85; font-size: .95rem; }
+  .badge { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: .78rem; font-weight: 700; vertical-align: middle; }
+  .b-blue { background: #dbeafe; color: #1d4ed8; }
+  .b-green { background: #dcfce7; color: #15803d; }
+  .b-gray { background: #e5e7eb; color: #4b5563; }
+  .b-red { background: #fee2e2; color: #b91c1c; }
+  .b-amber { background: #fef3c7; color: #b45309; }
+  .b-navy { background: #e0e7ff; color: #3730a3; }
+  header.page .badge { margin-right: 8px; }
+  section { background: #fff; border-radius: 12px; padding: 24px 28px; margin-bottom: 22px; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+  section h2 { margin: 0 0 14px; font-size: 1.15rem; color: #1e3a5f; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; }
+  section h3 { margin: 18px 0 8px; font-size: 1rem; color: #2c5282; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: .9rem; }
+  th { background: #f1f5f9; text-align: left; padding: 8px 10px; border: 1px solid #e2e8f0; white-space: nowrap; }
+  td { padding: 8px 10px; border: 1px solid #e2e8f0; vertical-align: top; }
+  code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: .85em; font-family: Consolas, 'Courier New', monospace; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: .85rem; }
+  pre code { background: none; padding: 0; color: inherit; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 10px; }
+  .card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; background: #fafbfc; }
+  .card h4 { margin: 0 0 8px; font-size: .95rem; }
+  .card ul { margin: 0; padding-left: 18px; font-size: .88rem; }
+  .card li { margin-bottom: 4px; }
+  .summary-box { background: #eff6ff; border-left: 4px solid #2563eb; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  .warn-box { background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  .danger-box { background: #fef2f2; border-left: 4px solid #ef4444; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  footer { text-align: center; color: #94a3b8; font-size: .8rem; margin-top: 30px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Phase 09d-1 — Purge Execute Core</h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · 비가역 파기 실행(관계형 PII tombstone + ref-count) · 2026-06-05</div>
+  <div style="margin-top:12px">
+    <span class="badge b-green">구현 완료</span>
+    <span class="badge b-green">scoped 22 + 회귀 통과</span>
+    <span class="badge b-navy">적대 검증 5-agent 반영</span>
+  </div>
+</header>
+
+<section>
+  <h2>1. Executive Summary</h2>
+  <div class="summary-box">
+    비가역 파기의 <strong>실행 core</strong>. ① <code>POST /purge-batches/execute</code>(PRIVACY_ADMIN ·
+    <strong>confirm=true</strong> · bulk=<code>sourceDryRunBatchId</code>의 ELIGIBLE만/단건 XOR),
+    ② <strong>실행 시 eligibility 재검증</strong>(dry-run 불신뢰 — drift 는 SKIPPED 기록),
+    ③ <strong>관계형 PII tombstone</strong> — PII 인벤토리 §3~§7 분류표를 1:1 구현(PLACEHOLDER/NULLIFY/HASH_ONLY/KEEP 불가침),
+    ④ <strong>Applicant ref-count 익명화</strong>(ciHash = <code>"PURGED:"+UUID</code> sentinel),
+    ⑤ item=REQUIRES_NEW all-or-nothing / batch=비원자 집계(PARTIAL_FAILED) / <code>PURGE_EXECUTE</code> coarse 감사.
+    <strong>바이너리 소멸 미확인(STORED·soft-DELETED) 시 PURGED 승격 금지</strong> — 물리삭제/최종 승격은 09d-2 saga.
+  </div>
+  <table>
+    <tr><th>계약 문서</th><td><code>phase-09-pii-field-inventory.md</code>(field-level allowlist) · 설계 §5.2/§5.4 · ADR-0005/0007</td></tr>
+    <tr><th>구현 문서</th><td><code>docs/codex/implementation/phase-09d-1-purge-execute-core.md</code></td></tr>
+    <tr><th>운영 DDL</th><td><code>docs/codex/ops/phase-09d-1-purge-execute-ddl.sql</code> — date PII 6컬럼 nullable + batch 집계 3컬럼</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>2. 완료 범위</h2>
+  <div class="cards">
+    <div class="card">
+      <h4><span class="badge b-green">A</span> Execute API + 안전장치</h4>
+      <ul>
+        <li>PRIVACY_ADMIN narrow matcher(broad 보다 먼저)</li>
+        <li><strong>confirm=true 명시 필수</strong> · bulk/단건 XOR</li>
+        <li>bulk 후보 = 근거 dry-run(DRY_RUN 검증)의 <strong>ELIGIBLE item 만</strong></li>
+        <li>criteria 실패는 batch 생성 전 400/404</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-green">B</span> Tombstone(인벤토리 계약)</h4>
+      <ul>
+        <li>전용 <code>ApplicationPiiPurgeRepository</code> — bulk JPQL 12종(<code>createdBy</code> updatable=false 대응)</li>
+        <li>학력·경력 정확 날짜 <strong>전부 null(안 A)</strong> · 자격번호 <strong>HMAC HASH_ONLY</strong></li>
+        <li>평가 comment per-candidate 만 — Interview 공유 텍스트 불가침</li>
+        <li>섹션 엔티티 비로딩 — stale flush 없음</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-green">C</span> 원장 전이 + 승격 가드</h4>
+      <ul>
+        <li>item REQUIRES_NEW all-or-nothing · 실패 item 증적 잔존</li>
+        <li>batch COMPLETED/<strong>PARTIAL_FAILED</strong>/FAILED + 집계(purged/pending/skipped/failed)</li>
+        <li><strong>STORED·soft-DELETED 잔존 시 PURGE_PENDING</strong>(purgedAt 미세팅) — "DB PURGED+파일 잔존" 불허</li>
+        <li>ALREADY_PURGED 멱등 skip</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-green">D</span> ref-count + 감사</h4>
+      <ul>
+        <li>모든 지원서 파기 대상일 때만 Applicant 익명화(8필드, §2)</li>
+        <li>ciHash sentinel — CI 연결 단절(재가입 허용=파기 우선)</li>
+        <li><code>PURGE_EXECUTE</code> coarse 감사 + <code>PurgeExecuteMetadata</code></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>3. 적대적 검증(5-agent) 결과</h2>
+  <table>
+    <thead><tr><th>검증 항목</th><th>판정</th><th>조치</th></tr></thead>
+    <tbody>
+      <tr><td>인벤토리 §3~§7 필드 커버리지</td><td><span class="badge b-amber">지적 1</span></td><td>applicantNameSnapshot 누락 주장 = <strong>false positive</strong>(엔티티 <code>markPurge*</code> 가 PLACEHOLDER 처리 — 통합 테스트 실측)</td></tr>
+      <tr><td>ref-count/Applicant §2</td><td><span class="badge b-amber">지적 2</span></td><td>flush 누락 주장 = false positive(동일 영속성 컨텍스트 인스턴스 + id-fallback, 테스트 실측). 8필드 처리·loginId null 비충돌은 <strong>confirmed</strong></td></tr>
+      <tr><td>트랜잭션 의미론</td><td><span class="badge b-gray">관찰</span></td><td>직렬 실행 전제/FAILED 분류 해석/재실행 ledger 기록 — <strong>문서화</strong>(한계 2~4)</td></tr>
+      <tr><td><strong>PURGED 승격 가드</strong></td><td><span class="badge b-red">REAL</span></td><td><strong>반영</strong> — soft-DELETED(물리삭제 실패 가능)도 outstanding 에 포함하도록 수정 + 테스트 케이스 추가</td></tr>
+      <tr><td>안전장치(ADR-0007)</td><td><span class="badge b-green">confirmed</span></td><td>—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>4. 테스트 결과</h2>
+  <p><span class="badge b-green">9d-1 scoped 22 + 영향 영역 회귀 — 전부 통과</span></p>
+  <table>
+    <thead><tr><th>테스트</th><th>건수</th><th>핵심 검증</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr><td><code>ApplicationPiiPurgeServiceTest</code></td><td>1(대형)</td><td><strong>인벤토리 field-level 계약</strong> — 전 섹션(학력/경력/자격/어학/병역/수상/공백/answer/평가) PLACEHOLDER·NULLIFY·HMAC·KEEP 필드 단위</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>PurgeExecutionServiceTest</code></td><td>2</td><td>비-tx 통합(REQUIRES_NEW 실검증) — drift SKIPPED · STORED/<strong>soft-DELETED</strong> PENDING · 무첨부 PURGED+purgedAt · ref-count/ciHash sentinel · coarse 감사 · 멱등 ALREADY_PURGED · 단건 모드 · 검증 4종</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>AdminRetentionControllerTest</code></td><td>14</td><td>+execute 403/confirm 400</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>AuditMetadataContractTest</code> / <code>RetentionDryRunServiceTest</code></td><td>3 / 2</td><td>permits 10종 / 9c 회귀</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td>회귀 — 섹션 controller 5종(nullable 완화 영향) + ApplicantSignUp/Account + JobApplicationService 36</td><td>다수</td><td>BUILD SUCCESSFUL</td><td><span class="badge b-green">passed</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>5. 한계 / 다음 단계</h2>
+  <table>
+    <thead><tr><th>구분</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge b-amber">운영</span></td><td>수동 DDL(<code>phase-09d-1-purge-execute-ddl.sql</code>) 적용 필요 · PURGE_PENDING 의 첨부 PII(§6)는 9d-2 까지 잔존(PURGED 미표기라 계약 위반 아님)</td></tr>
+      <tr><td><span class="badge b-amber">인벤토리 갭</span></td><td><code>StageResult.comment</code>·CorrectionHistory comment 스냅샷 미분류 — 인벤토리 갱신 후 처리 권고(임의 확장 안 함)</td></tr>
+      <tr><td><span class="badge b-gray">문서화</span></td><td>item 직렬 실행 전제(병렬화 시 ref-count 재설계) · 재실행은 실행별 ledger 기록 · orchestration 실패=FAILED 해석 명시</td></tr>
+      <tr><td><span class="badge b-navy">다음</span></td><td><strong>09d-2 — Attachment binary delete saga</strong>: PhysicalFileStatus 확장(3단계 마이그레이션), 첨부 §6 PII, 물리삭제(멱등), PENDING→<strong>PURGED 최종 승격</strong>, outstanding 집합에 BINARY_DELETE_* 추가</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>Phase 09d-1 — Purge Execute Core 구현 리포트 · 2026-06-05</footer>
+</div>
+</body>
+</html>

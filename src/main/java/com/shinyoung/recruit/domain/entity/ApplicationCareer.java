@@ -49,7 +49,7 @@ public class ApplicationCareer extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private EmploymentType employmentType;
 
-    @Column(nullable = false)
+    // 파기(NULLIFY 안 A — 정확 날짜 보존 금지, PII 인벤토리 §4) 대상이라 nullable — 입력 필수는 request 검증이 보장한다(9d-1).
     private LocalDate startDate;
 
     private LocalDate endDate;

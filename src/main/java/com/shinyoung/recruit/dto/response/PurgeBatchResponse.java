@@ -20,7 +20,10 @@ public record PurgeBatchResponse(
         long totalCount,
         long eligibleCount,
         long skippedCount,
-        long policyConflictCount
+        long policyConflictCount,
+        long purgedCount,
+        long pendingCount,
+        long failedCount
 ) {
     public static PurgeBatchResponse from(PurgeBatch batch) {
         return new PurgeBatchResponse(
@@ -36,7 +39,10 @@ public record PurgeBatchResponse(
                 batch.getTotalCount(),
                 batch.getEligibleCount(),
                 batch.getSkippedCount(),
-                batch.getPolicyConflictCount()
+                batch.getPolicyConflictCount(),
+                batch.getPurgedCount(),
+                batch.getPendingCount(),
+                batch.getFailedCount()
         );
     }
 }

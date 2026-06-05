@@ -42,7 +42,7 @@ public class ApplicationAward extends BaseEntity {
     @Column(nullable = false)
     private String awardingOrganization;
 
-    @Column(nullable = false)
+    // 파기(ALTER_NULLABLE+NULLIFY, PII 인벤토리 §5) 대상이라 nullable — 입력 필수는 request 검증이 보장한다(9d-1).
     private LocalDate awardDate;
 
     @Column(length = 2000)
