@@ -11,11 +11,12 @@
   - **execute 통합/집계**: PENDING item 커밋 후 saga 실행(예외도 실패 흡수) — 승격=purged, 실패=pending 유지+`binary_delete_failed_count`(신규 컬럼) → batch **PARTIAL_FAILED**. metadata/응답 전파.
 - **적대적 검증(3-agent)**: 첨부 PII §6 커버리지 **confirmed**. REAL 1건 반영 — `promoteToPurged` silent skip→`orElseThrow`(item 부재=ledger 불변식 위반, tx 롤백으로 마커-원장 정합). false positive 반박(allCleared 코드 오독/동일 tx 원자성/②③ crash 안전 상태/제출검증·legacy 기처리). 관찰(9e scan 확장 시 null path 오탐 주의·직렬 전제) 문서화.
 - Tests: scoped **48 passed** — `PurgeExecutionServiceTest` 2(saga 완주: STORED·soft-deleted→최종 PURGED+BINARY_DELETED+storagePath null+filenameHash / 실패(traversal invalid)→PENDING+FAILED+PARTIAL_FAILED+집계 1 / drift·ref-count·멱등 유지) · `ApplicationAttachmentDeleteServiceTest` 12(SOFT_DELETED 전환) · health scan 4+3 · attachment controller 9 · retention 14 · PiiPurge 1 · contract 3(+binaryDeleteFailedCount). 전체 회귀 미실행(프로젝트 규칙).
+- 구현 리뷰 반영(2026-06-05, instruction.md, Major 1 + Medium 2 + Low 2): ① **Major 1 — 빈 storagePath 삭제 대상의 오승격 차단**: BINARY_DELETE_PENDING/FAILED 인데 storagePath null/blank 면 성공이 아니라 **데이터 불일치 = 실패**(warn + 9e 재처리) — 미확인 PURGED 승격 경로 봉쇄. 정상 "이미 소멸"은 BINARY_DELETED 로 대상 조회에서 제외. ② **Medium 1 — health scan ORPHAN 오탐 방지**: BINARY_DELETE_PENDING/FAILED row 의 storageKey 를 "known but deferred" 집합으로 수집(이슈/카운트 미반영)해 orphan 판정 제외 + 회귀 테스트 추가. ③ **Medium 2 — 실파일 삭제 실증**: storage root 실파일 생성→execute→`Files.exists=false`+BINARY_DELETED 검증(핵심 경로 — MISSING_AS_SUCCESS 만으로 불충분). ④ Low 1/2 — 9e 의무 고정(BINARY_DELETED+null path 정상 분류 테스트 / row 수준 failureCode·reasonMessage 위치 결정). 반영 후 재실행 **22 passed**(PurgeExecution 2 — 실파일 실증 포함 · health scan 5 — 오탐 방지 포함 · health controller 3 · AttachmentDelete 12).
 - 운영 주의: 수동 DDL `docs/codex/ops/phase-09d-2-attachment-saga-ddl.sql`(storage_path nullable·filename_hash·binary_deleted_at·집계 컬럼). **2단계 UPDATE(DELETED→SOFT_DELETED)는 1단계 코드 배포 후 별도 시점**(스크립트 주석 고정), 3단계 enum 제거는 후속 phase.
 - Documentation:
   - `docs/codex/implementation/phase-09d-2-attachment-binary-delete-saga.md`
   - `docs/codex/reports/phase-09d-2-attachment-binary-delete-saga.html`
-- 상태: 구현 완료. 다음 = **09e**(reconciliation sweep — PENDING/FAILED 재처리(유일 재처리 경로), scan §6.1 확장, 하드닝).
+- 상태: 구현 완료(리뷰 1차 반영 포함). 다음 = **09e**(reconciliation sweep — PENDING/FAILED 재처리(유일 재처리 경로), scan §6.1 확장, 하드닝).
 
 ## Phase 09d-1 - Purge Execute Core (구현 완료)
 

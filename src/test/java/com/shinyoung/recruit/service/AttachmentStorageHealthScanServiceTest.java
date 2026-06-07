@@ -199,6 +199,31 @@ class AttachmentStorageHealthScanServiceTest {
     }
 
     @Test
+    void scan은_purge_saga_진행중_파일을_orphan으로_오탐하지_않는다() {
+        Applicant applicant = createApplicant("health-deferred", "Health Deferred");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        Long pendingId = upload(applicant, applicationId, "purge-pending.pdf", "pending");
+        Long failedId = upload(applicant, applicationId, "purge-failed.pdf", "failed");
+
+        ApplicationAttachment pending = attachmentRepository.findById(pendingId).orElseThrow();
+        ReflectionTestUtils.setField(pending, "physicalFileStatus", PhysicalFileStatus.BINARY_DELETE_PENDING);
+        ApplicationAttachment failed = attachmentRepository.findById(failedId).orElseThrow();
+        ReflectionTestUtils.setField(failed, "physicalFileStatus", PhysicalFileStatus.BINARY_DELETE_FAILED);
+        attachmentRepository.saveAndFlush(pending);
+        attachmentRepository.saveAndFlush(failed);
+
+        AttachmentStorageHealthScanResponse response = scanService.scanDryRun();
+
+        // BINARY_DELETE_PENDING/FAILED 의 파일은 9e 재처리 대상(known but deferred) —
+        // ORPHAN 오탐 금지 + row 이슈/카운트에도 미포함(9d-2 리뷰 Medium 1).
+        assertThat(response.orphanPhysicalFileCount()).isZero();
+        assertThat(response.storedRowCount()).isZero();
+        assertThat(response.deletedRowCount()).isZero();
+        assertThat(response.missingRowCount()).isZero();
+        assertThat(response.issues()).isEmpty();
+    }
+
+    @Test
     void scan_excludes_metadata_only_rows_and_does_not_mutate_db_or_files() throws Exception {
         Applicant applicant = createApplicant("health-dry-run", "Health Dry Run");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());

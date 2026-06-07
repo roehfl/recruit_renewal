@@ -2,6 +2,7 @@ package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.common.hash.AuditHmac;
 import com.shinyoung.recruit.common.hash.HashUtil;
+import com.shinyoung.recruit.config.AttachmentProperties;
 import com.shinyoung.recruit.domain.entity.ActivityLog;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
@@ -47,6 +48,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -80,10 +84,13 @@ class PurgeExecutionServiceTest {
     @Autowired private ActivityLogRepository activityLogRepository;
     @Autowired private PurgeBatchRepository purgeBatchRepository;
     @Autowired private AuditHmac auditHmac;
+    @Autowired private AttachmentProperties attachmentProperties;
     @Autowired private JdbcTemplate jdbcTemplate;
 
     @AfterEach
-    void cleanUp() {
+    void cleanUp() throws Exception {
+        // 테스트 실패 시 잔존할 수 있는 실파일 정리(정상 흐름에선 saga 가 삭제한다).
+        Files.deleteIfExists(realBinaryPath());
         // 비-트랜잭션 테스트가 커밋한 행 전부 정리(FK 자식 → 부모 순). 다른 테스트와의 공유 DB 오염 방지.
         List<String> tables = List.of(
                 "activity_log", "purge_job_item", "purge_batch", "retention_hold", "retention_policy",
@@ -102,7 +109,7 @@ class PurgeExecutionServiceTest {
     }
 
     @Test
-    void execute는_재검증_후_tombstone하고_saga로_바이너리_소멸_확인까지_완주한다() {
+    void execute는_재검증_후_tombstone하고_saga로_바이너리_소멸_확인까지_완주한다() throws Exception {
         // ---- fixture: 최종전형 확정 + anchor 60일 전 + 전역 정책 30일 ----
         Long jobPostingId = createPosting();
         Long finalStageId = stageService.create(jobPostingId, new StageCreateRequest(
@@ -123,12 +130,17 @@ class PurgeExecutionServiceTest {
         }
         stageService.announce(jobPostingId, finalStageId, "employee01");
 
-        // B = STORED 바이너리 첨부 — PURGED 승격 금지 대상.
+        // B = STORED 바이너리 첨부 + storage root 에 **실파일** 생성 — 핵심 경로(실삭제 + exists 재확인 +
+        // BINARY_DELETED) 실증(9d-2 리뷰 Medium 2 — MISSING_AS_SUCCESS 만으로는 불충분).
         JobApplication appB = jobApplicationRepository.findById(appWithBinary).orElseThrow();
         attachmentRepository.save(ApplicationAttachment.createStored(
                 appB, AttachmentType.PORTFOLIO, ApplicationSectionType.ATTACHMENT, null,
                 "홍길동_포트폴리오.pdf", "stored-random.pdf", "attachments/stored-random.pdf",
                 "application/pdf", 1024L, 1));
+        Path realBinary = realBinaryPath();
+        Files.createDirectories(realBinary.getParent());
+        Files.write(realBinary, "dummy-pdf-binary".getBytes(StandardCharsets.UTF_8));
+        assertThat(Files.exists(realBinary)).isTrue();
 
         // D = soft-delete 첨부 — 물리삭제 실패로 파일이 잔존할 수 있는 상태(소멸 미확인 → saga 대상).
         JobApplication appD = jobApplicationRepository.findById(appSoftDeletedBinary).orElseThrow();
@@ -174,7 +186,7 @@ class PurgeExecutionServiceTest {
         Map<Long, PurgeJobItemResponse> items = executed.items().stream()
                 .collect(Collectors.toMap(PurgeJobItemResponse::applicationId, Function.identity()));
         assertThat(items.get(appNoBinary).status()).isEqualTo(PurgeItemStatus.PURGED);
-        // saga 완주: 파일 부재 확인(MISSING_AS_SUCCESS) → PENDING→PURGED 최종 승격.
+        // saga 완주: B = 실파일 삭제 + exists 재확인, D = 파일 부재(MISSING_AS_SUCCESS) → PENDING→PURGED 승격.
         assertThat(items.get(appWithBinary).status()).isEqualTo(PurgeItemStatus.PURGED);
         assertThat(items.get(appSoftDeletedBinary).status()).isEqualTo(PurgeItemStatus.PURGED);
         // saga 실패(E): PENDING 유지 — reconciliation(9e) 대상.
@@ -183,6 +195,9 @@ class PurgeExecutionServiceTest {
         assertThat(items.get(appDriftHold).reasonCode()).isEqualTo(AuditReasonCode.RETENTION_HOLD);
 
         // ---- 첨부 saga 결과: 성공 = BINARY_DELETED(storagePath null·binaryDeletedAt·PII 제거), 실패 = FAILED 유지 ----
+        // 실파일이 물리적으로 소멸했는지 실증(리뷰 Medium 2).
+        assertThat(Files.exists(realBinary)).isFalse();
+
         ApplicationAttachment purgedAttachment = attachmentRepository
                 .findByJobApplicationId(appWithBinary).get(0);
         assertThat(purgedAttachment.getPhysicalFileStatus()).isEqualTo(PhysicalFileStatus.BINARY_DELETED);
@@ -303,6 +318,11 @@ class PurgeExecutionServiceTest {
         assertThat(result.batch().totalCount()).isEqualTo(1);
         assertThat(result.batch().purgedCount()).isEqualTo(1);
         assertThat(result.batch().sourceDryRunBatchId()).isNull();
+    }
+
+    private Path realBinaryPath() {
+        return attachmentProperties.getStorageRoot().toAbsolutePath().normalize()
+                .resolve("attachments/stored-random.pdf");
     }
 
     private Long createPosting() {

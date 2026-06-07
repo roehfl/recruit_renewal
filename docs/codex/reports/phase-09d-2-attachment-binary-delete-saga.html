@@ -61,6 +61,12 @@
     <strong>전부 소멸 확인 시에만</strong> JobApplication/item <strong>최종 PURGED 승격</strong>(purgedAt).
     실패 = <code>BINARY_DELETE_FAILED</code> 유지 + batch <code>PARTIAL_FAILED</code>(9e reconciliation 대상).
     <code>PhysicalFileStatus</code> 재정의 <strong>1단계 안전 마이그레이션</strong>(DELETED·SOFT_DELETED 병존·동일 취급) 포함.
+    <br><br>
+    <strong>2026-06-05 구현 리뷰 반영(Major 1 + Medium 2 + Low 2):</strong> ① <strong>빈 storagePath 삭제 대상은
+    실패 처리</strong>(데이터 불일치 — 성공 처리 시 미확인 PURGED 승격 가능, 9e 재처리 대상). ② health scan 이
+    BINARY_DELETE_PENDING/FAILED 파일을 <strong>ORPHAN 으로 오탐하지 않도록</strong> "known but deferred" 키 집합
+    적용(+회귀 테스트). ③ <strong>실파일 생성→실삭제→Files.exists=false 실증 테스트</strong> 추가(핵심 경로).
+    ④ 9e 의무 고정: BINARY_DELETED+null path 정상 분류 테스트 / row 수준 failureCode·reasonMessage 위치 결정.
   </div>
   <table>
     <tr><th>구현 문서</th><td><code>docs/codex/implementation/phase-09d-2-attachment-binary-delete-saga.md</code></td></tr>
@@ -119,13 +125,14 @@
 
 <section>
   <h2>4. 테스트 결과</h2>
-  <p><span class="badge b-green">scoped 48 passed(+fail-loud 수정 후 재실행 통과)</span></p>
+  <p><span class="badge b-green">scoped 48 passed + 리뷰 반영 재실행 22 passed</span></p>
   <table>
     <thead><tr><th>테스트</th><th>건수</th><th>핵심 검증</th><th>결과</th></tr></thead>
     <tbody>
-      <tr><td><code>PurgeExecutionServiceTest</code></td><td>2</td><td><strong>saga 완주</strong>: STORED/soft-deleted 첨부 → 소멸 확인 → item PENDING→<strong>PURGED</strong>·purgedAt·BINARY_DELETED·storagePath null·filenameHash HMAC / <strong>삭제 실패</strong>(traversal invalid) → PENDING 유지+FAILED(경로 보존)+<strong>PARTIAL_FAILED</strong>+binaryDeleteFailedCount=1 / drift·ref-count·멱등 유지</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>PurgeExecutionServiceTest</code></td><td>2</td><td><strong>saga 완주</strong>: STORED = <strong>실파일 생성→실삭제→Files.exists=false 실증</strong>(리뷰 Medium 2), soft-deleted = 파일 부재 — 둘 다 item PENDING→<strong>PURGED</strong>·purgedAt·BINARY_DELETED·storagePath null·filenameHash HMAC / <strong>삭제 실패</strong>(traversal invalid) → PENDING 유지+FAILED(경로 보존)+<strong>PARTIAL_FAILED</strong>+binaryDeleteFailedCount=1 / drift·ref-count·멱등 유지</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>AttachmentStorageHealthScanServiceTest</code></td><td>5</td><td>+BINARY_DELETE_PENDING/FAILED 파일 <strong>ORPHAN 오탐 금지</strong>(리뷰 Medium 1)</td><td><span class="badge b-green">passed</span></td></tr>
       <tr><td><code>ApplicationAttachmentDeleteServiceTest</code></td><td>12</td><td>soft-delete = <strong>SOFT_DELETED</strong> 기록(1단계)</td><td><span class="badge b-green">passed</span></td></tr>
-      <tr><td>회귀 — health scan 4+3 · attachment controller 9 · retention controller 14 · PiiPurge 1 · contract 3</td><td>34</td><td>동일 취급/오탐 없음</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td>회귀 — storage health controller 3 · attachment controller 9 · retention controller 14 · PiiPurge 1 · contract 3</td><td>30</td><td>동일 취급/오탐 없음</td><td><span class="badge b-green">passed</span></td></tr>
     </tbody>
   </table>
 </section>
@@ -136,7 +143,7 @@
     <thead><tr><th>구분</th><th>내용</th></tr></thead>
     <tbody>
       <tr><td><span class="badge b-amber">운영</span></td><td>수동 DDL 적용 + <strong>2단계 UPDATE(DELETED→SOFT_DELETED)는 1단계 코드 배포 후 별도 시점</strong>(스크립트 주석 고정) · 3단계 enum 제거는 후속 phase</td></tr>
-      <tr><td><span class="badge b-gray">9e 예약</span></td><td>PENDING/FAILED reconciliation sweep(execute 재실행은 ALREADY_PURGED skip — 9e 가 유일 재처리 경로) · scan §6.1 확장("PURGED 인데 파일 존재" 치명 탐지, BINARY_DELETED null path 오탐 방지) · FAILED reasonMessage</td></tr>
+      <tr><td><span class="badge b-gray">9e 예약</span></td><td>PENDING/FAILED reconciliation sweep(execute 재실행은 ALREADY_PURGED skip — 9e 가 유일 재처리 경로) · scan §6.1 확장("PURGED 인데 파일 존재" 치명 탐지 + <strong>BINARY_DELETED+null path 정상 분류 테스트 의무</strong> — 리뷰 Low 1) · row 수준 failureCode/reasonMessage 위치 결정(attachment vs purge item — 리뷰 Low 2)</td></tr>
       <tr><td><span class="badge b-navy">다음</span></td><td><strong>09e — Reconciliation + 안정화/테스트 하드닝</strong>(Phase 09 마지막 슬라이스)</td></tr>
     </tbody>
   </table>

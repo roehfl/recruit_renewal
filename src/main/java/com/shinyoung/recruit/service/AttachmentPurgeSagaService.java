@@ -55,8 +55,12 @@ public class AttachmentPurgeSagaService {
     /** ② 멱등 물리 삭제 + 존재 재확인. true = 소멸 확인(이미 없음 포함). */
     private boolean deletePhysicalFile(Long applicationId, Long attachmentId, String storagePath) {
         if (storagePath == null || storagePath.isBlank()) {
-            // 경로가 이미 없으면 삭제할 바이너리도 없다(방어 — 정상 흐름에선 BINARY_DELETED 에서만 null).
-            return true;
+            // 삭제 대상(BINARY_DELETE_PENDING/FAILED)인데 경로가 없으면 "소멸 확인"이 아니라 데이터 불일치 —
+            // 성공 처리하면 미확인 상태로 PURGED 승격될 수 있다(9d-2 리뷰 Major 1). 재처리(9e) 대상으로 남긴다.
+            // 정상적인 "이미 소멸" 상태는 BINARY_DELETED 이며 애초에 대상 조회에서 제외된다.
+            log.warn("Purge binary delete target has empty storagePath. applicationId={}, attachmentId={}",
+                    applicationId, attachmentId);
+            return false;
         }
         try {
             AttachmentStorageDeleteResult result = attachmentStorageService.deleteIfExistsWithResult(storagePath);

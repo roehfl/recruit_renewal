@@ -23,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -135,22 +136,35 @@ public class AttachmentStorageHealthScanService {
             List<AttachmentStorageHealthIssueResponse> issues
     ) {
         // 1단계 마이그레이션(9d-2): legacy DELETED 와 SOFT_DELETED 를 동일(soft-deleted)하게 스캔한다.
-        // BINARY_* purge 상태는 본 스캔 대상이 아니다(BINARY_DELETED 의 storagePath null 오탐 방지) — 9e 에서 확장.
+        // BINARY_DELETE_PENDING/FAILED 는 9e 재처리 대상이라 row 이슈 판정에선 제외하되, 파일이 잔존할 수 있으므로
+        // storageKey 를 "known but deferred" 로 등록해 ORPHAN 오탐을 막는다(9d-2 리뷰 Medium 1).
+        // BINARY_DELETED(storagePath null)는 스캔 대상 외 — 본격 상태별 정책은 9e 에서 확장.
         List<ApplicationAttachment> attachments = attachmentRepository.findByPhysicalFileStatusIn(List.of(
                 PhysicalFileStatus.STORED,
                 PhysicalFileStatus.DELETED,
                 PhysicalFileStatus.SOFT_DELETED,
-                PhysicalFileStatus.MISSING
+                PhysicalFileStatus.MISSING,
+                PhysicalFileStatus.BINARY_DELETE_PENDING,
+                PhysicalFileStatus.BINARY_DELETE_FAILED
         ));
         List<AttachmentRowInfo> storedRows = new ArrayList<>();
         List<AttachmentRowInfo> deletedRows = new ArrayList<>();
         List<AttachmentRowInfo> missingRows = new ArrayList<>();
+        Set<String> deferredPurgeKeys = new HashSet<>();
         long storedRowCount = 0;
         long deletedRowCount = 0;
         long missingRowCount = 0;
 
         for (ApplicationAttachment attachment : attachments) {
             PhysicalFileStatus status = attachment.getPhysicalFileStatus();
+            if (status == PhysicalFileStatus.BINARY_DELETE_PENDING
+                    || status == PhysicalFileStatus.BINARY_DELETE_FAILED) {
+                // purge saga 진행/실패 행 — 이슈/카운트 없이 키만 known 처리(orphan 오탐 방지).
+                toStorageKey(storageRoot, attachment.getStoragePath())
+                        .filter(this::isManagedStorageKey)
+                        .ifPresent(deferredPurgeKeys::add);
+                continue;
+            }
             if (status == PhysicalFileStatus.STORED) {
                 storedRowCount++;
             } else if (PhysicalFileStatus.SOFT_DELETED_FAMILY.contains(status)) {
@@ -193,6 +207,7 @@ public class AttachmentStorageHealthScanService {
                 List.copyOf(storedRows),
                 List.copyOf(deletedRows),
                 List.copyOf(missingRows),
+                Set.copyOf(deferredPurgeKeys),
                 storedRowCount,
                 deletedRowCount,
                 missingRowCount
@@ -256,6 +271,10 @@ public class AttachmentStorageHealthScanService {
 
         for (PhysicalFileInfo physicalFile : physicalFiles.values()) {
             if (storedKeys.contains(physicalFile.storageKey()) || deletedKeys.contains(physicalFile.storageKey())) {
+                continue;
+            }
+            // purge saga 진행/실패(BINARY_DELETE_PENDING/FAILED) 행의 파일 — 9e 재처리 대상, orphan 아님.
+            if (rowScan.deferredPurgeKeys().contains(physicalFile.storageKey())) {
                 continue;
             }
             AttachmentRowInfo missingRow = missingRowsByKey.get(physicalFile.storageKey());
@@ -411,6 +430,7 @@ public class AttachmentStorageHealthScanService {
             List<AttachmentRowInfo> storedRows,
             List<AttachmentRowInfo> deletedRows,
             List<AttachmentRowInfo> missingRows,
+            Set<String> deferredPurgeKeys,
             long storedRowCount,
             long deletedRowCount,
             long missingRowCount

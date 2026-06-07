@@ -6,6 +6,8 @@
 - Work type: implementation (설계: `phase-09-privacy-purge-audit-retention-design.md` §5.4 첨부 saga·slice 9d-2, 계약: PII 인벤토리 §6/§8, ADR-0005)
 - Goal: 파기의 마지막 조각 — 첨부 **바이너리 물리 삭제 saga(①②③)** 를 execute 흐름에 통합하고, **소멸 확인 후에만** `JobApplication`/`PurgeJobItem` 을 최종 PURGED 로 승격한다. `PhysicalFileStatus` 재정의 1단계 마이그레이션 포함.
 
+> 2026-06-05 구현 리뷰 반영(instruction.md, Major 1 + Medium 2 + Low 2): ① **Major 1 — 빈 storagePath 삭제 대상의 오승격 차단**: 삭제 대상(BINARY_DELETE_PENDING/FAILED)인데 storagePath 가 null/blank 면 "소멸 확인"이 아니라 **데이터 불일치 = 실패** 처리(warn 로그 + 9e 재처리 대상). 정상적인 "이미 소멸" 은 BINARY_DELETED 이며 대상 조회에서 애초에 제외됨. ② **Medium 1 — health scan ORPHAN 오탐 방지**: BINARY_DELETE_PENDING/FAILED row 의 storageKey 를 row scan 에서 "known but deferred" 집합으로 수집(이슈/카운트 미반영)해 orphan 판정에서 제외 — 9e 재처리 대상 파일이 ORPHAN_PHYSICAL_FILE 로 오탐되지 않음(+회귀 테스트). ③ **Medium 2 — 실파일 삭제 성공 경로 실증**: storage root 에 실파일 생성 → execute → `Files.exists=false` + BINARY_DELETED/storagePath null/binaryDeletedAt 검증 추가(MISSING_AS_SUCCESS 만으로는 불충분 — 핵심 경로 실증). ④ **Low 1**: 9e health scan 확장 시 "BINARY_DELETED + storagePath null = 정상" 분류 테스트 의무를 다음 단계 항목으로 고정. ⑤ **Low 2**: BINARY_DELETE_FAILED 의 상세 실패 사유(row 수준 sanitized failureCode/reasonMessage — attachment vs purge item 위치 결정 포함)는 9e 결정 사항으로 고정(현재는 log + status 만).
+
 ## Implemented Scope
 
 ### A — PhysicalFileStatus 재정의 + 1단계 안전 마이그레이션 (인벤토리 §8)
@@ -65,10 +67,11 @@
 
 | File | 건수 | 내용 |
 |------|------|------|
-| `PurgeExecutionServiceTest`(갱신) | 2 | **saga 완주 통합** — STORED(B)/soft-deleted(D) 첨부는 소멸 확인(MISSING_AS_SUCCESS) 후 **최종 PURGED 승격**(item PENDING→PURGED·purgedAt·BINARY_DELETED·storagePath null·binaryDeletedAt·filenameHash HMAC·originalFileName placeholder), **삭제 실패(E — traversal 경로 invalid)** 는 PENDING 유지+BINARY_DELETE_FAILED(storagePath 보존)+batch **PARTIAL_FAILED**+binaryDeleteFailedCount=1+coarse 감사 검증, drift SKIP·ref-count·멱등 재실행 유지 |
+| `PurgeExecutionServiceTest`(갱신) | 2 | **saga 완주 통합** — STORED(B)는 **storage root 실파일 생성→실삭제→`Files.exists=false` 실증**(리뷰 Medium 2), soft-deleted(D)는 파일 부재(MISSING_AS_SUCCESS) — 둘 다 **최종 PURGED 승격**(item PENDING→PURGED·purgedAt·BINARY_DELETED·storagePath null·binaryDeletedAt·filenameHash HMAC·originalFileName placeholder), **삭제 실패(E — traversal 경로 invalid)** 는 PENDING 유지+BINARY_DELETE_FAILED(storagePath 보존)+batch **PARTIAL_FAILED**+binaryDeleteFailedCount=1+coarse 감사 검증, drift SKIP·ref-count·멱등 재실행 유지 |
 | `ApplicationAttachmentDeleteServiceTest`(갱신) | 12 | soft-delete 가 **SOFT_DELETED** 를 기록(1단계) — 단언 5곳 전환 |
 | `AuditMetadataContractTest`(갱신) | 3 | `PurgeExecuteMetadata` +binaryDeleteFailedCount |
-| 회귀 | — | health scan 4 · attachment controller 9 · storage health controller 3 · retention controller 14 · PiiPurge 1 |
+| `AttachmentStorageHealthScanServiceTest`(보강) | 5 | +BINARY_DELETE_PENDING/FAILED 파일은 **ORPHAN 오탐 금지**(known but deferred — 리뷰 Medium 1) |
+| 회귀 | — | attachment controller 9 · storage health controller 3 · retention controller 14 · PiiPurge 1 |
 
 ## Class-by-Class Explanation (핵심)
 
@@ -110,7 +113,8 @@ $env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tes
 2. legacy `DELETED` enum 은 2단계 UPDATE + 잔존 0건 확인 후 3단계(후속 phase)에서 제거.
 3. health scan 의 BINARY_* 상태별 정책(§6.1 표 — "PURGED 인데 파일 존재" 치명 탐지)은 9e.
 4. saga 는 직렬 실행 전제(9d-1 과 동일) — 병렬화 시 target 재조회/lock 재설계.
-5. 9e 의 health scan BINARY_* 확장 시 `BINARY_DELETED` 의 null storagePath 를 INVALID 로 오탐하지 않도록 §6.1 표 기준 분기 필수(적대 검증 관찰 — 현재는 scan 대상 외라 안전).
+5. 9e 의 health scan BINARY_* 확장 시 `BINARY_DELETED` 의 null storagePath 를 INVALID 로 오탐하지 않도록 §6.1 표 기준 분기 + **"BINARY_DELETED + storagePath null = 정상" 분류 테스트 필수**(리뷰 Low 1 고정 — 현재는 scan 대상 외라 안전).
+6. `BINARY_DELETE_FAILED` 의 row 수준 실패 사유 부재 — 현재 log + status 만. 9e 에서 sanitized failureCode/reasonMessage 를 attachment 또는 purge item 어느 쪽에 둘지 결정(리뷰 Low 2 고정).
 
 ## Next Phase Considerations
 
