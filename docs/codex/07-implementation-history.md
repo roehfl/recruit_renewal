@@ -1,5 +1,21 @@
 # 07. Implementation History
 
+## Phase 09e - Reconciliation + 안정화 (구현 완료 — Phase 09 종료)
+
+- Date: 2026-06-08
+- Work type: implementation. 설계 §6 reconciliation·§6.1 storage-health-scan 상태별 정책, 계약 = PII 인벤토리(ADR-0005/0006/0007).
+- Implemented:
+  - **Reconciliation sweep**(ROLE_PRIVACY_ADMIN): `POST /api/admin/retention/purge-batches/reconcile`(narrow matcher). `PurgeReconciliationService`(무트랜잭션) — `findByPurgeResult(PURGE_PENDING)` → 원 `purgeBatchId` 로 9d-2 saga `completeBinaryDeletion` 재구동 → 전부 소멸 확인 시 최종 PURGED 승격, 실패 시 PENDING 유지(다음 sweep 재시도). execute 재실행은 ALREADY_PURGED skip 이라 **유일한 재처리 경로**. 단건 실패/null batchId 격리. coarse 감사 `PURGE_RECONCILE`+`PurgeReconcileMetadata`(scanned/promoted/stillPending/errors, recordRequiresNew, stillPending||errors→FAILURE). `PurgeReconcileResponse`(PII-free).
+  - **storage-health-scan §6.1 상태별 정책**: 신규 issue `PURGED_PHYSICAL_FILE_PRESENT`(치명) — orphan 후보 파일의 applicationId 파싱→`findIdsByIdInAndPurgeResult(ids, PURGED)` 대조로 "DB PURGED+파일 잔존" 탐지. BINARY_DELETED+null=정상(오탐 금지, Low 1), BINARY_DELETE_PENDING/FAILED=retry(issue 아님)+`pendingBinaryDeleteRowCount` 집계. 이슈는 fileKeyHash 만(PII 미노출). 응답 +2 카운트.
+  - **Low 2 — row 수준 실패코드**: `ApplicationAttachment.binaryDeleteFailureCode`(sanitized, nullable) — `markBinaryDeleteFailed(code)` 세팅/`markBinaryDeleted` 해소. saga `deletePhysicalFile` boolean→실패코드 반환(EMPTY_STORAGE_PATH/STILL_EXISTS/INVALID_STORAGE_PATH/DELETE_FAILED/EXCEPTION), `finalizeBinaryDeletion` `Set`→`Map<Long,String>`. 전부 PII-free.
+- **적대적 검증(3-agent)**: health-scan 치명탐지·Low 2/회귀 두 영역 **confirmed(clean)**. reconcile 지적 다수는 false positive(null batchId 여도 saga 는 applicationId 기준 조회 + item 부재 시 orElseThrow 롤백으로 오승격 차단; empty-target 승격은 실제 소멸이라 의도된 복구) 또는 동시성(직렬 실행 전제로 범위 외). 실반영 1건 — **null batchId 조기 가드**.
+- Tests: scoped **42 passed**(Reconciliation 3 · HealthScan 7 — 치명탐지/Low 1 · Execution 2 — Low 2 · RetentionController 15 — reconcile 권한 · MetadataContract 3 — permits 11 · AttachmentDelete 12). 전체 회귀 미실행(프로젝트 규칙).
+- 운영 주의: 수동 DDL `docs/codex/ops/phase-09e-reconciliation-ddl.sql`(`binary_delete_failure_code` 1컬럼, 신규 테이블 없음). reconcile 은 수동 트리거(동시 실행 금지 권고 — 직렬 전제).
+- Documentation:
+  - `docs/codex/implementation/phase-09e-reconciliation.md`
+  - `docs/codex/reports/phase-09e-reconciliation.html`
+- 상태: 구현 완료. **Phase 09(감사+보존/파기) 9a~9e 전 슬라이스 종료.** 후속(별도 phase): legacy `DELETED` enum 제거(3단계), reconcile 자동 스케줄러(SYSTEM actor), 동시성 제어(@Version).
+
 ## Phase 09d-2 - Attachment Binary Delete Saga (구현 완료)
 
 - Date: 2026-06-05

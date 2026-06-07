@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -131,19 +132,20 @@ public class PurgeItemProcessor {
             Long batchId,
             Long applicationId,
             Set<Long> succeededAttachmentIds,
-            Set<Long> failedAttachmentIds
+            Map<Long, String> failedAttachmentCodes
     ) {
         List<ApplicationAttachment> targets = applicationAttachmentRepository
                 .findByJobApplicationIdAndPhysicalFileStatusIn(applicationId, List.of(
                         PhysicalFileStatus.BINARY_DELETE_PENDING, PhysicalFileStatus.BINARY_DELETE_FAILED));
         LocalDateTime now = LocalDateTime.now(clock);
         // 보수적 판정: 실패가 하나라도 있거나, 성공 확인이 없는 대상이 남으면 승격 금지.
-        boolean allCleared = failedAttachmentIds.isEmpty();
+        boolean allCleared = failedAttachmentCodes.isEmpty();
         for (ApplicationAttachment attachment : targets) {
             if (succeededAttachmentIds.contains(attachment.getId())) {
                 attachment.markBinaryDeleted(now);
             } else {
-                attachment.markBinaryDeleteFailed();
+                // 실패 코드 미상이면 보수적으로 UNKNOWN(스캔↔확정 사이 대상 변동 등) — 승격 금지.
+                attachment.markBinaryDeleteFailed(failedAttachmentCodes.getOrDefault(attachment.getId(), "UNKNOWN"));
                 allCleared = false;
             }
         }

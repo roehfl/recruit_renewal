@@ -27,25 +27,30 @@ class AuditMetadataContractTest {
             "ci", "cihash", "password", "sourcefilename" // hash/extension 은 별도 허용 목록에서 명시
     );
 
-    private static final Map<Class<?>, Set<String>> EXPECTED_COMPONENTS = Map.of(
-            ExportMetadata.class, Set.of("datasetType", "filtersHash", "filtersSafeJson", "rowCount", "fileName"),
-            PdfMetadata.class, Set.of("applicationId", "jobPostingId", "jobPositionId"),
-            UploadMetadata.class, Set.of("stageId", "outcome", "rowCount", "changedCount", "unchangedCount",
-                    "errorCount", "staleCount", "sourceFileNameHash", "sourceFileExtension", "sourceFileSize",
-                    "contentHash"),
-            UploadConflictMetadata.class, Set.of("stageId", "sourceFileNameHash", "sourceFileExtension",
-                    "sourceFileSize", "contentHash"),
-            StageResultChangeMetadata.class, Set.of("stageId", "changedCount"),
-            EvaluationReopenMetadata.class, Set.of("interviewId", "previousSubmittedAt"),
-            AttachmentAdminMetadata.class, Set.of("physicalDeleteRequested"),
+    // Map.ofEntries — 11개 이상이라 Map.of(최대 10쌍) 한계 회피.
+    private static final Map<Class<?>, Set<String>> EXPECTED_COMPONENTS = Map.ofEntries(
+            Map.entry(ExportMetadata.class,
+                    Set.of("datasetType", "filtersHash", "filtersSafeJson", "rowCount", "fileName")),
+            Map.entry(PdfMetadata.class, Set.of("applicationId", "jobPostingId", "jobPositionId")),
+            Map.entry(UploadMetadata.class, Set.of("stageId", "outcome", "rowCount", "changedCount",
+                    "unchangedCount", "errorCount", "staleCount", "sourceFileNameHash", "sourceFileExtension",
+                    "sourceFileSize", "contentHash")),
+            Map.entry(UploadConflictMetadata.class, Set.of("stageId", "sourceFileNameHash", "sourceFileExtension",
+                    "sourceFileSize", "contentHash")),
+            Map.entry(StageResultChangeMetadata.class, Set.of("stageId", "changedCount")),
+            Map.entry(EvaluationReopenMetadata.class, Set.of("interviewId", "previousSubmittedAt")),
+            Map.entry(AttachmentAdminMetadata.class, Set.of("physicalDeleteRequested")),
             // Phase 09c — retention/purge metadata(PII-free 설정값·집계만).
-            RetentionPolicyChangeMetadata.class, Set.of("operation", "policyId", "jobPostingId",
-                    "retentionPeriodDays", "baselineType", "enabled"),
-            PurgeBatchMetadata.class, Set.of("purgeBatchId", "mode", "totalCount", "eligibleCount",
-                    "skippedCount", "policyConflictCount"),
+            Map.entry(RetentionPolicyChangeMetadata.class, Set.of("operation", "policyId", "jobPostingId",
+                    "retentionPeriodDays", "baselineType", "enabled")),
+            Map.entry(PurgeBatchMetadata.class, Set.of("purgeBatchId", "mode", "totalCount", "eligibleCount",
+                    "skippedCount", "policyConflictCount")),
             // Phase 09d-1/09d-2 — execute coarse 집계(PII-free).
-            PurgeExecuteMetadata.class, Set.of("purgeBatchId", "sourceDryRunBatchId", "totalCount",
-                    "purgedCount", "pendingCount", "skippedCount", "failedCount", "binaryDeleteFailedCount")
+            Map.entry(PurgeExecuteMetadata.class, Set.of("purgeBatchId", "sourceDryRunBatchId", "totalCount",
+                    "purgedCount", "pendingCount", "skippedCount", "failedCount", "binaryDeleteFailedCount")),
+            // Phase 09e — reconciliation sweep coarse 집계(PII-free).
+            Map.entry(PurgeReconcileMetadata.class, Set.of("scannedCount", "promotedCount",
+                    "stillPendingCount", "errorCount"))
     );
 
     @Test

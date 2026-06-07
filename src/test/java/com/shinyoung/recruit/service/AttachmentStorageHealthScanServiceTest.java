@@ -224,6 +224,50 @@ class AttachmentStorageHealthScanServiceTest {
     }
 
     @Test
+    void scan은_PURGED_지원서_경로의_파일을_치명적_불일치로_분류한다() throws Exception {
+        Applicant applicant = createApplicant("health-purged", "Health Purged");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+
+        // 지원서를 최종 PURGED 로 마킹(첨부 row 없음 — 파일만 잔존하는 누수 상황 재현).
+        JobApplication application = jobApplicationRepository.findById(applicationId).orElseThrow();
+        application.markPurged(1L, LocalDateTime.now(FIXED_CLOCK));
+        jobApplicationRepository.saveAndFlush(application);
+
+        // PURGED 지원서 경로에 파일이 남아 있음 = "DB PURGED + 파일 잔존" 치명적 불일치(§6.1).
+        Path leaked = attachmentProperties.getStorageRoot()
+                .resolve("applications/" + applicationId + "/2026/06/15/leaked.pdf");
+        Files.createDirectories(leaked.getParent());
+        Files.writeString(leaked, "leaked", StandardCharsets.UTF_8);
+
+        AttachmentStorageHealthScanResponse response = scanService.scanDryRun();
+
+        assertThat(response.purgedPhysicalFilePresentCount()).isEqualTo(1);
+        assertThat(response.orphanPhysicalFileCount()).isZero(); // PURGED 로 분류 — orphan 아님
+        assertThat(categories(response))
+                .contains(AttachmentStorageHealthIssueType.PURGED_PHYSICAL_FILE_PRESENT.name());
+    }
+
+    @Test
+    void scan은_BINARY_DELETED_null_storagePath를_정상으로_본다() {
+        Applicant applicant = createApplicant("health-binary-deleted", "Health BinaryDeleted");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        Long attachmentId = upload(applicant, applicationId, "to-purge.pdf", "to-purge");
+
+        // 최종 소멸 완료(BINARY_DELETED + storagePath null + 파일 없음) = 정상(09e Low 1 — 오탐 금지).
+        ApplicationAttachment attachment = attachmentRepository.findById(attachmentId).orElseThrow();
+        storageService.deleteIfExists(attachment.getStoragePath());
+        attachment.markBinaryDeleted(LocalDateTime.now(FIXED_CLOCK));
+        attachmentRepository.saveAndFlush(attachment);
+
+        AttachmentStorageHealthScanResponse response = scanService.scanDryRun();
+
+        assertThat(response.invalidStoragePathCount()).isZero();
+        assertThat(response.orphanPhysicalFileCount()).isZero();
+        assertThat(response.purgedPhysicalFilePresentCount()).isZero();
+        assertThat(response.issues()).isEmpty();
+    }
+
+    @Test
     void scan_excludes_metadata_only_rows_and_does_not_mutate_db_or_files() throws Exception {
         Applicant applicant = createApplicant("health-dry-run", "Health Dry Run");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());

@@ -21,5 +21,6 @@ public sealed interface AuditMetadata permits
         AttachmentAdminMetadata,
         RetentionPolicyChangeMetadata,
         PurgeBatchMetadata,
-        PurgeExecuteMetadata {
+        PurgeExecuteMetadata,
+        PurgeReconcileMetadata {
 }

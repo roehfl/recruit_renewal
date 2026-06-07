@@ -151,6 +151,20 @@ class AdminRetentionControllerTest {
     }
 
     @Test
+    void reconcile는_PRIVACY_ADMIN_전용이다() throws Exception {
+        mockMvc.perform(post("/api/admin/retention/purge-batches/reconcile")
+                        .with(authentication(adminAuthentication("ROLE_RECRUIT_ADMIN"))))
+                .andExpect(status().isForbidden());
+
+        // 무대상이어도 PRIVACY_ADMIN 은 200 + coarse 집계(scanned 0).
+        mockMvc.perform(post("/api/admin/retention/purge-batches/reconcile")
+                        .with(authentication(adminAuthentication("ROLE_PRIVACY_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.scannedCount").value(0));
+    }
+
+    @Test
     void execute는_PRIVACY_ADMIN_전용이고_confirm_없으면_400() throws Exception {
         mockMvc.perform(post("/api/admin/retention/purge-batches/execute")
                         .with(authentication(adminAuthentication("ROLE_RECRUIT_ADMIN")))

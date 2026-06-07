@@ -71,6 +71,10 @@ public class ApplicationAttachment extends BaseEntity {
     /** 물리 소멸 확인 시점(9d-2 saga 최종 단계에서만 세팅). */
     private LocalDateTime binaryDeletedAt;
 
+    /** 바이너리 삭제 실패의 sanitized 코드(09e — reconciliation 추적용, PII 미포함). 성공 시 null. */
+    @Column(length = 100)
+    private String binaryDeleteFailureCode;
+
     @Column(nullable = false, length = 100)
     private String contentType;
 
@@ -208,15 +212,20 @@ public class ApplicationAttachment extends BaseEntity {
         this.physicalFileStatus = PhysicalFileStatus.BINARY_DELETE_PENDING;
     }
 
-    /** saga ③ — 물리 소멸 확인 확정. storagePath 는 이 시점에 null(인벤토리 §6). */
+    /** saga ③ — 물리 소멸 확인 확정. storagePath 는 이 시점에 null(인벤토리 §6). 이전 실패 코드는 해소. */
     public void markBinaryDeleted(LocalDateTime binaryDeletedAt) {
         this.physicalFileStatus = PhysicalFileStatus.BINARY_DELETED;
         this.binaryDeletedAt = binaryDeletedAt;
         this.storagePath = null;
+        this.binaryDeleteFailureCode = null;
     }
 
-    /** saga ③ — 물리 삭제 실패(재시도/reconciliation 대상, 9e). storagePath 보존. */
-    public void markBinaryDeleteFailed() {
+    /**
+     * saga ③ — 물리 삭제 실패(재시도/reconciliation 대상, 9e). storagePath 보존.
+     * {@code failureCode} 는 sanitized 코드(PII 미포함) — reconciliation/health-scan 추적용(09e 리뷰 Low 2).
+     */
+    public void markBinaryDeleteFailed(String failureCode) {
         this.physicalFileStatus = PhysicalFileStatus.BINARY_DELETE_FAILED;
+        this.binaryDeleteFailureCode = failureCode;
     }
 }

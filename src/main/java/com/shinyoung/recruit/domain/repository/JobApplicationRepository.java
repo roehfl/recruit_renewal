@@ -4,6 +4,7 @@ import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.dto.response.ApplicationExportRow;
 import com.shinyoung.recruit.dto.response.FunnelCohortRow;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
+import com.shinyoung.recruit.enumeration.PurgeResult;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -17,6 +18,15 @@ import java.util.Optional;
 public interface JobApplicationRepository extends JpaRepository<JobApplication, Long> {
 
     Optional<JobApplication> findByIdAndApplicantId(Long id, Long applicantId);
+
+    /** reconciliation(09e) — 바이너리 삭제 미완(PURGE_PENDING) 잔여 건 재처리 대상. */
+    List<JobApplication> findByPurgeResult(PurgeResult purgeResult);
+
+    /** health-scan 치명탐지(09e §6.1) — 후보 applicationId 중 최종 PURGED 인 것만(파기 후 파일 잔존 판정). */
+    @Query("select j.id from JobApplication j where j.id in :ids and j.purgeResult = :purgeResult")
+    List<Long> findIdsByIdInAndPurgeResult(
+            @Param("ids") List<Long> ids,
+            @Param("purgeResult") PurgeResult purgeResult);
 
     Optional<JobApplication> findByApplicantIdAndJobPostingId(Long applicantId, Long jobPostingId);
 

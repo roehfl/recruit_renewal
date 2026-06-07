@@ -6,8 +6,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -38,47 +40,50 @@ public class AttachmentPurgeSagaService {
                 PhysicalFileStatus.BINARY_DELETE_PENDING, PhysicalFileStatus.BINARY_DELETE_FAILED));
 
         Set<Long> succeeded = new HashSet<>();
-        Set<Long> failed = new HashSet<>();
+        Map<Long, String> failed = new HashMap<>();
         for (Object[] row : targets) {
             Long attachmentId = (Long) row[0];
             String storagePath = (String) row[1];
-            if (deletePhysicalFile(applicationId, attachmentId, storagePath)) {
+            String failureCode = deletePhysicalFile(applicationId, attachmentId, storagePath);
+            if (failureCode == null) {
                 succeeded.add(attachmentId);
             } else {
-                failed.add(attachmentId);
+                failed.put(attachmentId, failureCode);
             }
         }
 
         return purgeItemProcessor.finalizeBinaryDeletion(batchId, applicationId, succeeded, failed);
     }
 
-    /** ② 멱등 물리 삭제 + 존재 재확인. true = 소멸 확인(이미 없음 포함). */
-    private boolean deletePhysicalFile(Long applicationId, Long attachmentId, String storagePath) {
+    /**
+     * ② 멱등 물리 삭제 + 존재 재확인. null = 소멸 확인(이미 없음 포함), non-null = sanitized 실패코드(09e Low 2).
+     */
+    private String deletePhysicalFile(Long applicationId, Long attachmentId, String storagePath) {
         if (storagePath == null || storagePath.isBlank()) {
             // 삭제 대상(BINARY_DELETE_PENDING/FAILED)인데 경로가 없으면 "소멸 확인"이 아니라 데이터 불일치 —
             // 성공 처리하면 미확인 상태로 PURGED 승격될 수 있다(9d-2 리뷰 Major 1). 재처리(9e) 대상으로 남긴다.
             // 정상적인 "이미 소멸" 상태는 BINARY_DELETED 이며 애초에 대상 조회에서 제외된다.
             log.warn("Purge binary delete target has empty storagePath. applicationId={}, attachmentId={}",
                     applicationId, attachmentId);
-            return false;
+            return "EMPTY_STORAGE_PATH";
         }
         try {
             AttachmentStorageDeleteResult result = attachmentStorageService.deleteIfExistsWithResult(storagePath);
             if (result.failed()) {
                 log.warn("Purge binary delete failed. applicationId={}, attachmentId={}, failureCode={}",
                         applicationId, attachmentId, result.failureCode());
-                return false;
+                return result.failureCode() == null ? "DELETE_FAILED" : result.failureCode();
             }
             // 소멸 재확인(설계 §5.4) — deleteIfExists 성공이어도 잔존하면 PURGED 승격 금지.
-            boolean stillExists = attachmentStorageService.exists(storagePath);
-            if (stillExists) {
+            if (attachmentStorageService.exists(storagePath)) {
                 log.warn("Purge binary still exists after delete. applicationId={}, attachmentId={}",
                         applicationId, attachmentId);
+                return "STILL_EXISTS";
             }
-            return !stillExists;
+            return null;
         } catch (RuntimeException e) {
             log.warn("Purge binary delete threw. applicationId={}, attachmentId={}", applicationId, attachmentId, e);
-            return false;
+            return "EXCEPTION";
         }
     }
 }

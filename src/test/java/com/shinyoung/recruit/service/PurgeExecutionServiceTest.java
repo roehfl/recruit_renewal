@@ -213,6 +213,8 @@ class PurgeExecutionServiceTest {
         assertThat(failedAttachment.getPhysicalFileStatus()).isEqualTo(PhysicalFileStatus.BINARY_DELETE_FAILED);
         assertThat(failedAttachment.getStoragePath()).isEqualTo("../escape.pdf"); // 재시도 위해 보존
         assertThat(failedAttachment.getOriginalFileName()).isEqualTo(JobApplication.PURGED_PLACEHOLDER); // PII 는 제거됨
+        // row 수준 실패 사유(09e Low 2) — traversal 경로는 storage 가 INVALID_STORAGE_PATH 로 거부.
+        assertThat(failedAttachment.getBinaryDeleteFailureCode()).isEqualTo("INVALID_STORAGE_PATH");
 
         // ---- marker: saga 완주(B) = 최종 PURGED + purgedAt, saga 실패(E) = PURGE_PENDING(purgedAt 미세팅) ----
         JobApplication purgedApp = jobApplicationRepository.findById(appNoBinary).orElseThrow();

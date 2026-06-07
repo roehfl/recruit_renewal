@@ -31,5 +31,7 @@ public enum AuditActionType {
     RETENTION_HOLD_RELEASE,
     RETENTION_ANCHOR_SET,
     PURGE_SCAN,
-    PURGE_EXECUTE
+    PURGE_EXECUTE,
+    /** PURGE_PENDING 잔여 건의 바이너리 삭제 재처리 sweep(09e reconciliation). */
+    PURGE_RECONCILE
 }

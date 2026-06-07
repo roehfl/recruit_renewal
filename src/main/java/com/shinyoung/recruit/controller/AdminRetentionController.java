@@ -8,6 +8,7 @@ import com.shinyoung.recruit.dto.response.ApiResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.dto.response.PurgeBatchDetailResponse;
 import com.shinyoung.recruit.dto.response.PurgeBatchResponse;
+import com.shinyoung.recruit.dto.response.PurgeReconcileResponse;
 import com.shinyoung.recruit.dto.response.RetentionAnchorResponse;
 import com.shinyoung.recruit.dto.response.RetentionHoldResponse;
 import com.shinyoung.recruit.dto.response.RetentionPolicyResponse;
@@ -15,6 +16,7 @@ import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.CurrentEmployeeService;
 import com.shinyoung.recruit.service.PurgeBatchReadService;
 import com.shinyoung.recruit.service.PurgeExecutionService;
+import com.shinyoung.recruit.service.PurgeReconciliationService;
 import com.shinyoung.recruit.service.RetentionAnchorService;
 import com.shinyoung.recruit.service.RetentionDryRunService;
 import com.shinyoung.recruit.service.RetentionHoldService;
@@ -51,6 +53,7 @@ public class AdminRetentionController {
     private final RetentionDryRunService retentionDryRunService;
     private final PurgeBatchReadService purgeBatchReadService;
     private final PurgeExecutionService purgeExecutionService;
+    private final PurgeReconciliationService purgeReconciliationService;
     private final CurrentEmployeeService currentEmployeeService;
 
     // ---- RetentionPolicy ----
@@ -149,6 +152,18 @@ public class AdminRetentionController {
     ) {
         String actor = currentEmployeeService.getCurrentEmployeeActor(userDetails);
         return ResponseEntity.ok(ApiResponse.success(purgeExecutionService.execute(request, actor)));
+    }
+
+    /**
+     * PURGE_PENDING 잔여 건의 바이너리 삭제 재처리 sweep(09e, ROLE_PRIVACY_ADMIN 전용 matcher).
+     * execute 재실행은 ALREADY_PURGED skip 이라 본 sweep 이 유일한 재처리 경로다.
+     */
+    @PostMapping("/purge-batches/reconcile")
+    public ResponseEntity<ApiResponse<PurgeReconcileResponse>> reconcile(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        String actor = currentEmployeeService.getCurrentEmployeeActor(userDetails);
+        return ResponseEntity.ok(ApiResponse.success(purgeReconciliationService.reconcile(actor)));
     }
 
     @GetMapping("/purge-batches")
