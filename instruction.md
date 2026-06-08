@@ -1,36 +1,68 @@
-Medium 1 — Reconcile이 전체 PURGE_PENDING을 한 번에 조회한다
+여전히 남은 Major — PURGED + 파일 잔존 탐지가 row 매칭 파일을 놓친다
 
-PurgeReconciliationService는 jobApplicationRepository.findByPurgeResult(PURGE_PENDING)로 전체 대상을 한 번에 가져온다.
-현재는 수동 운영/소규모 전제라 괜찮지만, 장애 후 PENDING이 쌓이면 한 요청이 길어질 수 있다.
+현재 AttachmentStorageHealthScanService.addOrphanIssues()는 orphan 후보만 먼저 만든다. 이 후보는 storedKeys, deletedKeys, deferredPurgeKeys, missingRowsByKey에 매칭되지 않는 파일만 포함한다.
 
-후속 하드닝으로 아래 형태가 낫다.
+그 다음에야 purgedApplicationIds(orphanCandidates)를 호출해서 PURGED_PHYSICAL_FILE_PRESENT를 만든다. 즉 치명탐지 대상이 orphanCandidates로 제한되어 있다.
 
-POST /api/admin/retention/purge-batches/reconcile?limit=100
+그래서 이 케이스는 여전히 빠진다.
 
-또는 내부적으로 PageRequest를 써서 chunk 단위로 처리해라. Phase 09 종료 후 운영 안정화 과제로 넘겨도 되지만, 운영 전에 넣는 편이 안전하다.
+JobApplication.purgeResult = PURGED
+ApplicationAttachment.physicalFileStatus = STORED
+ApplicationAttachment.storagePath = applications/{applicationId}/...
+실제 파일 존재
 
-Medium 2 — Reconcile summary audit 실패 시 이미 승격된 건은 롤백되지 않는다
+왜 빠지냐면, STORED row는 storedRows에 들어간다.
+그리고 addOrphanIssues()는 storedKeys.contains(key)면 orphan 후보에서 제외한다.
+따라서 해당 파일은 PURGED_PHYSICAL_FILE_PRESENT도 아니고, orphan도 아니고, stored missing도 아니다. 아무 이슈 없이 통과할 수 있다.
 
-Reconcile은 application별 saga를 REQUIRES_NEW로 먼저 커밋하고, 마지막에 recordRequiresNew()로 summary audit을 남긴다.
+현재 테스트도 이 구멍을 막지 않는다. 테스트는 “첨부 row 없음 + PURGED 지원서 경로에 파일만 남음” 케이스만 검증한다.
 
-즉 summary audit 저장이 실패하면, 이미 승격된 application은 유지되지만 PURGE_RECONCILE 감사는 남지 않을 수 있다. 이건 9d의 batch complete audit 문제와 같은 유형이다.
+하지만 health scan은 정상 코드 경로만 검증하는 게 아니라 오염된 운영 데이터와 깨진 불변식을 찾는 장치다. PURGED 지원서의 경로에 파일이 존재하면, row가 있든 없든 치명이다.
 
-현실적 해결책은 둘 중 하나다.
+필요한 수정
 
-A. reconcile 시작 시점에 STARTED audit을 먼저 남기고, 완료 시 summary audit을 남긴다.
-B. reconcile 전용 ledger batch를 만들고, ActivityLog는 보조 summary로 둔다.
+PURGED_PHYSICAL_FILE_PRESENT 분류를 orphan 분기 뒤가 아니라 전체 physical file 기준의 선행 분기로 빼라.
 
-지금 Phase 09 구조상 B는 과하다. 최소한 A 또는 “audit 실패 시 운영자가 재조회 가능한 로그/response” 정도는 후속으로 잡아라.
+private void addOrphanIssues(
+        Map<String, PhysicalFileInfo> physicalFiles,
+        RowScanResult rowScan,
+        List<AttachmentStorageHealthIssueResponse> issues
+) {
+    Set<Long> purgedApplicationIds = purgedApplicationIds(
+            new ArrayList<>(physicalFiles.values())
+    );
 
-Low 1 — 실패코드 sanitization을 코드로 강제하지 않는다
+    for (PhysicalFileInfo physicalFile : physicalFiles.values()) {
+        Long applicationId = applicationIdFromKey(physicalFile.storageKey());
+        if (applicationId != null && purgedApplicationIds.contains(applicationId)) {
+            issues.add(AttachmentStorageHealthIssueResponse.of(
+                    AttachmentStorageHealthIssueType.PURGED_PHYSICAL_FILE_PRESENT,
+                    applicationId,
+                    null,
+                    PhysicalFileStatus.BINARY_DELETED,
+                    physicalFile.fileKeyHash(),
+                    physicalFile.size(),
+                    "Purged application still has a physical file (critical)."
+            ));
+            continue;
+        }
 
-문서상 binaryDeleteFailureCode는 sanitized code이고 길이 100이다.
-현재 local storage 구현의 실패코드는 짧은 상수라 안전하지만, markBinaryDeleteFailed(failureCode)는 전달받은 값을 그대로 저장한다.
-
-미래 S3/NAS 구현에서 긴 메시지나 경로가 failureCode로 들어오면 컬럼 길이 초과 또는 정보 노출이 생길 수 있다. 아래처럼 entity/service 경계에서 고정해라.
-
-private String sanitizeFailureCode(String code) {
-    if (code == null || code.isBlank()) return "UNKNOWN";
-    String sanitized = code.replaceAll("[^A-Z0-9_]", "_");
-    return sanitized.length() <= 100 ? sanitized : sanitized.substring(0, 100);
+        // 이후 기존 stored/deleted/missing/deferred/orphan 분기
+    }
 }
+
+그리고 테스트는 반드시 아래 케이스로 추가해라.
+
+1. 지원서를 markPurged()
+2. 같은 applicationId에 ApplicationAttachment row를 STORED 상태로 남김
+3. storagePath에 실제 파일 생성
+4. scanDryRun()
+5. purgedPhysicalFilePresentCount == 1
+6. ORPHAN이 아니라 PURGED_PHYSICAL_FILE_PRESENT
+
+이 테스트가 들어가야 내가 지적한 치명탐지 구멍이 닫힌다.
+
+추가 Low — 문서가 현재 구현보다 낙관적이다
+
+07-implementation-history.md에는 Phase 09 종료라고 되어 있고, 9e 구현 리뷰 반영으로 Medium/Low만 적혀 있다.
+하지만 위 Major가 남아 있으므로 문서의 “Phase 09 종료” 문구는 아직 이르다. 치명탐지 보정 후 종료 처리해라.

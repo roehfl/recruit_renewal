@@ -6,7 +6,9 @@
 - Work type: implementation (설계: `phase-09-privacy-purge-audit-retention-design.md` §6 reconciliation·§6.1 storage-health-scan 상태별 정책, 계약: PII 인벤토리, ADR-0005/0006/0007)
 - Goal: 파기 lifecycle 의 마지막 안전망 — ① **reconciliation sweep**(PURGE_PENDING 잔여 건 바이너리 삭제 재처리 → 최종 PURGED 승격, execute 재실행은 ALREADY_PURGED skip 이라 **유일한 재처리 경로**), ② **storage-health-scan §6.1 상태별 정책 확장**("DB PURGED + 파일 잔존" 치명탐지 + BINARY_DELETED null path 정상 분류 + BINARY_DELETE_PENDING/FAILED retry 가시화), ③ **Low 2 — row 수준 실패 사유**(reconciliation 추적), ④ 권한/멱등/Clock 회귀 하드닝.
 
-> 2026-06-08 구현 리뷰 반영(instruction.md, Medium 1·2 + Low 1): ① **Medium 1 — chunk 처리**: reconcile 이 전체 PURGE_PENDING 을 한 번에 조회하던 것을 `limit`(기본 100, max 1000 clamp) + `findByPurgeResultOrderByIdAsc(..., PageRequest)` 로 chunk 처리 — 장애 후 PENDING 누적 시 단일 요청 폭주 방지. `scannedCount == limit` 이면 운영자가 재호출(잔여 sweep). ② **Medium 2 — STARTED 선행 감사(방안 A)**: sweep 시작 시 `PURGE_RECONCILE` STARTED 감사를 먼저 남기고 완료 시 SUMMARY 감사 — summary 저장이 실패해도 'STARTED 만 있고 SUMMARY 없음' 으로 미완 sweep 을 감사 read 에서 탐지 가능(9d batch complete audit 문제와 동형). ③ **Low 1 — 실패코드 sanitize 강제**: `ApplicationAttachment.markBinaryDeleteFailed` 가 엔티티 경계에서 `[A-Z0-9_]` 외 치환 + len100 절단 — 미래 S3/NAS 구현이 긴 메시지·경로를 넘겨도 컬럼 초과/정보 노출 차단.
+> 2026-06-08 구현 리뷰 1차 반영(Medium 1·2 + Low 1): ① **Medium 1 — chunk 처리**: reconcile 이 전체 PURGE_PENDING 을 한 번에 조회하던 것을 `limit`(기본 100, max 1000 clamp) + `findByPurgeResultOrderByIdAsc(..., PageRequest)` 로 chunk 처리 — 장애 후 PENDING 누적 시 단일 요청 폭주 방지. `scannedCount == limit` 이면 운영자가 재호출(잔여 sweep). ② **Medium 2 — STARTED 선행 감사(방안 A)**: sweep 시작 시 `PURGE_RECONCILE` STARTED 감사를 먼저 남기고 완료 시 SUMMARY 감사 — summary 저장이 실패해도 'STARTED 만 있고 SUMMARY 없음' 으로 미완 sweep 을 감사 read 에서 탐지 가능(9d batch complete audit 문제와 동형). ③ **Low 1 — 실패코드 sanitize 강제**: `ApplicationAttachment.markBinaryDeleteFailed` 가 엔티티 경계에서 `[A-Z0-9_]` 외 치환 + len100 절단 — 미래 S3/NAS 구현이 긴 메시지·경로를 넘겨도 컬럼 초과/정보 노출 차단.
+>
+> 2026-06-08 구현 리뷰 2차 반영(**Major — 치명탐지 누락 보정** + 문서 Low): **Major** — `PURGED_PHYSICAL_FILE_PRESENT` 분류가 orphan 후보로만 제한돼 "PURGED 지원서 + STORED(또는 DELETED/MISSING) row + 실파일 잔존" 케이스를 놓쳤다(STORED row 의 파일은 orphan 후보에서 제외되므로 무이슈 통과). 수정: 치명탐지를 **전체 물리파일 기준 선행 분기**로 분리 — `scanDryRun` 이 모든 물리파일의 applicationId 로 `purgedApplicationIds`/`purgedFileKeys` 를 먼저 구해 `addPurgedFilePresentIssues` 로 분류하고, `addDeletedRemainingIssues`/`addOrphanIssues` 는 purgedFileKeys 를 skip(중복 방지·상위 심각도). row 상태 무관하게 PURGED 경로 파일은 치명 1회로 분류. 적대 검증(9 케이스 전수) confirmed — 중복/누락/회귀 없음. 회귀 테스트 추가(STORED row + 실파일 + PURGED → `purgedPhysicalFilePresentCount==1`, orphan 아님). 문서 Low — Major 보정 후 "Phase 09 종료" 유지.
 
 ## Implemented Scope
 
@@ -35,7 +37,7 @@
 | `BINARY_DELETED` | storagePath null → 스캔 대상 외(**오탐 금지**, Low 1) |
 | orphan 파일(어떤 row 도 매칭 안 됨) | applicationId 파싱 → **PURGED 지원서면 `PURGED_PHYSICAL_FILE_PRESENT`(치명)**, 아니면 `ORPHAN_PHYSICAL_FILE` |
 
-- 치명탐지 메커니즘: orphan 후보 파일의 key(`applications/{id}/...`)에서 applicationId 파싱 → `findIdsByIdInAndPurgeResult(ids, PURGED)` 일괄 조회 → PURGED 집합이면 치명 분류. 이슈는 **fileKeyHash 만 노출**(경로/파일명 원문 미노출).
+- 치명탐지 메커니즘: **전체 물리파일**(orphan 후보 한정 아님 — 리뷰 2차 Major)의 key(`applications/{id}/...`)에서 applicationId 파싱 → `findIdsByIdInAndPurgeResult(ids, PURGED)` 일괄 조회 → PURGED 집합이면 `addPurgedFilePresentIssues` 가 선행 분류, 그 키는 deleted-remaining/orphan 분기에서 skip(중복 방지). row 상태(STORED/DELETED/MISSING/orphan) 무관. 이슈는 **fileKeyHash 만 노출**(경로/파일명 원문 미노출).
 - 응답에 `pendingBinaryDeleteRowCount`·`purgedPhysicalFilePresentCount` 추가.
 
 ### C — Low 2: row 수준 바이너리 삭제 실패 사유
@@ -76,7 +78,7 @@
 | `domain/repository/JobApplicationRepository.java` | `findByPurgeResult` + `findIdsByIdInAndPurgeResult` |
 | `service/AttachmentPurgeSagaService.java` | `deletePhysicalFile` 실패코드 반환 + failed `Map` 전파 |
 | `service/PurgeItemProcessor.java` | `finalizeBinaryDeletion` 시그니처 `Map<Long,String>` |
-| `service/AttachmentStorageHealthScanService.java` | §6.1 — pending 집계 + PURGED 치명 분류(JobApplicationRepository 주입) |
+| `service/AttachmentStorageHealthScanService.java` | §6.1 — pending 집계 + **PURGED 치명 분류(전체 물리파일 선행 분기, row 상태 무관 — 리뷰 2차 Major)**, JobApplicationRepository 주입 |
 | `dto/response/AttachmentStorageHealthScanResponse.java` | +2 카운트 |
 | `service/AuditMetadata.java` | permits +`PurgeReconcileMetadata` |
 | `controller/AdminRetentionController.java` / `config/SecurityConfig.java` | reconcile 엔드포인트 + PRIVACY narrow matcher |
@@ -86,7 +88,7 @@
 | File | 건수 | 내용 |
 |------|------|------|
 | `PurgeReconciliationServiceTest`(신규) | 4 | 비-tx 통합 — PURGE_PENDING+BINARY_DELETE_FAILED → 재처리 → **최종 PURGED 승격**(item PURGED·purgedAt·BINARY_DELETED·storagePath null·실패코드 해소·STARTED+SUMMARY 2감사) + 멱등(2회차 무대상) / 빈 storagePath = stillPending 유지·`EMPTY_STORAGE_PATH`·FAILURE summary / actor 부재 거부 / **limit chunk 처리(리뷰 Medium 1)** |
-| `AttachmentStorageHealthScanServiceTest`(보강) | 7 | +PURGED 지원서 파일 = `PURGED_PHYSICAL_FILE_PRESENT`(치명, orphan 아님) / BINARY_DELETED+null = 무이슈(Low 1) |
+| `AttachmentStorageHealthScanServiceTest`(보강) | 8 | +PURGED+orphan 파일 = 치명 / **PURGED+STORED row+실파일 = 치명(리뷰 2차 Major — orphan 아님·STORED_MISSING 아님)** / BINARY_DELETED+null = 무이슈(Low 1) |
 | `PurgeExecutionServiceTest`(보강) | 2 | 실패 첨부 `binaryDeleteFailureCode == INVALID_STORAGE_PATH`(Low 2) |
 | `AdminRetentionControllerTest`(보강) | 15 | reconcile RECRUIT 403 / PRIVACY 200(무대상 scanned 0) |
 | `AuditMetadataContractTest`(보강) | 3 | permits 11종 + `PurgeReconcileMetadata` allowlist |
@@ -96,7 +98,7 @@
 1. reconcile = PRIVACY_ADMIN + actor 필수. PURGE_PENDING 만 대상, 원 batchId 로 saga 재구동.
 2. PURGED 승격은 saga ③ allCleared(전부 소멸 확인)에서만 — reconcile 도 동일 불변식 승계("DB PURGED + 파일 잔존" 불허). 빈 path/STILL_EXISTS/예외 = 실패코드 → PENDING 유지.
 3. 멱등: 승격 후 PURGE_PENDING 목록에서 빠짐 → 재sweep 무대상. 실패 건은 다음 sweep 재시도.
-4. health-scan §6.1: BINARY_DELETED+null=정상, PENDING/FAILED=retry(issue 아님), PURGED+파일존재=치명. 치명/orphan 이슈는 fileKeyHash 만(PII 미노출).
+4. health-scan §6.1: BINARY_DELETED+null=정상, PENDING/FAILED=retry(issue 아님), **PURGED 경로 파일존재=치명(row 상태 STORED/DELETED/MISSING/orphan 무관, 전체 물리파일 기준 선행 분류, 중복 없음)**. 치명/orphan 이슈는 fileKeyHash 만(PII 미노출).
 5. 실패코드는 sanitized(경로/파일명 원문 미포함) — attachment row 에 영속(queryable) + 감사는 coarse 집계.
 6. ledger delete 금지(PurgeJobItem mutable 전이만). 감사는 batch/sweep coarse(item 중복 기록 금지).
 
@@ -112,8 +114,8 @@ $env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tes
 
 ## Test Results
 
-- scoped: 1차 **42 passed** + 구현 리뷰 반영 후 **28 재실행 passed**(Reconciliation **4** — chunk 포함 · Execution 2 · HealthScan 7 · RetentionController 15). 전체 회귀 미실행(프로젝트 규칙).
-- **적대적 검증(3-agent 워크플로)**: health-scan 치명탐지·Low 2/회귀 두 영역 **confirmed(clean)**. reconcile 영역 지적 다수는 ① false positive(null batchId 여도 saga 는 applicationId 기준 조회 + item 부재 시 orElseThrow 롤백으로 오승격 차단 — empty-target 승격은 "바이너리 실제 소멸"이라 의도된 복구), ② 동시성(reconcile↔execute race·중복 sweep) = **직렬 실행 전제로 범위 외**(문서화). 실반영 1건 — **null batchId 조기 가드**(보장된 롤백 churn 제거 + 명시적 error 격리).
+- scoped: 1차 **42 passed**, 리뷰 1차(Medium/Low) **28 passed**, 리뷰 2차(Major) **HealthScan 8 passed**(Reconciliation 4 — chunk 포함 · HealthScan **8** — PURGED+STORED 치명 회귀 포함 · Execution 2 · RetentionController 15). 전체 회귀 미실행(프로젝트 규칙).
+- **적대적 검증**: (3-agent) health-scan 치명탐지·Low 2/회귀 **confirmed(clean)**, reconcile 지적은 false positive(null batchId 도 applicationId 기준 조회 + orElseThrow 롤백으로 오승격 차단) 또는 동시성(직렬 전제 범위 외) — 실반영 **null batchId 조기 가드**. (리뷰 2차 1-agent 전수) 치명탐지 보정 **9 케이스 전수 confirmed** — STORED/DELETED/MISSING/orphan × PURGED 모두 치명 1회, 중복·누락·회귀 없음.
 
 ## Known Limitations
 

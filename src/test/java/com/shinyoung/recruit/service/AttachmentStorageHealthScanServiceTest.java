@@ -248,6 +248,29 @@ class AttachmentStorageHealthScanServiceTest {
     }
 
     @Test
+    void scan은_PURGED_지원서의_STORED_row_파일도_치명적_불일치로_분류한다() {
+        Applicant applicant = createApplicant("health-purged-stored", "Health Purged Stored");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        // STORED 첨부 + 실파일 업로드 — row 가 가리키는 파일이 실재한다.
+        upload(applicant, applicationId, "kept.pdf", "kept");
+
+        // 지원서를 PURGED 로 마킹(첨부 row 는 STORED 그대로 — 오염된 운영 데이터 재현).
+        JobApplication application = jobApplicationRepository.findById(applicationId).orElseThrow();
+        application.markPurged(1L, LocalDateTime.now(FIXED_CLOCK));
+        jobApplicationRepository.saveAndFlush(application);
+
+        AttachmentStorageHealthScanResponse response = scanService.scanDryRun();
+
+        // row 가 STORED 이고 파일이 실재해도(STORED_MISSING 아님), PURGED 지원서 파일이므로 치명(09e 리뷰 Major).
+        assertThat(response.purgedPhysicalFilePresentCount()).isEqualTo(1);
+        assertThat(response.orphanPhysicalFileCount()).isZero();
+        assertThat(response.storedMissingPhysicalFileCount()).isZero();
+        assertThat(categories(response))
+                .contains(AttachmentStorageHealthIssueType.PURGED_PHYSICAL_FILE_PRESENT.name())
+                .doesNotContain(AttachmentStorageHealthIssueType.ORPHAN_PHYSICAL_FILE.name());
+    }
+
+    @Test
     void scan은_BINARY_DELETED_null_storagePath를_정상으로_본다() {
         Applicant applicant = createApplicant("health-binary-deleted", "Health BinaryDeleted");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());

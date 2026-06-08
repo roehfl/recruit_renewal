@@ -50,9 +50,16 @@ public class AttachmentStorageHealthScanService {
         PhysicalScanResult physicalScan = scanPhysicalFiles(storageRoot, issues);
         RowScanResult rowScan = scanRows(storageRoot, issues);
 
+        // 치명탐지(§6.1, 09e 리뷰 Major): PURGED 지원서 경로의 파일은 row 매칭 여부와 무관하게 "DB PURGED + 파일 잔존"
+        // 치명적 불일치다. orphan 분기에 종속시키면 STORED/DELETED row 가 가리키는 파일을 놓치므로, <b>전체 물리파일</b>
+        // 기준 선행 분기로 분류하고 다른 분기에서는 해당 키를 제외한다(중복 방지).
+        Set<Long> purgedApplicationIds = purgedApplicationIds(physicalScan.managedFilesByKey().values());
+        Set<String> purgedFileKeys = purgedFileKeys(physicalScan.managedFilesByKey().values(), purgedApplicationIds);
+        addPurgedFilePresentIssues(physicalScan.managedFilesByKey(), purgedApplicationIds, issues);
+
         addStoredMissingIssues(rowScan.storedRows(), physicalScan.managedFilesByKey(), issues);
-        addDeletedRemainingIssues(rowScan.deletedRows(), physicalScan.managedFilesByKey(), issues);
-        addOrphanIssues(physicalScan.managedFilesByKey(), rowScan, issues);
+        addDeletedRemainingIssues(rowScan.deletedRows(), physicalScan.managedFilesByKey(), purgedFileKeys, issues);
+        addOrphanIssues(physicalScan.managedFilesByKey(), rowScan, purgedFileKeys, issues);
 
         Map<AttachmentStorageHealthIssueType, Long> issueCounts = countIssues(issues);
         return new AttachmentStorageHealthScanResponse(
@@ -244,9 +251,13 @@ public class AttachmentStorageHealthScanService {
     private void addDeletedRemainingIssues(
             List<AttachmentRowInfo> deletedRows,
             Map<String, PhysicalFileInfo> physicalFiles,
+            Set<String> purgedFileKeys,
             List<AttachmentStorageHealthIssueResponse> issues
     ) {
         for (AttachmentRowInfo row : deletedRows) {
+            if (purgedFileKeys.contains(row.storageKey())) {
+                continue; // PURGED 치명탐지가 선행 처리(중복 방지) — DELETED 보다 상위 심각도.
+            }
             PhysicalFileInfo physicalFile = physicalFiles.get(row.storageKey());
             if (physicalFile != null) {
                 issues.add(AttachmentStorageHealthIssueResponse.of(
@@ -262,9 +273,36 @@ public class AttachmentStorageHealthScanService {
         }
     }
 
+    /**
+     * 치명탐지(§6.1, 09e 리뷰 Major) — PURGED 지원서 경로의 <b>모든</b> 물리파일(STORED/DELETED/MISSING/orphan
+     * row 매칭 무관)을 {@code PURGED_PHYSICAL_FILE_PRESENT} 로 분류. "DB PURGED 면 파일이 없어야 한다"는 불변식
+     * 위반을 row 상태와 무관하게 잡는다. 이슈는 fileKeyHash 만 노출(경로/파일명 PII 미노출).
+     */
+    private void addPurgedFilePresentIssues(
+            Map<String, PhysicalFileInfo> physicalFiles,
+            Set<Long> purgedApplicationIds,
+            List<AttachmentStorageHealthIssueResponse> issues
+    ) {
+        for (PhysicalFileInfo physicalFile : physicalFiles.values()) {
+            Long applicationId = applicationIdFromKey(physicalFile.storageKey());
+            if (applicationId != null && purgedApplicationIds.contains(applicationId)) {
+                issues.add(AttachmentStorageHealthIssueResponse.of(
+                        AttachmentStorageHealthIssueType.PURGED_PHYSICAL_FILE_PRESENT,
+                        applicationId,
+                        null,
+                        PhysicalFileStatus.BINARY_DELETED,
+                        physicalFile.fileKeyHash(),
+                        physicalFile.size(),
+                        "Purged application still has a physical file (critical)."
+                ));
+            }
+        }
+    }
+
     private void addOrphanIssues(
             Map<String, PhysicalFileInfo> physicalFiles,
             RowScanResult rowScan,
+            Set<String> purgedFileKeys,
             List<AttachmentStorageHealthIssueResponse> issues
     ) {
         Set<String> storedKeys = rowScan.storedRows().stream()
@@ -276,19 +314,11 @@ public class AttachmentStorageHealthScanService {
         Map<String, AttachmentRowInfo> missingRowsByKey = rowScan.missingRows().stream()
                 .collect(Collectors.toMap(AttachmentRowInfo::storageKey, Function.identity(), (left, right) -> left));
 
-        // orphan 후보(어떤 row 키에도 매칭 안 됨)를 먼저 모아 applicationId 추출 → PURGED 지원서 집합을 일괄 조회.
-        // PURGED 인데 파일이 남아 있으면 "DB PURGED + 파일 잔존" 치명적 불일치(§6.1)로 분류한다.
-        List<PhysicalFileInfo> orphanCandidates = new ArrayList<>();
+        // MISSING row + 파일 존재(PURGED 키는 치명탐지가 선행 처리하므로 제외).
         for (PhysicalFileInfo physicalFile : physicalFiles.values()) {
-            String key = physicalFile.storageKey();
-            if (storedKeys.contains(key) || deletedKeys.contains(key) || rowScan.deferredPurgeKeys().contains(key)
-                    || missingRowsByKey.containsKey(key)) {
+            if (purgedFileKeys.contains(physicalFile.storageKey())) {
                 continue;
             }
-            orphanCandidates.add(physicalFile);
-        }
-
-        for (PhysicalFileInfo physicalFile : physicalFiles.values()) {
             AttachmentRowInfo missingRow = missingRowsByKey.get(physicalFile.storageKey());
             if (missingRow != null) {
                 issues.add(AttachmentStorageHealthIssueResponse.of(
@@ -303,19 +333,11 @@ public class AttachmentStorageHealthScanService {
             }
         }
 
-        Set<Long> purgedApplicationIds = purgedApplicationIds(orphanCandidates);
-        for (PhysicalFileInfo physicalFile : orphanCandidates) {
-            Long applicationId = applicationIdFromKey(physicalFile.storageKey());
-            if (applicationId != null && purgedApplicationIds.contains(applicationId)) {
-                issues.add(AttachmentStorageHealthIssueResponse.of(
-                        AttachmentStorageHealthIssueType.PURGED_PHYSICAL_FILE_PRESENT,
-                        applicationId,
-                        null,
-                        PhysicalFileStatus.BINARY_DELETED,
-                        physicalFile.fileKeyHash(),
-                        physicalFile.size(),
-                        "Purged application still has a physical file (critical)."
-                ));
+        // orphan(어떤 row 키에도 매칭 안 됨 + PURGED/deferred 아님).
+        for (PhysicalFileInfo physicalFile : physicalFiles.values()) {
+            String key = physicalFile.storageKey();
+            if (purgedFileKeys.contains(key) || storedKeys.contains(key) || deletedKeys.contains(key)
+                    || rowScan.deferredPurgeKeys().contains(key) || missingRowsByKey.containsKey(key)) {
                 continue;
             }
             addPhysicalIssue(
@@ -328,9 +350,21 @@ public class AttachmentStorageHealthScanService {
         }
     }
 
-    /** orphan 후보 파일의 applicationId 중 최종 PURGED 인 집합(치명탐지용, §6.1). */
-    private Set<Long> purgedApplicationIds(List<PhysicalFileInfo> orphanCandidates) {
-        List<Long> candidateIds = orphanCandidates.stream()
+    /** PURGED 지원서에 속하는 물리파일 key 집합(치명탐지가 선행 분류한 키 — 타 분기 중복 방지용). */
+    private Set<String> purgedFileKeys(
+            java.util.Collection<PhysicalFileInfo> physicalFiles, Set<Long> purgedApplicationIds) {
+        return physicalFiles.stream()
+                .filter(file -> {
+                    Long id = applicationIdFromKey(file.storageKey());
+                    return id != null && purgedApplicationIds.contains(id);
+                })
+                .map(PhysicalFileInfo::storageKey)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    /** 물리파일의 applicationId 중 최종 PURGED 인 집합(치명탐지용, §6.1 — 전체 파일 기준). */
+    private Set<Long> purgedApplicationIds(java.util.Collection<PhysicalFileInfo> physicalFiles) {
+        List<Long> candidateIds = physicalFiles.stream()
                 .map(file -> applicationIdFromKey(file.storageKey()))
                 .filter(java.util.Objects::nonNull)
                 .distinct()
