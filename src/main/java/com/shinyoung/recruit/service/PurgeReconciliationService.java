@@ -10,6 +10,7 @@ import com.shinyoung.recruit.enumeration.PurgeResult;
 import com.shinyoung.recruit.exception.InvalidRetentionRequestException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -32,20 +33,33 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PurgeReconciliationService {
 
+    /** 한 sweep 이 처리하는 최대 건수 상한 — 장애 후 PENDING 누적 시 단일 요청 폭주 방지(09e 리뷰 Medium 1). */
+    static final int MAX_RECONCILE_LIMIT = 1000;
+
     private final JobApplicationRepository jobApplicationRepository;
     private final AttachmentPurgeSagaService attachmentPurgeSagaService;
     private final ActivityLogService activityLogService;
     private final AuditRequestContextResolver auditRequestContextResolver;
     private final Clock clock;
 
-    public PurgeReconcileResponse reconcile(String actor) {
+    /**
+     * @param limit 이번 sweep 의 처리 상한(chunk). {@code scannedCount == limit} 이면 잔여가 더 있을 수 있어
+     *              운영자가 재호출한다(09e 리뷰 Medium 1). 1..{@value #MAX_RECONCILE_LIMIT} 로 clamp.
+     */
+    public PurgeReconcileResponse reconcile(String actor, int limit) {
         String resolvedActor = requireActor(actor);
+        int capped = Math.max(1, Math.min(limit, MAX_RECONCILE_LIMIT));
 
-        List<JobApplication> pendings = jobApplicationRepository.findByPurgeResult(PurgeResult.PURGE_PENDING);
+        List<JobApplication> pendings = jobApplicationRepository.findByPurgeResultOrderByIdAsc(
+                PurgeResult.PURGE_PENDING, PageRequest.of(0, capped));
         long scanned = pendings.size();
         long promoted = 0;
         long stillPending = 0;
         long errors = 0;
+
+        // 선행 STARTED 감사(09e 리뷰 Medium 2, 방안 A) — summary 감사가 실패해도 sweep 수행 증적이 남는다.
+        // 'STARTED 만 있고 SUMMARY 없음' = 운영자가 감사 read API 로 미완 sweep 을 탐지하는 신호.
+        recordStartedAudit(resolvedActor, scanned);
 
         for (JobApplication application : pendings) {
             Long batchId = application.getPurgeBatchId();
@@ -74,6 +88,21 @@ public class PurgeReconciliationService {
         recordReconcileAudit(resolvedActor, scanned, promoted, stillPending, errors);
         return new PurgeReconcileResponse(
                 LocalDateTime.now(clock), scanned, promoted, stillPending, errors);
+    }
+
+    private void recordStartedAudit(String actor, long scanned) {
+        AuditActorContext context = auditRequestContextResolver.resolve(actor);
+        activityLogService.recordRequiresNew(AuditEvent.builder()
+                .actorType(context.actorType())
+                .actorId(context.actorId())
+                .actorRoleSnapshot(context.actorRoleSnapshot())
+                .actionType(AuditActionType.PURGE_RECONCILE)
+                .actionResult(AuditActionResult.SUCCESS)
+                .targetType(AuditTargetType.PURGE_BATCH)
+                .reasonMessage("reconcile started: scanned=" + scanned)
+                .ipAddress(context.ipAddress())
+                .userAgent(context.userAgent())
+                .build());
     }
 
     private void recordReconcileAudit(

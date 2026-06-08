@@ -19,8 +19,8 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
 
     Optional<JobApplication> findByIdAndApplicantId(Long id, Long applicantId);
 
-    /** reconciliation(09e) — 바이너리 삭제 미완(PURGE_PENDING) 잔여 건 재처리 대상. */
-    List<JobApplication> findByPurgeResult(PurgeResult purgeResult);
+    /** reconciliation(09e) — 바이너리 삭제 미완(PURGE_PENDING) 잔여 건 재처리 대상(chunk 단위, 09e 리뷰 Medium 1). */
+    List<JobApplication> findByPurgeResultOrderByIdAsc(PurgeResult purgeResult, Pageable pageable);
 
     /** health-scan 치명탐지(09e §6.1) — 후보 applicationId 중 최종 PURGED 인 것만(파기 후 파일 잔존 판정). */
     @Query("select j.id from JobApplication j where j.id in :ids and j.purgeResult = :purgeResult")

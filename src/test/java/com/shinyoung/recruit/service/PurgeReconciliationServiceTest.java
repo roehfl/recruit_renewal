@@ -82,7 +82,7 @@ class PurgeReconciliationServiceTest {
         // 9d-2 saga 가 바이너리 삭제에 실패해 PURGE_PENDING + BINARY_DELETE_FAILED 로 멈춘 상태를 재현.
         Long applicationId = createPurgePendingWithFailedAttachment("recon-a", jobPostingId, "attachments/recon-a.pdf");
 
-        PurgeReconcileResponse response = purgeReconciliationService.reconcile("privacy01");
+        PurgeReconcileResponse response = purgeReconciliationService.reconcile("privacy01", 100);
 
         assertThat(response.scannedCount()).isEqualTo(1);
         assertThat(response.promotedCount()).isEqualTo(1);
@@ -99,18 +99,23 @@ class PurgeReconciliationServiceTest {
         assertThat(attachment.getBinaryDeletedAt()).isNotNull();
         assertThat(attachment.getBinaryDeleteFailureCode()).isNull(); // 성공 시 실패코드 해소
 
+        // PURGE_RECONCILE 감사 = STARTED(선행) + SUMMARY(완료) 2건(09e 리뷰 Medium 2).
         List<ActivityLog> audits = activityLogRepository.search(
                 LocalDateTime.now().minusDays(1), LocalDateTime.now().plusDays(1),
                 null, AuditActionType.PURGE_RECONCILE, null, null, null, null,
                 PageRequest.of(0, 10)).getContent();
-        assertThat(audits).hasSize(1);
-        assertThat(audits.get(0).getActionResult()).isEqualTo(AuditActionResult.SUCCESS);
-        assertThat(audits.get(0).getActorId()).isEqualTo("privacy01");
-        assertThat(audits.get(0).getMetadataJson())
+        assertThat(audits).hasSize(2);
+        ActivityLog summary = audits.stream()
+                .filter(a -> a.getMetadataJson() != null).findFirst().orElseThrow();
+        assertThat(summary.getActionResult()).isEqualTo(AuditActionResult.SUCCESS);
+        assertThat(summary.getActorId()).isEqualTo("privacy01");
+        assertThat(summary.getMetadataJson())
                 .contains("\"scannedCount\":1").contains("\"promotedCount\":1");
+        assertThat(audits.stream().anyMatch(a -> a.getReasonMessage() != null
+                && a.getReasonMessage().contains("reconcile started"))).isTrue();
 
         // 멱등: 더는 PURGE_PENDING 이 없으므로 두 번째 sweep 은 무대상.
-        PurgeReconcileResponse second = purgeReconciliationService.reconcile("privacy01");
+        PurgeReconcileResponse second = purgeReconciliationService.reconcile("privacy01", 100);
         assertThat(second.scannedCount()).isZero();
         assertThat(second.promotedCount()).isZero();
     }
@@ -123,7 +128,7 @@ class PurgeReconciliationServiceTest {
         // storagePath 가 비어 있어 소멸 확인이 불가능한 BINARY_DELETE_FAILED — 재처리해도 승격 금지(Major 1).
         Long applicationId = createPurgePendingWithFailedAttachment("recon-b", jobPostingId, "");
 
-        PurgeReconcileResponse response = purgeReconciliationService.reconcile("privacy01");
+        PurgeReconcileResponse response = purgeReconciliationService.reconcile("privacy01", 100);
 
         assertThat(response.scannedCount()).isEqualTo(1);
         assertThat(response.promotedCount()).isZero();
@@ -137,18 +142,41 @@ class PurgeReconciliationServiceTest {
         assertThat(attachment.getPhysicalFileStatus()).isEqualTo(PhysicalFileStatus.BINARY_DELETE_FAILED);
         assertThat(attachment.getBinaryDeleteFailureCode()).isEqualTo("EMPTY_STORAGE_PATH");
 
+        // STARTED(SUCCESS) + SUMMARY(FAILURE — stillPending>0) 2건.
         List<ActivityLog> audits = activityLogRepository.search(
                 LocalDateTime.now().minusDays(1), LocalDateTime.now().plusDays(1),
                 null, AuditActionType.PURGE_RECONCILE, null, null, null, null,
                 PageRequest.of(0, 10)).getContent();
-        assertThat(audits).hasSize(1);
-        assertThat(audits.get(0).getActionResult()).isEqualTo(AuditActionResult.FAILURE);
+        assertThat(audits).hasSize(2);
+        ActivityLog summary = audits.stream()
+                .filter(a -> a.getMetadataJson() != null).findFirst().orElseThrow();
+        assertThat(summary.getActionResult()).isEqualTo(AuditActionResult.FAILURE);
     }
 
     @Test
     void reconcile는_actor가_없으면_거부한다() {
-        assertThatThrownBy(() -> purgeReconciliationService.reconcile(" "))
+        assertThatThrownBy(() -> purgeReconciliationService.reconcile(" ", 100))
                 .isInstanceOf(InvalidRetentionRequestException.class);
+    }
+
+    @Test
+    void reconcile는_limit으로_처리량을_chunk_단위로_제한한다() {
+        Long jobPostingId = createPosting();
+        jobPostingService.publish(jobPostingId);
+        createPurgePendingWithFailedAttachment("recon-c1", jobPostingId, "attachments/recon-c1.pdf");
+        createPurgePendingWithFailedAttachment("recon-c2", jobPostingId, "attachments/recon-c2.pdf");
+
+        // limit=1 → 한 번에 1건만 처리(09e 리뷰 Medium 1). 잔여는 다음 sweep.
+        PurgeReconcileResponse first = purgeReconciliationService.reconcile("privacy01", 1);
+        assertThat(first.scannedCount()).isEqualTo(1);
+        assertThat(first.promotedCount()).isEqualTo(1);
+
+        PurgeReconcileResponse second = purgeReconciliationService.reconcile("privacy01", 1);
+        assertThat(second.scannedCount()).isEqualTo(1);
+        assertThat(second.promotedCount()).isEqualTo(1);
+
+        PurgeReconcileResponse third = purgeReconciliationService.reconcile("privacy01", 1);
+        assertThat(third.scannedCount()).isZero();
     }
 
     /** 관계형 PII 제거는 끝났으나 바이너리 삭제만 실패한 상태(PURGE_PENDING + BINARY_DELETE_FAILED)를 만든다. */

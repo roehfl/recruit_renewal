@@ -59,6 +59,11 @@
     BINARY_DELETED null path 정상 분류 + BINARY_DELETE_PENDING/FAILED retry 가시화,
     ③ <strong>Low 2</strong> — row 수준 sanitized 실패코드(<code>binaryDeleteFailureCode</code>),
     ④ 권한/멱등/Clock 회귀 하드닝. <strong>reconcile 도 "소멸 확인 후에만 PURGED" 불변식 승계.</strong>
+    <br><br>
+    <strong>2026-06-08 구현 리뷰 반영(Medium 1·2 + Low 1):</strong> ① <strong>chunk 처리</strong> —
+    <code>?limit=100</code>(max 1000 clamp) + PageRequest 로 단일 요청 폭주 방지(scannedCount==limit 면 재호출).
+    ② <strong>STARTED 선행 감사</strong> — summary 실패해도 'STARTED 만 있고 SUMMARY 없음' 으로 미완 sweep 탐지.
+    ③ <strong>실패코드 sanitize 엔티티 강제</strong>(<code>[A-Z0-9_]</code> 외 치환 + len100) — 미래 S3/NAS 의 긴 메시지·경로 차단.
   </div>
   <table>
     <tr><th>구현 문서</th><td><code>docs/codex/implementation/phase-09e-reconciliation.md</code></td></tr>
@@ -72,10 +77,10 @@
     <div class="card">
       <h4><span class="badge b-green">A</span> Reconciliation sweep</h4>
       <ul>
-        <li><code>POST /retention/purge-batches/reconcile</code> — PRIVACY_ADMIN narrow matcher</li>
+        <li><code>POST /retention/purge-batches/reconcile?limit=100</code> — PRIVACY_ADMIN, <strong>chunk 처리</strong></li>
         <li>PURGE_PENDING → 원 batchId 로 saga ②③ 재구동 → 최종 PURGED 승격</li>
         <li>단건 실패 격리 · <strong>null batchId 조기 가드</strong>(적대 검증 반영)</li>
-        <li><code>PURGE_RECONCILE</code> coarse 감사 + 멱등(재sweep 무대상)</li>
+        <li><code>PURGE_RECONCILE</code> <strong>STARTED+SUMMARY 2-phase 감사</strong> + 멱등(재sweep 무대상)</li>
       </ul>
     </div>
     <div class="card">
@@ -90,7 +95,7 @@
     <div class="card">
       <h4><span class="badge b-green">C</span> Low 2 실패코드</h4>
       <ul>
-        <li><code>binaryDeleteFailureCode</code>(sanitized, row 영속)</li>
+        <li><code>binaryDeleteFailureCode</code>(엔티티 경계 sanitize 강제, row 영속)</li>
         <li>EMPTY_STORAGE_PATH / STILL_EXISTS / INVALID_STORAGE_PATH / DELETE_FAILED / EXCEPTION</li>
         <li>성공(BINARY_DELETED) 시 null 해소 · saga Set→Map 전파</li>
       </ul>
@@ -120,11 +125,11 @@
 
 <section>
   <h2>4. 테스트 결과</h2>
-  <p><span class="badge b-green">scoped 42 passed(+null-guard 보강 후 재실행 통과)</span></p>
+  <p><span class="badge b-green">1차 42 passed + 구현 리뷰 반영 28 재실행 passed</span></p>
   <table>
     <thead><tr><th>테스트</th><th>건수</th><th>핵심 검증</th><th>결과</th></tr></thead>
     <tbody>
-      <tr><td><code>PurgeReconciliationServiceTest</code></td><td>3</td><td>PURGE_PENDING+BINARY_DELETE_FAILED → 재처리 → <strong>최종 PURGED 승격</strong>(item PURGED·purgedAt·BINARY_DELETED·storagePath null·실패코드 해소·SUCCESS 감사)+멱등 / 빈 path = stillPending·<code>EMPTY_STORAGE_PATH</code>·FAILURE 감사 / actor 부재 거부</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>PurgeReconciliationServiceTest</code></td><td>4</td><td>PURGE_PENDING+BINARY_DELETE_FAILED → 재처리 → <strong>최종 PURGED 승격</strong>(item PURGED·purgedAt·BINARY_DELETED·storagePath null·실패코드 해소·STARTED+SUMMARY 2감사)+멱등 / 빈 path = stillPending·<code>EMPTY_STORAGE_PATH</code>·FAILURE summary / actor 거부 / <strong>limit chunk</strong></td><td><span class="badge b-green">passed</span></td></tr>
       <tr><td><code>AttachmentStorageHealthScanServiceTest</code></td><td>7</td><td>+PURGED 지원서 파일 = 치명(orphan 아님) / BINARY_DELETED+null = 무이슈(Low 1)</td><td><span class="badge b-green">passed</span></td></tr>
       <tr><td><code>PurgeExecutionServiceTest</code></td><td>2</td><td>실패 첨부 <code>binaryDeleteFailureCode == INVALID_STORAGE_PATH</code>(Low 2)</td><td><span class="badge b-green">passed</span></td></tr>
       <tr><td><code>AdminRetentionControllerTest</code> / <code>AuditMetadataContractTest</code></td><td>15 / 3</td><td>reconcile 403/200 · permits 11종</td><td><span class="badge b-green">passed</span></td></tr>
@@ -138,7 +143,7 @@
   <table>
     <thead><tr><th>구분</th><th>내용</th></tr></thead>
     <tbody>
-      <tr><td><span class="badge b-amber">운영</span></td><td>수동 DDL(<code>binary_delete_failure_code</code>) 적용 · reconcile 은 <strong>수동 PRIVACY_ADMIN 트리거</strong>(동시 실행 금지 권고)</td></tr>
+      <tr><td><span class="badge b-amber">운영</span></td><td>수동 DDL(<code>binary_delete_failure_code</code>) 적용 · reconcile 은 <strong>수동 PRIVACY_ADMIN 트리거</strong>(동시 실행 금지 권고) · 대량 PENDING 은 <code>limit</code> chunk 로 반복 호출(<code>scannedCount==limit</code> 면 잔여)</td></tr>
       <tr><td><span class="badge b-gray">직렬 전제</span></td><td>reconcile/execute/saga 동시성 미보장 — 병렬 시 lost-update 가능. 낙관적 lock(@Version)은 후속 과제(적대 검증 race 지적 문서화)</td></tr>
       <tr><td><span class="badge b-navy">후속</span></td><td>legacy <code>DELETED</code> enum 제거(3단계) · reconcile 자동 스케줄러(SYSTEM actor) · 치명탐지 알람 연동 · 실패 상세 대시보드</td></tr>
       <tr><td><span class="badge b-blue">Phase 09</span></td><td><strong>9a~9e 전 슬라이스 완료</strong> — 감사 + 보존/파기 lifecycle 종료</td></tr>

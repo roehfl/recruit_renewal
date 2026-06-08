@@ -9,8 +9,9 @@
   - **storage-health-scan §6.1 상태별 정책**: 신규 issue `PURGED_PHYSICAL_FILE_PRESENT`(치명) — orphan 후보 파일의 applicationId 파싱→`findIdsByIdInAndPurgeResult(ids, PURGED)` 대조로 "DB PURGED+파일 잔존" 탐지. BINARY_DELETED+null=정상(오탐 금지, Low 1), BINARY_DELETE_PENDING/FAILED=retry(issue 아님)+`pendingBinaryDeleteRowCount` 집계. 이슈는 fileKeyHash 만(PII 미노출). 응답 +2 카운트.
   - **Low 2 — row 수준 실패코드**: `ApplicationAttachment.binaryDeleteFailureCode`(sanitized, nullable) — `markBinaryDeleteFailed(code)` 세팅/`markBinaryDeleted` 해소. saga `deletePhysicalFile` boolean→실패코드 반환(EMPTY_STORAGE_PATH/STILL_EXISTS/INVALID_STORAGE_PATH/DELETE_FAILED/EXCEPTION), `finalizeBinaryDeletion` `Set`→`Map<Long,String>`. 전부 PII-free.
 - **적대적 검증(3-agent)**: health-scan 치명탐지·Low 2/회귀 두 영역 **confirmed(clean)**. reconcile 지적 다수는 false positive(null batchId 여도 saga 는 applicationId 기준 조회 + item 부재 시 orElseThrow 롤백으로 오승격 차단; empty-target 승격은 실제 소멸이라 의도된 복구) 또는 동시성(직렬 실행 전제로 범위 외). 실반영 1건 — **null batchId 조기 가드**.
-- Tests: scoped **42 passed**(Reconciliation 3 · HealthScan 7 — 치명탐지/Low 1 · Execution 2 — Low 2 · RetentionController 15 — reconcile 권한 · MetadataContract 3 — permits 11 · AttachmentDelete 12). 전체 회귀 미실행(프로젝트 규칙).
-- 운영 주의: 수동 DDL `docs/codex/ops/phase-09e-reconciliation-ddl.sql`(`binary_delete_failure_code` 1컬럼, 신규 테이블 없음). reconcile 은 수동 트리거(동시 실행 금지 권고 — 직렬 전제).
+- Tests: 1차 scoped **42 passed** + 구현 리뷰 반영 **28 재실행 passed**(Reconciliation 4 — chunk/STARTED 감사 포함 · HealthScan 7 · Execution 2 · RetentionController 15). 전체 회귀 미실행(프로젝트 규칙).
+- 구현 리뷰 반영(2026-06-08, instruction.md, Medium 1·2 + Low 1): ① **Medium 1 — chunk 처리**: 전체 PURGE_PENDING 일괄 조회 → `findByPurgeResultOrderByIdAsc(..., PageRequest)` + `limit`(기본 100, 1..1000 clamp). `scannedCount==limit` = 잔여 → 재호출. ② **Medium 2 — STARTED 선행 감사(방안 A)**: sweep 시작 시 `PURGE_RECONCILE` STARTED 감사 → 완료 시 SUMMARY 감사. summary 실패해도 'STARTED 만 있고 SUMMARY 없음' 으로 미완 sweep 탐지. ③ **Low 1 — 실패코드 sanitize 엔티티 강제**: `markBinaryDeleteFailed` 가 `[A-Z0-9_]` 외 치환 + len100 절단(미래 S3/NAS 긴 메시지·경로 차단).
+- 운영 주의: 수동 DDL `docs/codex/ops/phase-09e-reconciliation-ddl.sql`(`binary_delete_failure_code` 1컬럼, 신규 테이블 없음). reconcile 은 수동 트리거(동시 실행 금지 권고 — 직렬 전제), 대량 시 `limit` chunk 반복.
 - Documentation:
   - `docs/codex/implementation/phase-09e-reconciliation.md`
   - `docs/codex/reports/phase-09e-reconciliation.html`

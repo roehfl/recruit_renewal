@@ -160,10 +160,11 @@ public class AdminRetentionController {
      */
     @PostMapping("/purge-batches/reconcile")
     public ResponseEntity<ApiResponse<PurgeReconcileResponse>> reconcile(
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(defaultValue = "100") int limit
     ) {
         String actor = currentEmployeeService.getCurrentEmployeeActor(userDetails);
-        return ResponseEntity.ok(ApiResponse.success(purgeReconciliationService.reconcile(actor)));
+        return ResponseEntity.ok(ApiResponse.success(purgeReconciliationService.reconcile(actor, limit)));
     }
 
     @GetMapping("/purge-batches")

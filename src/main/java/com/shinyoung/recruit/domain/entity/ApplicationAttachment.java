@@ -222,10 +222,19 @@ public class ApplicationAttachment extends BaseEntity {
 
     /**
      * saga ③ — 물리 삭제 실패(재시도/reconciliation 대상, 9e). storagePath 보존.
-     * {@code failureCode} 는 sanitized 코드(PII 미포함) — reconciliation/health-scan 추적용(09e 리뷰 Low 2).
+     * {@code failureCode} 는 reconciliation/health-scan 추적용 — <b>엔티티 경계에서 sanitize 강제</b>(09e 리뷰 Low 1):
+     * 미래 S3/NAS 구현이 긴 메시지·경로를 넘겨도 컬럼 초과/정보 노출이 없도록 {@code [A-Z0-9_]} 외 치환 + len100 절단.
      */
     public void markBinaryDeleteFailed(String failureCode) {
         this.physicalFileStatus = PhysicalFileStatus.BINARY_DELETE_FAILED;
-        this.binaryDeleteFailureCode = failureCode;
+        this.binaryDeleteFailureCode = sanitizeFailureCode(failureCode);
+    }
+
+    private static String sanitizeFailureCode(String code) {
+        if (code == null || code.isBlank()) {
+            return "UNKNOWN";
+        }
+        String sanitized = code.replaceAll("[^A-Z0-9_]", "_");
+        return sanitized.length() <= 100 ? sanitized : sanitized.substring(0, 100);
     }
 }
