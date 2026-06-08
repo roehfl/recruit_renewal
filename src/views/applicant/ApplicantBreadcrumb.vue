@@ -1,6 +1,6 @@
 <template>
   <nav class="app-breadcrumb" aria-label="현재 위치">
-    <RouterLink to="/" class="breadcrumb-link"> 홈 </RouterLink>
+    <RouterLink to="/applicant" class="breadcrumb-link"> 홈 </RouterLink>
 
     <span v-if="breadcrumbItems.length > 0" class="breadcrumb-separator"> › </span>
 
@@ -9,11 +9,9 @@
         {{ item.name }}
       </RouterLink>
 
-      <span v-else class="breadcrumb-current">
-        {{ item.name }}
-      </span>
-
+      <span v-if="index !== breadcrumbItems.length - 1" class="breadcrumb-link"> {{ item.name }} </span>
       <span v-if="index !== breadcrumbItems.length - 1" class="breadcrumb-separator"> › </span>
+      <span v-if="index == breadcrumbItems.length - 1" class="breadcrumb-current"> {{ item.name }} </span>
     </template>
   </nav>
 </template>
@@ -55,7 +53,6 @@ const isLink = (item: MenuItem, index: number): boolean => {
   gap: 8px;
 
   min-height: 36px;
-  padding: 0 24px;
 
   background: var(--app-primary-subtle-color);
   /* border-top: 1px solid var(--app-border-color); */
@@ -78,11 +75,11 @@ const isLink = (item: MenuItem, index: number): boolean => {
 }
 
 .breadcrumb-link:hover {
-  color: var(--app-color-primary-olive-dark);
+  color: var(--app-color-primary-hover);
 }
 
 .breadcrumb-current {
-  color: var(--app-color-primary-olive-dark);
+  color: var(--app-color-primary);
   font-weight: 700;
 }
 

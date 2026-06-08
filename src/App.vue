@@ -19,13 +19,13 @@ import { RouterView } from 'vue-router'
   <a-config-provider
     :theme="{
       token: {
-        colorPrimary: 'var(--app-color-primary)',
-        colorLink: 'var(--app-color-primary)',
+        colorPrimary: '#0f4726',
+        colorLink: '#0f4726',
         borderRadius: 8,
-        colorInfo: 'var(--app-color-info)',
-        colorSuccess: 'var(--app-color-success)',
-        colorWarning: 'var(--app-color-warning)',
-        colorError: 'var(--app-color-error)',
+        colorInfo: '#1677ff',
+        colorSuccess: '#2f855a',
+        colorWarning: '#d97706',
+        colorError: '#ff4d4f',
         fontFamily: 'Pretendard',
       },
     }"

@@ -53,15 +53,15 @@ const footerMenus: FooterMenuGroup[] = [
     items: [
       {
         title: '보상 및 평가',
-        url: '/hr/reward',
-      },
-      {
-        title: '복리후생',
-        url: '/hr/welfare',
+        url: '/applicant/hrRule',
       },
       {
         title: '교육제도',
-        url: '/hr/education',
+        url: '/applicant/training',
+      },
+      {
+        title: '복리후생',
+        url: '/applicant/benefits',
       },
     ],
   },

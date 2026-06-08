@@ -5,7 +5,6 @@ import {
   MenuOutlined,
   CloseOutlined,
   RightOutlined,
-  BellOutlined,
   UserOutlined,
   DownOutlined,
 } from '@ant-design/icons-vue'
@@ -92,7 +91,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
           <template v-else>
             <a-button type="text" class="notice-button" aria-label="알림" @click="goNotice">
               <a-badge :dot="hasUnreadNotice">
-                <BellOutlined />
+                <!-- <BellOutlined /> -->
               </a-badge>
             </a-button>
 
@@ -325,32 +324,31 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
   display: flex;
   align-items: center;
   gap: 7px;
-  color: var(--app-text-color);
+  color: var(--app-text-primary);
   cursor: pointer;
 
   &:hover {
-    color: var(--app-primary-color);
+    // color: var(--app-text-primary);
 
     .user-avatar {
-      background: var(--app-primary-light-color);
+      background: var(--app-bg-btn-hover);
       color: var(--app-primary-color);
     }
   }
 }
 
 .user-avatar {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: #d1d5db;
-  color: var(--app-bg-surface);
+  // background: var(--app-bg-muted);
+  color: var(--app-text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 18px;
-  transition:
-    color 0.15s ease,
-    background 0.15s ease;
+  transition: color 0.15s ease;
+  background: 0.15s ease;
 }
 
 .user-name {
@@ -497,7 +495,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
 
   &:hover {
     color: var(--app-primary-color);
-    background: var(--app-primary-subtle-color);
+    background: var(--app-bg-btn-hover);
   }
 }
 
@@ -578,6 +576,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
 
     &:hover {
       color: var(--app-primary-color);
+      // background: var(--app-bg-btn-hover);
     }
   }
 }
@@ -679,7 +678,8 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
 
   .ant-dropdown-menu-item:hover {
     color: var(--app-primary-color);
-    background: var(--app-primary-subtle-color);
+    background: var(--app-bg-btn-hover) !important;
+    border-radius: 0px;
   }
 
   .ant-dropdown-menu-item-danger {

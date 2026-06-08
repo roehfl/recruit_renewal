@@ -134,7 +134,7 @@ onMounted(() => {
         >
           <template #bodyCell="{ column, record, index }">
             <template v-if="column.key === 'number'">
-              <a-tag v-if="record.pinned" class="notice-tag">공지</a-tag>
+              <span v-if="record.pinned" class="new-badge">NEW</span>
               <span v-else>
                 {{ pagination.total - ((pagination.current - 1) * pagination.pageSize + index) }}
               </span>
@@ -330,5 +330,15 @@ onMounted(() => {
 .notice-detail-content :deep(th) {
   padding: 8px;
   border: 1px solid #d9d9d9;
+}
+
+.new-badge {
+  flex-shrink: 0;
+  border-radius: 4px;
+  background: #e8f6ef;
+  padding: 2px 5px;
+  color: var(--app-color-success);
+  font-size: 10px;
+  font-weight: 700;
 }
 </style>

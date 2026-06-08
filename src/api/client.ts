@@ -1,6 +1,12 @@
 import axios from 'axios'
 import { useUiStore } from '@/stores/uiStore'
 
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    skipAuthRedirect?: boolean
+  }
+}
+
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
   timeout: 10000,
@@ -28,11 +34,13 @@ apiClient.interceptors.response.use(
   },
   (error) => {
     const uiStore = useUiStore()
+    const currentPath = window.location.pathname
     uiStore.hideLoading()
 
     const status = error.response?.status
+    const skipAuthRedirect = error.config?.skipAuthRedirect === true
 
-    if (status === 401) {
+    if (status === 401 && !skipAuthRedirect && currentPath !== '/login') {
       // 세션 만료 또는 미로그인
       window.location.href = '/login'
     }

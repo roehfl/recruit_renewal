@@ -9,4 +9,12 @@ export const authRoutes: RouteRecordRaw[] = [
       public: true,
     },
   },
+  {
+    path: '/signup',
+    name: 'Signup',
+    component: () => import('@/views/auth/SignupView.vue'),
+    meta: {
+      public: true,
+    },
+  }
 ]

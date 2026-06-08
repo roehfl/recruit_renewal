@@ -21,6 +21,7 @@
   --app-bg-muted: #f9fafb;
   --app-bg-soft: #f8faf6;
   --app-bg-selected: #f4f8f0;
+  --app-bg-btn-hover: #eaf8f3;
 
   --app-border-default: #e5e7eb;
   --app-border-strong: #d1d5db;
@@ -66,4 +67,13 @@
   --app-divider-color: var(--app-border-subtle);
   --app-box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
   --app-card-shadow: 0 1px 3px rgb(0 0 0 / 6%);
+
+  --tap-color-primary-hover: #146135;
+  --tap-color-primary: #0f4726;
+  --tap-color-primary-dark: #0a321b;
+  --tap-muted-soft: #f9f9f9;
+  --tap-text: #202a32;
+  --tap-muted: #9ca3af;
+  
+  --tap-panel-shadow: rgba(31, 41, 55, 0.06);
 }

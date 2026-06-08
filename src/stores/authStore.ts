@@ -18,6 +18,7 @@ export const useAuthStore = defineStore('auth', {
     roles: (state) => state.user?.roles ?? [],
     userType: (state) => state.user?.userType,
     name: (state) => state.user?.name ?? '',
+    loginId: (state) => state.user?.loginId ?? '',
     deptName: (state) => state.user?.deptName ?? '',
   },
 
@@ -35,7 +36,7 @@ export const useAuthStore = defineStore('auth', {
 
     async fetchMe() {
       try {
-        const response = await authApi.me()
+        const response = await authApi.me({ skipAuthRedirect: true })
         this.user = response.data.data
         this.initialized = true
         return true

@@ -46,6 +46,70 @@ export const applicantRoutes: RouteRecordRaw[] = [
       //       roles: ['ROLE_APPLICANT'],
       //     },
       //   },
+      {
+        path: 'hrRule',
+        name: 'ApplicantHrRule',          // 회사 소개 > 보상 및 평가
+        component: () => import('@/views/applicant/ApplicantHrRule.vue'),
+        meta: {
+          public: true,
+        },
+      },
+      {
+        path: 'training',
+        name: 'ApplicantTraining',          // 회사 소개 > 교육제도
+        component: () => import('@/views/applicant/ApplicantTraining.vue'),
+        meta: {
+          public: true,
+        },
+      },
+      {
+        path: 'recruitProcedure',
+        name: 'ApplicantRecruitProcedure',   // 채용안내 > 채용절차
+        component: () => import('@/views/applicant/ApplicantRecruitProcedure.vue'),
+        meta: {
+          public: true,
+        },
+      },
+      {
+        path: ':applicationId/form',
+        name: 'application',
+        component: () => import('@/views/applicant/ApplicationFormView.vue'),
+        meta: {
+          public: true,
+        },
+      },
+      {
+        path: 'dutyIntroduction',
+        name: 'ApplicantDutyIntroduction',
+        component: () => import('@/views/applicant/ApplicantDutyIntroduction.vue'),
+        meta: {
+          public: true,
+        },
+      },
+      {
+        path: 'recruits',
+        name: 'ApplicantRecruits',   // 채용공고 
+        component: () => import('@/views/applicant/ApplicantRecruit.vue'),
+        meta: {
+          public: true,
+        },
+      },
+      {
+        path: ':jobPostingId/detail',    // 채용공고 > 공고 상세
+        name: 'ApplicationDetail',
+        component: () => import('@/views/applicant/ApplicationDetailView.vue'),
+        meta: {
+          public: true,
+        },
+      },
+      {
+        path: 'profile',
+        name: 'ApplicantProfile',
+        component: () => import('@/views/applicant/ApplicantProfile.vue'),
+        meta: {
+          public: true,
+        },
+      },
     ],
   },
 ]

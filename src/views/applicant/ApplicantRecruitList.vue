@@ -8,8 +8,8 @@
     </div>
 
     <a-tabs v-model:activeKey="activeTab" class="recruit-tabs" :tabBarGutter="8">
-      <a-tab-pane key="PUBLIC" tab="공개채용" />
-      <a-tab-pane key="REGULAR" tab="수시채용" />
+      <a-tab-pane key="PUBLIC_RECRUITMENT" tab="공개채용" />
+      <a-tab-pane key="ROLLING_RECRUITMENT" tab="수시채용" />
     </a-tabs>
 
     <div class="recruit-list">
@@ -22,20 +22,24 @@
           @click="goRecruitDetail(recruit.id)"
         >
           <div class="recruit-item-top">
-            <a-tag :class="['status-tag', recruit.status]">
-              {{ getStatusText(recruit.status) }}
+            <a-tag :class="['status-tag', recruit.receptionStatus]">
+                {{ recruitStatusTypeMap[recruit.receptionStatus] }}
             </a-tag>
 
             <span class="dday">
-              {{ recruit.dday }}
+              {{ getDDay(recruit.receptionEndDateTime) }}
             </span>
+            <!-- <a-tag color="blue">
+              {{ getDDay(recruit.receptionEndDateTime) }}
+            </a-tag> -->
           </div>
 
           <div class="recruit-title">
             {{ recruit.title }}
           </div>
 
-          <div class="recruit-period">{{ recruit.startDate }} ~ {{ recruit.endDate }}</div>
+          <div class="recruit-period">{{ formatDate(recruit.receptionStartDateTime, 'YYYY.MM.DD') }} ~ {{ formatDate(recruit.receptionEndDateTime, 'YYYY.MM.DD') }}</div>
+
         </button>
       </template>
 
@@ -43,103 +47,92 @@
     </div>
 
     <button type="button" class="more-button" @click="goRecruitList">
-      <span>{{ moreButtonText }}</span>
+      <span> 바로가기 </span>
       <RightOutlined />
     </button>
   </a-card>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { onMounted, reactive, computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { RightOutlined } from '@ant-design/icons-vue'
+import { boardApi } from '@/api/boardApi'
+import type { JobPostingListItem } from '@/types/jobPosting'
+import { formatDate } from '@/common/dateUtil'
 
-type RecruitType = 'PUBLIC' | 'REGULAR'
-type RecruitStatus = 'OPEN' | 'CLOSED' | 'SOON'
-
-interface RecruitItem {
-  id: number
-  type: RecruitType
-  status: RecruitStatus
-  title: string
-  startDate: string
-  endDate: string
-  dday: string
-}
+type RecruitType = 'PUBLIC_RECRUITMENT' | 'ROLLING_RECRUITMENT'
 
 const router = useRouter()
+const loading = ref(false)
+const pagination = reactive({ current: 1, pageSize: 10, total: 0 })
+const activeTab = ref<RecruitType>('PUBLIC_RECRUITMENT')
 
-const activeTab = ref<RecruitType>('PUBLIC')
-
-const recruitList = ref<RecruitItem[]>([
-  {
-    id: 1,
-    type: 'PUBLIC',
-    status: 'OPEN',
-    title: '개발계 공고 테스트임',
-    startDate: '2026.05.01',
-    endDate: '2026.05.20',
-    dday: 'D-14',
-  },
-  {
-    id: 2,
-    type: 'PUBLIC',
-    status: 'OPEN',
-    title: '개발계 테스트 공고',
-    startDate: '2026.05.03',
-    endDate: '2026.05.31',
-    dday: 'D-25',
-  },
-  {
-    id: 3,
-    type: 'PUBLIC',
-    status: 'CLOSED',
-    title: '2112년 공채',
-    startDate: '2026.04.01',
-    endDate: '2026.04.30',
-    dday: '마감',
-  },
-  {
-    id: 4,
-    type: 'REGULAR',
-    status: 'OPEN',
-    title: 'IT 직무 수시채용',
-    startDate: '2026.05.01',
-    endDate: '2026.12.31',
-    dday: '상시',
-  },
-])
-
-const filteredRecruitList = computed<RecruitItem[]>(() => {
-  return recruitList.value.filter((item) => item.type === activeTab.value)
+const originJobPostings = ref<JobPostingListItem[]>([])
+const jobPostings = ref<JobPostingListItem[]>([])
+const searchForm = reactive({
+  type: 'ALL' as 'ALL' | 'TITLE' | 'CONTENT',
+  status: 'PUBLISHED',
+  keyword: '',
 })
+const searchType = ref({ keyword: '', status: 'ALL' as string | undefined })
 
-const moreButtonText = computed<string>(() => {
-  return activeTab.value === 'PUBLIC' ? '공개채용 더보기' : '수시채용 더보기'
-})
-
-const getStatusText = (status: RecruitStatus): string => {
-  const statusMap: Record<RecruitStatus, string> = {
-    OPEN: '접수중',
-    CLOSED: '접수마감',
-    SOON: '마감임박',
-  }
-
-  return statusMap[status]
+// 공고 상태
+const recruitStatusTypeMap: Record<string, string> = {
+  ACCEPTING: '진행중',
+  CLOSED: '마감',
+  UPCOMING: '예정',
 }
 
+async function loadJobPostings() {
+  loading.value = true
+  try {
+    const result = await boardApi.fetchJobPostings({
+      page: pagination.current - 1,
+      size: pagination.pageSize,
+      type: searchForm.type,
+      status: 'OPEN',
+      keyword: searchType.value.keyword,
+    })
+
+    originJobPostings.value = result.data.data.content
+    // 진행중인 공고
+    jobPostings.value = originJobPostings.value.filter((item) => item.receptionStatus === 'ACCEPTING' )
+    pagination.total = result.data.data.totalElements
+
+  } finally {
+    loading.value = false
+  }
+}
+
+const getDDay = (endDateTime: string) => {
+  const now = new Date();
+  const endDate = new Date(endDateTime)
+
+  const diffTime = endDate.getTime() - now.getTime();
+  if (diffTime < 0) return '마감'
+
+  const diffDay = Math.floor( diffTime / ( 1000 * 60 * 60 * 24 ) );
+  if (diffDay === 0) return 'D-DAY'
+  
+  return `D-${diffDay}`;
+}
+
+const filteredRecruitList = computed<JobPostingListItem[]>(() => {
+  return jobPostings.value.filter((item) => item.postingType === activeTab.value)
+})
+
 const goRecruitDetail = async (recruitId: number): Promise<void> => {
-  await router.push(`/recruit/${recruitId}`)
+  await router.push(`/applicant/${recruitId}/detail`)
 }
 
 const goRecruitList = async (): Promise<void> => {
-  await router.push({
-    path: '/recruit',
-    query: {
-      type: activeTab.value,
-    },
-  })
+  await router.push('/applicant/recruits')
 }
+
+onMounted(() => {
+  loadJobPostings()
+})
 </script>
 
 <style scoped>
@@ -178,7 +171,7 @@ const goRecruitList = async (): Promise<void> => {
 }
 
 :deep(.ant-tabs-nav) {
-  margin-bottom: 8px;
+  margin-bottom: 0px;
 }
 
 :deep(.ant-tabs-tab) {
@@ -189,19 +182,30 @@ const goRecruitList = async (): Promise<void> => {
   min-width: 96px;
   padding: 9px 18px;
   border-radius: 8px;
-  color: var(--app-text-primary);
+  color: var(--tap-muted);
   font-size: 15px;
   text-align: center;
 }
 
+:deep(.ant-tabs-tab-btn:hover) {
+  color: var(--app-color-primary);
+  font-weight: 500;
+}
+
+/* :deep(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  background: var(--app-bg-btn-hover);
+  color: var(--app-color-primary);
+  font-weight: 600;
+} */
+
 :deep(.ant-tabs-tab-active .ant-tabs-tab-btn) {
-  background: var(--app-primary-subtle-color);
-  color: var(--app-text-primary);
-  font-weight: 700;
+  /* background: color-mix(in srgb, var(--app-color-primary) 5%, transparent); */
+  color: var(--app-color-primary);
+  font-weight: 600;
 }
 
 :deep(.ant-tabs-ink-bar) {
-  display: none;
+  /* display: none; */
 }
 
 .recruit-list {
@@ -220,8 +224,8 @@ const goRecruitList = async (): Promise<void> => {
 }
 
 .recruit-item:hover .recruit-title {
-  color: var(--app-color-warning);
-  text-decoration: underline;
+  color: var(--app-color-primary-emerald);
+  /* text-decoration: underline; */
 }
 
 .recruit-item-top {
@@ -236,17 +240,18 @@ const goRecruitList = async (): Promise<void> => {
   border: 0;
   background: transparent;
   padding: 0;
+  font-weight: 700;
   font-size: 13px;
   line-height: 1.2;
 }
 
-.status-tag.OPEN {
+.status-tag.ACCEPTING {
   color: var(--app-color-success);
 }
 
-/* .status-tag.SOON {
-  color: #d46b08;
-} */
+.status-tag.UPCOMING {
+  color: var(--app-color-warning);
+}
 
 .status-tag.CLOSED {
   color: var(--app-text-muted);
@@ -255,7 +260,7 @@ const goRecruitList = async (): Promise<void> => {
 .dday {
   color: var(--app-color-warning);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .recruit-title {
@@ -263,7 +268,7 @@ const goRecruitList = async (): Promise<void> => {
   overflow: hidden;
   color: var(--app-text-primary);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -280,11 +285,13 @@ const goRecruitList = async (): Promise<void> => {
 .more-button {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* justify-content: space-between; */
+  /* justify-content: flex-end; */
+  gap: 6px;
   width: calc(100% + 48px);
-  height: 42px;
-  margin: 12px -24px -24px;
-  padding: 0 22px;
+  height: 50px;
+  margin: 0px 0px -24px -24px;
+  padding: 12px 24px;
   border: 0;
   border-radius: 0 0 8px 8px;
   background: var(--app-primary-subtle-color);
@@ -295,7 +302,7 @@ const goRecruitList = async (): Promise<void> => {
 }
 
 .more-button:hover {
-  background: #ece7d7;
+  background: var(--app-bg-btn-hover);
 }
 
 .empty-box {

@@ -10,91 +10,60 @@
     </div>
 
     <ul class="notice-list">
-      <li
-        v-for="notice in visibleNotices"
-        :key="notice.id"
-        class="notice-item"
-        @click="goNoticeDetail(notice.url)"
-      >
+      <li v-for="notice in notices" :key="notice.id" class="notice-item" @click="goNoticeList()">
         <div class="notice-main">
-          <span v-if="notice.isNew" class="new-badge">NEW</span>
+          <span v-if="notice.pinned" class="new-badge">NEW</span>
           <span class="notice-text">{{ notice.title }}</span>
         </div>
 
-        <span class="notice-date">{{ notice.createdDate }}</span>
+        <span class="notice-date">{{ notice.createdAt }}</span>
       </li>
     </ul>
   </a-card>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { RightOutlined } from '@ant-design/icons-vue'
+import type { NoticeListItem } from '@/types/notice'
+import { boardApi } from '@/api/boardApi'
 
-interface NoticeItem {
-  id: number
-  title: string
-  createdDate: string
-  url: string
-  isNew?: boolean
+const loading = ref(false)
+const notices = ref<NoticeListItem[]>([])
+const searchForm = reactive({ searchType: 'ALL' as 'ALL' | 'TITLE' | 'CONTENT', keyword: '' })
+const pagination = reactive({ current: 1, pageSize: 4, total: 0 })
+
+async function loadNotices() {
+  loading.value = true
+  try {
+    const result = await boardApi.fetchNotices({
+      page: pagination.current - 1,
+      size: pagination.pageSize,
+      searchType: searchForm.searchType,
+      keyword: searchForm.keyword || undefined,
+    })
+
+    notices.value = result.data.data.content
+    pagination.total = result.data.data.totalElements
+  } finally {
+    loading.value = false
+  }
 }
-
-interface Props {
-  maxCount?: number
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  maxCount: 4,
-})
 
 const router = useRouter()
 
-const notices = ref<NoticeItem[]>([
-  {
-    id: 1,
-    title: '2026년 상반기 공개채용 서류전형 결과 발표 안내',
-    createdDate: '2026.05.06',
-    url: '/notice/1',
-    isNew: true,
-  },
-  {
-    id: 2,
-    title: '입사지원서 작성 시 유의사항 안내',
-    createdDate: '2026.05.03',
-    url: '/notice/2',
-  },
-  {
-    id: 3,
-    title: '채용 홈페이지 시스템 점검 안내',
-    createdDate: '2026.05.01',
-    url: '/notice/3',
-  },
-  {
-    id: 4,
-    title: '4번째 row',
-    createdDate: '2026.05.05',
-    url: '/notice/4',
-  },
-  {
-    id: 5,
-    title: '5번째 row',
-    createdDate: '2026.03.05',
-    url: '/notice/5',
-  },
-])
-
-const visibleNotices = computed<NoticeItem[]>(() => {
-  return notices.value.slice(0, props.maxCount)
-})
-
-const goNoticeDetail = async (url: string): Promise<void> => {
-  await router.push(url)
-}
+// const goNoticeDetail = async (url: number): Promise<void> => {
+//   await router.push(noticeList)
+// }
 
 const goNoticeList = async (): Promise<void> => {
-  await router.push('/notice')
+  await router.push('/applicant/noticeList')
 }
+
+onMounted(() => {
+  loadNotices()
+})
 </script>
 
 <style scoped>
@@ -155,8 +124,8 @@ const goNoticeList = async (): Promise<void> => {
 }
 
 .notice-item:hover .notice-text {
-  color: #2f6f55;
-  text-decoration: underline;
+  color: var(--app-color-primary-emerald);
+  /* text-decoration: double; */
 }
 
 .notice-main {

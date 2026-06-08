@@ -8,6 +8,10 @@ export interface JobPostingListItem {
   status: JobPostingStatusCode
   startDate: string
   endDate: string
+  receptionStatus: string
+  postingType: string
+  receptionStartDateTime: string
+  receptionEndDateTime: string
 }
 
 export interface JobPostingSearchParams {
@@ -16,4 +20,28 @@ export interface JobPostingSearchParams {
   type: string
   status: JobPostingStatusCode
   keyword: string
+}
+
+export interface JobPostingDetail {
+  id: number
+  title: string
+  contentHtml: string
+}
+
+export interface MyJobPostingListItem {
+  totalElements: number
+  content: MyJobPostingDetailListItem[]
+}
+
+export interface MyJobPostingDetailListItem {
+  applicationId: number
+  jobPostingId: number
+  jobPostingTitle: string
+  status: JobPostingStatusCode
+  jobPositionId: number
+  jobPositionName: string
+  summary: string
+  startDate: string
+  endDate: string
+  postingType: string
 }

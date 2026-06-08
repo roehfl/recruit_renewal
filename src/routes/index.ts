@@ -10,6 +10,10 @@ export const router = createRouter({
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
 
+  if(!authStore.initialized) {
+    await authStore.fetchMe()
+  }
+
   if (to.meta.public) {
     return true
   }

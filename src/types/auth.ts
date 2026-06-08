@@ -10,3 +10,12 @@ export interface LoginUser {
   userType: 'Applicant' | 'Employee'
   roles: string[]
 }
+
+export interface SignupUser {
+  loginId: string,
+  password: string,
+  name: string,
+  phoneNumber: string,
+  email: string,
+  ci: string
+}

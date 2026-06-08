@@ -100,17 +100,9 @@ const changeTab = (key: BenefitTabKey): void => {
 
 <style scoped>
 .benefits-page {
-  --theme-primary: #6f8f3d;
-  --theme-primary-dark: #536d2f;
-  --theme-primary-soft: #f7faf2;
-  --theme-title: #183153;
-  --theme-text: #202a32;
-  --theme-muted: #8a8175;
-  --theme-panel-shadow: rgba(31, 41, 55, 0.06);
-
   width: 100%;
   background: #ffffff;
-  color: var(--theme-text);
+  color: var(--tap-text);
 }
 
 .page-inner {
@@ -121,11 +113,11 @@ const changeTab = (key: BenefitTabKey): void => {
 
 .page-title {
   margin: 0;
-  font-size: 38px;
+  font-size: 40px;
   font-weight: 800;
   line-height: 1.25;
   letter-spacing: -0.04em;
-  color: var(--theme-title);
+  color: var(--tap-text);
 }
 
 /* =========================
@@ -144,7 +136,7 @@ const changeTab = (key: BenefitTabKey): void => {
   flex: 1;
   min-width: 0;
   height: 58px;
-  border-bottom: 2px solid var(--theme-primary);
+  border-bottom: 2px solid var(--tap-color-primary-hover);
 }
 
 .benefit-tab {
@@ -161,15 +153,15 @@ const changeTab = (key: BenefitTabKey): void => {
   align-items: center;
   justify-content: center;
 
-  background: #ffffff;
-  color: var(--theme-muted);
+  background: var(--tap-muted-soft);
+  color: var(--tap-muted);
   font-size: 18px;
   font-weight: 500;
   letter-spacing: -0.02em;
 
   border: 0;
-  border-bottom: 2px solid var(--theme-primary);
-  border-radius: 0;
+  border-bottom: 2px solid var(--tap-color-primary-hover);
+  border-radius: 8px 8px 0 0;
 
   cursor: pointer;
   transition:
@@ -179,14 +171,14 @@ const changeTab = (key: BenefitTabKey): void => {
 }
 
 .benefit-tab:hover {
-  color: var(--theme-primary-dark);
+  color: var(--tap-color-primary);
 }
 
 .benefit-tab.active {
-  color: var(--theme-primary-dark);
+  color: var(--tap-color-primary-hover);
   font-weight: 700;
 
-  border: 2px solid var(--theme-primary);
+  border: 2px solid var(--tap-color-primary-hover);
   border-bottom: 0;
   border-radius: 8px 8px 0 0;
 
@@ -200,13 +192,13 @@ const changeTab = (key: BenefitTabKey): void => {
   margin-top: 0;
   padding: 42px 52px;
 
-  border: 2px solid var(--theme-primary);
+  border: 2px solid var(--tap-color-primary-hover);
   border-top: 0;
 
   border-radius: 0 0 8px 8px;
 
-  background: linear-gradient(180deg, #ffffff 0%, var(--theme-primary-soft) 100%);
-  box-shadow: 0 10px 28px var(--theme-panel-shadow);
+  background: linear-gradient(180deg, #ffffff 0%, var(--tap-muted-soft) 300%);
+  box-shadow: 0 10px 28px var(--tap-panel-shadow);
 }
 
 .benefit-list {
@@ -222,7 +214,7 @@ const changeTab = (key: BenefitTabKey): void => {
   font-size: 16px;
   line-height: 1.9;
   letter-spacing: -0.025em;
-  color: var(--theme-text);
+  color: var(--tap-text);
 }
 
 .benefit-list li:last-child {
@@ -230,7 +222,7 @@ const changeTab = (key: BenefitTabKey): void => {
 }
 
 .benefit-list li::marker {
-  color: var(--theme-primary-dark);
+  color: var(--tap-color-primary-dark);
   font-size: 0.9em;
 }
 

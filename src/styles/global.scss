@@ -88,3 +88,155 @@ select {
   border: 1px solid var(--app-border-color);
   border-radius: var(--app-border-radius);
 }
+
+
+/* =========================
+   탭 버튼 영역
+========================= */
+.tab-buttons {
+  display: flex;
+  align-items: flex-end;
+  margin-top: 38px;
+  overflow: visible;
+  white-space: normal;
+  border-bottom: none;
+}
+
+.tab-button-line-fill {
+  flex: 1;
+  min-width: 0;
+  height: 58px;
+  border-bottom: 2px solid var(--tap-color-primary-hover);
+}
+
+.tab-button {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+
+  min-width: 250px;
+  height: 58px;
+  padding: 0 32px;
+  margin: 0;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  background: var(--tap-muted-soft);
+  color: var(--tap-muted);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+
+  border: 0;
+  border-bottom: 2px solid var(--tap-color-primary-hover);
+  border-radius: 8px 8px 0 0;
+
+  cursor: pointer;
+  transition:
+    color 0.18s ease,
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.tab-button:hover {
+  color: var(--tap-color-primary);
+}
+
+.tab-button.active {
+  color: var(--tap-color-primary-hover);
+  font-weight: 700;
+
+  border: 2px solid var(--tap-color-primary-hover);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+
+  background: #ffffff;
+}
+
+
+/* =========================
+  탭 컨텐츠 영역
+========================= */
+.tab-panel {
+  margin-top: 0;
+  padding: 42px 52px;
+
+  border: 2px solid var(--tap-color-primary-hover);
+  border-top: 0;
+
+  border-radius: 0 0 8px 8px;
+
+  background: linear-gradient(180deg, #ffffff 0%, var(--tap-muted-soft) 300%);
+  box-shadow: 0 10px 28px var(--tap-panel-shadow);
+}
+
+.tab-list {
+  max-width: 920px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.tab-list li {
+  margin-bottom: 15px;
+  padding-left: 4px;
+
+  font-size: 16px;
+  line-height: 1.9;
+  letter-spacing: -0.025em;
+  color: var(--tap-text);
+}
+
+.tab-list li:last-child {
+  margin-bottom: 0;
+}
+
+.tab-list li::marker {
+  color: var(--tap-color-primary-dark);
+  font-size: 0.9em;
+}
+
+/* =========================
+   반응형
+========================= */
+@media (max-width: 768px) {
+  .tab-page-inner {
+    padding: 32px 16px 64px;
+  }
+
+  .tab-page-title {
+    font-size: 30px;
+  }
+
+  .tab-buttons {
+    margin-top: 30px;
+  }
+
+  .tab-button-line-fill {
+    display: none;
+  }
+
+  .tab-button {
+    flex: 1;
+    min-width: 0;
+    height: 54px;
+    padding: 0 12px;
+    font-size: 14px;
+  }
+
+  .tab-panel {
+    padding: 26px 22px;
+  }
+
+  .tab-list {
+    max-width: none;
+    padding-left: 18px;
+  }
+
+  .tab-list li {
+    margin-bottom: 12px;
+    font-size: 14px;
+    line-height: 1.75;
+  }
+}
