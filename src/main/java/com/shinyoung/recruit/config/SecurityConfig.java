@@ -103,6 +103,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/admin/retention/job-postings/*/anchor").hasAuthority("ROLE_PRIVACY_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/admin/retention/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN", "ROLE_PRIVACY_ADMIN")
+                // cleanup은 삭제(write) — retention 관례에 따라 PRIVACY_ADMIN 전용(설계 9장).
+                .requestMatchers(HttpMethod.POST, "/api/admin/client-events/cleanup").hasAuthority("ROLE_PRIVACY_ADMIN")
                 // client event 조회(Phase 09f-3) — broad /api/admin/** 보다 먼저(순서가 보안 요구사항).
                 // 민감 필드 원문 vs 마스킹은 컨트롤러에서 권한별 projection으로 추가 게이팅한다.
                 .requestMatchers(HttpMethod.GET, "/api/admin/client-events/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN", "ROLE_PRIVACY_ADMIN")

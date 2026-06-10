@@ -1,12 +1,14 @@
 package com.shinyoung.recruit.controller;
 
 import com.shinyoung.recruit.dto.response.ApiResponse;
+import com.shinyoung.recruit.dto.response.ClientEventLogCleanupResponse;
 import com.shinyoung.recruit.dto.response.ClientEventLogResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.enumeration.ClientEventSeverity;
 import com.shinyoung.recruit.enumeration.ClientEventSource;
 import com.shinyoung.recruit.enumeration.ClientEventType;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
+import com.shinyoung.recruit.service.ClientEventLogCleanupService;
 import com.shinyoung.recruit.service.ClientEventLogReadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -15,6 +17,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -33,6 +36,7 @@ public class AdminClientEventLogController {
     private static final String ROLE_PRIVACY_ADMIN = "ROLE_PRIVACY_ADMIN";
 
     private final ClientEventLogReadService clientEventLogReadService;
+    private final ClientEventLogCleanupService clientEventLogCleanupService;
 
     @GetMapping("/admin/client-events")
     public ResponseEntity<ApiResponse<PageResponse<ClientEventLogResponse>>> searchEvents(
@@ -61,6 +65,13 @@ public class AdminClientEventLogController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 clientEventLogReadService.getEvent(id, includeSensitive(userDetails))));
+    }
+
+    /** retention cleanup 수동 트리거 — 삭제(write)라 ROLE_PRIVACY_ADMIN 전용(SecurityConfig matcher, 설계 9장). */
+    @PostMapping("/admin/client-events/cleanup")
+    public ResponseEntity<ApiResponse<ClientEventLogCleanupResponse>> cleanup() {
+        return ResponseEntity.ok(ApiResponse.success(
+                new ClientEventLogCleanupResponse(clientEventLogCleanupService.cleanup())));
     }
 
     /** 민감 필드 원문은 ROLE_PRIVACY_ADMIN 전용. principal 부재 시 항상 마스킹(심층 방어). */

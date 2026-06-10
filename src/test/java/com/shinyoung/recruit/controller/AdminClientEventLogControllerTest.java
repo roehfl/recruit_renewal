@@ -159,4 +159,30 @@ class AdminClientEventLogControllerTest {
         mockMvc.perform(get("/api/admin/client-events"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void PRIVACY_ADMIN은_cleanup을_수동_트리거할_수_있다() throws Exception {
+        repository.save(ClientEventLog.builder()
+                .receivedAt(LocalDateTime.now().minusDays(120))
+                .eventType(ClientEventType.API_ERROR)
+                .severity(ClientEventSeverity.ERROR)
+                .source(ClientEventSource.APPLICANT_WEB)
+                .clientSessionId("session-old-0001")
+                .clientEventId("event-old-0001")
+                .build());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/admin/client-events/cleanup")
+                        .with(authentication(auth("ROLE_PRIVACY_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deletedCount").value(1));
+    }
+
+    @Test
+    void RECRUIT_ADMIN은_cleanup을_트리거할_수_없다() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/admin/client-events/cleanup")
+                        .with(authentication(auth("ROLE_RECRUIT_ADMIN"))))
+                .andExpect(status().isForbidden());
+    }
 }
