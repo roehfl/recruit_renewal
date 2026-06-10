@@ -1,5 +1,28 @@
 # 07. Implementation History
 
+## 2026-06-11 - Phase 09f-4 Client Event Retention (구현 완료)
+
+- Date: 2026-06-11
+- Work type: implementation. Phase 09f(지원자 화면 진단 로그) 네 번째/마지막 BE 슬라이스 — retention cleanup 파이프라인.
+- Scope: bulk delete(`@Modifying(flushAutomatically=true)` JPQL DELETE) + `ClientEventLogCleanupService` + `SchedulingConfig`(@EnableScheduling 프로젝트 최초 도입) + `ClientEventLogCleanupScheduler` + `POST /api/admin/client-events/cleanup` + 09f-1 파일 헤더 주석 정리(62d3b82). retention cleanup 행위자 ActivityLog 계측 제외(설계상, 진단 로그).
+- Implemented:
+  - **ClientEventLogRepository.deleteByReceivedAtBefore**: `@Modifying(flushAutomatically = true)` + 단일 JPQL DELETE. 엔티티 로딩 없이 삭제 건수(`int`) 반환. `flushAutomatically` = 프로젝트 `@Modifying` 관례 정렬(리뷰 반영 커밋 ca19479).
+  - **ClientEventLogCleanupService**: `@Transactional`. `threshold = now(clock) - retentionDays`. 기본 90일(`client-event-log.retention-days`). strict `<` — `receivedAt == threshold` 유지. 스케줄러와 수동 트리거 양쪽에서 호출.
+  - **SchedulingConfig**: `@EnableScheduling` 프로젝트 최초 도입. `@SpringBootTest` 컨텍스트에도 활성. cron 04:00이라 간섭 위험 낮음.
+  - **ClientEventLogCleanupScheduler**: `@Scheduled(cron = "${client-event-log.cleanup-cron:0 0 4 * * *}")`. 예외 무전파(`log.error`만).
+  - **ClientEventLogCleanupResponse**: `record(int deletedCount)`.
+  - **AdminClientEventLogController**: `POST /admin/client-events/cleanup` 추가. SecurityConfig narrow matcher 게이팅 — 컨트롤러 내 인증 로직 없음(retention write 관례).
+  - **SecurityConfig**: `POST /api/admin/client-events/cleanup → hasAuthority("ROLE_PRIVACY_ADMIN")` narrow matcher 삽입. GET matcher 앞, broad `/api/admin/**` 앞.
+  - **헤더 주석 정리(62d3b82)**: 09f-1 슬라이스 파일 9개의 `// src/...` 경로 주석 제거(프로젝트 스타일 정렬).
+- APIs: `POST /api/admin/client-events/cleanup` — `ROLE_PRIVACY_ADMIN` 전용(narrow matcher). 401(미인증), 403(`ROLE_PRIVACY_ADMIN` 미보유). 응답: `{"deletedCount": N}`.
+- Business rules: strict `<` 경계(receivedAt == threshold 유지), flushAutomatically 관례 정렬, 예외 무전파, cleanup write = PRIVACY_ADMIN 전용, matcher 순서 = 보안 요구사항.
+- Tests: scoped **60건 통과** — 09f-4 신규: `ClientEventLogCleanupServiceTest`(2) · `ClientEventLogCleanupSchedulerTest`(2) · `AdminClientEventLogControllerTest`(+2 = 10). 09f 전체: 10개 클래스 60건. 회귀 `AdminAuditControllerTest`(10) 통과.
+- Plan deviations: 없음(cleanup 경계값 91/89일 쌍 검증은 계획 취지와 동일).
+- Documentation:
+  - `docs/codex/implementation/phase-09f-4-client-event-retention.md`
+  - `docs/codex/reports/phase-09f-4-client-event-retention.html`
+- 상태: 구현 완료. **Phase 09f 전 BE 슬라이스(09f-1/09f-3/09f-4) 종료.** 프론트엔드 연동은 별도 FE 프로젝트(09f-2).
+
 ## 2026-06-10 - Phase 09f-3 Admin Client Event Read API (구현 완료)
 
 - Date: 2026-06-10
