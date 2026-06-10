@@ -1,8 +1,16 @@
 package com.shinyoung.recruit.domain.repository;
 
 import com.shinyoung.recruit.domain.entity.ClientEventLog;
+import com.shinyoung.recruit.enumeration.ClientEventSeverity;
+import com.shinyoung.recruit.enumeration.ClientEventSource;
+import com.shinyoung.recruit.enumeration.ClientEventType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
+import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 /**
@@ -26,4 +34,30 @@ public interface ClientEventLogRepository extends Repository<ClientEventLog, Lon
     long count();
 
     boolean existsByClientSessionIdAndClientEventId(String clientSessionId, String clientEventId);
+
+    /** client event 검색(09f-3 read API). receivedAt 범위는 필수(가드는 서비스에서). 최신순 고정 정렬. */
+    @Query("""
+            SELECT c FROM ClientEventLog c
+            WHERE c.receivedAt >= :from AND c.receivedAt <= :to
+              AND (:eventType IS NULL OR c.eventType = :eventType)
+              AND (:severity IS NULL OR c.severity = :severity)
+              AND (:source IS NULL OR c.source = :source)
+              AND (:applicationId IS NULL OR c.applicationId = :applicationId)
+              AND (:jobPostingId IS NULL OR c.jobPostingId = :jobPostingId)
+              AND (:clientSessionId IS NULL OR c.clientSessionId = :clientSessionId)
+              AND (:relatedCorrelationId IS NULL OR c.relatedCorrelationId = :relatedCorrelationId)
+            ORDER BY c.receivedAt DESC, c.id DESC
+            """)
+    Page<ClientEventLog> search(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("eventType") ClientEventType eventType,
+            @Param("severity") ClientEventSeverity severity,
+            @Param("source") ClientEventSource source,
+            @Param("applicationId") Long applicationId,
+            @Param("jobPostingId") Long jobPostingId,
+            @Param("clientSessionId") String clientSessionId,
+            @Param("relatedCorrelationId") String relatedCorrelationId,
+            Pageable pageable
+    );
 }

@@ -89,4 +89,34 @@ class ClientEventLogRepositoryTest {
                 .build())
                 .isInstanceOf(InvalidClientEventLogException.class);
     }
+
+    @Test
+    void search는_필터와_최신순_정렬을_지원한다() {
+        clientEventLogRepository.save(baseBuilder("session-0001", "event-0001")
+                .applicationId(123L).build());
+        clientEventLogRepository.save(ClientEventLog.builder()
+                .receivedAt(LocalDateTime.of(2026, 6, 10, 13, 0))
+                .eventType(ClientEventType.JS_ERROR)
+                .severity(ClientEventSeverity.ERROR)
+                .source(ClientEventSource.APPLICANT_WEB)
+                .clientSessionId("session-0002")
+                .clientEventId("event-0002")
+                .applicationId(123L)
+                .build());
+
+        var page = clientEventLogRepository.search(
+                LocalDateTime.of(2026, 6, 10, 0, 0), LocalDateTime.of(2026, 6, 11, 0, 0),
+                null, null, null, 123L, null, null, null,
+                org.springframework.data.domain.PageRequest.of(0, 10));
+
+        assertThat(page.getTotalElements()).isEqualTo(2);
+        // receivedAt DESC — 13:00 이벤트가 먼저
+        assertThat(page.getContent().get(0).getClientEventId()).isEqualTo("event-0002");
+
+        var filtered = clientEventLogRepository.search(
+                LocalDateTime.of(2026, 6, 10, 0, 0), LocalDateTime.of(2026, 6, 11, 0, 0),
+                ClientEventType.JS_ERROR, null, null, null, null, null, null,
+                org.springframework.data.domain.PageRequest.of(0, 10));
+        assertThat(filtered.getTotalElements()).isEqualTo(1);
+    }
 }
