@@ -1,5 +1,32 @@
 # 07. Implementation History
 
+## 2026-06-10 - Phase 09f-1 Client Event Ingest Foundation (구현 완료)
+
+- Date: 2026-06-10
+- Work type: implementation. Phase 09f(지원자 화면 진단 로그) 첫 슬라이스 — 수집(ingest) 파이프라인 기반.
+- Scope: `POST /api/client-events` 수집 API + `client_event_log` 엔티티 + 3단 rate limit + metadata allowlist sanitizer. 조회(09f-3)/retention cleanup(09f-4)는 이월.
+- Implemented:
+  - **enum 3종**: `ClientEventType`(14종 — PAGE_OPENED/CHECKPOINT/API_ERROR/API_TIMEOUT/NETWORK_ERROR/SESSION_EXPIRED/FORBIDDEN/JS_ERROR/UNHANDLED_REJECTION/APPLICATION_DRAFT_SAVE_FAILED/APPLICATION_SUBMIT_CLICKED/APPLICATION_SUBMIT_FAILED/ATTACHMENT_UPLOAD_FAILED/CLIENT_VALIDATION_FAILED), `ClientEventSeverity`(INFO/WARN/ERROR), `ClientEventSource`(APPLICANT_WEB/ADMIN_WEB).
+  - **예외 2종**: `InvalidClientEventLogException`(400), `ClientEventRateLimitExceededException`(429). `GlobalExceptionHandler` 핸들러 2건 추가.
+  - **Entity**: `ClientEventLog` — insert-only, `BaseEntity` 미상속, `receivedAt`(Clock). unique `(client_session_id, client_event_id)`, 7 인덱스. `principalHash`=HMAC, `ipAddress`/`userAgent` 서버 추출 전용.
+  - **Repository**: `ClientEventLogRepository` — 마커 `Repository<ClientEventLog, Long>`. `save`/`saveAndFlush`/`findById`/`count`/`existsByClientSessionIdAndClientEventId`.
+  - **ClientEventMetadataSanitizer**: eventType별 exact allowlist 14종(빈 Set 포함 — SESSION_EXPIRED 등은 key 보내면 400) + 2차 금지 key 방어선 21종(PII성, 대소문자 무시). value String 200자/nested 금지. 직렬화 결과 4000자 이하. 전용 `JsonMapper`(앱 Jackson 분리).
+  - **ClientEventRateLimiter**: in-memory 고정 윈도우(60초) 3단 — ip 300/분, ip+session 60/분, principal 120/분. 맵 크기 가드(10,000 상한 + 만료 lazy eviction, fail-closed).
+  - **DTO**: `ClientEventLogRequest`(record, `clientSessionId`/`clientEventId` `@Pattern ^[A-Za-z0-9-]{8,80}$`, `message` safe code `@Pattern`+200자), `ClientEventLogIngestResponse`(`ofAccepted`/`ofDuplicate`/`ofDisabled`).
+  - **ClientEventLogService**: 의도적 `@Transactional` 미사용(saveAndFlush DataIntegrityViolationException catch가 rollback-only에 깨지지 않도록). source=APPLICANT_WEB 강제. 서버 추출 ip/ua. principalHash=`AuditHmac.hmacHex("CLIENT_PRINCIPAL:"+username)`. message 7자리+ 숫자열 마스킹. stripQuery. 중복 선확인 + race catch → duplicate 흡수.
+  - **ClientEventLogController**: `POST /client-events`, `consumes=APPLICATION_JSON_VALUE`, `permitAll`, `@Valid`.
+  - **SecurityConfig**: `POST /api/client-events` permitAll matcher 추가. CORS `setExposedHeaders(X-Request-Id)`.
+  - **application.yaml**: `client-event-log` 블록(enabled/retention-days/max-metadata-json-length/cleanup-cron/rate-limit 3종). 전부 환경변수 주입 + 기본값.
+- APIs: `POST /api/client-events` — permitAll, JSON-only, 200(accepted/duplicate), 400(source위조/ID형식/message/metadata), 415(non-JSON), 429(rate limit).
+- Business rules: source=APPLICANT_WEB만, metadata exact allowlist+2차금지key, safe message code, 3단 rate limit, 중복 race 흡수, 서버 추출값만 신뢰, principalHash=HMAC, routePath/apiPath query 제거.
+- Tests: scoped **39 passed** — `ClientEventLogRepositoryTest`(4) · `ClientEventMetadataSanitizerTest`(11) · `ClientEventRateLimiterTest`(6) · `ClientEventLogServiceTest`(7) · `ClientEventLogControllerTest`(10) · `ClientEventLogRateLimitControllerTest`(1). 전체 회귀 미실행(프로젝트 규칙).
+- Plan deviations: ① 정적 팩토리 `ofAccepted`/`ofDuplicate`/`ofDisabled`(플랜 `accepted()`/`duplicate()`/`disabled()`는 record 접근자 충돌로 컴파일 불가) ② sanitize 정규식 `\p{Cntrl}+`(연속 collapse) ③ `ClientEventRateLimiter` primary 생성자 `@Autowired` 추가(다중 생성자 Spring 해석 실패 해결) ④ 엔티티 주석 3필드 보강.
+- Deferred: 관리자 조회 API(09f-3), retention bulk delete + 스케줄러(09f-4), FE 연동(09f-2 별도 프로젝트).
+- Documentation:
+  - `docs/codex/implementation/phase-09f-1-client-event-ingest.md`
+  - `docs/codex/reports/phase-09f-1-client-event-ingest.html`
+- 상태: 구현 완료. 다음 = **09f-3**(관리자 조회 API — Repository 검색 쿼리, ClientEventLogResponse 민감 필드 projection, AdminClientEventLogController, SecurityConfig narrow matcher).
+
 ## Phase 09e - Reconciliation + 안정화 (구현 완료 — Phase 09 종료)
 
 - Date: 2026-06-08
