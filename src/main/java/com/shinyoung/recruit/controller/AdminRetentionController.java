@@ -25,11 +25,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -72,7 +70,8 @@ public class AdminRetentionController {
         return ResponseEntity.ok(ApiResponse.success(retentionPolicyService.create(request, actor)));
     }
 
-    @PutMapping("/policies/{policyId}")
+    /** 정책 수정 — 전 엔드포인트 GET/POST 정책에 따라 POST(과거 PUT). */
+    @PostMapping("/policies/{policyId}")
     public ResponseEntity<ApiResponse<RetentionPolicyResponse>> updatePolicy(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long policyId,
@@ -82,7 +81,8 @@ public class AdminRetentionController {
         return ResponseEntity.ok(ApiResponse.success(retentionPolicyService.update(policyId, request, actor)));
     }
 
-    @DeleteMapping("/policies/{policyId}")
+    /** 정책 삭제 — 전 엔드포인트 GET/POST 정책에 따라 POST(과거 DELETE). */
+    @PostMapping("/policies/{policyId}/delete")
     public ResponseEntity<ApiResponse<Void>> deletePolicy(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long policyId
@@ -108,8 +108,8 @@ public class AdminRetentionController {
         return ResponseEntity.ok(ApiResponse.success(retentionHoldService.set(request, actor)));
     }
 
-    /** release — 행 삭제가 아니라 releasedAt 마킹(증적 보존). */
-    @DeleteMapping("/holds/{holdId}")
+    /** release — 행 삭제가 아니라 releasedAt 마킹(증적 보존). 전 엔드포인트 GET/POST 정책에 따라 POST(과거 DELETE). */
+    @PostMapping("/holds/{holdId}/release")
     public ResponseEntity<ApiResponse<RetentionHoldResponse>> releaseHold(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long holdId

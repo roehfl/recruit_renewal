@@ -185,15 +185,13 @@ record UploadConflictMetadata(long stageId, String sourceFileNameHash, String so
 - **ROLE_PRIVACY_ADMIN 전용**: purge execute, RetentionPolicy/RetentionHold 변경, ActivityLog 민감필드(ip/ua) 원문, purge batch 상세/실행결과 원문.
 - **ROLE_RECRUIT_ADMIN 까지**: retention dry-run/scan, retention 결과 조회, ActivityLog 마스킹 목록, RetentionPolicy read-only.
 - 두 권한 모두 `DeptRoleMapping` 파생(하드코딩 금지). **narrow requestMatcher 를 broad `/api/admin/**` 보다 먼저** 배치(순서가 보안 요구사항).
-- **requestMatcher 는 path 뿐 아니라 HTTP method 까지 분기**(리뷰 #5) — 같은 `/api/admin/retention/policies/**` 라도 GET=RECRUIT, write=PRIVACY. SecurityConfig 구현 지시문에 아래 수준으로 명시(기존 broad `/api/admin/**` 보다 **위**):
+- **requestMatcher 는 path 뿐 아니라 HTTP method 까지 분기**(리뷰 #5) — 같은 `/api/admin/retention/policies/**` 라도 GET=RECRUIT, write=PRIVACY. **전 엔드포인트 GET/POST 만 허용(프로젝트 규약)** — 정책 update/delete·hold release 는 POST 로 전환(과거 PUT/DELETE), write 권한은 `POST /policies/**`·`POST /holds/**` 한 줄로 커버. SecurityConfig 구현 지시문에 아래 수준으로 명시(기존 broad `/api/admin/**` 보다 **위**):
 
   ```java
   .requestMatchers(HttpMethod.POST,   "/api/admin/retention/purge-batches/execute").hasAuthority("ROLE_PRIVACY_ADMIN")
-  .requestMatchers(HttpMethod.POST,   "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
-  .requestMatchers(HttpMethod.PUT,    "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
-  .requestMatchers(HttpMethod.DELETE, "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
-  .requestMatchers(HttpMethod.POST,   "/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")   // 리뷰 2차 #7: method 분기
-  .requestMatchers(HttpMethod.DELETE, "/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+  .requestMatchers(HttpMethod.POST,   "/api/admin/retention/purge-batches/reconcile").hasAuthority("ROLE_PRIVACY_ADMIN")
+  .requestMatchers(HttpMethod.POST,   "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")   // create/update({id})/delete({id}/delete)
+  .requestMatchers(HttpMethod.POST,   "/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")       // set/release({id}/release), 리뷰 2차 #7: method 분기
   .requestMatchers(HttpMethod.POST,   "/api/admin/retention/job-postings/*/anchor").hasAuthority("ROLE_PRIVACY_ADMIN")
   .requestMatchers(HttpMethod.GET,    "/api/admin/retention/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN","ROLE_PRIVACY_ADMIN")
   .requestMatchers(HttpMethod.GET,    "/api/admin/audit/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN","ROLE_PRIVACY_ADMIN")
@@ -259,8 +257,8 @@ record UploadConflictMetadata(long stageId, String sourceFileNameHash, String so
 | GET | `/api/admin/audit/activities` | RECRUIT_ADMIN(마스킹) / PRIVACY_ADMIN(원문) | 감사 로그 검색(actorId/actionType/actionResult/targetType/jobPostingId/applicationId/occurredAt range, 페이지네이션) |
 | GET | `/api/admin/audit/activities/{id}` | 동일 | 감사 단건(권한별 ip/ua 마스킹) |
 | GET | `/api/admin/retention/policies` | RECRUIT_ADMIN | RetentionPolicy 조회(전역+override) |
-| POST/PUT/DELETE | `/api/admin/retention/policies/**` (write) | **PRIVACY_ADMIN** | RetentionPolicy CUD(in-tx 감사) |
-| GET/POST/DELETE | `/api/admin/retention/holds/**` | POST·DELETE=**PRIVACY_ADMIN** / GET=RECRUIT_ADMIN | RetentionHold(**manual only**) 관리/조회 — method 분기(리뷰 #7) |
+| POST | `/api/admin/retention/policies/**` (create·`{id}` update·`{id}/delete`) | **PRIVACY_ADMIN** | RetentionPolicy CUD(in-tx 감사). **GET/POST 만** — 과거 PUT/DELETE → POST |
+| GET / POST | `/api/admin/retention/holds/**` (set·`{id}/release`) | POST=**PRIVACY_ADMIN** / GET=PRIVACY_ADMIN | RetentionHold(**manual only**) — release 는 POST `{id}/release`(과거 DELETE), method 분기(리뷰 #7) |
 | POST | `/api/admin/retention/job-postings/{id}/anchor` | **PRIVACY_ADMIN** | hiringEndedAt 수동 확정(리뷰 #5). 감사 `RETENTION_ANCHOR_SET`/`JOB_POSTING`. 자동 세팅 없음 |
 | POST | `/api/admin/retention/purge-batches/dry-run` | RECRUIT_ADMIN | dry-run scan(eligibility 산정, 무변경, PurgeBatch mode=DRY_RUN 생성) |
 | GET | `/api/admin/retention/purge-batches` | RECRUIT_ADMIN(요약) / PRIVACY_ADMIN(원문) | PurgeBatch 목록/결과 |

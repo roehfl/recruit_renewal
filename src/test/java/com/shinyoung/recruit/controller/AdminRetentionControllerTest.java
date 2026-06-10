@@ -32,7 +32,6 @@ import java.util.List;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -195,7 +194,8 @@ class AdminRetentionControllerTest {
 
     @Test
     void hold_해제는_RECRUIT_ADMIN이면_403() throws Exception {
-        mockMvc.perform(delete("/api/admin/retention/holds/{id}", 1L)
+        // release 는 POST /holds/{id}/release(전 엔드포인트 GET/POST 정책 — 과거 DELETE).
+        mockMvc.perform(post("/api/admin/retention/holds/{id}/release", 1L)
                         .with(authentication(adminAuthentication("ROLE_RECRUIT_ADMIN"))))
                 .andExpect(status().isForbidden());
     }

@@ -120,8 +120,8 @@
     <thead><tr><th>Method</th><th>Path</th><th>권한</th><th>상태</th></tr></thead>
     <tbody>
       <tr><td>GET</td><td><code>/admin/retention/policies</code></td><td>RECRUIT·PRIVACY</td><td><span class="badge b-green">완료</span></td></tr>
-      <tr><td>POST/PUT/DELETE</td><td><code>/admin/retention/policies/{id?}</code></td><td><strong>PRIVACY</strong></td><td><span class="badge b-green">완료</span></td></tr>
-      <tr><td>GET / POST / DELETE</td><td><code>/admin/retention/holds/{id?}</code></td><td><strong>전부 PRIVACY</strong>(reason 자유 텍스트 — 리뷰 Medium 1 반영, 조회도 전용화)</td><td><span class="badge b-green">완료</span></td></tr>
+      <tr><td>POST</td><td><code>/admin/retention/policies</code> · <code>/policies/{id}</code> · <code>/policies/{id}/delete</code></td><td><strong>PRIVACY</strong></td><td><span class="badge b-green">완료</span> (GET/POST 만 — 과거 PUT/DELETE)</td></tr>
+      <tr><td>GET / POST</td><td><code>/admin/retention/holds</code> · <code>/holds/{id}/release</code></td><td><strong>전부 PRIVACY</strong>(reason 자유 텍스트 — 리뷰 Medium 1 반영, 조회도 전용화)</td><td><span class="badge b-green">완료</span> (release 는 POST)</td></tr>
       <tr><td>POST</td><td><code>/admin/retention/job-postings/{id}/anchor</code></td><td><strong>PRIVACY</strong></td><td><span class="badge b-green">완료</span></td></tr>
       <tr><td>POST</td><td><code>/admin/retention/purge-batches/dry-run</code></td><td>RECRUIT·PRIVACY</td><td><span class="badge b-green">완료</span></td></tr>
       <tr><td>GET</td><td><code>/admin/retention/purge-batches?page&amp;size</code>(+<code>/{id}</code>)</td><td>RECRUIT·PRIVACY — 목록 size≤100 가드(리뷰 Low 2)</td><td><span class="badge b-green">완료</span></td></tr>

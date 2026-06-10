@@ -43,14 +43,15 @@ terminal = 설계 9c 확정 query 그대로: `status == WITHDRAWN` OR (finalStag
 | Method | Path | 권한 |
 | --- | --- | --- |
 | GET | `/admin/retention/policies` | RECRUIT_ADMIN·PRIVACY_ADMIN |
-| POST/PUT/DELETE | `/admin/retention/policies/{id?}` | **PRIVACY_ADMIN** |
+| POST | `/admin/retention/policies`(create) · `/policies/{id}`(update) · `/policies/{id}/delete`(delete) | **PRIVACY_ADMIN** |
 | GET | `/admin/retention/holds` | **PRIVACY_ADMIN**(reason 자유 텍스트 — 리뷰 Medium 1 반영) |
-| POST | `/admin/retention/holds` / DELETE `/holds/{id}`(release) | **PRIVACY_ADMIN** |
+| POST | `/admin/retention/holds`(set) · `/holds/{id}/release`(release) | **PRIVACY_ADMIN** |
 | POST | `/admin/retention/job-postings/{id}/anchor` | **PRIVACY_ADMIN** |
 | POST | `/admin/retention/purge-batches/dry-run` | RECRUIT_ADMIN·PRIVACY_ADMIN |
 | GET | `/admin/retention/purge-batches?page&size`(+`/{id}`) | RECRUIT_ADMIN·PRIVACY_ADMIN — 목록은 page/size 필수 가드(size≤100, 리뷰 Low 2) |
 
 - SecurityConfig: **HTTP method 까지 분기한 narrow matcher**(설계 리뷰 #5/#7)를 broad `/api/admin/**` 보다 먼저 등록. PRIVACY_ADMIN 단독 권한도 retention GET/dry-run 접근 가능.
+- **전 엔드포인트 GET/POST 만 허용(프로젝트 규약)**: 정책 update/delete·hold release 는 과거 PUT/DELETE → POST 로 전환(`/policies/{id}` update, `/policies/{id}/delete`, `/holds/{id}/release`). write 권한(PRIVACY_ADMIN)은 `POST /policies/**`·`POST /holds/**` 한 줄로 커버, dead PUT/DELETE matcher 제거.
 - 09c batch/item 응답은 식별자·집계·reasonCode 만(지원자 PII 없음)이라 RECRUIT/PRIVACY 동일 — execute 실패 상세 원문이 생기는 09d 에서 projection 분기 도입 예정.
 
 ### F — 감사 계측 (in-tx, ADR-0006)

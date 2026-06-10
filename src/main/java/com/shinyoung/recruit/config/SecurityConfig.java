@@ -90,11 +90,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/admin/retention/purge-batches/execute").hasAuthority("ROLE_PRIVACY_ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/admin/retention/purge-batches/reconcile").hasAuthority("ROLE_PRIVACY_ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/admin/retention/purge-batches/dry-run").hasAnyAuthority("ROLE_RECRUIT_ADMIN", "ROLE_PRIVACY_ADMIN")
+                // 정책 create/update/delete 전부 POST(전 엔드포인트 GET/POST 정책) — /policies/** 한 줄로 커버.
                 .requestMatchers(HttpMethod.POST, "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+                // hold set/release 전부 POST(release 는 /holds/{id}/release) — /holds/** 한 줄로 커버.
                 .requestMatchers(HttpMethod.POST, "/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")
                 // hold reason 은 자유 텍스트(민감 가능) — 조회도 PRIVACY_ADMIN 전용(9c 리뷰 Medium 1, 아래 GET 보다 먼저).
                 .requestMatchers(HttpMethod.GET, "/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/admin/retention/job-postings/*/anchor").hasAuthority("ROLE_PRIVACY_ADMIN")
