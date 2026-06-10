@@ -80,9 +80,11 @@ public class ClientEventLog {
     @Column(name = "source", nullable = false, length = 30)
     private ClientEventSource source;
 
+    /** 형식 제한(^[A-Za-z0-9-]{8,80}$)은 request DTO @Pattern으로 강제한다(설계 6.1). */
     @Column(name = "client_session_id", nullable = false, length = 80)
     private String clientSessionId;
 
+    /** 형식 제한(^[A-Za-z0-9-]{8,80}$)은 request DTO @Pattern으로 강제한다(설계 6.1). */
     @Column(name = "client_event_id", nullable = false, length = 80)
     private String clientEventId;
 
@@ -125,7 +127,7 @@ public class ClientEventLog {
     @Column(name = "error_code", length = 100)
     private String errorCode;
 
-    /** safe message code만 허용(설계 6.3, 리뷰 Blocker 3) — 자유 원문 금지. */
+    /** safe message code만 허용(설계 6.3, 리뷰 Blocker 3) — 자유 원문 금지. 컬럼 500은 DB 가드이며 서비스/DTO가 200자를 강제한다. */
     @Column(name = "message", length = 500)
     private String message;
 
