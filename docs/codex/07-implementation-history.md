@@ -1,5 +1,27 @@
 # 07. Implementation History
 
+## 2026-06-10 - Phase 09f-3 Admin Client Event Read API (구현 완료)
+
+- Date: 2026-06-10
+- Work type: implementation. Phase 09f(지원자 화면 진단 로그) 세 번째 슬라이스 — 관리자 조회 파이프라인.
+- Scope: `GET /api/admin/client-events`(검색 11파라미터) + `GET /api/admin/client-events/{id}`(단건 조회). 권한별 민감 필드 projection + 조회 가드. retention cleanup(09f-4)은 이월.
+- Implemented:
+  - **예외 2종**: `ClientEventLogNotFoundException`(404), `InvalidClientEventQueryException`(400). `GlobalExceptionHandler` 핸들러 2건 추가.
+  - **Repository 검색 쿼리**: `ClientEventLogRepository.search` — JPQL `@Query`, 9 필터 파라미터 + `Pageable`, `ORDER BY c.receivedAt DESC, c.id DESC` 고정 정렬. 기존 마커 Repository에 추가.
+  - **Repository 테스트 보강**: `search는_필터와_최신순_정렬을_지원한다` 1건 추가(총 5건).
+  - **ClientEventLogResponse**: 34필드 `record`. `from(log, includeSensitive)` 정적 팩토리. `includeSensitive=false` 시 `ipAddress`/`userAgent`/`principalHash`/`stackSummary` → `"***"`. `message`(safe code)/`metadataJson`(exact allowlist)/`stackHash` 양 권한 노출. null 원문 null 유지.
+  - **ClientEventLogReadService**: `@Transactional(readOnly=true)`. 가드 — `MAX_PAGE_SIZE=100`, `MAX_RANGE_DAYS=90`, `DEFAULT_RANGE_DAYS=7`. Duration 비교(소수 버림 없음, 09b 선례). `normalize(trim + blank→null)`.
+  - **AdminClientEventLogController**: `GET /admin/client-events`(11파라미터) + `GET /admin/client-events/{id}`. `includeSensitive` = `ROLE_PRIVACY_ADMIN` 보유 시만 `true`. `AdminAuditController` 선례.
+  - **SecurityConfig**: `GET /api/admin/client-events/**` → `ROLE_RECRUIT_ADMIN/ROLE_PRIVACY_ADMIN` narrow matcher 삽입. broad `/api/admin/**` 앞. `ROLE_ADMIN` 단독 → 403(의도적 privacy-tightening).
+- APIs: `GET /api/admin/client-events`(검색, 11파라미터) + `GET /api/admin/client-events/{id}`(단건). 인가: RECRUIT_ADMIN/PRIVACY_ADMIN. 400(가드 위반), 401(미인증), 403(권한 미보유/ROLE_ADMIN), 404(미존재 id).
+- Business rules: page size ≤100, 범위 ≤90일, default 7일, normalize, 마스킹 4필드(ipAddress/userAgent/principalHash/stackSummary) PRIVACY_ADMIN 전용, matcher 순서=보안 요구사항, ROLE_ADMIN 403 의도적.
+- Tests: scoped **19 passed** — `ClientEventLogRepositoryTest`(5 — 09f-3 search 1건 추가) · `ClientEventLogReadServiceTest`(6) · `AdminClientEventLogControllerTest`(8 — 플랜 7 + 정렬 검증 1건 추가). 전체 회귀 미실행(프로젝트 규칙).
+- Deferred: retention bulk delete + 스케줄러(09f-4), FE 연동(09f-2 별도 프로젝트).
+- Documentation:
+  - `docs/codex/implementation/phase-09f-3-admin-client-event-read.md`
+  - `docs/codex/reports/phase-09f-3-admin-client-event-read.html`
+- 상태: 구현 완료. 다음 = **09f-4**(Retention Cleanup — bulk delete, CleanupService, 스케줄러, 관리자 수동 트리거 API).
+
 ## 2026-06-10 - Phase 09f-1 Client Event Ingest Foundation (구현 완료)
 
 - Date: 2026-06-10
