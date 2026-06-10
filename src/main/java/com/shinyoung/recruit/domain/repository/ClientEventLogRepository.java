@@ -37,7 +37,7 @@ public interface ClientEventLogRepository extends Repository<ClientEventLog, Lon
     boolean existsByClientSessionIdAndClientEventId(String clientSessionId, String clientEventId);
 
     /** retention cleanup 전용 bulk delete(09f-4). 엔티티 로딩 없이 단일 DELETE 문으로 삭제 건수를 반환한다. */
-    @Modifying
+    @Modifying(flushAutomatically = true)
     @Query("DELETE FROM ClientEventLog c WHERE c.receivedAt < :threshold")
     int deleteByReceivedAtBefore(@Param("threshold") LocalDateTime threshold);
 
