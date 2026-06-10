@@ -309,7 +309,7 @@
 |------|------|
 | Method | POST |
 | Path | `/api/client-events` |
-| Base Path Prefix | `/api` (CorrelationIdFilter 적용) |
+| Base Path Prefix | `/api` (`WebMvcConfig`가 controller 패키지에 일괄 부여) |
 | Content-Type | `application/json` (JSON-only, 다른 타입 → 415) |
 | 인증 | `permitAll` — 미인증/세션 만료/가입 화면 오류도 수집 가능 |
 | Rate Limit | ip 300/분, ip+session 60/분, 인증 시 principal 120/분 |
@@ -456,7 +456,7 @@ client_event_log (독립)
 | null_또는_빈_metadata는_null을_반환한다 | null/empty → null |
 | allowlist_key는_JSON으로_직렬화된다 | durationMs/retryable 통과, JSON 포함 확인 |
 | allowlist에_없는_key는_거부된다 | unknownKey → 400 |
-| PII성_key는_어느_eventType에서도_거부된다 | mobile/schoolName/companyName/fileName → 400 |
+| PII성_key는_어느_eventType에서도_거부된다 | mobile/schoolName/companyName/fileName → 400 (어느 allowlist에도 없어 1차 allowlist 검사에서 거부 — FORBIDDEN_KEYS는 allowlist 확장 시 대비용 2차 방어선) |
 | 다른_eventType의_허용_key라도_해당_eventType_allowlist에_없으면_거부된다 | fileExtension→API_ERROR: 400, axiosCode→ATTACHMENT: 400 |
 | metadata가_허용되지_않는_eventType은_key가_있으면_거부된다 | SESSION_EXPIRED+durationMs → 400 |
 | nested_object와_array_value는_거부된다 | Map/List value → 400 |
