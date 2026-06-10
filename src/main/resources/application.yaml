@@ -62,3 +62,14 @@ recruit:
     max-total-size-per-application: ${RECRUIT_ATTACHMENT_MAX_TOTAL_SIZE_PER_APPLICATION:100MB}
     allowed-extensions: ${RECRUIT_ATTACHMENT_ALLOWED_EXTENSIONS:pdf,jpg,jpeg,png,doc,docx,xls,xlsx,hwp,hwpx}
     allowed-content-types: ${RECRUIT_ATTACHMENT_ALLOWED_CONTENT_TYPES:application/pdf,image/jpeg,image/png,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/x-hwp,application/haansofthwp,application/vnd.hancom.hwpx}
+client-event-log:
+  # 지원자 화면 진단 로그(Phase 09f). 감사 로그(activity_log)와 분리된 단기 운영 데이터.
+  enabled: ${CLIENT_EVENT_LOG_ENABLED:true}
+  retention-days: ${CLIENT_EVENT_LOG_RETENTION_DAYS:90}
+  max-metadata-json-length: ${CLIENT_EVENT_LOG_MAX_METADATA_JSON_LENGTH:4000}
+  cleanup-cron: ${CLIENT_EVENT_LOG_CLEANUP_CRON:0 0 4 * * *}
+  rate-limit:
+    # 1차 ip 글로벌(sessionId 변조 우회 차단) / 2차 ip+session / 3차 인증 principal
+    per-minute-ip: ${CLIENT_EVENT_LOG_RATE_LIMIT_PER_MINUTE_IP:300}
+    per-minute-session: ${CLIENT_EVENT_LOG_RATE_LIMIT_PER_MINUTE_SESSION:60}
+    per-minute-principal: ${CLIENT_EVENT_LOG_RATE_LIMIT_PER_MINUTE_PRINCIPAL:120}
