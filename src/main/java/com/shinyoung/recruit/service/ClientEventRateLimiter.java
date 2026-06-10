@@ -2,6 +2,7 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.exception.ClientEventRateLimitExceededException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -36,6 +37,7 @@ public class ClientEventRateLimiter {
     private final int maxEntries;
     private final Map<String, Window> windows = new ConcurrentHashMap<>();
 
+    @Autowired
     public ClientEventRateLimiter(
             Clock clock,
             @Value("${client-event-log.rate-limit.per-minute-ip:300}") int perMinuteIp,
