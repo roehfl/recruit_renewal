@@ -188,6 +188,18 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler(InvalidClientEventLogException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidClientEventLog(InvalidClientEventLogException e) {
+        return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+    }
+
+    /** client event 수집 rate limit 초과(Phase 09f). FE telemetry는 fire-and-forget이라 응답을 사용하지 않는다. */
+    @ExceptionHandler(ClientEventRateLimitExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleClientEventRateLimitExceeded(ClientEventRateLimitExceededException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     /**
      * DB 제약 위반(unique 등). 사전 체크를 통과한 동시 요청 race가 대표 경로이며 409로 응답한다.
      * 제약명/컬럼명/SQL 등 내부 정보는 응답에 노출하지 않는다. 다만 FK/NOT NULL 위반 같은
