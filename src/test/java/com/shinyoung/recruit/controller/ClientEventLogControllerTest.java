@@ -1,4 +1,3 @@
-// src/test/java/com/shinyoung/recruit/controller/ClientEventLogControllerTest.java
 package com.shinyoung.recruit.controller;
 
 import com.shinyoung.recruit.security.auth.CustomUserDetails;

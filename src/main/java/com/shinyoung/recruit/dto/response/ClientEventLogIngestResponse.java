@@ -1,4 +1,3 @@
-// src/main/java/com/shinyoung/recruit/dto/response/ClientEventLogIngestResponse.java
 package com.shinyoung.recruit.dto.response;
 
 /** 수집 결과(Phase 09f). FE telemetry는 fire-and-forget이라 이 값을 사용하지 않는다 — 운영 진단/테스트용. */

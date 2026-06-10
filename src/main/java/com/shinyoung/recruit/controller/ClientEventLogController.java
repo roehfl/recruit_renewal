@@ -1,4 +1,3 @@
-// src/main/java/com/shinyoung/recruit/controller/ClientEventLogController.java
 package com.shinyoung.recruit.controller;
 
 import com.shinyoung.recruit.dto.request.ClientEventLogRequest;

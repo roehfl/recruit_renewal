@@ -1,4 +1,3 @@
-// src/test/java/com/shinyoung/recruit/service/ClientEventLogServiceTest.java
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.common.hash.AuditHmac;

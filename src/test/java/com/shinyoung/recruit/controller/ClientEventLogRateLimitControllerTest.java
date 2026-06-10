@@ -1,4 +1,3 @@
-// src/test/java/com/shinyoung/recruit/controller/ClientEventLogRateLimitControllerTest.java
 package com.shinyoung.recruit.controller;
 
 import org.junit.jupiter.api.BeforeEach;

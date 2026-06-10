@@ -1,4 +1,3 @@
-// src/main/java/com/shinyoung/recruit/service/ClientEventRateLimiter.java
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.exception.ClientEventRateLimitExceededException;

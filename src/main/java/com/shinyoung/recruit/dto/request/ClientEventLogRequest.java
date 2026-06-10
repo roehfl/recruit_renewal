@@ -1,4 +1,3 @@
-// src/main/java/com/shinyoung/recruit/dto/request/ClientEventLogRequest.java
 package com.shinyoung.recruit.dto.request;
 
 import com.shinyoung.recruit.enumeration.ClientEventSeverity;
