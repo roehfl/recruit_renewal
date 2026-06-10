@@ -550,6 +550,8 @@ AES_SECRET_KEY=22791194512954214612461221261067 ./gradlew test \
 
 9. **in-memory rate limiter**: 서버 재시작 시 카운터 초기화. 멀티 인스턴스 환경에서 공유 안 됨. Redis/token bucket 전환은 후속 별도 phase.
 
+10. **reverse proxy 배치 시 ip 단 한계**: IP는 `HttpServletRequest.getRemoteAddr()`로 추출하므로, 운영에서 reverse proxy 뒤에 배치되면 모든 지원자가 proxy IP를 공유해 1차 ip 한도(기본 300/분)가 사이트 전체 telemetry 상한이 되고 2차 `ip+session` 단은 사실상 session 단으로 동작한다. 운영 배치 시 `server.forward-headers-strategy=framework` 정렬 또는 `CLIENT_EVENT_LOG_RATE_LIMIT_PER_MINUTE_IP` 상향이 필요하다(한도는 모두 환경변수로 조정 가능).
+
 ---
 
 ## 12. Next Phase 고려사항

@@ -405,13 +405,14 @@
     </div>
 
     <div class="warn">
-      <b>기능 제한 5건</b>
+      <b>기능 제한 6건</b>
       <ul>
         <li><b>rate limit이 @Valid 이후 적용</b>: malformed request flood는 카운터 미집계(Bean Validation에서 먼저 거부).</li>
         <li><b>stackSummary 자유 문자열</b>: 현재 검증 없이 수집. 조회 시 ROLE_PRIVACY_ADMIN 전용 예정(09f-3).</li>
         <li><b>ipAddress/userAgent 원문 저장</b>: 조회 API(09f-3)에서 ROLE_PRIVACY_ADMIN 게이팅 예정.</li>
         <li><b>retention 미구현</b>: yaml 설정 블록만 존재, cleanup 로직은 09f-4.</li>
         <li><b>in-memory rate limiter</b>: 서버 재시작 시 초기화, 멀티 인스턴스 미공유. Redis 전환은 별도 phase.</li>
+        <li><b>reverse proxy 배치 시 ip 단 한계</b>: <code>getRemoteAddr()</code> 기반이라 proxy 뒤에서는 전 사용자가 proxy IP를 공유 — 1차 ip 한도(300/분)가 사이트 전체 상한이 됨. 운영 배치 시 <code>server.forward-headers-strategy=framework</code> 정렬 또는 ip 한도 환경변수 상향 필요.</li>
       </ul>
     </div>
   </section>
