@@ -82,7 +82,7 @@ class ClientEventLogServiceTest {
         when(repository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ClientEventLogIngestResponse response = service.record(
-                request(ClientEventSource.APPLICANT_WEB, "Request failed with status code 500",
+                request(ClientEventSource.APPLICANT_WEB, "API_REQUEST_FAILED",
                         Map.of("durationMs", 1250)),
                 null, servletRequest());
 
@@ -130,19 +130,31 @@ class ClientEventLogServiceTest {
     }
 
     @Test
-    void message의_7자리_이상_연속_숫자는_마스킹된다() {
+    void 자유_문자열_message는_서비스에서도_거부된다() {
+        // 컨트롤러 @Valid를 거치지 않는 내부 호출 경로 대비 — DTO와 동일한 safe code 계약(3차 리뷰 Minor)
+        when(repository.existsByClientSessionIdAndClientEventId(anyString(), anyString())).thenReturn(false);
+
+        assertThatThrownBy(() -> service.record(
+                request(ClientEventSource.APPLICANT_WEB, "Request failed with status code 500", null),
+                null, servletRequest()))
+                .isInstanceOf(InvalidClientEventLogException.class);
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void safe_code_안의_7자리_이상_연속_숫자는_마스킹된다() {
+        // 코드 형태로 위장한 숫자열(전화번호류) 방어 — 검증 통과 후에도 마스킹 적용
         when(repository.existsByClientSessionIdAndClientEventId(anyString(), anyString())).thenReturn(false);
         when(repository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        service.record(request(ClientEventSource.APPLICANT_WEB, "submit failed 010-1234-5678 retry", null),
+        service.record(request(ClientEventSource.APPLICANT_WEB, "ERR_01012345678", null),
                 null, servletRequest());
 
         ArgumentCaptor<ClientEventLog> captor = ArgumentCaptor.forClass(ClientEventLog.class);
         verify(repository).saveAndFlush(captor.capture());
         assertThat(captor.getValue().getMessage())
-                .isEqualTo("submit failed * retry")
-                .doesNotContain("010")
-                .doesNotContain("5678");
+                .isEqualTo("ERR_*")
+                .doesNotContain("0101");
     }
 
     @Test

@@ -48,7 +48,7 @@
   <div class="sub">
     신영증권 채용 Renewal 백엔드 · 구현 리포트 ·
     <span class="badge b-green">구현 완료</span>
-    <span class="badge b-green">테스트 통과 (43)</span>
+    <span class="badge b-green">테스트 통과 (44)</span>
     · 2026-06-10
   </div>
 </header>
@@ -72,7 +72,7 @@
       <tr><th>총 커밋</th><td>6 (f9256ff → e1c14c1)</td></tr>
       <tr><th>신규 클래스</th><td>13종</td></tr>
       <tr><th>수정 클래스</th><td>5종 (GlobalExceptionHandler, SecurityConfig, application.yaml, ClientEventLog 주석, ClientEventRateLimiter @Autowired)</td></tr>
-      <tr><th>테스트</th><td>6 클래스, 43건 통과 (2차 리뷰 Major 2 반영으로 controller 4건 추가)</td></tr>
+      <tr><th>테스트</th><td>6 클래스, 44건 통과 (2차 리뷰 Major 2 반영 controller 4건 + 3차 리뷰 반영 service 1건 추가)</td></tr>
     </table>
   </section>
 
@@ -233,7 +233,8 @@
       <ul>
         <li><code>safe(value, max)</code> — 제어문자 치환, truncate, blank→null</li>
         <li><code>stripQuery(path)</code> — <code>?</code> 이후 제거</li>
-        <li><code>maskLongDigitRuns(message)</code> — 7자리+ 연속 숫자(<code>[0-9][0-9\\-]{5,}[0-9]</code>) → <code>*</code> (DTO 패턴이 1차 방어, 마스킹은 2차 방어)</li>
+        <li><code>safeMessage(message)</code> — <code>^[A-Z][A-Z0-9_]{2,80}$</code> 검증, 위반 시 400. DTO @Pattern과 동일 계약을 서비스에서도 강제(3차 리뷰 Minor — 내부 호출 경로 대비)</li>
+        <li><code>maskLongDigitRuns(message)</code> — 7자리+ 연속 숫자(<code>[0-9][0-9\\-]{5,}[0-9]</code>) → <code>*</code> (검증 통과 후에도 적용 — 코드로 위장한 숫자열 방어)</li>
       </ul>
     </div>
   </section>
@@ -309,7 +310,8 @@
       <li><b>metadata sanitize</b>: exact allowlist + 금지 key + value 타입/길이 검증</li>
       <li><b>서버 추출값 강제</b>: ip/ua/receivedAt/ingestCorrelationId는 서비스에서만 채움</li>
       <li><b>principalHash</b>: HMAC_SHA256(secret, "CLIENT_PRINCIPAL:"+username) — 원문 미저장</li>
-      <li><b>message 마스킹</b>: 7자리+ 연속 숫자 → <code>*</code> (검증 우회 경로 대비 2차 방어)</li>
+      <li><b>message 서비스 검증</b>: <code>safeMessage</code>가 DTO와 동일 패턴(<code>^[A-Z][A-Z0-9_]{2,80}$</code>)을 서비스에서도 강제 — 내부 호출 경로 대비(3차 리뷰 Minor)</li>
+      <li><b>message 마스킹</b>: 7자리+ 연속 숫자 → <code>*</code> (검증 통과 후에도 적용 — 위장 숫자열 방어)</li>
       <li><b>routePath/apiPath</b>: query string(<code>?</code> 이후) 제거</li>
     </ul>
 
@@ -362,7 +364,7 @@
   <!-- 9. 테스트 결과 -->
   <section>
     <h2>9. 테스트 결과</h2>
-    <div class="ok"><b>전체 43건 성공</b> (scoped 실행 확인 — 2차 리뷰 Major 2 반영으로 controller 4건 추가)</div>
+    <div class="ok"><b>전체 44건 성공</b> (scoped 실행 확인 — 2차 리뷰 controller 4건 + 3차 리뷰 service 1건 추가)</div>
 
     <h3>테스트 명령</h3>
     <pre>AES_SECRET_KEY=22791194512954214612461221261067 \
@@ -381,10 +383,10 @@
         <tr><td><code>ClientEventLogRepositoryTest</code></td><td>@DataJpaTest</td><td>4</td><td><span class="badge b-green">통과</span></td></tr>
         <tr class="row-even"><td><code>ClientEventMetadataSanitizerTest</code></td><td>단위</td><td>11</td><td><span class="badge b-green">통과</span></td></tr>
         <tr><td><code>ClientEventRateLimiterTest</code></td><td>단위</td><td>6</td><td><span class="badge b-green">통과</span></td></tr>
-        <tr class="row-even"><td><code>ClientEventLogServiceTest</code></td><td>단위(Mock)</td><td>7</td><td><span class="badge b-green">통과</span></td></tr>
+        <tr class="row-even"><td><code>ClientEventLogServiceTest</code></td><td>단위(Mock)</td><td>8</td><td><span class="badge b-green">통과</span></td></tr>
         <tr><td><code>ClientEventLogControllerTest</code></td><td>@SpringBootTest</td><td>14</td><td><span class="badge b-green">통과</span></td></tr>
         <tr class="row-even"><td><code>ClientEventLogRateLimitControllerTest</code></td><td>@SpringBootTest (별도 ctx)</td><td>1</td><td><span class="badge b-green">통과</span></td></tr>
-        <tr><td><b>합계</b></td><td></td><td><b>43</b></td><td><span class="badge b-green">전체 통과</span></td></tr>
+        <tr><td><b>합계</b></td><td></td><td><b>44</b></td><td><span class="badge b-green">전체 통과</span></td></tr>
       </tbody>
     </table>
     <p class="muted">전체 회귀 테스트는 프로젝트 규칙(명시 요청 시에만)에 따라 미실행.</p>
@@ -402,6 +404,7 @@
         <li><b>ClientEventRateLimiter <code>@Autowired</code></b>: 다중 생성자 환경에서 Spring 주입 생성자 판단 실패 해결.</li>
         <li><b>엔티티 주석 보강</b>: <code>message</code>/<code>ipAddress</code>/<code>userAgent</code> 3개 필드 Javadoc 추가(Task 2 리뷰 반영).</li>
         <li><b>message 패턴 강화(2차 리뷰 Major 2)</b>: 최초 패턴 <code>^[A-Za-z0-9 _.:\-]*$</code>는 영문 자유 문장(이름/회사명/주소성 문자열)을 통과시켜 "safe code" 계약보다 약했음. <code>^[A-Z][A-Z0-9_]{2,80}$</code> 대문자 코드 allowlist로 교체(리뷰 안 A). axios 기본 문구(<code>Request failed with status code 500</code>)도 정책상 거부 — HTTP 상태는 <code>httpStatus</code>/<code>errorCode</code> 필드로 전달. FE는 messageCode만 전송.</li>
+        <li><b>message 서비스 검증 추가(3차 리뷰 Minor)</b>: DTO @Pattern만으로는 컨트롤러 @Valid를 거치지 않는 내부 호출 경로에서 자유 문자열 저장 가능. 서비스 <code>safeMessage()</code>에 동일 패턴 검증 추가, 서비스 테스트 픽스처를 safe code로 정렬.</li>
       </ol>
     </div>
 

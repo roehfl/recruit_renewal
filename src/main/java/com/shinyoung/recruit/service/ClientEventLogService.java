@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.regex.Pattern;
 
 /**
  * client event 수집 파이프라인(Phase 09f, 설계 6.2). best-effort — 수집 실패가 업무 API에
@@ -50,9 +51,14 @@ public class ClientEventLogService {
     private static final int MAX_USER_AGENT = 512;
 
     /**
+     * 대문자 safe message code만 허용(3차 리뷰 Minor) — DTO {@code @Pattern}과 동일 계약.
+     * 컨트롤러 {@code @Valid}를 거치지 않는 내부 호출 경로가 생겨도 자유 문자열 저장을 막는다.
+     */
+    private static final Pattern SAFE_MESSAGE_CODE = Pattern.compile("^[A-Z][A-Z0-9_]{2,80}$");
+
+    /**
      * 7자리 이상 연속 숫자(하이픈 개입 허용) — 전화번호류 혼입 마스킹(설계 6.3).
-     * 1차 방어는 DTO의 safe message code 패턴({@code ^[A-Z][A-Z0-9_]{2,80}$})이고,
-     * 이 마스킹은 검증을 우회하는 경로(향후 내부 호출 등)에 대한 2차 방어다.
+     * safe code 검증을 통과한 값에도 적용한다 — 코드 형태로 위장한 숫자열({@code P01012345678} 등) 방어.
      */
     private static final String LONG_DIGIT_RUN = "[0-9][0-9\\-]{5,}[0-9]";
 
@@ -123,7 +129,7 @@ public class ClientEventLogService {
                 .apiPath(safe(stripQuery(request.apiPath()), MAX_API_PATH))
                 .httpStatus(request.httpStatus())
                 .errorCode(safe(request.errorCode(), MAX_ERROR_CODE))
-                .message(maskLongDigitRuns(safe(request.message(), MAX_MESSAGE)))
+                .message(maskLongDigitRuns(safeMessage(request.message())))
                 .stackHash(safe(request.stackHash(), MAX_STACK_HASH))
                 .stackSummary(safe(request.stackSummary(), MAX_STACK_SUMMARY))
                 .frontendVersion(safe(request.frontendVersion(), MAX_FRONTEND_VERSION))
@@ -166,6 +172,17 @@ public class ClientEventLogService {
         }
         int queryIndex = path.indexOf('?');
         return queryIndex < 0 ? path : path.substring(0, queryIndex);
+    }
+
+    private String safeMessage(String message) {
+        String sanitized = safe(message, MAX_MESSAGE);
+        if (sanitized == null) {
+            return null;
+        }
+        if (!SAFE_MESSAGE_CODE.matcher(sanitized).matches()) {
+            throw new InvalidClientEventLogException("message는 safe message code만 허용됩니다.");
+        }
+        return sanitized;
     }
 
     private String maskLongDigitRuns(String message) {

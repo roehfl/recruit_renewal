@@ -360,14 +360,14 @@ client_event_log (독립)
 | **PRIVACY_ADMIN은_cleanup을_수동_트리거할_수_있다** | now-120d 로그 1건 seed → POST /api/admin/client-events/cleanup → deletedCount=1 *(09f-4 신규)* |
 | **RECRUIT_ADMIN은_cleanup을_트리거할_수_없다** | ROLE_RECRUIT_ADMIN → POST cleanup → 403 *(09f-4 신규)* |
 
-### 09f 전체 scoped 테스트 (66건)
+### 09f 전체 scoped 테스트 (67건)
 
 | 테스트 클래스 | 건수 | 슬라이스 |
 |-------------|------|---------|
 | `ClientEventLogRepositoryTest` | 5 | 09f-1/09f-3 |
 | `ClientEventMetadataSanitizerTest` | 11 | 09f-1 |
 | `ClientEventRateLimiterTest` | 6 | 09f-1 |
-| `ClientEventLogServiceTest` | 7 | 09f-1 |
+| `ClientEventLogServiceTest` | 8 | 09f-1 (3차 리뷰 Minor로 1건 추가) |
 | `ClientEventLogControllerTest` | 14 | 09f-1 (2차 리뷰 Major 2로 4건 추가) |
 | `ClientEventLogRateLimitControllerTest` | 1 | 09f-1 |
 | `ClientEventLogReadServiceTest` | 6 | 09f-3 |
@@ -375,7 +375,7 @@ client_event_log (독립)
 | `ClientEventLogCleanupServiceTest` | 2 | 09f-4 |
 | `ClientEventLogCleanupSchedulerTest` | 2 | 09f-4 |
 | `SchedulingConfigTest` | 2 | 09f-4 (2차 리뷰 Major 1로 추가) |
-| **합계** | **66** | |
+| **합계** | **67** | |
 
 **실행 명령**:
 
@@ -394,7 +394,7 @@ $env:AES_SECRET_KEY="22791194512954214612461221261067"
 .\gradlew.bat test --tests "com.shinyoung.recruit.controller.AdminAuditControllerTest" --no-daemon
 ```
 
-**결과**: **66건 통과**, 실패 0(2차 리뷰 반영 후 재실행). 회귀 `AdminAuditControllerTest` 10건은 09f-4 구현 시점 통과.
+**결과**: **67건 통과**, 실패 0(2차·3차 리뷰 반영 후 재실행). 회귀 `AdminAuditControllerTest` 10건은 09f-4 구현 시점 통과.
 
 ---
 

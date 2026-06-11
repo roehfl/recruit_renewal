@@ -1,5 +1,17 @@
 # 07. Implementation History
 
+## 2026-06-11 - Phase 09f 3차 리뷰 반영 (Minor — service message 검증)
+
+- Date: 2026-06-11
+- Work type: review fix. `instruction.md`의 09f 3차 리뷰(남은 Minor) 반영 — 서비스 단위 테스트가 새 message 계약과 불일치하고, 서비스 자체는 safe code 검증을 하지 않던 문제.
+- Implemented:
+  - **ClientEventLogService.safeMessage()**: DTO `@Pattern`과 동일한 `^[A-Z][A-Z0-9_]{2,80}$` 검증을 서비스에도 추가(리뷰 권장 코드 그대로). 위반 시 `InvalidClientEventLogException(400)`. 컨트롤러 `@Valid`를 거치지 않는 내부 호출 경로가 생겨도 자유 문자열이 저장되지 않는다.
+  - **숫자 마스킹 유지**: `maskLongDigitRuns`는 검증 통과 후에도 적용 — 코드 형태로 위장한 숫자열(`P01012345678` 등) 방어.
+  - **ClientEventLogServiceTest 정렬**: `정상_수집시...` 픽스처 message를 `API_REQUEST_FAILED`로 교체. 자유 문자열 마스킹 테스트를 제거하고 `자유_문자열_message는_서비스에서도_거부된다`(신규) + `safe_code_안의_7자리_이상_연속_숫자는_마스킹된다`(`ERR_01012345678` → `ERR_*`)로 대체. 총 8건.
+- Tests: scoped — `ClientEventLogServiceTest`(8) · `ClientEventLogControllerTest`(14). 09f 전체 67건.
+- Documentation: 09f-1 md/html(safeMessage·테스트 표·44건), 09f-4 md/html(합계 67건), design 문서(서비스 양쪽 검증 명시).
+- 상태: 반영 완료.
+
 ## 2026-06-11 - Phase 09f 2차 리뷰 반영 (Major 1/Major 2/Minor 1)
 
 - Date: 2026-06-11

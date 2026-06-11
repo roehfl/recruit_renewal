@@ -154,7 +154,8 @@
 
 - message는 FE가 정의한 safe message code만 허용한다. 상세 원인 추적은 `errorCode`, `eventType`, `httpStatus`, `apiPath`, `relatedCorrelationId`로 한다.
 - BE 강제 규칙(2차 리뷰 Major 2로 강화): 패턴 `^[A-Z][A-Z0-9_]{2,80}$`(대문자 코드)만 허용한다. 최초 패턴 `^[A-Za-z0-9 _.:\-]{0,200}$`는 영문 자유 문장(이름/회사명/주소성 문자열)을 통과시켜 "safe code" 계약보다 약했으므로 폐기. 한글·`@`는 물론 소문자 문장·axios 기본 문구(`Request failed with status code 500`)도 400. FE는 표시 문구 대신 messageCode(`API_REQUEST_FAILED` 등)만 전송한다. FE는 fire-and-forget이므로 사용자 영향 없다.
-- 패턴을 통과해도 7자리 이상 연속 숫자(하이픈 개입 포함)는 `*`로 마스킹한다 — 검증 우회 경로 대비 2차 방어.
+- 동일 패턴을 DTO(`@Pattern`)와 서비스(`safeMessage`) 양쪽에서 강제한다(3차 리뷰 Minor) — 컨트롤러 `@Valid`를 거치지 않는 내부 호출 경로가 생겨도 자유 문자열이 저장되지 않는다.
+- 패턴을 통과해도 7자리 이상 연속 숫자(하이픈 개입 포함)는 `*`로 마스킹한다 — 코드 형태로 위장한 숫자열(전화번호류) 방어.
 
 ### 6.4 ClientEventRateLimiter
 

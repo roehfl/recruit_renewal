@@ -289,7 +289,8 @@
 - **safe 유틸**:
   - `safe(value, max)` — `\p{Cntrl}+` 치환 후 trim, 길이 초과 truncate, blank→null.
   - `stripQuery(path)` — `?` 이후 제거.
-  - `maskLongDigitRuns(message)` — 7자리 이상 연속 숫자(`[0-9][0-9\\-]{5,}[0-9]`) → `*`. 전화번호류 혼입 방어.
+  - `safeMessage(message)` — `safe()` 후 `^[A-Z][A-Z0-9_]{2,80}$` 패턴 검증, 위반 시 `InvalidClientEventLogException(400)`. DTO `@Pattern`과 동일 계약 — 컨트롤러 `@Valid`를 거치지 않는 내부 호출 경로 대비(3차 리뷰 Minor).
+  - `maskLongDigitRuns(message)` — 7자리 이상 연속 숫자(`[0-9][0-9\\-]{5,}[0-9]`) → `*`. safe code 검증 통과 후에도 적용 — 코드 형태로 위장한 숫자열(`P01012345678` 등) 방어.
 - **관련**: `ClientEventLogRepository`, `ClientEventMetadataSanitizer`, `ClientEventRateLimiter`, `AuditHmac`, `CorrelationIdFilter`.
 
 ### `controller.ClientEventLogController` — Controller
@@ -418,7 +419,7 @@ client_event_log (독립)
 
 3. **2차 금지 key**: allowlist 통과 후에도 21종 PII성 key(대소문자 무시)를 차단. allowlist 향후 확장 시 실수로 PII key 추가되는 것 방어.
 
-4. **safe message code 계약(2차 리뷰 Major 2 강화)**: `message`는 자유 문자열 전면 금지. `^[A-Z][A-Z0-9_]{2,80}$` 패턴의 대문자 코드만 허용(`API_REQUEST_FAILED`, `APPLICATION_SUBMIT_FAILED`, `ATTACHMENT_UPLOAD_FAILED`, `SESSION_EXPIRED` 등). 한글뿐 아니라 영문 이름/회사명/학교명/주소성 문자열(`Hong Gil Dong application failed`)도 400. axios 기본 문구(`Request failed with status code 500`)도 자유 문장이므로 정책상 거부 — HTTP 상태 정보는 `httpStatus`/`errorCode` 필드로 전달한다. FE는 표시 문구 대신 messageCode만 전송한다. 서비스의 7자리 이상 연속 숫자 `*` 마스킹은 검증 우회 경로 대비 2차 방어로 유지.
+4. **safe message code 계약(2차 리뷰 Major 2 강화 + 3차 리뷰 Minor 서비스 검증)**: `message`는 자유 문자열 전면 금지. `^[A-Z][A-Z0-9_]{2,80}$` 패턴의 대문자 코드만 허용(`API_REQUEST_FAILED`, `APPLICATION_SUBMIT_FAILED`, `ATTACHMENT_UPLOAD_FAILED`, `SESSION_EXPIRED` 등). 한글뿐 아니라 영문 이름/회사명/학교명/주소성 문자열(`Hong Gil Dong application failed`)도 400. axios 기본 문구(`Request failed with status code 500`)도 자유 문장이므로 정책상 거부 — HTTP 상태 정보는 `httpStatus`/`errorCode` 필드로 전달한다. FE는 표시 문구 대신 messageCode만 전송한다. 동일 패턴을 DTO(`@Pattern`)와 서비스(`safeMessage`) **양쪽에서 검증** — 컨트롤러 `@Valid`를 거치지 않는 내부 호출 경로가 생겨도 자유 문자열이 저장되지 않는다. 7자리 이상 연속 숫자 `*` 마스킹은 검증 통과 후에도 적용(코드 형태로 위장한 숫자열 방어).
 
 5. **3단 rate limit(고정 윈도우 60초)**:
    - 1차: ip 300/분 — sessionId를 바꿔도 동일 ip면 차단.
@@ -476,14 +477,15 @@ client_event_log (독립)
 | 윈도우가_지나면_카운터가_회복된다 | 61초 진행 후 허용 |
 | 맵_크기_상한을_넘으면_신규_key는_차단된다 | maxEntries=4 채움 → 신규 429 |
 
-### ClientEventLogServiceTest (7건) — 단위(Mock)
+### ClientEventLogServiceTest (8건) — 단위(Mock)
 
 | 테스트명 | 검증 내용 |
 |---------|----------|
-| 정상_수집시_서버값으로_저장된다 | ip/ua 서버 추출, apiPath/routePath query 제거, receivedAt Clock 기준 |
+| 정상_수집시_서버값으로_저장된다 | ip/ua 서버 추출, apiPath/routePath query 제거, receivedAt Clock 기준. message=`API_REQUEST_FAILED`(safe code 픽스처) |
 | 인증_사용자는_HMAC_hash만_저장되고_원문은_저장되지_않는다 | principalHash=HMAC, username 미포함 |
 | source가_APPLICANT_WEB이_아니면_거부된다 | ADMIN_WEB → InvalidClientEventLogException |
-| message의_7자리_이상_연속_숫자는_마스킹된다 | 010-1234-5678 → `*` (DTO 검증 우회 경로 대비 service 2차 방어) |
+| 자유_문자열_message는_서비스에서도_거부된다 | `Request failed with status code 500` → InvalidClientEventLogException, 저장 없음(3차 리뷰 Minor) |
+| safe_code_안의_7자리_이상_연속_숫자는_마스킹된다 | `ERR_01012345678` → `ERR_*` (위장 숫자열 방어) |
 | 중복_선확인되면_저장없이_duplicate_응답한다 | existsBy true → ofDuplicate |
 | race_충돌도_duplicate_응답으로_흡수되고_예외가_전파되지_않는다 | saveAndFlush 예외 → ofDuplicate |
 | enabled가_꺼져있으면_저장하지_않는다 | enabled=false → ofDisabled |
@@ -526,7 +528,7 @@ AES_SECRET_KEY=22791194512954214612461221261067 ./gradlew test \
   --tests "com.shinyoung.recruit.controller.ClientEventLogRateLimitControllerTest"
 ```
 
-**결과**: 전체 **43건 성공** (scoped 실행 확인 — 2차 리뷰 반영으로 controller 테스트 4건 추가).
+**결과**: 전체 **44건 성공** (scoped 실행 확인 — 2차 리뷰 반영 controller 4건 + 3차 리뷰 반영 service 1건 추가).
 
 ---
 
@@ -543,6 +545,8 @@ AES_SECRET_KEY=22791194512954214612461221261067 ./gradlew test \
 4. **ClientEventLog 주석 보강(3필드)**: commit f61df5b에서 `message`, `ipAddress`, `userAgent` 필드 Javadoc 주석 보강(설계 의도 명시 — safe code 계약, PRIVACY_ADMIN 전용).
 
 5. **message 패턴 강화(2차 리뷰 Major 2)**: 최초 구현의 `^[A-Za-z0-9 _.:\\-]*$`는 영문 자유 문장(이름/회사명/주소성 문자열)을 통과시켜 "safe code" 계약보다 약했다. `^[A-Z][A-Z0-9_]{2,80}$` 대문자 코드 allowlist 패턴으로 교체(리뷰 안 A). `@Size(max=200)`은 패턴이 길이를 상한하므로 제거. FE 연동 시 표시 문구가 아닌 messageCode만 전송하도록 계약 변경 필요.
+
+6. **message 서비스 검증 추가(3차 리뷰 Minor)**: DTO `@Pattern`만으로는 컨트롤러 `@Valid`를 거치지 않는 내부 호출 경로에서 자유 문자열이 저장될 수 있었다(서비스 테스트가 그 동작을 고정하고 있었음). 서비스 `safeMessage()`에 동일 패턴 검증을 추가하고, 서비스 테스트 픽스처를 safe code로 교체 + 자유 문자열 거부 테스트로 정렬.
 
 ### 기능 제한
 

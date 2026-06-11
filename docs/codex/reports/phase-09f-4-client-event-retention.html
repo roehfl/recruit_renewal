@@ -50,7 +50,7 @@
   <div class="sub">
     신영증권 채용 Renewal 백엔드 · 구현 리포트 ·
     <span class="badge b-green">구현 완료</span>
-    <span class="badge b-green">테스트 통과 (66)</span>
+    <span class="badge b-green">테스트 통과 (67)</span>
     <span class="badge b-blue">Phase 09f 전체 완료</span>
     · 2026-06-11
   </div>
@@ -92,7 +92,7 @@
       <tr class="row-even"><th>신규 클래스</th><td>4종 (ClientEventLogCleanupService, SchedulingConfig, ClientEventLogCleanupScheduler, ClientEventLogCleanupResponse)</td></tr>
       <tr><th>수정 클래스</th><td>3종 (ClientEventLogRepository, AdminClientEventLogController, SecurityConfig)</td></tr>
       <tr class="row-even"><th>헤더 주석 정리</th><td>09f-1 파일 9개 — <code>// src/...</code> 경로 주석 제거(프로젝트 스타일 정렬)</td></tr>
-      <tr><th>테스트</th><td>09f-4 신규 4건(CleanupService 2 + Scheduler 2) + 기존 AdminController +2건 + 2차 리뷰 반영 6건(SchedulingConfigTest 2, ClientEventLogControllerTest +4) = 총 09f 66건 통과</td></tr>
+      <tr><th>테스트</th><td>09f-4 신규 4건(CleanupService 2 + Scheduler 2) + 기존 AdminController +2건 + 2차 리뷰 6건(SchedulingConfigTest 2, ControllerTest +4) + 3차 리뷰 1건(ServiceTest) = 총 09f 67건 통과</td></tr>
     </table>
   </section>
 
@@ -294,7 +294,7 @@ DELETE FROM ClientEventLog c WHERE c.receivedAt &lt; threshold
   <!-- 7. 테스트 결과 -->
   <section>
     <h2>7. 테스트 결과</h2>
-    <div class="ok"><b>09f-4 신규 4건 + 기존 AdminController +2건 + 2차 리뷰 반영 6건 = 09f 전체 66건 통과</b> (scoped 실행). 회귀 AdminAuditControllerTest 10건 통과.</div>
+    <div class="ok"><b>09f-4 신규 4건 + 기존 AdminController +2건 + 2차 리뷰 6건 + 3차 리뷰 1건 = 09f 전체 67건 통과</b> (scoped 실행). 회귀 AdminAuditControllerTest 10건 통과.</div>
 
     <h3>ClientEventLogCleanupServiceTest (2건) — @SpringBootTest + @Transactional</h3>
     <table>
@@ -333,13 +333,13 @@ DELETE FROM ClientEventLog c WHERE c.receivedAt &lt; threshold
       <tr class="row-even"><td><b>RECRUIT_ADMIN은_cleanup을_트리거할_수_없다</b></td><td>ROLE_RECRUIT_ADMIN → POST cleanup → 403</td><td><span class="badge b-blue">09f-4 신규</span></td></tr>
     </table>
 
-    <h3>09f 전체 scoped 테스트 (66건)</h3>
+    <h3>09f 전체 scoped 테스트 (67건)</h3>
     <table>
       <tr><th>테스트 클래스</th><th>건수</th><th>슬라이스</th></tr>
       <tr><td>ClientEventLogRepositoryTest</td><td>5</td><td>09f-1/09f-3</td></tr>
       <tr class="row-even"><td>ClientEventMetadataSanitizerTest</td><td>11</td><td>09f-1</td></tr>
       <tr><td>ClientEventRateLimiterTest</td><td>6</td><td>09f-1</td></tr>
-      <tr class="row-even"><td>ClientEventLogServiceTest</td><td>7</td><td>09f-1</td></tr>
+      <tr class="row-even"><td>ClientEventLogServiceTest</td><td>8</td><td>09f-1 (3차 리뷰 Minor로 1건 추가)</td></tr>
       <tr><td>ClientEventLogControllerTest</td><td>14</td><td>09f-1 (2차 리뷰 Major 2로 4건 추가)</td></tr>
       <tr class="row-even"><td>ClientEventLogRateLimitControllerTest</td><td>1</td><td>09f-1</td></tr>
       <tr><td>ClientEventLogReadServiceTest</td><td>6</td><td>09f-3</td></tr>
@@ -347,7 +347,7 @@ DELETE FROM ClientEventLog c WHERE c.receivedAt &lt; threshold
       <tr><td>ClientEventLogCleanupServiceTest</td><td>2</td><td>09f-4</td></tr>
       <tr class="row-even"><td>ClientEventLogCleanupSchedulerTest</td><td>2</td><td>09f-4</td></tr>
       <tr><td>SchedulingConfigTest</td><td>2</td><td>09f-4 (2차 리뷰 Major 1로 추가)</td></tr>
-      <tr><th>합계</th><th>66</th><td></td></tr>
+      <tr><th>합계</th><th>67</th><td></td></tr>
     </table>
 
     <h3>실행 명령</h3>

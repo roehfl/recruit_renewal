@@ -1,95 +1,36 @@
-Major 1 — cleanup scheduler가 실제로 동작하지 않을 가능성이 큼
+남은 Minor — Service 단위 테스트가 새 message 계약과 불일치
 
-ClientEventLogCleanupScheduler에 @Scheduled는 붙어 있다.
-그런데 애플리케이션 메인 클래스에는 @EnableScheduling이 없다. 현재 RecruitApplication은 @SpringBootApplication만 선언되어 있다.
+ClientEventLogServiceTest의 정상 수집 테스트가 아직 자유 문자열 message를 직접 넘긴다.
 
-Spring Boot에서 @Scheduled 메서드를 실행하려면 일반적으로 @EnableScheduling 활성화가 필요하다. 이게 없으면 수동 cleanup API는 동작해도, 매일 04:00 자동 정리는 실행되지 않는다.
+"Request failed with status code 500"
 
-수정:
+또 다른 테스트도 service를 직접 호출하면서 "submit failed 010-1234-5678 retry"를 저장 가능 경로로 검증한다.
 
-@SpringBootApplication
-@EnableScheduling
-public class RecruitApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(RecruitApplication.class, args);
-    }
-}
+문제는 컨트롤러에서는 @Valid로 막히지만, 서비스 자체는 message safe-code 검증을 하지 않는다. 실제 저장 시점에서는 safe() + 숫자 마스킹만 하고 그대로 저장한다.
 
-또는 별도 config:
+현재 public API 경로만 보면 실질 위험은 낮다. 하지만 테스트가 새 정책과 반대로 “서비스는 자유 문자열을 저장할 수 있음”을 고정하고 있어서 나중에 내부 호출 경로가 생기면 정책이 깨진다.
 
-@Configuration
-@EnableScheduling
-public class SchedulingConfig {
-}
+수정 권장:
 
-테스트도 추가해라.
-
-@SpringBootTest
-class SchedulingConfigTest {
-    @Autowired
-    ScheduledAnnotationBeanPostProcessor processor;
-
-    @Test
-    void scheduling_is_enabled() {
-        assertThat(processor).isNotNull();
-    }
-}
-Major 2 — message가 “safe code”라고 보기엔 아직 느슨함
-
-DTO 주석은 message를 safe message code/고정 영문 문구만 허용한다고 되어 있고, 한글이나 @ 등은 400으로 막는다고 설명한다.
-하지만 실제 검증은 이 정규식뿐이다.
-
-@Pattern(regexp = "^[A-Za-z0-9 _.:\\-]*$")
-String message
-
-즉 영문 이름, 회사명, 학교명, 간단한 주소성 문자열은 여전히 통과한다.
-서비스에서도 추가 처리는 7자리 이상 숫자열 마스킹 정도다.
-
-예를 들면 아래는 통과 가능하다.
-
-{
-  "message": "Hong Gil Dong application failed"
-}
-
-이건 “safe code”가 아니라 “영문 자유 문자열”에 가깝다. 9f 목적이 지원자 화면 진단 로그이고, 엔티티 주석도 “원문 PII 미저장”을 명시하고 있으므로 현재 구현은 문서의 보안 주장보다 약하다.
-
-권장 수정은 둘 중 하나다.
-
-안 A — message를 enum/code allowlist로 제한
-
+ClientEventLogServiceTest.정상_수집시_서버값으로_저장된다의 message를 API_REQUEST_FAILED로 교체.
+message의_7자리_이상_연속_숫자는_마스킹된다 테스트는 제거하거나, “DTO 검증 우회 경로 대비 2차 방어” 목적이면 별도 sanitizer 단위로 분리.
+더 안전하게는 서비스에도 동일 패턴 검증을 넣어라.
 private static final Pattern SAFE_MESSAGE_CODE =
         Pattern.compile("^[A-Z][A-Z0-9_]{2,80}$");
 
-허용 예:
+private String safeMessage(String message) {
+    String sanitized = safe(message, MAX_MESSAGE);
+    if (sanitized == null) {
+        return null;
+    }
+    if (!SAFE_MESSAGE_CODE.matcher(sanitized).matches()) {
+        throw new InvalidClientEventLogException("message는 safe message code만 허용됩니다.");
+    }
+    return sanitized;
+}
 
-API_REQUEST_FAILED
-APPLICATION_SUBMIT_FAILED
-ATTACHMENT_UPLOAD_FAILED
-SESSION_EXPIRED
+그리고 builder에는:
 
-안 B — message를 아예 수집하지 않고 errorCode/eventType/metadata로만 진단
+.message(safeMessage(request.message()))
 
-현 단계에서는 A가 현실적이다. FE에서 표시문구 대신 messageCode만 보내게 해라.
-
-추가 테스트:
-
-message = "Hong Gil Dong application failed" -> 400
-message = "API_REQUEST_FAILED" -> 200
-message = "submit failed" -> 400
-message = "Request failed with status code 500" -> 정책상 허용 여부 명확화
-
-현재 테스트는 한글 message 거부만 검증하고 있어서, 영문 PII성 문자열은 못 잡는다.
-
-Minor 1 — reverse proxy 환경에서 IP rate limit 정확도가 떨어질 수 있음
-
-수집 서비스는 IP를 servletRequest.getRemoteAddr()로 가져온다.
-rate limiter는 ip, ip + clientSessionId, principalHash 3단으로 제한한다.
-
-서버 앞에 Nginx/Apache reverse proxy가 있으면 getRemoteAddr()가 실제 사용자 IP가 아니라 프록시 IP로 고정될 수 있다. 그러면 모든 사용자가 동일 IP로 묶여 per-minute-ip 한도에 걸릴 수 있다.
-
-운영에서 프록시를 둔다면 다음 중 하나를 명시해야 한다.
-
-server:
-  forward-headers-strategy: framework
-
-또는 trusted proxy 기준의 ForwardedHeaderFilter/X-Forwarded-For 처리 정책을 별도 config로 둬라. 단, public endpoint라서 임의 X-Forwarded-For 신뢰는 금지해야 한다.
+이렇게 바꾸는 게 가장 깔끔하다.
