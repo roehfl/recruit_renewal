@@ -1,36 +1,15 @@
-남은 Minor — Service 단위 테스트가 새 message 계약과 불일치
+ApplicationBasicInfo 도메인 설계 및 api 추가하려고 한다.
+정의는 지원서 입력 중 지원자에 대한 기본 정보이다.
+1. 사진 (파일 업로드) 2. 내/외국인 3. 생년월일 4. 연락처 5. email 6. 이름 (한글, 영문) 7. 보훈여부 8. 장애여부  9. 주소
 
-ClientEventLogServiceTest의 정상 수집 테스트가 아직 자유 문자열 message를 직접 넘긴다.
+내/외국인은 외국인인 경우 국적을 입력 받는다.
 
-"Request failed with status code 500"
+장애여부의 경우 대상 / 비대상으로 나뉘고 대상이면 등급과 유형을 입력 받는다.
+등급과 유형은 코드값을 사용한다.
 
-또 다른 테스트도 service를 직접 호출하면서 "submit failed 010-1234-5678 retry"를 저장 가능 경로로 검증한다.
+보훈여부의 경우 대상 / 비대상으로 입력받는다.
 
-문제는 컨트롤러에서는 @Valid로 막히지만, 서비스 자체는 message safe-code 검증을 하지 않는다. 실제 저장 시점에서는 safe() + 숫자 마스킹만 하고 그대로 저장한다.
+연락처는 휴대폰과 비상연락처 2개 이고 휴대폰만 필수이다.
 
-현재 public API 경로만 보면 실질 위험은 낮다. 하지만 테스트가 새 정책과 반대로 “서비스는 자유 문자열을 저장할 수 있음”을 고정하고 있어서 나중에 내부 호출 경로가 생기면 정책이 깨진다.
-
-수정 권장:
-
-ClientEventLogServiceTest.정상_수집시_서버값으로_저장된다의 message를 API_REQUEST_FAILED로 교체.
-message의_7자리_이상_연속_숫자는_마스킹된다 테스트는 제거하거나, “DTO 검증 우회 경로 대비 2차 방어” 목적이면 별도 sanitizer 단위로 분리.
-더 안전하게는 서비스에도 동일 패턴 검증을 넣어라.
-private static final Pattern SAFE_MESSAGE_CODE =
-        Pattern.compile("^[A-Z][A-Z0-9_]{2,80}$");
-
-private String safeMessage(String message) {
-    String sanitized = safe(message, MAX_MESSAGE);
-    if (sanitized == null) {
-        return null;
-    }
-    if (!SAFE_MESSAGE_CODE.matcher(sanitized).matches()) {
-        throw new InvalidClientEventLogException("message는 safe message code만 허용됩니다.");
-    }
-    return sanitized;
-}
-
-그리고 builder에는:
-
-.message(safeMessage(request.message()))
-
-이렇게 바꾸는 게 가장 깔끔하다.
+사진은 파일 업로드를 고려중이긴 한데, 우선 보안이슈 때문에 고민중이다.
+파일 업로드를 대체할 방법이 있을까?
