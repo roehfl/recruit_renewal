@@ -1,5 +1,19 @@
 # 07. Implementation History
 
+## 2026-06-11 - Phase 09f 2차 리뷰 반영 (Major 1/Major 2/Minor 1)
+
+- Date: 2026-06-11
+- Work type: review fix. `instruction.md`의 09f 2차 리뷰 3건 반영.
+- Implemented:
+  - **Major 1 — 스케줄링 활성 검증 테스트**: `SchedulingConfig`(@EnableScheduling)는 09f-4에서 이미 도입된 상태였으므로 코드 변경 없이, 누락 회귀를 잡는 `SchedulingConfigTest` 2건 추가(`ScheduledAnnotationBeanPostProcessor` 존재 + `ClientEventLogCleanupScheduler` cron 작업 등록 확인).
+  - **Major 2 — message safe code allowlist 강화(리뷰 안 A)**: `ClientEventLogRequest.message` 패턴을 `^[A-Za-z0-9 _.:\\-]*$`(영문 자유 문자열 통과) → `^[A-Z][A-Z0-9_]{2,80}$`(대문자 코드만)로 교체, `@Size(max=200)` 제거(패턴이 길이 상한). 영문 이름/회사명/주소성 문자열·소문자 문장·axios 기본 문구 모두 400. FE는 messageCode만 전송. 컨트롤러 테스트 4건 추가(영문 자유 문장 400 / 소문자 400 / axios 문구 400 / `API_REQUEST_FAILED` 200). 서비스 숫자 마스킹은 2차 방어로 유지(주석 명시).
+  - **Minor 1 — reverse proxy 정책 문서 보강**: 09f-1 문서/리포트의 reverse proxy 한계 항목에 trusted proxy 기준 `ForwardedHeaderFilter`/`X-Forwarded-For` 처리 정책 및 "public endpoint에서 임의 X-Forwarded-For 신뢰 금지(rate limit 우회 가능)" 명시. 코드 변경 없음(운영 배치 시 결정 사항).
+- Tests: scoped — `SchedulingConfigTest`(2) · `ClientEventLogControllerTest`(14 = 기존 10 + 신규 4) · `ClientEventLogServiceTest`(7) · `ClientEventLogCleanupSchedulerTest`(2). 09f 전체 66건.
+- Documentation:
+  - `docs/codex/implementation/phase-09f-1-client-event-ingest.md` / `docs/codex/reports/phase-09f-1-client-event-ingest.html` (message 계약·proxy 정책)
+  - `docs/codex/implementation/phase-09f-4-client-event-retention.md` / `docs/codex/reports/phase-09f-4-client-event-retention.html` (SchedulingConfigTest)
+- 상태: 반영 완료. FE 연동 시 message → messageCode 계약 변경 공지 필요.
+
 ## 2026-06-11 - Phase 09f-4 Client Event Retention (구현 완료)
 
 - Date: 2026-06-11

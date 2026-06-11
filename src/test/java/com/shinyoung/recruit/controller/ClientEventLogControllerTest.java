@@ -129,6 +129,45 @@ class ClientEventLogControllerTest {
     }
 
     @Test
+    void 영문_자유_문장_message는_400이다() throws Exception {
+        // 영문 이름/회사명/학교명 등 PII성 자유 문자열 차단(2차 리뷰 Major 2)
+        mockMvc.perform(post("/api/client-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body("APPLICANT_WEB", UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+                                "\"message\": \"Hong Gil Dong application failed\"")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 소문자_message는_400이다() throws Exception {
+        mockMvc.perform(post("/api/client-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body("APPLICANT_WEB", UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+                                "\"message\": \"submit failed\"")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void axios_기본_오류_문구도_자유_문장이므로_400이다() throws Exception {
+        // 정책: 자유 문장 전면 금지. HTTP 상태 정보는 httpStatus/errorCode 필드로 전달한다.
+        mockMvc.perform(post("/api/client-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body("APPLICANT_WEB", UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+                                "\"message\": \"Request failed with status code 500\"")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void safe_message_code는_허용된다() throws Exception {
+        mockMvc.perform(post("/api/client-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body("APPLICANT_WEB", UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+                                "\"message\": \"API_REQUEST_FAILED\"")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accepted").value(true));
+    }
+
+    @Test
     void 같은_이벤트_재전송은_duplicate로_흡수되고_409로_새지_않는다() throws Exception {
         String sessionId = UUID.randomUUID().toString();
         String eventId = UUID.randomUUID().toString();

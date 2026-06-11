@@ -18,8 +18,11 @@ import java.util.Map;
  * {@code ingestCorrelationId}는 body로 받지 않는다 — 서버에서만 채운다(FE 값 신뢰 금지).
  *
  * <p>{@code clientSessionId}/{@code clientEventId}는 UUID 등 안전한 opaque id 형식으로 제한한다
- * (unique 컬럼/rate limiter map key 오염 방지, 리뷰 Major 5). {@code message}는 자유 원문이 아니라
- * safe message code/고정 영문 문구만 허용한다(리뷰 Blocker 3) — 한글/{@code @} 등은 PII 혼입 신호로 400.
+ * (unique 컬럼/rate limiter map key 오염 방지, 리뷰 Major 5). {@code message}는 자유 문자열이 아니라
+ * 대문자 safe message code({@code API_REQUEST_FAILED} 등)만 허용한다(리뷰 Blocker 3 + 2차 리뷰 Major 2)
+ * — 한글은 물론 영문 자유 문장(이름/회사명/주소성 문자열 혼입 가능)도 400. FE는 표시 문구 대신
+ * messageCode만 전송한다. axios 기본 문구("Request failed with status code 500")도 자유 문장이므로
+ * 거부 — 해당 정보는 {@code httpStatus}/{@code errorCode}로 전달한다.
  */
 public record ClientEventLogRequest(
         @NotNull ClientEventType eventType,
@@ -46,8 +49,7 @@ public record ClientEventLogRequest(
         @Size(max = 300) String apiPath,
         Integer httpStatus,
         @Size(max = 100) String errorCode,
-        @Size(max = 200)
-        @Pattern(regexp = "^[A-Za-z0-9 _.:\\-]*$", message = "message는 safe message code만 허용됩니다.")
+        @Pattern(regexp = "^[A-Z][A-Z0-9_]{2,80}$", message = "message는 safe message code만 허용됩니다.")
         String message,
         @Size(max = 128) String stackHash,
         @Size(max = 2000) String stackSummary,

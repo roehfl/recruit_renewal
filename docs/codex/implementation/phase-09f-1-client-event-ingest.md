@@ -198,7 +198,7 @@
   - `pageCode` / `componentCode` / `routePath` / `operation` — 화면 컨텍스트.
   - `jobPostingId` / `applicationId` — denormalized 검색 키(FK 없음).
   - `httpMethod` / `apiPath` / `httpStatus` / `errorCode` — API 오류 컨텍스트.
-  - `message` — safe code 패턴 강제, DB 500자/서비스 200자.
+  - `message` — safe message code allowlist 패턴 강제(`^[A-Z][A-Z0-9_]{2,80}$`), DB 500자/서비스 200자.
   - `stackHash`(128) / `stackSummary`(2000) — JS 오류 스택. stackSummary는 ROLE_PRIVACY_ADMIN 전용(설계 8.3).
   - `ipAddress`(64) / `userAgent`(512) — 서버 추출값. ROLE_PRIVACY_ADMIN 전용.
   - `principalHash`(128) — HMAC(`"CLIENT_PRINCIPAL:"+username`). 원문 미저장.
@@ -258,7 +258,7 @@
 - **필수 검증**:
   - `eventType`, `severity`, `source` — `@NotNull`.
   - `clientSessionId`, `clientEventId` — `@NotBlank` + `@Pattern(regexp = "^[A-Za-z0-9\\-]{8,80}$")`.
-  - `message` — `@Size(max=200)` + `@Pattern(regexp = "^[A-Za-z0-9 _.:\\-]*$")` (safe message code/영문만 허용, 한글/@/@등 → 400).
+  - `message` — `@Pattern(regexp = "^[A-Z][A-Z0-9_]{2,80}$")` (대문자 safe message code만 허용 — 2차 리뷰 Major 2 반영. 한글은 물론 `Hong Gil Dong application failed` 같은 영문 자유 문장도 400. null 허용).
 - **선택 필드**: `clientOccurredAt`, `relatedCorrelationId`(100), `pageCode`(80), `componentCode`(80), `routePath`(300), `operation`(80), `jobPostingId`, `applicationId`, `httpMethod`(10), `apiPath`(300), `httpStatus`, `errorCode`(100), `stackHash`(128), `stackSummary`(2000), `frontendVersion`(80), `browserName`(80), `browserVersion`(80), `osName`(80), `viewport`(40), `timezone`(80), `metadata(Map<String,Object>)`.
 - **관련**: `ClientEventLogController`, `ClientEventLogService.record`, `ClientEventMetadataSanitizer`.
 
@@ -335,7 +335,7 @@
   "apiPath": "/api/applicant/applications/123/education",
   "httpStatus": 500,
   "errorCode": "INTERNAL_SERVER_ERROR",
-  "message": "Request failed with status code 500",
+  "message": "API_REQUEST_FAILED",
   "stackHash": "abc123",
   "stackSummary": "at saveEducation (app.js:120)",
   "frontendVersion": "2026.06.10-1",
@@ -384,7 +384,7 @@
 | `source != APPLICANT_WEB` | 400 |
 | `clientSessionId` 형식 위반(`^[A-Za-z0-9\\-]{8,80}$`) | 400 |
 | `clientEventId` 형식 위반 | 400 |
-| `message` safe code 위반(한글/@/@/특수문자) | 400 |
+| `message` safe code 위반(한글/영문 자유 문장/소문자/특수문자) | 400 |
 | metadata allowlist 외 key | 400 |
 | metadata 금지 key(PII성) | 400 |
 | metadata nested object/array | 400 |
@@ -418,7 +418,7 @@ client_event_log (독립)
 
 3. **2차 금지 key**: allowlist 통과 후에도 21종 PII성 key(대소문자 무시)를 차단. allowlist 향후 확장 시 실수로 PII key 추가되는 것 방어.
 
-4. **safe message code 계약**: `message`는 자유 원문 금지. `^[A-Za-z0-9 _.:\\-]*$` 패턴만 허용. 한글/`@`/특수문자는 PII 혼입 신호로 즉시 400. 서비스에서 7자리 이상 연속 숫자(전화번호류)도 `*`로 마스킹.
+4. **safe message code 계약(2차 리뷰 Major 2 강화)**: `message`는 자유 문자열 전면 금지. `^[A-Z][A-Z0-9_]{2,80}$` 패턴의 대문자 코드만 허용(`API_REQUEST_FAILED`, `APPLICATION_SUBMIT_FAILED`, `ATTACHMENT_UPLOAD_FAILED`, `SESSION_EXPIRED` 등). 한글뿐 아니라 영문 이름/회사명/학교명/주소성 문자열(`Hong Gil Dong application failed`)도 400. axios 기본 문구(`Request failed with status code 500`)도 자유 문장이므로 정책상 거부 — HTTP 상태 정보는 `httpStatus`/`errorCode` 필드로 전달한다. FE는 표시 문구 대신 messageCode만 전송한다. 서비스의 7자리 이상 연속 숫자 `*` 마스킹은 검증 우회 경로 대비 2차 방어로 유지.
 
 5. **3단 rate limit(고정 윈도우 60초)**:
    - 1차: ip 300/분 — sessionId를 바꿔도 동일 ip면 차단.
@@ -483,12 +483,12 @@ client_event_log (독립)
 | 정상_수집시_서버값으로_저장된다 | ip/ua 서버 추출, apiPath/routePath query 제거, receivedAt Clock 기준 |
 | 인증_사용자는_HMAC_hash만_저장되고_원문은_저장되지_않는다 | principalHash=HMAC, username 미포함 |
 | source가_APPLICANT_WEB이_아니면_거부된다 | ADMIN_WEB → InvalidClientEventLogException |
-| message의_7자리_이상_연속_숫자는_마스킹된다 | 010-1234-5678 → `*` |
+| message의_7자리_이상_연속_숫자는_마스킹된다 | 010-1234-5678 → `*` (DTO 검증 우회 경로 대비 service 2차 방어) |
 | 중복_선확인되면_저장없이_duplicate_응답한다 | existsBy true → ofDuplicate |
 | race_충돌도_duplicate_응답으로_흡수되고_예외가_전파되지_않는다 | saveAndFlush 예외 → ofDuplicate |
 | enabled가_꺼져있으면_저장하지_않는다 | enabled=false → ofDisabled |
 
-### ClientEventLogControllerTest (10건) — `@SpringBootTest`
+### ClientEventLogControllerTest (14건) — `@SpringBootTest`
 
 | 테스트명 | 검증 내용 |
 |---------|----------|
@@ -499,6 +499,10 @@ client_event_log (독립)
 | clientSessionId_형식_위반은_400이다 | 한글 sessionId → 400 |
 | 허용되지_않은_metadata_key는_400이다 | phoneNumber key → 400 |
 | message에_한글이_섞이면_400이다 | 한글 message → 400 |
+| 영문_자유_문장_message는_400이다 | `Hong Gil Dong application failed` → 400 (2차 리뷰 Major 2) |
+| 소문자_message는_400이다 | `submit failed` → 400 |
+| axios_기본_오류_문구도_자유_문장이므로_400이다 | `Request failed with status code 500` → 400 (정책: 자유 문장 전면 금지) |
+| safe_message_code는_허용된다 | `API_REQUEST_FAILED` → 200, accepted=true |
 | 같은_이벤트_재전송은_duplicate로_흡수되고_409로_새지_않는다 | 2번째 전송 → 200(duplicate=true) |
 | JSON이_아닌_content_type은_415다 | text/plain → 415 |
 | CORS_응답에_X_Request_Id가_노출된다 | Access-Control-Expose-Headers: X-Request-Id |
@@ -522,7 +526,7 @@ AES_SECRET_KEY=22791194512954214612461221261067 ./gradlew test \
   --tests "com.shinyoung.recruit.controller.ClientEventLogRateLimitControllerTest"
 ```
 
-**결과**: 전체 **39건 성공** (scoped 실행 확인).
+**결과**: 전체 **43건 성공** (scoped 실행 확인 — 2차 리뷰 반영으로 controller 테스트 4건 추가).
 
 ---
 
@@ -538,6 +542,8 @@ AES_SECRET_KEY=22791194512954214612461221261067 ./gradlew test \
 
 4. **ClientEventLog 주석 보강(3필드)**: commit f61df5b에서 `message`, `ipAddress`, `userAgent` 필드 Javadoc 주석 보강(설계 의도 명시 — safe code 계약, PRIVACY_ADMIN 전용).
 
+5. **message 패턴 강화(2차 리뷰 Major 2)**: 최초 구현의 `^[A-Za-z0-9 _.:\\-]*$`는 영문 자유 문장(이름/회사명/주소성 문자열)을 통과시켜 "safe code" 계약보다 약했다. `^[A-Z][A-Z0-9_]{2,80}$` 대문자 코드 allowlist 패턴으로 교체(리뷰 안 A). `@Size(max=200)`은 패턴이 길이를 상한하므로 제거. FE 연동 시 표시 문구가 아닌 messageCode만 전송하도록 계약 변경 필요.
+
 ### 기능 제한
 
 5. **rate limit이 `@Valid` 이후에 적용됨**: 검증 실패 요청(malformed flood)은 rate limiter 카운터에 집계되지 않는다. Bean Validation 실패는 `MethodArgumentNotValidException`으로 처리되어 service에 도달하지 않기 때문.
@@ -550,7 +556,7 @@ AES_SECRET_KEY=22791194512954214612461221261067 ./gradlew test \
 
 9. **in-memory rate limiter**: 서버 재시작 시 카운터 초기화. 멀티 인스턴스 환경에서 공유 안 됨. Redis/token bucket 전환은 후속 별도 phase.
 
-10. **reverse proxy 배치 시 ip 단 한계**: IP는 `HttpServletRequest.getRemoteAddr()`로 추출하므로, 운영에서 reverse proxy 뒤에 배치되면 모든 지원자가 proxy IP를 공유해 1차 ip 한도(기본 300/분)가 사이트 전체 telemetry 상한이 되고 2차 `ip+session` 단은 사실상 session 단으로 동작한다. 운영 배치 시 `server.forward-headers-strategy=framework` 정렬 또는 `CLIENT_EVENT_LOG_RATE_LIMIT_PER_MINUTE_IP` 상향이 필요하다(한도는 모두 환경변수로 조정 가능).
+10. **reverse proxy 배치 시 ip 단 한계**: IP는 `HttpServletRequest.getRemoteAddr()`로 추출하므로, 운영에서 reverse proxy 뒤에 배치되면 모든 지원자가 proxy IP를 공유해 1차 ip 한도(기본 300/분)가 사이트 전체 telemetry 상한이 되고 2차 `ip+session` 단은 사실상 session 단으로 동작한다. 운영 배치 시 `server.forward-headers-strategy=framework` 정렬 또는 trusted proxy 기준의 `ForwardedHeaderFilter`/`X-Forwarded-For` 처리 정책을 별도 config로 명시해야 한다(또는 `CLIENT_EVENT_LOG_RATE_LIMIT_PER_MINUTE_IP` 상향 — 한도는 모두 환경변수로 조정 가능). **단, `/api/client-events`는 public endpoint이므로 임의 `X-Forwarded-For` 헤더를 무조건 신뢰하면 안 된다** — 클라이언트가 헤더를 위조해 ip rate limit을 우회할 수 있으므로, forwarded 헤더는 반드시 신뢰할 수 있는 proxy의 것만 수용하도록 trusted proxy 목록 기준으로 처리한다(2차 리뷰 Minor 1).
 
 ---
 

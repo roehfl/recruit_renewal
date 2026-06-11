@@ -49,7 +49,11 @@ public class ClientEventLogService {
     private static final int MAX_IP_ADDRESS = 64;
     private static final int MAX_USER_AGENT = 512;
 
-    /** 7자리 이상 연속 숫자(하이픈 개입 허용) — 전화번호류 혼입 마스킹(설계 6.3). */
+    /**
+     * 7자리 이상 연속 숫자(하이픈 개입 허용) — 전화번호류 혼입 마스킹(설계 6.3).
+     * 1차 방어는 DTO의 safe message code 패턴({@code ^[A-Z][A-Z0-9_]{2,80}$})이고,
+     * 이 마스킹은 검증을 우회하는 경로(향후 내부 호출 등)에 대한 2차 방어다.
+     */
     private static final String LONG_DIGIT_RUN = "[0-9][0-9\\-]{5,}[0-9]";
 
     private final ClientEventLogRepository repository;

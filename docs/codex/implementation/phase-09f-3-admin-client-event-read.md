@@ -371,7 +371,7 @@ client_event_log (독립)
 
 6. **stackSummary 마스킹 근거(설계 §8.3, 리뷰 Blocker 3)**: JS 스택 트레이스는 자유 문자열 성격이라 PII(이름/연락처/파일명 등)가 혼입될 수 있음. `message`와 달리 safe code 패턴 강제 없이 2000자까지 수집. 따라서 `ROLE_PRIVACY_ADMIN` 전용.
 
-7. **항상 노출되는 필드**: `message`는 safe code 패턴(`^[A-Za-z0-9 _.:\\-]*$`)으로 강제됨 — PII 혼입 불가. `metadataJson`은 exact allowlist 통과 — PII성 key 수집 자체가 차단됨. `stackHash`는 스택 원문의 해시값 — 원문 미포함.
+7. **항상 노출되는 필드**: `message`는 safe code 패턴(`^[A-Z][A-Z0-9_]{2,80}$`, 2차 리뷰 Major 2로 강화)으로 강제됨 — PII 혼입 불가. `metadataJson`은 exact allowlist 통과 — PII성 key 수집 자체가 차단됨. `stackHash`는 스택 원문의 해시값 — 원문 미포함.
 
 8. **null 원문 보존**: `mask` 헬퍼가 `value == null` 조건을 `includeSensitive=true`와 동일하게 처리하므로, null 원문 필드는 `"***"` 아닌 null로 반환됨.
 

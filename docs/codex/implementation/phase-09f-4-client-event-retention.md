@@ -100,6 +100,22 @@
 - `service/ClientEventLogServiceTest.java` (첫 줄 `// src/...` 제거)
 - `service/ClientEventRateLimiterTest.java` (첫 줄 `// src/...` 제거)
 
+### 2차 리뷰 반영 — Major 1(스케줄링 테스트)/Major 2(message 패턴 강화)/Minor 1(proxy 문서)
+
+신규(test):
+- `config/SchedulingConfigTest.java` (Major 1 — `@EnableScheduling` 활성/cron 등록 검증 2건)
+
+수정(main):
+- `dto/request/ClientEventLogRequest.java` (Major 2 — `message` 패턴 `^[A-Za-z0-9 _.:\\-]*$` → `^[A-Z][A-Z0-9_]{2,80}$`, `@Size(max=200)` 제거)
+- `service/ClientEventLogService.java` (주석만 — 숫자 마스킹을 2차 방어로 명시)
+
+수정(test):
+- `controller/ClientEventLogControllerTest.java` (+영문 자유 문장 400, +소문자 400, +axios 기본 문구 400, +safe code 200 — 총 14건)
+
+수정(docs):
+- `phase-09f-1-client-event-ingest.md`/`.html` (message 계약, reverse proxy trusted-proxy 정책)
+- `phase-09f-4-client-event-retention.md`/`.html` (본 문서 — SchedulingConfigTest)
+
 ---
 
 ## 4. 신규 클래스
@@ -320,6 +336,15 @@ client_event_log (독립)
 | 정상_실행시_cleanup을_위임한다 | `cleanupService.cleanup()` 호출 verify |
 | cleanup_실패는_로그만_남기고_전파하지_않는다 | `cleanup()` throw → `runCleanup()` 예외 없음 |
 
+### SchedulingConfigTest (2건, 2차 리뷰 Major 1 반영) — `@SpringBootTest`
+
+| 테스트명 | 검증 내용 |
+|---------|----------|
+| 스케줄링이_활성화되어_있다 | `ScheduledAnnotationBeanPostProcessor` 빈 존재 |
+| cleanup_스케줄러의_cron_작업이_등록되어_있다 | 등록된 ScheduledTask 중 `ClientEventLogCleanupScheduler` 대상 작업 존재 |
+
+> **배경**: `@EnableScheduling`이 빠지면 `@Scheduled` cron이 컴파일/기동 오류 없이 조용히 미동작한다. `SchedulingConfig` 자체는 09f-4에서 함께 도입됐으나, 누락 회귀를 컨텍스트 수준에서 잡는 테스트가 없어 2차 리뷰(Major 1)에서 보강했다.
+
 ### AdminClientEventLogControllerTest (10건, 09f-3 8건 + 09f-4 신규 2건) — `@SpringBootTest`
 
 | 테스트명 | 검증 내용 |
@@ -335,7 +360,7 @@ client_event_log (독립)
 | **PRIVACY_ADMIN은_cleanup을_수동_트리거할_수_있다** | now-120d 로그 1건 seed → POST /api/admin/client-events/cleanup → deletedCount=1 *(09f-4 신규)* |
 | **RECRUIT_ADMIN은_cleanup을_트리거할_수_없다** | ROLE_RECRUIT_ADMIN → POST cleanup → 403 *(09f-4 신규)* |
 
-### 09f 전체 scoped 테스트 (60건)
+### 09f 전체 scoped 테스트 (66건)
 
 | 테스트 클래스 | 건수 | 슬라이스 |
 |-------------|------|---------|
@@ -343,13 +368,14 @@ client_event_log (독립)
 | `ClientEventMetadataSanitizerTest` | 11 | 09f-1 |
 | `ClientEventRateLimiterTest` | 6 | 09f-1 |
 | `ClientEventLogServiceTest` | 7 | 09f-1 |
-| `ClientEventLogControllerTest` | 10 | 09f-1 |
+| `ClientEventLogControllerTest` | 14 | 09f-1 (2차 리뷰 Major 2로 4건 추가) |
 | `ClientEventLogRateLimitControllerTest` | 1 | 09f-1 |
 | `ClientEventLogReadServiceTest` | 6 | 09f-3 |
 | `AdminClientEventLogControllerTest` | 10 | 09f-3/09f-4 |
 | `ClientEventLogCleanupServiceTest` | 2 | 09f-4 |
 | `ClientEventLogCleanupSchedulerTest` | 2 | 09f-4 |
-| **합계** | **60** | |
+| `SchedulingConfigTest` | 2 | 09f-4 (2차 리뷰 Major 1로 추가) |
+| **합계** | **66** | |
 
 **실행 명령**:
 
@@ -361,13 +387,14 @@ $env:AES_SECRET_KEY="22791194512954214612461221261067"
   "--tests=com.shinyoung.recruit.service.ClientEvent*" `
   "--tests=com.shinyoung.recruit.controller.ClientEventLog*" `
   "--tests=com.shinyoung.recruit.controller.AdminClientEventLogControllerTest" `
+  "--tests=com.shinyoung.recruit.config.SchedulingConfigTest" `
   --no-daemon
 
 # 인접 회귀
 .\gradlew.bat test --tests "com.shinyoung.recruit.controller.AdminAuditControllerTest" --no-daemon
 ```
 
-**결과**: **60건 통과**, 실패 0. 회귀 `AdminAuditControllerTest` 10건 통과.
+**결과**: **66건 통과**, 실패 0(2차 리뷰 반영 후 재실행). 회귀 `AdminAuditControllerTest` 10건은 09f-4 구현 시점 통과.
 
 ---
 

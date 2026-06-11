@@ -48,7 +48,7 @@
   <div class="sub">
     신영증권 채용 Renewal 백엔드 · 구현 리포트 ·
     <span class="badge b-green">구현 완료</span>
-    <span class="badge b-green">테스트 통과 (39)</span>
+    <span class="badge b-green">테스트 통과 (43)</span>
     · 2026-06-10
   </div>
 </header>
@@ -72,7 +72,7 @@
       <tr><th>총 커밋</th><td>6 (f9256ff → e1c14c1)</td></tr>
       <tr><th>신규 클래스</th><td>13종</td></tr>
       <tr><th>수정 클래스</th><td>5종 (GlobalExceptionHandler, SecurityConfig, application.yaml, ClientEventLog 주석, ClientEventRateLimiter @Autowired)</td></tr>
-      <tr><th>테스트</th><td>6 클래스, 39건 통과</td></tr>
+      <tr><th>테스트</th><td>6 클래스, 43건 통과 (2차 리뷰 Major 2 반영으로 controller 4건 추가)</td></tr>
     </table>
   </section>
 
@@ -166,7 +166,7 @@
         <tr><td><code>ingestCorrelationId</code></td><td>ingest_correlation_id(100)</td><td>수집 API X-Request-Id</td></tr>
         <tr class="row-even"><td><code>relatedCorrelationId</code></td><td>related_correlation_id(100)</td><td>실패 업무 API X-Request-Id. CS 상관키</td></tr>
         <tr><td><code>jobPostingId</code> / <code>applicationId</code></td><td>job_posting_id / application_id</td><td>denormalized. FK 없음</td></tr>
-        <tr class="row-even"><td><code>message</code></td><td>message(500)</td><td>safe code만. 서비스가 200자 강제 + 숫자 마스킹</td></tr>
+        <tr class="row-even"><td><code>message</code></td><td>message(500)</td><td>대문자 safe code만(<code>^[A-Z][A-Z0-9_]{2,80}$</code>, 2차 리뷰 Major 2). 서비스 숫자 마스킹은 2차 방어</td></tr>
         <tr><td><code>stackSummary</code></td><td>stack_summary(2000)</td><td>조회 시 ROLE_PRIVACY_ADMIN 전용 (09f-3)</td></tr>
         <tr class="row-even"><td><code>ipAddress</code></td><td>ip_address(64)</td><td>서버 추출. ROLE_PRIVACY_ADMIN 전용</td></tr>
         <tr><td><code>userAgent</code></td><td>user_agent(512)</td><td>서버 추출. ROLE_PRIVACY_ADMIN 전용</td></tr>
@@ -233,7 +233,7 @@
       <ul>
         <li><code>safe(value, max)</code> — 제어문자 치환, truncate, blank→null</li>
         <li><code>stripQuery(path)</code> — <code>?</code> 이후 제거</li>
-        <li><code>maskLongDigitRuns(message)</code> — 7자리+ 연속 숫자(<code>[0-9][0-9\\-]{5,}[0-9]</code>) → <code>*</code></li>
+        <li><code>maskLongDigitRuns(message)</code> — 7자리+ 연속 숫자(<code>[0-9][0-9\\-]{5,}[0-9]</code>) → <code>*</code> (DTO 패턴이 1차 방어, 마스킹은 2차 방어)</li>
       </ul>
     </div>
   </section>
@@ -258,7 +258,7 @@
   "clientOccurredAt": "2026-06-10T11:59:00", // 선택, 브라우저 시각
   "pageCode": "APPLICATION_FORM",    // 선택, max 80
   "httpStatus": 500,                 // 선택
-  "message": "Request failed",       // 선택, ^[A-Za-z0-9 _.:\\-]*$ max 200
+  "message": "API_REQUEST_FAILED",   // 선택, 대문자 safe code ^[A-Z][A-Z0-9_]{2,80}$
   "metadata": { "durationMs": 1250 } // 선택, eventType별 allowlist
 }</pre>
 
@@ -276,7 +276,7 @@
       <tbody>
         <tr><td><code>source=ADMIN_WEB</code></td><td>400</td><td>서비스 레벨 차단</td></tr>
         <tr class="row-even"><td>clientSessionId/EventId 형식 위반</td><td>400</td><td>@Pattern 검증</td></tr>
-        <tr><td>message safe code 위반 (한글/특수문자)</td><td>400</td><td>@Pattern 검증</td></tr>
+        <tr><td>message safe code 위반 (한글/영문 자유 문장/소문자/특수문자)</td><td>400</td><td>@Pattern 검증 (2차 리뷰 Major 2 강화)</td></tr>
         <tr class="row-even"><td>metadata allowlist 외 key</td><td>400</td><td>sanitizer</td></tr>
         <tr><td>metadata 금지 key (PII성)</td><td>400</td><td>2차 방어선</td></tr>
         <tr class="row-even"><td>metadata nested object/array</td><td>400</td><td>sanitizer</td></tr>
@@ -296,7 +296,7 @@
       <tbody>
         <tr><td><code>eventType / severity / source</code></td><td>@NotNull</td></tr>
         <tr class="row-even"><td><code>clientSessionId / clientEventId</code></td><td>@NotBlank + <code>^[A-Za-z0-9\-]{8,80}$</code></td></tr>
-        <tr><td><code>message</code></td><td>@Size(max=200) + <code>^[A-Za-z0-9 _.:\-]*$</code> — safe code만</td></tr>
+        <tr><td><code>message</code></td><td><code>^[A-Z][A-Z0-9_]{2,80}$</code> — 대문자 safe message code만. 영문 자유 문장(이름/회사명 등)도 400. FE는 표시 문구 대신 messageCode만 전송</td></tr>
         <tr class="row-even"><td>기타 문자열 필드</td><td>@Size(max=N) — 컬럼 길이 동일</td></tr>
       </tbody>
     </table>
@@ -309,7 +309,7 @@
       <li><b>metadata sanitize</b>: exact allowlist + 금지 key + value 타입/길이 검증</li>
       <li><b>서버 추출값 강제</b>: ip/ua/receivedAt/ingestCorrelationId는 서비스에서만 채움</li>
       <li><b>principalHash</b>: HMAC_SHA256(secret, "CLIENT_PRINCIPAL:"+username) — 원문 미저장</li>
-      <li><b>message 마스킹</b>: 7자리+ 연속 숫자 → <code>*</code></li>
+      <li><b>message 마스킹</b>: 7자리+ 연속 숫자 → <code>*</code> (검증 우회 경로 대비 2차 방어)</li>
       <li><b>routePath/apiPath</b>: query string(<code>?</code> 이후) 제거</li>
     </ul>
 
@@ -362,7 +362,7 @@
   <!-- 9. 테스트 결과 -->
   <section>
     <h2>9. 테스트 결과</h2>
-    <div class="ok"><b>전체 39건 성공</b> (scoped 실행 확인)</div>
+    <div class="ok"><b>전체 43건 성공</b> (scoped 실행 확인 — 2차 리뷰 Major 2 반영으로 controller 4건 추가)</div>
 
     <h3>테스트 명령</h3>
     <pre>AES_SECRET_KEY=22791194512954214612461221261067 \
@@ -382,9 +382,9 @@
         <tr class="row-even"><td><code>ClientEventMetadataSanitizerTest</code></td><td>단위</td><td>11</td><td><span class="badge b-green">통과</span></td></tr>
         <tr><td><code>ClientEventRateLimiterTest</code></td><td>단위</td><td>6</td><td><span class="badge b-green">통과</span></td></tr>
         <tr class="row-even"><td><code>ClientEventLogServiceTest</code></td><td>단위(Mock)</td><td>7</td><td><span class="badge b-green">통과</span></td></tr>
-        <tr><td><code>ClientEventLogControllerTest</code></td><td>@SpringBootTest</td><td>10</td><td><span class="badge b-green">통과</span></td></tr>
+        <tr><td><code>ClientEventLogControllerTest</code></td><td>@SpringBootTest</td><td>14</td><td><span class="badge b-green">통과</span></td></tr>
         <tr class="row-even"><td><code>ClientEventLogRateLimitControllerTest</code></td><td>@SpringBootTest (별도 ctx)</td><td>1</td><td><span class="badge b-green">통과</span></td></tr>
-        <tr><td><b>합계</b></td><td></td><td><b>39</b></td><td><span class="badge b-green">전체 통과</span></td></tr>
+        <tr><td><b>합계</b></td><td></td><td><b>43</b></td><td><span class="badge b-green">전체 통과</span></td></tr>
       </tbody>
     </table>
     <p class="muted">전체 회귀 테스트는 프로젝트 규칙(명시 요청 시에만)에 따라 미실행.</p>
@@ -401,6 +401,7 @@
         <li><b>sanitize 정규식 <code>\p{Cntrl}+</code></b>: 연속 제어문자를 공백 1개로 collapse하도록 <code>+</code> 추가(플랜 <code>\p{Cntrl}</code> 대비).</li>
         <li><b>ClientEventRateLimiter <code>@Autowired</code></b>: 다중 생성자 환경에서 Spring 주입 생성자 판단 실패 해결.</li>
         <li><b>엔티티 주석 보강</b>: <code>message</code>/<code>ipAddress</code>/<code>userAgent</code> 3개 필드 Javadoc 추가(Task 2 리뷰 반영).</li>
+        <li><b>message 패턴 강화(2차 리뷰 Major 2)</b>: 최초 패턴 <code>^[A-Za-z0-9 _.:\-]*$</code>는 영문 자유 문장(이름/회사명/주소성 문자열)을 통과시켜 "safe code" 계약보다 약했음. <code>^[A-Z][A-Z0-9_]{2,80}$</code> 대문자 코드 allowlist로 교체(리뷰 안 A). axios 기본 문구(<code>Request failed with status code 500</code>)도 정책상 거부 — HTTP 상태는 <code>httpStatus</code>/<code>errorCode</code> 필드로 전달. FE는 messageCode만 전송.</li>
       </ol>
     </div>
 
@@ -412,7 +413,7 @@
         <li><b>ipAddress/userAgent 원문 저장</b>: 조회 API(09f-3)에서 ROLE_PRIVACY_ADMIN 게이팅 예정.</li>
         <li><b>retention 미구현</b>: yaml 설정 블록만 존재, cleanup 로직은 09f-4.</li>
         <li><b>in-memory rate limiter</b>: 서버 재시작 시 초기화, 멀티 인스턴스 미공유. Redis 전환은 별도 phase.</li>
-        <li><b>reverse proxy 배치 시 ip 단 한계</b>: <code>getRemoteAddr()</code> 기반이라 proxy 뒤에서는 전 사용자가 proxy IP를 공유 — 1차 ip 한도(300/분)가 사이트 전체 상한이 됨. 운영 배치 시 <code>server.forward-headers-strategy=framework</code> 정렬 또는 ip 한도 환경변수 상향 필요.</li>
+        <li><b>reverse proxy 배치 시 ip 단 한계</b>: <code>getRemoteAddr()</code> 기반이라 proxy 뒤에서는 전 사용자가 proxy IP를 공유 — 1차 ip 한도(300/분)가 사이트 전체 상한이 됨. 운영 배치 시 <code>server.forward-headers-strategy=framework</code> 정렬 또는 trusted proxy 기준 <code>ForwardedHeaderFilter</code>/<code>X-Forwarded-For</code> 처리 정책을 별도 config로 명시(또는 ip 한도 환경변수 상향). 단 public endpoint이므로 임의 <code>X-Forwarded-For</code>를 무조건 신뢰하면 rate limit 우회가 가능 — 반드시 trusted proxy 목록 기준으로만 수용(2차 리뷰 Minor 1).</li>
       </ul>
     </div>
   </section>

@@ -50,7 +50,7 @@
   <div class="sub">
     신영증권 채용 Renewal 백엔드 · 구현 리포트 ·
     <span class="badge b-green">구현 완료</span>
-    <span class="badge b-green">테스트 통과 (60)</span>
+    <span class="badge b-green">테스트 통과 (66)</span>
     <span class="badge b-blue">Phase 09f 전체 완료</span>
     · 2026-06-11
   </div>
@@ -92,7 +92,7 @@
       <tr class="row-even"><th>신규 클래스</th><td>4종 (ClientEventLogCleanupService, SchedulingConfig, ClientEventLogCleanupScheduler, ClientEventLogCleanupResponse)</td></tr>
       <tr><th>수정 클래스</th><td>3종 (ClientEventLogRepository, AdminClientEventLogController, SecurityConfig)</td></tr>
       <tr class="row-even"><th>헤더 주석 정리</th><td>09f-1 파일 9개 — <code>// src/...</code> 경로 주석 제거(프로젝트 스타일 정렬)</td></tr>
-      <tr><th>테스트</th><td>09f-4 신규 4건(CleanupService 2 + Scheduler 2) + 기존 AdminController +2건 = 총 09f 60건 통과</td></tr>
+      <tr><th>테스트</th><td>09f-4 신규 4건(CleanupService 2 + Scheduler 2) + 기존 AdminController +2건 + 2차 리뷰 반영 6건(SchedulingConfigTest 2, ClientEventLogControllerTest +4) = 총 09f 66건 통과</td></tr>
     </table>
   </section>
 
@@ -185,6 +185,7 @@
       <tr><td><code>config/SchedulingConfig.java</code></td><td>신규 — @EnableScheduling 프로젝트 최초 도입</td></tr>
       <tr class="row-even"><td><code>service/ClientEventLogCleanupScheduler.java</code></td><td>신규 — @Scheduled(cron), 예외 무전파</td></tr>
       <tr><td><code>test/.../ClientEventLogCleanupSchedulerTest.java</code></td><td>신규 — 2건(Mock 단위 테스트)</td></tr>
+      <tr class="row-even"><td><code>test/.../config/SchedulingConfigTest.java</code></td><td>신규(2차 리뷰 Major 1) — @EnableScheduling 활성/cron 등록 검증 2건</td></tr>
     </table>
 
     <h3>커밋 cd8629f — cleanup 수동 트리거</h3>
@@ -293,7 +294,7 @@ DELETE FROM ClientEventLog c WHERE c.receivedAt &lt; threshold
   <!-- 7. 테스트 결과 -->
   <section>
     <h2>7. 테스트 결과</h2>
-    <div class="ok"><b>09f-4 신규 4건 + 기존 AdminController +2건 = 09f 전체 60건 통과</b> (scoped 실행). 회귀 AdminAuditControllerTest 10건 통과.</div>
+    <div class="ok"><b>09f-4 신규 4건 + 기존 AdminController +2건 + 2차 리뷰 반영 6건 = 09f 전체 66건 통과</b> (scoped 실행). 회귀 AdminAuditControllerTest 10건 통과.</div>
 
     <h3>ClientEventLogCleanupServiceTest (2건) — @SpringBootTest + @Transactional</h3>
     <table>
@@ -308,6 +309,14 @@ DELETE FROM ClientEventLog c WHERE c.receivedAt &lt; threshold
       <tr><td>정상_실행시_cleanup을_위임한다</td><td>mock cleanupService.cleanup() 호출 verify</td></tr>
       <tr class="row-even"><td>cleanup_실패는_로그만_남기고_전파하지_않는다</td><td>cleanup() throw → runCleanup() doesNotThrowAnyException</td></tr>
     </table>
+
+    <h3>SchedulingConfigTest (2건, 2차 리뷰 Major 1 반영) — @SpringBootTest</h3>
+    <table>
+      <tr><th>테스트명</th><th>검증 내용</th></tr>
+      <tr><td>스케줄링이_활성화되어_있다</td><td>ScheduledAnnotationBeanPostProcessor 빈 존재</td></tr>
+      <tr class="row-even"><td>cleanup_스케줄러의_cron_작업이_등록되어_있다</td><td>등록된 ScheduledTask 목록에 ClientEventLogCleanupScheduler 대상 작업 포함</td></tr>
+    </table>
+    <p class="muted">배경: @EnableScheduling이 빠지면 @Scheduled cron이 기동 오류 없이 조용히 미동작 — 누락 회귀를 컨텍스트 수준에서 고정.</p>
 
     <h3>AdminClientEventLogControllerTest (10건, 09f-3 8건 + 09f-4 신규 2건) — @SpringBootTest</h3>
     <table>
@@ -324,20 +333,21 @@ DELETE FROM ClientEventLog c WHERE c.receivedAt &lt; threshold
       <tr class="row-even"><td><b>RECRUIT_ADMIN은_cleanup을_트리거할_수_없다</b></td><td>ROLE_RECRUIT_ADMIN → POST cleanup → 403</td><td><span class="badge b-blue">09f-4 신규</span></td></tr>
     </table>
 
-    <h3>09f 전체 scoped 테스트 (60건)</h3>
+    <h3>09f 전체 scoped 테스트 (66건)</h3>
     <table>
       <tr><th>테스트 클래스</th><th>건수</th><th>슬라이스</th></tr>
       <tr><td>ClientEventLogRepositoryTest</td><td>5</td><td>09f-1/09f-3</td></tr>
       <tr class="row-even"><td>ClientEventMetadataSanitizerTest</td><td>11</td><td>09f-1</td></tr>
       <tr><td>ClientEventRateLimiterTest</td><td>6</td><td>09f-1</td></tr>
       <tr class="row-even"><td>ClientEventLogServiceTest</td><td>7</td><td>09f-1</td></tr>
-      <tr><td>ClientEventLogControllerTest</td><td>10</td><td>09f-1</td></tr>
+      <tr><td>ClientEventLogControllerTest</td><td>14</td><td>09f-1 (2차 리뷰 Major 2로 4건 추가)</td></tr>
       <tr class="row-even"><td>ClientEventLogRateLimitControllerTest</td><td>1</td><td>09f-1</td></tr>
       <tr><td>ClientEventLogReadServiceTest</td><td>6</td><td>09f-3</td></tr>
       <tr class="row-even"><td>AdminClientEventLogControllerTest</td><td>10</td><td>09f-3/09f-4</td></tr>
       <tr><td>ClientEventLogCleanupServiceTest</td><td>2</td><td>09f-4</td></tr>
       <tr class="row-even"><td>ClientEventLogCleanupSchedulerTest</td><td>2</td><td>09f-4</td></tr>
-      <tr><th>합계</th><th>60</th><td></td></tr>
+      <tr><td>SchedulingConfigTest</td><td>2</td><td>09f-4 (2차 리뷰 Major 1로 추가)</td></tr>
+      <tr><th>합계</th><th>66</th><td></td></tr>
     </table>
 
     <h3>실행 명령</h3>
@@ -347,6 +357,7 @@ DELETE FROM ClientEventLog c WHERE c.receivedAt &lt; threshold
   "--tests=com.shinyoung.recruit.service.ClientEvent*" `
   "--tests=com.shinyoung.recruit.controller.ClientEventLog*" `
   "--tests=com.shinyoung.recruit.controller.AdminClientEventLogControllerTest" `
+  "--tests=com.shinyoung.recruit.config.SchedulingConfigTest" `
   --no-daemon
 
 # 인접 회귀

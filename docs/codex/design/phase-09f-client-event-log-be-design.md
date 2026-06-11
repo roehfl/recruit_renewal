@@ -152,9 +152,9 @@
 
 **message는 자유 문자열로 받지 않는다(리뷰 Blocker 3, 권장안 A 채택)**:
 
-- message는 FE가 정의한 safe message code 또는 고정 영문 문구만 허용한다. 상세 원인 추적은 `errorCode`, `eventType`, `httpStatus`, `apiPath`, `relatedCorrelationId`로 한다.
-- BE 강제 규칙: 패턴 `^[A-Za-z0-9 _.:\-]{0,200}$`만 허용한다. 한글·`@`·기타 특수문자가 포함되면(지원자 이름/이메일 혼입 신호) `InvalidClientEventLogException` → 400. FE는 fire-and-forget이므로 사용자 영향 없다.
-- 패턴을 통과해도 7자리 이상 연속 숫자(하이픈 개입 포함)는 `*`로 마스킹한다 — 전화번호류 혼입 차단.
+- message는 FE가 정의한 safe message code만 허용한다. 상세 원인 추적은 `errorCode`, `eventType`, `httpStatus`, `apiPath`, `relatedCorrelationId`로 한다.
+- BE 강제 규칙(2차 리뷰 Major 2로 강화): 패턴 `^[A-Z][A-Z0-9_]{2,80}$`(대문자 코드)만 허용한다. 최초 패턴 `^[A-Za-z0-9 _.:\-]{0,200}$`는 영문 자유 문장(이름/회사명/주소성 문자열)을 통과시켜 "safe code" 계약보다 약했으므로 폐기. 한글·`@`는 물론 소문자 문장·axios 기본 문구(`Request failed with status code 500`)도 400. FE는 표시 문구 대신 messageCode(`API_REQUEST_FAILED` 등)만 전송한다. FE는 fire-and-forget이므로 사용자 영향 없다.
+- 패턴을 통과해도 7자리 이상 연속 숫자(하이픈 개입 포함)는 `*`로 마스킹한다 — 검증 우회 경로 대비 2차 방어.
 
 ### 6.4 ClientEventRateLimiter
 
@@ -316,7 +316,7 @@ client-event-log:
 - FE가 보낸 IP/User-Agent/principal 값은 무시한다.
 - `relatedCorrelationId`로 실패 업무 API의 `X-Request-Id`를 저장할 수 있다.
 - metadata는 eventType별 exact allowlist 외 key가 하나라도 있으면 400으로 거부된다. 금지 key 패턴은 2차 방어선으로 함께 적용된다.
-- message는 safe message code 패턴(`^[A-Za-z0-9 _.:\-]{0,200}$`)만 허용되고, 7자리 이상 연속 숫자는 마스킹된다.
+- message는 safe message code 패턴(`^[A-Z][A-Z0-9_]{2,80}$`, 2차 리뷰 Major 2로 강화)만 허용되고, 7자리 이상 연속 숫자는 마스킹된다.
 - stack/route/apiPath는 sanitize + truncate된다.
 - `(clientSessionId, clientEventId)` 중복은 중복 insert하지 않는다. race 충돌도 `saveAndFlush` + catch로 `duplicate=true` 성공 응답으로 흡수되며 409로 새지 않는다.
 - rate limit은 ip/ip+session/principal 3단으로 동작하고, 초과는 429로 거부되며 업무 API에 영향이 없다.
