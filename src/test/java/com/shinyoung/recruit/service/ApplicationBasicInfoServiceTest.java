@@ -197,6 +197,22 @@ class ApplicationBasicInfoServiceTest {
                 .isInstanceOf(InvalidJobApplicationException.class);
     }
 
+    @Test
+    void birth_date_exactly_14_is_accepted_and_one_day_short_is_rejected() {
+        Applicant applicant = createApplicant("bi-age-boundary", "AgeBoundary");
+        Long applicationId = createApplication(applicant);
+
+        // exactly 14 today (clock 2026-06-15) → accepted
+        BasicInfoResponse ok = basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
+                ageRequest(LocalDate.of(2012, 6, 15)));
+        assertThat(ok.persisted()).isTrue();
+
+        // 13 years 364 days (born one day later) → rejected
+        assertThatThrownBy(() -> basicInfoService.saveBasicInfo(
+                applicant.getId(), applicationId, ageRequest(LocalDate.of(2012, 6, 16))))
+                .isInstanceOf(InvalidJobApplicationException.class);
+    }
+
     // ---- fixtures ----
 
     private BasicInfoSaveRequest domesticRequest() {

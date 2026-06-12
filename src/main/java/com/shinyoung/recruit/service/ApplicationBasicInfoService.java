@@ -47,8 +47,10 @@ public class ApplicationBasicInfoService {
     public BasicInfoResponse saveBasicInfo(Long applicantId, Long applicationId, BasicInfoSaveRequest request) {
         JobApplication application = sectionAccessService.findOwnedApplication(applicantId, applicationId);
         sectionAccessService.validateWritable(application);
+        // Basic info is an always-required section (no ApplicationFormConfig flag), so there is no validateBasicInfoEnabled guard.
         validateRequest(request);
 
+        // Upsert mirrors ApplicationMilitaryService: create-on-first-save then update() applies request fields uniformly for both new and existing rows.
         ApplicationBasicInfo basicInfo = basicInfoRepository.findByJobApplicationId(applicationId)
                 .orElseGet(() -> basicInfoRepository.save(toBasicInfo(application, request)));
 
