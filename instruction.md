@@ -86,3 +86,25 @@
 - [ ] PDF header가 BasicInfo 존재 시 그 값을, 없으면 기존 fallback을 사용한다.
 - [ ] 파기 실행 시 basic_info 전 개인정보 컬럼이 null이 되고 read가 깨지지 않는다.
 - [ ] 신규/수정 테스트가 통과하고, 구현 문서(md)+HTML 리포트+이력+PII 인벤토리가 갱신된다.
+
+다음 내용도 참고하라.
+
+첫째, 관리자 endpoint path를 명시해라. 기존 컨트롤러 패턴상 /admin/applications/{applicationId}/military, /admin/applications/{applicationId}/answers 같은 구조다.
+따라서 BasicInfo도 아래처럼 고정하는 게 낫다.
+
+GET /admin/applications/{applicationId}/basic-info
+
+둘째, submit validator 호출 순서를 더 명확히 해라. 현재 기존 ApplicationSubmitValidator는 config null 검사를 먼저 하고 이후 섹션 검증을 한다.
+spec은 validate() 진입 직후 BasicInfo를 무조건 호출하라고 했으니, 구현자는 아래 순서로 처리하면 된다.
+
+Long applicationId = application.getId();
+validateBasicInfo(applicationId);
+
+ApplicationFormConfig config = application.getJobPosting().getApplicationFormConfig();
+if (config == null) {
+    throw ...
+}
+
+셋째, BasicInfo가 존재하지만 purge로 전부 null인 경우 PDF fallback을 쓰면 안 된다. spec의 “BasicInfo 존재 시 source of truth = BasicInfo” 원칙대로 가야 한다. 이걸 테스트명으로 박아두면 안전하다.
+
+PDF_BasicInfo_존재하지만_필드_null이면_Applicant로_fallback하지_않는다

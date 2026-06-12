@@ -178,8 +178,13 @@
 
 ### 7.4 관리자 조회 (A안)
 
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/admin/applications/{applicationId}/basic-info` | 관리자 기본정보 조회 |
+
+- 경로는 기존 관리자 섹션 패턴(`/admin/applications/{applicationId}/military`, `/admin/applications/{applicationId}/answers`)과 일관되게 고정.
 - `AdminBasicInfoResponse`(record) + `from(ApplicationBasicInfo)`.
-- `AdminApplicationSectionService`에 BasicInfo read 메서드 추가(다른 섹션과 동일 톤), `AdminApplicationSectionController`에 조회 엔드포인트 추가.
+- `AdminApplicationSectionService`에 BasicInfo read 메서드 추가(다른 섹션과 동일 톤), `AdminApplicationSectionController`에 위 엔드포인트 추가.
 - `ci`/`ciHash`/`password`는 절대 노출 금지(기존 PDF 정책 상속).
 
 ## 8. Validation & Business Rules
@@ -193,7 +198,15 @@
 6. upsert: `findByJobApplicationId().orElseGet(save(create))` 후 `update`
 
 ### 8.2 제출(`ApplicationSubmitValidator.validateBasicInfo`) — 항상 실행
-- `validate()` 진입 직후 무조건 호출(폼 설정 무관).
+- **호출 순서**: `validate()` 진입 직후, **config null 검사보다 먼저** `validateBasicInfo(applicationId)`를 호출. 즉:
+  ```java
+  Long applicationId = application.getId();
+  validateBasicInfo(applicationId);          // BasicInfo는 폼 설정 무관 항상 필수 → 최우선
+
+  ApplicationFormConfig config = application.getJobPosting().getApplicationFormConfig();
+  if (config == null) { throw ...; }
+  // 이하 기존 섹션 검증
+  ```
 - 존재 필수 + 필수 present(`nameKorean`,`birthDate`,`nationalityType`,`mobilePhone`,`email`,`veteranStatus`,`disabilityStatus`) + 조건부 present(FOREIGN⇒countryCode, disability SUBJECT⇒grade+type).
 - 주소·영문명·비상연락처는 제출 비필수.
 
@@ -234,7 +247,9 @@ int purgeBasicInfo(@Param("applicationId") Long applicationId);
 ## 10. PDF/export 스냅샷 배선 (M2)
 
 - `ApplicationPdfService.buildHeader()`는 현재 이름=snapshot, **휴대폰/email=live Applicant**. → 스냅샷 계약 미완성.
-- 보정: **`ApplicationBasicInfo` 존재 시 PDF header 이름/휴대폰/email source of truth = BasicInfo**. 없으면(레거시 지원서) 기존 fallback(snapshot name + Applicant phone/email) 유지 — 하위호환.
+- 보정: **`ApplicationBasicInfo` 존재 시 PDF header 이름/휴대폰/email source of truth = BasicInfo**.
+- **fallback 조건은 "BasicInfo row 부재"만**이다(레거시 지원서). **row가 존재하지만 파기로 전 필드 null인 경우 fallback 금지** — purge된 지원서가 PDF에서 live Applicant PII로 부활하면 안 된다. 즉 분기 기준은 "필드 null 여부"가 아니라 "row 존재 여부".
+  - 회귀 방지 테스트명: `PDF_BasicInfo_존재하지만_필드_null이면_Applicant로_fallback하지_않는다`
 - 구현 위치: `AdminApplicationSectionService`에 BasicInfo read를 추가(§7.4)하고 `ApplicationPdfService`가 이를 사용하도록 배선. 복호화는 컨버터가 투명 처리, `ci`/`password`는 미노출.
 - Excel export는 §4대로 audit 후 동일 정책.
 
@@ -268,7 +283,7 @@ int purgeBasicInfo(@Param("applicationId") Long applicationId);
 - 암호화 라운드트립 + 파기: 실제 값 저장 시 raw 컬럼 암호문(평문≠저장값)·read 복호화; `purgeBasicInfo` 후 raw 컬럼 null
 - 제출: 기본정보 누락/조건부 누락 시 제출 거부
 - 완성도: BASIC_INFO required group 반영(누락 시 미완료) — `ApplicationCompletionReadCheckerTest`/`ApplicationDashboardServiceTest`
-- 관리자/PDF: AdminBasicInfoResponse 조회, PDF header가 BasicInfo 우선 + 없을 때 fallback
+- 관리자/PDF: AdminBasicInfoResponse 조회, PDF header가 BasicInfo 우선 + row 부재 시에만 fallback + `PDF_BasicInfo_존재하지만_필드_null이면_Applicant로_fallback하지_않는다`
 - 명령: scoped 우선(`./gradlew test --tests "*BasicInfo*"` 등). 전체 `clean test`는 명시 요청 시에만, 보고에 실행 여부/사유 명시.
 
 ## 13. Remaining Issues
