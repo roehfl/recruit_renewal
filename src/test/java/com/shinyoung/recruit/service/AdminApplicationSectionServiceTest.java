@@ -489,6 +489,28 @@ class AdminApplicationSectionServiceTest {
                 .containsExactly(withdrawnStage.getId());
     }
 
+    @Test
+    void get_basic_info_returns_persisted_values() {
+        JobApplication application = createApplication("admin-section-basic-info");
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, application);
+
+        com.shinyoung.recruit.dto.response.AdminBasicInfoResponse response =
+                adminApplicationSectionService.getBasicInfo(application.getId());
+
+        assertThat(response).isNotNull();
+        assertThat(response.nameKorean()).isEqualTo("홍길동");
+    }
+
+    @Test
+    void get_basic_info_returns_null_when_absent() {
+        JobApplication application = createApplication("admin-section-basic-info-absent");
+
+        com.shinyoung.recruit.dto.response.AdminBasicInfoResponse response =
+                adminApplicationSectionService.getBasicInfo(application.getId());
+
+        assertThat(response).isNull();
+    }
+
     private JobApplication createApplication(String loginId) {
         Applicant applicant = createApplicant(loginId, loginId);
         Long jobPostingId = createPublishedJobPosting();

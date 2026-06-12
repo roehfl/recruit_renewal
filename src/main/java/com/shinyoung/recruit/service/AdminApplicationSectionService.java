@@ -11,6 +11,7 @@ import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
@@ -27,6 +28,7 @@ import com.shinyoung.recruit.dto.response.AdminApplicationAnswerResponse;
 import com.shinyoung.recruit.dto.response.AdminApplicationStageResultResponse;
 import com.shinyoung.recruit.dto.response.AdminAttachmentResponse;
 import com.shinyoung.recruit.dto.response.AdminAwardResponse;
+import com.shinyoung.recruit.dto.response.AdminBasicInfoResponse;
 import com.shinyoung.recruit.dto.response.AdminCareerItemResponse;
 import com.shinyoung.recruit.dto.response.AdminCareerResponse;
 import com.shinyoung.recruit.dto.response.AdminCertificateResponse;
@@ -51,6 +53,7 @@ import java.util.stream.Collectors;
 public class AdminApplicationSectionService {
 
     private final JobApplicationRepository jobApplicationRepository;
+    private final ApplicationBasicInfoRepository basicInfoRepository;
     private final ApplicationEducationRepository educationRepository;
     private final ApplicationEducationSemesterGradeRepository semesterGradeRepository;
     private final ApplicationCareerProfileRepository careerProfileRepository;
@@ -115,6 +118,13 @@ public class AdminApplicationSectionService {
                 .stream()
                 .map(AdminLanguageResponse::from)
                 .toList();
+    }
+
+    public AdminBasicInfoResponse getBasicInfo(Long applicationId) {
+        validateApplicationExists(applicationId);
+        return basicInfoRepository.findByJobApplicationId(applicationId)
+                .map(AdminBasicInfoResponse::from)
+                .orElse(null);
     }
 
     public AdminMilitaryResponse getMilitary(Long applicationId) {

@@ -4,6 +4,7 @@ import com.shinyoung.recruit.dto.response.AdminAttachmentResponse;
 import com.shinyoung.recruit.dto.response.AdminApplicationAnswerResponse;
 import com.shinyoung.recruit.dto.response.AdminApplicationStageResultResponse;
 import com.shinyoung.recruit.dto.response.AdminAwardResponse;
+import com.shinyoung.recruit.dto.response.AdminBasicInfoResponse;
 import com.shinyoung.recruit.dto.response.AdminCareerResponse;
 import com.shinyoung.recruit.dto.response.AdminCertificateResponse;
 import com.shinyoung.recruit.dto.response.AdminEducationResponse;
@@ -52,6 +53,13 @@ public class AdminApplicationSectionController {
             @PathVariable Long applicationId
     ) {
         return ResponseEntity.ok(ApiResponse.success(adminApplicationSectionService.getLanguages(applicationId)));
+    }
+
+    @GetMapping("/admin/applications/{applicationId}/basic-info")
+    public ResponseEntity<ApiResponse<AdminBasicInfoResponse>> getBasicInfo(
+            @PathVariable Long applicationId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(adminApplicationSectionService.getBasicInfo(applicationId)));
     }
 
     @GetMapping("/admin/applications/{applicationId}/military")
