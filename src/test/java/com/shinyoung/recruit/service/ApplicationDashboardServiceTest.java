@@ -2,6 +2,7 @@ package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
 import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
+import com.shinyoung.recruit.domain.entity.ApplicationBasicInfo;
 import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.ApplicationMilitary;
@@ -15,6 +16,7 @@ import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
@@ -26,6 +28,9 @@ import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingAttachmentRequirementRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
 import com.shinyoung.recruit.domain.repository.StageResultRepository;
+import com.shinyoung.recruit.enumeration.DisabilityStatus;
+import com.shinyoung.recruit.enumeration.NationalityType;
+import com.shinyoung.recruit.enumeration.VeteranStatus;
 import com.shinyoung.recruit.dto.response.ApplicationDashboardResponse;
 import com.shinyoung.recruit.dto.response.ApplicationSectionReadinessResponse;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
@@ -112,11 +117,15 @@ class ApplicationDashboardServiceTest {
     @Mock
     private ApplicationAttachmentRepository attachmentRepository;
 
+    @Mock
+    private ApplicationBasicInfoRepository basicInfoRepository;
+
     private ApplicationDashboardService dashboardService;
 
     @BeforeEach
     void setUp() {
         ApplicationCompletionReadChecker checker = new ApplicationCompletionReadChecker(
+                basicInfoRepository,
                 educationRepository,
                 careerProfileRepository,
                 careerRepository,
@@ -151,6 +160,9 @@ class ApplicationDashboardServiceTest {
                 .thenReturn(Optional.empty());
         lenient().when(militaryRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(Optional.empty());
+        // Default: BASIC_INFO absent (always-required group, will show as missing)
+        lenient().when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID))
+                .thenReturn(Optional.empty());
     }
 
     @Test
@@ -158,6 +170,7 @@ class ApplicationDashboardServiceTest {
         ApplicationFormConfig config = config(true, true, false, false, true, false, false);
         JobApplication application = application(JobApplicationStatus.DRAFT, acceptingPosting(config));
         stubDashboard(application);
+        when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
         when(educationRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(true);
         when(careerProfileRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(Optional.of(profile(CareerType.EXPERIENCED)));
@@ -176,8 +189,9 @@ class ApplicationDashboardServiceTest {
         assertThat(response.editable()).isTrue();
         assertThat(response.submittable()).isTrue();
         assertThat(response.withdrawable()).isFalse();
-        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(3);
-        assertThat(response.completionSummary().completedRequiredSectionCount()).isEqualTo(3);
+        // BASIC_INFO is now always a required group (+1): education + career + military + basic_info = 4
+        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(4);
+        assertThat(response.completionSummary().completedRequiredSectionCount()).isEqualTo(4);
         assertThat(response.completionSummary().requiredCompletionRate()).isEqualTo(100);
         assertThat(response.requiredMissingSections()).isEmpty();
     }
@@ -187,15 +201,17 @@ class ApplicationDashboardServiceTest {
         ApplicationFormConfig config = config(true, false, false, false, false, false, false);
         JobApplication application = application(JobApplicationStatus.DRAFT, acceptingPosting(config));
         stubDashboard(application);
+        when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
         when(educationRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(false);
 
         ApplicationDashboardResponse response = dashboardService.getDashboard(APPLICANT_ID, APPLICATION_ID);
 
         assertThat(response.editable()).isTrue();
         assertThat(response.submittable()).isFalse();
-        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(1);
-        assertThat(response.completionSummary().completedRequiredSectionCount()).isZero();
-        assertThat(response.completionSummary().requiredCompletionRate()).isZero();
+        // BASIC_INFO required + present = 1 completed; EDUCATION required + missing = 0 completed → 2 required total, 1 completed
+        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(2);
+        assertThat(response.completionSummary().completedRequiredSectionCount()).isEqualTo(1);
+        assertThat(response.completionSummary().requiredCompletionRate()).isEqualTo(50);
         assertThat(response.requiredMissingSections())
                 .extracting(ApplicationSectionReadinessResponse::sectionCode, ApplicationSectionReadinessResponse::reasonCode)
                 .containsExactly(org.assertj.core.groups.Tuple.tuple("EDUCATION", "MISSING_ROW"));
@@ -205,12 +221,14 @@ class ApplicationDashboardServiceTest {
     void missing_form_config_is_blocking() {
         JobApplication application = application(JobApplicationStatus.DRAFT, acceptingPosting(null));
         stubDashboard(application);
+        when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
 
         ApplicationDashboardResponse response = dashboardService.getDashboard(APPLICANT_ID, APPLICATION_ID);
 
         assertThat(response.editable()).isTrue();
         assertThat(response.submittable()).isFalse();
-        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(1);
+        // BASIC_INFO present (1 completed required) + FORM_CONFIG missing (1 incomplete required) = 2 required total
+        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(2);
         assertThat(response.completionSummary().submitBlockingIssueCount()).isEqualTo(1);
         assertThat(response.requiredMissingSections())
                 .extracting(ApplicationSectionReadinessResponse::sectionCode, ApplicationSectionReadinessResponse::reasonCode)
@@ -368,6 +386,7 @@ class ApplicationDashboardServiceTest {
     @Test
     void optional_empty_sections_are_not_blocking() {
         ApplicationFormConfig config = config(false, false, true, true, false, true, true);
+        when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
         ApplicationDashboardResponse response = dashboardFor(config);
 
         assertThat(response.submittable()).isTrue();
@@ -395,11 +414,14 @@ class ApplicationDashboardServiceTest {
                 false, false,
                 false, false
         );
+        when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
 
         ApplicationDashboardResponse response = dashboardFor(config);
 
         assertThat(response.submittable()).isTrue();
-        assertThat(response.completionSummary().requiredSectionCount()).isZero();
+        // BASIC_INFO is always required and present → 1 required, 1 completed (not blocking)
+        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(1);
+        assertThat(response.completionSummary().completedRequiredSectionCount()).isEqualTo(1);
         assertThat(response.completionSummary().optionalSectionCount()).isEqualTo(3);
         assertThat(response.optionalIncompleteSections())
                 .extracting(ApplicationSectionReadinessResponse::sectionCode)
@@ -420,11 +442,13 @@ class ApplicationDashboardServiceTest {
                 true, true,
                 true, true
         );
+        when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
 
         ApplicationDashboardResponse response = dashboardFor(config);
 
         assertThat(response.submittable()).isFalse();
-        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(4);
+        // BASIC_INFO present (completed) + 4 domain required sections missing = 5 required total
+        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(5);
         assertThat(response.requiredMissingSections())
                 .extracting(ApplicationSectionReadinessResponse::sectionCode, ApplicationSectionReadinessResponse::reasonCode)
                 .containsExactlyInAnyOrder(
@@ -454,13 +478,15 @@ class ApplicationDashboardServiceTest {
                 .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")));
         when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
                 .thenReturn(List.of(attachment(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, false)));
+        when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
 
         ApplicationDashboardResponse response = dashboardFor(config());
 
         assertThat(response.submittable()).isTrue();
         assertThat(response.requiredMissingSections()).isEmpty();
-        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(1);
-        assertThat(response.completionSummary().completedRequiredSectionCount()).isEqualTo(1);
+        // BASIC_INFO required + present, ATTACHMENT required + present = 2 required, 2 completed
+        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(2);
+        assertThat(response.completionSummary().completedRequiredSectionCount()).isEqualTo(2);
     }
 
     @Test
@@ -472,14 +498,16 @@ class ApplicationDashboardServiceTest {
                 ));
         when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
                 .thenReturn(List.of(attachment(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, false)));
+        when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
 
         ApplicationDashboardResponse response = dashboardFor(config());
 
         assertThat(response.submittable()).isTrue();
         assertThat(response.requiredMissingSections()).isEmpty();
         assertThat(response.optionalIncompleteSections()).isEmpty();
-        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(1);
-        assertThat(response.completionSummary().completedRequiredSectionCount()).isEqualTo(1);
+        // BASIC_INFO required + present, ATTACHMENT required + present = 2 required, 2 completed
+        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(2);
+        assertThat(response.completionSummary().completedRequiredSectionCount()).isEqualTo(2);
         assertThat(response.completionSummary().optionalSectionCount()).isZero();
         assertThat(response.completionSummary().optionalIncompleteCount()).isZero();
     }
@@ -504,6 +532,7 @@ class ApplicationDashboardServiceTest {
     void optional_attachment_min_count_zero_does_not_create_optional_issue() {
         when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(requirement(false, 0, AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, "Portfolio")));
+        when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
 
         ApplicationDashboardResponse response = dashboardFor(config());
 
@@ -516,6 +545,7 @@ class ApplicationDashboardServiceTest {
     void optional_attachment_min_count_positive_creates_non_blocking_issue() {
         when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(requirement(false, 1, AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, "Portfolio")));
+        when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
 
         ApplicationDashboardResponse response = dashboardFor(config());
 
@@ -657,6 +687,16 @@ class ApplicationDashboardServiceTest {
         lenient().when(config.isUseGapPeriod()).thenReturn(useGapPeriod);
         lenient().when(config.isRequireGapPeriod()).thenReturn(requireGapPeriod);
         return config;
+    }
+
+    private ApplicationBasicInfo validBasicInfo() {
+        return ApplicationBasicInfo.create(
+                mock(JobApplication.class),
+                "홍길동", null, NationalityType.DOMESTIC, null,
+                java.time.LocalDate.of(1995, 1, 1), "01012345678", null, "test@example.com",
+                VeteranStatus.NOT_SUBJECT, DisabilityStatus.NOT_SUBJECT,
+                null, null, null, null, null
+        );
     }
 
     private ApplicationCareerProfile profile(CareerType careerType) {

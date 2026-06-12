@@ -2,6 +2,7 @@ package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
 import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
+import com.shinyoung.recruit.domain.entity.ApplicationBasicInfo;
 import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.ApplicationMilitary;
@@ -11,6 +12,7 @@ import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
@@ -20,6 +22,8 @@ import com.shinyoung.recruit.domain.repository.ApplicationLanguageRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationMilitaryRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingAttachmentRequirementRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
+import com.shinyoung.recruit.enumeration.DisabilityStatus;
+import com.shinyoung.recruit.enumeration.NationalityType;
 import com.shinyoung.recruit.dto.response.ApplicationCompletionSummaryResponse;
 import com.shinyoung.recruit.dto.response.ApplicationSectionReadinessResponse;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
@@ -48,6 +52,7 @@ public class ApplicationCompletionReadChecker {
     private static final int SHORT_TEXT_MAX_LENGTH = 500;
     private static final int LONG_TEXT_MAX_LENGTH = 5000;
 
+    private static final String BASIC_INFO = "BASIC_INFO";
     private static final String EDUCATION = "EDUCATION";
     private static final String CAREER = "CAREER";
     private static final String MILITARY = "MILITARY";
@@ -59,6 +64,7 @@ public class ApplicationCompletionReadChecker {
     private static final String GAP_PERIOD = "GAP_PERIOD";
     private static final String ATTACHMENT = "ATTACHMENT";
 
+    private final ApplicationBasicInfoRepository basicInfoRepository;
     private final ApplicationEducationRepository educationRepository;
     private final ApplicationCareerProfileRepository careerProfileRepository;
     private final ApplicationCareerRepository careerRepository;
@@ -77,6 +83,7 @@ public class ApplicationCompletionReadChecker {
         ApplicationFormConfig config = application.getJobPosting().getApplicationFormConfig();
 
         ReadinessAccumulator accumulator = new ReadinessAccumulator();
+        checkBasicInfo(applicationId, accumulator);
         if (config == null) {
             accumulator.addRequiredGroup(FORM_CONFIG);
             accumulator.addRequiredIssue(item(
@@ -99,6 +106,34 @@ public class ApplicationCompletionReadChecker {
         checkAttachments(application, accumulator);
 
         return accumulator.toResult();
+    }
+
+    private void checkBasicInfo(Long applicationId, ReadinessAccumulator accumulator) {
+        accumulator.addRequiredGroup(BASIC_INFO);
+        ApplicationBasicInfo basicInfo = basicInfoRepository.findByJobApplicationId(applicationId).orElse(null);
+        if (basicInfo == null) {
+            accumulator.addRequiredIssue(item(BASIC_INFO, "Basic info", true, "MISSING_ROW",
+                    "Basic info section is required before submit."));
+            return;
+        }
+        boolean requiredMissing = isBlank(basicInfo.getNameKorean())
+                || basicInfo.getBirthDate() == null
+                || basicInfo.getNationalityType() == null
+                || isBlank(basicInfo.getMobilePhone())
+                || isBlank(basicInfo.getEmail())
+                || basicInfo.getVeteranStatus() == null
+                || basicInfo.getDisabilityStatus() == null
+                || (basicInfo.getNationalityType() == NationalityType.FOREIGN && isBlank(basicInfo.getCountryCode()))
+                || (basicInfo.getDisabilityStatus() == DisabilityStatus.SUBJECT
+                        && (isBlank(basicInfo.getDisabilityGradeCode()) || isBlank(basicInfo.getDisabilityTypeCode())));
+        if (requiredMissing) {
+            accumulator.addRequiredIssue(item(BASIC_INFO, "Basic info", true, "MISSING_REQUIRED_FIELD",
+                    "Basic info required fields are missing before submit."));
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private void checkEducation(ApplicationFormConfig config, Long applicationId, ReadinessAccumulator accumulator) {
