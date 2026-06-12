@@ -175,7 +175,42 @@ BINARY_DELETE_FAILED : 물리 삭제 실패(재시도/ reconciliation 대상)
 
 **`@Column(updatable=false)` 회피**: `createdBy` 는 JPQL/native bulk update 로만 클리어 가능(엔티티 dirty-update 안 됨).
 
-## 10. 판단 보류 / 확인 필요 항목
+## 10. ApplicationBasicInfo (Phase 10 추가)
+
+> Phase 10(기본정보 섹션) 구현 완료 후 추가. 근거 스캔: 2026-06-12, 실제 엔티티 소스 기준.
+
+**핵심 정책**: `AesCryptoUtil` 랜덤 IV(비결정적) → 암호화 컬럼에 `'__PURGED__'` 평문 치환 불가(복호화 시 깨짐). 전 PII 컬럼 `null` 파기. 파기 marker는 `JobApplication`이 보유, `application_basic_info` 행은 빈 shell로 보존.
+
+| 엔티티.필드 | nullable | 암호화 | 분류 | 처리 |
+| --- | --- | :---: | --- | --- |
+| `ApplicationBasicInfo.id` | false (PK) | - | KEEP_TOMBSTONE | 보존 |
+| `ApplicationBasicInfo.jobApplication` (FK) | false (UNIQUE) | - | KEEP_TOMBSTONE | 보존 |
+| `ApplicationBasicInfo.nameKorean` | true | ✔ AES | NULLIFY | null |
+| `ApplicationBasicInfo.nameEnglish` | true | ✔ AES | NULLIFY | null |
+| `ApplicationBasicInfo.nationalityType` | true | - | NULLIFY | null (enum) |
+| `ApplicationBasicInfo.countryCode` | true | ✔ AES | NULLIFY | null |
+| `ApplicationBasicInfo.birthDate` | true | - | NULLIFY | null (LocalDate) |
+| `ApplicationBasicInfo.mobilePhone` | true | ✔ AES | NULLIFY | null |
+| `ApplicationBasicInfo.emergencyPhone` | true | ✔ AES | NULLIFY | null |
+| `ApplicationBasicInfo.email` | true | ✔ AES | NULLIFY | null |
+| `ApplicationBasicInfo.veteranStatus` | true | - | NULLIFY | null (enum) |
+| `ApplicationBasicInfo.disabilityStatus` | true | - | NULLIFY | null (enum, 민감정보) |
+| `ApplicationBasicInfo.disabilityGradeCode` | true | ✔ AES | NULLIFY | null (민감정보) |
+| `ApplicationBasicInfo.disabilityTypeCode` | true | ✔ AES | NULLIFY | null (민감정보) |
+| `ApplicationBasicInfo.zipCode` | true | ✔ AES | NULLIFY | null |
+| `ApplicationBasicInfo.addressBasic` | true | ✔ AES | NULLIFY | null |
+| `ApplicationBasicInfo.addressDetail` | true | ✔ AES | NULLIFY | null |
+| `ApplicationBasicInfo.createdBy` | true | - | NULLIFY | null (JPQL bulk update — `@Column(updatable=false)` 우회) |
+| `ApplicationBasicInfo.updatedBy` | true | - | NULLIFY | null |
+| `ApplicationBasicInfo.createdAt` | false | - | KEEP_TOMBSTONE | 보존 |
+| `ApplicationBasicInfo.updatedAt` | false | - | KEEP_TOMBSTONE | 보존 |
+
+**특이사항**:
+- 전 필드 nullable(DB NOT NULL은 FK만) → `PLACEHOLDER` 없음. DDL 변경 불필요.
+- 암호화 컬럼은 AES 랜덤 IV 특성상 `'__PURGED__'` 치환 불가 → `NULLIFY`만.
+- 파기 쿼리: `ApplicationPiiPurgeRepository.purgeBasicInfo(@Modifying flushAutomatically=true)` JPQL bulk update.
+
+## 12. 판단 보류 / 확인 필요 항목
 
 - **날짜 일반화 — 안 A 확정(리뷰 3차 #3)**: education(admission/graduation)·career(start/end) 정확 날짜는 **전부 NULLIFY, 일반화 컬럼 추가 없음**. 근거: 현 funnel 통계가 이 날짜들을 안 쓴다 → 통계 손실 0. 가역적(향후 졸업연도/근속 통계 필요 시 안 B 의 nullable 컬럼 추가). "통계 편의" 보다 "재식별 제거" 우선.
 - **`ciHash` — 해소(리뷰 2차 #1)**: 보존 금지. ref0 파기 시 `"PURGED:"+UUID` 로 overwrite(권장안 A). 중복가입 차단은 파기 후 미보장(파기 우선).
@@ -184,6 +219,6 @@ BINARY_DELETE_FAILED : 물리 삭제 실패(재시도/ reconciliation 대상)
 - **`Interview.memo` 잔존**: §7 flag — Phase 9 범위 밖(group 공유 행). 운영 가이드(실명 금지) 또는 후속 정리. **확인 필요.**
 - **StageResult comment 계열 — 해소(9d-1 리뷰 Major 1)**: §7-1 로 분류 확정 + 9d-1 tombstone 에 포함 구현.
 
-## 11. 9d 착수 게이트
+## 13. 9d 착수 게이트
 
 본 인벤토리(특히 §9 DDL 목록, §10 확인 항목)가 **확정**되어야 9d-1/9d-2 구현을 시작한다. ADR-0005 는 본 인벤토리 확정 전까지 `accepted-with-implementation-gate`.

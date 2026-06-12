@@ -1,5 +1,36 @@
 # 07. Implementation History
 
+## 2026-06-12 - Phase 10 ApplicationBasicInfo (지원자 기본정보 섹션) 구현 완료
+
+- Date: 2026-06-12
+- Work type: implementation. 지원서 기본정보 섹션 전체 수직 슬라이스 (11개 커밋 `76793f8` … `98d33b9`).
+- Scope: 신규 도메인 엔티티 + 지원자/관리자 API + 제출·완성도·PDF·파기 통합 배선.
+- Implemented:
+  - **Enum 3종**: `NationalityType`(DOMESTIC/FOREIGN), `VeteranStatus`(SUBJECT/NOT_SUBJECT), `DisabilityStatus`(SUBJECT/NOT_SUBJECT).
+  - **엔티티 `ApplicationBasicInfo`**: `JobApplication` 1:1 @OneToOne(LAZY) unique, 모든 문자열 PII(`nameKorean`, `nameEnglish`, `countryCode`, `mobilePhone`, `emergencyPhone`, `email`, `disabilityGradeCode`, `disabilityTypeCode`, `zipCode`, `addressBasic`, `addressDetail`) `AesAttributeConverter` at-rest 암호화. enum(`nationalityType`, `veteranStatus`, `disabilityStatus`)·`birthDate` 평문. DB NOT NULL은 FK만. static create + update 메서드.
+  - **`ApplicationBasicInfoRepository`**: `findByJobApplicationId`, `existsByJobApplicationId`.
+  - **`ApplicationBasicInfoService`**: 조회+prefill(Applicant 기반, persisted=false)+upsert+조건부 검증(국적/장애/나이 만14~100세/전화 `^[0-9-]{9,20}$`). `CommonCodeRepository.existsByGroupCodeAndCodeAndActiveTrue` 활성 코드 검증.
+  - **`ApplicationBasicInfoController`**: `GET /applications/{applicationId}/basic-info` (persisted/prefill), `POST /applications/{applicationId}/basic-info` (upsert).
+  - **DTOs**: `BasicInfoSaveRequest`(record, Bean Validation), `BasicInfoResponse`(of+prefill), `AdminBasicInfoResponse`(from).
+  - **`CommonCodeRepository.existsByGroupCodeAndCodeAndActiveTrue`**: 활성 코드 파생 쿼리 추가.
+  - **`ApplicationSubmitValidator.validateBasicInfo`**: `ApplicationFormConfig` 검사보다 최우선 항상 실행. 필수 7개 필드 + 조건부 검증.
+  - **`ApplicationCompletionReadChecker` BASIC_INFO 그룹**: config 무관 항상 필수 그룹 등록. checkBasicInfo 추가.
+  - **관리자 API**: `AdminApplicationSectionService.getBasicInfo` + `AdminApplicationSectionController GET /admin/applications/{applicationId}/basic-info`. 장애 등급·유형 포함(민감정보, 관리자 전용).
+  - **PDF 스냅샷 배선**: `ApplicationPdfService.buildHeader` — BasicInfo 행 존재 시 이름/휴대폰/이메일 source of truth = BasicInfo. 행 부재 시에만 fallback. 파기 후 필드 null이어도 fallback 금지(회귀 방지 테스트 포함).
+  - **파기**: `ApplicationPiiPurgeRepository.purgeBasicInfo`(전 PII 컬럼 + createdBy/updatedBy null, JPQL bulk update), `ApplicationPiiPurgeService.purgeRelationalPii` 첫 번째 호출.
+- APIs:
+  - `GET /applications/{applicationId}/basic-info` — 지원자(본인), `BasicInfoResponse`
+  - `POST /applications/{applicationId}/basic-info` — 지원자(본인), upsert
+  - `GET /admin/applications/{applicationId}/basic-info` — 관리자, `AdminBasicInfoResponse`
+- Business rules: FOREIGN→countryCode 필수+활성 NATIONALITY 코드; DOMESTIC→countryCode 금지; SUBJECT→grade+type 필수+활성 코드; 나이 만 14~100세(Clock); 전화 숫자·하이픈 9~20자; 제출 최우선; PDF row-based source; 파기 null-only(AES 랜덤 IV).
+- Tests: scoped 실행 — `ApplicationBasicInfoEncryptionTest`(1) · `ApplicationBasicInfoServiceTest`(11) · `ApplicationBasicInfoControllerTest`(4) · `ApplicationSubmitValidatorBasicInfoTest`(2) · `ApplicationCompletionReadCheckerTest`(보강) · `ApplicationPdfServiceTest`(+3) · `ApplicationPiiPurgeServiceTest`(보강). 전체 `clean test` 는 로컬 타임아웃으로 미실행.
+- Documentation:
+  - `docs/codex/implementation/phase-10-application-basic-info.md`
+  - `docs/codex/reports/phase-10-application-basic-info.html`
+  - `docs/codex/implementation/phase-09-pii-field-inventory.md` — §10 ApplicationBasicInfo 섹션 추가 (전 필드 NULLIFY)
+- Deferred: 증명사진(PHOTO) 첨부, CommonCode 시드 데이터, Excel export BasicInfo 반영, 전화번호 normalize.
+- Notes: `addressBasic/addressDetail` 컬럼 length 스펙 1000 vs 구현 2000 (widen 커밋 `8fc642f`). 운영 DDL 시 2000 기준.
+
 ## 2026-06-11 - Phase 09f 3차 리뷰 반영 (Minor — service message 검증)
 
 - Date: 2026-06-11

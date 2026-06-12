@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 10 — ApplicationBasicInfo 구현 리포트</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; color: #1a1a2e; line-height: 1.6; }
+  .page { max-width: 1060px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  /* ── Header ── */
+  .report-header { background: #1a1a2e; color: #fff; border-radius: 10px; padding: 32px; margin-bottom: 28px; }
+  .report-header h1 { font-size: 1.6rem; margin-bottom: 6px; }
+  .report-header .meta { font-size: 0.85rem; color: #a0aec0; margin-top: 10px; }
+  .badge { display: inline-block; border-radius: 4px; padding: 2px 10px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
+  .badge-done    { background: #276749; color: #c6f6d5; }
+  .badge-blue    { background: #2b4590; color: #bee3f8; }
+  .badge-gray    { background: #4a5568; color: #e2e8f0; }
+  .badge-red     { background: #742a2a; color: #fed7d7; }
+  .badge-amber   { background: #744210; color: #fefcbf; }
+  .badge-purple  { background: #44337a; color: #e9d8fd; }
+
+  /* ── Section titles ── */
+  h2 { font-size: 1.15rem; font-weight: 700; margin: 32px 0 14px; padding-bottom: 6px; border-bottom: 2px solid #e2e8f0; color: #2d3748; }
+  h3 { font-size: 0.97rem; font-weight: 600; margin: 20px 0 8px; color: #4a5568; }
+
+  /* ── Cards ── */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 4px; }
+  .card { background: #fff; border-radius: 8px; border: 1px solid #e2e8f0; padding: 18px 20px; }
+  .card h3 { margin-top: 0; color: #2d3748; }
+  .card ul { margin: 10px 0 0 16px; }
+  .card li { font-size: 0.88rem; margin-bottom: 4px; }
+  .card-done { border-left: 4px solid #48bb78; }
+  .card-oos   { border-left: 4px solid #fc8181; }
+  .card-defer { border-left: 4px solid #f6ad55; }
+
+  /* ── Summary block ── */
+  .summary { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 18px 22px; margin-bottom: 24px; font-size: 0.92rem; }
+  .summary p { margin-bottom: 6px; }
+  .summary p:last-child { margin-bottom: 0; }
+
+  /* ── Tables ── */
+  table { width: 100%; border-collapse: collapse; font-size: 0.86rem; margin-bottom: 4px; }
+  th { background: #edf2f7; color: #4a5568; font-weight: 600; text-align: left; padding: 9px 12px; border-bottom: 2px solid #cbd5e0; }
+  td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: #f7fafc; }
+  code { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 0.82rem; background: #edf2f7; padding: 1px 5px; border-radius: 3px; }
+
+  /* ── Warning block ── */
+  .warning { background: #fffbeb; border: 1px solid #f6e05e; border-radius: 8px; padding: 14px 18px; font-size: 0.88rem; margin-bottom: 12px; }
+  .warning strong { color: #744210; }
+
+  /* ── Issue list ── */
+  .issue-list { margin: 0 0 0 18px; }
+  .issue-list li { font-size: 0.88rem; margin-bottom: 6px; }
+
+  /* ── Privacy note ── */
+  .privacy-note { background: #fff5f5; border: 1px solid #fed7d7; border-radius: 8px; padding: 12px 16px; font-size: 0.85rem; margin-bottom: 14px; color: #742a2a; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══════════ HEADER ══════════ -->
+  <div class="report-header">
+    <h1>Phase 10 — ApplicationBasicInfo (지원자 기본정보 섹션)</h1>
+    <div>
+      <span class="badge badge-done">구현 완료</span>
+      &nbsp;
+      <span class="badge badge-blue">Vertical Slice</span>
+      &nbsp;
+      <span class="badge badge-purple">PII / AES</span>
+    </div>
+    <div class="meta">
+      프로젝트: 신영증권 채용 Renewal 백엔드 &nbsp;|&nbsp;
+      작성일: 2026-06-12 &nbsp;|&nbsp;
+      커밋 범위: <code>76793f8</code> … <code>98d33b9</code> (11개 커밋)
+    </div>
+  </div>
+
+  <!-- ══════════ EXECUTIVE SUMMARY ══════════ -->
+  <h2>Executive Summary</h2>
+  <div class="summary">
+    <p>지원서 작성 중 입력하는 지원자 기본정보(이름·생년월일·국적·연락처·이메일·보훈·장애·주소)를 지원서별 1:1 섹션 엔티티 <code>ApplicationBasicInfo</code>로 저장·조회한다.</p>
+    <p>모든 문자열 PII는 <code>AesAttributeConverter</code>로 at-rest 암호화한다. DB NOT NULL 제약은 FK(<code>job_application_id</code>)만이며, 파기(Purge) 시 전 PII 컬럼을 <code>null</code>로 처리한다.</p>
+    <p>제출 검증(항상 최우선), 완성도 체커(BASIC_INFO 필수 그룹), 관리자 조회 API, PDF 스냅샷 배선(BasicInfo source of truth), 파기 saga 편입까지 전체 수직 슬라이스가 완료됐다.</p>
+    <p>테스트는 scoped 실행으로 검증 완료. 전체 테스트 스위트는 로컬 환경 타임아웃으로 미실행.</p>
+    <p><strong>다음 단계로 진행 가능.</strong> 증명사진(PHOTO)·CommonCode 시드·Excel export 배선은 후속 슬라이스.</p>
+  </div>
+
+  <!-- ══════════ SCOPE CARDS ══════════ -->
+  <h2>Scope</h2>
+  <div class="card-grid">
+    <div class="card card-done">
+      <h3><span class="badge badge-done">완료</span> 구현된 항목</h3>
+      <ul>
+        <li>엔티티 <code>ApplicationBasicInfo</code> (AES 암호화)</li>
+        <li>Enum 3종: NationalityType / VeteranStatus / DisabilityStatus</li>
+        <li><code>ApplicationBasicInfoRepository</code></li>
+        <li><code>ApplicationBasicInfoService</code> (upsert + prefill + 조건부 검증)</li>
+        <li><code>ApplicationBasicInfoController</code> GET/POST</li>
+        <li>DTO 3종: Request / Response / AdminResponse</li>
+        <li><code>CommonCodeRepository</code> 활성 코드 검증 메서드</li>
+        <li>제출 검증 — 항상 최우선 실행</li>
+        <li>완성도 체커 — BASIC_INFO 필수 그룹</li>
+        <li>관리자 조회 API (AdminApplicationSectionController)</li>
+        <li>PDF header BasicInfo source of truth 배선</li>
+        <li>파기 saga — 전 PII 컬럼 null</li>
+        <li>scoped 단위 테스트 (암호화·서비스·컨트롤러·제출·파기·완성도·PDF)</li>
+      </ul>
+    </div>
+    <div class="card card-oos">
+      <h3><span class="badge badge-red">범위 밖</span> 미구현 (Out of Scope)</h3>
+      <ul>
+        <li>증명사진(PHOTO) 업로드 — 후속 슬라이스</li>
+        <li>CommonCode 시드 데이터 (국가·장애 코드) — 운영 별도 등록</li>
+        <li>Excel export BasicInfo 반영 — audit 후 결정</li>
+        <li>전화번호 normalize — 후속 정책</li>
+      </ul>
+    </div>
+    <div class="card card-defer">
+      <h3><span class="badge badge-amber">알려진 이슈</span> 이월·주의</h3>
+      <ul>
+        <li>전체 테스트 스위트 타임아웃 (로컬 환경)</li>
+        <li><code>addressBasic/addressDetail</code> 스펙 1000 vs 구현 2000</li>
+        <li>CommonCode 그룹코드 최종 확정 필요</li>
+        <li>장애 정보는 민감정보 — 관리자 전용</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ══════════ ARCHITECTURE / DOMAIN ══════════ -->
+  <h2>Architecture / Domain</h2>
+  <h3>Entity 관계</h3>
+  <table>
+    <thead><tr><th>관계</th><th>설명</th></tr></thead>
+    <tbody>
+      <tr><td><code>JobApplication</code> 1 — 1 <code>ApplicationBasicInfo</code></td><td>FK <code>job_application_id</code> UNIQUE NOT NULL. 지원서별 1:1 스냅샷.</td></tr>
+      <tr><td><code>ApplicationBasicInfo</code> → <code>BaseEntity</code></td><td><code>createdAt</code>, <code>updatedAt</code>, <code>createdBy</code>, <code>updatedBy</code> 상속. 파기 시 createdBy/updatedBy도 null.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>핵심 클래스</h3>
+  <table>
+    <thead><tr><th>클래스</th><th>유형</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td><code>ApplicationBasicInfo</code></td><td><span class="badge badge-blue">Entity</span></td><td>기본정보 스냅샷. 문자열 PII는 AES 암호화. static create / update.</td></tr>
+      <tr><td><code>NationalityType</code></td><td><span class="badge badge-gray">Enum</span></td><td>DOMESTIC / FOREIGN</td></tr>
+      <tr><td><code>VeteranStatus</code></td><td><span class="badge badge-gray">Enum</span></td><td>SUBJECT / NOT_SUBJECT</td></tr>
+      <tr><td><code>DisabilityStatus</code></td><td><span class="badge badge-gray">Enum</span></td><td>SUBJECT / NOT_SUBJECT</td></tr>
+      <tr><td><code>ApplicationBasicInfoRepository</code></td><td><span class="badge badge-blue">Repository</span></td><td>findByJobApplicationId / existsByJobApplicationId</td></tr>
+      <tr><td><code>ApplicationBasicInfoService</code></td><td><span class="badge badge-blue">Service</span></td><td>upsert + prefill + 조건부 검증 (국적/장애/나이/전화)</td></tr>
+      <tr><td><code>ApplicationBasicInfoController</code></td><td><span class="badge badge-blue">Controller</span></td><td>지원자 GET/POST</td></tr>
+      <tr><td><code>BasicInfoSaveRequest</code></td><td><span class="badge badge-purple">Request DTO</span></td><td>record, Bean Validation, 국적·장애 코드는 서비스 조건부</td></tr>
+      <tr><td><code>BasicInfoResponse</code></td><td><span class="badge badge-purple">Response DTO</span></td><td>persisted 플래그, of / prefill 팩토리</td></tr>
+      <tr><td><code>AdminBasicInfoResponse</code></td><td><span class="badge badge-purple">Response DTO</span></td><td>관리자 전용, from 팩토리. 장애 정보 포함(민감정보).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>암호화 필드 (AES at-rest)</h3>
+  <div class="privacy-note">
+    아래 필드들은 DB에 AES 암호문으로 저장됩니다. 실제 값·복호화 결과는 이 문서에 표시하지 않습니다. 민감정보(장애 등급·유형)는 관리자 엔드포인트에서만 접근 가능합니다.
+  </div>
+  <table>
+    <thead><tr><th>필드</th><th>컬럼 length (암호문 기준)</th><th>필수(저장)</th><th>파기</th></tr></thead>
+    <tbody>
+      <tr><td><code>nameKorean</code></td><td>500</td><td>필수</td><td>null</td></tr>
+      <tr><td><code>nameEnglish</code></td><td>500</td><td>선택</td><td>null</td></tr>
+      <tr><td><code>countryCode</code></td><td>500</td><td>FOREIGN 시 필수</td><td>null</td></tr>
+      <tr><td><code>mobilePhone</code></td><td>500</td><td>필수</td><td>null</td></tr>
+      <tr><td><code>emergencyPhone</code></td><td>500</td><td>선택</td><td>null</td></tr>
+      <tr><td><code>email</code></td><td>500</td><td>필수</td><td>null</td></tr>
+      <tr><td><code>disabilityGradeCode</code></td><td>500</td><td>SUBJECT 시 필수</td><td>null</td></tr>
+      <tr><td><code>disabilityTypeCode</code></td><td>500</td><td>SUBJECT 시 필수</td><td>null</td></tr>
+      <tr><td><code>zipCode</code></td><td>500</td><td>선택</td><td>null</td></tr>
+      <tr><td><code>addressBasic</code></td><td>2000</td><td>선택</td><td>null</td></tr>
+      <tr><td><code>addressDetail</code></td><td>2000</td><td>선택</td><td>null</td></tr>
+    </tbody>
+  </table>
+  <h3>평문 필드</h3>
+  <table>
+    <thead><tr><th>필드</th><th>타입</th><th>필수(저장)</th><th>파기</th></tr></thead>
+    <tbody>
+      <tr><td><code>id</code></td><td>Long (PK)</td><td>—</td><td>유지</td></tr>
+      <tr><td><code>jobApplication</code> (FK)</td><td>@OneToOne LAZY, NOT NULL UNIQUE</td><td>—</td><td>유지</td></tr>
+      <tr><td><code>nationalityType</code></td><td>NationalityType enum</td><td>필수</td><td>null</td></tr>
+      <tr><td><code>veteranStatus</code></td><td>VeteranStatus enum</td><td>필수</td><td>null</td></tr>
+      <tr><td><code>disabilityStatus</code></td><td>DisabilityStatus enum</td><td>필수</td><td>null</td></tr>
+      <tr><td><code>birthDate</code></td><td>LocalDate</td><td>필수</td><td>null</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ══════════ API LIST ══════════ -->
+  <h2>API List</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Method</th><th>Path</th><th>대상</th><th>요청 바디</th><th>응답</th><th>권한</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/applications/{applicationId}/basic-info</code></td>
+        <td>지원자</td>
+        <td>—</td>
+        <td><code>ApiResponse&lt;BasicInfoResponse&gt;</code></td>
+        <td>지원자(본인)</td>
+      </tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/applications/{applicationId}/basic-info</code></td>
+        <td>지원자</td>
+        <td><code>BasicInfoSaveRequest</code></td>
+        <td><code>ApiResponse&lt;BasicInfoResponse&gt;</code></td>
+        <td>지원자(본인)</td>
+      </tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/admin/applications/{applicationId}/basic-info</code></td>
+        <td>관리자</td>
+        <td>—</td>
+        <td><code>ApiResponse&lt;AdminBasicInfoResponse&gt;</code></td>
+        <td>관리자</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>GET /applications/{applicationId}/basic-info 응답 구조</h3>
+  <table>
+    <thead><tr><th>케이스</th><th>persisted</th><th>basicInfoId</th><th>데이터 소스</th></tr></thead>
+    <tbody>
+      <tr><td>행 있음</td><td><code>true</code></td><td>행의 id</td><td>저장된 BasicInfo</td></tr>
+      <tr><td>행 없음</td><td><code>false</code></td><td><code>null</code></td><td>Applicant prefill (nameKorean←userName, mobilePhone←phoneNumber, email←email, 나머지 null)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ══════════ VALIDATION / POLICY ══════════ -->
+  <h2>Validation &amp; Business Rules</h2>
+
+  <h3>저장 시 검증 순서</h3>
+  <table>
+    <thead><tr><th>순서</th><th>검증</th><th>실패 응답</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>소유 검증 — 본인 지원서만 접근</td><td>403/404</td></tr>
+      <tr><td>2</td><td>쓰기 가능 — DRAFT/PUBLISHED + 접수 기간</td><td>400</td></tr>
+      <tr><td>3</td><td>FOREIGN → countryCode 필수 + 활성 NATIONALITY 코드</td><td>400</td></tr>
+      <tr><td>3</td><td>DOMESTIC → countryCode 금지</td><td>400</td></tr>
+      <tr><td>4</td><td>SUBJECT → disabilityGradeCode + disabilityTypeCode 필수 + 활성 코드</td><td>400</td></tr>
+      <tr><td>4</td><td>NOT_SUBJECT → 두 코드 모두 금지</td><td>400</td></tr>
+      <tr><td>5</td><td>birthDate → 만 14세 이상 ~ 만 100세 이하 (Clock 기준)</td><td>400</td></tr>
+      <tr><td>6</td><td>mobilePhone 필수, 숫자·하이픈만, 9~20자 (<code>^[0-9-]{9,20}$</code>)</td><td>400</td></tr>
+      <tr><td>6</td><td>emergencyPhone 선택, 입력 시 동일 형식</td><td>400</td></tr>
+    </tbody>
+  </table>
+
+  <h3>제출 검증 (ApplicationSubmitValidator)</h3>
+  <table>
+    <thead><tr><th>규칙</th><th>설명</th></tr></thead>
+    <tbody>
+      <tr><td>항상 최우선 실행</td><td>ApplicationFormConfig 존재 여부 무관 — validate() 진입 직후 validateBasicInfo() 호출</td></tr>
+      <tr><td>필수 7개 필드</td><td>nameKorean, birthDate, nationalityType, mobilePhone, email, veteranStatus, disabilityStatus</td></tr>
+      <tr><td>조건부</td><td>FOREIGN → countryCode, SUBJECT → disabilityGradeCode + disabilityTypeCode</td></tr>
+      <tr><td>비필수(제출)</td><td>nameEnglish, emergencyPhone, zipCode, addressBasic, addressDetail</td></tr>
+    </tbody>
+  </table>
+
+  <h3>PDF 스냅샷 정책</h3>
+  <table>
+    <thead><tr><th>조건</th><th>이름/휴대폰/이메일 소스</th></tr></thead>
+    <tbody>
+      <tr><td>BasicInfo 행 존재 (필드 null이어도)</td><td>BasicInfo 값 (파기 후 null 그대로)</td></tr>
+      <tr><td>BasicInfo 행 없음 (레거시 지원서)</td><td>applicantNameSnapshot / applicant.phoneNumber / applicant.email fallback</td></tr>
+    </tbody>
+  </table>
+
+  <h3>파기 (Purge)</h3>
+  <div class="warning">
+    <strong>보안 정책:</strong> AES 랜덤 IV(비결정적) → 암호화 컬럼에 <code>'__PURGED__'</code> 평문 치환 불가(복호화 시 깨짐). 전 PII 컬럼 <code>null</code> 처리. 파기 후 행 자체는 보존(파기 marker = JobApplication).
+  </div>
+  <table>
+    <thead><tr><th>처리 방식</th><th>대상 컬럼</th></tr></thead>
+    <tbody>
+      <tr><td><code>NULLIFY</code> (전부)</td><td>nameKorean, nameEnglish, email, mobilePhone, emergencyPhone, birthDate, nationalityType, countryCode, veteranStatus, disabilityStatus, disabilityGradeCode, disabilityTypeCode, zipCode, addressBasic, addressDetail, createdBy, updatedBy</td></tr>
+      <tr><td>유지 (KEEP)</td><td>id, jobApplication (FK), createdAt, updatedAt</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ══════════ CHANGED FILES ══════════ -->
+  <h2>Changed Files</h2>
+  <h3>신규 파일</h3>
+  <table>
+    <thead><tr><th>파일</th><th>유형</th></tr></thead>
+    <tbody>
+      <tr><td><code>domain/entity/ApplicationBasicInfo.java</code></td><td><span class="badge badge-blue">Entity</span></td></tr>
+      <tr><td><code>enumeration/NationalityType.java</code></td><td><span class="badge badge-gray">Enum</span></td></tr>
+      <tr><td><code>enumeration/VeteranStatus.java</code></td><td><span class="badge badge-gray">Enum</span></td></tr>
+      <tr><td><code>enumeration/DisabilityStatus.java</code></td><td><span class="badge badge-gray">Enum</span></td></tr>
+      <tr><td><code>domain/repository/ApplicationBasicInfoRepository.java</code></td><td><span class="badge badge-blue">Repository</span></td></tr>
+      <tr><td><code>service/ApplicationBasicInfoService.java</code></td><td><span class="badge badge-blue">Service</span></td></tr>
+      <tr><td><code>controller/ApplicationBasicInfoController.java</code></td><td><span class="badge badge-blue">Controller</span></td></tr>
+      <tr><td><code>dto/request/BasicInfoSaveRequest.java</code></td><td><span class="badge badge-purple">Request DTO</span></td></tr>
+      <tr><td><code>dto/response/BasicInfoResponse.java</code></td><td><span class="badge badge-purple">Response DTO</span></td></tr>
+      <tr><td><code>dto/response/AdminBasicInfoResponse.java</code></td><td><span class="badge badge-purple">Response DTO</span></td></tr>
+      <tr><td><code>test/.../ApplicationBasicInfoEncryptionTest.java</code></td><td><span class="badge badge-gray">Test</span></td></tr>
+      <tr><td><code>test/.../ApplicationBasicInfoServiceTest.java</code></td><td><span class="badge badge-gray">Test</span></td></tr>
+      <tr><td><code>test/.../ApplicationBasicInfoControllerTest.java</code></td><td><span class="badge badge-gray">Test</span></td></tr>
+      <tr><td><code>test/.../ApplicationSubmitValidatorBasicInfoTest.java</code></td><td><span class="badge badge-gray">Test</span></td></tr>
+      <tr><td><code>test/.../BasicInfoTestSupport.java</code></td><td><span class="badge badge-gray">Test Support</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>수정 파일</h3>
+  <table>
+    <thead><tr><th>파일</th><th>변경 내용</th></tr></thead>
+    <tbody>
+      <tr><td><code>domain/repository/CommonCodeRepository.java</code></td><td><code>existsByGroupCodeAndCodeAndActiveTrue</code> 추가</td></tr>
+      <tr><td><code>domain/repository/ApplicationPiiPurgeRepository.java</code></td><td><code>purgeBasicInfo</code> JPQL bulk update 추가</td></tr>
+      <tr><td><code>service/ApplicationPiiPurgeService.java</code></td><td><code>purgeRelationalPii</code> 첫 호출 추가</td></tr>
+      <tr><td><code>service/ApplicationSubmitValidator.java</code></td><td>basicInfoRepository 주입 + validateBasicInfo 최우선 호출</td></tr>
+      <tr><td><code>service/ApplicationCompletionReadChecker.java</code></td><td>basicInfoRepository 주입 + checkBasicInfo 필수 그룹</td></tr>
+      <tr><td><code>service/AdminApplicationSectionService.java</code></td><td>basicInfoRepository 주입 + getBasicInfo 추가</td></tr>
+      <tr><td><code>controller/AdminApplicationSectionController.java</code></td><td>admin basic-info GET 엔드포인트 추가</td></tr>
+      <tr><td><code>service/ApplicationPdfService.java</code></td><td>basicInfoRepository 주입 + buildHeader BasicInfo 우선 배선</td></tr>
+      <tr><td><code>test/.../ApplicationPiiPurgeServiceTest.java</code></td><td>BasicInfo 파기 검증 추가</td></tr>
+      <tr><td><code>test/.../ApplicationCompletionReadCheckerTest.java</code></td><td>BASIC_INFO 그룹 검증 추가</td></tr>
+      <tr><td><code>test/.../ApplicationPdfServiceTest.java</code></td><td>PDF BasicInfo 우선·fallback·no-fallback 검증 추가</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ══════════ TEST RESULTS ══════════ -->
+  <h2>Test Results</h2>
+  <div class="warning">
+    <strong>전체 테스트 스위트 미실행:</strong> 로컬 환경에서 <code>./gradlew clean test</code> 전체 실행 시 타임아웃 발생. scoped 테스트로 검증 완료. AES 키: <code>AES_SECRET_KEY</code> 환경변수 필요.
+  </div>
+
+  <table>
+    <thead><tr><th>테스트 클래스</th><th>유형</th><th>케이스 수</th><th>주요 검증</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>ApplicationBasicInfoEncryptionTest</code></td>
+        <td>@DataJpaTest</td>
+        <td>1</td>
+        <td>AES 암호화·복호화 라운드트립 (raw 컬럼 ≠ 평문)</td>
+        <td><span class="badge badge-done">통과</span></td>
+      </tr>
+      <tr>
+        <td><code>ApplicationBasicInfoServiceTest</code></td>
+        <td>Unit (Mockito)</td>
+        <td>11</td>
+        <td>save+get, prefill, upsert, 국적/장애/나이/전화 검증, 비소유, 쓰기불가, 경계값</td>
+        <td><span class="badge badge-done">통과</span></td>
+      </tr>
+      <tr>
+        <td><code>ApplicationBasicInfoControllerTest</code></td>
+        <td>@WebMvcTest</td>
+        <td>4</td>
+        <td>GET prefill, save→persisted, 필수 필드 누락 400, 타 지원자 접근</td>
+        <td><span class="badge badge-done">통과</span></td>
+      </tr>
+      <tr>
+        <td><code>ApplicationSubmitValidatorBasicInfoTest</code></td>
+        <td>Unit (Mockito)</td>
+        <td>2</td>
+        <td>기본정보 없으면 제출 거부, 있으면 통과</td>
+        <td><span class="badge badge-done">통과</span></td>
+      </tr>
+      <tr>
+        <td><code>ApplicationCompletionReadCheckerTest</code> (보강)</td>
+        <td>@DataJpaTest</td>
+        <td>—</td>
+        <td>BASIC_INFO required group 반영</td>
+        <td><span class="badge badge-done">통과</span></td>
+      </tr>
+      <tr>
+        <td><code>ApplicationPdfServiceTest</code> (보강)</td>
+        <td>@DataJpaTest</td>
+        <td>3</td>
+        <td>BasicInfo 존재 시 BasicInfo값, 필드 null이어도 fallback 금지, 행 없으면 Applicant fallback</td>
+        <td><span class="badge badge-done">통과</span></td>
+      </tr>
+      <tr>
+        <td><code>ApplicationPiiPurgeServiceTest</code> (보강)</td>
+        <td>@DataJpaTest</td>
+        <td>—</td>
+        <td>purgeBasicInfo 후 전 PII 컬럼 null</td>
+        <td><span class="badge badge-done">통과</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ══════════ REMAINING ISSUES ══════════ -->
+  <h2>Remaining Issues</h2>
+  <ul class="issue-list">
+    <li>
+      <span class="badge badge-amber">Warning</span>
+      <strong>addressBasic/addressDetail 컬럼 length 불일치</strong> — 스펙 문서는 1000, 구현 엔티티는 2000 (커밋 <code>8fc642f</code>에서 widen). 운영 DDL 생성 시 2000 기준 사용.
+    </li>
+    <li>
+      <span class="badge badge-amber">Warning</span>
+      <strong>CommonCode 그룹코드 미확정</strong> — <code>NATIONALITY</code> / <code>DISABILITY_GRADE</code> / <code>DISABILITY_TYPE</code> 가정. 운영 시 최종 확정 필요.
+    </li>
+    <li>
+      <span class="badge badge-amber">Warning</span>
+      <strong>전체 테스트 스위트 미실행</strong> — scoped 테스트로 검증 완료. 전체 실행은 CI 환경 권장.
+    </li>
+    <li>
+      <span class="badge badge-red">Deferred</span>
+      <strong>증명사진(PHOTO) 미구현</strong> — 후속 슬라이스. <code>AttachmentType.PHOTO</code> 추가 + 이미지 강화(EXIF 제거, magic-byte 검증).
+    </li>
+    <li>
+      <span class="badge badge-red">Deferred</span>
+      <strong>CommonCode 시드 데이터 미포함</strong> — 국가·장애 코드는 운영/관리자 도구로 별도 등록.
+    </li>
+    <li>
+      <span class="badge badge-red">Deferred</span>
+      <strong>Excel export BasicInfo 미배선</strong> — PDF 완료. Excel 경로는 audit 후 결정.
+    </li>
+    <li>
+      <span class="badge badge-gray">Low</span>
+      <strong>전화번호 normalize 미구현</strong> — v1 입력값 그대로 저장. 후속 정책.
+    </li>
+  </ul>
+
+  <!-- ══════════ NEXT PHASE ══════════ -->
+  <h2>Next Phase Recommendation</h2>
+  <table>
+    <thead><tr><th>우선순위</th><th>항목</th><th>이유</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>증명사진(PHOTO) 슬라이스</td><td>기본정보 섹션의 마지막 미구현 항목. AttachmentType.PHOTO 추가 + 이미지 강화.</td></tr>
+      <tr><td>2</td><td>CommonCode 시드 데이터</td><td>국가/장애 코드 미등록 시 FOREIGN/SUBJECT 저장 불가. 운영 필수.</td></tr>
+      <tr><td>3</td><td>Excel export BasicInfo 반영</td><td>연락처·이메일 노출 경로 audit 후 동일 정책 적용.</td></tr>
+      <tr><td>4</td><td>전화번호 normalize 정책</td><td>하이픈 제거 등 표준화. 검색·중복 검출에 영향.</td></tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top:32px;font-size:0.8rem;color:#718096;">
+    이 문서는 자동 생성된 구현 상태 리포트입니다. 비밀번호·암호화 키·내부 저장 경로·개인 실 데이터는 포함하지 않습니다.
+  </p>
+</div>
+</body>
+</html>
