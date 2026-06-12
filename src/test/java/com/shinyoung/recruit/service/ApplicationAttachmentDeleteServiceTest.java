@@ -7,7 +7,10 @@ import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
+import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.AttachmentReplaceRequest;
@@ -92,6 +95,12 @@ class ApplicationAttachmentDeleteServiceTest {
     @Autowired
     private ApplicationAttachmentRepository attachmentRepository;
 
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
+
+    @Autowired
+    private JobApplicationRepository jobApplicationRepository;
+
     @Test
     void applicant_owner_draft_stored_delete_marks_deleted_and_deletes_physical_file_after_commit() {
         Applicant applicant = createApplicant("delete-stored", "Delete Stored");
@@ -160,6 +169,7 @@ class ApplicationAttachmentDeleteServiceTest {
         assertThatThrownBy(() -> deleteService.deleteForApplicant(other.getId(), applicationId, attachmentId))
                 .isInstanceOf(JobApplicationNotFoundException.class);
 
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(owner.getId(), applicationId);
         assertThatThrownBy(() -> deleteService.deleteForApplicant(owner.getId(), applicationId, attachmentId))
                 .isInstanceOf(InvalidJobApplicationException.class);
@@ -167,6 +177,7 @@ class ApplicationAttachmentDeleteServiceTest {
         Applicant withdrawnApplicant = createApplicant("delete-withdrawn", "Delete Withdrawn");
         Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting());
         Long withdrawnAttachmentId = upload(withdrawnApplicant, withdrawnApplicationId, "withdrawn.pdf", "withdrawn");
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(withdrawnApplicationId).orElseThrow());
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);
         assertThatThrownBy(() -> deleteService.deleteForApplicant(withdrawnApplicant.getId(), withdrawnApplicationId, withdrawnAttachmentId))
@@ -216,6 +227,7 @@ class ApplicationAttachmentDeleteServiceTest {
         Applicant submittedApplicant = createApplicant("delete-admin-submitted", "Delete Admin Submitted");
         Long submittedApplicationId = createApplication(submittedApplicant, createPublishedJobPosting());
         Long submittedAttachmentId = upload(submittedApplicant, submittedApplicationId, "submitted.pdf", "submitted");
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(submittedApplicationId).orElseThrow());
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
         AttachmentDeleteResponse submittedResponse = deleteService.deleteForAdmin(
@@ -235,6 +247,7 @@ class ApplicationAttachmentDeleteServiceTest {
         Applicant withdrawnApplicant = createApplicant("delete-admin-withdrawn", "Delete Admin Withdrawn");
         Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting());
         Long withdrawnAttachmentId = upload(withdrawnApplicant, withdrawnApplicationId, "withdrawn.pdf", "withdrawn");
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(withdrawnApplicationId).orElseThrow());
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);
 

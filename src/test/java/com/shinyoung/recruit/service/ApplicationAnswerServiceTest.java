@@ -7,7 +7,10 @@ import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
+import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationAnswerReplaceRequest;
 import com.shinyoung.recruit.dto.request.ApplicationAnswerRequest;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
@@ -73,6 +76,12 @@ class ApplicationAnswerServiceTest {
     @Autowired
     private ApplicationAnswerRepository applicationAnswerRepository;
 
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
+
+    @Autowired
+    private JobApplicationRepository jobApplicationRepository;
+
     @Test
     void get_questions_returns_active_questions_and_existing_answers() {
         Applicant applicant = createApplicant("answer-get", "Answer Get");
@@ -121,11 +130,13 @@ class ApplicationAnswerServiceTest {
 
         Applicant submittedApplicant = createApplicant("answer-status-submitted", "Answer Status Submitted");
         Long submittedApplicationId = createApplication(submittedApplicant, jobPostingId);
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(submittedApplicationId).orElseThrow());
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
         assertThat(applicationAnswerService.getQuestions(submittedApplicant.getId(), submittedApplicationId)).hasSize(1);
 
         Applicant withdrawnApplicant = createApplicant("answer-status-withdrawn", "Answer Status Withdrawn");
         Long withdrawnApplicationId = createApplication(withdrawnApplicant, jobPostingId);
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(withdrawnApplicationId).orElseThrow());
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);
         assertThat(applicationAnswerService.getQuestions(withdrawnApplicant.getId(), withdrawnApplicationId)).hasSize(1);
@@ -243,6 +254,7 @@ class ApplicationAnswerServiceTest {
         JobPostingQuestionResponse submittedQuestion = createQuestion(submittedPostingId, 0, QuestionAnswerType.LONG_TEXT, 3000, false);
         publish(submittedPostingId);
         Long submittedApplicationId = createApplication(submittedApplicant, submittedPostingId);
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(submittedApplicationId).orElseThrow());
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
         assertThatThrownBy(() -> applicationAnswerService.replaceAnswers(
@@ -256,6 +268,7 @@ class ApplicationAnswerServiceTest {
         JobPostingQuestionResponse withdrawnQuestion = createQuestion(withdrawnPostingId, 0, QuestionAnswerType.LONG_TEXT, 3000, false);
         publish(withdrawnPostingId);
         Long withdrawnApplicationId = createApplication(withdrawnApplicant, withdrawnPostingId);
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(withdrawnApplicationId).orElseThrow());
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);
 

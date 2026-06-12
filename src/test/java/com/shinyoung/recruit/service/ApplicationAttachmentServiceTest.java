@@ -7,8 +7,10 @@ import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.AttachmentReplaceRequest;
@@ -75,6 +77,9 @@ class ApplicationAttachmentServiceTest {
 
     @Autowired
     private ApplicationAttachmentRepository attachmentRepository;
+
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
 
     @Test
     void replace_attachments_success_and_get_success() {
@@ -188,6 +193,7 @@ class ApplicationAttachmentServiceTest {
     void replace_fails_when_application_is_not_draft() {
         Applicant submittedApplicant = createApplicant("attachment-submitted", "Attachment Submitted");
         Long submittedApplicationId = createApplication(submittedApplicant, createPublishedJobPosting());
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(submittedApplicationId).orElseThrow());
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
         assertThatThrownBy(() -> applicationAttachmentService.replaceAttachments(
@@ -198,6 +204,7 @@ class ApplicationAttachmentServiceTest {
 
         Applicant withdrawnApplicant = createApplicant("attachment-withdrawn", "Attachment Withdrawn");
         Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting());
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(withdrawnApplicationId).orElseThrow());
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);
 

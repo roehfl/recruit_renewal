@@ -5,6 +5,8 @@ import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
+import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
@@ -12,6 +14,7 @@ import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.service.JobApplicationService;
 import com.shinyoung.recruit.service.JobPostingService;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,6 +66,12 @@ class AdminApplicationControllerTest {
     @Autowired
     private JobApplicationService jobApplicationService;
 
+    @Autowired
+    private JobApplicationRepository jobApplicationRepository;
+
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -97,6 +106,7 @@ class AdminApplicationControllerTest {
         List<Long> jobPositionIds = jobPositionIds(jobPostingId);
         Long draftApplicationId = createApplication(draftApplicant, jobPostingId, jobPositionIds.get(0));
         Long submittedApplicationId = createApplication(submittedApplicant, jobPostingId, jobPositionIds.get(1));
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(submittedApplicationId).orElseThrow());
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
         mockMvc.perform(get("/api/admin/applications")

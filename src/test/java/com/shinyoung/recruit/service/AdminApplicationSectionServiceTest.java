@@ -22,6 +22,7 @@ import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
@@ -69,6 +70,7 @@ import com.shinyoung.recruit.enumeration.QuestionCategory;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -116,6 +118,9 @@ class AdminApplicationSectionServiceTest {
 
     @Autowired
     private JobApplicationRepository jobApplicationRepository;
+
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
 
     @Autowired
     private ApplicationEducationRepository educationRepository;
@@ -454,7 +459,9 @@ class AdminApplicationSectionServiceTest {
         Stage draftStage = stageRepository.save(stage(draft.getJobPosting(), "Draft Stage", 1, true));
         Stage submittedStage = stageRepository.save(stage(submitted.getJobPosting(), "Submitted Stage", 1, true));
         Stage withdrawnStage = stageRepository.save(stage(withdrawn.getJobPosting(), "Withdrawn Stage", 1, true));
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, submitted);
         jobApplicationService.submit(submitted.getApplicant().getId(), submitted.getId());
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, withdrawn);
         jobApplicationService.submit(withdrawn.getApplicant().getId(), withdrawn.getId());
         jobApplicationService.withdraw(withdrawn.getApplicant().getId(), withdrawn.getId());
 

@@ -2,11 +2,15 @@ package com.shinyoung.recruit.controller;
 
 import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
+import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
+import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
@@ -70,6 +74,12 @@ class ApplicationAttachmentControllerTest {
 
     @Autowired
     private JobApplicationService jobApplicationService;
+
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
+
+    @Autowired
+    private JobApplicationRepository jobApplicationRepository;
 
     private MockMvc mockMvc;
 
@@ -254,6 +264,7 @@ class ApplicationAttachmentControllerTest {
     void submitted_application_replace_returns_api_response() throws Exception {
         Applicant applicant = createApplicant("attachment-api-submitted", "Attachment Api Submitted");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 

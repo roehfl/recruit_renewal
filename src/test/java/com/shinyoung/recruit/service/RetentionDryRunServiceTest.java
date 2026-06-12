@@ -8,8 +8,10 @@ import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ActivityLogRepository;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
@@ -85,6 +87,9 @@ class RetentionDryRunServiceTest {
 
     @Autowired
     private JobApplicationRepository jobApplicationRepository;
+
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
 
     @Autowired
     private ActivityLogRepository activityLogRepository;
@@ -180,6 +185,7 @@ class RetentionDryRunServiceTest {
                 applicant.getId(),
                 new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
         );
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(applicant.getId(), applicationId);
         return applicationId;
     }

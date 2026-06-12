@@ -6,8 +6,10 @@ import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
@@ -73,6 +75,9 @@ class ApplicationStageResultServiceTest {
 
     @Autowired
     private JobApplicationRepository jobApplicationRepository;
+
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
 
     @Test
     void applicant_can_read_result_announced_stage_result() {
@@ -262,6 +267,7 @@ class ApplicationStageResultServiceTest {
 
     private Long createSubmittedApplication(Applicant applicant, Long jobPostingId) {
         Long applicationId = createApplication(applicant, jobPostingId);
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(applicant.getId(), applicationId);
         return applicationId;
     }

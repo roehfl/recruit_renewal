@@ -7,7 +7,10 @@ import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
+import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.AttachmentReplaceRequest;
@@ -80,6 +83,12 @@ class ApplicationAttachmentFileServiceTest {
 
     @Autowired
     private ApplicationAttachmentRepository attachmentRepository;
+
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
+
+    @Autowired
+    private JobApplicationRepository jobApplicationRepository;
 
     @Test
     void upload_success_creates_stored_row_and_append_only_sort_order() {
@@ -228,6 +237,7 @@ class ApplicationAttachmentFileServiceTest {
                 null
         )).isInstanceOf(JobApplicationNotFoundException.class);
 
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(owner.getId(), applicationId);
 
         assertThatThrownBy(() -> applicationAttachmentFileService.upload(

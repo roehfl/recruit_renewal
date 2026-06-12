@@ -6,10 +6,12 @@ import com.shinyoung.recruit.domain.entity.ApplicationEducation;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationSemesterGradeRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.EducationReplaceRequest;
@@ -73,6 +75,9 @@ class ApplicationEducationServiceTest {
 
     @Autowired
     private JobApplicationRepository jobApplicationRepository;
+
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
 
     @Autowired
     private ApplicationEducationRepository educationRepository;
@@ -230,6 +235,7 @@ class ApplicationEducationServiceTest {
         Applicant submittedApplicant = createApplicant("education-submitted", "Education Submitted");
         Long submittedPostingId = createPublishedJobPosting(false);
         Long submittedApplicationId = createApplication(submittedApplicant, submittedPostingId);
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(submittedApplicationId).orElseThrow());
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
         assertThatThrownBy(() -> applicationEducationService.replaceEducations(
@@ -241,6 +247,7 @@ class ApplicationEducationServiceTest {
         Applicant withdrawnApplicant = createApplicant("education-withdrawn", "Education Withdrawn");
         Long withdrawnPostingId = createPublishedJobPosting(false);
         Long withdrawnApplicationId = createApplication(withdrawnApplicant, withdrawnPostingId);
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(withdrawnApplicationId).orElseThrow());
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);
 

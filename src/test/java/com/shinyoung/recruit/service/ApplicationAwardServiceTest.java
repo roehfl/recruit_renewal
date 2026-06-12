@@ -7,7 +7,10 @@ import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
+import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.AwardReplaceRequest;
@@ -64,6 +67,12 @@ class ApplicationAwardServiceTest {
 
     @Autowired
     private ApplicationAwardRepository awardRepository;
+
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
+
+    @Autowired
+    private JobApplicationRepository jobApplicationRepository;
 
     @Test
     void replace_awards_success_and_get_success() {
@@ -125,6 +134,7 @@ class ApplicationAwardServiceTest {
     void replace_fails_when_application_is_not_draft() {
         Applicant submittedApplicant = createApplicant("award-submitted", "Award Submitted");
         Long submittedApplicationId = createApplication(submittedApplicant, createPublishedJobPosting(true));
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(submittedApplicationId).orElseThrow());
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
         assertThatThrownBy(() -> applicationAwardService.replaceAwards(
@@ -135,6 +145,7 @@ class ApplicationAwardServiceTest {
 
         Applicant withdrawnApplicant = createApplicant("award-withdrawn", "Award Withdrawn");
         Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting(true));
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(withdrawnApplicationId).orElseThrow());
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);
 

@@ -6,8 +6,11 @@ import com.shinyoung.recruit.domain.entity.ApplicationLanguage;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationLanguageRepository;
+import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
@@ -64,6 +67,12 @@ class ApplicationLanguageServiceTest {
 
     @Autowired
     private ApplicationLanguageRepository languageRepository;
+
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
+
+    @Autowired
+    private JobApplicationRepository jobApplicationRepository;
 
     @Test
     void replace_languages_success_and_get_success() {
@@ -128,6 +137,7 @@ class ApplicationLanguageServiceTest {
     void replace_fails_when_application_is_not_draft() {
         Applicant submittedApplicant = createApplicant("language-submitted", "Language Submitted");
         Long submittedApplicationId = createApplication(submittedApplicant, createPublishedJobPosting(true));
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(submittedApplicationId).orElseThrow());
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
         assertThatThrownBy(() -> applicationLanguageService.replaceLanguages(
@@ -138,6 +148,7 @@ class ApplicationLanguageServiceTest {
 
         Applicant withdrawnApplicant = createApplicant("language-withdrawn", "Language Withdrawn");
         Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting(true));
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(withdrawnApplicationId).orElseThrow());
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);
 

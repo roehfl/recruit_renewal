@@ -3,11 +3,15 @@ package com.shinyoung.recruit.controller;
 import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.entity.Employee;
+import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
+import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPostingQuestionCreateRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
@@ -93,6 +97,12 @@ class ApplicationControllerTest {
 
     @Autowired
     private StageResultService stageResultService;
+
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
+
+    @Autowired
+    private JobApplicationRepository jobApplicationRepository;
 
     private MockMvc mockMvc;
 
@@ -240,6 +250,7 @@ class ApplicationControllerTest {
         Long jobPostingId = createPublishedJobPosting();
         List<Long> jobPositionIds = jobPositionIds(jobPostingId);
         Long applicationId = createApplication(applicant, jobPostingId, jobPositionIds.get(0));
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
@@ -272,6 +283,7 @@ class ApplicationControllerTest {
     void submit_application_returns_api_response() throws Exception {
         Applicant applicant = createApplicant("api-submit", "Api Submit");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         authenticate(applicant);
 
         mockMvc.perform(post("/api/applications/{applicationId}/submit", applicationId))
@@ -285,6 +297,7 @@ class ApplicationControllerTest {
     void submit_invalid_state_returns_api_response() throws Exception {
         Applicant applicant = createApplicant("api-submit-state", "Api Submit State");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
@@ -307,6 +320,7 @@ class ApplicationControllerTest {
                 false
         ));
         Long applicationId = createApplication(applicant, jobPostingId);
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         authenticate(applicant);
 
         mockMvc.perform(post("/api/applications/{applicationId}/submit", applicationId))
@@ -330,6 +344,7 @@ class ApplicationControllerTest {
         createQuestion(jobPostingId, true, QuestionAnswerType.LONG_TEXT, 1000);
         jobPostingService.publish(jobPostingId);
         Long applicationId = createApplication(applicant, jobPostingId);
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         authenticate(applicant);
 
         mockMvc.perform(post("/api/applications/{applicationId}/submit", applicationId))
@@ -343,6 +358,7 @@ class ApplicationControllerTest {
         Applicant owner = createApplicant("api-submit-owner", "Api Submit Owner");
         Applicant other = createApplicant("api-submit-other", "Api Submit Other");
         Long applicationId = createApplication(owner, createPublishedJobPosting());
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         authenticate(other);
 
         mockMvc.perform(post("/api/applications/{applicationId}/submit", applicationId))
@@ -355,6 +371,7 @@ class ApplicationControllerTest {
     void withdraw_application_returns_api_response() throws Exception {
         Applicant applicant = createApplicant("api-withdraw", "Api Withdraw");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
@@ -382,6 +399,7 @@ class ApplicationControllerTest {
         Applicant owner = createApplicant("api-withdraw-owner", "Api Withdraw Owner");
         Applicant other = createApplicant("api-withdraw-other", "Api Withdraw Other");
         Long applicationId = createApplication(owner, createPublishedJobPosting());
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(owner.getId(), applicationId);
         authenticate(other);
 
@@ -423,6 +441,7 @@ class ApplicationControllerTest {
         Applicant applicant = createApplicant("api-my-list", "Api My List");
         Long jobPostingId = createPublishedJobPosting();
         Long applicationId = createApplication(applicant, jobPostingId);
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(applicant.getId(), applicationId);
         Long stageId = createStage(jobPostingId, 0, true);
         decideAndAnnounce(jobPostingId, stageId, StageResultStatus.PASSED);
@@ -473,6 +492,7 @@ class ApplicationControllerTest {
         Long jobPostingId = createPublishedJobPosting();
         Long applicationId = createApplication(applicant, jobPostingId);
         Long stageId = createStage(jobPostingId, 0, true);
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(applicant.getId(), applicationId);
         decideAndAnnounce(jobPostingId, stageId, StageResultStatus.PASSED);
         MockMvc securedMockMvc = securedMockMvc();

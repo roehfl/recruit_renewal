@@ -1,6 +1,7 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
+import com.shinyoung.recruit.domain.entity.ApplicationBasicInfo;
 import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
@@ -11,6 +12,7 @@ import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
@@ -20,6 +22,8 @@ import com.shinyoung.recruit.domain.repository.ApplicationLanguageRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationMilitaryRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingAttachmentRequirementRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
+import com.shinyoung.recruit.enumeration.DisabilityStatus;
+import com.shinyoung.recruit.enumeration.NationalityType;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
 import com.shinyoung.recruit.enumeration.AttachmentType;
 import com.shinyoung.recruit.enumeration.CareerType;
@@ -56,14 +60,17 @@ public class ApplicationSubmitValidator {
     private final ApplicationAnswerRepository applicationAnswerRepository;
     private final JobPostingAttachmentRequirementRepository attachmentRequirementRepository;
     private final ApplicationAttachmentRepository attachmentRepository;
+    private final ApplicationBasicInfoRepository basicInfoRepository;
 
     public void validate(JobApplication application) {
+        Long applicationId = application.getId();
+        validateBasicInfo(applicationId);
+
         ApplicationFormConfig config = application.getJobPosting().getApplicationFormConfig();
         if (config == null) {
             throw new InvalidJobApplicationException("Application form config is required before submit.");
         }
 
-        Long applicationId = application.getId();
         validateEducation(config, applicationId);
         validateCareer(config, applicationId);
         validateMilitary(config, applicationId);
@@ -236,6 +243,32 @@ public class ApplicationSubmitValidator {
                 throw new InvalidJobApplicationException(requirement.getDisplayName() + " attachment is required before submit.");
             }
         }
+    }
+
+    private void validateBasicInfo(Long applicationId) {
+        ApplicationBasicInfo basicInfo = basicInfoRepository.findByJobApplicationId(applicationId)
+                .orElseThrow(() -> new InvalidJobApplicationException("Basic info is required before submit."));
+
+        if (isBlank(basicInfo.getNameKorean())
+                || basicInfo.getBirthDate() == null
+                || basicInfo.getNationalityType() == null
+                || isBlank(basicInfo.getMobilePhone())
+                || isBlank(basicInfo.getEmail())
+                || basicInfo.getVeteranStatus() == null
+                || basicInfo.getDisabilityStatus() == null) {
+            throw new InvalidJobApplicationException("Basic info required fields are missing before submit.");
+        }
+        if (basicInfo.getNationalityType() == NationalityType.FOREIGN && isBlank(basicInfo.getCountryCode())) {
+            throw new InvalidJobApplicationException("Country code is required for a foreign applicant before submit.");
+        }
+        if (basicInfo.getDisabilityStatus() == DisabilityStatus.SUBJECT
+                && (isBlank(basicInfo.getDisabilityGradeCode()) || isBlank(basicInfo.getDisabilityTypeCode()))) {
+            throw new InvalidJobApplicationException("Disability grade/type are required for a disability subject before submit.");
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private record AttachmentRequirementKey(

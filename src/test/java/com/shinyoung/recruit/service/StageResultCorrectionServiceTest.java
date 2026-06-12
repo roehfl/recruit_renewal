@@ -7,9 +7,12 @@ import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.entity.StageResultCorrectionHistory;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
+import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.domain.repository.StageResultCorrectionHistoryRepository;
 import com.shinyoung.recruit.domain.repository.StageResultRepository;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
@@ -72,6 +75,12 @@ class StageResultCorrectionServiceTest {
 
     @Autowired
     private JobPostingRepository jobPostingRepository;
+
+    @Autowired
+    private JobApplicationRepository jobApplicationRepository;
+
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
 
     @Autowired
     private StageResultRepository stageResultRepository;
@@ -267,6 +276,7 @@ class StageResultCorrectionServiceTest {
                 applicant.getId(),
                 new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
         );
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(applicant.getId(), applicationId);
         return applicationId;
     }

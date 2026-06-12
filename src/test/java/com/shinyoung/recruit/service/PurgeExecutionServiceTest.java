@@ -12,10 +12,12 @@ import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.PurgeBatch;
 import com.shinyoung.recruit.domain.repository.ActivityLogRepository;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.PurgeBatchRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
@@ -80,6 +82,7 @@ class PurgeExecutionServiceTest {
     @Autowired private ApplicantRepository applicantRepository;
     @Autowired private JobPostingRepository jobPostingRepository;
     @Autowired private JobApplicationRepository jobApplicationRepository;
+    @Autowired private ApplicationBasicInfoRepository basicInfoRepository;
     @Autowired private ApplicationAttachmentRepository attachmentRepository;
     @Autowired private ActivityLogRepository activityLogRepository;
     @Autowired private PurgeBatchRepository purgeBatchRepository;
@@ -96,7 +99,7 @@ class PurgeExecutionServiceTest {
                 "activity_log", "purge_job_item", "purge_batch", "retention_hold", "retention_policy",
                 "interview_evaluation", "interview_participant", "interview",
                 "stage_result_correction_history", "stage_result", "stage",
-                "application_attachment", "application_answer",
+                "application_attachment", "application_answer", "application_basic_info",
                 "application_education_semester_grade", "application_education",
                 "application_career_profile", "application_career", "application_certificate",
                 "application_language", "application_military", "application_award", "application_gap_period",
@@ -350,6 +353,7 @@ class PurgeExecutionServiceTest {
                 .map(JobPosition::getId).findFirst().orElseThrow();
         Long applicationId = jobApplicationService.create(
                 applicant.getId(), new ApplicationCreateRequest(jobPostingId, jobPositionId));
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(applicant.getId(), applicationId);
         return applicationId;
     }

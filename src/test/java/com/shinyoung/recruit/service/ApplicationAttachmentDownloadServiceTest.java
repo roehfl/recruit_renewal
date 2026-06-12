@@ -7,7 +7,10 @@ import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
+import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.AttachmentReplaceRequest;
@@ -82,6 +85,12 @@ class ApplicationAttachmentDownloadServiceTest {
     @Autowired
     private ApplicationAttachmentRepository attachmentRepository;
 
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
+
+    @Autowired
+    private JobApplicationRepository jobApplicationRepository;
+
     @Test
     void applicant_owner_can_download_stored_attachment_from_draft_submitted_and_withdrawn_application() throws Exception {
         Applicant draftApplicant = createApplicant("download-draft", "Download Draft");
@@ -98,6 +107,7 @@ class ApplicationAttachmentDownloadServiceTest {
         Applicant submittedApplicant = createApplicant("download-submitted", "Download Submitted");
         Long submittedApplicationId = createApplication(submittedApplicant, createPublishedJobPosting());
         Long submittedAttachmentId = upload(submittedApplicant, submittedApplicationId, "submitted.pdf", "submitted");
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(submittedApplicationId).orElseThrow());
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
         AttachmentDownloadResource submitted = downloadService.downloadForApplicant(
@@ -110,6 +120,7 @@ class ApplicationAttachmentDownloadServiceTest {
         Applicant withdrawnApplicant = createApplicant("download-withdrawn", "Download Withdrawn");
         Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting());
         Long withdrawnAttachmentId = upload(withdrawnApplicant, withdrawnApplicationId, "withdrawn.pdf", "withdrawn");
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(withdrawnApplicationId).orElseThrow());
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);
 
