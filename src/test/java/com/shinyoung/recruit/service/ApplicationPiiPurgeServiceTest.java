@@ -11,6 +11,7 @@ import com.shinyoung.recruit.domain.entity.ApplicationCertificate;
 import com.shinyoung.recruit.domain.entity.ApplicationEducation;
 import com.shinyoung.recruit.domain.entity.ApplicationGapPeriod;
 import com.shinyoung.recruit.domain.entity.ApplicationLanguage;
+import com.shinyoung.recruit.domain.entity.ApplicationBasicInfo;
 import com.shinyoung.recruit.domain.entity.ApplicationMilitary;
 import com.shinyoung.recruit.domain.entity.Employee;
 import com.shinyoung.recruit.domain.entity.Interview;
@@ -32,6 +33,7 @@ import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationGapPeriodRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationLanguageRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationMilitaryRepository;
 import com.shinyoung.recruit.domain.repository.EmployeeRepository;
 import com.shinyoung.recruit.domain.repository.InterviewEvaluationRepository;
@@ -60,8 +62,11 @@ import com.shinyoung.recruit.enumeration.InterviewMethod;
 import com.shinyoung.recruit.enumeration.MilitaryBranch;
 import com.shinyoung.recruit.enumeration.MilitaryRank;
 import com.shinyoung.recruit.enumeration.MilitaryServiceType;
+import com.shinyoung.recruit.enumeration.DisabilityStatus;
 import com.shinyoung.recruit.enumeration.MilitarySubjectType;
+import com.shinyoung.recruit.enumeration.NationalityType;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
+import com.shinyoung.recruit.enumeration.VeteranStatus;
 import com.shinyoung.recruit.enumeration.QuestionCategory;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
@@ -99,6 +104,7 @@ class ApplicationPiiPurgeServiceTest {
     @Autowired private JobPostingRepository jobPostingRepository;
     @Autowired private JobApplicationRepository jobApplicationRepository;
     @Autowired private JobPostingQuestionRepository jobPostingQuestionRepository;
+    @Autowired private ApplicationBasicInfoRepository basicInfoRepository;
     @Autowired private ApplicationAnswerRepository answerRepository;
     @Autowired private ApplicationEducationRepository educationRepository;
     @Autowired private ApplicationCareerRepository careerRepository;
@@ -204,6 +210,12 @@ class ApplicationPiiPurgeServiceTest {
                         null, BigDecimal.valueOf(88),
                         "이전 코멘트 — 홍길동", "새 코멘트", null, LocalDateTime.now()));
 
+        basicInfoRepository.save(ApplicationBasicInfo.create(
+                application, "홍길동", "Hong", NationalityType.DOMESTIC, null,
+                LocalDate.of(1995, 1, 1), "01012345678", "01099998888", "hong@example.com",
+                VeteranStatus.NOT_SUBJECT, DisabilityStatus.NOT_SUBJECT, null, null,
+                "06236", "서울시 강남구", "101동"));
+
         entityManager.flush();
 
         // ---- 실행 ----
@@ -299,5 +311,23 @@ class ApplicationPiiPurgeServiceTest {
         assertThat(purgedCorrection.getNewComment()).isNull();
         assertThat(purgedCorrection.getPreviousStatus()).isEqualTo(StageResultStatus.PENDING); // KEEP
         assertThat(purgedCorrection.getCorrectedBy()).isEqualTo("emp01"); // KEEP(직원)
+
+        // BasicInfo — 암호화 컬럼은 placeholder 불가(복호화 시 깨짐), 전 PII 컬럼 null.
+        ApplicationBasicInfo purgedBasicInfo = basicInfoRepository.findByJobApplicationId(applicationId).orElseThrow();
+        assertThat(purgedBasicInfo.getNameKorean()).isNull();
+        assertThat(purgedBasicInfo.getNameEnglish()).isNull();
+        assertThat(purgedBasicInfo.getEmail()).isNull();
+        assertThat(purgedBasicInfo.getMobilePhone()).isNull();
+        assertThat(purgedBasicInfo.getEmergencyPhone()).isNull();
+        assertThat(purgedBasicInfo.getBirthDate()).isNull();
+        assertThat(purgedBasicInfo.getNationalityType()).isNull();
+        assertThat(purgedBasicInfo.getCountryCode()).isNull();
+        assertThat(purgedBasicInfo.getVeteranStatus()).isNull();
+        assertThat(purgedBasicInfo.getDisabilityStatus()).isNull();
+        assertThat(purgedBasicInfo.getDisabilityGradeCode()).isNull();
+        assertThat(purgedBasicInfo.getDisabilityTypeCode()).isNull();
+        assertThat(purgedBasicInfo.getZipCode()).isNull();
+        assertThat(purgedBasicInfo.getAddressBasic()).isNull();
+        assertThat(purgedBasicInfo.getAddressDetail()).isNull();
     }
 }

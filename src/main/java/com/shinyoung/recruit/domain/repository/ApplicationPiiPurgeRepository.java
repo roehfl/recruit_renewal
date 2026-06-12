@@ -22,6 +22,25 @@ import java.util.List;
  */
 public interface ApplicationPiiPurgeRepository extends Repository<JobApplication, Long> {
 
+    /**
+     * BasicInfo — 전 PII 컬럼 null(암호화 컬럼은 placeholder 저장 시 복호화 불가, NULLIFY 전용).
+     * 인벤토리 §3-BasicInfo: nameKorean/nameEnglish/email/mobilePhone/emergencyPhone/birthDate/
+     * nationalityType/countryCode/veteranStatus/disabilityStatus/disabilityGradeCode/disabilityTypeCode/
+     * zipCode/addressBasic/addressDetail + audit(createdBy/updatedBy) — KEEP_TOMBSTONE 없음.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update ApplicationBasicInfo b
+            set b.nameKorean = null, b.nameEnglish = null, b.email = null,
+                b.mobilePhone = null, b.emergencyPhone = null,
+                b.birthDate = null, b.nationalityType = null, b.countryCode = null,
+                b.veteranStatus = null, b.disabilityStatus = null,
+                b.disabilityGradeCode = null, b.disabilityTypeCode = null,
+                b.zipCode = null, b.addressBasic = null, b.addressDetail = null,
+                b.createdBy = null, b.updatedBy = null
+            where b.jobApplication.id = :applicationId""")
+    int purgeBasicInfo(@Param("applicationId") Long applicationId);
+
     /** ref-count 판정용 — 해당 지원자의 전체 지원서. */
     @Query("select j from JobApplication j where j.applicant.id = :applicantId")
     List<JobApplication> findByApplicantId(@Param("applicantId") Long applicantId);

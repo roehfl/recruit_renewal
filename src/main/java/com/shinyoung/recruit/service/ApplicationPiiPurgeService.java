@@ -24,6 +24,7 @@ public class ApplicationPiiPurgeService {
 
     @Transactional(propagation = Propagation.REQUIRED)
     public void purgeRelationalPii(Long applicationId) {
+        purgeRepository.purgeBasicInfo(applicationId);
         purgeRepository.purgeAnswers(applicationId);
         purgeRepository.purgeEducations(applicationId);
         purgeRepository.purgeEducationSemesterGrades(applicationId);
