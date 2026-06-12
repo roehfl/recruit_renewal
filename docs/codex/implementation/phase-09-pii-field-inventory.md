@@ -210,7 +210,7 @@ BINARY_DELETE_FAILED : 물리 삭제 실패(재시도/ reconciliation 대상)
 - 암호화 컬럼은 AES 랜덤 IV 특성상 `'__PURGED__'` 치환 불가 → `NULLIFY`만.
 - 파기 쿼리: `ApplicationPiiPurgeRepository.purgeBasicInfo(@Modifying flushAutomatically=true)` JPQL bulk update.
 
-## 12. 판단 보류 / 확인 필요 항목
+## 11. 판단 보류 / 확인 필요 항목
 
 - **날짜 일반화 — 안 A 확정(리뷰 3차 #3)**: education(admission/graduation)·career(start/end) 정확 날짜는 **전부 NULLIFY, 일반화 컬럼 추가 없음**. 근거: 현 funnel 통계가 이 날짜들을 안 쓴다 → 통계 손실 0. 가역적(향후 졸업연도/근속 통계 필요 시 안 B 의 nullable 컬럼 추가). "통계 편의" 보다 "재식별 제거" 우선.
 - **`ciHash` — 해소(리뷰 2차 #1)**: 보존 금지. ref0 파기 시 `"PURGED:"+UUID` 로 overwrite(권장안 A). 중복가입 차단은 파기 후 미보장(파기 우선).
@@ -219,6 +219,6 @@ BINARY_DELETE_FAILED : 물리 삭제 실패(재시도/ reconciliation 대상)
 - **`Interview.memo` 잔존**: §7 flag — Phase 9 범위 밖(group 공유 행). 운영 가이드(실명 금지) 또는 후속 정리. **확인 필요.**
 - **StageResult comment 계열 — 해소(9d-1 리뷰 Major 1)**: §7-1 로 분류 확정 + 9d-1 tombstone 에 포함 구현.
 
-## 13. 9d 착수 게이트
+## 12. 9d 착수 게이트
 
-본 인벤토리(특히 §9 DDL 목록, §10 확인 항목)가 **확정**되어야 9d-1/9d-2 구현을 시작한다. ADR-0005 는 본 인벤토리 확정 전까지 `accepted-with-implementation-gate`.
+본 인벤토리(특히 §9 DDL 목록, §11 확인 항목)가 **확정**되어야 9d-1/9d-2 구현을 시작한다. ADR-0005 는 본 인벤토리 확정 전까지 `accepted-with-implementation-gate`.

@@ -198,6 +198,18 @@ class ApplicationBasicInfoServiceTest {
     }
 
     @Test
+    void disability_not_subject_with_codes_is_rejected() {
+        Applicant applicant = createApplicant("bi-disability-forbidden", "DisabilityForbidden");
+        Long applicationId = createApplication(applicant);
+
+        assertThatThrownBy(() -> basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
+                new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
+                        LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
+                        VeteranStatus.NOT_SUBJECT, DisabilityStatus.NOT_SUBJECT, "G1", "T1", null, null, null)))
+                .isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
     void birth_date_exactly_14_is_accepted_and_one_day_short_is_rejected() {
         Applicant applicant = createApplicant("bi-age-boundary", "AgeBoundary");
         Long applicationId = createApplication(applicant);
