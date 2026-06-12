@@ -1,7 +1,9 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.Applicant;
+import com.shinyoung.recruit.domain.entity.ApplicationBasicInfo;
 import com.shinyoung.recruit.domain.entity.JobApplication;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.dto.response.AdminApplicationAnswerResponse;
 import com.shinyoung.recruit.dto.response.AdminAwardResponse;
@@ -46,6 +48,7 @@ public class ApplicationPdfService {
     private final JobApplicationRepository jobApplicationRepository;
     private final AdminApplicationSectionService sectionService;
     private final ApplicationPdfRenderer renderer;
+    private final ApplicationBasicInfoRepository basicInfoRepository;
 
     public ApplicationPdfDocument generate(Long applicationId) {
         JobApplication application = jobApplicationRepository.findById(applicationId)
@@ -61,12 +64,19 @@ public class ApplicationPdfService {
     }
 
     private ApplicationPdfView.Header buildHeader(JobApplication application) {
+        // BasicInfo row 가 존재하면 그것이 source of truth (파기로 필드가 null 이어도 fallback 하지 않는다).
+        ApplicationBasicInfo basicInfo = basicInfoRepository.findByJobApplicationId(application.getId()).orElse(null);
         Applicant applicant = application.getApplicant();
+
+        String name = basicInfo != null ? basicInfo.getNameKorean() : application.getApplicantNameSnapshot();
+        String phone = basicInfo != null ? basicInfo.getMobilePhone() : applicant.getPhoneNumber();
+        String email = basicInfo != null ? basicInfo.getEmail() : applicant.getEmail();
+
         return new ApplicationPdfView.Header(
                 application.getId(),
-                application.getApplicantNameSnapshot(),
-                applicant.getPhoneNumber(),
-                applicant.getEmail(),
+                name,
+                phone,
+                email,
                 application.getJobPostingTitleSnapshot(),
                 application.getJobPositionNameSnapshot(),
                 str(application.getStatus()),
