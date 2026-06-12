@@ -123,8 +123,8 @@
 | `disabilityGradeCode` | `String` (`DISABILITY_GRADE`) | ✔ | 500 | nullable | SUBJECT시 | null |
 | `disabilityTypeCode` | `String` (`DISABILITY_TYPE`) | ✔ | 500 | nullable | SUBJECT시 | null |
 | `zipCode` | `String` | ✔ | 500 | nullable | 선택 | null |
-| `addressBasic` | `String` | ✔ | 1000 | nullable | 선택 | null |
-| `addressDetail` | `String` | ✔ | 1000 | nullable | 선택 | null |
+| `addressBasic` | `String` | ✔ | 2000 | nullable | 선택 | null |
+| `addressDetail` | `String` | ✔ | 2000 | nullable | 선택 | null |
 
 ### 6.1 암호문 컬럼 길이 정책 (M5)
 
