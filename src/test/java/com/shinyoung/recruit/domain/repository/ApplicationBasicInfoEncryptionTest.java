@@ -1,42 +1,40 @@
 package com.shinyoung.recruit.domain.repository;
 
+import com.shinyoung.recruit.common.crypto.CryptoHolder;
 import com.shinyoung.recruit.common.hash.HashUtil;
+import com.shinyoung.recruit.config.CryptoConfig;
+import com.shinyoung.recruit.config.JpaConfig;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.entity.ApplicationBasicInfo;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
-import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
-import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
-import com.shinyoung.recruit.dto.request.JobPositionRequest;
-import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.enumeration.DisabilityStatus;
 import com.shinyoung.recruit.enumeration.NationalityType;
 import com.shinyoung.recruit.enumeration.VeteranStatus;
-import com.shinyoung.recruit.service.JobApplicationService;
-import com.shinyoung.recruit.service.JobPostingService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
+@DataJpaTest
+@Import({CryptoConfig.class, JpaConfig.class, CryptoHolder.class})
+@TestPropertySource(properties = "crypto.aes.key=22791194512954214612461221261067")
 @Transactional
 class ApplicationBasicInfoEncryptionTest {
 
     @Autowired private ApplicationBasicInfoRepository basicInfoRepository;
     @Autowired private ApplicantRepository applicantRepository;
-    @Autowired private JobPostingService jobPostingService;
-    @Autowired private JobApplicationService jobApplicationService;
     @Autowired private JobPostingRepository jobPostingRepository;
     @Autowired private JobApplicationRepository jobApplicationRepository;
 
@@ -79,18 +77,25 @@ class ApplicationBasicInfoEncryptionTest {
         applicant.setPhoneNumber("01000000000");
         applicant = applicantRepository.save(applicant);
 
-        Long jobPostingId = jobPostingService.create(new JobPostingCreateRequest(
-                "2026 recruitment", "<p>content</p>",
-                LocalDateTime.of(2026, 6, 1, 9, 0), LocalDateTime.of(2026, 6, 30, 18, 0),
-                List.of(new JobPositionRequest("Backend", 0)),
-                new ApplicationFormConfigRequest(false, false, false, false, false, false, false)));
-        jobPostingService.publish(jobPostingId);
-        JobPosting posting = jobPostingRepository.findDetailById(jobPostingId).orElseThrow();
-        Long positionId = posting.getJobPositions().stream()
-                .sorted(Comparator.comparing(JobPosition::getSortOrder)).map(JobPosition::getId)
-                .findFirst().orElseThrow();
-        Long applicationId = jobApplicationService.create(
-                applicant.getId(), new ApplicationCreateRequest(jobPostingId, positionId));
-        return jobApplicationRepository.findById(applicationId).orElseThrow();
+        JobPosting posting = JobPosting.create(
+                "2026 recruitment",
+                "<p>content</p>",
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 30, 18, 0));
+        JobPosition position = JobPosition.create("Backend", 0);
+        posting.replaceJobPositions(List.of(position));
+        posting = jobPostingRepository.save(posting);
+        posting.publish(LocalDateTime.now());
+
+        JobPosition savedPosition = posting.getJobPositions().get(0);
+
+        JobApplication application = JobApplication.create(
+                applicant,
+                posting,
+                savedPosition,
+                applicant.getName(),
+                posting.getTitle(),
+                savedPosition.getPositionName());
+        return jobApplicationRepository.save(application);
     }
 }

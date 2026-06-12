@@ -90,11 +90,11 @@ public class ApplicationBasicInfo extends BaseEntity {
     private String zipCode;
 
     @Convert(converter = AesAttributeConverter.class)
-    @Column(length = 1000)
+    @Column(length = 2000)
     private String addressBasic;
 
     @Convert(converter = AesAttributeConverter.class)
-    @Column(length = 1000)
+    @Column(length = 2000)
     private String addressDetail;
 
     private ApplicationBasicInfo(
