@@ -25,6 +25,9 @@ public class ClientEventLogCleanupService {
             Clock clock,
             @Value("${client-event-log.retention-days:90}") int retentionDays
     ) {
+        if (retentionDays < 1 || retentionDays > 365) {
+            throw new IllegalArgumentException("client-event-log.retention-days must be between 1 and 365.");
+        }
         this.repository = repository;
         this.clock = clock;
         this.retentionDays = retentionDays;

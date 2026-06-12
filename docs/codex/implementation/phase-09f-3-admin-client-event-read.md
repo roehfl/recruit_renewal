@@ -271,7 +271,7 @@
         "apiPath": "/api/applicant/applications/123/education",
         "httpStatus": 500,
         "errorCode": "INTERNAL_SERVER_ERROR",
-        "message": "Request failed with status code 500",
+        "message": "API_REQUEST_FAILED",
         "stackHash": "abc123",
         "stackSummary": "***",
         "frontendVersion": "2026.06.10-1",

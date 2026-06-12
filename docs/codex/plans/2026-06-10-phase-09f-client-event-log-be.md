@@ -230,7 +230,7 @@ class ClientEventLogRepositoryTest {
                 .apiPath("/api/applicant/applications/1/education")
                 .httpStatus(500)
                 .errorCode("INTERNAL_SERVER_ERROR")
-                .message("Request failed with status code 500")
+                .message("API_REQUEST_FAILED")
                 .applicationId(123L)
                 .jobPostingId(10L)
                 .ipAddress("127.0.0.1")
@@ -1237,7 +1237,7 @@ class ClientEventLogServiceTest {
         when(repository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ClientEventLogIngestResponse response = service.record(
-                request(ClientEventSource.APPLICANT_WEB, "Request failed with status code 500",
+                request(ClientEventSource.APPLICANT_WEB, "API_REQUEST_FAILED",
                         Map.of("durationMs", 1250)),
                 null, servletRequest());
 

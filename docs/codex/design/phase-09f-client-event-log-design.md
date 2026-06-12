@@ -874,7 +874,7 @@ try {
     operation: 'SUBMIT_APPLICATION',
     applicationId,
     jobPostingId,
-    message: 'Application submit failed',
+    message: 'APPLICATION_SUBMIT_FAILED',
   })
   throw e
 }
@@ -938,7 +938,7 @@ logClientEvent({
   "apiPath": "/applicant/applications/123/education",
   "httpStatus": 500,
   "errorCode": "INTERNAL_SERVER_ERROR",
-  "message": "Request failed with status code 500",
+  "message": "API_REQUEST_FAILED",
   "frontendVersion": "2026.06.10-1",
   "viewport": "1440x900",
   "timezone": "Asia/Seoul",

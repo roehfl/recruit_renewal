@@ -14,6 +14,9 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 /** retention cleanup(설계 9장) — receivedAt 기준 경계 삭제. 기본 retention-days=90(테스트는 동일 기본값 가정). */
 @SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
@@ -59,5 +62,30 @@ class ClientEventLogCleanupServiceTest {
 
         assertThat(cleanupService.cleanup()).isZero();
         assertThat(repository.count()).isEqualTo(1);
+    }
+
+    // ── retention-days 범위 가드(단위 테스트 — Spring 컨텍스트 불필요) ──────────────
+
+    @Test
+    void retention_days가_0이면_생성시_예외가_발생한다() {
+        assertThatThrownBy(() ->
+                new ClientEventLogCleanupService(mock(ClientEventLogRepository.class), Clock.systemUTC(), 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("1 and 365");
+    }
+
+    @Test
+    void retention_days가_366이면_생성시_예외가_발생한다() {
+        assertThatThrownBy(() ->
+                new ClientEventLogCleanupService(mock(ClientEventLogRepository.class), Clock.systemUTC(), 366))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("1 and 365");
+    }
+
+    @Test
+    void retention_days가_유효한_값이면_정상_생성된다() {
+        assertThatCode(() ->
+                new ClientEventLogCleanupService(mock(ClientEventLogRepository.class), Clock.systemUTC(), 90))
+                .doesNotThrowAnyException();
     }
 }
