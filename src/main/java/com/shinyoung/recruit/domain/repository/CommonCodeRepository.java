@@ -17,4 +17,6 @@ public interface CommonCodeRepository extends JpaRepository<CommonCode, Long> {
     List<CommonCode> findAllByOrderByGroupCodeAscSortOrderAscIdAsc();
 
     boolean existsByGroupCodeAndCode(String groupCode, String code);
+
+    boolean existsByGroupCodeAndCodeAndActiveTrue(String groupCode, String code);
 }
