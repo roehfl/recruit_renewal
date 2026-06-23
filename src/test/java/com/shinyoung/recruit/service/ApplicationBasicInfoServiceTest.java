@@ -210,6 +210,38 @@ class ApplicationBasicInfoServiceTest {
     }
 
     @Test
+    void veteran_subject_requires_type_and_persists_it() {
+        Applicant applicant = createApplicant("bi-veteran", "Veteran");
+        Long applicationId = createApplication(applicant);
+
+        // SUBJECT인데 종류 누락 → 거부
+        assertThatThrownBy(() -> basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
+                new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
+                        LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
+                        VeteranStatus.SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null)))
+                .isInstanceOf(InvalidJobApplicationException.class);
+
+        // SUBJECT + 종류 → 성공 + 평문 라운드트립
+        BasicInfoResponse ok = basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
+                new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
+                        LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
+                        VeteranStatus.SUBJECT, "국가유공자", DisabilityStatus.NOT_SUBJECT, null, null, null, null, null));
+        assertThat(ok.veteranType()).isEqualTo("국가유공자");
+    }
+
+    @Test
+    void veteran_not_subject_with_type_is_rejected() {
+        Applicant applicant = createApplicant("bi-veteran-forbidden", "VeteranForbidden");
+        Long applicationId = createApplication(applicant);
+
+        assertThatThrownBy(() -> basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
+                new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
+                        LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
+                        VeteranStatus.NOT_SUBJECT, "국가유공자", DisabilityStatus.NOT_SUBJECT, null, null, null, null, null)))
+                .isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
     void birth_date_exactly_14_is_accepted_and_one_day_short_is_rejected() {
         Applicant applicant = createApplicant("bi-age-boundary", "AgeBoundary");
         Long applicationId = createApplication(applicant);

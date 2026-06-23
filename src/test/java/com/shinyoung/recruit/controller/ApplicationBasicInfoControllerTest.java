@@ -144,6 +144,54 @@ class ApplicationBasicInfoControllerTest {
     }
 
     @Test
+    void veteran_subject_without_type_returns_bad_request() throws Exception {
+        Applicant applicant = createApplicant("bi-api-veteran", "Api Veteran");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        authenticate(applicant);
+
+        mockMvc.perform(post("/api/applications/{applicationId}/basic-info", applicationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "nameKorean": "홍길동",
+                                  "nationalityType": "DOMESTIC",
+                                  "birthDate": "1995-01-01",
+                                  "mobilePhone": "01012345678",
+                                  "email": "hong@example.com",
+                                  "veteranStatus": "SUBJECT",
+                                  "disabilityStatus": "NOT_SUBJECT"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void veteran_subject_with_type_persists() throws Exception {
+        Applicant applicant = createApplicant("bi-api-veteran-ok", "Api Veteran Ok");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        authenticate(applicant);
+
+        mockMvc.perform(post("/api/applications/{applicationId}/basic-info", applicationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "nameKorean": "홍길동",
+                                  "nationalityType": "DOMESTIC",
+                                  "birthDate": "1995-01-01",
+                                  "mobilePhone": "01012345678",
+                                  "email": "hong@example.com",
+                                  "veteranStatus": "SUBJECT",
+                                  "veteranType": "국가유공자",
+                                  "disabilityStatus": "NOT_SUBJECT"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.persisted").value(true))
+                .andExpect(jsonPath("$.data.veteranType").value("국가유공자"));
+    }
+
+    @Test
     void other_applicants_application_is_hidden() throws Exception {
         Applicant owner = createApplicant("bi-api-owner", "Api Owner");
         Applicant other = createApplicant("bi-api-other", "Api Other");

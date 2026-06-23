@@ -8,6 +8,7 @@ import com.shinyoung.recruit.dto.request.BasicInfoSaveRequest;
 import com.shinyoung.recruit.dto.response.BasicInfoResponse;
 import com.shinyoung.recruit.enumeration.DisabilityStatus;
 import com.shinyoung.recruit.enumeration.NationalityType;
+import com.shinyoung.recruit.enumeration.VeteranStatus;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -69,6 +70,7 @@ public class ApplicationBasicInfoService {
             throw new InvalidJobApplicationException("Basic info request is required.");
         }
         validateNationality(request);
+        validateVeteran(request);
         validateDisability(request);
         validateBirthDate(request.birthDate());
         validatePhone("Mobile phone", request.mobilePhone(), true);
@@ -85,6 +87,16 @@ public class ApplicationBasicInfoService {
             }
         } else if (!isBlank(request.countryCode())) {
             throw new InvalidJobApplicationException("Country code is not allowed for a domestic applicant.");
+        }
+    }
+
+    private void validateVeteran(BasicInfoSaveRequest request) {
+        if (request.veteranStatus() == VeteranStatus.SUBJECT) {
+            if (isBlank(request.veteranType())) {
+                throw new InvalidJobApplicationException("Veteran type is required for a veteran subject.");
+            }
+        } else if (!isBlank(request.veteranType())) {
+            throw new InvalidJobApplicationException("Veteran type is not allowed when not a veteran subject.");
         }
     }
 
