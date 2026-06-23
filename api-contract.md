@@ -42,3 +42,28 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 ## 화면 계약
 
 > 실제 화면 계약은 슬라이스 작업 시 위 템플릿을 복사해 이 아래에 추가한다.
+
+### 화면: 지원자 경력 (ApplicationCareer)
+
+- 프론트: (후속) `src/api/applicationApi.ts` 경력 관련 + 경력 입력 화면
+- 백엔드: `com.shinyoung.recruit.controller.ApplicationCareerController`
+
+#### GET·POST `/api/applications/{applicationId}/careers`  🔴 백엔드 구현됨 / 프론트 미반영
+
+- 변경(2026-06-23): 요청·응답에서 `careerType` 제거. 경력 행에 `promotionDate`(진급일, nullable) 추가.
+- 요청: `{ careers: [{ companyName, departmentName, positionTitle, employmentType, startDate, endDate, promotionDate, currentlyEmployed, responsibilities, resignationReason, sortOrder }] }`
+- 응답(200): `ApiResponse<{ careers: [...] }>` (careerType 필드 없음)
+- 경력은 선택(0개 허용). 신입/경력 타입(careerType) 개념 폐지.
+- 관리자 조회 `GET /api/admin/applications/{id}/careers` 응답도 동일하게 careerType 제거 + promotionDate 추가.
+
+### 화면: 관리자 학교 마스터 (School)
+
+- 프론트: (후속) 학교 검색/관리 화면, `src/api`의 school 관련
+- 백엔드: `SchoolController`(공개 검색), `AdminSchoolController`(CRUD/xlsx import)
+
+#### School 생성·수정·검색·import  🔴 백엔드 구현됨 / 프론트 미반영
+
+- 변경(2026-06-23): `schoolCode` 제거, `schoolCategory` 추가.
+- 생성/수정 요청·응답: `schoolCode` 없음, `schoolCategory` 포함. `schoolType`/`schoolCategory`는 코드 문자열(프론트가 CommonCode 그룹 `SCHOOL_TYPE`/`SCHOOL_CATEGORY`로 렌더, 백엔드 validation 미결합).
+- xlsx import 헤더(7열): `schoolName, schoolType, schoolCategory, educationMode, region, address, countryCode`
+- 중복제거: `(schoolName, schoolType, region)` fallback
