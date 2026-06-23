@@ -67,3 +67,27 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 생성/수정 요청·응답: `schoolCode` 없음, `schoolCategory` 포함. `schoolType`/`schoolCategory`는 코드 문자열(프론트가 CommonCode 그룹 `SCHOOL_TYPE`/`SCHOOL_CATEGORY`로 렌더, 백엔드 validation 미결합).
 - xlsx import 헤더(7열): `schoolName, schoolType, schoolCategory, educationMode, region, address, countryCode`
 - 중복제거: `(schoolName, schoolType, region)` fallback
+
+### 화면: 지원자 어학 (ApplicationLanguage)
+
+- 프론트: (후속) `src/api`의 어학 관련 + 어학 입력 화면
+- 백엔드: `com.shinyoung.recruit.controller.ApplicationLanguageController`
+
+#### GET·POST `/api/applications/{applicationId}/languages`  🔴 백엔드 구현됨 / 프론트 미반영
+
+- 변경(2026-06-23): 요청·응답에서 `score`,`grade` 제거. `scoreOrGrade`(선택), `conversationalAbility`(선택) 추가.
+- 요청: `{ languages: [{ languageName, testName, scoreOrGrade, conversationalAbility, examDate, expiredDate, issuingOrganization, sortOrder }] }`
+- 응답(200): `ApiResponse<[{ languageId, languageName, testName, scoreOrGrade, conversationalAbility, examDate, expiredDate, issuingOrganization, sortOrder }]>`
+- `conversationalAbility`는 공통코드 그룹 `LANGUAGE_CONVERSATION` 코드 문자열(프론트가 CommonCode로 렌더, 백엔드 validation 미결합, 코드 시드 안 함).
+- 관리자 조회 `GET /api/admin/applications/{id}/languages` 응답도 동일하게 `scoreOrGrade`/`conversationalAbility` 반영.
+
+### 화면: 지원자 기본정보 — 보훈 (ApplicationBasicInfo)
+
+- 프론트: (후속) 기본정보 입력 화면 보훈 영역
+- 백엔드: `com.shinyoung.recruit.controller.ApplicationBasicInfoController`
+
+#### GET·POST `/api/applications/{applicationId}/basic-info`  🔴 백엔드 구현됨 / 프론트 미반영
+
+- 변경(2026-06-23): 요청·응답에 `veteranType`(문자열, 평문, 선택) 추가.
+- 규칙: `veteranStatus=="SUBJECT"`면 `veteranType` 필수, `"NOT_SUBJECT"`면 비어 있어야 함(값 있으면 400).
+- 자유 입력 String(공통코드/암호화 아님 — 보훈은 일반 PII). 관리자 조회 응답(`AdminBasicInfoResponse`)에도 `veteranType` 포함.
