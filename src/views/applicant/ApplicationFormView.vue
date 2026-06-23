@@ -16,6 +16,9 @@ import { apiClient } from '@/api/client'
 import type { ApiResponse } from '@/types/api'
 
 import BasicInfoSection from '@/views/applicant/application/sections/BasicInfoSection.vue'
+import LanguageSection from '@/views/applicant/application/sections/LanguageSection.vue'
+import AwardSection from '@/views/applicant/application/sections/AwardSection.vue'
+import CertificateSection from '@/views/applicant/application/sections/CertificateSection.vue'
 
 /**
  * 실제 섹션 컴포넌트가 준비되기 전까지 화면 구조를 확인하기 위한 fallback 컴포넌트다.
@@ -77,9 +80,9 @@ const sectionComponentMap: Record<ApplicationSectionType, Component> = {
   MILITARY: ApplicationSectionPlaceholder,
   EDUCATION: ApplicationSectionPlaceholder,
   CAREER: ApplicationSectionPlaceholder,
-  CERTIFICATE: ApplicationSectionPlaceholder,
-  LANGUAGE: ApplicationSectionPlaceholder,
-  AWARD: ApplicationSectionPlaceholder,
+  CERTIFICATE: CertificateSection,
+  LANGUAGE: LanguageSection,
+  AWARD: AwardSection,
   GAP_PERIOD: ApplicationSectionPlaceholder,
   QUESTION_ANSWER: ApplicationSectionPlaceholder,
   ATTACHMENT: ApplicationSectionPlaceholder,
