@@ -7,9 +7,9 @@ import com.shinyoung.recruit.domain.entity.School;
  */
 public record SchoolResponse(
         Long id,
-        String schoolCode,
         String schoolName,
         String schoolType,
+        String schoolCategory,
         String educationMode,
         String region,
         String address,
@@ -20,9 +20,9 @@ public record SchoolResponse(
     public static SchoolResponse from(School school) {
         return new SchoolResponse(
                 school.getId(),
-                school.getSchoolCode(),
                 school.getSchoolName(),
                 school.getSchoolType(),
+                school.getSchoolCategory(),
                 school.getEducationMode(),
                 school.getRegion(),
                 school.getAddress(),

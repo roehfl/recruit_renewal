@@ -16,7 +16,7 @@ import java.util.List;
 /**
  * School xlsx 일괄 import(upsert)(Phase 08c). 행 단위로 적용하고(전체 거부 아님), 유효하지 않은 행만 skip 한다.
  *
- * <p>upsert 키: {@code schoolCode}(있으면) 우선, 없으면 {@code (schoolName, schoolType, region)} fallback.
+ * <p>upsert 키: {@code (schoolName, schoolType, region)} fallback.
  * 기존이면 서술 필드 update(활성 상태 보존), 신규면 insert. 결과는 insert/update/skip 카운트 + skip 사유로 반환한다.
  *
  * <p>행은 적용 전에 필수/길이를 검증해(엔티티 컬럼 길이와 일치) DB flush 시점의 {@code DataIntegrityViolationException}
@@ -48,26 +48,26 @@ public class SchoolImportService {
                 continue;
             }
 
-            String schoolCode = blankToNull(row.schoolCode());
             String schoolName = blankToNull(row.schoolName());
             String schoolType = blankToNull(row.schoolType());
+            String schoolCategory = blankToNull(row.schoolCategory());
             String educationMode = blankToNull(row.educationMode());
             String region = blankToNull(row.region());
             String address = blankToNull(row.address());
             String countryCode = blankToNull(row.countryCode());
 
-            ExistingMatch match = findExisting(schoolCode, schoolName, schoolType, region);
+            ExistingMatch match = findExisting(schoolName, schoolType, region);
             if (match.ambiguous()) {
                 errors.add(new SchoolImportRowError(row.rowNumber(), match.reason()));
                 continue;
             }
             if (match.school() != null) {
                 // active 는 보존(import 가 비활성화하지 않는다 → School.update 에 null 전달).
-                match.school().update(schoolName, schoolType, educationMode, region, address, countryCode, null);
+                match.school().update(schoolName, schoolType, schoolCategory, educationMode, region, address, countryCode, null);
                 updated++;
             } else {
                 schoolRepository.save(School.create(
-                        schoolCode, schoolName, schoolType, educationMode, region, address, countryCode, true));
+                        schoolName, schoolType, schoolCategory, educationMode, region, address, countryCode, true));
                 inserted++;
             }
         }
@@ -81,9 +81,9 @@ public class SchoolImportService {
         if (blankToNull(row.schoolName()) == null) {
             errors.add("schoolName은(는) 필수입니다.");
         }
-        validateMax(errors, "schoolCode", row.schoolCode(), 100);
         validateMax(errors, "schoolName", row.schoolName(), 200);
         validateMax(errors, "schoolType", row.schoolType(), 50);
+        validateMax(errors, "schoolCategory", row.schoolCategory(), 50);
         validateMax(errors, "educationMode", row.educationMode(), 50);
         validateMax(errors, "region", row.region(), 100);
         validateMax(errors, "address", row.address(), 500);
@@ -97,12 +97,7 @@ public class SchoolImportService {
         }
     }
 
-    private ExistingMatch findExisting(String schoolCode, String schoolName, String schoolType, String region) {
-        if (schoolCode != null) {
-            return schoolRepository.findBySchoolCode(schoolCode)
-                    .map(ExistingMatch::matched)
-                    .orElseGet(ExistingMatch::none);
-        }
+    private ExistingMatch findExisting(String schoolName, String schoolType, String region) {
         List<School> matches = schoolRepository.findByNaturalKey(schoolName, schoolType, region);
         if (matches.size() > 1) {
             return ExistingMatch.ambiguous(

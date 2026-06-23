@@ -8,9 +8,9 @@ package com.shinyoung.recruit.dto.request;
  */
 public record SchoolImportRowRequest(
         int rowNumber,
-        String schoolCode,
         String schoolName,
         String schoolType,
+        String schoolCategory,
         String educationMode,
         String region,
         String address,

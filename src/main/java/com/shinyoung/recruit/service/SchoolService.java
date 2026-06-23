@@ -7,10 +7,8 @@ import com.shinyoung.recruit.dto.request.SchoolUpdateRequest;
 import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.dto.response.SchoolResponse;
 import com.shinyoung.recruit.dto.response.SchoolSearchResponse;
-import com.shinyoung.recruit.exception.InvalidSchoolException;
 import com.shinyoung.recruit.exception.SchoolNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -21,7 +19,6 @@ import java.util.List;
 
 /**
  * School 관리(Phase 08b). public 자동완성(활성 top-N) + admin CRUD(비활성 포함 페이지 목록).
- * {@code schoolCode} 는 식별 키라 생성 후 불변이고, 중복은 선검사 + DB unique 제약(동시성)으로 막아 400 으로 변환한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -63,26 +60,17 @@ public class SchoolService {
 
     @Transactional
     public SchoolResponse create(SchoolCreateRequest request) {
-        String schoolCode = blankToNull(request.schoolCode());
-        if (schoolCode != null && schoolRepository.existsBySchoolCode(schoolCode)) {
-            throw new InvalidSchoolException("이미 존재하는 schoolCode입니다. " + schoolCode);
-        }
-        try {
-            // 동시 생성 race 의 unique violation 은 flush 시점에 400 으로 변환한다.
-            School saved = schoolRepository.saveAndFlush(School.create(
-                    schoolCode,
-                    request.schoolName(),
-                    request.schoolType(),
-                    request.educationMode(),
-                    request.region(),
-                    request.address(),
-                    request.countryCode(),
-                    request.active()
-            ));
-            return SchoolResponse.from(saved);
-        } catch (DataIntegrityViolationException e) {
-            throw new InvalidSchoolException("이미 존재하는 schoolCode입니다. " + schoolCode);
-        }
+        School saved = schoolRepository.save(School.create(
+                request.schoolName(),
+                request.schoolType(),
+                request.schoolCategory(),
+                request.educationMode(),
+                request.region(),
+                request.address(),
+                request.countryCode(),
+                request.active()
+        ));
+        return SchoolResponse.from(saved);
     }
 
     @Transactional
@@ -92,6 +80,7 @@ public class SchoolService {
         school.update(
                 request.schoolName(),
                 request.schoolType(),
+                request.schoolCategory(),
                 request.educationMode(),
                 request.region(),
                 request.address(),

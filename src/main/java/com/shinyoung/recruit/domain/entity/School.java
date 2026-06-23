@@ -8,7 +8,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -16,17 +15,14 @@ import lombok.NoArgsConstructor;
 /**
  * 학교 master(Phase 08b). 지원자 학력 입력의 자동완성/검색과 학교별 통계 grouping 의 기준이다(ADR 0004).
  *
- * <p>식별/중복제거는 외부 {@code schoolCode}(있으면 unique) 우선, 없으면 {@code (schoolName, schoolType, region)}
- * fallback 이다(재import 멱등은 08c). {@code schoolCode} 는 식별 키라 생성 후 불변으로 두고, 나머지 서술 필드는 수정 가능하다.
- * {@code schoolType}/{@code educationMode} 는 코드 문자열(표시는 프론트가 CommonCode group 으로 렌더)이며 백엔드 validation 은 결합하지 않는다.
+ * <p>식별/중복제거는 {@code (schoolName, schoolType, region)} fallback 기준이다(재import 멱등은 08c).
+ * 서술 필드는 수정 가능하다. {@code schoolType}/{@code schoolCategory}/{@code educationMode} 는 코드 문자열
+ * (표시는 프론트가 CommonCode group 으로 렌더)이며 백엔드 validation 은 결합하지 않는다.
  */
 @Entity
 @Getter
 @Table(
         name = "school",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_school_code", columnNames = {"school_code"})
-        },
         indexes = {
                 @Index(name = "idx_school_name", columnList = "school_name"),
                 @Index(name = "idx_school_type", columnList = "school_type")
@@ -39,14 +35,14 @@ public class School extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "school_code", length = 100)
-    private String schoolCode;
-
     @Column(name = "school_name", nullable = false, length = 200)
     private String schoolName;
 
     @Column(name = "school_type", length = 50)
     private String schoolType;
+
+    @Column(name = "school_category", length = 50)
+    private String schoolCategory;
 
     @Column(name = "education_mode", length = 50)
     private String educationMode;
@@ -64,18 +60,18 @@ public class School extends BaseEntity {
     private boolean active;
 
     private School(
-            String schoolCode,
             String schoolName,
             String schoolType,
+            String schoolCategory,
             String educationMode,
             String region,
             String address,
             String countryCode,
             boolean active
     ) {
-        this.schoolCode = normalize(schoolCode);
         this.schoolName = requireText(schoolName);
         this.schoolType = normalize(schoolType);
+        this.schoolCategory = normalize(schoolCategory);
         this.educationMode = normalize(educationMode);
         this.region = normalize(region);
         this.address = normalize(address);
@@ -84,25 +80,26 @@ public class School extends BaseEntity {
     }
 
     public static School create(
-            String schoolCode,
             String schoolName,
             String schoolType,
+            String schoolCategory,
             String educationMode,
             String region,
             String address,
             String countryCode,
             Boolean active
     ) {
-        return new School(schoolCode, schoolName, schoolType, educationMode, region, address, countryCode,
+        return new School(schoolName, schoolType, schoolCategory, educationMode, region, address, countryCode,
                 active == null || active);
     }
 
     /**
-     * 서술 필드만 변경한다. {@code schoolCode}(식별 키)는 불변이다.
+     * 서술 필드만 변경한다.
      */
     public void update(
             String schoolName,
             String schoolType,
+            String schoolCategory,
             String educationMode,
             String region,
             String address,
@@ -111,6 +108,7 @@ public class School extends BaseEntity {
     ) {
         this.schoolName = requireText(schoolName);
         this.schoolType = normalize(schoolType);
+        this.schoolCategory = normalize(schoolCategory);
         this.educationMode = normalize(educationMode);
         this.region = normalize(region);
         this.address = normalize(address);

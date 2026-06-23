@@ -517,7 +517,7 @@ class AdminStatisticsControllerTest {
 
     private School saveSchool(String name) {
         return schoolRepository.saveAndFlush(
-                School.create(null, name, "UNIVERSITY", null, "Seoul", null, "KR", true));
+                School.create(name, "UNIVERSITY", null, null, "Seoul", null, "KR", true));
     }
 
     private void education(JobApplication application, EducationLevel level, Long schoolId, int sortOrder) {

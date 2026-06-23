@@ -41,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SchoolImportControllerTest {
 
     private static final List<String> HEADER = List.of(
-            "schoolCode", "schoolName", "schoolType", "educationMode", "region", "address", "countryCode");
+            "schoolName", "schoolType", "schoolCategory", "educationMode", "region", "address", "countryCode");
     private static final String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     @Autowired
@@ -63,14 +63,16 @@ class SchoolImportControllerTest {
     }
 
     @Test
-    void import_inserts_new_and_updates_existing_by_school_code() throws Exception {
-        // 기존: schoolCode SC1 (region 옛값)
-        schoolRepository.save(School.create("SC1", "Existing University", "UNIVERSITY", null, "Seoul", null, "KR", true));
+    void import_inserts_new_and_updates_existing_by_natural_key() throws Exception {
+        // 기존: (Existing University, UNIVERSITY, Seoul) — natural key
+        schoolRepository.save(School.create("Existing University", "UNIVERSITY", null, null, "Seoul", null, "KR", true));
 
         List<List<String>> rows = List.of(
                 HEADER,
-                List.of("SC1", "Existing University", "UNIVERSITY", "ONCAMPUS", "Incheon", "addr", "KR"), // update
-                List.of("SC2", "New University", "UNIVERSITY", "ONCAMPUS", "Busan", "addr2", "KR"));       // insert
+                // 동일 natural key(name/type/region) → 서술 필드 update
+                List.of("Existing University", "UNIVERSITY", "GENERAL", "ONCAMPUS", "Seoul", "addr", "KR"),
+                // 새 학교 → insert
+                List.of("New University", "UNIVERSITY", "GENERAL", "ONCAMPUS", "Busan", "addr2", "KR"));
 
         mockMvc.perform(multipart("/api/admin/schools/import")
                         .file(new MockMultipartFile("file", "schools.xlsx", XLSX, xlsx(rows)))
@@ -81,19 +83,21 @@ class SchoolImportControllerTest {
                 .andExpect(jsonPath("$.data.updated").value(1))
                 .andExpect(jsonPath("$.data.skipped").value(0));
 
-        School updated = schoolRepository.findBySchoolCode("SC1").orElseThrow();
-        assertThat(updated.getRegion()).isEqualTo("Incheon"); // 업데이트됨
-        assertThat(schoolRepository.findBySchoolCode("SC2")).isPresent(); // 신규
+        School updated = schoolRepository.findByNaturalKey("Existing University", "UNIVERSITY", "Seoul")
+                .stream().findFirst().orElseThrow();
+        assertThat(updated.getAddress()).isEqualTo("addr"); // 업데이트됨(기존 null)
+        assertThat(updated.getSchoolCategory()).isEqualTo("GENERAL");
+        assertThat(schoolRepository.findByNaturalKey("New University", "UNIVERSITY", "Busan")).hasSize(1);
     }
 
     @Test
-    void import_upserts_by_natural_key_when_school_code_absent() throws Exception {
-        schoolRepository.save(School.create(null, "Natural University", "UNIVERSITY", null, "Seoul", null, "KR", true));
+    void import_updates_existing_by_natural_key_only() throws Exception {
+        schoolRepository.save(School.create("Natural University", "UNIVERSITY", null, null, "Seoul", null, "KR", true));
 
-        // schoolCode 없음 → (name,type,region) fallback 으로 동일 학교 매칭 → update(중복 insert 아님)
+        // (name,type,region) fallback 으로 동일 학교 매칭 → update(중복 insert 아님)
         List<List<String>> rows = List.of(
                 HEADER,
-                List.of("", "Natural University", "UNIVERSITY", "ONLINE", "Seoul", "newaddr", "KR"));
+                List.of("Natural University", "UNIVERSITY", "GENERAL", "ONLINE", "Seoul", "newaddr", "KR"));
 
         mockMvc.perform(multipart("/api/admin/schools/import")
                         .file(new MockMultipartFile("file", "schools.xlsx", XLSX, xlsx(rows)))
@@ -109,8 +113,8 @@ class SchoolImportControllerTest {
     void import_skips_blank_school_name_rows() throws Exception {
         List<List<String>> rows = List.of(
                 HEADER,
-                List.of("SCX", "Valid University", "UNIVERSITY", "", "Seoul", "", "KR"),
-                List.of("SCY", "   ", "UNIVERSITY", "", "Seoul", "", "KR")); // blank name → skip
+                List.of("Valid University", "UNIVERSITY", "GENERAL", "", "Seoul", "", "KR"),
+                List.of("   ", "UNIVERSITY", "GENERAL", "", "Seoul", "", "KR")); // blank name → skip
 
         mockMvc.perform(multipart("/api/admin/schools/import")
                         .file(new MockMultipartFile("file", "schools.xlsx", XLSX, xlsx(rows)))
@@ -127,8 +131,8 @@ class SchoolImportControllerTest {
         String tooLongCountry = "X".repeat(20); // countryCode length 10 초과 → DB 예외 대신 행 skip
         List<List<String>> rows = List.of(
                 HEADER,
-                List.of("SCV", "Valid University", "UNIVERSITY", "", "Seoul", "", "KR"),
-                List.of("SCB", "Bad University", "UNIVERSITY", "", "Seoul", "", tooLongCountry));
+                List.of("Valid University", "UNIVERSITY", "GENERAL", "", "Seoul", "", "KR"),
+                List.of("Bad University", "UNIVERSITY", "GENERAL", "", "Seoul", "", tooLongCountry));
 
         mockMvc.perform(multipart("/api/admin/schools/import")
                         .file(new MockMultipartFile("file", "schools.xlsx", XLSX, xlsx(rows)))
@@ -151,14 +155,14 @@ class SchoolImportControllerTest {
 
     @Test
     void import_skips_ambiguous_natural_key_rows() throws Exception {
-        // schoolCode null 인 동일 (name,type,region) 학교가 2건 → fallback upsert 모호 → skip
+        // 동일 (name,type,region) 학교가 2건 → fallback upsert 모호 → skip
         schoolRepository.saveAll(List.of(
-                School.create(null, "Dup University", "UNIVERSITY", null, "Seoul", null, "KR", true),
-                School.create(null, "Dup University", "UNIVERSITY", null, "Seoul", null, "KR", true)));
+                School.create("Dup University", "UNIVERSITY", null, null, "Seoul", null, "KR", true),
+                School.create("Dup University", "UNIVERSITY", null, null, "Seoul", null, "KR", true)));
 
         List<List<String>> rows = List.of(
                 HEADER,
-                List.of("", "Dup University", "UNIVERSITY", "ONLINE", "Seoul", "addr", "KR"));
+                List.of("Dup University", "UNIVERSITY", "GENERAL", "ONLINE", "Seoul", "addr", "KR"));
 
         mockMvc.perform(multipart("/api/admin/schools/import")
                         .file(new MockMultipartFile("file", "schools.xlsx", XLSX, xlsx(rows)))
@@ -179,7 +183,7 @@ class SchoolImportControllerTest {
 
     @Test
     void import_rejects_wrong_header() throws Exception {
-        List<String> wrong = List.of("wrong", "schoolName", "schoolType", "educationMode", "region", "address", "countryCode");
+        List<String> wrong = List.of("wrong", "schoolType", "schoolCategory", "educationMode", "region", "address", "countryCode");
         mockMvc.perform(multipart("/api/admin/schools/import")
                         .file(new MockMultipartFile("file", "schools.xlsx", XLSX, xlsx(List.of(wrong))))
                         .with(authentication(adminAuthentication())))
@@ -230,13 +234,13 @@ class SchoolImportControllerTest {
                 header.createCell(c, CellType.STRING).setCellValue(HEADER.get(c));
             }
             Row row = sheet.createRow(1);
-            row.createCell(0, CellType.STRING).setCellValue("SCF");
-            row.createCell(1, CellType.STRING).setCellValue("Formula University");
-            row.createCell(2, CellType.STRING).setCellValue("UNIVERSITY");
-            row.createCell(3, CellType.STRING).setCellValue("");
-            row.createCell(4, CellType.STRING).setCellValue("Seoul");
-            row.createCell(5, CellType.FORMULA).setCellFormula("1+1"); // address 셀이 formula → skip
-            row.createCell(6, CellType.STRING).setCellValue("KR");
+            row.createCell(0, CellType.STRING).setCellValue("Formula University"); // schoolName
+            row.createCell(1, CellType.STRING).setCellValue("UNIVERSITY");         // schoolType
+            row.createCell(2, CellType.STRING).setCellValue("GENERAL");            // schoolCategory
+            row.createCell(3, CellType.STRING).setCellValue("");                   // educationMode
+            row.createCell(4, CellType.STRING).setCellValue("Seoul");              // region
+            row.createCell(5, CellType.FORMULA).setCellFormula("1+1");             // address 셀이 formula → skip
+            row.createCell(6, CellType.STRING).setCellValue("KR");                 // countryCode
             workbook.write(out);
             return out.toByteArray();
         }

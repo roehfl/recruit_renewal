@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 /**
- * School 수정 요청. {@code schoolCode}(식별 키)는 불변이라 포함하지 않는다. {@code active=false} 로 soft delete.
+ * School 수정 요청. {@code active=false} 로 soft delete.
  */
 public record SchoolUpdateRequest(
         @NotBlank(message = "schoolName은(는) 필수입니다.")
@@ -13,6 +13,9 @@ public record SchoolUpdateRequest(
 
         @Size(max = 50, message = "schoolType은(는) 50자 이하여야 합니다.")
         String schoolType,
+
+        @Size(max = 50, message = "schoolCategory은(는) 50자 이하여야 합니다.")
+        String schoolCategory,
 
         @Size(max = 50, message = "educationMode은(는) 50자 이하여야 합니다.")
         String educationMode,

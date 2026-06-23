@@ -21,7 +21,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * School admin 관리(Phase 08b/08c). 비활성 포함 페이지 목록 + 생성/수정(POST 컨벤션) + xlsx 일괄 import(upsert).
- * schoolCode 는 생성 후 불변(수정 요청에 미포함)이다.
  */
 @RestController
 @RequiredArgsConstructor

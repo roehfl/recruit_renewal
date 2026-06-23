@@ -57,10 +57,10 @@ class SchoolControllerTest {
     @Test
     void public_search_returns_active_prefix_first_excluding_inactive() throws Exception {
         schoolRepository.saveAll(List.of(
-                School.create(null, "Seoul National University", "UNIVERSITY", null, "Seoul", null, "KR", true),
-                School.create(null, "Hankuk Seoul Campus", "UNIVERSITY", null, "Seoul", null, "KR", true),
-                School.create(null, "Busan University", "UNIVERSITY", null, "Busan", null, "KR", true),
-                School.create(null, "Seoul Closed School", "UNIVERSITY", null, "Seoul", null, "KR", false)));
+                School.create("Seoul National University", "UNIVERSITY", null, null, "Seoul", null, "KR", true),
+                School.create("Hankuk Seoul Campus", "UNIVERSITY", null, null, "Seoul", null, "KR", true),
+                School.create("Busan University", "UNIVERSITY", null, null, "Busan", null, "KR", true),
+                School.create("Seoul Closed School", "UNIVERSITY", null, null, "Seoul", null, "KR", false)));
 
         mockMvc.perform(get("/api/schools").param("q", "Seoul").with(anonymous()))
                 .andExpect(status().isOk())
@@ -77,8 +77,8 @@ class SchoolControllerTest {
     @Test
     void public_search_filters_by_school_type() throws Exception {
         schoolRepository.saveAll(List.of(
-                School.create(null, "Seoul High School", "HIGH_SCHOOL", null, "Seoul", null, "KR", true),
-                School.create(null, "Seoul University", "UNIVERSITY", null, "Seoul", null, "KR", true)));
+                School.create("Seoul High School", "HIGH_SCHOOL", null, null, "Seoul", null, "KR", true),
+                School.create("Seoul University", "UNIVERSITY", null, null, "Seoul", null, "KR", true)));
 
         mockMvc.perform(get("/api/schools").param("q", "Seoul").param("schoolType", "UNIVERSITY")
                         .with(anonymous()))
@@ -91,8 +91,8 @@ class SchoolControllerTest {
     void public_search_escapes_like_wildcards() throws Exception {
         // q="%" 가 전체 매칭으로 새지 않고, 이름에 literal '%' 가 든 학교만 매칭되어야 한다(escape).
         schoolRepository.saveAll(List.of(
-                School.create(null, "Alpha University", "UNIVERSITY", null, "Seoul", null, "KR", true),
-                School.create(null, "A%B University", "UNIVERSITY", null, "Seoul", null, "KR", true)));
+                School.create("Alpha University", "UNIVERSITY", null, null, "Seoul", null, "KR", true),
+                School.create("A%B University", "UNIVERSITY", null, null, "Seoul", null, "KR", true)));
 
         mockMvc.perform(get("/api/schools").param("q", "%").with(anonymous()))
                 .andExpect(status().isOk())
@@ -102,7 +102,7 @@ class SchoolControllerTest {
 
     @Test
     void public_search_blank_q_returns_empty() throws Exception {
-        schoolRepository.save(School.create(null, "Anything University", "UNIVERSITY", null, "Seoul", null, "KR", true));
+        schoolRepository.save(School.create("Anything University", "UNIVERSITY", null, null, "Seoul", null, "KR", true));
 
         mockMvc.perform(get("/api/schools").with(anonymous()))
                 .andExpect(status().isOk())
@@ -110,24 +110,19 @@ class SchoolControllerTest {
     }
 
     @Test
-    void admin_create_persists_and_rejects_duplicate_school_code() throws Exception {
+    void admin_create_persists() throws Exception {
         String body = """
-                {"schoolCode":"SC001","schoolName":"테스트대학교","schoolType":"UNIVERSITY","region":"서울"}
+                {"schoolName":"테스트대학교","schoolType":"UNIVERSITY","schoolCategory":"GENERAL","region":"서울"}
                 """;
         mockMvc.perform(jsonAdmin(post("/api/admin/schools"), body))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.schoolCode").value("SC001"))
                 .andExpect(jsonPath("$.data.schoolName").value("테스트대학교"))
+                .andExpect(jsonPath("$.data.schoolCategory").value("GENERAL"))
                 .andExpect(jsonPath("$.data.active").value(true));
-
-        // schoolCode 중복 → 400
-        mockMvc.perform(jsonAdmin(post("/api/admin/schools"),
-                        "{\"schoolCode\":\"SC001\",\"schoolName\":\"다른대학교\"}"))
-                .andExpect(status().isBadRequest());
     }
 
     @Test
-    void admin_create_allows_multiple_null_school_codes() throws Exception {
+    void admin_create_allows_multiple_schools() throws Exception {
         mockMvc.perform(jsonAdmin(post("/api/admin/schools"), "{\"schoolName\":\"A대학교\"}"))
                 .andExpect(status().isOk());
         mockMvc.perform(jsonAdmin(post("/api/admin/schools"), "{\"schoolName\":\"B대학교\"}"))
@@ -143,16 +138,16 @@ class SchoolControllerTest {
     @Test
     void admin_update_changes_fields_and_soft_delete_hides_from_search() throws Exception {
         School school = schoolRepository.save(
-                School.create("SC100", "Editme University", "UNIVERSITY", null, "Seoul", null, "KR", true));
+                School.create("Editme University", "UNIVERSITY", null, null, "Seoul", null, "KR", true));
 
         String body = """
-                {"schoolName":"Editme University","schoolType":"UNIVERSITY","region":"Incheon","active":false}
+                {"schoolName":"Editme University","schoolType":"UNIVERSITY","schoolCategory":"GENERAL","region":"Incheon","active":false}
                 """;
         mockMvc.perform(jsonAdmin(post("/api/admin/schools/{id}", school.getId()), body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.region").value("Incheon"))
-                .andExpect(jsonPath("$.data.active").value(false))
-                .andExpect(jsonPath("$.data.schoolCode").value("SC100")); // 식별 키 유지
+                .andExpect(jsonPath("$.data.schoolCategory").value("GENERAL"))
+                .andExpect(jsonPath("$.data.active").value(false));
 
         // 비활성이라 public 검색에서 제외
         mockMvc.perform(get("/api/schools").param("q", "Editme").with(anonymous()))
@@ -167,24 +162,10 @@ class SchoolControllerTest {
     }
 
     @Test
-    void admin_update_ignores_extra_school_code_keeping_it_immutable() throws Exception {
-        School school = schoolRepository.save(
-                School.create("SC200", "Immutable University", "UNIVERSITY", null, "Seoul", null, "KR", true));
-
-        // 수정 body 에 schoolCode 를 섞어 보내도 무시되고 기존 식별 키가 유지되어야 한다.
-        String body = """
-                {"schoolName":"Immutable University","schoolCode":"HACKED","active":true}
-                """;
-        mockMvc.perform(jsonAdmin(post("/api/admin/schools/{id}", school.getId()), body))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.schoolCode").value("SC200"));
-    }
-
-    @Test
     void admin_list_includes_inactive_paged() throws Exception {
         schoolRepository.saveAll(List.of(
-                School.create(null, "ListedActive University", "UNIVERSITY", null, "Seoul", null, "KR", true),
-                School.create(null, "ListedInactive University", "UNIVERSITY", null, "Seoul", null, "KR", false)));
+                School.create("ListedActive University", "UNIVERSITY", null, null, "Seoul", null, "KR", true),
+                School.create("ListedInactive University", "UNIVERSITY", null, null, "Seoul", null, "KR", false)));
 
         mockMvc.perform(get("/api/admin/schools").param("q", "Listed")
                         .with(authentication(adminAuthentication())))

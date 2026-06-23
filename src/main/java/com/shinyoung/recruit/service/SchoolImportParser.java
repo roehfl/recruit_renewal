@@ -32,7 +32,7 @@ import java.util.List;
 public class SchoolImportParser {
 
     public static final List<String> HEADERS = List.of(
-            "schoolCode", "schoolName", "schoolType", "educationMode", "region", "address", "countryCode");
+            "schoolName", "schoolType", "schoolCategory", "educationMode", "region", "address", "countryCode");
 
     private static final int COLUMN_COUNT = 7;
 

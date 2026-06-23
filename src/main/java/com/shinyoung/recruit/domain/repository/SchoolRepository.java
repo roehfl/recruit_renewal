@@ -8,13 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface SchoolRepository extends JpaRepository<School, Long> {
-
-    boolean existsBySchoolCode(String schoolCode);
-
-    Optional<School> findBySchoolCode(String schoolCode);
 
     /**
      * import fallback dedup 키: (schoolName, schoolType, region). null 필드는 IS NULL 로 매칭한다.
