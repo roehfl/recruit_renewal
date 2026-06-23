@@ -1,0 +1,10 @@
+# 중첩된 코드 저장소 (각자 자체 git으로 관리)
+recruit_back/
+recruit_front/
+
+# 의존성/빌드 산출물
+node_modules/
+
+# 기타
+*.log
+.DS_Store
