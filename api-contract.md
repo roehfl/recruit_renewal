@@ -105,6 +105,35 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 필수: `certificateName`, `issuingOrganization`, `acquiredDate`. 나머지 선택.
 - 자격증은 선택(0개 허용 = 빈 배열). 전체 교체(replace) 방식.
 
+### 화면: 지원자 공백기간 (ApplicationGapPeriod)
+
+- 프론트: `src/api/application/sections/gapPeriodApi.ts`, `src/views/applicant/application/sections/GapPeriodSection.vue` (ApplicationFormView `sectionComponentMap.GAP_PERIOD`)
+- 백엔드: `com.shinyoung.recruit.controller.ApplicationGapPeriodController`
+
+#### GET·POST `/api/applications/{applicationId}/gap-periods`  🟢
+
+- 요청: `{ gapPeriods: [{ startDate, endDate, gapType, reason, description, sortOrder }] }`
+- 응답(200): `ApiResponse<[{ gapPeriodId, startDate, endDate, gapType, reason, description, sortOrder }]>`
+- 필수: `startDate`, `endDate`, `gapType`, `reason`. `description`은 선택(≤2000).
+- `gapType`은 enum `EDUCATION`/`CAREER`/`OTHER`(프론트 라벨 학업/경력/기타, 하드코딩 — 공통코드 아님).
+- 공백기간은 선택(0개 허용 = 빈 배열). 전체 교체(replace) 방식. 프론트 "해당 사항 없음" 체크박스는 영속화 부재로 주석 처리됨.
+
+### 화면: 지원자 자기소개/질문 (ApplicationQuestionAnswer)
+
+- 프론트: `src/api/application/sections/questionAnswerApi.ts`, `src/views/applicant/application/sections/QuestionAnswerSection.vue` (ApplicationFormView `sectionComponentMap.QUESTION_ANSWER`)
+- 백엔드: `com.shinyoung.recruit.controller.ApplicationAnswerController`
+
+#### GET `/api/applications/{applicationId}/questions`  🟢
+
+- 응답(200): `ApiResponse<[{ questionId, questionText, helperText, category, answerType, required, minLength, maxLength, sortOrder, answerId, answerText, updatedAt }]>`
+- 공고가 정의한 질문(JobPostingQuestion) + 지원자 기존 답변 병합. `category` enum SELF_INTRODUCTION/GENERAL/JOB_SPECIFIC/ETC, `answerType` enum SHORT_TEXT/LONG_TEXT.
+
+#### POST `/api/applications/{applicationId}/answers`  🟢
+
+- 요청: `{ answers: [{ questionId, answerText }] }` (answerText ≤5000, 전체 교체)
+- 응답(200): `GET /questions`와 동일 형태(질문 + 갱신된 답변).
+- draft 부분 저장 허용(answerText NotBlank 아님). 필수/minLength는 프론트 최종 제출 검증에서만 강제.
+
 ### 화면: 지원자 기본정보 — 보훈 (ApplicationBasicInfo)
 
 - 프론트: (후속) 기본정보 입력 화면 보훈 영역
