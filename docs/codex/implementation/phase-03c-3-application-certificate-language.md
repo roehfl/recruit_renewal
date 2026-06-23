@@ -1,5 +1,7 @@
 # Phase 03c-3 - Application Certificate + Language
 
+> **변경 주의(2026-06-23)**: 본 문서의 Language `score`/`grade` 서술은 이후 슬라이스에서 단일 `scoreOrGrade`로 통합되고 `conversationalAbility`(LANGUAGE_CONVERSATION 코드)가 추가되었다. 현재 계약/스키마는 `07-implementation-history.md`(2026-06-23 항목)와 `recruit/api-contract.md` 어학 섹션을 따른다.
+
 ## Phase 이름
 
 Phase 03c-3: Application Certificate + Language vertical slice

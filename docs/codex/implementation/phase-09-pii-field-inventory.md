@@ -82,7 +82,7 @@
 | `ApplicationCertificate.expiredDate` / `scoreOrGrade` | true | NULLIFY | null |
 | `ApplicationLanguage.languageName` / `testName` | **false** | **PLACEHOLDER** | `"__PURGED__"` |
 | `ApplicationLanguage.examDate` | **false** | **ALTER_NULLABLE+NULLIFY** | DDL nullable 후 null |
-| `ApplicationLanguage.score` / `grade` / `expiredDate` / `issuingOrganization` | true | NULLIFY | null |
+| `ApplicationLanguage.scoreOrGrade` / `conversationalAbility` / `expiredDate` / `issuingOrganization` | true | NULLIFY | null (conversationalAbility는 LANGUAGE_CONVERSATION 코드값이나 행이 `__PURGED__`되어 보존 실익 없음) |
 | `ApplicationMilitary.militarySubjectType` / `serviceType` / `militaryBranch` / `rank` | - | KEEP_TOMBSTONE | 비PII enum |
 | `ApplicationMilitary.serviceStartDate` / `serviceEndDate` | true | NULLIFY | null(복무 timeline 재식별) |
 | `ApplicationMilitary.exemptionReason` | true (len 1000) | NULLIFY | null(민감) |
@@ -175,6 +175,8 @@ BINARY_DELETE_FAILED : 물리 삭제 실패(재시도/ reconciliation 대상)
 
 **`@Column(updatable=false)` 회피**: `createdBy` 는 JPQL/native bulk update 로만 클리어 가능(엔티티 dirty-update 안 됨).
 
+**어학/보훈 변경(2026-06-23)**: `application_language` `score`/`grade` 컬럼 제거 + `score_or_grade`/`conversational_ability` 추가; `application_basic_info` `veteran_type` 추가. 개발 H2는 JPA ddl-auto, 운영 MariaDB는 ALTER(컬럼 drop/add) 필요. veteranType은 평문(암호화 아님).
+
 ## 10. ApplicationBasicInfo (Phase 10 추가)
 
 > Phase 10(기본정보 섹션) 구현 완료 후 추가. 근거 스캔: 2026-06-12, 실제 엔티티 소스 기준.
@@ -194,6 +196,7 @@ BINARY_DELETE_FAILED : 물리 삭제 실패(재시도/ reconciliation 대상)
 | `ApplicationBasicInfo.emergencyPhone` | true | ✔ AES | NULLIFY | null |
 | `ApplicationBasicInfo.email` | true | ✔ AES | NULLIFY | null |
 | `ApplicationBasicInfo.veteranStatus` | true | - | NULLIFY | null (enum) |
+| `ApplicationBasicInfo.veteranType` | true | - | NULLIFY | null (보훈 종류, 평문·일반 PII) |
 | `ApplicationBasicInfo.disabilityStatus` | true | - | NULLIFY | null (enum, 민감정보) |
 | `ApplicationBasicInfo.disabilityGradeCode` | true | ✔ AES | NULLIFY | null (민감정보) |
 | `ApplicationBasicInfo.disabilityTypeCode` | true | ✔ AES | NULLIFY | null (민감정보) |

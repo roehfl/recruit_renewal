@@ -1,5 +1,20 @@
 # 07. Implementation History
 
+## 2026-06-23 - 어학 scoreOrGrade·conversationalAbility / 기본정보 veteranType
+
+- Date: 2026-06-23
+- Work type: refactor + 소규모 기능 추가 (백엔드 전용 슬라이스, 브랜치 `feature/language-veteran-fields`).
+- 어학(language):
+  - `ApplicationLanguage.score`/`grade` 제거 → `scoreOrGrade`(평문 nullable String, `ApplicationCertificate`와 동일 패턴) 1필드로 합침.
+  - `conversationalAbility`(평문 nullable String) 추가. 공통코드 그룹 `LANGUAGE_CONVERSATION` 코드값이나 백엔드 validation 미결합(SCHOOL_TYPE 선례), 코드 시드 안 함.
+  - DTO(LanguageRequest/LanguageResponse/AdminLanguageResponse)·서비스 매핑·PDF "점수/등급"+"회화능력" 행·`purgeLanguages` NULLIFY 반영. 둘 다 선택값.
+- 기본정보(basic info):
+  - `ApplicationBasicInfo.veteranType`(평문 nullable String, `@Column(length=200)`) 추가 — 보훈은 일반 PII(민감정보 아님)라 암호화하지 않음(`veteranStatus` 평문 enum과 동일 취급).
+  - 조건부 검증 `validateVeteran`: `veteranStatus==SUBJECT`면 종류 필수, `NOT_SUBJECT`면 값 금지(`validateDisability` 구조 미러, 공통코드 조회 제외).
+  - BasicInfoSaveRequest/BasicInfoResponse/AdminBasicInfoResponse·서비스 create/update·`purgeBasicInfo` NULLIFY 반영.
+- 계약: `recruit/api-contract.md`에 어학·기본정보(보훈) 섹션 기록(🔴 백엔드 구현됨/프론트 미반영). 프론트는 후속 슬라이스.
+- Tests: 어학(LanguageService/LanguageController/PiiPurge/AdminSection*/Pdf) + 기본정보(BasicInfoService/BasicInfoController/Encryption/Dashboard/Pdf/PiiPurge/SubmitValidatorBasicInfo) scoped 통과. 전체 리그레션 미실행(하네스 §5).
+
 ## 2026-06-23 - 경력 careerType 제거·진급일 추가 / School schoolCode 제거·schoolCategory 추가
 
 - Date: 2026-06-23

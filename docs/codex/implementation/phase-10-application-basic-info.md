@@ -1,5 +1,7 @@
 # Phase 10 — ApplicationBasicInfo (지원자 기본정보 섹션)
 
+> **변경 주의(2026-06-23)**: `veteranStatus==SUBJECT`일 때 입력하는 평문 `veteranType`(보훈 종류) 필드가 이후 슬라이스에서 추가되었다(조건부 검증: SUBJECT 필수 / NOT_SUBJECT 금지, 파기 NULLIFY 포함). 상세는 `07-implementation-history.md`(2026-06-23 항목) 참고.
+
 - 작성일: 2026-06-12
 - 상태: 구현 완료
 - 기준 스펙: `docs/superpowers/specs/2026-06-12-application-basic-info-design.md`
