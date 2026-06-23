@@ -19,6 +19,8 @@ import BasicInfoSection from '@/views/applicant/application/sections/BasicInfoSe
 import LanguageSection from '@/views/applicant/application/sections/LanguageSection.vue'
 import AwardSection from '@/views/applicant/application/sections/AwardSection.vue'
 import CertificateSection from '@/views/applicant/application/sections/CertificateSection.vue'
+import GapPeriodSection from '@/views/applicant/application/sections/GapPeriodSection.vue'
+import QuestionAnswerSection from '@/views/applicant/application/sections/QuestionAnswerSection.vue'
 
 /**
  * 실제 섹션 컴포넌트가 준비되기 전까지 화면 구조를 확인하기 위한 fallback 컴포넌트다.
@@ -83,8 +85,8 @@ const sectionComponentMap: Record<ApplicationSectionType, Component> = {
   CERTIFICATE: CertificateSection,
   LANGUAGE: LanguageSection,
   AWARD: AwardSection,
-  GAP_PERIOD: ApplicationSectionPlaceholder,
-  QUESTION_ANSWER: ApplicationSectionPlaceholder,
+  GAP_PERIOD: GapPeriodSection,
+  QUESTION_ANSWER: QuestionAnswerSection,
   ATTACHMENT: ApplicationSectionPlaceholder,
 }
 
