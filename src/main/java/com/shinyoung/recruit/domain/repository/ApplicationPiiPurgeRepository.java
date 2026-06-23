@@ -117,8 +117,9 @@ public interface ApplicationPiiPurgeRepository extends Repository<JobApplication
     @Modifying(flushAutomatically = true)
     @Query("""
             update ApplicationLanguage l
-            set l.languageName = '__PURGED__', l.testName = '__PURGED__', l.examDate = null, l.score = null,
-                l.grade = null, l.expiredDate = null, l.issuingOrganization = null,
+            set l.languageName = '__PURGED__', l.testName = '__PURGED__', l.examDate = null,
+                l.scoreOrGrade = null, l.conversationalAbility = null,
+                l.expiredDate = null, l.issuingOrganization = null,
                 l.createdBy = null, l.updatedBy = null
             where l.jobApplication.id = :applicationId""")
     int purgeLanguages(@Param("applicationId") Long applicationId);

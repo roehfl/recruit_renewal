@@ -163,7 +163,7 @@ class ApplicationPiiPurgeServiceTest {
                 application, "정보처리기사", "한국산업인력공단", LocalDate.of(2020, 5, 1),
                 "12-345-678", LocalDate.of(2030, 5, 1), "합격", 1));
         languageRepository.save(ApplicationLanguage.create(
-                application, "영어", "TOEIC", "900", "A", LocalDate.of(2024, 1, 1),
+                application, "영어", "TOEIC", "900", "상", LocalDate.of(2024, 1, 1),
                 LocalDate.of(2026, 1, 1), "ETS", 1));
         militaryRepository.save(ApplicationMilitary.create(
                 application, MilitarySubjectType.COMPLETED, MilitaryServiceType.ACTIVE_DUTY,
@@ -259,8 +259,8 @@ class ApplicationPiiPurgeServiceTest {
         assertThat(language.getLanguageName()).isEqualTo(PURGED);
         assertThat(language.getTestName()).isEqualTo(PURGED);
         assertThat(language.getExamDate()).isNull();
-        assertThat(language.getScore()).isNull();
-        assertThat(language.getGrade()).isNull();
+        assertThat(language.getScoreOrGrade()).isNull();
+        assertThat(language.getConversationalAbility()).isNull();
         assertThat(language.getExpiredDate()).isNull();
         assertThat(language.getIssuingOrganization()).isNull();
 

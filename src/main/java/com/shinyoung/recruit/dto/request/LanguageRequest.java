@@ -13,9 +13,9 @@ public record LanguageRequest(
         @NotBlank(message = "Test name is required.")
         String testName,
 
-        String score,
+        String scoreOrGrade,
 
-        String grade,
+        String conversationalAbility,
 
         @NotNull(message = "Exam date is required.")
         LocalDate examDate,

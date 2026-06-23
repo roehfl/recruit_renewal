@@ -164,8 +164,8 @@ public class ApplicationPdfService {
             rows.add(new RecordRow(List.of(
                     field("언어", l.languageName()),
                     field("시험명", l.testName()),
-                    field("점수", l.score()),
-                    field("등급", l.grade()),
+                    field("점수/등급", l.scoreOrGrade()),
+                    field("회화능력", l.conversationalAbility()),
                     field("응시일", l.examDate()),
                     field("만료일", l.expiredDate()),
                     field("발급기관", l.issuingOrganization()))));

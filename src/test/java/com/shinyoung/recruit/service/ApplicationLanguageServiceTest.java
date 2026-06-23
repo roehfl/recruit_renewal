@@ -97,6 +97,23 @@ class ApplicationLanguageServiceTest {
     }
 
     @Test
+    void replace_persists_score_or_grade_and_conversational_ability() {
+        Applicant applicant = createApplicant("language-fields", "Language Fields");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
+
+        List<LanguageResponse> responses = applicationLanguageService.replaceLanguages(
+                applicant.getId(),
+                applicationId,
+                new LanguageReplaceRequest(List.of(new LanguageRequest(
+                        "English", "TOEIC", "950", "BUSINESS",
+                        LocalDate.of(2024, 1, 1), LocalDate.of(2026, 1, 1), "ETS", 0))));
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).scoreOrGrade()).isEqualTo("950");
+        assertThat(responses.get(0).conversationalAbility()).isEqualTo("BUSINESS");
+    }
+
+    @Test
     void replace_deletes_existing_languages_and_empty_list_is_allowed() {
         Applicant applicant = createApplicant("language-replace", "Language Replace");
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));

@@ -42,9 +42,9 @@ public class ApplicationLanguage extends BaseEntity {
     @Column(nullable = false)
     private String testName;
 
-    private String score;
+    private String scoreOrGrade;
 
-    private String grade;
+    private String conversationalAbility;
 
     // 파기(ALTER_NULLABLE+NULLIFY, PII 인벤토리 §5) 대상이라 nullable — 입력 필수는 request 검증이 보장한다(9d-1).
     private LocalDate examDate;
@@ -60,8 +60,8 @@ public class ApplicationLanguage extends BaseEntity {
             JobApplication jobApplication,
             String languageName,
             String testName,
-            String score,
-            String grade,
+            String scoreOrGrade,
+            String conversationalAbility,
             LocalDate examDate,
             LocalDate expiredDate,
             String issuingOrganization,
@@ -70,8 +70,8 @@ public class ApplicationLanguage extends BaseEntity {
         this.jobApplication = jobApplication;
         this.languageName = languageName;
         this.testName = testName;
-        this.score = score;
-        this.grade = grade;
+        this.scoreOrGrade = scoreOrGrade;
+        this.conversationalAbility = conversationalAbility;
         this.examDate = examDate;
         this.expiredDate = expiredDate;
         this.issuingOrganization = issuingOrganization;
@@ -82,8 +82,8 @@ public class ApplicationLanguage extends BaseEntity {
             JobApplication jobApplication,
             String languageName,
             String testName,
-            String score,
-            String grade,
+            String scoreOrGrade,
+            String conversationalAbility,
             LocalDate examDate,
             LocalDate expiredDate,
             String issuingOrganization,
@@ -93,8 +93,8 @@ public class ApplicationLanguage extends BaseEntity {
                 jobApplication,
                 languageName,
                 testName,
-                score,
-                grade,
+                scoreOrGrade,
+                conversationalAbility,
                 examDate,
                 expiredDate,
                 issuingOrganization,

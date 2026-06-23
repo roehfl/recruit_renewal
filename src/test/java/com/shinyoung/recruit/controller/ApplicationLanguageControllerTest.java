@@ -258,8 +258,8 @@ class ApplicationLanguageControllerTest {
                     {
                       "languageName": "English",
                       "testName": "TOEIC",
-                      "score": "900",
-                      "grade": null,
+                      "scoreOrGrade": "900",
+                      "conversationalAbility": "상",
                       "examDate": "2024-01-01",
                       "expiredDate": "2026-01-01",
                       "issuingOrganization": "ETS",
