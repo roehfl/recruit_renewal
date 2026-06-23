@@ -208,7 +208,7 @@ class ApplicationPiiPurgeServiceTest {
         basicInfoRepository.save(ApplicationBasicInfo.create(
                 application, "홍길동", "Hong", NationalityType.DOMESTIC, null,
                 LocalDate.of(1995, 1, 1), "01012345678", "01099998888", "hong@example.com",
-                VeteranStatus.NOT_SUBJECT, DisabilityStatus.NOT_SUBJECT, null, null,
+                VeteranStatus.SUBJECT, "국가유공자", DisabilityStatus.NOT_SUBJECT, null, null,
                 "06236", "서울시 강남구", "101동"));
 
         entityManager.flush();
@@ -316,6 +316,7 @@ class ApplicationPiiPurgeServiceTest {
         assertThat(purgedBasicInfo.getNationalityType()).isNull();
         assertThat(purgedBasicInfo.getCountryCode()).isNull();
         assertThat(purgedBasicInfo.getVeteranStatus()).isNull();
+        assertThat(purgedBasicInfo.getVeteranType()).isNull();
         assertThat(purgedBasicInfo.getDisabilityStatus()).isNull();
         assertThat(purgedBasicInfo.getDisabilityGradeCode()).isNull();
         assertThat(purgedBasicInfo.getDisabilityTypeCode()).isNull();

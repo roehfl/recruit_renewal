@@ -57,7 +57,7 @@ public class ApplicationBasicInfoService {
         basicInfo.update(
                 request.nameKorean(), request.nameEnglish(), request.nationalityType(), request.countryCode(),
                 request.birthDate(), request.mobilePhone(), request.emergencyPhone(), request.email(),
-                request.veteranStatus(), request.disabilityStatus(),
+                request.veteranStatus(), request.veteranType(), request.disabilityStatus(),
                 request.disabilityGradeCode(), request.disabilityTypeCode(),
                 request.zipCode(), request.addressBasic(), request.addressDetail());
 
@@ -133,7 +133,7 @@ public class ApplicationBasicInfoService {
                 application,
                 request.nameKorean(), request.nameEnglish(), request.nationalityType(), request.countryCode(),
                 request.birthDate(), request.mobilePhone(), request.emergencyPhone(), request.email(),
-                request.veteranStatus(), request.disabilityStatus(),
+                request.veteranStatus(), request.veteranType(), request.disabilityStatus(),
                 request.disabilityGradeCode(), request.disabilityTypeCode(),
                 request.zipCode(), request.addressBasic(), request.addressDetail());
     }

@@ -27,7 +27,7 @@ public final class BasicInfoTestSupport {
                 application,
                 "홍길동", null, NationalityType.DOMESTIC, null,
                 LocalDate.of(1995, 1, 1), "01012345678", null, "test@example.com",
-                VeteranStatus.NOT_SUBJECT, DisabilityStatus.NOT_SUBJECT,
+                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT,
                 null, null, null, null, null));
     }
 }

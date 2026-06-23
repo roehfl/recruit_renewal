@@ -21,6 +21,7 @@ public record BasicInfoSaveRequest(
         @Size(max = 20) String emergencyPhone,
         @NotBlank @Email @Size(max = 100) String email,
         @NotNull VeteranStatus veteranStatus,
+        @Size(max = 100) String veteranType,
         @NotNull DisabilityStatus disabilityStatus,
         @Size(max = 50) String disabilityGradeCode,
         @Size(max = 50) String disabilityTypeCode,

@@ -48,7 +48,7 @@ class ApplicationBasicInfoEncryptionTest {
         ApplicationBasicInfo saved = basicInfoRepository.save(ApplicationBasicInfo.create(
                 application, "홍길동", "Hong Gildong", NationalityType.DOMESTIC, null,
                 LocalDate.of(1995, 1, 1), "01012345678", null, "test@example.com",
-                VeteranStatus.NOT_SUBJECT, DisabilityStatus.NOT_SUBJECT, null, null,
+                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null,
                 "06236", "서울시 강남구", "101동 1001호"));
         entityManager.flush();
         entityManager.clear();

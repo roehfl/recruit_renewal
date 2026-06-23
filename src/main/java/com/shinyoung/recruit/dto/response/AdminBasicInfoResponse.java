@@ -18,6 +18,7 @@ public record AdminBasicInfoResponse(
         String emergencyPhone,
         String email,
         VeteranStatus veteranStatus,
+        String veteranType,
         DisabilityStatus disabilityStatus,
         String disabilityGradeCode,
         String disabilityTypeCode,
@@ -32,7 +33,7 @@ public record AdminBasicInfoResponse(
                 basicInfo.getNameKorean(), basicInfo.getNameEnglish(),
                 basicInfo.getNationalityType(), basicInfo.getCountryCode(), basicInfo.getBirthDate(),
                 basicInfo.getMobilePhone(), basicInfo.getEmergencyPhone(), basicInfo.getEmail(),
-                basicInfo.getVeteranStatus(), basicInfo.getDisabilityStatus(),
+                basicInfo.getVeteranStatus(), basicInfo.getVeteranType(), basicInfo.getDisabilityStatus(),
                 basicInfo.getDisabilityGradeCode(), basicInfo.getDisabilityTypeCode(),
                 basicInfo.getZipCode(), basicInfo.getAddressBasic(), basicInfo.getAddressDetail());
     }

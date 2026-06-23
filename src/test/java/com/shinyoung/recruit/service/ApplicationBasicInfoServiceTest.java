@@ -90,7 +90,7 @@ class ApplicationBasicInfoServiceTest {
         BasicInfoResponse second = basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
                 new BasicInfoSaveRequest("김철수", null, NationalityType.DOMESTIC, null,
                         LocalDate.of(1990, 5, 5), "01099998888", null, "kim@example.com",
-                        VeteranStatus.SUBJECT, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null));
+                        VeteranStatus.SUBJECT, "국가유공자", DisabilityStatus.NOT_SUBJECT, null, null, null, null, null));
 
         assertThat(second.basicInfoId()).isEqualTo(first.basicInfoId());
         assertThat(second.nameKorean()).isEqualTo("김철수");
@@ -124,7 +124,7 @@ class ApplicationBasicInfoServiceTest {
         assertThatThrownBy(() -> basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
                 new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, "US",
                         LocalDate.of(1995, 1, 1), "01012345678", null, "a@b.com",
-                        VeteranStatus.NOT_SUBJECT, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null)))
+                        VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null)))
                 .isInstanceOf(InvalidJobApplicationException.class);
     }
 
@@ -170,7 +170,7 @@ class ApplicationBasicInfoServiceTest {
         assertThatThrownBy(() -> basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
                 new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
                         LocalDate.of(1995, 1, 1), "010-abc-1234", null, "a@b.com",
-                        VeteranStatus.NOT_SUBJECT, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null)))
+                        VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null)))
                 .isInstanceOf(InvalidJobApplicationException.class);
     }
 
@@ -205,7 +205,7 @@ class ApplicationBasicInfoServiceTest {
         assertThatThrownBy(() -> basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
                 new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
                         LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
-                        VeteranStatus.NOT_SUBJECT, DisabilityStatus.NOT_SUBJECT, "G1", "T1", null, null, null)))
+                        VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, "G1", "T1", null, null, null)))
                 .isInstanceOf(InvalidJobApplicationException.class);
     }
 
@@ -230,25 +230,25 @@ class ApplicationBasicInfoServiceTest {
     private BasicInfoSaveRequest domesticRequest() {
         return new BasicInfoSaveRequest("홍길동", "Hong", NationalityType.DOMESTIC, null,
                 LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
-                VeteranStatus.NOT_SUBJECT, DisabilityStatus.NOT_SUBJECT, null, null, "06236", "서울", "101호");
+                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, "06236", "서울", "101호");
     }
 
     private BasicInfoSaveRequest foreignRequest(String countryCode) {
         return new BasicInfoSaveRequest("홍길동", null, NationalityType.FOREIGN, countryCode,
                 LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
-                VeteranStatus.NOT_SUBJECT, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null);
+                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null);
     }
 
     private BasicInfoSaveRequest disabilityRequest(String grade, String type) {
         return new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
                 LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
-                VeteranStatus.NOT_SUBJECT, DisabilityStatus.SUBJECT, grade, type, null, null, null);
+                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.SUBJECT, grade, type, null, null, null);
     }
 
     private BasicInfoSaveRequest ageRequest(LocalDate birthDate) {
         return new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
                 birthDate, "01012345678", null, "hong@example.com",
-                VeteranStatus.NOT_SUBJECT, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null);
+                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null);
     }
 
     private Applicant createApplicant(String loginId, String userName) {

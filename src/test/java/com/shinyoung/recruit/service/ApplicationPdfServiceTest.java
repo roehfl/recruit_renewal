@@ -65,7 +65,7 @@ class ApplicationPdfServiceTest {
                 "새이름", null, NationalityType.DOMESTIC, null,
                 LocalDate.of(1995, 1, 1),
                 "01099998888", null, "basic@new.com",
-                VeteranStatus.NOT_SUBJECT, DisabilityStatus.NOT_SUBJECT,
+                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT,
                 null, null, null, null, null);
         basicInfoRepository.saveAndFlush(basicInfo);
 
@@ -101,7 +101,7 @@ class ApplicationPdfServiceTest {
                 null, null, null, null,
                 null,
                 null, null, null,
-                null, null,
+                null, null, null,
                 null, null, null, null, null);
         basicInfoRepository.saveAndFlush(purgedBasicInfo);
 

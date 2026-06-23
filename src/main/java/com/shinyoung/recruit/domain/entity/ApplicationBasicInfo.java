@@ -74,6 +74,9 @@ public class ApplicationBasicInfo extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private VeteranStatus veteranStatus;
 
+    @Column(length = 200)
+    private String veteranType;
+
     @Enumerated(EnumType.STRING)
     private DisabilityStatus disabilityStatus;
 
@@ -108,6 +111,7 @@ public class ApplicationBasicInfo extends BaseEntity {
             String emergencyPhone,
             String email,
             VeteranStatus veteranStatus,
+            String veteranType,
             DisabilityStatus disabilityStatus,
             String disabilityGradeCode,
             String disabilityTypeCode,
@@ -125,6 +129,7 @@ public class ApplicationBasicInfo extends BaseEntity {
         this.emergencyPhone = emergencyPhone;
         this.email = email;
         this.veteranStatus = veteranStatus;
+        this.veteranType = veteranType;
         this.disabilityStatus = disabilityStatus;
         this.disabilityGradeCode = disabilityGradeCode;
         this.disabilityTypeCode = disabilityTypeCode;
@@ -144,6 +149,7 @@ public class ApplicationBasicInfo extends BaseEntity {
             String emergencyPhone,
             String email,
             VeteranStatus veteranStatus,
+            String veteranType,
             DisabilityStatus disabilityStatus,
             String disabilityGradeCode,
             String disabilityTypeCode,
@@ -153,7 +159,7 @@ public class ApplicationBasicInfo extends BaseEntity {
     ) {
         return new ApplicationBasicInfo(
                 jobApplication, nameKorean, nameEnglish, nationalityType, countryCode, birthDate,
-                mobilePhone, emergencyPhone, email, veteranStatus, disabilityStatus,
+                mobilePhone, emergencyPhone, email, veteranStatus, veteranType, disabilityStatus,
                 disabilityGradeCode, disabilityTypeCode, zipCode, addressBasic, addressDetail
         );
     }
@@ -168,6 +174,7 @@ public class ApplicationBasicInfo extends BaseEntity {
             String emergencyPhone,
             String email,
             VeteranStatus veteranStatus,
+            String veteranType,
             DisabilityStatus disabilityStatus,
             String disabilityGradeCode,
             String disabilityTypeCode,
@@ -184,6 +191,7 @@ public class ApplicationBasicInfo extends BaseEntity {
         this.emergencyPhone = emergencyPhone;
         this.email = email;
         this.veteranStatus = veteranStatus;
+        this.veteranType = veteranType;
         this.disabilityStatus = disabilityStatus;
         this.disabilityGradeCode = disabilityGradeCode;
         this.disabilityTypeCode = disabilityTypeCode;
