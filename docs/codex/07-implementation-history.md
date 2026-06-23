@@ -1,5 +1,20 @@
 # 07. Implementation History
 
+## 2026-06-23 - 경력 careerType 제거·진급일 추가 / School schoolCode 제거·schoolCategory 추가
+
+- Date: 2026-06-23
+- Work type: refactor (백엔드 전용 슬라이스, 브랜치 `feature/career-school-cleanup`).
+- 경력(career):
+  - `careerType`(enum) + `ApplicationCareerProfile` 엔티티·리포지토리 + `CareerType` enum 완전 제거. 타입 기반 검증(저장 시 EXPERIENCED-only, 제출 게이트, 완료판정) 제거 → 경력은 선택 목록(0개 허용).
+  - `ApplicationCareer.promotionDate`(진급일, LocalDate nullable) 추가. PDF 진급일 행, `purgeCareers` NULLIFY 반영. `purgeCareerProfile` 제거.
+  - DTO 정리(CareerReplaceRequest/CareerResponse/AdminCareerResponse에서 careerType 제거; CareerRequest/CareerItemResponse/AdminCareerItemResponse에 promotionDate 추가), `AdminApplicationSectionService.getCareers`·`ApplicationSubmitValidator.validateCareer`·`ApplicationCompletionReadChecker.checkCareer` 제거.
+- School(마스터):
+  - `schoolCode` + `uk_school_code` unique + `existsBySchoolCode`/`findBySchoolCode` 제거 → 중복제거는 `(schoolName, schoolType, region)` fallback 단일화(ADR 0004 개정).
+  - `schoolCategory`(코드 문자열) 추가. xlsx import 헤더 7열(schoolCode 제외, schoolCategory 포함). DTO/서비스/파서 반영.
+  - `schoolType`/`schoolCategory`는 CommonCode 그룹(`SCHOOL_TYPE`/`SCHOOL_CATEGORY`)으로 표시(백엔드 validation 미결합, 코드값은 운영 admin 등록).
+- 계약: 응답/요청 변경으로 프론트 연동 영향 → `recruit/api-contract.md`에 기록, 프론트는 후속 슬라이스.
+- Tests: 경력 관련(CareerService/CareerController/AdminSection*/Dashboard/PiiPurge/Pdf/Completion) + 학교(School/SchoolImport/Statistics) scoped 통과. ※ `ApplicationSubmitValidatorTest`는 basicInfo @Mock 누락으로 본 변경 이전부터 NPE 실패하던 상태(별도 이슈). 전체 리그레션 미실행.
+
 ## 2026-06-12 - Phase 10 ApplicationBasicInfo (지원자 기본정보 섹션) 구현 완료
 
 - Date: 2026-06-12

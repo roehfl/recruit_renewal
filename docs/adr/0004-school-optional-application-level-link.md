@@ -15,5 +15,5 @@ accepted (2026-06-02, Phase 08 design / grill-with-docs Q6·Q8).
 ## Consequences
 
 - 학교별 통계는 `schoolId` 매칭 건만 정확하고, 미매칭(free-text)은 '기타' 버킷이다. 과거 데이터는 소급 매칭하지 않는다.
-- `School` 식별은 외부 `schoolCode`(있으면 unique) 우선, 없으면 `(schoolName, schoolType, region)` fallback 으로 re-import 멱등을 보장한다.
+- `School` 식별/중복제거는 `(schoolName, schoolType, region)` fallback 으로 re-import 멱등을 보장한다. (2026-06-23 개정: 외부 `schoolCode` 컬럼 제거 — 불필요로 판단. 분류용 `schoolCategory` 코드 컬럼 추가, `schoolType`과 함께 CommonCode 그룹으로 표시.)
 - `ApplicationEducation` 은 필드 추가(비파괴)이며 기존 쓰기/조회 계약을 바꾸지 않는다.
