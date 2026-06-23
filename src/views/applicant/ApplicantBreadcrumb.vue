@@ -9,9 +9,12 @@
         {{ item.name }}
       </RouterLink>
 
-      <span v-if="index !== breadcrumbItems.length - 1" class="breadcrumb-link"> {{ item.name }} </span>
+      <span 
+        v-else
+        :class="index === breadcrumbItems.length - 1 ? 'breadcrumb-current' : 'breadcrumb-link'">
+        {{ item.name }}
+      </span>
       <span v-if="index !== breadcrumbItems.length - 1" class="breadcrumb-separator"> › </span>
-      <span v-if="index == breadcrumbItems.length - 1" class="breadcrumb-current"> {{ item.name }} </span>
     </template>
   </nav>
 </template>

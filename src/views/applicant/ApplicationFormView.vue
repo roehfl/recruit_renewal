@@ -15,6 +15,8 @@ import {
 import { apiClient } from '@/api/client'
 import type { ApiResponse } from '@/types/api'
 
+import BasicInfoSection from '@/views/applicant/application/sections/BasicInfoSection.vue'
+
 /**
  * 실제 섹션 컴포넌트가 준비되기 전까지 화면 구조를 확인하기 위한 fallback 컴포넌트다.
  * 각 섹션 컴포넌트가 생기면 sectionComponentMap의 값을 실제 import 컴포넌트로 교체하면 된다.
@@ -70,7 +72,8 @@ const ApplicationSectionPlaceholder = defineComponent({
  * }
  */
 const sectionComponentMap: Record<ApplicationSectionType, Component> = {
-  BASIC_INFO: ApplicationSectionPlaceholder,
+  // BASIC_INFO: ApplicationSectionPlaceholder,
+  BASIC_INFO: BasicInfoSection,
   MILITARY: ApplicationSectionPlaceholder,
   EDUCATION: ApplicationSectionPlaceholder,
   CAREER: ApplicationSectionPlaceholder,

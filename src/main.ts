@@ -8,8 +8,11 @@ import 'ant-design-vue/dist/reset.css'
 
 import App from './App.vue'
 import { router } from '@/routes'
+import { installClientErrorHandlers } from '@/plugins/clientErrorHandlers'
 
 import './styles/global.scss'
+
+installClientErrorHandlers()
 
 const app = createApp(App)
 

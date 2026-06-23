@@ -1,63 +1,31 @@
 <template>
   <section class="profile-page">
     <div class="page-inner">
-      <ApplicantBreadcrumb />
 
       <h1 class="page-title">마이페이지</h1>
+
       <div class="profile-card">
         <div class="profile-left">
-            <div class="profile-image"></div>
             <div class="profile-info">
                 <div class="name">{{ authStore.name }}</div>
                 <div class="email">{{ authStore.loginId }}</div>
             </div>
         </div>
       
-        <div class="profild-right">
+        <div class="profile-right">
           <a-button class="setting-button"
-          @click="modalOpen()">수정</a-button>
+          @click="settingModalOpen()">수정</a-button>
           <a-button class="logout-button"
           @click="logout()">로그아웃</a-button>
         </div>            
       </div>
 
-      <!-- <h2 class="page-title-sub">지원 목록</h2> -->
-      <div>
-        <a-card title="지원 목록">
-        <a-form layout="inline" class="search-form">
-          <a-form-item label="키워드">
-            <a-input v-model:value="searchState.keyword" placeholder="공고명" @pressEnter="onSearchClick"/>
-          </a-form-item>
-          <a-form-item label="상태">
-            <a-select
-              v-model:value="searchState.status"
-              style="width: 140px"
-              :options="[
-                { label: '진행중', value: '진행중' },
-                { label: '예정', value: '예정' },
-                { label: '마감', value: '마감' },
-              ]" />
-          </a-form-item>
-
-          <a-form-item>
-            <a-space>
-              <a-button type="primary" @click="onSearchClick()">조회</a-button>
-              <a-button @click="onSearchReset">초기화</a-button>
-            </a-space>
-          </a-form-item>
-        </a-form>
-        <a-table :columns="columns" :data-source="applicationListItems" :pagination="{ pageSize: 5 }" />
-        </a-card>
-
-        <!-- <h2 class="page-title-sub">추가 입력사항</h2> -->
-      </div>
-
       <a-modal
         :getContainer="false"
-        v-model:open="isModalOpen"
+        v-model:open="isSettingModalOpen"
         title="내 정보 수정"
         :width="750"
-        @cancel="modalClose()"
+        @cancel="settingModalClose()"
         >
 
         <div class="modal-body">
@@ -70,29 +38,29 @@
           <div class="content-selection">
             <div>
               <a-form
-              :model="form"
-              :rules="rules"
+              :model="PasswordForm"
+              :rules="PasswordRules"
               layout="vertical"
               autocomplete="off"
             >
-              <a-form-item label="현재비밀번호" name="password">
-                <a-input-password v-model:value="form.currentPassword" size="large" placeholder="비밀번호">
+              <a-form-item label="현재비밀번호" name="currentPassword">
+                <a-input-password v-model:value="PasswordForm.currentPassword" size="large" placeholder="비밀번호">
                   <template #prefix>
                     <LockOutlined />
                   </template>
                 </a-input-password>
               </a-form-item>
 
-              <a-form-item label="새 비밀번호" name="password">
-                <a-input-password v-model:value="form.newPassword" size="large" placeholder="비밀번호">
+              <a-form-item label="새 비밀번호" name="newPassword">
+                <a-input-password v-model:value="PasswordForm.newPassword" size="large" placeholder="새 비밀번호">
                   <template #prefix>
                     <LockOutlined />
                   </template>
                 </a-input-password>
               </a-form-item>
 
-              <a-form-item label="새 비밀번호 확인" name="password">
-                <a-input-password v-model:value="form.newPasswordCheck" size="large" placeholder="비밀번호">
+              <a-form-item label="새 비밀번호 확인" name="newPasswordCheck">
+                <a-input-password v-model:value="PasswordForm.newPasswordCheck" size="large" placeholder="새 비밀번호 확인">
                   <template #prefix>
                     <LockOutlined />
                   </template>
@@ -103,42 +71,102 @@
           <div class="changePassword">
             <a-button class="changePasswordButton"
             type="primary"
-            @click="changePassword()"
+            @click="changePasswordButton()"
             >변경</a-button>
           </div>
         </div>
+        </div>
+      </a-modal>
+
+      <div>
+        <div class="page-inner-top">
+          <h2 class="page-title-sub">지원 목록</h2>
+          <a-button class="more-info-button" type="primary"
+          @click="moreInfoModalOpen()">지원자 추가사항 입력</a-button>
+        </div>
+        <div class="myApplicationTable">
+          <a-table
+          :columns="columns"
+          :data-source="applicationListItems"
+          :pagination="{ pageSize: 5 }"/>
+        </div>
       </div>
 
-        
+      <a-modal
+        :getContainer="false"
+        v-model:open="isMoreInfoModalOpen"
+        title="지원자 추가사항 입력"
+        :width="900"
+        @cancel="moreInfoModalClose()">
+        <div>준비 중입니다.</div>
       </a-modal>
+      
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { onMounted, h, ref, reactive } from 'vue'
-import ApplicantBreadcrumb from '@/views/applicant/ApplicantBreadcrumb.vue'
-import type { MyApplicationList, MyApplicationListItem } from '@/types/application'
+import type { ChangePasswordRequest, MyApplicationList, MyApplicationListItem } from '@/types/application'
 import { message, type TableColumnsType } from 'ant-design-vue'
 import { LockOutlined } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { applicationApi } from '@/api/applicationApi'
+import { getApiErrorMessage } from '@/api/apiError'
 
-interface TableRow {
-  key: string
-  title: string
-  dept: string
-  status: '진행중' | '마감' | '예정'
-  createdAt: string
+interface Password {
+  currentPassword: string
+  newPassword: string
+  newPasswordCheck: string
 }
 
-const loading = ref(false)
+const PasswordForm = reactive<Password>({
+  currentPassword: '',
+  newPassword: '',
+  newPasswordCheck: '',
+})
+
+const changePassword = ref<ChangePasswordRequest>({
+  data: '',
+  message: '',
+  success: false
+})
+
+const PasswordRules = {
+  currentPassword: [
+    {
+      required: true,
+      message: '비밀번호를 입력하세요.',
+      trigger: 'blur',
+    },
+  ],
+  newPassword: [
+    {
+      required: true,
+      message: '새 비밀번호를 입력하세요.',
+      trigger: 'blur',
+    },
+  ],
+  newPasswordCheck: [
+    {
+      required: true,
+      message: '새 비밀번호 확인을 입력하세요.',
+      trigger: 'blur',
+    },
+  ],
+}
+
+const loading = ref(false);
+const selectMenu = ref('');
 const applicationList = ref<MyApplicationList[]>([])
 const applicationListItems = ref<MyApplicationListItem[]>([])
-const searchState = ref({ keyword: '', status: undefined as string | undefined })
-const isModalOpen = ref(false);
+const isSettingModalOpen = ref(false);
+const isMoreInfoModalOpen = ref(false);
 const pagination = reactive({ current: 1, pageSize: 5, total: 0 })
+
+const router = useRouter();
+const authStore = useAuthStore();
 
 const applicationStatusTypeMap: Record<string, string> = {
   DRAFT: '임시저장', 
@@ -146,21 +174,65 @@ const applicationStatusTypeMap: Record<string, string> = {
   WITHDRAWN: '제출취소'
 }
 
-const modalOpen = () => {
-  isModalOpen.value = true;
-  console.log("modal open 실행", isModalOpen.value);
+const settingModalOpen = () => {
+  isSettingModalOpen.value = true;
 }
 
-const modalClose = () => {
-    isModalOpen.value = false;
+const settingModalClose = () => {
+  isSettingModalOpen.value = false;
 }
 
-const onSearchReset = () => {
-  searchState.value = { keyword: '', status: undefined }
-
+const moreInfoModalOpen = () => {
+  isMoreInfoModalOpen.value = true;
 }
 
-async function loadMyApplications() {
+const moreInfoModalClose = () => {
+  isMoreInfoModalOpen.value = false;
+}
+
+const checkPassword = async () => {
+  try {
+    const result = await applicationApi.changePassword({
+      currentPassword: PasswordForm.currentPassword,
+      newPassword: PasswordForm.newPassword,
+    })
+    changePassword.value = {
+      data: result.data.data as unknown as string,
+      message: result.data.message ?? '',
+      success: result.data.success,
+    }
+    if(changePassword.value.success){
+      message.success('비밀번호가 변경되었습니다.');
+      PasswordForm.currentPassword = '';
+      PasswordForm.newPassword = '';
+      PasswordForm.newPasswordCheck = '';
+      settingModalClose();
+    }
+  }
+  catch (error) {
+    console.error(error);
+    message.error(getApiErrorMessage(error, 'fallback 메세지'));
+  }
+}
+
+const changePasswordButton = async() => {
+  if(!PasswordForm.currentPassword) {
+    return;
+  }
+  else if(PasswordForm.newPassword !== PasswordForm.newPasswordCheck) {
+    message.error('새 비밀번호가 일치하지 않습니다.');
+    return;
+  }
+
+  await checkPassword();
+}
+
+const logout = async () => {
+    await authStore.logout();
+    router.replace('/applicant');
+}
+
+const loadMyApplications = async () => {
   loading.value = true;
   try {
     const result = await applicationApi.getMyApplications({
@@ -185,103 +257,56 @@ async function loadMyApplications() {
   }
 }
 
-const onSearchClick = () => {
-  rows.value = rows.value.filter((item) => {
-    const keywordMatched = !searchState.value.keyword || item.title.includes(searchState.value.keyword);
-    const statusMatched = !searchState.value.status || item.status === searchState.value.status;
-
-    return keywordMatched && statusMatched;
-  })
-}
-
-const rows = ref<TableRow[]>([
-  {
-    key: '1',
-    title: '2026 상반기 신입 채용',
-    dept: '인사팀',
-    status: '진행중',
-    createdAt: '2026-05-01',
-  },
-  {
-    key: '2',
-    title: '백엔드 경력 채용',
-    dept: '플랫폼팀',
-    status: '예정',
-    createdAt: '2026-05-08',
-  },
-  { key: '3',
-    title: '디자이너 채용',
-    dept: '디자인팀',
-    status: '마감',
-    createdAt: '2026-04-15' },
-])
-
-console.log("#### applicationList", applicationListItems.value)
-
 const columns: TableColumnsType<MyApplicationListItem> = [
   {
     title: '공고명',
-    dataIndex: 'jobPostingTitle',
-    key: 'title', 
-    customRender: ({record}) => { return record.jobPostingTitle?? '-' },
+    dataIndex: 'title',
+    key: 'title',
+    customRender: ({ record }) => h('a', { onClick: () => goDetail(record.jobPostingId) }, record.jobPostingTitle),
   },
   {
     title: '상태',
     dataIndex: 'applicationStatus',
     key: 'status',
-    width: 120,
+    width: 130,
+    align: 'center',
     customRender: ({record}) => { return applicationStatusTypeMap[String(record?.applicationStatus)] ?? '-'},
   },
   {
-    title: '최종 제출 시간',
-    dataIndex: 'submittedAt', 
-    key: 'submittedAt',
-    width: 140,
-    customRender: ({record}) => { return record?.submittedAt ?? '미제출' },
+    title: '지원서 수정',
+    dataIndex: 'title',
+    key: 'title',
+    width: 150,
+    align: 'center',
+    customRender: ({ record }) => h('a', { onClick: () => goForm(record.applicationId) }, '바로가기'),
   },
   {
-    title: '상세',
-    key: 'action',
-    width: 120,
-    customRender: () => h('a', { class: 'action-link' }, '수정'),
+    title: '전형결과 확인',
+    key: 'result',
+    width: 180,
+    align: 'center',
+    customRender: () => h('a', { class: 'action-link' }, '확인'),
   },
 ]
 
-const selectMenu = ref('');
-
-const form = ({
-  currentPassword: '',
-  newPassword: '',
-  newPasswordCheck: '',
-})
-
-const rules = {
-  currentPassword: [
-    {
-      required: true,
-      message: '비밀번호를 입력하세요.',
-      trigger: 'blur',
+const goDetail = async (id: number) => {
+  const selectedPosting = applicationListItems.value.find((item) => item.jobPositionId === id)
+  await router.push({
+    path: `/applicant/${id}/detail`,
+    state: {
+      data: JSON.stringify(selectedPosting),
     },
-  ],
+  })
 }
 
-const openMessage = () => message.success('비밀번호가 변경되었습니다.')
-
-const changePassword = () => {
-  console.log("데이터 저장 후 초기화");
-  form.currentPassword = '';
-  form.newPassword = '';
-  form.newPasswordCheck = '';
-  modalClose();
-  openMessage();
-}
-
-const router = useRouter();
-const authStore = useAuthStore();
-
-const logout = async () => {
-    await authStore.logout();
-    router.replace('/applicant');
+const goForm = async (id: number) => {
+  const selectedApplication = applicationListItems.value.find((item) => item.applicationId === id)
+  await router.push({
+    path: `/applicant/${id}/form`,
+    state: {
+      data: JSON.stringify(selectedApplication),
+    },
+  })
 }
 
 onMounted(() => {
@@ -300,7 +325,22 @@ onMounted(() => {
 .page-inner {
   max-width: 1080px;
   margin: 0 auto;
-  padding: 42px 20px 88px;
+  padding: 98px 20px 88px;
+  /* padding: 42px 20px 88px; */
+}
+
+.page-inner-top {
+  width: 100%;
+  max-width: 1040px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.page-inner-top-left {
+  display: flex;
+  align-items: center;
+  gap: 40px;
 }
 
 .page-title {
@@ -313,13 +353,14 @@ onMounted(() => {
 }
 
 .page-title-sub {
-  margin-top: 50px;
+  margin-top: 20px;
   margin-bottom: 20px;
-  font-size: 24px; 
-  font-weight: 600;
+  margin-left: 15px;
+  font-size: 20px; 
+  font-weight: 550;
   line-height: 1.25;
   letter-spacing: -0.04em;
-  color: var(--app-text-secondary);
+  color: var(--app-text);
 }
 
 /* =========================
@@ -328,7 +369,7 @@ onMounted(() => {
 
 .profile-card {
   width: 100%;
-  max-width: 1038px;
+  max-width: 1040px;
   max-height: 150px;
 
   display: flex;
@@ -351,17 +392,8 @@ onMounted(() => {
 .profile-left {
   display: flex;
   align-items: center;
+  margin-left: 20px;
   gap: 40px;
-}
-
-.profile-image {
-  width: 90px;
-  height: 90px;
-
-  border-radius: 50%;
-  background-color: var(--app-border-soft);
-
-  /* flex-shrink: 0; */
 }
 
 .profile-info {
@@ -384,14 +416,13 @@ onMounted(() => {
 .profile-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 15px;
 }
 
 .setting-button {
   width: 60px;
   height: 40px;
-  padding: 0 15px;
-  margin-right: 10px;
+  padding: 0 10px;
 
   border: 1px solid var(--app-border-soft);
   border-radius: 15px;
@@ -407,7 +438,7 @@ onMounted(() => {
 .logout-button {
   width: 100px;
   height: 40px;
-  padding: 0 15px;
+  padding: 0 10px;
 
   border: 1px solid var(--app-border-soft);
   border-radius: 15px;
@@ -437,13 +468,11 @@ onMounted(() => {
    그리드 영역
 ========================= */
 
+.myApplicationTable {
+  border: 1px solid var(--app-border-subtle);
+  border-radius: 10px;
 
-.search-form {
-  margin-bottom: 16px;
-}
-
-:deep(.ant-card-body) {
-  min-height: 350px;
+  background-color: #ffffff;
   box-shadow: 0 5px 20px var(--tap-panel-shadow);
 }
 
@@ -451,31 +480,9 @@ onMounted(() => {
   min-height: 250px;
 }
 
-:deep(.ant-table-cell)
-.status-tag {
-  margin: 0;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  font-weight: 500;
-  font-size: 13px;
-  line-height: 1.2;
+:deep(.ant-table-cell) {
+  padding-left: 20px;
 }
-:deep(.ant-table-cell)
-.status-tag.진행중 {
-  color: var(--app-color-success);
-}
-
-:deep(.ant-table-cell)
-.status-tag.예정 {
-  color: #d46b08;
-}
-
-:deep(.ant-table-cell)
-.status-tag.마감 {
-  color: var(--app-text-muted);
-}
-
 
 /* =========================
    내 정보 수정 화면
@@ -518,6 +525,14 @@ onMounted(() => {
   display: flex;
   margin: 20px 0;
   justify-content: flex-end;
+}
+
+/* =========================
+   지원자 추가사항 영역
+========================= */
+
+.more-info-button{
+  margin-right: 15px;
 }
 
 </style>

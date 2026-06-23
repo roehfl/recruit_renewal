@@ -5,7 +5,7 @@
 
       <button type="button" class="notice-more" @click="goNoticeList">
         더보기
-        <RightOutlined />
+        <RightOutlined class="go-icon" />
       </button>
     </div>
 
@@ -53,10 +53,6 @@ async function loadNotices() {
 
 const router = useRouter()
 
-// const goNoticeDetail = async (url: number): Promise<void> => {
-//   await router.push(noticeList)
-// }
-
 const goNoticeList = async (): Promise<void> => {
   await router.push('/applicant/noticeList')
 }
@@ -98,8 +94,10 @@ onMounted(() => {
   gap: 4px;
   border: 0;
   background: transparent;
-  color: var(--app-text-secondary);
-  font-size: 13px;
+  /* color: var(--app-text-secondary); */
+  color: var(--app-primary-color);
+  font-weight: 600;
+  font-size: 14px;
   cursor: pointer;
 }
 
@@ -158,5 +156,9 @@ onMounted(() => {
   color: var(--app-color-success);
   font-size: 10px;
   font-weight: 700;
+}
+
+.go-icon {
+  font-size: 12px;
 }
 </style>

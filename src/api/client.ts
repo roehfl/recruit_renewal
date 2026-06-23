@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useUiStore } from '@/stores/uiStore'
+import { logApiError } from '@/common/httpErrorTelemetry'
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -36,6 +37,8 @@ apiClient.interceptors.response.use(
     const uiStore = useUiStore()
     const currentPath = window.location.pathname
     uiStore.hideLoading()
+
+    logApiError(error)
 
     const status = error.response?.status
     const skipAuthRedirect = error.config?.skipAuthRedirect === true

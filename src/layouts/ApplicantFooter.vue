@@ -30,7 +30,7 @@
       <div class="footer-bottom">
         <p class="copyright">COPYRIGHT SHINYOUNG SECURITIES CO.,LTD. ALL RIGHTS RESERVED</p>
 
-        <RouterLink class="privacy-link" to="/privacy"> 개인정보처리방침 </RouterLink>
+        <RouterLink class="privacy-link" to="/applicant/privacy"> 개인정보처리방침 </RouterLink>
       </div>
     </div>
   </footer>
@@ -70,11 +70,11 @@ const footerMenus: FooterMenuGroup[] = [
     items: [
       {
         title: '채용절차',
-        url: '/guide/process',
+        url: '/applicant/recruitProcedure',
       },
       {
         title: '직무소개',
-        url: '/guide/job',
+        url: '/applicant/dutyIntroduction',
       },
     ],
   },
@@ -82,12 +82,8 @@ const footerMenus: FooterMenuGroup[] = [
     title: '채용공고',
     items: [
       {
-        title: '공개채용',
-        url: '/recruit/public',
-      },
-      {
-        title: '수시채용',
-        url: '/recruit/regular',
+        title: '채용공고',
+        url: '/applicant/recruits',
       },
     ],
   },
@@ -104,7 +100,7 @@ const footerMenus: FooterMenuGroup[] = [
       },
       {
         title: '지원자 마이페이지',
-        url: '/mypage',
+        url: '/applicant/profile',
       },
     ],
   },

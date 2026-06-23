@@ -1,6 +1,6 @@
 import { apiClient } from './client'
 import type { ApiResponse } from '@/types/api'
-import type { LoginRequest, LoginUser, SignupUser } from '@/types/auth'
+import type { LoginRequest, LoginUser, SignupUser, checkEmailRequest } from '@/types/auth'
 
 export const authApi = {
   login(request: LoginRequest) {
@@ -19,5 +19,13 @@ export const authApi = {
 
   signup(request: SignupUser) {
     return apiClient.post<ApiResponse<SignupUser>>('/auth/applicants/sign-up', request)
+  },
+
+  checkEmail(email: string) {
+    return apiClient.get<ApiResponse<checkEmailRequest>>('/auth/applicants/check-email', {
+      params: {
+        email,
+      },
+    })
   },
 }

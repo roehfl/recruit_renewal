@@ -8,6 +8,7 @@ export interface LoginUser {
   name: string
   deptName: string
   userType: 'Applicant' | 'Employee'
+  phoneNumber: string
   roles: string[]
 }
 
@@ -18,4 +19,10 @@ export interface SignupUser {
   phoneNumber: string,
   email: string,
   ci: string
+}
+
+export interface checkEmailRequest {
+  success: boolean,
+  data: {available: boolean},
+  message: string
 }

@@ -10,6 +10,7 @@ import { apiClient } from '@/api/client'
 import type { ApiResponse } from '@/types/api'
 import type { MyJobPostingListItem, MyJobPostingDetailListItem } from '@/types/jobPosting'
 import { boardApi } from '@/api/boardApi'
+import HtmlView from '@/views/common/htmlView.vue'
 
 
 const route = useRoute();
@@ -256,7 +257,8 @@ onMounted(async () => {
       <a-spin :spinning="loading">
         <template v-if="jobPostContentHtml">
           <a-card class="form-content-card" :bordered="false">
-            <div v-html="jobPostContentHtml"></div>
+            <HtmlView :content="jobPostContentHtml" />
+            <!-- <div v-html="jobPostContentHtml"></div> -->
           </a-card>
         </template>
 

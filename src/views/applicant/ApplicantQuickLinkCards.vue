@@ -17,7 +17,8 @@
         <div class="card-content">
           <div>
             <h3 class="card-title">{{ item.title }}</h3>
-            <p class="card-desc">{{ item.description }}</p>
+            <!-- <p class="card-desc">{{ item.description }}</p> -->
+            <p class="card-desc" v-html="item.description"></p>
           </div>
 
           <div class="card-bottom">
@@ -26,7 +27,6 @@
           </div>
         </div>
 
-        <!-- <div class="card-deco" /> -->
       </a-card>
     </div>
   </section>
@@ -58,8 +58,8 @@ const quickLinks = ref<QuickLinkItem[]>([
   },
   {
     title: '직무소개',
-    description: '어떤 업무를 원하시나요? 다양한 직무를 확인하실 수 있습니다.',
-    url: '/job-intro',
+    description: '어떤 업무를 원하시나요?<br> 다양한 직무를 확인하실 수 있습니다.',
+    url: '/applicant/dutyIntroduction',
   },
 ])
 
@@ -160,7 +160,7 @@ const goPage = async (url: string): Promise<void> => {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #5f6f54;
+  color: var(--app-primary-color);
   font-size: 14px;
   font-weight: 600;
 }
@@ -169,30 +169,6 @@ const goPage = async (url: string): Promise<void> => {
   font-size: 12px;
 }
 
-/* .card-deco {
-  position: absolute;
-  right: -14px;
-  bottom: -18px;
-  width: 82px;
-  height: 82px;
-  border: 5px solid rgba(255, 255, 255, 0.9);
-  border-radius: 52% 48% 44% 56%;
-  transform: rotate(-28deg);
-  opacity: 0.9;
-}
-
-.card-deco::before {
-  position: absolute;
-  top: 50%;
-  left: -18px;
-  width: 92px;
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
-  content: '';
-  transform: rotate(48deg);
-  transform-origin: center;
-} */
 
 @media (max-width: 1100px) {
   .quick-link-grid {

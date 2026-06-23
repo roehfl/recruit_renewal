@@ -29,9 +29,6 @@
             <span class="dday">
               {{ getDDay(recruit.receptionEndDateTime) }}
             </span>
-            <!-- <a-tag color="blue">
-              {{ getDDay(recruit.receptionEndDateTime) }}
-            </a-tag> -->
           </div>
 
           <div class="recruit-title">
@@ -48,7 +45,7 @@
 
     <button type="button" class="more-button" @click="goRecruitList">
       <span> 바로가기 </span>
-      <RightOutlined />
+      <RightOutlined class="go-icon" />
     </button>
   </a-card>
 </template>
@@ -285,8 +282,6 @@ onMounted(() => {
 .more-button {
   display: flex;
   align-items: center;
-  /* justify-content: space-between; */
-  /* justify-content: flex-end; */
   gap: 6px;
   width: calc(100% + 48px);
   height: 50px;
@@ -296,7 +291,7 @@ onMounted(() => {
   border-radius: 0 0 8px 8px;
   background: var(--app-primary-subtle-color);
   color: var(--app-primary-color);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -307,5 +302,9 @@ onMounted(() => {
 
 .empty-box {
   padding: 28px 0 20px;
+}
+
+.go-icon {
+  font-size: 12px;
 }
 </style>

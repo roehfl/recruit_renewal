@@ -94,3 +94,14 @@ export interface ApplicationSearchParams {
   page: number
   size: number
 }
+
+export interface ChangePasswordParams {
+  currentPassword: string
+  newPassword: string
+}
+
+export interface ChangePasswordRequest {
+  data: string
+  message: string
+  success: boolean
+}

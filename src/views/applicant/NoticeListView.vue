@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 // import { useRouter } from 'vue-router'
+import ApplicantBreadcrumb from '@/views/applicant/ApplicantBreadcrumb.vue'
 import type { TableColumnsType, TablePaginationConfig } from 'ant-design-vue'
 import { boardApi } from '@/api/boardApi'
 import type { NoticeListItem, NoticeDetail } from '@/types/notice'
@@ -85,70 +86,76 @@ onMounted(() => {
 </script>
 <template>
   <section class="board-page">
-    <div class="board-container">
-      <div class="board-card">
-        <div class="board-header">
-          <div>
-            <h2>공지사항</h2>
-            <!-- <p>채용 관련 공지사항을 확인할 수 있습니다.</p> -->
+    <div class="page-inner">
+        <ApplicantBreadcrumb />
+
+        <h1 class="page-title">공지사항</h1>
+
+      <div class="board-container">
+        <div class="board-card">
+          <div class="board-header">
+            <div>
+              <h2>등록된 공지사항</h2>
+              <!-- <p>채용 관련 공지사항을 확인할 수 있습니다.</p> -->
+            </div>
+            <span class="board-count">
+              총 <strong>{{ pagination.total }}</strong
+              >건
+            </span>
           </div>
-          <span class="board-count">
-            총 <strong>{{ pagination.total }}</strong
-            >건
-          </span>
+          <a-form class="board-search" layout="inline">
+            <a-form-item>
+              <a-select
+                v-model:value="searchForm.searchType"
+                class="search-select"
+                popupClassName="board-search-select-dropdown"
+              >
+                <a-select-option value="ALL">전체</a-select-option>
+                <a-select-option value="TITLE">제목</a-select-option>
+                <a-select-option value="CONTENT">내용</a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item class="keyword-item">
+              <a-input-search
+                v-model:value="searchForm.keyword"
+                placeholder="검색어를 입력하세요"
+                enter-button="검색"
+                @search="handleSearch"
+              />
+            </a-form-item>
+            <a-form-item> <a-button @click="handleReset">초기화</a-button> </a-form-item>
+          </a-form>
+          <a-table
+            :columns="columns"
+            :data-source="notices"
+            :loading="loading"
+            :pagination="{
+              current: pagination.current,
+              pageSize: pagination.pageSize,
+              total: pagination.total,
+              showSizeChanger: false,
+            }"
+            row-key="id"
+            @change="handleTableChange"
+          >
+            <template #bodyCell="{ column, record, index }">
+              <template v-if="column.key === 'number'">
+                <span>
+                  {{ pagination.total - ((pagination.current - 1) * pagination.pageSize + index) }}
+                </span>
+              </template>
+              <template v-if="column.key === 'title'">
+                <span v-if="record.pinned" class="new-badge">NEW</span>
+                <button class="title-button" @click="openNoticeDetail(record.id)">
+                  {{ record.title }}
+                </button>
+              </template>
+              <template v-if="column.key === 'createdAt'">
+                {{ formatDate(record.createdAt) }}
+              </template>
+            </template>
+          </a-table>
         </div>
-        <a-form class="board-search" layout="inline">
-          <a-form-item>
-            <a-select
-              v-model:value="searchForm.searchType"
-              class="search-select"
-              popupClassName="board-search-select-dropdown"
-            >
-              <a-select-option value="ALL">전체</a-select-option>
-              <a-select-option value="TITLE">제목</a-select-option>
-              <a-select-option value="CONTENT">내용</a-select-option>
-            </a-select>
-          </a-form-item>
-          <a-form-item class="keyword-item">
-            <a-input-search
-              v-model:value="searchForm.keyword"
-              placeholder="검색어를 입력하세요"
-              enter-button="검색"
-              @search="handleSearch"
-            />
-          </a-form-item>
-          <a-form-item> <a-button @click="handleReset">초기화</a-button> </a-form-item>
-        </a-form>
-        <a-table
-          :columns="columns"
-          :data-source="notices"
-          :loading="loading"
-          :pagination="{
-            current: pagination.current,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
-            showSizeChanger: false,
-          }"
-          row-key="id"
-          @change="handleTableChange"
-        >
-          <template #bodyCell="{ column, record, index }">
-            <template v-if="column.key === 'number'">
-              <span v-if="record.pinned" class="new-badge">NEW</span>
-              <span v-else>
-                {{ pagination.total - ((pagination.current - 1) * pagination.pageSize + index) }}
-              </span>
-            </template>
-            <template v-if="column.key === 'title'">
-              <button class="title-button" @click="openNoticeDetail(record.id)">
-                {{ record.title }}
-              </button>
-            </template>
-            <template v-if="column.key === 'createdAt'">
-              {{ formatDate(record.createdAt) }}
-            </template>
-          </template>
-        </a-table>
       </div>
     </div>
   </section>
@@ -169,10 +176,28 @@ onMounted(() => {
   padding: 0;
 }
 .board-container {
-  max-width: 1180px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 32px 24px 60px;
+  padding: 0px 24px 60px 0px;
 }
+
+.page-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 42px 20px 42px;
+}
+
+.page-title {
+  margin: 0;
+  /* font-size: 40px;  */
+  font-size: 38px; 
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.04em;
+  margin-bottom: 38px;
+  color: var(--tap-text);
+}
+
 .board-card {
   background: var(--app-bg-surface);
   border: 1px solid var(--app-border-default);
@@ -188,8 +213,8 @@ onMounted(() => {
 }
 .board-header h2 {
   margin: 0;
-  font-size: 22px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 600;
   letter-spacing: -0.04em;
   color: var(--app-text-primary);
 }
@@ -279,7 +304,7 @@ onMounted(() => {
     .ant-select-item-option-selected:not(.ant-select-item-option-disabled)
 ) {
   background-color: #f4f8f0 !important;
-  color: var(--app-color-primary-olive-dark) !important;
+  color: var(--app-color-primary-emerald) !important;
   font-weight: 700;
 }
 
@@ -312,7 +337,7 @@ onMounted(() => {
 .notice-detail-content {
   min-height: 240px;
   padding: 24px 0 8px;
-  color: var(--app-text-secondary);
+  color: var(--app-text-primary);
   font-size: 14px;
   line-height: 1.8;
 }
@@ -337,6 +362,7 @@ onMounted(() => {
   border-radius: 4px;
   background: #e8f6ef;
   padding: 2px 5px;
+  margin-right: 5px;
   color: var(--app-color-success);
   font-size: 10px;
   font-weight: 700;

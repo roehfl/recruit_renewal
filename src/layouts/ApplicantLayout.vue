@@ -23,6 +23,6 @@ import ApplicantFooter from './ApplicantFooter.vue'
 }
 
 .applicant-content {
-  min-height: calc(100vh - 130px);
+  min-height: calc(100vh - 72px);
 }
 </style>

@@ -110,6 +110,14 @@ export const applicantRoutes: RouteRecordRaw[] = [
           public: true,
         },
       },
+      {
+        path: 'privacy',
+        name: 'ApplicantPrivacy',
+        component: () => import('@/views/applicant/ApplicantPrivacy.vue'),
+        meta: {
+          public: true,
+        },
+      },
     ],
   },
 ]

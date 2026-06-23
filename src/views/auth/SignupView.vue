@@ -18,7 +18,7 @@
                             <template #prefix>
                                 <UserOutlined />
                                 <a-button type="primary" class="inner-button"
-                                @click="checkDuplicateEmail">중복확인</a-button>
+                                @click="checkDuplicateEmailButton">중복확인</a-button>
                             </template>
                         </a-input>
                     </a-form-item>
@@ -85,6 +85,7 @@ import { useRouter } from 'vue-router'
 import { LockOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { authApi } from '@/api/authApi'
+import type { checkEmailRequest } from '@/types/auth'
 
 interface SignupForm {
   loginId: string
@@ -96,6 +97,12 @@ interface SignupForm {
 }
 
 const router = useRouter()
+
+const checkEmail = ref<checkEmailRequest>({
+  success: true, 
+  data: {available: true},
+  message: '',
+})
 
 const form = reactive<SignupForm>({
   loginId: '',
@@ -138,35 +145,52 @@ const rules = {
   passwordConfirm: [
     {
       required: true,
-      message: '비밀번호를 확인을.',
+      message: '비밀번호를 확인을 입력하세요.',
       trigger: 'blur',
     },
   ]
 }
 
-const loading = ref(false)
+const loading = ref(false);
+const isAvailable = ref(false);
 const isEmailChecked = ref(false);
 const isPhoneChecked = ref(false);
 
 const regEmail = /^[0-9a-zA-Z]([-_.]?[0-9a-zA-Z])*@[0-9a-zA-Z]([-_.]?[0-9a-zA-Z])*\.[a-zA-Z]{2,3}$/i;
 const regPhoneNumber = /^(01[016789{1}]-?[0-9]{3,4}-?[0-9]{4}$)/
-const checkDuplicateEmail = async () => {
+
+const checkAvailableEmail = async () => {
+    try {
+        const result = await authApi.checkEmail(
+            form.loginId,
+        )
+        checkEmail.value = {
+            success: result.data.success,
+            data: result.data.data as unknown as {available: true},
+            message: result.data.message ?? '',
+        }
+        isAvailable.value = checkEmail.value.data.available;   
+    }
+    catch (error) {
+        console.error(error);
+    }
+}
+
+const checkDuplicateEmailButton = async () => {
     if(!form.loginId) {
         return;
     }
 
-    const isDuplicated = false;
-    //TODO : 메일 주소 조회 로직 추가
-
+    await checkAvailableEmail();
     if(!regEmail.test(form.loginId)) {
         message.error('올바른 형식의 이메일 주소를 작성해주세요.');
     }
-    else if (isDuplicated) {
-        message.error('이미 가입된 아이디입니다.');
-    }
-    else {
+    else if (isAvailable.value) {
         isEmailChecked.value = true;
         message.success('사용 가능한 아이디입니다.');
+    }
+    else {
+        message.error('이미 가입된 아이디입니다.');
     }
 };
 
