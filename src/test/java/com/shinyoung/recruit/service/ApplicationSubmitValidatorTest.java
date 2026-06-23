@@ -2,7 +2,6 @@ package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
 import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
-import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.ApplicationMilitary;
 import com.shinyoung.recruit.domain.entity.JobApplication;
@@ -12,8 +11,6 @@ import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
-import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
-import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationGapPeriodRepository;
@@ -24,7 +21,6 @@ import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
 import com.shinyoung.recruit.enumeration.AttachmentDeleteActorType;
 import com.shinyoung.recruit.enumeration.AttachmentType;
-import com.shinyoung.recruit.enumeration.CareerType;
 import com.shinyoung.recruit.enumeration.MilitarySubjectType;
 import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
@@ -55,12 +51,6 @@ class ApplicationSubmitValidatorTest {
 
     @Mock
     private ApplicationEducationRepository educationRepository;
-
-    @Mock
-    private ApplicationCareerProfileRepository careerProfileRepository;
-
-    @Mock
-    private ApplicationCareerRepository careerRepository;
 
     @Mock
     private ApplicationMilitaryRepository militaryRepository;
@@ -126,93 +116,6 @@ class ApplicationSubmitValidatorTest {
 
     @Test
     void education_disabled_passes_without_education() {
-        assertThatCode(() -> validator.validate(application(config())))
-                .doesNotThrowAnyException();
-    }
-
-    @Test
-    void career_required_fails_when_profile_is_missing() {
-        ApplicationFormConfig config = config();
-        when(config.isUseCareer()).thenReturn(true);
-        when(careerProfileRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> validator.validate(application(config)))
-                .isInstanceOf(InvalidJobApplicationException.class);
-    }
-
-    @Test
-    void career_required_fails_when_career_type_is_not_selected() {
-        ApplicationFormConfig config = config();
-        when(config.isUseCareer()).thenReturn(true);
-        when(careerProfileRepository.findByJobApplicationId(APPLICATION_ID))
-                .thenReturn(Optional.of(profile(CareerType.NOT_SELECTED)));
-
-        assertThatThrownBy(() -> validator.validate(application(config)))
-                .isInstanceOf(InvalidJobApplicationException.class);
-    }
-
-    @Test
-    void experienced_career_fails_when_career_rows_are_missing() {
-        ApplicationFormConfig config = config();
-        when(config.isUseCareer()).thenReturn(true);
-        when(careerProfileRepository.findByJobApplicationId(APPLICATION_ID))
-                .thenReturn(Optional.of(profile(CareerType.EXPERIENCED)));
-        when(careerRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(false);
-
-        assertThatThrownBy(() -> validator.validate(application(config)))
-                .isInstanceOf(InvalidJobApplicationException.class);
-    }
-
-    @Test
-    void experienced_career_passes_when_career_rows_exist() {
-        ApplicationFormConfig config = config();
-        when(config.isUseCareer()).thenReturn(true);
-        when(careerProfileRepository.findByJobApplicationId(APPLICATION_ID))
-                .thenReturn(Optional.of(profile(CareerType.EXPERIENCED)));
-        when(careerRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(true);
-
-        assertThatCode(() -> validator.validate(application(config)))
-                .doesNotThrowAnyException();
-    }
-
-    @Test
-    void newcomer_career_passes_without_career_rows() {
-        ApplicationFormConfig config = config();
-        when(config.isUseCareer()).thenReturn(true);
-        when(careerProfileRepository.findByJobApplicationId(APPLICATION_ID))
-                .thenReturn(Optional.of(profile(CareerType.NEWCOMER)));
-        when(careerRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(false);
-
-        assertThatCode(() -> validator.validate(application(config)))
-                .doesNotThrowAnyException();
-    }
-
-    @Test
-    void not_applicable_career_passes_without_career_rows() {
-        ApplicationFormConfig config = config();
-        when(config.isUseCareer()).thenReturn(true);
-        when(careerProfileRepository.findByJobApplicationId(APPLICATION_ID))
-                .thenReturn(Optional.of(profile(CareerType.NOT_APPLICABLE)));
-        when(careerRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(false);
-
-        assertThatCode(() -> validator.validate(application(config)))
-                .doesNotThrowAnyException();
-    }
-
-    @Test
-    void newcomer_or_not_applicable_career_fails_when_career_rows_exist() {
-        ApplicationFormConfig config = config();
-        when(config.isUseCareer()).thenReturn(true);
-        when(careerProfileRepository.findByJobApplicationId(APPLICATION_ID))
-                .thenReturn(Optional.of(profile(CareerType.NEWCOMER)));
-        when(careerRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(true);
-
-        assertThatThrownBy(() -> validator.validate(application(config)))
-                .isInstanceOf(InvalidJobApplicationException.class);
-    }
-
-    @Test
-    void career_disabled_passes_without_profile() {
         assertThatCode(() -> validator.validate(application(config())))
                 .doesNotThrowAnyException();
     }
@@ -540,10 +443,6 @@ class ApplicationSubmitValidatorTest {
             case "isRequireMilitary" -> ((ApplicationFormConfig) invocation.getMock()).isUseMilitary();
             default -> RETURNS_DEFAULTS.answer(invocation);
         });
-    }
-
-    private ApplicationCareerProfile profile(CareerType careerType) {
-        return ApplicationCareerProfile.create(mock(JobApplication.class), careerType);
     }
 
     private ApplicationMilitary military(

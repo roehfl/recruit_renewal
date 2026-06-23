@@ -6,7 +6,6 @@ import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
 import com.shinyoung.recruit.domain.entity.ApplicationAward;
 import com.shinyoung.recruit.domain.entity.ApplicationCareer;
-import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationCertificate;
 import com.shinyoung.recruit.domain.entity.ApplicationEducation;
 import com.shinyoung.recruit.domain.entity.ApplicationGapPeriod;
@@ -27,7 +26,6 @@ import com.shinyoung.recruit.domain.entity.StageResultCorrectionHistory;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
-import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
@@ -108,7 +106,6 @@ class ApplicationPiiPurgeServiceTest {
     @Autowired private ApplicationAnswerRepository answerRepository;
     @Autowired private ApplicationEducationRepository educationRepository;
     @Autowired private ApplicationCareerRepository careerRepository;
-    @Autowired private ApplicationCareerProfileRepository careerProfileRepository;
     @Autowired private ApplicationCertificateRepository certificateRepository;
     @Autowired private ApplicationLanguageRepository languageRepository;
     @Autowired private ApplicationMilitaryRepository militaryRepository;
@@ -161,9 +158,7 @@ class ApplicationPiiPurgeServiceTest {
                 GraduationStatus.GRADUATED, DayNightType.DAY, CampusType.MAIN, false, "KR", 1));
         careerRepository.save(ApplicationCareer.create(
                 application, "이전회사", "개발팀", "대리", EmploymentType.FULL_TIME,
-                LocalDate.of(2019, 3, 1), LocalDate.of(2023, 5, 31), false, "백엔드 개발 담당", "이직", 1));
-        careerProfileRepository.save(ApplicationCareerProfile.create(
-                application, com.shinyoung.recruit.enumeration.CareerType.EXPERIENCED));
+                LocalDate.of(2019, 3, 1), LocalDate.of(2023, 5, 31), null, false, "백엔드 개발 담당", "이직", 1));
         certificateRepository.save(ApplicationCertificate.create(
                 application, "정보처리기사", "한국산업인력공단", LocalDate.of(2020, 5, 1),
                 "12-345-678", LocalDate.of(2030, 5, 1), "합격", 1));
@@ -247,10 +242,8 @@ class ApplicationPiiPurgeServiceTest {
         assertThat(career.getResignationReason()).isNull();
         assertThat(career.getStartDate()).isNull();
         assertThat(career.getEndDate()).isNull();
+        assertThat(career.getPromotionDate()).isNull();
         assertThat(career.getEmploymentType()).isEqualTo(EmploymentType.FULL_TIME); // KEEP
-
-        ApplicationCareerProfile profile = careerProfileRepository.findAll().get(0);
-        assertThat(profile.getCareerType()).isEqualTo(com.shinyoung.recruit.enumeration.CareerType.EXPERIENCED); // KEEP
 
         ApplicationCertificate certificate = certificateRepository.findAll().get(0);
         assertThat(certificate.getCertificateName()).isEqualTo(PURGED);

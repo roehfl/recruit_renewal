@@ -2,7 +2,6 @@ package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
 import com.shinyoung.recruit.domain.entity.ApplicationBasicInfo;
-import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
 import com.shinyoung.recruit.domain.entity.ApplicationMilitary;
@@ -13,8 +12,6 @@ import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
-import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
-import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationGapPeriodRepository;
@@ -26,7 +23,6 @@ import com.shinyoung.recruit.enumeration.DisabilityStatus;
 import com.shinyoung.recruit.enumeration.NationalityType;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
 import com.shinyoung.recruit.enumeration.AttachmentType;
-import com.shinyoung.recruit.enumeration.CareerType;
 import com.shinyoung.recruit.enumeration.MilitarySubjectType;
 import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
@@ -49,8 +45,6 @@ public class ApplicationSubmitValidator {
     private static final int LONG_TEXT_MAX_LENGTH = 5000;
 
     private final ApplicationEducationRepository educationRepository;
-    private final ApplicationCareerProfileRepository careerProfileRepository;
-    private final ApplicationCareerRepository careerRepository;
     private final ApplicationMilitaryRepository militaryRepository;
     private final ApplicationCertificateRepository certificateRepository;
     private final ApplicationLanguageRepository languageRepository;
@@ -72,7 +66,6 @@ public class ApplicationSubmitValidator {
         }
 
         validateEducation(config, applicationId);
-        validateCareer(config, applicationId);
         validateMilitary(config, applicationId);
         validateSimpleRequiredSection(config.isUseCertificate(), config.isRequireCertificate(), () -> certificateRepository.existsByJobApplicationId(applicationId), "Certificate");
         validateSimpleRequiredSection(config.isUseLanguage(), config.isRequireLanguage(), () -> languageRepository.existsByJobApplicationId(applicationId), "Language");
@@ -88,27 +81,6 @@ public class ApplicationSubmitValidator {
         }
         if (!educationRepository.existsByJobApplicationId(applicationId)) {
             throw new InvalidJobApplicationException("Education section is required before submit.");
-        }
-    }
-
-    private void validateCareer(ApplicationFormConfig config, Long applicationId) {
-        if (!isRequired(config.isUseCareer(), config.isRequireCareer())) {
-            return;
-        }
-
-        ApplicationCareerProfile profile = careerProfileRepository.findByJobApplicationId(applicationId)
-                .orElseThrow(() -> new InvalidJobApplicationException("Career profile is required before submit."));
-        CareerType careerType = profile.getCareerType();
-        if (careerType == null || careerType == CareerType.NOT_SELECTED) {
-            throw new InvalidJobApplicationException("Career type must be selected before submit.");
-        }
-
-        boolean hasCareerRows = careerRepository.existsByJobApplicationId(applicationId);
-        if (careerType == CareerType.EXPERIENCED && !hasCareerRows) {
-            throw new InvalidJobApplicationException("Career rows are required for experienced applicants before submit.");
-        }
-        if ((careerType == CareerType.NEWCOMER || careerType == CareerType.NOT_APPLICABLE) && hasCareerRows) {
-            throw new InvalidJobApplicationException("Career rows are not allowed for the selected career type before submit.");
         }
     }
 

@@ -1,15 +1,12 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.ApplicationCareer;
-import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.JobApplication;
-import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
 import com.shinyoung.recruit.dto.request.CareerReplaceRequest;
 import com.shinyoung.recruit.dto.request.CareerRequest;
 import com.shinyoung.recruit.dto.response.CareerItemResponse;
 import com.shinyoung.recruit.dto.response.CareerResponse;
-import com.shinyoung.recruit.enumeration.CareerType;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,7 +23,6 @@ public class ApplicationCareerService {
     private static final int CAREER_TEXT_MAX_LENGTH = 2000;
 
     private final ApplicationSectionAccessService sectionAccessService;
-    private final ApplicationCareerProfileRepository careerProfileRepository;
     private final ApplicationCareerRepository careerRepository;
 
     @Transactional(readOnly = true)
@@ -42,12 +38,6 @@ public class ApplicationCareerService {
         sectionAccessService.validateCareerEnabled(application);
         validateRequest(request);
 
-        ApplicationCareerProfile profile = careerProfileRepository.findByJobApplicationId(applicationId)
-                .orElseGet(() -> careerProfileRepository.save(
-                        ApplicationCareerProfile.create(application, request.careerType())
-                ));
-        profile.updateCareerType(request.careerType());
-
         careerRepository.deleteByJobApplicationId(applicationId);
         List<ApplicationCareer> careers = request.careers().stream()
                 .map(career -> toCareer(application, career))
@@ -58,14 +48,8 @@ public class ApplicationCareerService {
     }
 
     private void validateRequest(CareerReplaceRequest request) {
-        if (request == null || request.careerType() == null) {
-            throw new InvalidJobApplicationException("Career type is required.");
-        }
-        if (request.careers() == null) {
+        if (request == null || request.careers() == null) {
             throw new InvalidJobApplicationException("Career list is required.");
-        }
-        if (request.careerType() != CareerType.EXPERIENCED && !request.careers().isEmpty()) {
-            throw new InvalidJobApplicationException("Career items are allowed only for EXPERIENCED career type.");
         }
 
         Set<Integer> sortOrders = new HashSet<>();
@@ -123,6 +107,7 @@ public class ApplicationCareerService {
                 request.employmentType(),
                 request.startDate(),
                 request.endDate(),
+                request.promotionDate(),
                 request.currentlyEmployed(),
                 request.responsibilities(),
                 request.resignationReason(),
@@ -131,13 +116,10 @@ public class ApplicationCareerService {
     }
 
     private CareerResponse getCareerResponse(Long applicationId) {
-        CareerType careerType = careerProfileRepository.findByJobApplicationId(applicationId)
-                .map(ApplicationCareerProfile::getCareerType)
-                .orElse(CareerType.NOT_SELECTED);
         List<CareerItemResponse> careers = careerRepository.findByJobApplicationIdOrderBySortOrderAscIdAsc(applicationId)
                 .stream()
                 .map(CareerItemResponse::from)
                 .toList();
-        return new CareerResponse(careerType, careers);
+        return new CareerResponse(careers);
     }
 }

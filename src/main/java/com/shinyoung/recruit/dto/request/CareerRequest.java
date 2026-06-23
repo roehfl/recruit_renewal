@@ -23,6 +23,8 @@ public record CareerRequest(
 
         LocalDate endDate,
 
+        LocalDate promotionDate,
+
         @NotNull(message = "Currently employed flag is required.")
         Boolean currentlyEmployed,
 

@@ -3,7 +3,6 @@ package com.shinyoung.recruit.service;
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
 import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
 import com.shinyoung.recruit.domain.entity.ApplicationBasicInfo;
-import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.ApplicationMilitary;
 import com.shinyoung.recruit.domain.entity.JobApplication;
@@ -17,8 +16,6 @@ import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
-import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
-import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationGapPeriodRepository;
@@ -36,7 +33,6 @@ import com.shinyoung.recruit.dto.response.ApplicationSectionReadinessResponse;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
 import com.shinyoung.recruit.enumeration.AttachmentDeleteActorType;
 import com.shinyoung.recruit.enumeration.AttachmentType;
-import com.shinyoung.recruit.enumeration.CareerType;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.enumeration.MilitarySubjectType;
@@ -85,12 +81,6 @@ class ApplicationDashboardServiceTest {
     private ApplicationEducationRepository educationRepository;
 
     @Mock
-    private ApplicationCareerProfileRepository careerProfileRepository;
-
-    @Mock
-    private ApplicationCareerRepository careerRepository;
-
-    @Mock
     private ApplicationMilitaryRepository militaryRepository;
 
     @Mock
@@ -127,8 +117,6 @@ class ApplicationDashboardServiceTest {
         ApplicationCompletionReadChecker checker = new ApplicationCompletionReadChecker(
                 basicInfoRepository,
                 educationRepository,
-                careerProfileRepository,
-                careerRepository,
                 militaryRepository,
                 jobPostingQuestionRepository,
                 applicationAnswerRepository,
@@ -156,8 +144,6 @@ class ApplicationDashboardServiceTest {
                 .thenReturn(List.of());
         lenient().when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
                 .thenReturn(List.of());
-        lenient().when(careerProfileRepository.findByJobApplicationId(APPLICATION_ID))
-                .thenReturn(Optional.empty());
         lenient().when(militaryRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(Optional.empty());
         // Default: BASIC_INFO absent (always-required group, will show as missing)
@@ -172,9 +158,6 @@ class ApplicationDashboardServiceTest {
         stubDashboard(application);
         when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
         when(educationRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(true);
-        when(careerProfileRepository.findByJobApplicationId(APPLICATION_ID))
-                .thenReturn(Optional.of(profile(CareerType.EXPERIENCED)));
-        when(careerRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(true);
         when(militaryRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(Optional.of(military(
                         MilitarySubjectType.COMPLETED,
@@ -189,9 +172,9 @@ class ApplicationDashboardServiceTest {
         assertThat(response.editable()).isTrue();
         assertThat(response.submittable()).isTrue();
         assertThat(response.withdrawable()).isFalse();
-        // BASIC_INFO is now always a required group (+1): education + career + military + basic_info = 4
-        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(4);
-        assertThat(response.completionSummary().completedRequiredSectionCount()).isEqualTo(4);
+        // BASIC_INFO is now always a required group (+1): education + military + basic_info = 3 (career removed)
+        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(3);
+        assertThat(response.completionSummary().completedRequiredSectionCount()).isEqualTo(3);
         assertThat(response.completionSummary().requiredCompletionRate()).isEqualTo(100);
         assertThat(response.requiredMissingSections()).isEmpty();
     }
@@ -280,45 +263,6 @@ class ApplicationDashboardServiceTest {
 
         assertThatThrownBy(() -> dashboardService.getDashboard(APPLICANT_ID, APPLICATION_ID))
                 .isInstanceOf(JobApplicationNotFoundException.class);
-    }
-
-    @Test
-    void career_missing_profile_is_blocking() {
-        ApplicationDashboardResponse response = dashboardFor(config(false, true, false, false, false, false, false));
-
-        assertRequiredIssue(response, "CAREER", "MISSING_PROFILE");
-    }
-
-    @Test
-    void career_not_selected_is_blocking() {
-        when(careerProfileRepository.findByJobApplicationId(APPLICATION_ID))
-                .thenReturn(Optional.of(profile(CareerType.NOT_SELECTED)));
-
-        ApplicationDashboardResponse response = dashboardFor(config(false, true, false, false, false, false, false));
-
-        assertRequiredIssue(response, "CAREER", "TYPE_NOT_SELECTED");
-    }
-
-    @Test
-    void experienced_career_without_row_is_blocking() {
-        when(careerProfileRepository.findByJobApplicationId(APPLICATION_ID))
-                .thenReturn(Optional.of(profile(CareerType.EXPERIENCED)));
-        when(careerRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(false);
-
-        ApplicationDashboardResponse response = dashboardFor(config(false, true, false, false, false, false, false));
-
-        assertRequiredIssue(response, "CAREER", "MISSING_ROW");
-    }
-
-    @Test
-    void newcomer_with_career_row_is_blocking() {
-        when(careerProfileRepository.findByJobApplicationId(APPLICATION_ID))
-                .thenReturn(Optional.of(profile(CareerType.NEWCOMER)));
-        when(careerRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(true);
-
-        ApplicationDashboardResponse response = dashboardFor(config(false, true, false, false, false, false, false));
-
-        assertRequiredIssue(response, "CAREER", "INVALID_DISALLOWED_ROW");
     }
 
     @Test
@@ -422,10 +366,10 @@ class ApplicationDashboardServiceTest {
         // BASIC_INFO is always required and present → 1 required, 1 completed (not blocking)
         assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(1);
         assertThat(response.completionSummary().completedRequiredSectionCount()).isEqualTo(1);
-        assertThat(response.completionSummary().optionalSectionCount()).isEqualTo(3);
+        assertThat(response.completionSummary().optionalSectionCount()).isEqualTo(2);
         assertThat(response.optionalIncompleteSections())
                 .extracting(ApplicationSectionReadinessResponse::sectionCode)
-                .containsExactlyInAnyOrder("EDUCATION", "CAREER", "MILITARY");
+                .containsExactlyInAnyOrder("EDUCATION", "MILITARY");
         assertThat(response.optionalIncompleteSections())
                 .extracting(ApplicationSectionReadinessResponse::message)
                 .allSatisfy(message -> assertThat(message).doesNotContain("required before submit"));
@@ -697,10 +641,6 @@ class ApplicationDashboardServiceTest {
                 VeteranStatus.NOT_SUBJECT, DisabilityStatus.NOT_SUBJECT,
                 null, null, null, null, null
         );
-    }
-
-    private ApplicationCareerProfile profile(CareerType careerType) {
-        return ApplicationCareerProfile.create(mock(JobApplication.class), careerType);
     }
 
     private ApplicationMilitary military(

@@ -136,11 +136,12 @@ public class ApplicationPdfService {
                     field("고용형태", c.employmentType()),
                     field("입사일", c.startDate()),
                     field("퇴사일", c.endDate()),
+                    field("진급일", c.promotionDate()),
                     field("재직중", c.currentlyEmployed()),
                     field("담당업무", c.responsibilities()),
                     field("퇴사사유", c.resignationReason()))));
         }
-        return new Section("경력 (경력구분: " + str(career.careerType()) + ")", rows, EMPTY);
+        return new Section("경력", rows, EMPTY);
     }
 
     private Section certificateSection(Long applicationId) {

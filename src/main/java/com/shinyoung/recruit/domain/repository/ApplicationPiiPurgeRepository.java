@@ -91,16 +91,10 @@ public interface ApplicationPiiPurgeRepository extends Repository<JobApplication
             update ApplicationCareer c
             set c.companyName = '__PURGED__', c.departmentName = null, c.positionTitle = null,
                 c.responsibilities = null, c.resignationReason = null, c.startDate = null, c.endDate = null,
+                c.promotionDate = null,
                 c.createdBy = null, c.updatedBy = null
             where c.jobApplication.id = :applicationId""")
     int purgeCareers(@Param("applicationId") Long applicationId);
-
-    @Modifying(flushAutomatically = true)
-    @Query("""
-            update ApplicationCareerProfile p
-            set p.createdBy = null, p.updatedBy = null
-            where p.jobApplication.id = :applicationId""")
-    int purgeCareerProfile(@Param("applicationId") Long applicationId);
 
     @Modifying(flushAutomatically = true)
     @Query("""

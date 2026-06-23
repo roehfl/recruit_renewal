@@ -6,7 +6,6 @@ import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
 import com.shinyoung.recruit.domain.entity.ApplicationAward;
 import com.shinyoung.recruit.domain.entity.ApplicationCareer;
-import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationCertificate;
 import com.shinyoung.recruit.domain.entity.ApplicationEducation;
 import com.shinyoung.recruit.domain.entity.ApplicationEducationSemesterGrade;
@@ -24,7 +23,6 @@ import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
-import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
@@ -54,7 +52,6 @@ import com.shinyoung.recruit.dto.response.AdminMilitaryResponse;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
 import com.shinyoung.recruit.enumeration.AttachmentType;
 import com.shinyoung.recruit.enumeration.CampusType;
-import com.shinyoung.recruit.enumeration.CareerType;
 import com.shinyoung.recruit.enumeration.DayNightType;
 import com.shinyoung.recruit.enumeration.EducationLevel;
 import com.shinyoung.recruit.enumeration.EmploymentType;
@@ -127,9 +124,6 @@ class AdminApplicationSectionServiceTest {
 
     @Autowired
     private ApplicationEducationSemesterGradeRepository semesterGradeRepository;
-
-    @Autowired
-    private ApplicationCareerProfileRepository careerProfileRepository;
 
     @Autowired
     private ApplicationCareerRepository careerRepository;
@@ -211,33 +205,19 @@ class AdminApplicationSectionServiceTest {
         assertThat(adminApplicationSectionService.getAttachments(application.getId())).isEmpty();
         assertThat(adminApplicationSectionService.getAnswers(application.getId())).isEmpty();
         assertThat(adminApplicationSectionService.getMilitary(application.getId())).isNull();
-        assertThat(adminApplicationSectionService.getCareers(application.getId()).careerType()).isEqualTo(CareerType.NOT_SELECTED);
         assertThat(adminApplicationSectionService.getCareers(application.getId()).careers()).isEmpty();
     }
 
     @Test
-    void get_careers_returns_profile_and_sorted_careers() {
+    void get_careers_returns_sorted_careers() {
         JobApplication application = createApplication("admin-section-career");
-        careerProfileRepository.save(ApplicationCareerProfile.create(application, CareerType.EXPERIENCED));
         ApplicationCareer second = careerRepository.save(career(application, "Second Company", 1));
         ApplicationCareer first = careerRepository.save(career(application, "First Company", 0));
 
         AdminCareerResponse response = adminApplicationSectionService.getCareers(application.getId());
 
-        assertThat(response.careerType()).isEqualTo(CareerType.EXPERIENCED);
         assertThat(response.careers()).extracting(career -> career.careerId())
                 .containsExactly(first.getId(), second.getId());
-    }
-
-    @Test
-    void get_careers_allows_newcomer_without_career_rows() {
-        JobApplication application = createApplication("admin-section-newcomer");
-        careerProfileRepository.save(ApplicationCareerProfile.create(application, CareerType.NEWCOMER));
-
-        AdminCareerResponse response = adminApplicationSectionService.getCareers(application.getId());
-
-        assertThat(response.careerType()).isEqualTo(CareerType.NEWCOMER);
-        assertThat(response.careers()).isEmpty();
     }
 
     @Test
@@ -589,6 +569,7 @@ class AdminApplicationSectionServiceTest {
                 EmploymentType.FULL_TIME,
                 LocalDate.of(2023, 1, 1),
                 LocalDate.of(2024, 12, 31),
+                null,
                 false,
                 "Backend development",
                 "Career move",

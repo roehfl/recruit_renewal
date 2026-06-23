@@ -105,13 +105,12 @@ class ApplicationCareerControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
-                .andExpect(jsonPath("$.data.careerType").value("NOT_SELECTED"))
                 .andExpect(jsonPath("$.data.careers").isArray());
     }
 
     @Test
-    void replace_careers_newcomer_returns_api_response() throws Exception {
-        Applicant applicant = createApplicant("career-api-newcomer", "Career Api Newcomer");
+    void replace_careers_empty_returns_api_response() throws Exception {
+        Applicant applicant = createApplicant("career-api-empty", "Career Api Empty");
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         authenticate(applicant);
 
@@ -119,14 +118,12 @@ class ApplicationCareerControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "careerType": "NEWCOMER",
                                   "careers": []
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
-                .andExpect(jsonPath("$.data.careerType").value("NEWCOMER"))
                 .andExpect(jsonPath("$.data.careers").isArray());
     }
 
@@ -142,7 +139,6 @@ class ApplicationCareerControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
-                .andExpect(jsonPath("$.data.careerType").value("EXPERIENCED"))
                 .andExpect(jsonPath("$.data.careers[0].companyName").value("Shinyoung Tech"));
     }
 
@@ -156,27 +152,7 @@ class ApplicationCareerControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "careerType": null,
-                                  "careers": []
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").exists());
-    }
-
-    @Test
-    void invalid_enum_failure_returns_api_response() throws Exception {
-        Applicant applicant = createApplicant("career-api-enum", "Career Api Enum");
-        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
-        authenticate(applicant);
-
-        mockMvc.perform(post("/api/applications/{applicationId}/careers", applicationId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "careerType": "UNKNOWN_TYPE",
-                                  "careers": []
+                                  "careers": null
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
@@ -194,7 +170,6 @@ class ApplicationCareerControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "careerType": "NEWCOMER",
                                   "careers": []
                                 }
                                 """))
@@ -219,7 +194,6 @@ class ApplicationCareerControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "careerType": "NEWCOMER",
                                   "careers": []
                                 }
                                 """))
@@ -240,7 +214,6 @@ class ApplicationCareerControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "careerType": "NEWCOMER",
                                   "careers": []
                                 }
                                 """))
@@ -316,7 +289,6 @@ class ApplicationCareerControllerTest {
     private String validExperiencedCareerJson() {
         return """
                 {
-                  "careerType": "EXPERIENCED",
                   "careers": [
                     {
                       "companyName": "Shinyoung Tech",

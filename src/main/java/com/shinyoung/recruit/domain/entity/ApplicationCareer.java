@@ -54,6 +54,9 @@ public class ApplicationCareer extends BaseEntity {
 
     private LocalDate endDate;
 
+    // 진급일(최종 직급으로의 진급 시점). 선택 입력이며 파기 시 NULLIFY 대상이다.
+    private LocalDate promotionDate;
+
     @Column(nullable = false)
     private Boolean currentlyEmployed;
 
@@ -74,6 +77,7 @@ public class ApplicationCareer extends BaseEntity {
             EmploymentType employmentType,
             LocalDate startDate,
             LocalDate endDate,
+            LocalDate promotionDate,
             Boolean currentlyEmployed,
             String responsibilities,
             String resignationReason,
@@ -86,6 +90,7 @@ public class ApplicationCareer extends BaseEntity {
         this.employmentType = employmentType;
         this.startDate = startDate;
         this.endDate = endDate;
+        this.promotionDate = promotionDate;
         this.currentlyEmployed = currentlyEmployed;
         this.responsibilities = responsibilities;
         this.resignationReason = resignationReason;
@@ -100,6 +105,7 @@ public class ApplicationCareer extends BaseEntity {
             EmploymentType employmentType,
             LocalDate startDate,
             LocalDate endDate,
+            LocalDate promotionDate,
             Boolean currentlyEmployed,
             String responsibilities,
             String resignationReason,
@@ -113,6 +119,7 @@ public class ApplicationCareer extends BaseEntity {
                 employmentType,
                 startDate,
                 endDate,
+                promotionDate,
                 currentlyEmployed,
                 responsibilities,
                 resignationReason,

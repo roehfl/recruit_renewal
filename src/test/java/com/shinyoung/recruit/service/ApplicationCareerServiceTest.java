@@ -3,12 +3,10 @@ package com.shinyoung.recruit.service;
 import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.entity.ApplicationCareer;
-import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
-import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
@@ -20,7 +18,6 @@ import com.shinyoung.recruit.dto.request.CareerRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.dto.response.CareerResponse;
-import com.shinyoung.recruit.enumeration.CareerType;
 import com.shinyoung.recruit.enumeration.EmploymentType;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
@@ -70,9 +67,6 @@ class ApplicationCareerServiceTest {
     private JobPostingRepository jobPostingRepository;
 
     @Autowired
-    private ApplicationCareerProfileRepository careerProfileRepository;
-
-    @Autowired
     private ApplicationCareerRepository careerRepository;
 
     @Autowired
@@ -82,39 +76,35 @@ class ApplicationCareerServiceTest {
     private JobApplicationRepository jobApplicationRepository;
 
     @Test
-    void save_newcomer_without_careers_success() {
-        Applicant applicant = createApplicant("career-newcomer", "Career Newcomer");
+    void save_without_careers_success() {
+        Applicant applicant = createApplicant("career-empty-list", "Career Empty List");
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
 
         CareerResponse response = applicationCareerService.replaceCareers(
                 applicant.getId(),
                 applicationId,
-                new CareerReplaceRequest(CareerType.NEWCOMER, List.of())
+                new CareerReplaceRequest(List.of())
         );
 
-        assertThat(response.careerType()).isEqualTo(CareerType.NEWCOMER);
         assertThat(response.careers()).isEmpty();
-        assertThat(careerProfileRepository.findByJobApplicationId(applicationId))
-                .map(ApplicationCareerProfile::getCareerType)
-                .contains(CareerType.NEWCOMER);
+        assertThat(careerRepository.findByJobApplicationId(applicationId)).isEmpty();
     }
 
     @Test
-    void save_experienced_careers_success_and_get_success() {
-        Applicant applicant = createApplicant("career-experienced", "Career Experienced");
+    void save_careers_success_and_get_success() {
+        Applicant applicant = createApplicant("career-list", "Career List");
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
 
         CareerResponse response = applicationCareerService.replaceCareers(
                 applicant.getId(),
                 applicationId,
-                new CareerReplaceRequest(CareerType.EXPERIENCED, List.of(
+                new CareerReplaceRequest(List.of(
                         career("Second Company", 1),
                         career("First Company", 0)
                 ))
         );
         CareerResponse getResponse = applicationCareerService.getCareers(applicant.getId(), applicationId);
 
-        assertThat(response.careerType()).isEqualTo(CareerType.EXPERIENCED);
         assertThat(response.careers()).hasSize(2);
         assertThat(response.careers()).extracting(career -> career.companyName())
                 .containsExactly("First Company", "Second Company");
@@ -123,15 +113,44 @@ class ApplicationCareerServiceTest {
     }
 
     @Test
-    void replace_deletes_existing_careers_and_updates_existing_profile() {
+    void save_career_with_promotion_date_roundtrip() {
+        Applicant applicant = createApplicant("career-promotion", "Career Promotion");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
+
+        CareerRequest item = new CareerRequest(
+                "신영증권",
+                "IT",
+                "과장",
+                EmploymentType.FULL_TIME,
+                LocalDate.of(2020, 1, 1),
+                LocalDate.of(2023, 1, 1),
+                LocalDate.of(2022, 1, 1),
+                false,
+                "백엔드",
+                "이직",
+                0
+        );
+
+        applicationCareerService.replaceCareers(
+                applicant.getId(),
+                applicationId,
+                new CareerReplaceRequest(List.of(item))
+        );
+        CareerResponse response = applicationCareerService.getCareers(applicant.getId(), applicationId);
+
+        assertThat(response.careers()).hasSize(1);
+        assertThat(response.careers().get(0).promotionDate()).isEqualTo(LocalDate.of(2022, 1, 1));
+    }
+
+    @Test
+    void replace_deletes_existing_careers() {
         Applicant applicant = createApplicant("career-replace", "Career Replace");
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         applicationCareerService.replaceCareers(
                 applicant.getId(),
                 applicationId,
-                new CareerReplaceRequest(CareerType.EXPERIENCED, List.of(career("Old Company", 0)))
+                new CareerReplaceRequest(List.of(career("Old Company", 0)))
         );
-        Long oldProfileId = careerProfileRepository.findByJobApplicationId(applicationId).orElseThrow().getId();
         List<Long> oldCareerIds = careerRepository.findByJobApplicationId(applicationId).stream()
                 .map(ApplicationCareer::getId)
                 .toList();
@@ -139,60 +158,12 @@ class ApplicationCareerServiceTest {
         CareerResponse response = applicationCareerService.replaceCareers(
                 applicant.getId(),
                 applicationId,
-                new CareerReplaceRequest(CareerType.NOT_APPLICABLE, List.of())
+                new CareerReplaceRequest(List.of())
         );
 
-        assertThat(response.careerType()).isEqualTo(CareerType.NOT_APPLICABLE);
         assertThat(response.careers()).isEmpty();
-        assertThat(careerProfileRepository.findByJobApplicationId(applicationId).orElseThrow().getId())
-                .isEqualTo(oldProfileId);
         assertThat(careerRepository.findAll()).extracting(ApplicationCareer::getId)
                 .doesNotContainAnyElementsOf(oldCareerIds);
-    }
-
-    @Test
-    void experienced_with_empty_careers_is_allowed_and_deletes_existing_data() {
-        Applicant applicant = createApplicant("career-empty", "Career Empty");
-        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
-        applicationCareerService.replaceCareers(
-                applicant.getId(),
-                applicationId,
-                new CareerReplaceRequest(CareerType.EXPERIENCED, List.of(career("Old Company", 0)))
-        );
-
-        CareerResponse response = applicationCareerService.replaceCareers(
-                applicant.getId(),
-                applicationId,
-                new CareerReplaceRequest(CareerType.EXPERIENCED, List.of())
-        );
-
-        assertThat(response.careerType()).isEqualTo(CareerType.EXPERIENCED);
-        assertThat(response.careers()).isEmpty();
-        assertThat(careerRepository.findByJobApplicationId(applicationId)).isEmpty();
-    }
-
-    @Test
-    void non_experienced_type_cannot_have_career_items() {
-        Applicant applicant = createApplicant("career-type-validation", "Career Type Validation");
-        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
-
-        assertThatThrownBy(() -> applicationCareerService.replaceCareers(
-                applicant.getId(),
-                applicationId,
-                new CareerReplaceRequest(CareerType.NEWCOMER, List.of(career("Company", 0)))
-        )).isInstanceOf(InvalidJobApplicationException.class);
-
-        assertThatThrownBy(() -> applicationCareerService.replaceCareers(
-                applicant.getId(),
-                applicationId,
-                new CareerReplaceRequest(CareerType.NOT_APPLICABLE, List.of(career("Company", 0)))
-        )).isInstanceOf(InvalidJobApplicationException.class);
-
-        assertThatThrownBy(() -> applicationCareerService.replaceCareers(
-                applicant.getId(),
-                applicationId,
-                new CareerReplaceRequest(CareerType.NOT_SELECTED, List.of(career("Company", 0)))
-        )).isInstanceOf(InvalidJobApplicationException.class);
     }
 
     @Test
@@ -203,29 +174,24 @@ class ApplicationCareerServiceTest {
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 applicant.getId(),
                 applicationId,
-                new CareerReplaceRequest(null, List.of())
+                new CareerReplaceRequest(null)
         )).isInstanceOf(InvalidJobApplicationException.class);
 
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 applicant.getId(),
                 applicationId,
-                new CareerReplaceRequest(CareerType.EXPERIENCED, null)
+                new CareerReplaceRequest(List.of(career(null, 0)))
         )).isInstanceOf(InvalidJobApplicationException.class);
 
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 applicant.getId(),
                 applicationId,
-                new CareerReplaceRequest(CareerType.EXPERIENCED, List.of(career(null, 0)))
-        )).isInstanceOf(InvalidJobApplicationException.class);
-
-        assertThatThrownBy(() -> applicationCareerService.replaceCareers(
-                applicant.getId(),
-                applicationId,
-                new CareerReplaceRequest(CareerType.EXPERIENCED, List.of(new CareerRequest(
+                new CareerReplaceRequest(List.of(new CareerRequest(
                         "Company",
                         null,
                         null,
                         EmploymentType.FULL_TIME,
+                        null,
                         null,
                         null,
                         true,
@@ -238,13 +204,14 @@ class ApplicationCareerServiceTest {
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 applicant.getId(),
                 applicationId,
-                new CareerReplaceRequest(CareerType.EXPERIENCED, List.of(new CareerRequest(
+                new CareerReplaceRequest(List.of(new CareerRequest(
                         "Company",
                         null,
                         null,
                         EmploymentType.FULL_TIME,
                         LocalDate.of(2024, 1, 1),
                         LocalDate.of(2024, 12, 31),
+                        null,
                         true,
                         null,
                         null,
@@ -255,12 +222,13 @@ class ApplicationCareerServiceTest {
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 applicant.getId(),
                 applicationId,
-                new CareerReplaceRequest(CareerType.EXPERIENCED, List.of(new CareerRequest(
+                new CareerReplaceRequest(List.of(new CareerRequest(
                         "Company",
                         null,
                         null,
                         EmploymentType.FULL_TIME,
                         LocalDate.of(2024, 1, 1),
+                        null,
                         null,
                         null,
                         null,
@@ -278,13 +246,14 @@ class ApplicationCareerServiceTest {
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 applicant.getId(),
                 applicationId,
-                new CareerReplaceRequest(CareerType.EXPERIENCED, List.of(new CareerRequest(
+                new CareerReplaceRequest(List.of(new CareerRequest(
                         "Company",
                         null,
                         null,
                         EmploymentType.FULL_TIME,
                         LocalDate.of(2024, 1, 1),
                         null,
+                        null,
                         false,
                         null,
                         null,
@@ -295,13 +264,14 @@ class ApplicationCareerServiceTest {
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 applicant.getId(),
                 applicationId,
-                new CareerReplaceRequest(CareerType.EXPERIENCED, List.of(new CareerRequest(
+                new CareerReplaceRequest(List.of(new CareerRequest(
                         "Company",
                         null,
                         null,
                         EmploymentType.FULL_TIME,
                         LocalDate.of(2025, 1, 1),
                         LocalDate.of(2024, 12, 31),
+                        null,
                         false,
                         null,
                         null,
@@ -312,7 +282,7 @@ class ApplicationCareerServiceTest {
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 applicant.getId(),
                 applicationId,
-                new CareerReplaceRequest(CareerType.EXPERIENCED, List.of(career("A", 0), career("B", 0)))
+                new CareerReplaceRequest(List.of(career("A", 0), career("B", 0)))
         )).isInstanceOf(InvalidJobApplicationException.class);
     }
 
@@ -325,13 +295,14 @@ class ApplicationCareerServiceTest {
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 applicant.getId(),
                 applicationId,
-                new CareerReplaceRequest(CareerType.EXPERIENCED, List.of(new CareerRequest(
+                new CareerReplaceRequest(List.of(new CareerRequest(
                         "Company",
                         null,
                         null,
                         EmploymentType.FULL_TIME,
                         LocalDate.of(2024, 1, 1),
                         LocalDate.of(2024, 12, 31),
+                        null,
                         false,
                         longText,
                         null,
@@ -342,13 +313,14 @@ class ApplicationCareerServiceTest {
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 applicant.getId(),
                 applicationId,
-                new CareerReplaceRequest(CareerType.EXPERIENCED, List.of(new CareerRequest(
+                new CareerReplaceRequest(List.of(new CareerRequest(
                         "Company",
                         null,
                         null,
                         EmploymentType.FULL_TIME,
                         LocalDate.of(2024, 1, 1),
                         LocalDate.of(2024, 12, 31),
+                        null,
                         false,
                         null,
                         longText,
@@ -365,7 +337,7 @@ class ApplicationCareerServiceTest {
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 applicant.getId(),
                 applicationId,
-                new CareerReplaceRequest(CareerType.NEWCOMER, List.of())
+                new CareerReplaceRequest(List.of())
         )).isInstanceOf(InvalidJobApplicationException.class);
     }
 
@@ -379,7 +351,7 @@ class ApplicationCareerServiceTest {
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 submittedApplicant.getId(),
                 submittedApplicationId,
-                new CareerReplaceRequest(CareerType.NEWCOMER, List.of())
+                new CareerReplaceRequest(List.of())
         )).isInstanceOf(InvalidJobApplicationException.class);
 
         Applicant withdrawnApplicant = createApplicant("career-withdrawn", "Career Withdrawn");
@@ -391,7 +363,7 @@ class ApplicationCareerServiceTest {
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 withdrawnApplicant.getId(),
                 withdrawnApplicationId,
-                new CareerReplaceRequest(CareerType.NEWCOMER, List.of())
+                new CareerReplaceRequest(List.of())
         )).isInstanceOf(InvalidJobApplicationException.class);
     }
 
@@ -406,7 +378,7 @@ class ApplicationCareerServiceTest {
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 other.getId(),
                 applicationId,
-                new CareerReplaceRequest(CareerType.NEWCOMER, List.of())
+                new CareerReplaceRequest(List.of())
         )).isInstanceOf(JobApplicationNotFoundException.class);
     }
 
@@ -420,7 +392,7 @@ class ApplicationCareerServiceTest {
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 beforeApplicant.getId(),
                 beforeApplicationId,
-                new CareerReplaceRequest(CareerType.NEWCOMER, List.of())
+                new CareerReplaceRequest(List.of())
         )).isInstanceOf(InvalidJobApplicationException.class);
 
         Applicant afterApplicant = createApplicant("career-after", "Career After");
@@ -431,7 +403,7 @@ class ApplicationCareerServiceTest {
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 afterApplicant.getId(),
                 afterApplicationId,
-                new CareerReplaceRequest(CareerType.NEWCOMER, List.of())
+                new CareerReplaceRequest(List.of())
         )).isInstanceOf(InvalidJobApplicationException.class);
 
         Applicant draftApplicant = createApplicant("career-draft", "Career Draft");
@@ -442,7 +414,7 @@ class ApplicationCareerServiceTest {
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 draftApplicant.getId(),
                 draftApplicationId,
-                new CareerReplaceRequest(CareerType.NEWCOMER, List.of())
+                new CareerReplaceRequest(List.of())
         )).isInstanceOf(InvalidJobApplicationException.class);
     }
 
@@ -497,6 +469,7 @@ class ApplicationCareerServiceTest {
                 EmploymentType.FULL_TIME,
                 LocalDate.of(2022, 1, 1),
                 LocalDate.of(2024, 12, 31),
+                null,
                 false,
                 "Backend development",
                 "Career change",

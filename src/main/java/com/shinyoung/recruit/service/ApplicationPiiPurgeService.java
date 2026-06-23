@@ -29,7 +29,6 @@ public class ApplicationPiiPurgeService {
         purgeRepository.purgeEducations(applicationId);
         purgeRepository.purgeEducationSemesterGrades(applicationId);
         purgeRepository.purgeCareers(applicationId);
-        purgeRepository.purgeCareerProfile(applicationId);
 
         // certificateNumber = HASH_ONLY(인벤토리 §5) — 원문을 HMAC 으로 덮어써 dedup 능력만 보존.
         List<Object[]> certificateNumbers = purgeRepository.findCertificateNumbers(applicationId);

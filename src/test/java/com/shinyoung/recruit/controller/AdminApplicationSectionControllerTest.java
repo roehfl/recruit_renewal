@@ -6,7 +6,6 @@ import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
 import com.shinyoung.recruit.domain.entity.ApplicationAward;
 import com.shinyoung.recruit.domain.entity.ApplicationCareer;
-import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationCertificate;
 import com.shinyoung.recruit.domain.entity.ApplicationEducation;
 import com.shinyoung.recruit.domain.entity.ApplicationEducationSemesterGrade;
@@ -23,7 +22,6 @@ import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
-import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
@@ -43,7 +41,6 @@ import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
 import com.shinyoung.recruit.enumeration.AttachmentType;
 import com.shinyoung.recruit.enumeration.CampusType;
-import com.shinyoung.recruit.enumeration.CareerType;
 import com.shinyoung.recruit.enumeration.DayNightType;
 import com.shinyoung.recruit.enumeration.EducationLevel;
 import com.shinyoung.recruit.enumeration.EmploymentType;
@@ -124,9 +121,6 @@ class AdminApplicationSectionControllerTest {
     private ApplicationEducationSemesterGradeRepository semesterGradeRepository;
 
     @Autowired
-    private ApplicationCareerProfileRepository careerProfileRepository;
-
-    @Autowired
     private ApplicationCareerRepository careerRepository;
 
     @Autowired
@@ -180,7 +174,6 @@ class AdminApplicationSectionControllerTest {
         mockMvc.perform(get("/api/admin/applications/{applicationId}/careers", application.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.careerType").value("EXPERIENCED"))
                 .andExpect(jsonPath("$.data.careers[0].companyName").value("Shinyoung Securities"));
 
         mockMvc.perform(get("/api/admin/applications/{applicationId}/certificates", application.getId()))
@@ -237,7 +230,6 @@ class AdminApplicationSectionControllerTest {
 
         mockMvc.perform(get("/api/admin/applications/{applicationId}/careers", application.getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.careerType").value("NOT_SELECTED"))
                 .andExpect(jsonPath("$.data.careers").isArray())
                 .andExpect(jsonPath("$.data.careers").isEmpty());
 
@@ -380,7 +372,6 @@ class AdminApplicationSectionControllerTest {
                 new BigDecimal("3.8"),
                 new BigDecimal("4.5")
         ));
-        careerProfileRepository.save(ApplicationCareerProfile.create(application, CareerType.EXPERIENCED));
         careerRepository.save(ApplicationCareer.create(
                 application,
                 "Shinyoung Securities",
@@ -389,6 +380,7 @@ class AdminApplicationSectionControllerTest {
                 EmploymentType.FULL_TIME,
                 LocalDate.of(2023, 1, 1),
                 LocalDate.of(2024, 12, 31),
+                null,
                 false,
                 "Backend development",
                 "Career move",

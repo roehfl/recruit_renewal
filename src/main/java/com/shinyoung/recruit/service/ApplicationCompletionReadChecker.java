@@ -3,7 +3,6 @@ package com.shinyoung.recruit.service;
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
 import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
 import com.shinyoung.recruit.domain.entity.ApplicationBasicInfo;
-import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.ApplicationMilitary;
 import com.shinyoung.recruit.domain.entity.JobApplication;
@@ -13,8 +12,6 @@ import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
-import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
-import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationGapPeriodRepository;
@@ -28,7 +25,6 @@ import com.shinyoung.recruit.dto.response.ApplicationCompletionSummaryResponse;
 import com.shinyoung.recruit.dto.response.ApplicationSectionReadinessResponse;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
 import com.shinyoung.recruit.enumeration.AttachmentType;
-import com.shinyoung.recruit.enumeration.CareerType;
 import com.shinyoung.recruit.enumeration.MilitarySubjectType;
 import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
@@ -54,7 +50,6 @@ public class ApplicationCompletionReadChecker {
 
     private static final String BASIC_INFO = "BASIC_INFO";
     private static final String EDUCATION = "EDUCATION";
-    private static final String CAREER = "CAREER";
     private static final String MILITARY = "MILITARY";
     private static final String QUESTION = "QUESTION";
     private static final String FORM_CONFIG = "FORM_CONFIG";
@@ -66,8 +61,6 @@ public class ApplicationCompletionReadChecker {
 
     private final ApplicationBasicInfoRepository basicInfoRepository;
     private final ApplicationEducationRepository educationRepository;
-    private final ApplicationCareerProfileRepository careerProfileRepository;
-    private final ApplicationCareerRepository careerRepository;
     private final ApplicationMilitaryRepository militaryRepository;
     private final JobPostingQuestionRepository jobPostingQuestionRepository;
     private final ApplicationAnswerRepository applicationAnswerRepository;
@@ -95,7 +88,6 @@ public class ApplicationCompletionReadChecker {
             ));
         } else {
             checkEducation(config, applicationId, accumulator);
-            checkCareer(config, applicationId, accumulator);
             checkMilitary(config, applicationId, accumulator);
             checkSimpleSection(config.isUseCertificate(), config.isRequireCertificate(), () -> certificateRepository.existsByJobApplicationId(applicationId), CERTIFICATE, "Certificate", accumulator);
             checkSimpleSection(config.isUseLanguage(), config.isRequireLanguage(), () -> languageRepository.existsByJobApplicationId(applicationId), LANGUAGE, "Language", accumulator);
@@ -149,66 +141,6 @@ public class ApplicationCompletionReadChecker {
                     required,
                     "MISSING_ROW",
                     sectionMissingMessage("Education", required)
-            ), required, accumulator);
-        }
-    }
-
-    private void checkCareer(ApplicationFormConfig config, Long applicationId, ReadinessAccumulator accumulator) {
-        if (!config.isUseCareer()) {
-            return;
-        }
-        boolean required = config.isRequireCareer();
-        addGroup(CAREER, required, accumulator);
-
-        Optional<ApplicationCareerProfile> profile = careerProfileRepository.findByJobApplicationId(applicationId);
-        if (profile.isEmpty()) {
-            addIssue(item(
-                    CAREER,
-                    "Career",
-                    required,
-                    "MISSING_PROFILE",
-                    required
-                            ? "Career profile is required before submit."
-                            : "Career profile is empty."
-            ), required, accumulator);
-            return;
-        }
-
-        CareerType careerType = profile.get().getCareerType();
-        if (careerType == null || careerType == CareerType.NOT_SELECTED) {
-            addIssue(item(
-                    CAREER,
-                    "Career",
-                    required,
-                    "TYPE_NOT_SELECTED",
-                    required
-                            ? "Career type must be selected before submit."
-                            : "Career type has not been selected."
-            ), required, accumulator);
-            return;
-        }
-
-        boolean hasCareerRows = careerRepository.existsByJobApplicationId(applicationId);
-        if (careerType == CareerType.EXPERIENCED && !hasCareerRows) {
-            addIssue(item(
-                    CAREER,
-                    "Career",
-                    required,
-                    "MISSING_ROW",
-                    required
-                            ? "Career rows are required for experienced applicants before submit."
-                            : "Career rows are empty for the selected career type."
-            ), required, accumulator);
-        }
-        if ((careerType == CareerType.NEWCOMER || careerType == CareerType.NOT_APPLICABLE) && hasCareerRows) {
-            addIssue(item(
-                    CAREER,
-                    "Career",
-                    required,
-                    "INVALID_DISALLOWED_ROW",
-                    required
-                            ? "Career rows are not allowed for the selected career type before submit."
-                            : "Career rows do not match the selected career type."
             ), required, accumulator);
         }
     }

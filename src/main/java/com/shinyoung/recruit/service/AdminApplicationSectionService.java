@@ -1,7 +1,6 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
-import com.shinyoung.recruit.domain.entity.ApplicationCareerProfile;
 import com.shinyoung.recruit.domain.entity.ApplicationEducation;
 import com.shinyoung.recruit.domain.entity.ApplicationEducationSemesterGrade;
 import com.shinyoung.recruit.domain.entity.JobApplication;
@@ -12,7 +11,6 @@ import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
-import com.shinyoung.recruit.domain.repository.ApplicationCareerProfileRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCareerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
@@ -36,7 +34,6 @@ import com.shinyoung.recruit.dto.response.AdminEducationResponse;
 import com.shinyoung.recruit.dto.response.AdminGapPeriodResponse;
 import com.shinyoung.recruit.dto.response.AdminLanguageResponse;
 import com.shinyoung.recruit.dto.response.AdminMilitaryResponse;
-import com.shinyoung.recruit.enumeration.CareerType;
 import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -56,7 +53,6 @@ public class AdminApplicationSectionService {
     private final ApplicationBasicInfoRepository basicInfoRepository;
     private final ApplicationEducationRepository educationRepository;
     private final ApplicationEducationSemesterGradeRepository semesterGradeRepository;
-    private final ApplicationCareerProfileRepository careerProfileRepository;
     private final ApplicationCareerRepository careerRepository;
     private final ApplicationCertificateRepository certificateRepository;
     private final ApplicationLanguageRepository languageRepository;
@@ -90,15 +86,11 @@ public class AdminApplicationSectionService {
 
     public AdminCareerResponse getCareers(Long applicationId) {
         validateApplicationExists(applicationId);
-        CareerType careerType = careerProfileRepository.findByJobApplicationId(applicationId)
-                .map(ApplicationCareerProfile::getCareerType)
-                .orElse(CareerType.NOT_SELECTED);
         List<AdminCareerItemResponse> careers = careerRepository.findByJobApplicationIdOrderBySortOrderAscIdAsc(applicationId)
                 .stream()
                 .map(AdminCareerItemResponse::from)
                 .toList();
-
-        return new AdminCareerResponse(careerType, careers);
+        return new AdminCareerResponse(careers);
     }
 
     public List<AdminCertificateResponse> getCertificates(Long applicationId) {
