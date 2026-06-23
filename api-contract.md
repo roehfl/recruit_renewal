@@ -70,16 +70,40 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 
 ### 화면: 지원자 어학 (ApplicationLanguage)
 
-- 프론트: (후속) `src/api`의 어학 관련 + 어학 입력 화면
+- 프론트: `src/api/application/sections/languageApi.ts`, `src/views/applicant/application/sections/LanguageSection.vue` (ApplicationFormView `sectionComponentMap.LANGUAGE`)
 - 백엔드: `com.shinyoung.recruit.controller.ApplicationLanguageController`
 
-#### GET·POST `/api/applications/{applicationId}/languages`  🔴 백엔드 구현됨 / 프론트 미반영
+#### GET·POST `/api/applications/{applicationId}/languages`  🟢 (프론트 반영 완료)
 
 - 변경(2026-06-23): 요청·응답에서 `score`,`grade` 제거. `scoreOrGrade`(선택), `conversationalAbility`(선택) 추가.
 - 요청: `{ languages: [{ languageName, testName, scoreOrGrade, conversationalAbility, examDate, expiredDate, issuingOrganization, sortOrder }] }`
 - 응답(200): `ApiResponse<[{ languageId, languageName, testName, scoreOrGrade, conversationalAbility, examDate, expiredDate, issuingOrganization, sortOrder }]>`
 - `conversationalAbility`는 공통코드 그룹 `LANGUAGE_CONVERSATION` 코드 문자열(프론트가 CommonCode로 렌더, 백엔드 validation 미결합, 코드 시드 안 함).
 - 관리자 조회 `GET /api/admin/applications/{id}/languages` 응답도 동일하게 `scoreOrGrade`/`conversationalAbility` 반영.
+
+### 화면: 지원자 수상 (ApplicationAward)
+
+- 프론트: `src/api/application/sections/awardApi.ts`, `src/views/applicant/application/sections/AwardSection.vue` (ApplicationFormView `sectionComponentMap.AWARD`)
+- 백엔드: `com.shinyoung.recruit.controller.ApplicationAwardController`
+
+#### GET·POST `/api/applications/{applicationId}/awards`  🟢
+
+- 요청: `{ awards: [{ awardName, awardingOrganization, awardDate, description, sortOrder }] }`
+- 응답(200): `ApiResponse<[{ awardId, awardName, awardingOrganization, awardDate, description, sortOrder }]>`
+- 필수: `awardName`, `awardingOrganization`, `awardDate`. `description`은 선택, 최대 2000자.
+- 수상은 선택(0개 허용 = 빈 배열). 전체 교체(replace) 방식.
+
+### 화면: 지원자 자격증 (ApplicationCertificate)
+
+- 프론트: `src/api/application/sections/certificateApi.ts`, `src/views/applicant/application/sections/CertificateSection.vue` (ApplicationFormView `sectionComponentMap.CERTIFICATE`)
+- 백엔드: `com.shinyoung.recruit.controller.ApplicationCertificateController`
+
+#### GET·POST `/api/applications/{applicationId}/certificates`  🟢
+
+- 요청: `{ certificates: [{ certificateName, issuingOrganization, acquiredDate, certificateNumber, expiredDate, scoreOrGrade, sortOrder }] }`
+- 응답(200): `ApiResponse<[{ certificateId, certificateName, issuingOrganization, acquiredDate, certificateNumber, expiredDate, scoreOrGrade, sortOrder }]>`
+- 필수: `certificateName`, `issuingOrganization`, `acquiredDate`. 나머지 선택.
+- 자격증은 선택(0개 허용 = 빈 배열). 전체 교체(replace) 방식.
 
 ### 화면: 지원자 기본정보 — 보훈 (ApplicationBasicInfo)
 
