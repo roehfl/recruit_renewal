@@ -52,7 +52,15 @@ public class ApplicationEducation extends BaseEntity {
 
     private String majorName;
 
-    private String degreeName;
+    // 복수/부/세부전공 구분 — CommonCode 그룹 MAJOR_TYPE 코드값(veteranType 선례: String 저장, FK·검증 없음).
+    @Column(length = 200)
+    private String additionalMajorType;
+
+    // additionalMajorType에 해당하는 전공 명칭(자유텍스트). 파기 시 NULLIFY.
+    private String additionalMajorName;
+
+    // 논문명(자유텍스트). 파기 시 NULLIFY.
+    private String thesisTitle;
 
     private LocalDate admissionDate;
 
@@ -87,7 +95,9 @@ public class ApplicationEducation extends BaseEntity {
             EducationLevel educationLevel,
             String schoolName,
             String majorName,
-            String degreeName,
+            String additionalMajorType,
+            String additionalMajorName,
+            String thesisTitle,
             LocalDate admissionDate,
             LocalDate graduationDate,
             GraduationStatus graduationStatus,
@@ -102,7 +112,9 @@ public class ApplicationEducation extends BaseEntity {
         this.educationLevel = educationLevel;
         this.schoolName = schoolName;
         this.majorName = majorName;
-        this.degreeName = degreeName;
+        this.additionalMajorType = additionalMajorType;
+        this.additionalMajorName = additionalMajorName;
+        this.thesisTitle = thesisTitle;
         this.admissionDate = admissionDate;
         this.graduationDate = graduationDate;
         this.graduationStatus = graduationStatus;
@@ -119,7 +131,9 @@ public class ApplicationEducation extends BaseEntity {
             EducationLevel educationLevel,
             String schoolName,
             String majorName,
-            String degreeName,
+            String additionalMajorType,
+            String additionalMajorName,
+            String thesisTitle,
             LocalDate admissionDate,
             LocalDate graduationDate,
             GraduationStatus graduationStatus,
@@ -130,7 +144,8 @@ public class ApplicationEducation extends BaseEntity {
             Integer sortOrder
     ) {
         return create(
-                jobApplication, educationLevel, schoolName, majorName, degreeName,
+                jobApplication, educationLevel, schoolName, majorName,
+                additionalMajorType, additionalMajorName, thesisTitle,
                 admissionDate, graduationDate, graduationStatus, dayNightType, campusType,
                 transfer, countryCode, null, sortOrder);
     }
@@ -140,7 +155,9 @@ public class ApplicationEducation extends BaseEntity {
             EducationLevel educationLevel,
             String schoolName,
             String majorName,
-            String degreeName,
+            String additionalMajorType,
+            String additionalMajorName,
+            String thesisTitle,
             LocalDate admissionDate,
             LocalDate graduationDate,
             GraduationStatus graduationStatus,
@@ -156,7 +173,9 @@ public class ApplicationEducation extends BaseEntity {
                 educationLevel,
                 schoolName,
                 majorName,
-                degreeName,
+                additionalMajorType,
+                additionalMajorName,
+                thesisTitle,
                 admissionDate,
                 graduationDate,
                 graduationStatus,

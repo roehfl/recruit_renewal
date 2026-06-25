@@ -126,7 +126,7 @@ class ApplicationCareerServiceTest {
                 LocalDate.of(2023, 1, 1),
                 LocalDate.of(2022, 1, 1),
                 false,
-                "백엔드",
+                null,
                 "이직",
                 0
         );
@@ -140,6 +140,41 @@ class ApplicationCareerServiceTest {
 
         assertThat(response.careers()).hasSize(1);
         assertThat(response.careers().get(0).promotionDate()).isEqualTo(LocalDate.of(2022, 1, 1));
+    }
+
+    @Test
+    void save_career_with_current_salary_roundtrip() {
+        Applicant applicant = createApplicant("career-salary", "Career Salary");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
+
+        CareerRequest item = new CareerRequest(
+                "신영증권", "IT", "과장", EmploymentType.FULL_TIME,
+                LocalDate.of(2020, 1, 1), LocalDate.of(2023, 1, 1), null,
+                false, 4500, "이직", 0
+        );
+
+        applicationCareerService.replaceCareers(
+                applicant.getId(), applicationId, new CareerReplaceRequest(List.of(item)));
+        CareerResponse response = applicationCareerService.getCareers(applicant.getId(), applicationId);
+
+        assertThat(response.careers()).hasSize(1);
+        assertThat(response.careers().get(0).currentSalary()).isEqualTo(4500);
+    }
+
+    @Test
+    void replace_fails_when_current_salary_is_negative() {
+        Applicant applicant = createApplicant("career-salary-neg", "Career Salary Neg");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
+
+        assertThatThrownBy(() -> applicationCareerService.replaceCareers(
+                applicant.getId(),
+                applicationId,
+                new CareerReplaceRequest(List.of(new CareerRequest(
+                        "Company", null, null, EmploymentType.FULL_TIME,
+                        LocalDate.of(2024, 1, 1), LocalDate.of(2024, 12, 31), null,
+                        false, -1, null, 0
+                )))
+        )).isInstanceOf(InvalidJobApplicationException.class);
     }
 
     @Test
@@ -287,28 +322,10 @@ class ApplicationCareerServiceTest {
     }
 
     @Test
-    void replace_fails_when_text_fields_exceed_max_length() {
+    void replace_fails_when_resignation_reason_exceeds_max_length() {
         Applicant applicant = createApplicant("career-text-validation", "Career Text Validation");
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         String longText = "a".repeat(2001);
-
-        assertThatThrownBy(() -> applicationCareerService.replaceCareers(
-                applicant.getId(),
-                applicationId,
-                new CareerReplaceRequest(List.of(new CareerRequest(
-                        "Company",
-                        null,
-                        null,
-                        EmploymentType.FULL_TIME,
-                        LocalDate.of(2024, 1, 1),
-                        LocalDate.of(2024, 12, 31),
-                        null,
-                        false,
-                        longText,
-                        null,
-                        0
-                )))
-        )).isInstanceOf(InvalidJobApplicationException.class);
 
         assertThatThrownBy(() -> applicationCareerService.replaceCareers(
                 applicant.getId(),
@@ -471,7 +488,7 @@ class ApplicationCareerServiceTest {
                 LocalDate.of(2024, 12, 31),
                 null,
                 false,
-                "Backend development",
+                null,
                 "Career change",
                 sortOrder
         );

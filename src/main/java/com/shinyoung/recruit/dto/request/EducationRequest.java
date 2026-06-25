@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -21,7 +22,12 @@ public record EducationRequest(
 
         String majorName,
 
-        String degreeName,
+        @Size(max = 100, message = "Additional major type must be 100 characters or less.")
+        String additionalMajorType,
+
+        String additionalMajorName,
+
+        String thesisTitle,
 
         LocalDate admissionDate,
 
@@ -53,7 +59,9 @@ public record EducationRequest(
             EducationLevel educationLevel,
             String schoolName,
             String majorName,
-            String degreeName,
+            String additionalMajorType,
+            String additionalMajorName,
+            String thesisTitle,
             LocalDate admissionDate,
             LocalDate graduationDate,
             GraduationStatus graduationStatus,
@@ -64,8 +72,8 @@ public record EducationRequest(
             Integer sortOrder,
             List<SemesterGradeRequest> semesterGrades
     ) {
-        this(educationLevel, schoolName, majorName, degreeName, admissionDate, graduationDate,
-                graduationStatus, dayNightType, campusType, transfer, countryCode, sortOrder,
-                semesterGrades, null);
+        this(educationLevel, schoolName, majorName, additionalMajorType, additionalMajorName, thesisTitle,
+                admissionDate, graduationDate, graduationStatus, dayNightType, campusType, transfer, countryCode,
+                sortOrder, semesterGrades, null);
     }
 }

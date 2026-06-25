@@ -352,7 +352,9 @@ class AdminApplicationSectionControllerTest {
                 EducationLevel.UNIVERSITY,
                 "Shinyoung University",
                 "Computer Science",
-                "Bachelor",
+                null,
+                null,
+                null,
                 LocalDate.of(2021, 3, 1),
                 LocalDate.of(2025, 2, 28),
                 GraduationStatus.GRADUATED,
@@ -382,7 +384,7 @@ class AdminApplicationSectionControllerTest {
                 LocalDate.of(2024, 12, 31),
                 null,
                 false,
-                "Backend development",
+                4500,
                 "Career move",
                 0
         ));

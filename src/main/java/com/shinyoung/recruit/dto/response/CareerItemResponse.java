@@ -15,7 +15,7 @@ public record CareerItemResponse(
         LocalDate endDate,
         LocalDate promotionDate,
         Boolean currentlyEmployed,
-        String responsibilities,
+        Integer currentSalary,
         String resignationReason,
         Integer sortOrder
 ) {
@@ -31,7 +31,7 @@ public record CareerItemResponse(
                 career.getEndDate(),
                 career.getPromotionDate(),
                 career.getCurrentlyEmployed(),
-                career.getResponsibilities(),
+                career.getCurrentSalary(),
                 career.getResignationReason(),
                 career.getSortOrder()
         );

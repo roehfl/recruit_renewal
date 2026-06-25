@@ -70,10 +70,12 @@ public interface ApplicationPiiPurgeRepository extends Repository<JobApplication
             where a.jobApplication.id = :applicationId""")
     int purgeAnswers(@Param("applicationId") Long applicationId);
 
+    /** additionalMajorType 은 코드값이라 KEEP_TOMBSTONE(건드리지 않음). 자유텍스트 additionalMajorName/thesisTitle 만 NULLIFY. */
     @Modifying(flushAutomatically = true)
     @Query("""
             update ApplicationEducation e
-            set e.schoolName = '__PURGED__', e.majorName = null, e.degreeName = null, e.countryCode = null,
+            set e.schoolName = '__PURGED__', e.majorName = null,
+                e.additionalMajorName = null, e.thesisTitle = null, e.countryCode = null,
                 e.admissionDate = null, e.graduationDate = null, e.createdBy = null, e.updatedBy = null
             where e.jobApplication.id = :applicationId""")
     int purgeEducations(@Param("applicationId") Long applicationId);
@@ -90,7 +92,7 @@ public interface ApplicationPiiPurgeRepository extends Repository<JobApplication
     @Query("""
             update ApplicationCareer c
             set c.companyName = '__PURGED__', c.departmentName = null, c.positionTitle = null,
-                c.responsibilities = null, c.resignationReason = null, c.startDate = null, c.endDate = null,
+                c.currentSalary = null, c.resignationReason = null, c.startDate = null, c.endDate = null,
                 c.promotionDate = null,
                 c.createdBy = null, c.updatedBy = null
             where c.jobApplication.id = :applicationId""")

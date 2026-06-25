@@ -153,12 +153,13 @@ class ApplicationPiiPurgeServiceTest {
         answerRepository.save(ApplicationAnswer.create(application, question, "저는 홍길동이고 010-1234-5678 입니다"));
 
         educationRepository.save(ApplicationEducation.create(
-                application, EducationLevel.UNIVERSITY, "서울대학교", "컴퓨터공학", "학사",
+                application, EducationLevel.UNIVERSITY, "서울대학교", "컴퓨터공학",
+                "DOUBLE_MAJOR", "경영학", "딥러닝 추천시스템",
                 LocalDate.of(2015, 3, 2), LocalDate.of(2019, 2, 25),
                 GraduationStatus.GRADUATED, DayNightType.DAY, CampusType.MAIN, false, "KR", 1));
         careerRepository.save(ApplicationCareer.create(
                 application, "이전회사", "개발팀", "대리", EmploymentType.FULL_TIME,
-                LocalDate.of(2019, 3, 1), LocalDate.of(2023, 5, 31), null, false, "백엔드 개발 담당", "이직", 1));
+                LocalDate.of(2019, 3, 1), LocalDate.of(2023, 5, 31), null, false, 5000, "이직", 1));
         certificateRepository.save(ApplicationCertificate.create(
                 application, "정보처리기사", "한국산업인력공단", LocalDate.of(2020, 5, 1),
                 "12-345-678", LocalDate.of(2030, 5, 1), "합격", 1));
@@ -227,7 +228,9 @@ class ApplicationPiiPurgeServiceTest {
         ApplicationEducation education = educationRepository.findAll().get(0);
         assertThat(education.getSchoolName()).isEqualTo(PURGED);
         assertThat(education.getMajorName()).isNull();
-        assertThat(education.getDegreeName()).isNull();
+        assertThat(education.getAdditionalMajorName()).isNull();
+        assertThat(education.getThesisTitle()).isNull();
+        assertThat(education.getAdditionalMajorType()).isEqualTo("DOUBLE_MAJOR");
         assertThat(education.getCountryCode()).isNull();
         assertThat(education.getAdmissionDate()).isNull(); // 안 A — 정확 날짜 보존 금지
         assertThat(education.getGraduationDate()).isNull();
@@ -238,7 +241,7 @@ class ApplicationPiiPurgeServiceTest {
         assertThat(career.getCompanyName()).isEqualTo(PURGED);
         assertThat(career.getDepartmentName()).isNull();
         assertThat(career.getPositionTitle()).isNull();
-        assertThat(career.getResponsibilities()).isNull();
+        assertThat(career.getCurrentSalary()).isNull();
         assertThat(career.getResignationReason()).isNull();
         assertThat(career.getStartDate()).isNull();
         assertThat(career.getEndDate()).isNull();

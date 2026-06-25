@@ -4,6 +4,7 @@ import com.shinyoung.recruit.enumeration.EmploymentType;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
@@ -28,8 +29,8 @@ public record CareerRequest(
         @NotNull(message = "Currently employed flag is required.")
         Boolean currentlyEmployed,
 
-        @Size(max = 2000, message = "Responsibilities must be 2000 characters or less.")
-        String responsibilities,
+        @PositiveOrZero(message = "Current salary must be greater than or equal to 0.")
+        Integer currentSalary,
 
         @Size(max = 2000, message = "Resignation reason must be 2000 characters or less.")
         String resignationReason,

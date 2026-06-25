@@ -298,7 +298,7 @@ class ApplicationCareerControllerTest {
                       "startDate": "2022-01-01",
                       "endDate": "2024-12-31",
                       "currentlyEmployed": false,
-                      "responsibilities": "Backend development",
+                      "currentSalary": 4500,
                       "resignationReason": "Career change",
                       "sortOrder": 0
                     }

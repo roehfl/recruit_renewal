@@ -60,8 +60,8 @@ public class ApplicationCareer extends BaseEntity {
     @Column(nullable = false)
     private Boolean currentlyEmployed;
 
-    @Column(length = 2000)
-    private String responsibilities;
+    // 현재연봉(만원 단위). 선택 입력이며 파기(NULLIFY) 대상이다(PII 인벤토리 §Career).
+    private Integer currentSalary;
 
     @Column(length = 2000)
     private String resignationReason;
@@ -79,7 +79,7 @@ public class ApplicationCareer extends BaseEntity {
             LocalDate endDate,
             LocalDate promotionDate,
             Boolean currentlyEmployed,
-            String responsibilities,
+            Integer currentSalary,
             String resignationReason,
             Integer sortOrder
     ) {
@@ -92,7 +92,7 @@ public class ApplicationCareer extends BaseEntity {
         this.endDate = endDate;
         this.promotionDate = promotionDate;
         this.currentlyEmployed = currentlyEmployed;
-        this.responsibilities = responsibilities;
+        this.currentSalary = currentSalary;
         this.resignationReason = resignationReason;
         this.sortOrder = sortOrder;
     }
@@ -107,7 +107,7 @@ public class ApplicationCareer extends BaseEntity {
             LocalDate endDate,
             LocalDate promotionDate,
             Boolean currentlyEmployed,
-            String responsibilities,
+            Integer currentSalary,
             String resignationReason,
             Integer sortOrder
     ) {
@@ -121,7 +121,7 @@ public class ApplicationCareer extends BaseEntity {
                 endDate,
                 promotionDate,
                 currentlyEmployed,
-                responsibilities,
+                currentSalary,
                 resignationReason,
                 sortOrder
         );

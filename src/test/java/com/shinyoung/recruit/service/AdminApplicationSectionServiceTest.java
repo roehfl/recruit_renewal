@@ -549,6 +549,8 @@ class AdminApplicationSectionServiceTest {
                 schoolName,
                 educationLevel == EducationLevel.HIGH_SCHOOL ? null : "Computer Science",
                 null,
+                null,
+                null,
                 LocalDate.of(2021, 3, 1),
                 LocalDate.of(2025, 2, 28),
                 GraduationStatus.GRADUATED,
@@ -571,7 +573,7 @@ class AdminApplicationSectionServiceTest {
                 LocalDate.of(2024, 12, 31),
                 null,
                 false,
-                "Backend development",
+                null,
                 "Career move",
                 sortOrder
         );

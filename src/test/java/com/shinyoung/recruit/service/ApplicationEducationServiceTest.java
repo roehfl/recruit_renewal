@@ -116,11 +116,11 @@ class ApplicationEducationServiceTest {
         Long applicationId = createApplication(applicant, jobPostingId);
 
         EducationRequest linkedToMaster = new EducationRequest(
-                EducationLevel.UNIVERSITY, "Linked University", null, null,
+                EducationLevel.UNIVERSITY, "Linked University", null, null, null, null,
                 LocalDate.of(2020, 3, 1), LocalDate.of(2024, 2, 1), GraduationStatus.GRADUATED,
                 DayNightType.DAY, CampusType.MAIN, false, "KR", 1, List.of(), 777L);
         EducationRequest freeText = new EducationRequest(
-                EducationLevel.HIGH_SCHOOL, "Free Text High", null, null,
+                EducationLevel.HIGH_SCHOOL, "Free Text High", null, null, null, null,
                 null, null, GraduationStatus.GRADUATED, null, null, false, "KR", 0, List.of());
 
         List<EducationResponse> responses = applicationEducationService.replaceEducations(
@@ -146,6 +146,8 @@ class ApplicationEducationServiceTest {
                         EducationLevel.UNIVERSITY,
                         "Sort University",
                         "Computer Science",
+                        null,
+                        null,
                         null,
                         LocalDate.of(2022, 3, 1),
                         null,
@@ -324,6 +326,8 @@ class ApplicationEducationServiceTest {
                         null,
                         null,
                         null,
+                        null,
+                        null,
                         GraduationStatus.GRADUATED,
                         null,
                         null,
@@ -340,6 +344,8 @@ class ApplicationEducationServiceTest {
                 new EducationReplaceRequest(List.of(new EducationRequest(
                         EducationLevel.UNIVERSITY,
                         "University",
+                        null,
+                        null,
                         null,
                         null,
                         LocalDate.of(2025, 3, 1),
@@ -364,6 +370,8 @@ class ApplicationEducationServiceTest {
                         null,
                         null,
                         null,
+                        null,
+                        null,
                         GraduationStatus.GRADUATED,
                         null,
                         null,
@@ -380,6 +388,8 @@ class ApplicationEducationServiceTest {
                 new EducationReplaceRequest(List.of(new EducationRequest(
                         EducationLevel.UNIVERSITY,
                         "University",
+                        null,
+                        null,
                         null,
                         null,
                         null,
@@ -410,6 +420,8 @@ class ApplicationEducationServiceTest {
                         null,
                         null,
                         null,
+                        null,
+                        null,
                         GraduationStatus.GRADUATED,
                         null,
                         null,
@@ -425,6 +437,23 @@ class ApplicationEducationServiceTest {
                 applicationId,
                 new EducationReplaceRequest(List.of(universityEducation(0), highSchoolEducation(0)))
         )).isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
+    void save_education_with_additional_major_and_thesis_roundtrip() {
+        Applicant applicant = createApplicant("education-major", "Education Major");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
+
+        applicationEducationService.replaceEducations(
+                applicant.getId(), applicationId,
+                new EducationReplaceRequest(List.of(universityEducation(0))));
+        List<EducationResponse> responses =
+                applicationEducationService.getEducations(applicant.getId(), applicationId);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).additionalMajorType()).isEqualTo("DOUBLE_MAJOR");
+        assertThat(responses.get(0).additionalMajorName()).isEqualTo("경영학");
+        assertThat(responses.get(0).thesisTitle()).isEqualTo("딥러닝 추천시스템");
     }
 
     private Applicant createApplicant(String loginId, String applicantName) {
@@ -476,6 +505,8 @@ class ApplicationEducationServiceTest {
                 "Shinyoung High School",
                 null,
                 null,
+                null,
+                null,
                 LocalDate.of(2018, 3, 1),
                 LocalDate.of(2021, 2, 28),
                 GraduationStatus.GRADUATED,
@@ -493,7 +524,9 @@ class ApplicationEducationServiceTest {
                 EducationLevel.UNIVERSITY,
                 "Shinyoung University",
                 "Computer Science",
-                "Bachelor",
+                "DOUBLE_MAJOR",
+                "경영학",
+                "딥러닝 추천시스템",
                 LocalDate.of(2021, 3, 1),
                 LocalDate.of(2025, 2, 28),
                 GraduationStatus.GRADUATED,

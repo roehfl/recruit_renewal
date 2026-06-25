@@ -522,7 +522,7 @@ class AdminStatisticsControllerTest {
 
     private void education(JobApplication application, EducationLevel level, Long schoolId, int sortOrder) {
         educationRepository.saveAndFlush(ApplicationEducation.create(
-                application, level, "School-" + sortOrder, null, null, null, null,
+                application, level, "School-" + sortOrder, null, null, null, null, null, null,
                 GraduationStatus.GRADUATED, null, null, false, "KR", schoolId, sortOrder));
     }
 

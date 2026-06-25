@@ -86,8 +86,8 @@ public class ApplicationCareerService {
         if (career.endDate() != null && career.startDate().isAfter(career.endDate())) {
             throw new InvalidJobApplicationException("Start date cannot be after end date.");
         }
-        if (isLongerThan(career.responsibilities(), CAREER_TEXT_MAX_LENGTH)) {
-            throw new InvalidJobApplicationException("Responsibilities must be 2000 characters or less.");
+        if (career.currentSalary() != null && career.currentSalary() < 0) {
+            throw new InvalidJobApplicationException("Current salary must be greater than or equal to 0.");
         }
         if (isLongerThan(career.resignationReason(), CAREER_TEXT_MAX_LENGTH)) {
             throw new InvalidJobApplicationException("Resignation reason must be 2000 characters or less.");
@@ -109,7 +109,7 @@ public class ApplicationCareerService {
                 request.endDate(),
                 request.promotionDate(),
                 request.currentlyEmployed(),
-                request.responsibilities(),
+                request.currentSalary(),
                 request.resignationReason(),
                 request.sortOrder()
         );

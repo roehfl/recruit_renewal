@@ -103,8 +103,17 @@ public class ApplicationPdfService {
         for (AdminEducationResponse e : sectionService.getEducations(applicationId)) {
             List<Field> fields = new ArrayList<>(List.of(
                     field("학교명", e.schoolName()),
-                    field("전공", e.majorName()),
-                    field("학위", e.degreeName()),
+                    field("전공", e.majorName())));
+            if (hasText(e.additionalMajorType())) {
+                fields.add(field("전공구분", e.additionalMajorType()));
+            }
+            if (hasText(e.additionalMajorName())) {
+                fields.add(field("복수/부/세부전공명", e.additionalMajorName()));
+            }
+            if (hasText(e.thesisTitle())) {
+                fields.add(field("논문명", e.thesisTitle()));
+            }
+            fields.addAll(List.of(
                     field("학력수준", e.educationLevel()),
                     field("입학일", e.admissionDate()),
                     field("졸업일", e.graduationDate()),
@@ -129,7 +138,7 @@ public class ApplicationPdfService {
         AdminCareerResponse career = sectionService.getCareers(applicationId);
         List<RecordRow> rows = new ArrayList<>();
         for (AdminCareerItemResponse c : career.careers()) {
-            rows.add(new RecordRow(List.of(
+            List<Field> fields = new ArrayList<>(List.of(
                     field("회사명", c.companyName()),
                     field("부서", c.departmentName()),
                     field("직위", c.positionTitle()),
@@ -137,9 +146,12 @@ public class ApplicationPdfService {
                     field("입사일", c.startDate()),
                     field("퇴사일", c.endDate()),
                     field("진급일", c.promotionDate()),
-                    field("재직중", c.currentlyEmployed()),
-                    field("담당업무", c.responsibilities()),
-                    field("퇴사사유", c.resignationReason()))));
+                    field("재직중", c.currentlyEmployed())));
+            if (c.currentSalary() != null) {
+                fields.add(field("현재연봉(만원)", c.currentSalary()));
+            }
+            fields.add(field("퇴사사유", c.resignationReason()));
+            rows.add(new RecordRow(fields));
         }
         return new Section("경력", rows, EMPTY);
     }
@@ -226,6 +238,10 @@ public class ApplicationPdfService {
 
     private Field field(String label, Object value) {
         return new Field(label, str(value));
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private String str(Object value) {

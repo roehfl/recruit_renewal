@@ -62,12 +62,14 @@
 | --- | --- | --- | --- |
 | `ApplicationEducation.educationLevel` / `graduationStatus` / `dayNightType` / `campusType` / `transfer` / `sortOrder` | - | KEEP_TOMBSTONE | 비PII enum/coded(funnel) |
 | `ApplicationEducation.schoolId`(soft link) | true | KEEP_TOMBSTONE | **SCHOOL funnel 의 비식별 grouping 키** — 보존 |
+| `ApplicationEducation.additionalMajorType` | true | KEEP_TOMBSTONE | 코드값(CommonCode `MAJOR_TYPE`), purge 대상 아님 |
 | `ApplicationEducation.schoolName` | **false** | **PLACEHOLDER** | `"__PURGED__"`(free-text, schoolId 로 통계 대체) |
-| `ApplicationEducation.majorName` / `degreeName` / `countryCode` | true | NULLIFY | null |
+| `ApplicationEducation.majorName` / `additionalMajorName` / `thesisTitle` / `countryCode` | true | NULLIFY | null(자유텍스트) |
 | `ApplicationEducation.admissionDate` / `graduationDate` | true | **NULLIFY (안 A 확정)** | 정확 날짜 **보존 금지**. **안 A 채택(리뷰 3차 #3)**: 전부 `null`, 일반화 컬럼 추가 없음 — 현 funnel 통계(jobPosition/schoolId/certificate/stage)가 입학·졸업일을 안 쓰므로 통계 손실 0. (졸업연도 코호트 통계가 향후 필요하면 안 B로 전환: `graduationYear` 등 nullable 컬럼.) |
 | `ApplicationEducationSemesterGrade.*`(year/semester/credits/gpa…) | - | KEEP_TOMBSTONE | 비식별 학업 metric(schoolName/major 소거 후 단독 비식별) |
 | `ApplicationCareer.companyName` | **false** | **PLACEHOLDER** | `"__PURGED__"` |
-| `ApplicationCareer.departmentName` / `positionTitle` / `responsibilities` / `resignationReason` | true | NULLIFY | null(자유서술 포함) |
+| `ApplicationCareer.departmentName` / `positionTitle` / `resignationReason` | true | NULLIFY | null(자유서술 포함) |
+| `ApplicationCareer.currentSalary` | true | NULLIFY | null(재무정보) |
 | `ApplicationCareer.employmentType` / `currentlyEmployed` / `sortOrder` | - | KEEP_TOMBSTONE | 비PII |
 | `ApplicationCareer.startDate` / `endDate` | false/true | **NULLIFY (안 A 확정)** | 정확 날짜 **보존 금지**. **안 A**: 전부 null(`startDate` NOT NULL → ALTER nullable). 일반화/근속개월 컬럼 추가 없음. (안 B 선택 시 `careerStartYearMonth`/`careerEndYearMonth` varchar(7)·`careerDurationMonths` int 추가.) |
 | `ApplicationCareerProfile.careerType` | false | KEEP_TOMBSTONE | 비PII enum(funnel) |
@@ -176,6 +178,8 @@ BINARY_DELETE_FAILED : 물리 삭제 실패(재시도/ reconciliation 대상)
 **`@Column(updatable=false)` 회피**: `createdBy` 는 JPQL/native bulk update 로만 클리어 가능(엔티티 dirty-update 안 됨).
 
 **어학/보훈 변경(2026-06-23)**: `application_language` `score`/`grade` 컬럼 제거 + `score_or_grade`/`conversational_ability` 추가; `application_basic_info` `veteran_type` 추가. 개발 H2는 JPA ddl-auto, 운영 MariaDB는 ALTER(컬럼 drop/add) 필요. veteranType은 평문(암호화 아님).
+
+**경력/학력 변경(2026-06-25)**: `application_career` `responsibilities` 컬럼 제거 + `current_salary`(Integer, nullable) 추가. `application_education` `degree_name` 컬럼 제거 + `additional_major_type`(varchar 200, nullable), `additional_major_name`(nullable), `thesis_title`(nullable) 추가. 개발 H2는 JPA ddl-auto, 운영 MariaDB는 ALTER 필요. `additional_major_type`은 KEEP_TOMBSTONE(코드값, purge 대상 아님).
 
 ## 10. ApplicationBasicInfo (Phase 10 추가)
 
