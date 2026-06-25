@@ -51,10 +51,24 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 #### GET·POST `/api/applications/{applicationId}/careers`  🔴 백엔드 구현됨 / 프론트 미반영
 
 - 변경(2026-06-23): 요청·응답에서 `careerType` 제거. 경력 행에 `promotionDate`(진급일, nullable) 추가.
-- 요청: `{ careers: [{ companyName, departmentName, positionTitle, employmentType, startDate, endDate, promotionDate, currentlyEmployed, responsibilities, resignationReason, sortOrder }] }`
+- 변경(2026-06-25): 요청·응답에서 `responsibilities` 제거, `currentSalary`(현재연봉, Integer 만원 단위, nullable, 0 이상) 추가.
+- 요청: `{ careers: [{ companyName, departmentName, positionTitle, employmentType, startDate, endDate, promotionDate, currentlyEmployed, currentSalary, resignationReason, sortOrder }] }`
 - 응답(200): `ApiResponse<{ careers: [...] }>` (careerType 필드 없음)
 - 경력은 선택(0개 허용). 신입/경력 타입(careerType) 개념 폐지.
 - 관리자 조회 `GET /api/admin/applications/{id}/careers` 응답도 동일하게 careerType 제거 + promotionDate 추가.
+
+### 화면: 지원자 학력 (ApplicationEducation)
+
+- 프론트: (후속) 학력 입력 화면 + `src/api` education 관련
+- 백엔드: `com.shinyoung.recruit.controller.ApplicationEducationController`
+
+#### GET·POST `/api/applications/{applicationId}/educations`  🔴 백엔드 구현됨 / 프론트 미반영
+
+- 변경(2026-06-25): 요청·응답에서 `degreeName` 제거. `additionalMajorType`(복수/부/세부전공 구분), `additionalMajorName`(해당 전공 명칭), `thesisTitle`(논문명) 추가.
+- 요청: `{ educations: [{ educationLevel, schoolName, majorName, additionalMajorType, additionalMajorName, thesisTitle, admissionDate, graduationDate, graduationStatus, dayNightType, campusType, transfer, countryCode, sortOrder, semesterGrades, schoolId }] }`
+- 응답(200): `ApiResponse<{ educations: [...] }>` (degreeName 없음, 3필드 포함, educationId 포함)
+- `additionalMajorType`는 코드 문자열(프론트가 CommonCode 그룹 `MAJOR_TYPE`로 렌더, 백엔드 validation 미결합). `additionalMajorName`/`thesisTitle`는 선택 자유텍스트.
+- 관리자 조회 `GET /api/admin/applications/{id}/educations` 응답도 동일하게 degreeName 제거 + 3필드 추가.
 
 ### 화면: 관리자 학교 마스터 (School)
 
