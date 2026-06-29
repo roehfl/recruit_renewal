@@ -1,5 +1,21 @@
 # 07. Implementation History
 
+## 2026-06-30 - 학력 전체(평균) 평점 4필드 추가 (education-overall-gpa)
+
+- Date: 2026-06-30
+- Work type: 소규모 기능 추가 (백엔드 전용 슬라이스).
+- 학력(education):
+  - `ApplicationEducation`에 전체/전공 평점 4필드(`overallGradePoint`, `overallMaxGradePoint`, `overallMajorGradePoint`, `overallMajorMaxGradePoint`, 모두 `BigDecimal` DB nullable) 추가. 수동 입력 전용, 자동 평균 계산 없음.
+  - `ApplicationEducation.create()` 20-arg 오버로드 추가 (기존 15/16-arg 오버로드 유지, 하위 호환).
+  - `EducationRequest`(record) 4 컴포넌트 + `@DecimalMin` 추가; 15-arg/16-arg 호환 생성자(신규 4필드 null 기본값).
+  - `EducationResponse` / `AdminEducationResponse` 4 컴포넌트 + `from()` 매핑.
+  - `ApplicationEducationService.validateOverallGrades(EducationRequest)` 신규 — overall pair 필수(비고교) / 선택(고교), major pair 선택(전 레벨), 쌍 일관성·범위(max>0, point>=0, point<=max) 검증; 위반 시 `InvalidJobApplicationException`.
+  - `ApplicationEducationSemesterGrade` 변경 없음.
+- APIs: 경로 변경 없음 (`GET·POST /api/applications/{applicationId}/educations`, `GET /api/admin/applications/{applicationId}/educations`), 페이로드 4필드 추가.
+- 커밋: Entity `4422ad2`, DTO `19058f6`·`b9661a3`, Service+ServiceTest `006e663`, ControllerTest `bfc9ca2`.
+- Tests: `ApplicationEducationServiceTest`(16건, 4 신규) · `ApplicationEducationControllerTest`(8건) 그린. 인접 리그레션(AdminSection*/PiiPurge/Pdf/Statistics) scoped 통과. 전체 리그레션 미실행(하네스 §5).
+- 잔여: 프론트 학력 입력 UI 미구현(후속 슬라이스); 자동 평균 계산 없음; education.ts stale 필드 정리 범위 외.
+
 ## 2026-06-23 - 어학 scoreOrGrade·conversationalAbility / 기본정보 veteranType
 
 - Date: 2026-06-23
