@@ -7,6 +7,7 @@ import com.shinyoung.recruit.enumeration.DayNightType;
 import com.shinyoung.recruit.enumeration.EducationLevel;
 import com.shinyoung.recruit.enumeration.GraduationStatus;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -27,6 +28,10 @@ public record EducationResponse(
         String countryCode,
         Long schoolId,
         Integer sortOrder,
+        BigDecimal overallGradePoint,
+        BigDecimal overallMaxGradePoint,
+        BigDecimal overallMajorGradePoint,
+        BigDecimal overallMajorMaxGradePoint,
         List<SemesterGradeResponse> semesterGrades
 ) {
 
@@ -51,6 +56,10 @@ public record EducationResponse(
                 education.getCountryCode(),
                 education.getSchoolId(),
                 education.getSortOrder(),
+                education.getOverallGradePoint(),
+                education.getOverallMaxGradePoint(),
+                education.getOverallMajorGradePoint(),
+                education.getOverallMajorMaxGradePoint(),
                 semesterGrades.stream()
                         .map(SemesterGradeResponse::from)
                         .toList()
