@@ -65,10 +65,12 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 #### GET·POST `/api/applications/{applicationId}/educations`  🔴 백엔드 구현됨 / 프론트 미반영
 
 - 변경(2026-06-25): 요청·응답에서 `degreeName` 제거. `additionalMajorType`(복수/부/세부전공 구분), `additionalMajorName`(해당 전공 명칭), `thesisTitle`(논문명) 추가.
-- 요청: `{ educations: [{ educationLevel, schoolName, majorName, additionalMajorType, additionalMajorName, thesisTitle, admissionDate, graduationDate, graduationStatus, dayNightType, campusType, transfer, countryCode, sortOrder, semesterGrades, schoolId }] }`
-- 응답(200): `ApiResponse<{ educations: [...] }>` (degreeName 없음, 3필드 포함, educationId 포함)
+- 변경(2026-06-30, 🟡 구현 중): 학력 단위 전체 평점 요약 4필드 추가 — `overallGradePoint`(전체 평점), `overallMaxGradePoint`(전체 만점기준), `overallMajorGradePoint`(전공 전체 평점), `overallMajorMaxGradePoint`(전공 전체 만점기준). 모두 `BigDecimal`. 전체 쌍은 `HIGH_SCHOOL`이 아니면 필수, `HIGH_SCHOOL`이면 선택. 전공 전체 쌍은 모든 레벨에서 선택. 자동 평균계산 없음(수동 입력).
+- 요청: `{ educations: [{ educationLevel, schoolName, majorName, additionalMajorType, additionalMajorName, thesisTitle, admissionDate, graduationDate, graduationStatus, dayNightType, campusType, transfer, countryCode, sortOrder, semesterGrades, schoolId, overallGradePoint, overallMaxGradePoint, overallMajorGradePoint, overallMajorMaxGradePoint }] }`
+- 응답(200): `ApiResponse<{ educations: [...] }>` (degreeName 없음, 3필드 + 전체평점 4필드 포함, educationId 포함)
 - `additionalMajorType`는 코드 문자열(프론트가 CommonCode 그룹 `MAJOR_TYPE`로 렌더, 백엔드 validation 미결합). `additionalMajorName`/`thesisTitle`는 선택 자유텍스트.
-- 관리자 조회 `GET /api/admin/applications/{id}/educations` 응답도 동일하게 degreeName 제거 + 3필드 추가.
+- 전체 평점 쌍/전공 전체 쌍은 함께 입력해야 한다(평점만 있고 만점이 없으면 검증 실패). 평점 ≤ 만점, 만점 > 0.
+- 관리자 조회 `GET /api/admin/applications/{id}/educations` 응답도 동일하게 4필드 추가.
 
 ### 화면: 관리자 학교 마스터 (School)
 
@@ -158,3 +160,20 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 변경(2026-06-23): 요청·응답에 `veteranType`(문자열, 평문, 선택) 추가.
 - 규칙: `veteranStatus=="SUBJECT"`면 `veteranType` 필수, `"NOT_SUBJECT"`면 비어 있어야 함(값 있으면 400).
 - 자유 입력 String(공통코드/암호화 아님 — 보훈은 일반 PII). 관리자 조회 응답(`AdminBasicInfoResponse`)에도 `veteranType` 포함.
+
+### 화면: 지원자 병역 (ApplicationMilitary)
+
+- 프론트: (후속) 지원서 입력 화면 병역 영역 — 현재 `ApplicationSectionPlaceholder`
+- 백엔드: `com.shinyoung.recruit.controller.ApplicationMilitaryController`
+
+#### GET·POST `/api/applications/{applicationId}/military`  🟢 백엔드 구현됨 / 프론트 미반영
+
+- `militarySubjectType` enum: `SUBJECT`(병역대상·미필) / `NOT_SUBJECT`(비대상) / `COMPLETED`(군필) / `EXEMPTED`(면제). (2026-06-29: `NOT_APPLICABLE` 제거 — `NOT_SUBJECT`로 통합.)
+- 요청·응답 필드: `{ militarySubjectType, serviceType, militaryBranch, rank, serviceStartDate, serviceEndDate, nonServiceReason }`. (2026-06-29: `exemptionReason` → `nonServiceReason`으로 명칭 변경 — 면제·미필 사유 공통.)
+- `nonServiceReason`: 자유 입력 String(≤1000), 평문 저장이나 **민감정보 취급** — 관리자 조회 응답은 `nonServiceReasonMasked`(`***`)로만 노출, PII 파기 대상.
+- 저장(POST) 시 대상구분별 필드 정책:
+  - `SUBJECT`·`EXEMPTED`: `nonServiceReason` 허용, 복무 상세(serviceType/branch/rank/기간) 금지.
+  - `COMPLETED`: 복무 상세 허용, `nonServiceReason` 금지.
+  - `NOT_SUBJECT`: 모든 상세 필드 금지.
+- 최종 제출 검증: `COMPLETED`는 복무기간(start·end) 필수, **`SUBJECT`·`EXEMPTED`는 `nonServiceReason` 필수**(임시저장 단계에서는 선택). (2026-06-29: `SUBJECT` 사유 필수 신규.)
+- 관리자 조회: `AdminMilitaryResponse`(`nonServiceReasonMasked`), PDF 출력 라벨 "병역사유".
