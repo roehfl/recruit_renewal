@@ -118,7 +118,8 @@ class ApplicationEducationServiceTest {
         EducationRequest linkedToMaster = new EducationRequest(
                 EducationLevel.UNIVERSITY, "Linked University", null, null, null, null,
                 LocalDate.of(2020, 3, 1), LocalDate.of(2024, 2, 1), GraduationStatus.GRADUATED,
-                DayNightType.DAY, CampusType.MAIN, false, "KR", 1, List.of(), 777L);
+                DayNightType.DAY, CampusType.MAIN, false, "KR", 1, List.of(), 777L,
+                new BigDecimal("3.9"), new BigDecimal("4.5"), null, null);
         EducationRequest freeText = new EducationRequest(
                 EducationLevel.HIGH_SCHOOL, "Free Text High", null, null, null, null,
                 null, null, GraduationStatus.GRADUATED, null, null, false, "KR", 0, List.of());
@@ -161,7 +162,12 @@ class ApplicationEducationServiceTest {
                                 grade(2, 1),
                                 grade(1, 2),
                                 grade(1, 1)
-                        )
+                        ),
+                        null,
+                        new BigDecimal("3.5"),
+                        new BigDecimal("4.5"),
+                        null,
+                        null
                 )))
         );
 
@@ -456,6 +462,84 @@ class ApplicationEducationServiceTest {
         assertThat(responses.get(0).thesisTitle()).isEqualTo("딥러닝 추천시스템");
     }
 
+    @Test
+    void overall_grades_persist_and_round_trip() {
+        Applicant applicant = createApplicant("education-overall", "Education Overall");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
+
+        applicationEducationService.replaceEducations(
+                applicant.getId(), applicationId,
+                new EducationReplaceRequest(List.of(universityEducation(0))));
+        List<EducationResponse> responses =
+                applicationEducationService.getEducations(applicant.getId(), applicationId);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).overallGradePoint()).isEqualByComparingTo(new BigDecimal("3.8"));
+        assertThat(responses.get(0).overallMaxGradePoint()).isEqualByComparingTo(new BigDecimal("4.5"));
+        assertThat(responses.get(0).overallMajorGradePoint()).isEqualByComparingTo(new BigDecimal("3.7"));
+        assertThat(responses.get(0).overallMajorMaxGradePoint()).isEqualByComparingTo(new BigDecimal("4.5"));
+    }
+
+    @Test
+    void high_school_allows_null_overall_grades() {
+        Applicant applicant = createApplicant("education-hs-overall", "Education HS Overall");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
+
+        applicationEducationService.replaceEducations(
+                applicant.getId(), applicationId,
+                new EducationReplaceRequest(List.of(highSchoolEducation(0))));
+        List<EducationResponse> responses =
+                applicationEducationService.getEducations(applicant.getId(), applicationId);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).overallGradePoint()).isNull();
+        assertThat(responses.get(0).overallMaxGradePoint()).isNull();
+    }
+
+    @Test
+    void replace_fails_when_non_high_school_missing_overall_grades() {
+        Applicant applicant = createApplicant("education-overall-missing", "Education Overall Missing");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
+
+        assertThatThrownBy(() -> applicationEducationService.replaceEducations(
+                applicant.getId(),
+                applicationId,
+                new EducationReplaceRequest(List.of(new EducationRequest(
+                        EducationLevel.UNIVERSITY, "University", null, null, null, null,
+                        null, null, GraduationStatus.GRADUATED, null, null, false, "KR",
+                        0, List.of(), null, null, null, null, null)))
+        )).isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
+    void replace_fails_when_overall_grade_exceeds_max_or_major_missing_max() {
+        Applicant applicant = createApplicant("education-overall-invalid", "Education Overall Invalid");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
+
+        // 전체 평점 > 만점
+        assertThatThrownBy(() -> applicationEducationService.replaceEducations(
+                applicant.getId(),
+                applicationId,
+                new EducationReplaceRequest(List.of(new EducationRequest(
+                        EducationLevel.UNIVERSITY, "University", null, null, null, null,
+                        null, null, GraduationStatus.GRADUATED, null, null, false, "KR",
+                        0, List.of(), null,
+                        new BigDecimal("4.6"), new BigDecimal("4.5"), null, null)))
+        )).isInstanceOf(InvalidJobApplicationException.class);
+
+        // 전공 전체 평점만 있고 만점 없음
+        assertThatThrownBy(() -> applicationEducationService.replaceEducations(
+                applicant.getId(),
+                applicationId,
+                new EducationReplaceRequest(List.of(new EducationRequest(
+                        EducationLevel.UNIVERSITY, "University", null, null, null, null,
+                        null, null, GraduationStatus.GRADUATED, null, null, false, "KR",
+                        0, List.of(), null,
+                        new BigDecimal("3.8"), new BigDecimal("4.5"),
+                        new BigDecimal("3.7"), null)))
+        )).isInstanceOf(InvalidJobApplicationException.class);
+    }
+
     private Applicant createApplicant(String loginId, String applicantName) {
         String ci = loginId + "-ci";
         Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
@@ -535,7 +619,12 @@ class ApplicationEducationServiceTest {
                 false,
                 "KR",
                 sortOrder,
-                List.of(grade(2, 1), grade(1, 1))
+                List.of(grade(2, 1), grade(1, 1)),
+                null,
+                new BigDecimal("3.8"),
+                new BigDecimal("4.5"),
+                new BigDecimal("3.7"),
+                new BigDecimal("4.5")
         );
     }
 

@@ -72,6 +72,7 @@ public class ApplicationEducationService {
         Set<Integer> sortOrders = new HashSet<>();
         for (EducationRequest education : request.educations()) {
             validateEducationRequiredFields(education);
+            validateOverallGrades(education);
             if (!sortOrders.add(education.sortOrder())) {
                 throw new InvalidJobApplicationException("Education sort order must be unique.");
             }
@@ -141,6 +142,45 @@ public class ApplicationEducationService {
         }
     }
 
+    private void validateOverallGrades(EducationRequest education) {
+        BigDecimal overall = education.overallGradePoint();
+        BigDecimal overallMax = education.overallMaxGradePoint();
+        boolean highSchool = education.educationLevel() == EducationLevel.HIGH_SCHOOL;
+
+        if (!highSchool && (overall == null || overallMax == null)) {
+            throw new InvalidJobApplicationException("Overall grade point and max grade point are required.");
+        }
+        if ((overall == null) != (overallMax == null)) {
+            throw new InvalidJobApplicationException("Overall grade point and max grade point must be provided together.");
+        }
+        if (overall != null) {
+            if (isNegative(overall)) {
+                throw new InvalidJobApplicationException("Overall grade point must be greater than or equal to 0.");
+            }
+            if (isZeroOrNegative(overallMax)) {
+                throw new InvalidJobApplicationException("Overall max grade point must be greater than 0.");
+            }
+            if (overall.compareTo(overallMax) > 0) {
+                throw new InvalidJobApplicationException("Overall grade point cannot exceed overall max grade point.");
+            }
+        }
+
+        BigDecimal major = education.overallMajorGradePoint();
+        BigDecimal majorMax = education.overallMajorMaxGradePoint();
+        if (major != null && majorMax == null) {
+            throw new InvalidJobApplicationException("Overall major max grade point is required when overall major grade point is provided.");
+        }
+        if (major != null && isNegative(major)) {
+            throw new InvalidJobApplicationException("Overall major grade point must be greater than or equal to 0.");
+        }
+        if (majorMax != null && isZeroOrNegative(majorMax)) {
+            throw new InvalidJobApplicationException("Overall major max grade point must be greater than 0.");
+        }
+        if (major != null && majorMax != null && major.compareTo(majorMax) > 0) {
+            throw new InvalidJobApplicationException("Overall major grade point cannot exceed overall major max grade point.");
+        }
+    }
+
     private boolean isNegative(BigDecimal value) {
         return value.compareTo(BigDecimal.ZERO) < 0;
     }
@@ -166,6 +206,10 @@ public class ApplicationEducationService {
                 request.transfer(),
                 request.countryCode(),
                 request.schoolId(),
+                request.overallGradePoint(),
+                request.overallMaxGradePoint(),
+                request.overallMajorGradePoint(),
+                request.overallMajorMaxGradePoint(),
                 request.sortOrder()
         );
     }
