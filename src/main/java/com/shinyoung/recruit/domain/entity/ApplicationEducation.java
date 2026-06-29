@@ -20,6 +20,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
@@ -87,6 +88,16 @@ public class ApplicationEducation extends BaseEntity {
     @Column(name = "school_id")
     private Long schoolId;
 
+    // 학력 단위 전체(평균) 평점·만점기준. HIGH_SCHOOL이 아니면 서비스 검증에서 필수, HIGH_SCHOOL은 선택. DB는 nullable.
+    private BigDecimal overallGradePoint;
+
+    private BigDecimal overallMaxGradePoint;
+
+    // 전공 전체 평점·만점기준(모든 레벨 선택).
+    private BigDecimal overallMajorGradePoint;
+
+    private BigDecimal overallMajorMaxGradePoint;
+
     @Column(nullable = false)
     private Integer sortOrder;
 
@@ -106,6 +117,10 @@ public class ApplicationEducation extends BaseEntity {
             Boolean transfer,
             String countryCode,
             Long schoolId,
+            BigDecimal overallGradePoint,
+            BigDecimal overallMaxGradePoint,
+            BigDecimal overallMajorGradePoint,
+            BigDecimal overallMajorMaxGradePoint,
             Integer sortOrder
     ) {
         this.jobApplication = jobApplication;
@@ -123,6 +138,10 @@ public class ApplicationEducation extends BaseEntity {
         this.transfer = transfer;
         this.countryCode = countryCode;
         this.schoolId = schoolId;
+        this.overallGradePoint = overallGradePoint;
+        this.overallMaxGradePoint = overallMaxGradePoint;
+        this.overallMajorGradePoint = overallMajorGradePoint;
+        this.overallMajorMaxGradePoint = overallMajorMaxGradePoint;
         this.sortOrder = sortOrder;
     }
 
@@ -168,6 +187,35 @@ public class ApplicationEducation extends BaseEntity {
             Long schoolId,
             Integer sortOrder
     ) {
+        return create(
+                jobApplication, educationLevel, schoolName, majorName,
+                additionalMajorType, additionalMajorName, thesisTitle,
+                admissionDate, graduationDate, graduationStatus, dayNightType, campusType,
+                transfer, countryCode, schoolId, null, null, null, null, sortOrder);
+    }
+
+    public static ApplicationEducation create(
+            JobApplication jobApplication,
+            EducationLevel educationLevel,
+            String schoolName,
+            String majorName,
+            String additionalMajorType,
+            String additionalMajorName,
+            String thesisTitle,
+            LocalDate admissionDate,
+            LocalDate graduationDate,
+            GraduationStatus graduationStatus,
+            DayNightType dayNightType,
+            CampusType campusType,
+            Boolean transfer,
+            String countryCode,
+            Long schoolId,
+            BigDecimal overallGradePoint,
+            BigDecimal overallMaxGradePoint,
+            BigDecimal overallMajorGradePoint,
+            BigDecimal overallMajorMaxGradePoint,
+            Integer sortOrder
+    ) {
         return new ApplicationEducation(
                 jobApplication,
                 educationLevel,
@@ -184,6 +232,10 @@ public class ApplicationEducation extends BaseEntity {
                 transfer,
                 countryCode,
                 schoolId,
+                overallGradePoint,
+                overallMaxGradePoint,
+                overallMajorGradePoint,
+                overallMajorMaxGradePoint,
                 sortOrder
         );
     }
