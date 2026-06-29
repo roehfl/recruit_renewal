@@ -268,7 +268,7 @@ ApplicationEducation (1) ─── (N) ApplicationEducationSemesterGrade
           <li><strong>overall max > 0</strong>: <code>overallMaxGradePoint</code> ≤ 0 이면 거부.</li>
           <li><strong>overall point >= 0</strong>: <code>overallGradePoint</code> 음수 거부.</li>
           <li><strong>overall point ≤ max</strong>: <code>overallGradePoint &gt; overallMaxGradePoint</code> 이면 거부.</li>
-          <li><strong>major pair 선택 (전 레벨)</strong>: <code>overallMajorGradePoint</code>·<code>overallMajorMaxGradePoint</code> 모두 선택. point 있고 max null → 거부.</li>
+          <li><strong>major pair 선택 (전 레벨)</strong>: <code>overallMajorGradePoint</code>·<code>overallMajorMaxGradePoint</code> 모두 선택. 한쪽만 존재하면 거부 (both-or-neither).</li>
           <li><strong>major max > 0 / major point >= 0 / major point ≤ major max</strong>: 값 존재 시 위 overall과 동일.</li>
         </ol>
       </div>

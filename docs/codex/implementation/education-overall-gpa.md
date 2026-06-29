@@ -136,7 +136,7 @@
   - `HIGH_SCHOOL_전체평점_선택` — HIGH_SCHOOL 시 overall pair null 허용 확인
   - `비고교_전체평점_필수` — HIGH_SCHOOL 외 overall pair 중 하나 null → 거부
   - `전체평점_범위_초과` — point > max → 거부
-  - `전공전체평점_쌍_일관성` — majorPoint 있고 majorMax null → 거부
+  - `전공전체평점_쌍_일관성` — major pair 한쪽만 존재(majorPoint만 또는 majorMax만) → 거부 (both-or-neither)
 - 기존 정상 경로 픽스처 보강: 성공 경로 요청에 유효한 overall 4필드 포함
 
 ### `ApplicationEducationControllerTest`
@@ -180,7 +180,7 @@ ApplicationEducation (1) ──── (N) ApplicationEducationSemesterGrade  [�
 3. **overall max > 0**: `overallMaxGradePoint`가 0 이하이면 거부.
 4. **overall point >= 0**: `overallGradePoint`가 음수이면 거부.
 5. **overall point <= max**: `overallGradePoint > overallMaxGradePoint` 이면 거부.
-6. **major pair 선택**: `overallMajorGradePoint`·`overallMajorMaxGradePoint` 모두 모든 레벨에서 선택. 단 point 있고 max null → 거부.
+6. **major pair 선택**: `overallMajorGradePoint`·`overallMajorMaxGradePoint` 모두 모든 레벨에서 선택. 단 한쪽만 존재하면 거부 (both-or-neither).
 7. **major max > 0 / major point >= 0 / major point <= major max**: 값이 존재할 때 위 overall과 동일 검증 적용.
 
 예외 유형: `InvalidJobApplicationException` (400)
