@@ -121,6 +121,8 @@ class ApplicationEducationControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
                 .andExpect(jsonPath("$.data[0].educationLevel").value("UNIVERSITY"))
+                .andExpect(jsonPath("$.data[0].overallGradePoint").value(3.8))
+                .andExpect(jsonPath("$.data[0].overallMajorGradePoint").value(3.7))
                 .andExpect(jsonPath("$.data[0].semesterGrades[0].schoolYear").value(1));
     }
 
@@ -301,6 +303,10 @@ class ApplicationEducationControllerTest {
                       "transfer": false,
                       "countryCode": "KR",
                       "sortOrder": 0,
+                      "overallGradePoint": 3.8,
+                      "overallMaxGradePoint": 4.5,
+                      "overallMajorGradePoint": 3.7,
+                      "overallMajorMaxGradePoint": 4.5,
                       "semesterGrades": [
                         {
                           "schoolYear": 1,
