@@ -494,6 +494,8 @@ class ApplicationEducationServiceTest {
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).overallGradePoint()).isNull();
         assertThat(responses.get(0).overallMaxGradePoint()).isNull();
+        assertThat(responses.get(0).overallMajorGradePoint()).isNull();
+        assertThat(responses.get(0).overallMajorMaxGradePoint()).isNull();
     }
 
     @Test
@@ -537,6 +539,18 @@ class ApplicationEducationServiceTest {
                         0, List.of(), null,
                         new BigDecimal("3.8"), new BigDecimal("4.5"),
                         new BigDecimal("3.7"), null)))
+        )).isInstanceOf(InvalidJobApplicationException.class);
+
+        // 전공 전체 만점만 있고 평점 없음
+        assertThatThrownBy(() -> applicationEducationService.replaceEducations(
+                applicant.getId(),
+                applicationId,
+                new EducationReplaceRequest(List.of(new EducationRequest(
+                        EducationLevel.UNIVERSITY, "University", null, null, null, null,
+                        null, null, GraduationStatus.GRADUATED, null, null, false, "KR",
+                        0, List.of(), null,
+                        new BigDecimal("3.8"), new BigDecimal("4.5"),
+                        null, new BigDecimal("4.5"))))
         )).isInstanceOf(InvalidJobApplicationException.class);
     }
 

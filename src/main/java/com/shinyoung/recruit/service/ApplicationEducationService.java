@@ -167,8 +167,8 @@ public class ApplicationEducationService {
 
         BigDecimal major = education.overallMajorGradePoint();
         BigDecimal majorMax = education.overallMajorMaxGradePoint();
-        if (major != null && majorMax == null) {
-            throw new InvalidJobApplicationException("Overall major max grade point is required when overall major grade point is provided.");
+        if ((major == null) != (majorMax == null)) {
+            throw new InvalidJobApplicationException("Overall major grade point and max grade point must be provided together.");
         }
         if (major != null && isNegative(major)) {
             throw new InvalidJobApplicationException("Overall major grade point must be greater than or equal to 0.");
