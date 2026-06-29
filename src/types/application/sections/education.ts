@@ -50,6 +50,10 @@ export interface EducationRequest {
   sortOrder: number
   semesterGrades?: semesterGradeItem[]
   schoolId: number
+  overallGradePoint?: number
+  overallMaxGradePoint?: number
+  overallMajorGradePoint?: number
+  overallMajorMaxGradePoint?: number
 }
 
 export interface EducationResponse {
@@ -66,5 +70,9 @@ export interface EducationResponse {
   countryCode: string
   schoolId: number
   sortOrder: number
+  overallGradePoint?: number
+  overallMaxGradePoint?: number
+  overallMajorGradePoint?: number
+  overallMajorMaxGradePoint?: number
   semesterGrades: semesterGradeItem[]
 }
