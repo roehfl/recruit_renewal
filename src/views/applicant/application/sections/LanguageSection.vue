@@ -1,13 +1,8 @@
 <template>
   <div class="section-body">
-    <!--
-      '해당 사항 없음' 비활성화: 없음 상태가 백엔드에 저장되지 않아(빈 배열=미입력과 구분 불가)
-      새로고침 시 체크가 풀리는 문제로 주석 처리. 백엔드에 notApplicable 영속화가 생기면 되살린다.
-    <a-checkbox v-model:checked="notApplicable" class="na-checkbox">
+    <!-- <a-checkbox v-model:checked="notApplicable" class="na-checkbox">
       어학 성적 없음 (해당 사항 없음)
-    </a-checkbox>
-    -->
-
+    </a-checkbox> -->
 
     <div v-if="notApplicable" class="na-box">어학 성적 없음으로 표시되었습니다.</div>
 

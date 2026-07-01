@@ -14,13 +14,17 @@ import {
 
 import { apiClient } from '@/api/client'
 import type { ApiResponse } from '@/types/api'
+import { dashboardApi } from '@/api/application/dashboardApi'
 
 import BasicInfoSection from '@/views/applicant/application/sections/BasicInfoSection.vue'
+import EducationSection from '@/views/applicant/application/sections/EducationSection.vue'
+import CareerSection from '@/views/applicant/application/sections/CareerSection.vue'
 import LanguageSection from '@/views/applicant/application/sections/LanguageSection.vue'
 import AwardSection from '@/views/applicant/application/sections/AwardSection.vue'
 import CertificateSection from '@/views/applicant/application/sections/CertificateSection.vue'
 import GapPeriodSection from '@/views/applicant/application/sections/GapPeriodSection.vue'
 import QuestionAnswerSection from '@/views/applicant/application/sections/QuestionAnswerSection.vue'
+import MilitarySection from './application/sections/MilitarySection.vue'
 
 /**
  * 실제 섹션 컴포넌트가 준비되기 전까지 화면 구조를 확인하기 위한 fallback 컴포넌트다.
@@ -79,9 +83,9 @@ const ApplicationSectionPlaceholder = defineComponent({
 const sectionComponentMap: Record<ApplicationSectionType, Component> = {
   // BASIC_INFO: ApplicationSectionPlaceholder,
   BASIC_INFO: BasicInfoSection,
-  MILITARY: ApplicationSectionPlaceholder,
-  EDUCATION: ApplicationSectionPlaceholder,
-  CAREER: ApplicationSectionPlaceholder,
+  MILITARY: MilitarySection,
+  EDUCATION: EducationSection,
+  CAREER: CareerSection,
   CERTIFICATE: CertificateSection,
   LANGUAGE: LanguageSection,
   AWARD: AwardSection,
@@ -102,6 +106,26 @@ const sectionNameMap: Record<ApplicationSectionType, string> = {
   QUESTION_ANSWER: '자기소개/질문',
   ATTACHMENT: '첨부파일',
 }
+
+/**
+ * 프론트 섹션 타입 → 백엔드 완성도(dashboard) sectionCode 매핑.
+ * 대부분 동일하나 자기소개/질문은 백엔드에서 `QUESTION`으로 내려온다.
+ * CAREER는 백엔드 완성도 판정(ApplicationCompletionReadChecker) 대상이 아니므로 매핑하지 않는다.
+ */
+const completionSectionCodeMap: Partial<Record<ApplicationSectionType, string>> = {
+  BASIC_INFO: 'BASIC_INFO',
+  MILITARY: 'MILITARY',
+  EDUCATION: 'EDUCATION',
+  CERTIFICATE: 'CERTIFICATE',
+  LANGUAGE: 'LANGUAGE',
+  AWARD: 'AWARD',
+  GAP_PERIOD: 'GAP_PERIOD',
+  QUESTION_ANSWER: 'QUESTION',
+  ATTACHMENT: 'ATTACHMENT',
+}
+
+// 백엔드가 실제로 완성도를 판정하는 sectionCode 집합.
+const backendTrackedCompletionCodes = new Set<string>(Object.values(completionSectionCodeMap))
 
 type StepStatus = 'wait' | 'process' | 'finish' | 'error'
 
@@ -136,6 +160,8 @@ const saving = ref(false)
 const formPage = ref<ApplicationFormPageResponse | null>(null)
 const currentPageIndex = ref(0)
 const sectionRefs = ref<Map<string, SectionActionHandle>>(new Map())
+// 백엔드 완성도 판정 결과 중 "필수인데 아직 미완"인 섹션 코드 집합.
+const incompleteRequiredSectionCodes = ref<Set<string>>(new Set())
 
 const applicationId = computed<number | null>(() => {
   const raw = route.params.applicationId ?? route.query.applicationId
@@ -282,7 +308,9 @@ function resolvePageStepStatus(page: ApplicationFormPage, index: number): StepSt
     return 'process'
   }
 
-  return isPageCompleted(page) ? 'finish' : 'wait'
+  // 체크 아이콘 미사용
+  // return isPageCompleted(page) ? 'finish' : 'wait'
+  return 'wait'
 }
 
 function isPageCompleted(page: ApplicationFormPage): boolean {
@@ -318,7 +346,19 @@ function isSectionCompleted(item: ApplicationFormItem): boolean {
     return section.valid
   }
 
-  return !item.required
+  // 선택 섹션은 카운터 상 항상 충족으로 본다(분모에는 필수 섹션만 들어간다).
+  if (!item.required) {
+    return true
+  }
+
+  // 백엔드 완성도(dashboard) 판정 사용: 필수 섹션 코드가 미완 목록에 없으면 완료.
+  const code = completionSectionCodeMap[item.sectionType]
+  if (code && backendTrackedCompletionCodes.has(code)) {
+    return !incompleteRequiredSectionCodes.value.has(code)
+  }
+
+  // 백엔드가 완성도를 판정하지 않는 섹션(예: CAREER)은 완료로 단정하지 않는다.
+  return false
 }
 
 function normalizePositiveNumber(value: number | null | undefined): number | null {
@@ -348,10 +388,32 @@ async function fetchFormPage(id = applicationId.value): Promise<void> {
     formPage.value = response.data.data
     currentPageIndex.value = 0
     sectionRefs.value.clear()
+    await fetchCompletion(id)
   } catch (error) {
     message.error(getErrorMessage(error, '지원서 구성 조회에 실패했습니다.'))
   } finally {
     loading.value = false
+  }
+}
+
+// 지원서 완성도(섹션별 필수 충족 여부) 조회 후 미완 필수 섹션 코드 집합을 갱신한다.
+// 보조 정보이므로 실패해도 화면 로딩·저장 흐름을 막지 않는다.
+async function fetchCompletion(id = applicationId.value): Promise<void> {
+  if (!id) {
+    return
+  }
+
+  try {
+    const response = await dashboardApi.getApplicationDashboard(id)
+
+    if (!response.data.success || !response.data.data) {
+      return
+    }
+
+    const missing = response.data.data.requiredMissingSections ?? []
+    incompleteRequiredSectionCodes.value = new Set(missing.map((section) => section.sectionCode))
+  } catch (error) {
+    console.warn('지원서 완성도 조회에 실패했습니다.', error)
   }
 }
 
@@ -399,6 +461,9 @@ async function saveCurrentPage(): Promise<void> {
     for (const handle of savableHandles) {
       await handle.saveDraft?.()
     }
+
+    // 저장된 데이터 기준으로 완성도를 다시 판정해 카운터를 갱신한다.
+    await fetchCompletion()
 
     message.success('현재 페이지를 임시저장했습니다.')
   } catch (error) {
@@ -864,6 +929,12 @@ function getErrorMessage(error: unknown, fallback: string): string {
   border-radius: 10px;
   background: #fff;
 }
+
+:deep(.ant-steps .ant-steps-item-finish .ant-steps-item-icon) {
+  background-color: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0);
+}
+
 
 @media (max-width: 768px) {
   .page-inner {

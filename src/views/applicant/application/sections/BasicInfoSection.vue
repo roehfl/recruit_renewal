@@ -4,14 +4,12 @@
       <div aria-label="기본정보" class="form-table">
         <table class="apply-table">
           <colgroup>
-            <col style="width: 10%;">
-            <col style="width: 35%;">
-            <col style="width: 10%;">
-            <col style="width: 45%;">
+            <col style="width: 10%;">  <col style="width: 35%;">
+            <col style="width: 10%;">  <col style="width: 45%;">
           </colgroup>
           <tbody>
             <tr>
-              <th>사진<em> *</em></th>
+              <th>사진</th>
               <td>
                 <div aria-label="사진" class="picture-section">
                   <ul>
@@ -23,6 +21,7 @@
                     list-type="picture-card"
                     :max-count="1"
                     :before-upload="() => false"
+                    @remove="handleRemove"
                     style="width: auto;"
                   >
                     <div v-if="fileList.length === 0">사진등록</div>
@@ -53,20 +52,13 @@
                   <a-radio-group v-model:value="form.nationalityType" @change="onNationalityTypeChange">
                     <a-radio value="DOMESTIC">내국인</a-radio>
                     <a-radio value="FOREIGN">외국인</a-radio>
-                    <!-- <a-input 
-                      v-if="form.nationalityType ==='FOREIGN'" 
-                      v-model:value="form.countryCode" 
-                      style="width: 120px" 
-                      placeholder="ex) 미국"
-                      ref="nationalityTypeInputRef"
-                    ></a-input> -->
                     <a-select
                       v-if="form.nationalityType ==='FOREIGN'" 
                       v-model:value="form.countryCode" 
                       :options="nationalityOptions"
                       style="width: 120px" 
                       show-search
-                      palceholder="ex) 미국"
+                      placeholder="ex) 미국"
                       ref="nationalityTypeInputRef"
                       :filter-option="filterNationality"
                     />
@@ -80,7 +72,11 @@
                   <a-radio-group v-model:value="form.veteranStatus">
                     <a-radio value="NOT_SUBJECT">비대상</a-radio>
                     <a-radio value="SUBJECT">대상</a-radio>
-                    <a-input v-if="form.veteranStatus ==='SUBJECT'" style="width: 200px" placeholder="ex) 국가유공자의 자"></a-input>
+                    <a-input v-if="form.veteranStatus ==='SUBJECT'" 
+                      v-model:value="form.veteranType"
+                      style="width: 200px" 
+                      placeholder="ex) 국가유공자의 자"
+                    />
                   </a-radio-group>
                 </a-form-item>
               </td>
@@ -126,18 +122,10 @@
               <td>
                 <div class="phone-section">
                   <a-form-item label="휴대폰" class="inner-form-item">
-                    <a-input v-model:value="phoneForm.phone1" disabled style="width: 50px;"/>
-                    <span> - </span>
-                    <a-input v-model:value="phoneForm.phone2" disabled style="width: 60px;"/>
-                    <span> - </span>
-                    <a-input v-model:value="phoneForm.phone3" disabled style="width: 60px;"/>
+                    <a-input v-model:value="form.mobilePhone" disabled/>
                   </a-form-item>
                   <a-form-item label="비상연락처" :label-col="{ style: { width: '75px'}}">
-                    <a-input v-model:value="phoneForm.subPhone1" @keydown="onlyNumber" :maxlength="3" style="width: 50px;"/>
-                    <span> - </span>
-                    <a-input v-model:value="phoneForm.subPhone2" @keydown="onlyNumber" :maxlength="4" style="width: 60px;"/>
-                    <span> - </span>
-                    <a-input v-model:value="phoneForm.subPhone3" @keydown="onlyNumber" :maxlength="4" style="width: 60px;"/>
+                    <a-input v-model:value="form.emergencyPhone" :maxlength="11" @keydown="onlyNumber"/>
                   </a-form-item>
                 </div>
               </td>
@@ -147,8 +135,7 @@
                 <div class="td-column">
                   <a-form-item>
                     <a-input class="item-margin" v-model:value="form.zipCode" @click="openPostcode" readonly style="width: 100px;"/>
-                    <a-button @click="openPostcode" type="primary" shape="circle"><SearchOutlined /></a-button>
-                    <!-- <a-button @click="checkData" type="primary">임시저장</a-button> -->
+                    <a-button @click="openPostcode" shape="circle"><SearchOutlined /></a-button>
                   </a-form-item>
                   <a-input class="item-margin" v-model:value="form.addressBasic" />
                 </div>
@@ -176,20 +163,21 @@ import { message } from 'ant-design-vue'
 import { SearchOutlined } from '@ant-design/icons-vue'
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
-import { useRoute } from 'vue-router'
 import { basicInfoApi } from '@/api/application/sections/basicInfoApi'
 import { commonCodeApi } from '@/api/commonApi'
-import type { BasicInfoParams } from '@/types/application/sections/basicInfo'
-import type {  CommonCodeItems } from '@/types/commonCode'
 import { logClientEvent } from '@/common/clientEventLogger'
 import { getApiErrorMessage } from '@/api/apiError'
 import type { DefaultOptionType } from 'ant-design-vue/es/select'
-
+import type { BasicInfoParams, AttachmentResponse } from '@/types/application/sections/basicInfo'
+import type {  CommonCodeItems } from '@/types/commonCode'
+import type { SectionComponentProps } from '@/types/application'
+import type { UploadFile } from 'ant-design-vue'
 
 const authStore = useAuthStore();
 const loading = ref(false)
-const route = useRoute() 
-const fileList = ref([])
+const props = defineProps<SectionComponentProps>()
+const fileList = ref<UploadFile[]>([])
+const deleteAttachmentId = ref<number>()
 const nationalityTypeInputRef = ref();
 
 // 국가 코드  
@@ -226,34 +214,26 @@ const disabilityGradeOptions = computed(() =>
 
 const form = reactive<BasicInfoParams>({
     nameKorean:authStore.name,          // 한글명
-    nameEnglish:'',                     // 영문명
-    nationalityType: '',                // 내/외국인
-    countryCode:'',                     // 국가번호
-    veteranStatus: '',                  // 보훈여부
-    birthDate: '',                      // 생년월일
-    disabilityStatus: '',               // 장애여부 
-    disabilityGradeCode: '',            // 장애 등급
-    disabilityTypeCode: '',             // 장애 유형
-    zipCode: '',                        // 도로명주소
-    addressBasic: '',                   // 주소
-    addressDetail:'',                   // 상세주소
+    nameEnglish:undefined,              // 영문명
+    nationalityType: undefined,         // 내/외국인
+    countryCode:undefined,              // 국가번호
+    veteranStatus: undefined,           // 보훈여부
+    veteranType: undefined,             // 보훈 유형
+    birthDate: undefined,               // 생년월일
+    disabilityStatus: undefined,        // 장애여부 
+    disabilityGradeCode: undefined,     // 장애 등급
+    disabilityTypeCode: undefined,      // 장애 유형
+    zipCode: undefined,                 // 도로명주소
+    addressBasic: undefined,            // 주소
+    addressDetail:undefined,            // 상세주소
     email:authStore.loginId,            // 이메일
     mobilePhone:authStore.phoneNumber,  // 전화번호 
-    emergencyPhone:'',                  // 비상연락처
-})
-
-const phoneForm = reactive({
-    phone1:authStore.phoneNumber.substring(0, 3),   // 연락처1
-    phone2:authStore.phoneNumber.substring(3, 7),   // 연락처2
-    phone3:authStore.phoneNumber.substring(7, 11),  // 연락처3
-    subPhone1:'',                                   // 비상연락처1
-    subPhone2:'',                                   // 비상연락처2
-    subPhone3:'',                                   // 비상연락처3
+    emergencyPhone:undefined,           // 비상연락처
 })
 
 // 장애여부 '비대상' 클릭 시 드롭박스 초기화 
 const onNationalityTypeChange = () => {
-  form.countryCode = '';
+  form.countryCode = undefined;
 }
 // 장애여부 '비대상' 클릭 시 드롭박스 초기화 
 const onDisabilityStatusChange = () => {
@@ -266,10 +246,7 @@ const onlyNumber = (e: KeyboardEvent) => {
     const allowKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'];
 
     if (allowKeys.includes(e.key)) return;
-
-    if (!/^\d$/.test(e.key)) {
-        e.preventDefault();
-    }
+    if (!/^\d$/.test(e.key)) e.preventDefault();
 }
 
 // 주소 찾기 클릭 시 
@@ -289,31 +266,27 @@ const openPostcode = () => {
 const saveDraft = () => {
   vaildation();
 
-  // 비상연락처 format 작업 
-  form.emergencyPhone = `${phoneForm.subPhone1}${phoneForm.subPhone2}${phoneForm.subPhone3}`
-
-  return postBasicInfo().then(result => {
-    if (result.success){
-      return result.data;
-    }else {
-      throw new Error(result.error);
-    }
+  return deleteAttachmentFile().then(result => {
+    if (!result.success) throw new Error(result.error);
+    return postAttachmentFile();
+  })
+  .then(result => {
+    if (!result.success) throw new Error(result.error);
+    return postBasicInfo();
+  })
+  .then(result => {
+    if (result.success) return result.data;
+    else throw new Error(result.error);
   });
 }
 
 const validateBeforeSubmit = () => {
-    form.mobilePhone = `${phoneForm.phone1}${phoneForm.phone2}${phoneForm.phone3}`
-    if (!form.nameKorean || !form.nameEnglish || !form.birthDate || !form.mobilePhone || !form.email)  return false
-    return true;
+  vaildation();
+  
+  return true;
 }
 
 const vaildation = () => {
-  // // 사진
-  // if (fileList.value.length === 0) {
-  //   message.warn("사진을 등록하세요.")
-  //   return false;
-  // }
-
   // 내/외국인
   if (!form.nationalityType) throw new Error("국적을 선택하세요.");
   else {
@@ -325,6 +298,9 @@ const vaildation = () => {
 
   // 보훈여부
   if (!form.veteranStatus) throw new Error("보훈여부를 선택하세요.");
+  else {
+    if (!form.veteranType) throw new Error("보훈 유형을 입력하세요.");
+  }
 
   // 생년월일
   if (!form.birthDate) throw new Error("생년월일을 선택하세요.");
@@ -341,6 +317,14 @@ const vaildation = () => {
   if (!form.email) throw new Error("이메일을 입력하세요.")
 }
 
+function setFileList(list: AttachmentResponse) {
+  fileList.value = [{
+    uid: String(list.attachmentId),
+    name: list.originalFileName, 
+    status: 'done', 
+  }]
+}
+
 async function loadCommonCode(groupCode: string) {
   loading.value = true
   try {
@@ -348,8 +332,90 @@ async function loadCommonCode(groupCode: string) {
     
     if (groupCode === 'DISABILITY_GRADE')     disabilityGradeList.value= result.data.data;
     else if(groupCode === 'DISABILITY_TYPE')  disabilityStatusList.value = result.data.data;
-    else if(groupCode === 'NATIONALITY')      nationalityList.value = result.data.data;
+    else if(groupCode === 'NATIONALITY')      nationalityList.value = result.data.data || undefined;
 
+  } finally {
+    loading.value = false
+  }
+}
+
+// GET AttachmentFile 
+async function loadAttachmentFile() {
+  loading.value = true
+  try {
+    const result = await basicInfoApi.getApplicationAttachments(props.applicationId)
+    const attachments = result.data.data;
+    if (attachments.length === 0) return fileList.value = [];
+
+    // 첨부파일 있을 경우, BASIC_INFO에 업로드한 사진만 따로 저장하여 세팅 
+    const photo = attachments.find( attachment => 
+      attachment.attachmentType === 'ETC' && attachment.sectionType === 'BASIC_INFO'
+    )
+    if (photo) setFileList(photo)
+    else return fileList.value = [];
+
+  } finally {
+    loading.value = false
+  }
+}
+
+// 삭제할  AttachmentId 저장 
+const handleRemove = async (file: UploadFile) => {
+  deleteAttachmentId.value = Number(file.uid);
+  return true;
+}
+
+// POST attachmentFile
+async function postAttachmentFile() {
+  const file = fileList.value[0]?.originFileObj
+  if (!file) return { success: true }
+
+  loading.value = true
+  try {
+    const formData = new FormData();
+    formData.append('file', file)
+
+    const result = await basicInfoApi.postApplicationAttachmentsFile(formData, {
+      applicationId: props.applicationId,
+      attachmentType: "ETC",
+      sectionType: 'BASIC_INFO',
+    })
+    setFileList(result.data.data)
+    return {success: true, data: result.data.data}
+  } catch(error) {
+    logClientEvent({
+      eventType: 'APPLICATION_SUBMIT_FAILED',
+      severity: 'INFO',
+      pageCode: 'APPLICATION_FORM_BASIC_INFO',
+      operation: 'SUBMIT_APPLICATION_BASIC_INFO',
+      applicationId: props.applicationId,
+      message: 'APPLICATION_SUBMIT_CLICKED',
+    })
+    return {success: false, error: getApiErrorMessage(error, 'fallback 메세지')};
+  } finally {
+    loading.value = false
+  }
+}
+
+// 파일 delete, post 함수 
+async function deleteAttachmentFile() {
+  if (!deleteAttachmentId.value) return { success: true}
+
+  // 삭제 대상 처리 
+  loading.value = true
+  try {
+     const result = await basicInfoApi.deleteApplicationAttachments(props.applicationId, deleteAttachmentId.value) 
+      return {success: true, data: result.data.data}
+  } catch(error) {
+    logClientEvent({
+      eventType: 'APPLICATION_SUBMIT_FAILED',
+      severity: 'INFO',
+      pageCode: 'APPLICATION_FORM_BASIC_INFO',
+      operation: 'SUBMIT_APPLICATION_BASIC_INFO',
+      applicationId: props.applicationId,
+      message: 'APPLICATION_SUBMIT_CLICKED',
+    })
+    return {success: false, error: getApiErrorMessage(error, 'fallback 메세지')};
   } finally {
     loading.value = false
   }
@@ -357,48 +423,22 @@ async function loadCommonCode(groupCode: string) {
 
 // GET BasicInfo 
 async function loadBasicInfo() {
-  const applicationId = Number(route.params.applicationId);
-
   loading.value = true
   try {
-    const result = await basicInfoApi.getApplicationsBasicInfo(applicationId)
+    const result = await basicInfoApi.getApplicationsBasicInfo(props.applicationId)
     Object.assign(form, result.data.data);
-
-    if (form.emergencyPhone) {
-      phoneForm.subPhone1 = form.emergencyPhone.substring(0, 3);
-      phoneForm.subPhone2 = form.emergencyPhone.substring(3, 7);
-      phoneForm.subPhone3 = form.emergencyPhone.substring(7, 11);
-    }
 
   } finally {
     loading.value = false
   }
 }
 
+
 // POST BasicInfo
 async function postBasicInfo() {
-  const applicationId = Number(route.params.applicationId);
-  const params = { 
-      nameKorean: form.nameKorean,
-      nameEnglish: form.nameEnglish,
-      nationalityType: form.nationalityType,
-      countryCode: form.countryCode,
-      birthDate: form.birthDate,
-      mobilePhone: form.mobilePhone,
-      emergencyPhone: form.emergencyPhone,
-      email: form.email,
-      veteranStatus: form.veteranStatus,
-      disabilityStatus: form.disabilityStatus,
-      disabilityGradeCode: form.disabilityGradeCode || '',
-      disabilityTypeCode: form.disabilityTypeCode || '',
-      zipCode: form.zipCode,
-      addressBasic: form.addressBasic,
-      addressDetail: form.addressDetail,
-  }
-
   loading.value = true
   try {
-    const result = await basicInfoApi.postApplicationsBasicInfo(applicationId, params);
+    const result = await basicInfoApi.postApplicationsBasicInfo(props.applicationId, form);
     return {success: true, data: result.data.data}
 
   } catch(error) {
@@ -407,7 +447,7 @@ async function postBasicInfo() {
       severity: 'INFO',
       pageCode: 'APPLICATION_FORM_BASIC_INFO',
       operation: 'SUBMIT_APPLICATION_BASIC_INFO',
-      applicationId: applicationId,
+      applicationId: props.applicationId,
       message: 'APPLICATION_SUBMIT_CLICKED',
     })
     return {success: false, error: getApiErrorMessage(error, 'fallback 메세지')};
@@ -417,6 +457,7 @@ async function postBasicInfo() {
 }
 
 onMounted(() => {
+  loadAttachmentFile()
   loadBasicInfo()
 
   loadCommonCode('DISABILITY_TYPE')
