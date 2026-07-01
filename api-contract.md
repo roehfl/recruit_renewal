@@ -177,3 +177,34 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
   - `NOT_SUBJECT`: 모든 상세 필드 금지.
 - 최종 제출 검증: `COMPLETED`는 복무기간(start·end) 필수, **`SUBJECT`·`EXEMPTED`는 `nonServiceReason` 필수**(임시저장 단계에서는 선택). (2026-06-29: `SUBJECT` 사유 필수 신규.)
 - 관리자 조회: `AdminMilitaryResponse`(`nonServiceReasonMasked`), PDF 출력 라벨 "병역사유".
+
+### 화면: 메뉴 (Menu — 헤더/사이드바, 관리자 메뉴관리)
+
+- 프론트: `src/api/menuApi.ts`, `src/types/menu.ts`, 헤더(지원자)·관리자 사이드바(후속)
+- 백엔드: `com.shinyoung.recruit.controller.MenuController`
+
+#### GET `/menu/tree` · `/menu/{menuId}` · `/menu/breadcrumb`, POST `/menu/admin/menu` · `/menu/admin/menu/{menuId}`  🟢
+
+- 변경(2026-06-30, 🟢 확정): 메뉴에 `icon`(아이콘 컴포넌트명) 필드 추가. ant-design-vue 아이콘 컴포넌트명을 **문자열 그대로** 저장(예: `"SettingOutlined"`). nullable, 백엔드 검증 없음(자유 문자열, `VARCHAR(100)`). 대메뉴/소메뉴 모두 허용. 지원자(가로 헤더) 메뉴는 아이콘 미사용(null), 관리자 좌측 사이드바용.
+- 메뉴 노드: `{ id, parentId, site('APPLICANT'|'ADMIN'), type('ROUTE'|'URL'), name, path, sortOrder, icon, children:[...] }`. (트리는 최대 2단계, `children` 재귀.)
+- 저장 요청(`MenuSaveRequest`): `{ site, type, parentId?, name, path?, sortOrder?, icon? }` → 응답 `ApiResponse<{ id }>`.
+- 조회 응답(`MenuResponse`): 위 메뉴 노드 모양. `GET /menu/tree?site=`, `GET /menu/breadcrumb?site=&path=`, `GET /menu/{menuId}`.
+- 매핑: front `menuApi.getMenuTree()`/`getBreadcrumb()` ↔ back `MenuController.getTree()`/`getBreadcrumb()`. 생성/수정 API는 프론트 미반영(관리 화면은 후속 슬라이스).
+- 범위 밖(후속): 메뉴 관리 CRUD 화면 + 아이콘 피커, 아이콘 실제 렌더링(관리자 사이드바), 삭제(요청 시 DELETE 대신 POST 사용).
+
+### 화면: 지원서 작성 완성도 (ApplicationFormView — 상단 스텝 카운터)
+
+- 프론트: `src/views/applicant/ApplicationFormView.vue`, `src/api/application/dashboardApi.ts`, `src/types/application/dashboard.ts`
+- 백엔드: `com.shinyoung.recruit.controller.ApplicationController` (신규 아님, 기존 구현)
+
+#### GET `/applications/{applicationId}/dashboard`  🟢 확정 (프론트 반영 완료 / 백엔드 기존 구현)
+
+- 용도: 지원서 작성 화면 상단 스텝 네비게이션의 "남은 입력사항"(페이지별 `완료수/필수수`) 카운터 데이터 소스. **임시저장 여부가 아니라 저장된 데이터가 필수 규칙을 만족하는지**를 백엔드 `ApplicationCompletionReadChecker`가 판정한다.
+- 응답(200): `ApiResponse<ApplicationDashboardResponse>`
+  - `completionSummary`: `{ requiredSectionCount, completedRequiredSectionCount, requiredMissingCount, optionalSectionCount, completedOptionalSectionCount, optionalIncompleteCount, requiredCompletionRate, submitBlockingIssueCount }`
+  - `requiredMissingSections` / `optionalIncompleteSections`: `[{ sectionCode, sectionName, required, complete, reasonCode, message }]` — **미완 섹션만** 담김(완료 섹션은 목록에 없음).
+  - 그 외: `{ applicationId, jobPostingId, jobPostingTitle, jobPositionName, applicationStatus, accepting, editable, submittable, withdrawable, submittedAt, withdrawnAt, latestAnnouncedStageName, latestResultStatus }`
+- 프론트 완료 판정: 필수 섹션은 `sectionCode`가 `requiredMissingSections`에 **없으면** 완료로 본다. 프론트 `ApplicationSectionType` ↔ 백엔드 `sectionCode` 매핑 필요 — 대부분 동일하나 **`QUESTION_ANSWER` ↔ `QUESTION`**. **`CAREER`는 checker 판정 대상이 아님**(완료 확정 불가 → 완료로 단정하지 않음).
+- 갱신 시점: 화면 최초 로드(form-page 조회 직후) + **임시저장 성공 직후** 재조회하여 카운터 재계산.
+- 매핑: front `dashboardApi.getDashboard()` ↔ back `ApplicationController.getDashboard()`.
+- 범위 밖: 완성도 요약(`requiredCompletionRate` 등) 별도 UI 표시, `submittable` 기반 제출 버튼 제어, CAREER 섹션 완성도 백엔드 판정 추가.
