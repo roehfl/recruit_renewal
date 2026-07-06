@@ -4,6 +4,5 @@ public enum MilitarySubjectType {
     SUBJECT,
     NOT_SUBJECT,
     COMPLETED,
-    EXEMPTED,
-    NOT_APPLICABLE
+    EXEMPTED
 }

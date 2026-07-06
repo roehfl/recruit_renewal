@@ -16,10 +16,10 @@ public record AdminMilitaryResponse(
         MilitaryRank rank,
         LocalDate serviceStartDate,
         LocalDate serviceEndDate,
-        String exemptionReasonMasked
+        String nonServiceReasonMasked
 ) {
 
-    public static AdminMilitaryResponse from(ApplicationMilitary military, String exemptionReasonMasked) {
+    public static AdminMilitaryResponse from(ApplicationMilitary military, String nonServiceReasonMasked) {
         return new AdminMilitaryResponse(
                 military.getId(),
                 military.getMilitarySubjectType(),
@@ -28,7 +28,7 @@ public record AdminMilitaryResponse(
                 military.getRank(),
                 military.getServiceStartDate(),
                 military.getServiceEndDate(),
-                exemptionReasonMasked
+                nonServiceReasonMasked
         );
     }
 }

@@ -14,6 +14,7 @@ public record MenuResponse(
         String name,
         String path,
         Integer sortOrder,
+        String icon,
         List<MenuResponse> children
 ) {
     public static MenuResponse from(Menu menu, List<MenuResponse> children) {
@@ -26,6 +27,7 @@ public record MenuResponse(
                 menu.getName(),
                 menu.getPath(),
                 menu.getSortOrder(),
+                menu.getIcon(),
                 children
         );
     }

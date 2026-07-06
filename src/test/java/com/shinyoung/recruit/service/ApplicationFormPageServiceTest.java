@@ -14,6 +14,7 @@ import com.shinyoung.recruit.dto.response.ApplicationFormSectionResponse;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
+import com.shinyoung.recruit.enumeration.JobPostingType;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -132,6 +133,17 @@ class ApplicationFormPageServiceTest {
         assertThat(response.sections())
                 .extracting(ApplicationFormSectionResponse::pageTitle)
                 .containsExactly("Basic Info", "Basic Info", "Education And Career");
+    }
+
+    @Test
+    void form_page_exposes_job_posting_type() {
+        JobPosting jobPosting = posting(JobPostingStatus.PUBLISHED, config());
+        when(jobPosting.getPostingType()).thenReturn(JobPostingType.EXPERIENCED_RECRUITMENT);
+        stubApplication(application(JobApplicationStatus.DRAFT, jobPosting));
+
+        ApplicationFormPageResponse response = formPageService.getFormPage(APPLICANT_ID, APPLICATION_ID);
+
+        assertThat(response.postingType()).isEqualTo(JobPostingType.EXPERIENCED_RECRUITMENT);
     }
 
     @Test

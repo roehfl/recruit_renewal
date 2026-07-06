@@ -253,7 +253,7 @@ class AdminApplicationSectionServiceTest {
     }
 
     @Test
-    void get_military_masks_exemption_reason() {
+    void get_military_masks_non_service_reason() {
         JobApplication application = createApplication("admin-section-military");
         militaryRepository.save(ApplicationMilitary.create(
                 application,
@@ -268,7 +268,7 @@ class AdminApplicationSectionServiceTest {
 
         AdminMilitaryResponse response = adminApplicationSectionService.getMilitary(application.getId());
 
-        assertThat(response.exemptionReasonMasked()).isEqualTo("***");
+        assertThat(response.nonServiceReasonMasked()).isEqualTo("***");
     }
 
     @Test

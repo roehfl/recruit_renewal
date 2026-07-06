@@ -95,7 +95,7 @@ class ApplicationMilitaryServiceTest {
     }
 
     @Test
-    void save_not_subject_not_applicable_completed_and_exempted_success() {
+    void save_not_subject_completed_and_exempted_success() {
         Applicant notSubjectApplicant = createApplicant("military-not-subject", "Military Not Subject");
         Long notSubjectApplicationId = createApplication(notSubjectApplicant, createPublishedJobPosting(true));
         assertThat(applicationMilitaryService.saveMilitary(
@@ -103,14 +103,6 @@ class ApplicationMilitaryServiceTest {
                 notSubjectApplicationId,
                 subjectRequest(MilitarySubjectType.NOT_SUBJECT)
         ).militarySubjectType()).isEqualTo(MilitarySubjectType.NOT_SUBJECT);
-
-        Applicant notApplicableApplicant = createApplicant("military-not-applicable", "Military Not Applicable");
-        Long notApplicableApplicationId = createApplication(notApplicableApplicant, createPublishedJobPosting(true));
-        assertThat(applicationMilitaryService.saveMilitary(
-                notApplicableApplicant.getId(),
-                notApplicableApplicationId,
-                subjectRequest(MilitarySubjectType.NOT_APPLICABLE)
-        ).militarySubjectType()).isEqualTo(MilitarySubjectType.NOT_APPLICABLE);
 
         Applicant completedApplicant = createApplicant("military-completed", "Military Completed");
         Long completedApplicationId = createApplication(completedApplicant, createPublishedJobPosting(true));
@@ -130,7 +122,22 @@ class ApplicationMilitaryServiceTest {
                 exemptedRequest("test reason")
         );
         assertThat(exempted.militarySubjectType()).isEqualTo(MilitarySubjectType.EXEMPTED);
-        assertThat(exempted.exemptionReason()).isEqualTo("test reason");
+        assertThat(exempted.nonServiceReason()).isEqualTo("test reason");
+    }
+
+    @Test
+    void save_subject_with_non_service_reason_success() {
+        Applicant applicant = createApplicant("military-subject-reason", "Military Subject Reason");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
+
+        MilitaryResponse saved = applicationMilitaryService.saveMilitary(
+                applicant.getId(),
+                applicationId,
+                new MilitarySaveRequest(MilitarySubjectType.SUBJECT, null, null, null, null, null, "졸업 예정으로 입대 연기")
+        );
+
+        assertThat(saved.militarySubjectType()).isEqualTo(MilitarySubjectType.SUBJECT);
+        assertThat(saved.nonServiceReason()).isEqualTo("졸업 예정으로 입대 연기");
     }
 
     @Test
@@ -161,7 +168,7 @@ class ApplicationMilitaryServiceTest {
 
         assertThat(updated.militaryId()).isEqualTo(first.militaryId());
         assertThat(updated.militarySubjectType()).isEqualTo(MilitarySubjectType.EXEMPTED);
-        assertThat(updated.exemptionReason()).isEqualTo("updated reason");
+        assertThat(updated.nonServiceReason()).isEqualTo("updated reason");
         assertThat(militaryRepository.findAll()).hasSize(1);
     }
 
@@ -309,7 +316,15 @@ class ApplicationMilitaryServiceTest {
         assertThatThrownBy(() -> applicationMilitaryService.saveMilitary(
                 applicant.getId(),
                 applicationId,
-                subjectWithDetailRequest(MilitarySubjectType.NOT_APPLICABLE)
+                new MilitarySaveRequest(
+                        MilitarySubjectType.NOT_SUBJECT,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "not allowed for non-subject"
+                )
         )).isInstanceOf(InvalidJobApplicationException.class);
 
         assertThatThrownBy(() -> applicationMilitaryService.saveMilitary(

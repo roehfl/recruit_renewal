@@ -190,16 +190,16 @@ public class ApplicationCompletionReadChecker {
                             : "Military service period is incomplete."
             ), required, accumulator);
         }
-        if (subjectType == MilitarySubjectType.EXEMPTED
-                && (military.get().getExemptionReason() == null || military.get().getExemptionReason().isBlank())) {
+        if ((subjectType == MilitarySubjectType.EXEMPTED || subjectType == MilitarySubjectType.SUBJECT)
+                && (military.get().getNonServiceReason() == null || military.get().getNonServiceReason().isBlank())) {
             addIssue(item(
                     MILITARY,
                     "Military",
                     required,
                     "MISSING_REASON",
                     required
-                            ? "Military exemption reason is required before submit."
-                            : "Military exemption reason is empty."
+                            ? "Military non-service reason is required before submit."
+                            : "Military non-service reason is empty."
             ), required, accumulator);
         }
     }

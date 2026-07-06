@@ -16,6 +16,6 @@ public record MilitarySaveRequest(
         MilitaryRank rank,
         LocalDate serviceStartDate,
         LocalDate serviceEndDate,
-        @Size(max = 1000) String exemptionReason
+        @Size(max = 1000) String nonServiceReason
 ) {
 }

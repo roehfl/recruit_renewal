@@ -34,7 +34,8 @@ public class MenuService {
                 parent,
                 request.name(),
                 request.path(),
-                request.sortOrder()
+                request.sortOrder(),
+                request.icon()
         );
 
         return menuRepository.save(menu).getId();
@@ -59,7 +60,8 @@ public class MenuService {
                 parent,
                 request.name(),
                 request.path(),
-                request.sortOrder()
+                request.sortOrder(),
+                request.icon()
         );
 
         return menu.getId();

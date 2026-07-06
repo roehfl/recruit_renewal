@@ -28,13 +28,17 @@ public class Menu extends BaseEntity {
 
     private Integer sortOrder;
 
+    @Column(length = 100)
+    private String icon;
+
     private Menu(
             MenuSite site,
             MenuType type,
             Menu parent,
             String name,
             String path,
-            Integer sortOrder
+            Integer sortOrder,
+            String icon
     ) {
         this.site = site;
         this.type = type;
@@ -42,6 +46,7 @@ public class Menu extends BaseEntity {
         this.name = name;
         this.path = path;
         this.sortOrder = sortOrder;
+        this.icon = icon;
     }
 
     public static Menu create(
@@ -50,9 +55,10 @@ public class Menu extends BaseEntity {
             Menu parent,
             String name,
             String path,
-            Integer sortOrder
+            Integer sortOrder,
+            String icon
     ) {
-        return new Menu(site, type, parent, name, path, sortOrder);
+        return new Menu(site, type, parent, name, path, sortOrder, icon);
     }
 
     public void update(
@@ -61,7 +67,8 @@ public class Menu extends BaseEntity {
             Menu parent,
             String name,
             String path,
-            Integer sortOrder
+            Integer sortOrder,
+            String icon
     ) {
         this.site = site;
         this.type = type;
@@ -69,6 +76,7 @@ public class Menu extends BaseEntity {
         this.name = name;
         this.path = path;
         this.sortOrder = sortOrder == null ? 0 : sortOrder;
+        this.icon = icon;
     }
 
     public boolean isRootMenu() {

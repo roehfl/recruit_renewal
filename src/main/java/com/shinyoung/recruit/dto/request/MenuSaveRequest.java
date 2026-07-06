@@ -14,6 +14,7 @@ public record MenuSaveRequest(
         @NotBlank
         String name,
         String path,
-        Integer sortOrder
+        Integer sortOrder,
+        String icon
 ) {
 }

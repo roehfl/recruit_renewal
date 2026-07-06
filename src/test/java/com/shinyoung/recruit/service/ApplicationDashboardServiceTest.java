@@ -647,7 +647,7 @@ class ApplicationDashboardServiceTest {
             MilitarySubjectType subjectType,
             LocalDate serviceStartDate,
             LocalDate serviceEndDate,
-            String exemptionReason
+            String nonServiceReason
     ) {
         return ApplicationMilitary.create(
                 mock(JobApplication.class),
@@ -657,7 +657,7 @@ class ApplicationDashboardServiceTest {
                 null,
                 serviceStartDate,
                 serviceEndDate,
-                exemptionReason
+                nonServiceReason
         );
     }
 

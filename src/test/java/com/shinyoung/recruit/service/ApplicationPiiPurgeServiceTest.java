@@ -270,7 +270,7 @@ class ApplicationPiiPurgeServiceTest {
         ApplicationMilitary military = militaryRepository.findAll().get(0);
         assertThat(military.getServiceStartDate()).isNull();
         assertThat(military.getServiceEndDate()).isNull();
-        assertThat(military.getExemptionReason()).isNull();
+        assertThat(military.getNonServiceReason()).isNull();
         assertThat(military.getMilitarySubjectType()).isEqualTo(MilitarySubjectType.COMPLETED); // KEEP
 
         ApplicationAward award = awardRepository.findAll().get(0);

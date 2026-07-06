@@ -124,7 +124,7 @@ public class AdminApplicationSectionService {
         return militaryRepository.findByJobApplicationId(applicationId)
                 .map(military -> AdminMilitaryResponse.from(
                         military,
-                        maskSensitiveText(military.getExemptionReason())
+                        maskSensitiveText(military.getNonServiceReason())
                 ))
                 .orElse(null);
     }

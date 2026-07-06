@@ -154,7 +154,7 @@ class ApplicationMilitaryControllerTest {
                         .content("""
                                 {
                                   "militarySubjectType": "EXEMPTED",
-                                  "exemptionReason": "test reason"
+                                  "nonServiceReason": "test reason"
                                 }
                                 """))
                 .andExpect(status().isOk())

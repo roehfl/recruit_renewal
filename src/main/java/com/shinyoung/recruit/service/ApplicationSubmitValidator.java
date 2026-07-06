@@ -100,9 +100,9 @@ public class ApplicationSubmitValidator {
                 && (military.getServiceStartDate() == null || military.getServiceEndDate() == null)) {
             throw new InvalidJobApplicationException("Military service period is required for completed applicants before submit.");
         }
-        if (subjectType == MilitarySubjectType.EXEMPTED
-                && (military.getExemptionReason() == null || military.getExemptionReason().isBlank())) {
-            throw new InvalidJobApplicationException("Military exemption reason is required before submit.");
+        if ((subjectType == MilitarySubjectType.EXEMPTED || subjectType == MilitarySubjectType.SUBJECT)
+                && (military.getNonServiceReason() == null || military.getNonServiceReason().isBlank())) {
+            throw new InvalidJobApplicationException("Military non-service reason is required before submit.");
         }
     }
 

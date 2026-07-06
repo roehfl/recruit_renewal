@@ -32,7 +32,7 @@ import java.util.List;
  * 운영자용 Application PDF 생성 서비스(admin 전용, read-only). 지원서 양식 섹션을 그대로 미러한 표시 모델을
  * 만들어 {@link ApplicationPdfRenderer}로 PDF byte[]를 생성한다.
  *
- * <p>섹션 데이터는 {@link AdminApplicationSectionService}를 재사용한다(자격번호/병역 면제사유 마스킹 정책을 그대로 상속).
+ * <p>섹션 데이터는 {@link AdminApplicationSectionService}를 재사용한다(자격번호/병역 사유 마스킹 정책을 그대로 상속).
  * 기본정보의 연락처(name/phoneNumber/email)는 admin이 export/PDF에서 보는 PII surface다.
  * {@code ci}/{@code ciHash}/{@code password}는 어디에도 포함하지 않는다.
  */
@@ -196,7 +196,7 @@ public class ApplicationPdfService {
                     field("계급", m.rank()),
                     field("복무시작", m.serviceStartDate()),
                     field("복무종료", m.serviceEndDate()),
-                    field("면제사유", m.exemptionReasonMasked()))));
+                    field("병역사유", m.nonServiceReasonMasked()))));
         }
         return new Section("병역", rows, EMPTY);
     }

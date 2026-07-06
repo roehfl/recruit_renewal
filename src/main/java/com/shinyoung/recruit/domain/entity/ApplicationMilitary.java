@@ -60,7 +60,7 @@ public class ApplicationMilitary extends BaseEntity {
     private LocalDate serviceEndDate;
 
     @Column(length = 1000)
-    private String exemptionReason;
+    private String nonServiceReason;
 
     private ApplicationMilitary(
             JobApplication jobApplication,
@@ -70,7 +70,7 @@ public class ApplicationMilitary extends BaseEntity {
             MilitaryRank rank,
             LocalDate serviceStartDate,
             LocalDate serviceEndDate,
-            String exemptionReason
+            String nonServiceReason
     ) {
         this.jobApplication = jobApplication;
         this.militarySubjectType = militarySubjectType;
@@ -79,7 +79,7 @@ public class ApplicationMilitary extends BaseEntity {
         this.rank = rank;
         this.serviceStartDate = serviceStartDate;
         this.serviceEndDate = serviceEndDate;
-        this.exemptionReason = exemptionReason;
+        this.nonServiceReason = nonServiceReason;
     }
 
     public static ApplicationMilitary create(
@@ -90,7 +90,7 @@ public class ApplicationMilitary extends BaseEntity {
             MilitaryRank rank,
             LocalDate serviceStartDate,
             LocalDate serviceEndDate,
-            String exemptionReason
+            String nonServiceReason
     ) {
         return new ApplicationMilitary(
                 jobApplication,
@@ -100,7 +100,7 @@ public class ApplicationMilitary extends BaseEntity {
                 rank,
                 serviceStartDate,
                 serviceEndDate,
-                exemptionReason
+                nonServiceReason
         );
     }
 
@@ -111,7 +111,7 @@ public class ApplicationMilitary extends BaseEntity {
             MilitaryRank rank,
             LocalDate serviceStartDate,
             LocalDate serviceEndDate,
-            String exemptionReason
+            String nonServiceReason
     ) {
         this.militarySubjectType = militarySubjectType;
         this.serviceType = serviceType;
@@ -119,6 +119,6 @@ public class ApplicationMilitary extends BaseEntity {
         this.rank = rank;
         this.serviceStartDate = serviceStartDate;
         this.serviceEndDate = serviceEndDate;
-        this.exemptionReason = exemptionReason;
+        this.nonServiceReason = nonServiceReason;
     }
 }

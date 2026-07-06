@@ -192,8 +192,8 @@ class AdminApplicationSectionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.militarySubjectType").value("EXEMPTED"))
-                .andExpect(jsonPath("$.data.exemptionReasonMasked").value("***"))
-                .andExpect(jsonPath("$.data.exemptionReason").doesNotExist());
+                .andExpect(jsonPath("$.data.nonServiceReasonMasked").value("***"))
+                .andExpect(jsonPath("$.data.nonServiceReason").doesNotExist());
 
         mockMvc.perform(get("/api/admin/applications/{applicationId}/awards", application.getId()))
                 .andExpect(status().isOk())

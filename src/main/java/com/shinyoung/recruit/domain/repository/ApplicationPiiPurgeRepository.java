@@ -129,7 +129,7 @@ public interface ApplicationPiiPurgeRepository extends Repository<JobApplication
     @Modifying(flushAutomatically = true)
     @Query("""
             update ApplicationMilitary m
-            set m.serviceStartDate = null, m.serviceEndDate = null, m.exemptionReason = null,
+            set m.serviceStartDate = null, m.serviceEndDate = null, m.nonServiceReason = null,
                 m.createdBy = null, m.updatedBy = null
             where m.jobApplication.id = :applicationId""")
     int purgeMilitary(@Param("applicationId") Long applicationId);

@@ -132,9 +132,19 @@ class ApplicationSubmitValidatorTest {
 
     @Test
     void military_subject_types_pass_when_record_exists() {
-        assertMilitaryPasses(MilitarySubjectType.SUBJECT, null, null, null);
+        assertMilitaryPasses(MilitarySubjectType.SUBJECT, null, null, "졸업 예정으로 입대 연기");
         assertMilitaryPasses(MilitarySubjectType.NOT_SUBJECT, null, null, null);
-        assertMilitaryPasses(MilitarySubjectType.NOT_APPLICABLE, null, null, null);
+    }
+
+    @Test
+    void subject_military_fails_without_non_service_reason() {
+        ApplicationFormConfig config = config();
+        when(config.isUseMilitary()).thenReturn(true);
+        when(militaryRepository.findByJobApplicationId(APPLICATION_ID))
+                .thenReturn(Optional.of(military(MilitarySubjectType.SUBJECT, null, null, " ")));
+
+        assertThatThrownBy(() -> validator.validate(application(config)))
+                .isInstanceOf(InvalidJobApplicationException.class);
     }
 
     @Test
@@ -414,12 +424,12 @@ class ApplicationSubmitValidatorTest {
             MilitarySubjectType subjectType,
             LocalDate serviceStartDate,
             LocalDate serviceEndDate,
-            String exemptionReason
+            String nonServiceReason
     ) {
         ApplicationFormConfig config = config();
         when(config.isUseMilitary()).thenReturn(true);
         when(militaryRepository.findByJobApplicationId(APPLICATION_ID))
-                .thenReturn(Optional.of(military(subjectType, serviceStartDate, serviceEndDate, exemptionReason)));
+                .thenReturn(Optional.of(military(subjectType, serviceStartDate, serviceEndDate, nonServiceReason)));
 
         assertThatCode(() -> validator.validate(application(config)))
                 .doesNotThrowAnyException();
@@ -449,7 +459,7 @@ class ApplicationSubmitValidatorTest {
             MilitarySubjectType subjectType,
             LocalDate serviceStartDate,
             LocalDate serviceEndDate,
-            String exemptionReason
+            String nonServiceReason
     ) {
         return ApplicationMilitary.create(
                 mock(JobApplication.class),
@@ -459,7 +469,7 @@ class ApplicationSubmitValidatorTest {
                 null,
                 serviceStartDate,
                 serviceEndDate,
-                exemptionReason
+                nonServiceReason
         );
     }
 

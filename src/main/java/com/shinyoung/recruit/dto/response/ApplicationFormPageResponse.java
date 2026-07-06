@@ -6,6 +6,7 @@ import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
+import com.shinyoung.recruit.enumeration.JobPostingType;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,6 +16,7 @@ public record ApplicationFormPageResponse(
         Long jobPostingId,
         String jobPostingTitle,
         JobPostingStatus jobPostingStatus,
+        JobPostingType postingType,
         Long jobPositionId,
         String jobPositionName,
         JobApplicationStatus applicationStatus,
@@ -41,6 +43,7 @@ public record ApplicationFormPageResponse(
                 jobPosting.getId(),
                 resolveText(application.getJobPostingTitleSnapshot(), jobPosting.getTitle()),
                 jobPosting.getStatus(),
+                jobPosting.getPostingType(),
                 jobPosition.getId(),
                 resolveText(application.getJobPositionNameSnapshot(), jobPosition.getPositionName()),
                 application.getStatus(),

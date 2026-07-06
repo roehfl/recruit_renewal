@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ApplicationMilitaryService {
 
-    private static final int EXEMPTION_REASON_MAX_LENGTH = 1000;
+    private static final int NON_SERVICE_REASON_MAX_LENGTH = 1000;
 
     private final ApplicationSectionAccessService sectionAccessService;
     private final ApplicationMilitaryRepository militaryRepository;
@@ -45,7 +45,7 @@ public class ApplicationMilitaryService {
                 request.rank(),
                 request.serviceStartDate(),
                 request.serviceEndDate(),
-                request.exemptionReason()
+                request.nonServiceReason()
         );
 
         return MilitaryResponse.from(military);
@@ -55,8 +55,8 @@ public class ApplicationMilitaryService {
         if (request == null || request.militarySubjectType() == null) {
             throw new InvalidJobApplicationException("Military subject type is required.");
         }
-        if (request.exemptionReason() != null && request.exemptionReason().length() > EXEMPTION_REASON_MAX_LENGTH) {
-            throw new InvalidJobApplicationException("Exemption reason must be 1000 characters or less.");
+        if (request.nonServiceReason() != null && request.nonServiceReason().length() > NON_SERVICE_REASON_MAX_LENGTH) {
+            throw new InvalidJobApplicationException("Non-service reason must be 1000 characters or less.");
         }
         if (request.serviceStartDate() != null
                 && request.serviceEndDate() != null
@@ -69,24 +69,29 @@ public class ApplicationMilitaryService {
 
     private void validateFieldsBySubjectType(MilitarySaveRequest request) {
         MilitarySubjectType subjectType = request.militarySubjectType();
-        if (subjectType == MilitarySubjectType.SUBJECT
-                || subjectType == MilitarySubjectType.NOT_SUBJECT
-                || subjectType == MilitarySubjectType.NOT_APPLICABLE) {
+
+        // 비대상: 복무 상세도 사유도 입력할 수 없다.
+        if (subjectType == MilitarySubjectType.NOT_SUBJECT) {
             validateNoDetailFields(request);
             return;
         }
 
-        if (subjectType == MilitarySubjectType.COMPLETED && request.exemptionReason() != null) {
-            throw new InvalidJobApplicationException("Exemption reason is allowed only for exempted military status.");
+        // 미필(SUBJECT)·면제(EXEMPTED): 사유는 허용하되 복무 상세는 금지한다.
+        if (subjectType == MilitarySubjectType.SUBJECT || subjectType == MilitarySubjectType.EXEMPTED) {
+            if (hasServiceDetailFields(request)) {
+                throw new InvalidJobApplicationException("Service detail fields are not allowed for this military subject type.");
+            }
+            return;
         }
 
-        if (subjectType == MilitarySubjectType.EXEMPTED && hasServiceDetailFields(request)) {
-            throw new InvalidJobApplicationException("Service detail fields are not allowed for exempted military status.");
+        // 군필(COMPLETED): 복무 상세는 허용하되 사유는 금지한다.
+        if (subjectType == MilitarySubjectType.COMPLETED && request.nonServiceReason() != null) {
+            throw new InvalidJobApplicationException("Non-service reason is allowed only for not-yet-served or exempted military status.");
         }
     }
 
     private void validateNoDetailFields(MilitarySaveRequest request) {
-        if (hasServiceDetailFields(request) || request.exemptionReason() != null) {
+        if (hasServiceDetailFields(request) || request.nonServiceReason() != null) {
             throw new InvalidJobApplicationException("Military detail fields are not allowed for this military subject type.");
         }
     }
@@ -108,7 +113,7 @@ public class ApplicationMilitaryService {
                 request.rank(),
                 request.serviceStartDate(),
                 request.serviceEndDate(),
-                request.exemptionReason()
+                request.nonServiceReason()
         );
     }
 }
