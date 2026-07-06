@@ -208,3 +208,17 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 갱신 시점: 화면 최초 로드(form-page 조회 직후) + **임시저장 성공 직후** 재조회하여 카운터 재계산.
 - 매핑: front `dashboardApi.getDashboard()` ↔ back `ApplicationController.getDashboard()`.
 - 범위 밖: 완성도 요약(`requiredCompletionRate` 등) 별도 UI 표시, `submittable` 기반 제출 버튼 제어, CAREER 섹션 완성도 백엔드 판정 추가.
+
+### 화면: 지원서 작성 폼 로드 (ApplicationFormView — form-page)
+
+- 프론트: `src/views/applicant/ApplicationFormView.vue`, `src/api/application/*` (form-page 로드)
+- 백엔드: `com.shinyoung.recruit.controller.ApplicationController`
+
+#### GET `/applications/{applicationId}/form-page`  🟢 확정 (백엔드 구현·검증 완료)
+
+- 용도: 지원서 작성 화면의 폼 메타/레이아웃 로드. 응답 `postingType`으로 프론트가 채용유형별 UI 분기(예: 학력 성적 입력을 공개·인턴=학기별, 경력·수시=평균만 표시)를 판단한다.
+- 변경(2026-07-06, 🟢 확정): 응답에 `postingType`(`JobPostingType`) 추가.
+- 응답(200): `ApiResponse<{ applicationId, jobPostingId, jobPostingTitle, jobPostingStatus, postingType, jobPositionId, jobPositionName, applicationStatus, receptionStartDateTime, receptionEndDateTime, accepting, editable, submittedAt, withdrawnAt, formConfig, sections:[...] }>`
+- `postingType` 값: `"PUBLIC_RECRUITMENT" | "EXPERIENCED_RECRUITMENT" | "INTERN_RECRUITMENT" | "ROLLING_RECRUITMENT"`. 공고 미설정 시 백엔드 기본값 `PUBLIC_RECRUITMENT`.
+- 유형→성적모드 매핑은 **프론트**에 위치(백엔드 학력 검증 무변경). 주의: 현재 학력 검증은 비고졸 평균평점 필수·학기별 선택이므로, 공개·인턴이라도 평균 입력란을 숨기면 저장이 400으로 막힌다(평균 유지 필요).
+- 매핑: front form-page 로드 ↔ back `ApplicationController.getFormPage()`.
