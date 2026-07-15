@@ -211,7 +211,8 @@ public class JobPosting extends BaseEntity {
                     config.isUseAward(),
                     config.isRequireAward(),
                     config.isUseGapPeriod(),
-                    config.isRequireGapPeriod()
+                    config.isRequireGapPeriod(),
+                    config.isUseAttachment()
             );
             return;
         }

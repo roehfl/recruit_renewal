@@ -391,6 +391,7 @@ class JobPostingPublicServiceTest {
                         true,
                         true,
                         true,
+                        false,
                         false
                 )
         ));

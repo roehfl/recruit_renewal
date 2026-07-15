@@ -345,7 +345,8 @@ public class JobPostingService {
                 request.useAward(),
                 requireAward,
                 request.useGapPeriod(),
-                requireGapPeriod
+                requireGapPeriod,
+                request.useAttachment()
         );
     }
 
@@ -380,7 +381,8 @@ public class JobPostingService {
                 request.useAward(),
                 requireAward,
                 request.useGapPeriod(),
-                requireGapPeriod
+                requireGapPeriod,
+                request.useAttachment()
         );
     }
 

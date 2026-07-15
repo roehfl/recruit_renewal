@@ -47,4 +47,6 @@ public interface JobPostingPublicListProjection {
     Boolean getUseGapPeriod();
 
     Boolean getRequireGapPeriod();
+
+    Boolean getUseAttachment();
 }

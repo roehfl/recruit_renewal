@@ -63,6 +63,7 @@ public record JobPostingPublicListResponse(
                         jobPosting.getRequireAward(),
                         jobPosting.getUseGapPeriod(),
                         jobPosting.getRequireGapPeriod(),
+                        jobPosting.getUseAttachment(),
                         questionPolicyCount,
                         attachmentPolicyCount
                 )

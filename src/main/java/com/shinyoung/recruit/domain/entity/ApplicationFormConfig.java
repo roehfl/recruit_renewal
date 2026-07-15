@@ -60,6 +60,15 @@ public class ApplicationFormConfig {
     @Column(name = "require_gap_period", nullable = false)
     private boolean requireGapPeriod;
 
+    /**
+     * 첨부 섹션 노출 스위치. 짝이 되는 require 컬럼은 두지 않는다.
+     * 필수 여부는 job_posting_attachment_requirement 행이 단일 출처이며,
+     * 최종 노출은 useAttachment || 요구사항 행 존재 로 계산한다
+     * (ApplicationFormLayoutSectionPolicy).
+     */
+    @Column(nullable = false)
+    private boolean useAttachment;
+
     private ApplicationFormConfig(
             boolean useEducation,
             boolean requireEducation,
@@ -74,7 +83,8 @@ public class ApplicationFormConfig {
             boolean useAward,
             boolean requireAward,
             boolean useGapPeriod,
-            boolean requireGapPeriod
+            boolean requireGapPeriod,
+            boolean useAttachment
     ) {
         validateRequirement(useEducation, requireEducation, "education");
         validateRequirement(useCareer, requireCareer, "career");
@@ -97,6 +107,7 @@ public class ApplicationFormConfig {
         this.requireAward = requireAward;
         this.useGapPeriod = useGapPeriod;
         this.requireGapPeriod = requireGapPeriod;
+        this.useAttachment = useAttachment;
     }
 
     public static ApplicationFormConfig create(boolean useEducation, boolean useCareer, boolean useCertificate, boolean useLanguage, boolean useMilitary, boolean useAward, boolean useGapPeriod) {
@@ -114,6 +125,7 @@ public class ApplicationFormConfig {
                 useAward,
                 false,
                 useGapPeriod,
+                false,
                 false
         );
     }
@@ -132,7 +144,8 @@ public class ApplicationFormConfig {
             boolean useAward,
             boolean requireAward,
             boolean useGapPeriod,
-            boolean requireGapPeriod
+            boolean requireGapPeriod,
+            boolean useAttachment
     ) {
         return new ApplicationFormConfig(
                 useEducation,
@@ -148,7 +161,8 @@ public class ApplicationFormConfig {
                 useAward,
                 requireAward,
                 useGapPeriod,
-                requireGapPeriod
+                requireGapPeriod,
+                useAttachment
         );
     }
 
@@ -166,7 +180,8 @@ public class ApplicationFormConfig {
             boolean useAward,
             boolean requireAward,
             boolean useGapPeriod,
-            boolean requireGapPeriod
+            boolean requireGapPeriod,
+            boolean useAttachment
     ) {
         validateRequirement(useEducation, requireEducation, "education");
         validateRequirement(useCareer, requireCareer, "career");
@@ -189,6 +204,7 @@ public class ApplicationFormConfig {
         this.requireAward = requireAward;
         this.useGapPeriod = useGapPeriod;
         this.requireGapPeriod = requireGapPeriod;
+        this.useAttachment = useAttachment;
     }
 
     void assignJobPosting(JobPosting jobPosting) {

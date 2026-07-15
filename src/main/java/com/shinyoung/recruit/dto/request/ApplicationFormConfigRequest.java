@@ -14,7 +14,8 @@ public record ApplicationFormConfigRequest(
         boolean useAward,
         Boolean requireAward,
         boolean useGapPeriod,
-        Boolean requireGapPeriod
+        Boolean requireGapPeriod,
+        boolean useAttachment
 ) {
     public ApplicationFormConfigRequest(
             boolean useEducation,
@@ -39,7 +40,8 @@ public record ApplicationFormConfigRequest(
                 useAward,
                 null,
                 useGapPeriod,
-                null
+                null,
+                false
         );
     }
 }

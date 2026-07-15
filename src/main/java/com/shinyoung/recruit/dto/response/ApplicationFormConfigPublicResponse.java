@@ -16,11 +16,13 @@ public record ApplicationFormConfigPublicResponse(
         boolean useAward,
         boolean requireAward,
         boolean useGapPeriod,
-        boolean requireGapPeriod
+        boolean requireGapPeriod,
+        boolean useAttachment
 ) {
     public static ApplicationFormConfigPublicResponse from(ApplicationFormConfig config) {
         if (config == null) {
             return new ApplicationFormConfigPublicResponse(
+                    false,
                     false,
                     false,
                     false,
@@ -51,7 +53,8 @@ public record ApplicationFormConfigPublicResponse(
                 config.isUseAward(),
                 config.isRequireAward(),
                 config.isUseGapPeriod(),
-                config.isRequireGapPeriod()
+                config.isRequireGapPeriod(),
+                config.isUseAttachment()
         );
     }
 }

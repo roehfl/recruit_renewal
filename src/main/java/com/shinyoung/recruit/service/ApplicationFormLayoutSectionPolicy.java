@@ -72,6 +72,9 @@ public final class ApplicationFormLayoutSectionPolicy {
         if (config.isUseGapPeriod()) {
             sections.add(ApplicationSectionType.GAP_PERIOD);
         }
+        if (config.isUseAttachment()) {
+            sections.add(ApplicationSectionType.ATTACHMENT);
+        }
     }
 
     private static void addConfiguredRequiredSections(

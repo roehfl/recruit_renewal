@@ -41,7 +41,8 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
                    applicationFormConfig.useAward as useAward,
                    applicationFormConfig.requireAward as requireAward,
                    applicationFormConfig.useGapPeriod as useGapPeriod,
-                   applicationFormConfig.requireGapPeriod as requireGapPeriod
+                   applicationFormConfig.requireGapPeriod as requireGapPeriod,
+                   applicationFormConfig.useAttachment as useAttachment
             from JobPosting jobPosting
             left join jobPosting.applicationFormConfig applicationFormConfig
             where jobPosting.status = :status

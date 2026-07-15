@@ -364,7 +364,8 @@ class JobPostingServiceTest {
                 true,
                 null,
                 true,
-                null
+                null,
+                false
         )));
 
         JobPostingDetailResponse detail = jobPostingService.getJobPosting(id);
@@ -384,6 +385,7 @@ class JobPostingServiceTest {
                 true,
                 true,
                 true,
+                false,
                 false,
                 false,
                 false,
@@ -420,6 +422,7 @@ class JobPostingServiceTest {
                 false,
                 false,
                 false,
+                false,
                 false
         )));
 
@@ -437,6 +440,7 @@ class JobPostingServiceTest {
                 true,
                 false,
                 true,
+                false,
                 false,
                 false,
                 false,

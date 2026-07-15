@@ -10,6 +10,51 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ApplicationFormLayoutSectionPolicyTest {
 
+    private static ApplicationFormConfig configWithUseAttachment(boolean useAttachment) {
+        return ApplicationFormConfig.create(
+                false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+                useAttachment
+        );
+    }
+
+    @Test
+    void useAttachment가_true면_요구사항_행_없이도_ATTACHMENT_노출() {
+        Set<ApplicationSectionType> enabled = ApplicationFormLayoutSectionPolicy.enabledSections(
+                configWithUseAttachment(true), false, false
+        );
+
+        assertThat(enabled).contains(ApplicationSectionType.ATTACHMENT);
+    }
+
+    @Test
+    void useAttachment가_true여도_요구사항_행이_없으면_필수가_아니다() {
+        Set<ApplicationSectionType> required = ApplicationFormLayoutSectionPolicy.requiredSections(
+                configWithUseAttachment(true), false, false
+        );
+
+        assertThat(required).doesNotContain(ApplicationSectionType.ATTACHMENT);
+    }
+
+    @Test
+    void useAttachment가_false여도_요구사항_행이_있으면_ATTACHMENT_노출() {
+        Set<ApplicationSectionType> enabled = ApplicationFormLayoutSectionPolicy.enabledSections(
+                configWithUseAttachment(false), true, false
+        );
+
+        assertThat(enabled).contains(ApplicationSectionType.ATTACHMENT);
+    }
+
+    @Test
+    void 필수_요구사항이_있으면_useAttachment가_false여도_required는_enabled의_부분집합이다() {
+        ApplicationFormConfig config = configWithUseAttachment(false);
+
+        Set<ApplicationSectionType> enabled = ApplicationFormLayoutSectionPolicy.enabledSections(config, true, false);
+        Set<ApplicationSectionType> required = ApplicationFormLayoutSectionPolicy.requiredSections(config, true, false);
+
+        assertThat(required).contains(ApplicationSectionType.ATTACHMENT);
+        assertThat(enabled).containsAll(required);
+    }
+
     @Test
     void basic_info_is_always_enabled_and_required() {
         assertThat(ApplicationFormLayoutSectionPolicy.enabledSections(null, false, false))
@@ -34,6 +79,7 @@ class ApplicationFormLayoutSectionPolicyTest {
                 false,
                 false,
                 true,
+                false,
                 false
         );
 
@@ -70,7 +116,7 @@ class ApplicationFormLayoutSectionPolicyTest {
     @Test
     void 모든_config_false이고_외부_정책_없으면_BASIC_INFO만() {
         ApplicationFormConfig config = ApplicationFormConfig.create(
-                false, false, false, false, false, false, false, false, false, false, false, false, false, false
+                false, false, false, false, false, false, false, false, false, false, false, false, false, false, false
         );
 
         Set<ApplicationSectionType> enabled = ApplicationFormLayoutSectionPolicy.enabledSections(config, false, false);
@@ -105,7 +151,8 @@ class ApplicationFormLayoutSectionPolicyTest {
                 true,
                 false,
                 true,
-                true
+                true,
+                false
         );
 
         Set<ApplicationSectionType> sections = ApplicationFormLayoutSectionPolicy.requiredSections(config, true, true);

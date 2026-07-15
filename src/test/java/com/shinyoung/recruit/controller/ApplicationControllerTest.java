@@ -610,6 +610,7 @@ class ApplicationControllerTest {
                 false,
                 false,
                 false,
+                false,
                 false
         ));
         Long applicationId = createApplication(applicant, jobPostingId);

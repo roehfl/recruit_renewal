@@ -47,6 +47,7 @@ public record ApplicationFormRequiredPolicyResponse(
                 config.isRequireAward(),
                 config.isUseGapPeriod(),
                 config.isRequireGapPeriod(),
+                config.isUseAttachment(),
                 questionPolicyCount,
                 attachmentPolicyCount
         );
@@ -67,6 +68,7 @@ public record ApplicationFormRequiredPolicyResponse(
             Boolean requireAward,
             Boolean useGapPeriod,
             Boolean requireGapPeriod,
+            Boolean useAttachment,
             JobPostingQuestionPolicyCount questionPolicyCount
     ) {
         return from(
@@ -84,6 +86,7 @@ public record ApplicationFormRequiredPolicyResponse(
                 requireAward,
                 useGapPeriod,
                 requireGapPeriod,
+                useAttachment,
                 questionPolicyCount,
                 null
         );
@@ -104,6 +107,7 @@ public record ApplicationFormRequiredPolicyResponse(
             Boolean requireAward,
             Boolean useGapPeriod,
             Boolean requireGapPeriod,
+            Boolean useAttachment,
             JobPostingQuestionPolicyCount questionPolicyCount,
             JobPostingAttachmentRequirementPolicyCount attachmentPolicyCount
     ) {
@@ -120,7 +124,8 @@ public record ApplicationFormRequiredPolicyResponse(
                 && useAward == null
                 && requireAward == null
                 && useGapPeriod == null
-                && requireGapPeriod == null) {
+                && requireGapPeriod == null
+                && useAttachment == null) {
             return disabledPolicy(attachmentPolicyCount);
         }
 
@@ -145,7 +150,7 @@ public record ApplicationFormRequiredPolicyResponse(
                 formSection("AWARD", "Award", enabled(useAward), required(useAward, requireAward)),
                 formSection("GAP_PERIOD", "Gap Period", enabled(useGapPeriod), required(useGapPeriod, requireGapPeriod)),
                 questionSection(activeQuestionCount, requiredQuestionCount),
-                attachmentSection(totalAttachmentRequirementCount, requiredAttachmentRequirementCount)
+                attachmentSection(enabled(useAttachment), totalAttachmentRequirementCount, requiredAttachmentRequirementCount)
         );
 
         return new ApplicationFormRequiredPolicyResponse(
@@ -179,6 +184,7 @@ public record ApplicationFormRequiredPolicyResponse(
                 ApplicationFormSectionPolicyResponse.disabled("GAP_PERIOD", "Gap Period", "Application form config is not available."),
                 ApplicationFormSectionPolicyResponse.disabled("QUESTION", "Questions", "Application form config is not available."),
                 attachmentSection(
+                        false,
                         safeAttachmentPolicyCount.totalRequirementCount(),
                         safeAttachmentPolicyCount.requiredRequirementCount()
                 )
@@ -220,14 +226,15 @@ public record ApplicationFormRequiredPolicyResponse(
     }
 
     private static ApplicationFormSectionPolicyResponse attachmentSection(
+            boolean useAttachment,
             long totalRequirementCount,
             long requiredRequirementCount
     ) {
-        if (totalRequirementCount <= 0) {
+        if (!useAttachment && totalRequirementCount <= 0) {
             return ApplicationFormSectionPolicyResponse.disabled(
                     "ATTACHMENT",
                     "Attachment",
-                    "No attachment requirements are configured."
+                    "Attachment section is not used."
             );
         }
         if (requiredRequirementCount > 0) {

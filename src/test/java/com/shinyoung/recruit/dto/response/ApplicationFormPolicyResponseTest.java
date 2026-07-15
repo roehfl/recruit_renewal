@@ -72,6 +72,7 @@ class ApplicationFormPolicyResponseTest {
                 false,
                 true,
                 true,
+                false,
                 JobPostingQuestionPolicyCount.empty(1L)
         );
 
@@ -105,6 +106,7 @@ class ApplicationFormPolicyResponseTest {
                 false,
                 false,
                 false,
+                false,
                 JobPostingQuestionPolicyCount.empty(1L),
                 new JobPostingAttachmentRequirementPolicyCount(1L, 2, 1)
         );
@@ -118,6 +120,7 @@ class ApplicationFormPolicyResponseTest {
 
         ApplicationFormRequiredPolicyResponse optional = ApplicationFormRequiredPolicyResponse.from(
                 true,
+                false,
                 false,
                 false,
                 false,
