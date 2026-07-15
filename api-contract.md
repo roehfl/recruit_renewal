@@ -222,3 +222,44 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - `postingType` 값: `"PUBLIC_RECRUITMENT" | "EXPERIENCED_RECRUITMENT" | "INTERN_RECRUITMENT" | "ROLLING_RECRUITMENT"`. 공고 미설정 시 백엔드 기본값 `PUBLIC_RECRUITMENT`.
 - 유형→성적모드 매핑은 **프론트**에 위치(백엔드 학력 검증 무변경). 주의: 현재 학력 검증은 비고졸 평균평점 필수·학기별 선택이므로, 공개·인턴이라도 평균 입력란을 숨기면 저장이 400으로 막힌다(평균 유지 필요).
 - 매핑: front form-page 로드 ↔ back `ApplicationController.getFormPage()`.
+
+### 화면: 지원자 첨부파일 (ApplicationAttachment — 독립 섹션)
+
+- 프론트: `src/views/applicant/application/sections/AttachmentSection.vue`(신규), `src/api/application/sections/attachmentApi.ts`(신규), `src/types/application/sections/attachment.ts`(신규)
+- 백엔드: `com.shinyoung.recruit.controller.ApplicationAttachmentController` (기존 구현, 무변경)
+
+#### 섹션 노출 규칙 (`ApplicationFormConfig.useAttachment`)  🟢 확정 (백엔드 구현·테스트 / 프론트 반영·type-check)
+
+- 배경: `ATTACHMENT`는 이미 `ApplicationSectionType`의 layout section이나, 노출 스위치가 **`job_posting_attachment_requirement` 행 존재 여부뿐**이었다. 요구사항 행 없이 "사용자가 자유롭게 첨부하는 선택 섹션"을 만들 수 없어 `useAttachment`를 추가한다.
+- 규칙: `enabled = useAttachment || hasAttachmentRequirements`, `required = hasRequiredAttachmentRequirements`(**무변경**).
+  - `requireAttachment` 컬럼은 **추가하지 않는다.** required는 requirement 행이 단일 출처이며 `ApplicationCompletionReadChecker`·`ApplicationSubmitValidator`에 이미 배선되어 있다. 컬럼을 추가하면 진실 공급원이 갈라진다.
+  - 위 OR 규칙으로 "필수면 반드시 노출" 불변식이 자동 성립한다.
+- ⚠️ 운영 주의: 섹션을 켜면 **저장된 레이아웃(`application_form_page`)이 있는 기존 공고는 form-page 조회가 예외**로 막힌다(`ApplicationFormLayoutValidator` — enabled ⊆ placed ⊆ enabled 강제). 관리자 레이아웃 API로 ATTACHMENT를 포함해 재저장해야 한다. 저장 레이아웃이 없는 공고는 default factory가 자동 처리. `useAttachment` 기본값 `false`가 안전장치.
+- 영향 엔드포인트(필드 1개 추가): 공고 생성·수정 요청 `ApplicationFormConfigRequest`, 공고 상세/공개상세/공개목록 응답, `GET /applications/{id}/form-page`의 `formConfig`.
+
+#### `AttachmentType` enum 확장  🟢 확정
+
+- 신규 값 2개: `CAREER_DESCRIPTION`(경력기술서), `EMPLOYMENT_CERTIFICATE`(재직증명).
+- 기존 `CAREER_CERTIFICATE`(경력증명서)·`RESUME`·`TRANSCRIPT`는 **enum에 유지하되 드롭다운에는 노출하지 않는다**(기존 데이터 보존, 의미 왜곡 방지).
+- 프론트 드롭다운 7종(라벨 ↔ 값): 경력기술서=`CAREER_DESCRIPTION`, 포트폴리오=`PORTFOLIO`, 자격증명=`CERTIFICATE_PROOF`, 졸업증명=`GRADUATION_CERTIFICATE`, 재직증명=`EMPLOYMENT_CERTIFICATE`, 어학점수=`LANGUAGE_SCORE_REPORT`, 기타=`ETC`.
+- 라벨은 **프론트 상수 맵**이 출처. `ATTACHMENT_TYPE` 공통코드 그룹은 만들지 않는다(값 집합의 출처가 Java enum이라 코드 테이블과 이중화됨).
+
+#### GET·POST·DELETE `/applications/{applicationId}/attachments*`  🟢 확정 (백엔드 기존 구현 무변경 / 프론트 신규 반영)
+
+- 백엔드 **무변경**. 아래는 기존 구현을 계약에 명문화하는 것.
+- `GET /applications/{applicationId}/attachments` → `ApiResponse<AttachmentResponse[]>`
+  - `AttachmentResponse`: `{ attachmentId, attachmentType, sectionType, sectionRecordId, originalFileName, contentType, fileSize, sortOrder }`
+  - ⚠️ **sectionType 필터 파라미터가 없다. 전체가 내려온다.** 프론트는 반드시 `sectionType === 'ATTACHMENT'`로 필터링할 것. 누락 시 BASIC_INFO 증명사진이 첨부 목록에 섞이고, 거기서 삭제하면 사진이 지워진다.
+- `POST /applications/{applicationId}/attachments/files` (`multipart/form-data`) → `ApiResponse<AttachmentResponse>`
+  - part: `file`. query: `attachmentType`, `sectionType`, `sectionRecordId`(선택).
+  - `sortOrder`/`displayName`/`originalFileName`/`storedFileName`/`storagePath`를 클라이언트가 보내면 **400**(서버가 `sortOrder = max+1` 자동 부여).
+  - 제한: 지원서당 20개 / 총 100MB(증명사진과 **공유**), 파일당 20MB. 허용 확장자 `pdf,jpg,jpeg,png,doc,docx,xls,xlsx,hwp,hwpx`.
+  - 같은 `(attachmentType, sectionType)` 중복 업로드 **허용**(unique 제약 없음).
+- `POST /applications/{applicationId}/attachments/{attachmentId}/delete` → `ApiResponse<AttachmentDeleteResponse>`
+  - `AttachmentDeleteResponse`: `{ applicationId, attachmentId, deleted, physicalDeleteRequested, message }`
+  - 🔴 기존 프론트 `basicInfoApi.deleteApplicationAttachments`가 반환 타입을 `AttachmentResponse`로 **잘못 선언**함(필드가 전혀 다름). 신규 `attachmentApi.ts`에서 바로잡는다.
+- `GET /applications/{applicationId}/attachments/{attachmentId}/download` → 바이너리(`Content-Disposition: attachment`, `Cache-Control: no-store`)
+  - `STORED` 상태만 200. `METADATA_ONLY`/`MISSING`/`DELETED`는 404.
+- **쓰지 말 것**: `POST /applications/{applicationId}/attachments`(`replaceAttachments`)는 `METADATA_ONLY` 행만 교체하고 sortOrder가 기존 `STORED`와 겹치면 400이다. 업로드된 파일에는 무용 → 저장은 순차 delete/post 루프로 처리.
+- 매핑: front `attachmentApi.getApplicationAttachments()`/`postApplicationAttachmentsFile()`/`deleteApplicationAttachments()` ↔ back `ApplicationAttachmentController.getAttachments()`/`uploadAttachmentFile()`/`deleteAttachment()`.
+- 범위 밖: 증명사진 inline 서빙/썸네일 바인딩(BASIC_INFO 유지, 별도 슬라이스), `sectionType != ATTACHMENT`인 requirement 행 처리, 관리자 첨부 요구사항 설정 화면.
