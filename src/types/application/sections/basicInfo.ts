@@ -36,7 +36,8 @@ export interface ApiResponseBasicInfoResponse {
 }
 
 export type attachmentType =
-    "RESUME" | "TRANSCRIPT" | "GRADUATION_CERTIFICATE" | "CAREER_CERTIFICATE" | 
+    "RESUME" | "TRANSCRIPT" | "GRADUATION_CERTIFICATE" | "CAREER_CERTIFICATE" |
+    "CAREER_DESCRIPTION" | "EMPLOYMENT_CERTIFICATE" |
     "CERTIFICATE_PROOF" | "LANGUAGE_SCORE_REPORT" | "PORTFOLIO" | "ETC"
 
 export type sectionType =

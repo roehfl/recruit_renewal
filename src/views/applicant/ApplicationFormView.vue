@@ -24,6 +24,7 @@ import AwardSection from '@/views/applicant/application/sections/AwardSection.vu
 import CertificateSection from '@/views/applicant/application/sections/CertificateSection.vue'
 import GapPeriodSection from '@/views/applicant/application/sections/GapPeriodSection.vue'
 import QuestionAnswerSection from '@/views/applicant/application/sections/QuestionAnswerSection.vue'
+import AttachmentSection from '@/views/applicant/application/sections/AttachmentSection.vue'
 import MilitarySection from './application/sections/MilitarySection.vue'
 
 /**
@@ -91,7 +92,7 @@ const sectionComponentMap: Record<ApplicationSectionType, Component> = {
   AWARD: AwardSection,
   GAP_PERIOD: GapPeriodSection,
   QUESTION_ANSWER: QuestionAnswerSection,
-  ATTACHMENT: ApplicationSectionPlaceholder,
+  ATTACHMENT: AttachmentSection,
 }
 
 const sectionNameMap: Record<ApplicationSectionType, string> = {
