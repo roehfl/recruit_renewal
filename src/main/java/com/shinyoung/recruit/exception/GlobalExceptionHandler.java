@@ -321,6 +321,22 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler(InvalidAddressSearchRequestException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidAddressSearchRequest(InvalidAddressSearchRequestException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
+    /**
+     * 외부 주소 검색(juso.go.kr) 실패. 상위 의존 장애이므로 502로 매핑한다.
+     * 메시지는 서비스/클라이언트가 이미 클라이언트-안전하게 가공했으며, 승인키/오류코드 등 내부 상세는 로깅만 한다.
+     */
+    @ExceptionHandler(AddressSearchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAddressSearch(AddressSearchException e) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(InvalidStageResultUploadException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidStageResultUpload(InvalidStageResultUploadException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
