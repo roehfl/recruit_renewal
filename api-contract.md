@@ -223,6 +223,28 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 유형→성적모드 매핑은 **프론트**에 위치(백엔드 학력 검증 무변경). 주의: 현재 학력 검증은 비고졸 평균평점 필수·학기별 선택이므로, 공개·인턴이라도 평균 입력란을 숨기면 저장이 400으로 막힌다(평균 유지 필요).
 - 매핑: front form-page 로드 ↔ back `ApplicationController.getFormPage()`.
 
+### 화면: 주소 검색 (AddressSearch — juso.go.kr 프록시)
+
+- 프론트: (후속) 기본정보 주소 입력 보조 — 주소 검색 모달/자동완성, `src/api`의 address 관련
+- 백엔드: `com.shinyoung.recruit.controller.AddressSearchController`, `service.AddressSearchService`, `service.JusoAddressClient`
+
+#### GET `/api/addresses`  🟢 확정 (백엔드 구현·테스트 완료 / 프론트 미반영)
+
+- 용도: 정부 도로명주소 OpenAPI(`business.juso.go.kr/addrlink/addrLinkApi.do`)를 백엔드가 대리 호출(proxy)하는 주소 검색. 지원자 주소 입력 보조용 public 검색이다.
+- 승인키(`confmKey`)는 **서버 설정(`recruit.juso.confm-key`, 환경변수 `JUSO_CONFM_KEY`)에 보관**한다. 프론트/클라이언트는 confmKey를 보내지 않는다(승인키 미노출).
+- 외부 호출 방식(검증됨): `GET addrLinkApi.do?confmKey&currentPage&countPerPage&keyword&resultType=json` (레거시 파라미터 4종 + `resultType=json`).
+- 변경(2026-07-31, 🟢 확정): juso 조회 범위 상한(E0015) 대응 — 응답에 `maxPage` 추가, 범위 초과 요청은 400으로 선차단.
+- 요청(query): `{ keyword(필수, 비어있으면 400), currentPage(기본 1, min 1), countPerPage(기본 10, min 1, max `recruit.juso.max-count-per-page` 기본 100) }`
+- **조회 범위 상한**: `currentPage × countPerPage ≤ recruit.juso.max-search-range`(기본 **9,000**). 초과 시 juso가 `E0015 검색 범위를 초과하였습니다`를 반환하므로, 백엔드가 **외부 호출 전에 400**으로 막는다(상위 장애 502와 구분).
+  - 실측 경계(2026-07-31, keyword=`중앙로`, totalCount=10,715): `900×10`=9,000 정상 / `901×10`=9,010 E0015 / `90×100`=9,000 정상 / `91×100`=9,100 E0015 → **countPerPage와 무관한 offset 상한**.
+- 응답(200): `ApiResponse<{ totalCount, currentPage, countPerPage, maxPage, addresses: [{ roadAddr, jibunAddr, zipNo, siNm, sggNm, emdNm, bdNm, engAddr }] }>` (juso 원본을 정제 DTO로 매핑)
+  - `totalCount`/`currentPage`/`countPerPage`는 **juso 응답 `results.common`의 에코값**이다(백엔드 계산값 아님). 파싱 실패 시 방어적으로 `0`.
+  - ⚠️ **`totalCount`로 페이지네이션을 계산하지 말 것.** `totalCount`(10,715)가 조회 가능 범위(9,000)보다 클 수 있어 `ceil(totalCount/countPerPage)`로 페이지 수를 잡으면 조회 불가능한 페이지가 생긴다. 프론트는 반드시 `maxPage`를 쓴다.
+  - `maxPage` = `min(ceil(totalCount/countPerPage), floor(maxSearchRange/countPerPage))`. 결과 없음/비정상 응답이면 `0`.
+- 오류: 검색어 누락/공백 → 400. **조회 범위 상한 초과 → 400**(`"조회 가능한 검색 범위(9000건)를 초과했습니다. 검색어를 더 자세히 입력해 주세요."`). juso 승인키 미설정/외부 오류·타임아웃 → 502(내부 상세는 로깅만, 클라이언트엔 일반 메시지). 결과 없음은 200 + `totalCount=0` + 빈 배열.
+- 매핑: front address 검색 ↔ back `AddressSearchController.searchAddresses()` → `AddressSearchService.search()` → `JusoAddressClient.search()`.
+- 범위 밖: 상세주소(동/호) 입력, 좌표(위경도) 조회(별도 API), 프론트 주소 검색 UI, 도로명 영문주소 표시 정책.
+
 ### 화면: 지원자 첨부파일 (ApplicationAttachment — 독립 섹션)
 
 - 프론트: `src/views/applicant/application/sections/AttachmentSection.vue`(신규), `src/api/application/sections/attachmentApi.ts`(신규), `src/types/application/sections/attachment.ts`(신규)
