@@ -62,7 +62,6 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { message } from 'ant-design-vue'
 import { DeleteOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { attachmentApi } from '@/api/application/sections/attachmentApi'
 import { getApiErrorMessage } from '@/api/apiError'
@@ -129,8 +128,7 @@ function removeItem(index: number) {
 function validate(): boolean {
   if (items.length === 0) {
     if (props.section.required) {
-      message.warning('첨부파일을 추가하세요.')
-      return false
+      throw new Error('첨부파일을 추가하세요.')
     }
     return true
   }
@@ -138,12 +136,10 @@ function validate(): boolean {
     const item = items[i]
     if (!item) continue
     if (!item.attachmentType) {
-      message.warning(`첨부 ${i + 1}: 파일 종류를 선택하세요.`)
-      return false
+      throw new Error(`첨부 ${i + 1}: 파일 종류를 선택하세요.`)
     }
     if (item.fileList.length === 0) {
-      message.warning(`첨부 ${i + 1}: 파일을 선택하세요.`)
-      return false
+      throw new Error(`첨부 ${i + 1}: 파일을 선택하세요.`)
     }
   }
   return true
@@ -168,10 +164,27 @@ async function saveDraft() {
   if (!validate()) throw new Error('입력값을 확인해주세요.')
   loading.value = true
   try {
-    for (const attachmentId of removedAttachmentIds.value) {
+    // for (const attachmentId of removedAttachmentIds.value) {
+    //   await attachmentApi.deleteApplicationAttachments(props.applicationId, attachmentId)
+    // }
+
+    const deleteAttachmentIds = [
+      ...new Set([
+        ...removedAttachmentIds.value, 
+        ...items
+          .filter( item => item.attachmentId && item.fileList[0]?.originFileObj)
+          .map( item => item.attachmentId! )
+      ])
+    ]
+    for (const attachmentId of deleteAttachmentIds) {
       await attachmentApi.deleteApplicationAttachments(props.applicationId, attachmentId)
     }
     removedAttachmentIds.value = []
+
+    // 변경된 행은 attachmentId 제거, 이후 POST 되면 새로운 attachmentId가 들어감 
+    items.forEach( item => {
+      if (item.fileList[0]?.originFileObj) item.attachmentId = undefined
+    });
 
     for (const item of items) {
       const file = item.fileList[0]?.originFileObj
@@ -179,16 +192,23 @@ async function saveDraft() {
       if (!file || !item.attachmentType) continue
       const formData = new FormData()
       formData.append('file', file)
-      await attachmentApi.postApplicationAttachmentsFile(formData, {
+      const result = await attachmentApi.postApplicationAttachmentsFile(formData, {
         applicationId: props.applicationId,
         attachmentType: item.attachmentType,
         sectionType: ATTACHMENT_SECTION_TYPE,
       })
+
+      item.attachmentId = result.data.data.attachmentId;
+      item.fileList = [{
+        uid: String(result.data.data.attachmentId),
+        name: result.data.data.originalFileName,
+        status: 'done',
+      }]
     }
 
-    const result = await attachmentApi.getApplicationAttachments(props.applicationId)
-    setItems(result.data.data ?? [])
-    return result.data.data
+    // const result = await attachmentApi.getApplicationAttachments(props.applicationId)
+    // setItems(result.data.data ?? [])
+    // return result.data.data
   } catch (error) {
     logClientEvent({
       eventType: 'ATTACHMENT_UPLOAD_FAILED',
@@ -340,5 +360,8 @@ em {
 }
 :deep(.ant-select) {
   width: 100%;
+}
+:deep(.ant-upload-wrapper .ant-upload-list .ant-upload-list-item){
+  margin-top: 4px;
 }
 </style>

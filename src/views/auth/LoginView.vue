@@ -56,6 +56,15 @@ const moveAfterLogin = () => {
   router.replace('/applicant')
 }
 
+const clickToSignupButton = () => {
+  router.replace('/applicant/signup')
+}
+
+const clickToAccountRecovery = () => {
+  console.log("아이디 비밀번호 찾기")
+  router.replace('/applicant/accountRecovery')
+}
+
 const handleLogin = async () => {
   loading.value = true
   errorMessage.value = ''
@@ -96,7 +105,8 @@ const handleLogin = async () => {
       <a-card class="login-card" :bordered="false">
         <div class="login-card-header">
           <h2>로그인</h2>
-          <p>지원자는 이메일, 임직원은 사내 계정으로 로그인하세요.</p>
+          <p>최초 입사지원서 작성시에는</p>
+          <p>하단의 '입사지원하기' 버튼을 눌러주세요.</p>
         </div>
 
         <a-alert
@@ -140,10 +150,23 @@ const handleLogin = async () => {
           >
             로그인
           </a-button>
-        </a-form>
 
-        <div class="login-footer">
-          <a href="/applicant">채용공고 보러가기</a>
+          <a-button
+            class="signup-button"
+            html-type="submit"
+            size="large"
+            block
+            :loading="loading"
+            @click="clickToSignupButton"
+          >
+            입사지원하기
+          </a-button>
+        </a-form>
+        <div class="account-recovery-area">
+          <span
+            class="account-recovery"
+            @click="clickToAccountRecovery"
+          >아이디 또는 비밀번호를 잊으셨나요?</span>
         </div>
       </a-card>
     </div>
@@ -280,6 +303,38 @@ const handleLogin = async () => {
     color: var(--app-primary-color);
     font-weight: 600;
   }
+}
+
+.signup-button  {
+  margin-top: 8px;
+  height: 44px;
+  font-weight: 700;
+}
+
+:deep(.signup-button) {
+  color: var(--app-primary-color);
+}
+
+.account-recovery-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+
+  padding: 15px 15px 0px;
+}
+
+.account-recovery {
+  cursor: pointer;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--app-primary-color);
+}
+
+.account-recovery:hover {
+  text-align: center;
+  color: var(--app-color-primary-hover);
 }
 
 @media (max-width: 860px) {

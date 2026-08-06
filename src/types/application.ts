@@ -18,6 +18,12 @@ export type applicationStatus =
 export type latestResultStatus =
   | 'PENDING'
 
+export type postingType =
+  | 'PUBLIC_RECRUITMENT'
+  | 'EXPERIENCED_RECRUITMENT'
+  | 'INTERN_RECRUITMENT'
+  | 'ROLLING_RECRUITMENT'
+
 export interface ApplicationFormItem {
   sectionType: ApplicationSectionType
   sectionName?: string
@@ -38,6 +44,7 @@ export interface ApplicationFormPageResponse {
   jobPostingId: number
   jobPostingTitle?: string
   postingTitle?: string
+  postingType?: postingType
   jobPositionId?: number
   jobPositionName?: string
   accepting?: boolean
@@ -104,4 +111,19 @@ export interface ChangePasswordRequest {
   data: string
   message: string
   success: boolean
+}
+
+export interface SignupUser {
+  loginId: string,
+  password: string,
+  name: string,
+  phoneNumber: string,
+  email: string,
+  ci: string
+}
+
+export interface checkEmailRequest {
+  success: boolean,
+  data: {available: boolean},
+  message: string
 }

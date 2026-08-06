@@ -10,11 +10,11 @@ export const authRoutes: RouteRecordRaw[] = [
     },
   },
   {
-    path: '/signup',
-    name: 'Signup',
-    component: () => import('@/views/auth/SignupView.vue'),
+    path: '/nice-auth',
+    name: 'NiceAuthPopup',
+    component: () => import('@/views/auth/pop-up/NiceAuthPopup.vue'),
     meta: {
       public: true,
     },
-  }
+  },
 ]

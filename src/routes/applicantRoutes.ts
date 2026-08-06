@@ -118,6 +118,22 @@ export const applicantRoutes: RouteRecordRaw[] = [
           public: true,
         },
       },
+      {
+        path: 'signup',
+        name: 'Signup',
+        component: () => import('@/views/applicant/SignupView.vue'),
+        meta: {
+          public: true,
+        },
+      },
+      {
+        path: 'accountRecovery',
+        name: 'accountRecovery',
+        component: () => import('@/views/applicant/AccountRecovery.vue'),
+        meta: {
+          public: true,
+        },
+      },
     ],
   },
 ]

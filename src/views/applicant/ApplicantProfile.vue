@@ -180,6 +180,9 @@ const settingModalOpen = () => {
 
 const settingModalClose = () => {
   isSettingModalOpen.value = false;
+  PasswordForm.currentPassword = '';
+  PasswordForm.newPassword = '';
+  PasswordForm.newPasswordCheck = '';
 }
 
 const moreInfoModalOpen = () => {
@@ -270,7 +273,7 @@ const columns: TableColumnsType<MyApplicationListItem> = [
     key: 'status',
     width: 130,
     align: 'center',
-    customRender: ({record}) => { return applicationStatusTypeMap[String(record?.applicationStatus)] ?? '-'},
+    customRender: ({ record }) => h('span', { class: `status-tag ${record?.applicationStatus}` }, applicationStatusTypeMap[String(record?.applicationStatus)] ?? '-'),
   },
   {
     title: '지원서 수정',
@@ -278,7 +281,7 @@ const columns: TableColumnsType<MyApplicationListItem> = [
     key: 'title',
     width: 150,
     align: 'center',
-    customRender: ({ record }) => h('a', { onClick: () => goForm(record.applicationId) }, '바로가기'),
+    customRender: ({ record }) => h('a', { onClick: () => goForm(record) }, record?.applicationStatus !== 'DRAFT' ? '-' : '바로가기' ),
   },
   {
     title: '전형결과 확인',
@@ -299,10 +302,12 @@ const goDetail = async (id: number) => {
   })
 }
 
-const goForm = async (id: number) => {
-  const selectedApplication = applicationListItems.value.find((item) => item.applicationId === id)
+const goForm = async (record: MyApplicationListItem) => {
+  
+  if(record.applicationStatus !== 'DRAFT') return
+  const selectedApplication = applicationListItems.value.find((item) => item.applicationId === record.applicationId)
   await router.push({
-    path: `/applicant/${id}/form`,
+    path: `/applicant/${record.applicationId}/form`,
     state: {
       data: JSON.stringify(selectedApplication),
     },
@@ -482,6 +487,28 @@ onMounted(() => {
 
 :deep(.ant-table-cell) {
   padding-left: 20px;
+}
+
+:deep(.ant-table-cell) .status-tag {
+  margin: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+:deep(.ant-table-cell) .status-tag.SUBMITTED {
+  color: var(--app-color-success);
+}
+
+:deep(.ant-table-cell) .status-tag.DRAFT {
+  color: var(--app-text-secondary);
+}
+
+:deep(.ant-table-cell) .status-tag.WITHDRAWN {
+  color: #d46b08;
 }
 
 /* =========================

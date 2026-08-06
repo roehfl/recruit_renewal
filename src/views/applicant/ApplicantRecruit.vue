@@ -24,8 +24,8 @@
           </a-form-item>
         </a-form>
       </div>
-      <div>
-        <a-table :columns="columns" :data-source="jobPostings" :pagination="{ pageSize: 5 }" />
+      <div class="jobPostingTable">
+        <a-table :columns="columns" :data-source="jobPostings" :pagination="{ pageSize: 8 }" />
       </div>
     </div>
   </section>
@@ -256,6 +256,18 @@ onMounted(() => {
 
 :deep(.ant-table-cell) .status-tag.CLOSED {
   color: var(--app-text-muted);
+}
+
+/* =========================
+   그리드 영역
+========================= */
+
+.jobPostingTable {
+  border: 1px solid var(--app-border-subtle);
+  border-radius: 10px;
+
+  background-color: #ffffff;
+  box-shadow: 0 5px 20px var(--tap-panel-shadow);
 }
 
 /* =========================

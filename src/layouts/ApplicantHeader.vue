@@ -142,17 +142,9 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
       <div class="top-actions">
         <template v-if="!authStore.isLoggedIn">
           <RouterLink to="/login" class="top-link" @click="closeMenu"> 로그인 </RouterLink>
-          <span class="top-divider" />
-          <RouterLink to="/signup" class="top-link" @click="closeMenu"> 회원가입 </RouterLink>
         </template>
 
         <template v-else>
-          <a-button type="text" class="notice-button" aria-label="알림" @click="goNotice">
-            <a-badge :dot="hasUnreadNotice">
-              <BellOutlined />
-            </a-badge>
-          </a-button>
-
           <a-dropdown :trigger="['click']" overlay-class-name="user-dropdown-overlay">
             <button type="button" class="user-menu-button">
               <span class="user-avatar">
@@ -452,6 +444,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
 }
 
 .top-link {
+  margin-right: 20px;
   color: var(--app-text-color);
   font-weight: 600;
   text-decoration: none;

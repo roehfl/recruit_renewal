@@ -2,7 +2,7 @@
   <div class="section-body">
     <a-form>
       <div aria-label="기본정보" class="form-table">
-        <table class="apply-table">
+        <table class="table-area">
           <colgroup>
             <col style="width: 10%;">  <col style="width: 35%;">
             <col style="width: 10%;">  <col style="width: 45%;">
@@ -17,12 +17,8 @@
                     <li>용량 제한 : 1MB 미만</li>
                   </ul>
                   <a-upload
-                    v-model:file-list="fileList"
-                    list-type="picture-card"
-                    :max-count="1"
-                    :before-upload="() => false"
-                    @remove="handleRemove"
-                    style="width: auto;"
+                    v-model:file-list="fileList"  list-type="picture-card"
+                    :max-count="1" :before-upload="() => false" style="width: auto;"
                   >
                     <div v-if="fileList.length === 0">사진등록</div>
                   </a-upload>
@@ -53,14 +49,9 @@
                     <a-radio value="DOMESTIC">내국인</a-radio>
                     <a-radio value="FOREIGN">외국인</a-radio>
                     <a-select
-                      v-if="form.nationalityType ==='FOREIGN'" 
-                      v-model:value="form.countryCode" 
-                      :options="nationalityOptions"
-                      style="width: 120px" 
-                      show-search
-                      placeholder="ex) 미국"
-                      ref="nationalityTypeInputRef"
-                      :filter-option="filterNationality"
+                      v-if="form.nationalityType ==='FOREIGN'"    v-model:value="form.countryCode" 
+                      :options="nationalityOptions"   style="width: 120px"  show-search   placeholder="ex) 미국"
+                      ref="nationalityTypeInputRef"   :filter-option="filterNationality"
                     />
                   </a-radio-group>
                 </a-form-item>
@@ -69,13 +60,12 @@
               <th>보훈여부<em> *</em></th>
               <td>
                 <a-form-item>
-                  <a-radio-group v-model:value="form.veteranStatus">
+                  <a-radio-group v-model:value="form.veteranStatus" @change="onVeteranStatusChange">
                     <a-radio value="NOT_SUBJECT">비대상</a-radio>
                     <a-radio value="SUBJECT">대상</a-radio>
                     <a-input v-if="form.veteranStatus ==='SUBJECT'" 
                       v-model:value="form.veteranType"
-                      style="width: 200px" 
-                      placeholder="ex) 국가유공자의 자"
+                      style="width: 200px"    placeholder="ex) 국가유공자의 자"
                     />
                   </a-radio-group>
                 </a-form-item>
@@ -100,16 +90,12 @@
                   </a-radio-group>
                   <div v-if="form.disabilityStatus ==='SUBJECT'" >
                     <label>(등급: </label>
-                    <a-select v-model:value="form.disabilityGradeCode" style="width: 67px" 
-                      :options="disabilityGradeOptions" 
-                      :disabled="form.disabilityStatus !=='SUBJECT'"
-                      placeholder="선택"
+                    <a-select v-model:value="form.disabilityGradeCode" style="width: 67px"  placeholder="선택"
+                      :options="disabilityGradeOptions"   :disabled="form.disabilityStatus !=='SUBJECT'"
                     />
                     <label> / 유형: </label>
-                    <a-select v-model:value="form.disabilityTypeCode" style="width: 120px" 
-                      :options="disabilityStatusOptions" 
-                      :disabled="form.disabilityStatus !=='SUBJECT'"
-                      placeholder="선택"
+                    <a-select v-model:value="form.disabilityTypeCode" style="width: 120px"  placeholder="선택"
+                      :options="disabilityStatusOptions"  :disabled="form.disabilityStatus !=='SUBJECT'"
                     />
                     <label>)</label>
                   </div>
@@ -121,10 +107,10 @@
               <th>연락처<em> *</em></th>
               <td>
                 <div class="phone-section">
-                  <a-form-item label="휴대폰" class="inner-form-item">
+                  <a-form-item label="휴대폰">
                     <a-input v-model:value="form.mobilePhone" disabled/>
                   </a-form-item>
-                  <a-form-item label="비상연락처" :label-col="{ style: { width: '75px'}}">
+                  <a-form-item label="비상연락처">
                     <a-input v-model:value="form.emergencyPhone" :maxlength="11" @keydown="onlyNumber"/>
                   </a-form-item>
                 </div>
@@ -134,10 +120,10 @@
               <td rowspan="2">
                 <div class="td-column">
                   <a-form-item>
-                    <a-input class="item-margin" v-model:value="form.zipCode" @click="openPostcode" readonly style="width: 100px;"/>
-                    <a-button @click="openPostcode" shape="circle"><SearchOutlined /></a-button>
+                    <a-input class="item-margin" v-model:value="form.zipCode" @click="openAddressCode" readonly style="width: 100px;"/>
+                    <a-button @click="openAddressCode" shape="circle"><SearchOutlined /></a-button>
                   </a-form-item>
-                  <a-input class="item-margin" v-model:value="form.addressBasic" />
+                  <a-input class="item-margin" v-model:value="form.addressBasic" readonly/>
                 </div>
                 <a-form-item label="상세주소">
                   <a-input v-model:value="form.addressDetail"  placeholder="000동 000호"/>
@@ -156,6 +142,63 @@
       </div>
     </a-form>
   </div>
+
+  <!-- 주소 검색 모달 -->
+  <a-modal
+    v-model:open="AddressModalOpen"
+    title="주소 검색"
+    :width="600"
+    :footer="null"
+  >
+    <div class="table-border">
+
+    <table class="table-area">
+      <colgroup>
+        <col style="width: 20%" /><col style="width: 80%" />
+      </colgroup>
+      <tbody>
+        <tr>
+          <th>주소<em> *</em></th>
+          <td>
+            <div class="div-flex">
+              <a-input 
+                v-model:value="AddressSearch" 
+                @pressEnter="onSerach" 
+                ref="addressSearchRef"
+                placeholder="ex) 반포대로 58, 독립기념관, 삼성동 25" 
+              />
+              <a-button @click="onSerach" type="primary">검색</a-button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+          
+    <div class="address-result" v-if="addressSearchList.length > 0">
+      <div
+        v-for="address in addressSearchList" :key="`${address.zipNo}-${address.roadAddr}-${address.jibunAddr}`" class="address-card"
+        @click="selectAddress(address)"
+      >
+        <div class="card-content">
+          <div class="zip">{{ address.zipNo }}</div>
+          <div class="road">{{ address.roadAddr }}</div>
+        </div>
+        <div>
+          <div class="jibun-tag">지번주소</div>
+          <div class="jibun">{{ address.jibunAddr }}</div>
+        </div>
+      </div>
+      <div class="pagination-area">
+      <a-pagination
+        v-model:current="pagination.current" :total="pagination.total" :page-size="pagination.pageSize"
+        @change="changePage" 
+      /> 
+      </div>
+    </div>
+    
+    <a-empty v-else-if="searched" class="ant-empty-area" description="검색 결과가 없습니다."/>
+  </a-modal>
 </template>
 
 <script setup lang="ts">
@@ -164,12 +207,15 @@ import { SearchOutlined } from '@ant-design/icons-vue'
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 import { basicInfoApi } from '@/api/application/sections/basicInfoApi'
+import { attachmentApi } from '@/api/application/sections/attachmentApi'
 import { commonCodeApi } from '@/api/commonApi'
+import { addressApi } from '@/api/application/addressApi'
 import { logClientEvent } from '@/common/clientEventLogger'
 import { getApiErrorMessage } from '@/api/apiError'
 import type { DefaultOptionType } from 'ant-design-vue/es/select'
+import type { AddressItem } from '@/types/application/address'
 import type { BasicInfoParams, AttachmentResponse } from '@/types/application/sections/basicInfo'
-import type {  CommonCodeItems } from '@/types/commonCode'
+import type { CommonCodeItems } from '@/types/commonCode'
 import type { SectionComponentProps } from '@/types/application'
 import type { UploadFile } from 'ant-design-vue'
 
@@ -177,7 +223,7 @@ const authStore = useAuthStore();
 const loading = ref(false)
 const props = defineProps<SectionComponentProps>()
 const fileList = ref<UploadFile[]>([])
-const deleteAttachmentId = ref<number>()
+const originAttachments = ref<AttachmentResponse[]>([])
 const nationalityTypeInputRef = ref();
 
 // 국가 코드  
@@ -231,10 +277,16 @@ const form = reactive<BasicInfoParams>({
     emergencyPhone:undefined,           // 비상연락처
 })
 
-// 장애여부 '비대상' 클릭 시 드롭박스 초기화 
+// 내외국인 '내국인' 클릭 시 드롭박스 초기화 
 const onNationalityTypeChange = () => {
   form.countryCode = undefined;
 }
+
+// 보훈여부 '비대상' 클릭 시 텍스트필드 초기화 
+const onVeteranStatusChange = () => {
+  form.veteranType = undefined;
+}
+
 // 장애여부 '비대상' 클릭 시 드롭박스 초기화 
 const onDisabilityStatusChange = () => {
   form.disabilityGradeCode = undefined;
@@ -250,16 +302,85 @@ const onlyNumber = (e: KeyboardEvent) => {
 }
 
 // 주소 찾기 클릭 시 
-const openPostcode = () => {
-    message.success('주소찾기입니다.')
-    // const { kakao } = window as any;
+const AddressModalOpen = ref(false)
+const AddressSearch = ref<string>('');
+const openAddressCode = () => {
+  // 초기화 
+  searched.value = false;
+  AddressSearch.value = '';
+  addressSearchList.value = [];
 
-    // new window.kakao.Postcode({
-    //     oncomplete(data) {
-    //         form.value.zonecode = data.zonecode
-    //         form.value.address = data.address
-    //     }
-    // }).open()
+  // 모달 OPEN
+  AddressModalOpen.value = true;
+}
+
+
+// 주소 검색
+const searched = ref(false)
+const addressSearchRef = ref();
+const pagination = reactive({ current: 1, pageSize: 7, total: 0 })
+const addressSearchList = ref<AddressItem[]>([])
+
+// 주소 검색 클릭 시
+function onSerach() {
+  pagination.current = 1;
+  SearchClick();
+}
+
+// GET Addresses
+async function SearchClick () {
+  const keyword = AddressSearch.value.trim();
+
+  let warnMessage = '';
+  if (!keyword)                 warnMessage = '검색어를 입력해주세요.';
+  else if (keyword.length < 2)  warnMessage = '두 글자 이상 입력해주세요.';
+    
+  if (warnMessage) {
+    message.warn(warnMessage);
+    addressSearchRef.value?.focus();
+    addressSearchList.value = [];
+    return;
+  }
+  
+  searched.value = true;
+  loading.value = true
+  try {
+    const result = await addressApi.getAddresses({
+      keyword: AddressSearch.value,
+      currentPage: pagination.current,
+      countPerPage: pagination.pageSize,
+    })
+    addressSearchList.value = result.data.data.addresses
+    pagination.total = result.data.data.totalCount
+  } catch(error) {
+    addressSearchList.value = [];
+    logClientEvent({
+      eventType: 'API_ERROR',
+      severity: 'ERROR',
+      pageCode: 'APPLICATION_FORM_BASIC_INFO_ADDRESS_SEARCH',
+      operation: 'SEARCH_APPLICATION_BASIC_INFO_ADDRESS',
+      applicationId: props.applicationId,
+      message: 'APPLICATION_SEARCH_ADDRESS',
+    })
+    message.error(getApiErrorMessage(error, 'fallback 메세지'))
+  } finally {
+    loading.value = false
+  }
+}
+
+function changePage(page: number) {
+  pagination.current = page; 
+  SearchClick()
+}
+
+// 주소 선택시
+function selectAddress(address: AddressItem) {
+  form.zipCode = address.zipNo;
+  form.addressBasic = address.roadAddr;
+  form.addressDetail = address.bdNm+' ';
+
+  AddressModalOpen.value = false;
+
 }
 
 // 부모 임시저장 버튼 
@@ -299,7 +420,7 @@ const vaildation = () => {
   // 보훈여부
   if (!form.veteranStatus) throw new Error("보훈여부를 선택하세요.");
   else {
-    if (!form.veteranType) throw new Error("보훈 유형을 입력하세요.");
+    if (form.veteranStatus ==='SUBJECT' &&  !form.veteranType) throw new Error("보훈 유형을 입력하세요.");
   }
 
   // 생년월일
@@ -317,11 +438,12 @@ const vaildation = () => {
   if (!form.email) throw new Error("이메일을 입력하세요.")
 }
 
-function setFileList(list: AttachmentResponse) {
+function setFileList(list: AttachmentResponse, url?: string) {
   fileList.value = [{
     uid: String(list.attachmentId),
     name: list.originalFileName, 
     status: 'done', 
+    url: url
   }]
 }
 
@@ -343,26 +465,32 @@ async function loadCommonCode(groupCode: string) {
 async function loadAttachmentFile() {
   loading.value = true
   try {
-    const result = await basicInfoApi.getApplicationAttachments(props.applicationId)
+    const result = await attachmentApi.getApplicationAttachments(props.applicationId)
     const attachments = result.data.data;
     if (attachments.length === 0) return fileList.value = [];
 
     // 첨부파일 있을 경우, BASIC_INFO에 업로드한 사진만 따로 저장하여 세팅 
-    const photo = attachments.find( attachment => 
+    const photos = attachments.filter( attachment => 
       attachment.attachmentType === 'ETC' && attachment.sectionType === 'BASIC_INFO'
     )
-    if (photo) setFileList(photo)
-    else return fileList.value = [];
+    originAttachments.value = photos;
+
+    if (originAttachments.value.length === 0) return fileList.value = [];
+    const photo = originAttachments.value[originAttachments.value.length - 1]!
+    await downloadAttachment(photo);
 
   } finally {
     loading.value = false
   }
 }
 
-// 삭제할  AttachmentId 저장 
-const handleRemove = async (file: UploadFile) => {
-  deleteAttachmentId.value = Number(file.uid);
-  return true;
+// GET attachmentDownload
+async function downloadAttachment(photo: AttachmentResponse) {
+
+  // 이미지 Download 받아서 세팅 
+  const image = await attachmentApi.downloadApplicationAttachment(props.applicationId, photo.attachmentId)
+  const imageUrl = URL.createObjectURL(image.data);
+  setFileList(photo, imageUrl)
 }
 
 // POST attachmentFile
@@ -375,12 +503,11 @@ async function postAttachmentFile() {
     const formData = new FormData();
     formData.append('file', file)
 
-    const result = await basicInfoApi.postApplicationAttachmentsFile(formData, {
+    const result = await attachmentApi.postApplicationAttachmentsFile(formData, {
       applicationId: props.applicationId,
       attachmentType: "ETC",
       sectionType: 'BASIC_INFO',
     })
-    setFileList(result.data.data)
     return {success: true, data: result.data.data}
   } catch(error) {
     logClientEvent({
@@ -399,13 +526,20 @@ async function postAttachmentFile() {
 
 // 파일 delete, post 함수 
 async function deleteAttachmentFile() {
-  if (!deleteAttachmentId.value) return { success: true}
+  if (!originAttachments.value) return { success: true }
+  const currentUid = Number(fileList.value[0]?.uid);
+  const deleteTargets = originAttachments.value.filter(item => item.attachmentId !== currentUid)
+
+  if (deleteTargets.length === 0) return { success: true }
 
   // 삭제 대상 처리 
   loading.value = true
   try {
-     const result = await basicInfoApi.deleteApplicationAttachments(props.applicationId, deleteAttachmentId.value) 
-      return {success: true, data: result.data.data}
+    for (const attachment of deleteTargets) {
+      await attachmentApi.deleteApplicationAttachments(props.applicationId, attachment.attachmentId) 
+    }
+    originAttachments.value = [];
+    return {success: true}
   } catch(error) {
     logClientEvent({
       eventType: 'APPLICATION_SUBMIT_FAILED',
@@ -478,44 +612,37 @@ defineExpose({ saveDraft, validateBeforeSubmit })
   border-radius: 10px;
   overflow: hidden;
 }
-
-.apply-table {
+.table-area {
     width: 100%;
     border-collapse: collapse;
 }
-
-.apply-table th, 
-.apply-table td {
+.table-area th, 
+.table-area td {
     border: 1px solid #f0f0f0;
     padding: 12px;
 }
-
-.apply-table th {
+.table-area th {
     background: #fafafa;
     text-align: left;
 }
-
 /* 첫 행 */
-.apply-table tr:first-child th, 
-.apply-table tr:first-child td {
+.table-area tr:first-child th, 
+.table-area tr:first-child td {
     border-top: none;
 }
-
 /* 마지막 행 */
-.apply-table tr:last-child th, 
-.apply-table tr:last-child td {
+.table-area tr:last-child th, 
+.table-area tr:last-child td {
     border-bottom: none;
 }
-
 /* 첫 컬럼 */
-.apply-table tr th:first-child, 
-.apply-table tr td:first-child {
+.table-area tr th:first-child, 
+.table-area tr td:first-child {
     border-left: none;
 }
-
 /* 마지막 컬럼 */
-.apply-table tr th:last-child, 
-.apply-table tr td:last-child {
+.table-area tr th:last-child, 
+.table-area tr td:last-child {
     border-bottom: none;
     border-right: none;
 }
@@ -548,11 +675,9 @@ defineExpose({ saveDraft, validateBeforeSubmit })
     display: flex;
     align-items: center;
 }
-
 .picture-section > *{
     flex: 1;
 }
-
 .picture-section ul{
     padding: 0 5px 0 30px;
     margin-bottom: 0;
@@ -561,6 +686,70 @@ defineExpose({ saveDraft, validateBeforeSubmit })
 em {
     color: red;
     font-style: normal;    
+}
+
+.table-border {
+  border: 1px solid #f0f0f0;
+}
+
+.div-flex {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 주소 검색 리스트 테이블 */
+.address-result {
+  display: flex;
+  flex-direction: column;
+  margin-top: 12px;
+  border: 1px solid #f0f0f0;
+}
+.address-card {
+  border-bottom: 1px dotted #f0f0f0;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: .2s;
+}
+.address-card:last-child {
+  border: none;
+}
+.address-card:hover {
+  background-color: var(--app-bg-btn-hover);
+}
+.card-content {
+  display: flex;
+  align-items: center;
+}
+.road {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--app-text-primary);
+  margin-right: 8px;
+}
+.jibun-tag {
+  background-color: #f8faf6;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+  display: inline;
+  padding: 2px 4px;
+  font-size: 12px;
+  margin-right: 8px;
+}
+.jibun {
+  color: var(--app-text-secondary);
+  display: inline;
+  word-break: keep-all;
+}
+.zip {
+  color: var(--app-color-primary-hover);
+  font-size: 15px;
+  font-weight: 500;
+  margin: 0px 10px 0px 3px;
+}
+.pagination-area {
+  justify-items: center;
+  padding: 8px;
 }
 
 :deep(.ant-form-item) {
@@ -573,9 +762,12 @@ em {
     margin-bottom: 0 !important;
 }
 
-:deep(.inner-form-item .ant-form-item-row){
-    display: flex;
+.ant-empty-area {
+  margin-top: 24px;
 }
 
+:deep(.ant-pagination-options) {
+  display: none;
+}
 
 </style>
