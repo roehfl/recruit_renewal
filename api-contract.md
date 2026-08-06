@@ -233,7 +233,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 용도: 정부 도로명주소 OpenAPI(`business.juso.go.kr/addrlink/addrLinkApi.do`)를 백엔드가 대리 호출(proxy)하는 주소 검색. 지원자 주소 입력 보조용 public 검색이다.
 - 승인키(`confmKey`)는 **서버 설정(`recruit.juso.confm-key`, 환경변수 `JUSO_CONFM_KEY`)에 보관**한다. 프론트/클라이언트는 confmKey를 보내지 않는다(승인키 미노출).
 - 외부 호출 방식(검증됨): `GET addrLinkApi.do?confmKey&currentPage&countPerPage&keyword&resultType=json` (레거시 파라미터 4종 + `resultType=json`).
-- 변경(2026-07-31, 🟢 확정): juso 조회 범위 상한(E0015) 대응 — 응답에 `maxPage` 추가, 범위 초과 요청은 400으로 선차단.
+- 변경(2026-07-31, 🟢 확정): juso 조회 범위 상한(E0015) 대응 — 응답에 `maxPage` 추가, 범위 초과 요청은 400으로 선차단. juso 오류코드를 사용자 입력(400)/서버(502)로 분류.
 - 요청(query): `{ keyword(필수, 비어있으면 400), currentPage(기본 1, min 1), countPerPage(기본 10, min 1, max `recruit.juso.max-count-per-page` 기본 100) }`
 - **조회 범위 상한**: `currentPage × countPerPage ≤ recruit.juso.max-search-range`(기본 **9,000**). 초과 시 juso가 `E0015 검색 범위를 초과하였습니다`를 반환하므로, 백엔드가 **외부 호출 전에 400**으로 막는다(상위 장애 502와 구분).
   - 실측 경계(2026-07-31, keyword=`중앙로`, totalCount=10,715): `900×10`=9,000 정상 / `901×10`=9,010 E0015 / `90×100`=9,000 정상 / `91×100`=9,100 E0015 → **countPerPage와 무관한 offset 상한**.
@@ -241,7 +241,18 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
   - `totalCount`/`currentPage`/`countPerPage`는 **juso 응답 `results.common`의 에코값**이다(백엔드 계산값 아님). 파싱 실패 시 방어적으로 `0`.
   - ⚠️ **`totalCount`로 페이지네이션을 계산하지 말 것.** `totalCount`(10,715)가 조회 가능 범위(9,000)보다 클 수 있어 `ceil(totalCount/countPerPage)`로 페이지 수를 잡으면 조회 불가능한 페이지가 생긴다. 프론트는 반드시 `maxPage`를 쓴다.
   - `maxPage` = `min(ceil(totalCount/countPerPage), floor(maxSearchRange/countPerPage))`. 결과 없음/비정상 응답이면 `0`.
-- 오류: 검색어 누락/공백 → 400. **조회 범위 상한 초과 → 400**(`"조회 가능한 검색 범위(9000건)를 초과했습니다. 검색어를 더 자세히 입력해 주세요."`). juso 승인키 미설정/외부 오류·타임아웃 → 502(내부 상세는 로깅만, 클라이언트엔 일반 메시지). 결과 없음은 200 + `totalCount=0` + 빈 배열.
+- 오류 매핑: **juso 오류코드를 전부 502로 뭉개지 않는다.** 검색어가 원인이면 400 + juso 안내 메시지, 서버/승인키 문제면 502 + 일반 메시지.
+
+  | 상황 | 상태 | message |
+  |---|---|---|
+  | 검색어 누락/공백 | 400 | `검색어를 입력해 주세요.` |
+  | 조회 범위 상한 초과(선차단) | 400 | `조회 가능한 검색 범위(9000건)를 초과했습니다. 검색어를 더 자세히 입력해 주세요.` |
+  | juso가 검색어 거부 (`E0006`, `E0015`) | 400 | **juso 원문 그대로** (예: `주소를 상세히 입력해 주시기 바랍니다.`) |
+  | 승인키 미설정/거부, 네트워크·타임아웃, 파싱 실패, 미확인 juso 코드 | 502 | `주소 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.` |
+
+  - ⚠️ `E0006`은 **행정구역명 단독 검색에서 상시 발생한다** (실측: `영등포구` → E0006). juso는 도로명주소 검색이라 `여의대로`처럼 도로명/건물명이 필요하다. 정상 사용 중에도 흔한 경로이므로 프론트는 400 message를 검색창 밑에 그대로 노출한다.
+  - 미확인 코드를 400이 아니라 502로 보내는 이유: 서버 문제를 사용자 탓으로 잘못 분류해 승인키 관련 메시지가 노출되는 것을 막기 위함. 새 코드는 서버 로그 `juso 오류코드=...`를 보고 `JusoAddressClient.USER_INPUT_ERROR_CODES`에 추가한다.
+  - 결과 없음은 오류가 아니다 → 200 + `totalCount=0` + 빈 배열.
 - 매핑: front address 검색 ↔ back `AddressSearchController.searchAddresses()` → `AddressSearchService.search()` → `JusoAddressClient.search()`.
 - 범위 밖: 상세주소(동/호) 입력, 좌표(위경도) 조회(별도 API), 프론트 주소 검색 UI, 도로명 영문주소 표시 정책.
 
