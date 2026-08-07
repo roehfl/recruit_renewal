@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "recruit-front-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "recruit_front", "run", "dev"],
+      "port": 5173
+    }
+  ]
+}
