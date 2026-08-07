@@ -1,10 +1,5 @@
 <template>
   <section class="quick-link-section">
-    <!-- <div class="section-header">
-      <h2 class="section-title">바로가기</h2>
-      <p class="section-desc">지원자에게 필요한 주요 메뉴를 바로 확인하세요.</p>
-    </div> -->
-
     <div class="quick-link-grid">
       <a-card
         v-for="item in quickLinks"
@@ -17,7 +12,6 @@
         <div class="card-content">
           <div>
             <h3 class="card-title">{{ item.title }}</h3>
-            <!-- <p class="card-desc">{{ item.description }}</p> -->
             <p class="card-desc" v-html="item.description"></p>
           </div>
 
@@ -26,7 +20,6 @@
             <RightOutlined class="go-icon" />
           </div>
         </div>
-
       </a-card>
     </div>
   </section>
@@ -71,30 +64,6 @@ const goPage = async (url: string): Promise<void> => {
 <style scoped>
 .quick-link-section {
   width: 100%;
-  /* border: 1px solid var(--app-divider-color);
-  border-radius: 10px;
-  background: var(--app-bg-surface);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
-  padding: 24px; */
-}
-
-.section-header {
-  margin-bottom: 14px;
-}
-
-.section-title {
-  margin: 0;
-  color: var(--app-text-primary);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.35;
-}
-
-.section-desc {
-  margin: 6px 0 0;
-  color: var(--app-text-secondary);
-  font-size: 14px;
-  line-height: 1.45;
 }
 
 .quick-link-grid {
@@ -108,27 +77,35 @@ const goPage = async (url: string): Promise<void> => {
   overflow: hidden;
   min-height: 150px;
   border: 1px solid var(--app-border-soft);
-  border-top: 4px solid #2f6f55;
+  border-top: 4px solid var(--app-color-primary);
   border-radius: 8px;
   background: var(--app-content-bg-color);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.045);
+  color: var(--app-text-primary);
+  box-shadow: var(--app-shadow-soft-2);
   cursor: pointer;
   transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
+    background-color 0.2s ease,
     border-color 0.2s ease,
-    background-color 0.2s ease;
+    color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .quick-link-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--app-color-warning);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  border-color: var(--app-color-primary);
+  background: var(--app-color-primary);
+  color: #ffffff;
+  box-shadow: 0 12px 26px rgb(15 71 38 / 28%);
 }
 
+/* ant-card 내부 배경이 hover 컬러를 덮지 않도록 */
 :deep(.ant-card-body) {
   height: 100%;
   padding: 22px 20px;
+  background: transparent;
+}
+
+.quick-link-card:hover :deep(.ant-card-body) {
+  background: transparent;
 }
 
 .card-content {
@@ -142,7 +119,7 @@ const goPage = async (url: string): Promise<void> => {
 
 .card-title {
   margin: 0;
-  color: var(--app-text-primary);
+  color: inherit;
   font-size: 20px;
   font-weight: 700;
   line-height: 1.35;
@@ -150,7 +127,8 @@ const goPage = async (url: string): Promise<void> => {
 
 .card-desc {
   margin: 12px 0 0;
-  color: var(--app-text-primary);
+  color: inherit;
+  opacity: 0.82;
   font-size: 14px;
   line-height: 1.55;
   word-break: keep-all;
@@ -160,7 +138,7 @@ const goPage = async (url: string): Promise<void> => {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--app-primary-color);
+  color: inherit;
   font-size: 14px;
   font-weight: 600;
 }
@@ -168,7 +146,6 @@ const goPage = async (url: string): Promise<void> => {
 .go-icon {
   font-size: 12px;
 }
-
 
 @media (max-width: 1100px) {
   .quick-link-grid {
@@ -187,10 +164,6 @@ const goPage = async (url: string): Promise<void> => {
 
   .card-content {
     min-height: 112px;
-  }
-
-  .section-title {
-    font-size: 20px;
   }
 
   .card-title {
