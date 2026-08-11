@@ -2,6 +2,7 @@ package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.config.JusoProperties;
 import com.shinyoung.recruit.exception.AddressSearchException;
+import com.shinyoung.recruit.exception.InvalidAddressSearchRequestException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -73,9 +74,24 @@ class JusoAddressClientTest {
     }
 
     @Test
-    void juso_오류코드가_0이_아니면_예외를_던진다() {
+    void 서버측_juso_오류코드는_502_예외이고_juso_메시지를_노출하지_않는다() {
         String json = """
-                {"results":{"common":{"errorCode":"E0001","errorMessage":"승인되지 않은 KEY 입니다.","totalCount":"0",
+                {"results":{"common":{"errorCode":"E0005","errorMessage":"승인되지 않은 KEY 입니다.","totalCount":"0",
+                "currentPage":"1","countPerPage":"10"},"juso":null}}
+                """;
+        server.expect(method(HttpMethod.GET))
+                .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.search("teheran", 1, 10))
+                .isInstanceOf(AddressSearchException.class)
+                .hasMessageNotContaining("KEY");   // 승인키 관련 원인을 클라이언트에 노출하지 않는다
+    }
+
+    @Test
+    void 알_수_없는_juso_오류코드는_502로_보낸다() {
+        // 사용자 탓으로 잘못 분류해 승인키 문제를 노출하는 것보다 502가 안전하다.
+        String json = """
+                {"results":{"common":{"errorCode":"E9999","errorMessage":"미확인 오류","totalCount":"0",
                 "currentPage":"1","countPerPage":"10"},"juso":null}}
                 """;
         server.expect(method(HttpMethod.GET))
@@ -83,6 +99,36 @@ class JusoAddressClientTest {
 
         assertThatThrownBy(() -> client.search("teheran", 1, 10))
                 .isInstanceOf(AddressSearchException.class);
+    }
+
+    @Test
+    void 검색어_거부_오류코드는_400_예외이고_juso_안내메시지를_그대로_노출한다() {
+        // 실측: keyword=영등포구 처럼 행정구역명만 넣으면 juso가 E0006으로 거절한다.
+        // 사용자가 검색어만 고치면 되는 상황이므로 502(서버 장애)로 보이면 안 된다.
+        String json = """
+                {"results":{"common":{"errorCode":"E0006","errorMessage":"주소를 상세히 입력해 주시기 바랍니다.",
+                "totalCount":"0","currentPage":"1","countPerPage":"10"},"juso":null}}
+                """;
+        server.expect(method(HttpMethod.GET))
+                .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.search("영등포구", 1, 10))
+                .isInstanceOf(InvalidAddressSearchRequestException.class)
+                .hasMessage("주소를 상세히 입력해 주시기 바랍니다.");
+    }
+
+    @Test
+    void E0015는_안전망으로_400_처리한다() {
+        // AddressSearchService가 선차단하지만 juso가 상한을 낮추면 여기로 들어온다.
+        String json = """
+                {"results":{"common":{"errorCode":"E0015","errorMessage":"검색 범위를 초과하였습니다.",
+                "totalCount":"0","currentPage":"1","countPerPage":"10"},"juso":null}}
+                """;
+        server.expect(method(HttpMethod.GET))
+                .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.search("중앙로", 500, 10))
+                .isInstanceOf(InvalidAddressSearchRequestException.class);
     }
 
     @Test

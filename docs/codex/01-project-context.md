@@ -302,20 +302,44 @@ crypto:
     key: ${AES_SECRET_KEY}
 ```
 
-LDAP 설정 예시는 실제 값을 넣지 않고 property 구조만 둔다.
+LDAP 설정은 실제 값을 저장소에 넣지 않고 property 구조만 둔다. 현재 코드 기준(`recruit.ldap` prefix,
+`LdapProperties` 바인딩)은 다음과 같다.
 
 ```yaml
-ldap:
-  url: ${LDAP_URL}
-  base: ${LDAP_BASE_DN}
-  manager-dn: ${LDAP_MANAGER_DN}
-  manager-password: ${LDAP_MANAGER_PASSWORD}
-  user-search-base: ${LDAP_USER_SEARCH_BASE}
-  user-search-filter: ${LDAP_USER_SEARCH_FILTER:(sAMAccountName={0})}
-  group-search-base: ${LDAP_GROUP_SEARCH_BASE:}
+recruit:
+  ldap:
+    url: ${LDAP_URL:ldap://}
+    base: ${LDAP_BASE_DN:}
+    manager-dn: ${LDAP_MANAGER_DN:}
+    manager-password: ${LDAP_MANAGER_PASSWORD:}
+    user-search-base: ${LDAP_USER_SEARCH_BASE:}
+    user-search-filter: ${LDAP_USER_SEARCH_FILTER:(sAMAccountName={0})}
+    group-search-base: ${LDAP_GROUP_SEARCH_BASE:}
 ```
 
-실제 key 이름은 현재 코드와 맞춰 조정한다.
+값은 성격에 따라 두 부류이고 취급 강도가 다르다.
+
+| 환경변수 | 부류 | 기본값 | 비고 |
+| --- | --- | --- | --- |
+| `LDAP_MANAGER_DN` | 자격증명 | 없음 | 바인드 계정 DN. 유출 시 교체 대상 |
+| `LDAP_MANAGER_PASSWORD` | 자격증명 | 없음 | 로그·저장소에 절대 남기지 않는다 |
+| `LDAP_URL` | 환경 정보 | `ldap://`(미설정) | 내부망 주소 |
+| `LDAP_BASE_DN` | 조직 정보 | 빈 값 | base DN |
+| `LDAP_USER_SEARCH_BASE` | 조직 정보 | 빈 값 | 사용자 검색 base |
+| `LDAP_GROUP_SEARCH_BASE` | 조직 정보 | 빈 값 | 그룹(부서) 검색 base |
+| `LDAP_USER_SEARCH_FILTER` | 관용구 | `(sAMAccountName={0})` | AD 표준이라 기본값을 둔다 |
+
+조직 정보(base/search base)는 자격증명은 아니지만 회사 조직 구조가 드러나므로 실제 값을 커밋하지 않는다.
+
+미설정 시 애플리케이션은 정상 기동하되 LDAP 인증만 동작하지 않고, 기동 로그에 경고가 남는다
+(`AuthenticationConfig`). 로컬에서 LDAP을 쓰지 않는 개발자를 막지 않기 위한 선택이다.
+
+폐쇄망 등 외부 주입이 어려운 환경에서도 **소스를 수정해 다시 빌드할 필요가 없다.** 환경변수 대신
+jar 옆에 설정 파일을 두거나 실행 인자로 넘기면 된다.
+
+```bash
+java -jar recruit.jar --spring.config.additional-location=file:./config/
+```
 
 ### 7.2 컨테이너 실행 시 환경변수
 

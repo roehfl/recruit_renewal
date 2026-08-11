@@ -34,7 +34,7 @@ spring:
 #    url: ENC()
 #    driver-class-name: org.mariadb.jdbc.Driver
   datasource:
-    url: jdbc:h2:~/recruit;MODE=MariaDB;DATABASE_TO_LOWER=TRUE;DB_CLOSE_ON_EXIT=FALSE
+    url: jdbc:h2:file:/home/jnks/spring/data/recruit
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -48,6 +48,18 @@ audit:
   # (예: AUDIT_ALLOW_FALLBACK_SECRET=true) prod profile 에서는 true 여도 fallback 이 거부된다.
   allow-fallback-secret: ${AUDIT_ALLOW_FALLBACK_SECRET:false}
 recruit:
+  ldap:
+    # LDAP(AD) 접속·검색 설정. 실제 값은 저장소에 두지 않고 환경변수로 주입한다(CLAUDE.md 3장).
+    # - 자격증명(manager-dn, manager-password): 유출 시 교체 대상. 기본값 없음.
+    # - 환경/조직 정보(url, base, *-search-base): 내부망 주소와 조직 구조라 실제 값을 커밋하지 않는다.
+    # user-search-filter만 AD 표준 관용구라 기본값을 둔다.
+    url: ${LDAP_URL:ldap://}
+    base: ${LDAP_BASE_DN:}
+    manager-dn: ${LDAP_MANAGER_DN:}
+    manager-password: ${LDAP_MANAGER_PASSWORD:}
+    user-search-base: ${LDAP_USER_SEARCH_BASE:}
+    user-search-filter: ${LDAP_USER_SEARCH_FILTER:(sAMAccountName={0})}
+    group-search-base: ${LDAP_GROUP_SEARCH_BASE:}
   export:
     max-rows: ${RECRUIT_EXPORT_MAX_ROWS:50000}
   upload:
