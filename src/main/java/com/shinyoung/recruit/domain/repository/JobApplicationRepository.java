@@ -1,6 +1,7 @@
 package com.shinyoung.recruit.domain.repository;
 
 import com.shinyoung.recruit.domain.entity.JobApplication;
+import com.shinyoung.recruit.dto.response.ApplicationDailyCountRow;
 import com.shinyoung.recruit.dto.response.ApplicationExportRow;
 import com.shinyoung.recruit.dto.response.FunnelCohortRow;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
@@ -112,12 +113,29 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
                 application.status,
                 application.jobPosition.id,
                 application.jobPosition.positionName,
-                application.jobPosition.sortOrder)
+                application.jobPosition.sortOrder,
+                application.submittedAt)
             from JobApplication application
             where application.jobPosting.id = :jobPostingId
               and application.submittedAt is not null
             """)
     List<FunnelCohortRow> findFunnelCohort(@Param("jobPostingId") Long jobPostingId);
+
+    /**
+     * 일자별 제출 건수. 구간 제한 없이 전체를 날짜로 접어 반환하므로 결과 행 수는 제출이 있었던 날짜 수만큼이다.
+     * 공고 접수 구간 밖 제출(데이터 이상)의 탐지를 서비스 계층에서 함께 처리하려고 범위를 좁히지 않는다.
+     */
+    @Query("""
+            select new com.shinyoung.recruit.dto.response.ApplicationDailyCountRow(
+                cast(application.submittedAt as LocalDate),
+                count(application.id))
+            from JobApplication application
+            where application.jobPosting.id = :jobPostingId
+              and application.submittedAt is not null
+            group by cast(application.submittedAt as LocalDate)
+            order by cast(application.submittedAt as LocalDate)
+            """)
+    List<ApplicationDailyCountRow> findDailySubmittedCounts(@Param("jobPostingId") Long jobPostingId);
 
     @Query("""
             select count(application)

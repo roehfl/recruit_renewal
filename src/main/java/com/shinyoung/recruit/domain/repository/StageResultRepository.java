@@ -18,7 +18,8 @@ public interface StageResultRepository extends JpaRepository<StageResult, Long> 
             select new com.shinyoung.recruit.dto.response.FunnelStageResultRow(
                 result.jobApplication.id,
                 result.stage.id,
-                result.resultStatus)
+                result.resultStatus,
+                result.decidedAt)
             from StageResult result
             where result.stage.jobPosting.id = :jobPostingId
               and result.jobApplication.submittedAt is not null

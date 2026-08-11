@@ -2,6 +2,7 @@ package com.shinyoung.recruit.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.entity.ApplicationCertificate;
@@ -20,6 +21,8 @@ import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.domain.repository.SchoolRepository;
 import com.shinyoung.recruit.domain.repository.StageRepository;
 import com.shinyoung.recruit.domain.repository.StageResultRepository;
+import com.shinyoung.recruit.dto.response.ApplicationDailyPointResponse;
+import com.shinyoung.recruit.dto.response.ApplicationDailyResponse;
 import com.shinyoung.recruit.dto.response.DimensionFunnelResponse;
 import com.shinyoung.recruit.dto.response.FunnelResponse;
 import com.shinyoung.recruit.dto.response.StageFunnelResponse;
@@ -61,7 +64,8 @@ class AdminStatisticsControllerTest {
     @Autowired
     private WebApplicationContext context;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    // 일자별 추이 응답에 LocalDate가 있어 JavaTimeModule이 필요하다.
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @Autowired
     private JobPostingRepository jobPostingRepository;
@@ -487,7 +491,254 @@ class AdminStatisticsControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    // ---------- dimension 다중 요청 (대시보드) ----------
+
+    @Test
+    void multiple_dimensions_are_returned_as_dimension_groups_in_request_order() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend", "Frontend");
+        JobPosition backend = position(jobPosting, "Backend");
+        JobPosition frontend = position(jobPosting, "Frontend");
+        Stage stage1 = saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
+        School school = saveSchool("Shinyoung University");
+
+        JobApplication app1 = submittedApplication(jobPosting, backend, "App1");
+        JobApplication app2 = submittedApplication(jobPosting, frontend, "App2");
+        education(app1, EducationLevel.UNIVERSITY, school.getId(), 1);
+        certificate(app1, "정보처리기사");
+        result(stage1, app1, StageResultStatus.PASSED);
+        result(stage1, app2, StageResultStatus.FAILED);
+
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), "POSITION,SCHOOL,CERTIFICATE");
+
+        assertThat(funnel.dimensionGroups()).hasSize(3);
+        assertThat(funnel.dimensionGroups())
+                .extracting(group -> group.dimension().name())
+                .containsExactly("POSITION", "SCHOOL", "CERTIFICATE");
+        assertThat(funnel.dimensionGroups().get(0).groups())
+                .extracting(DimensionFunnelResponse::groupName)
+                .containsExactlyInAnyOrder("Backend", "Frontend");
+
+        // overall은 축 요청과 무관하게 그대로다.
+        assertThat(funnel.population().p()).isEqualTo(2);
+
+        // 다중 축은 하위호환 필드로 표현할 수 없으므로 비운다.
+        assertThat(funnel.dimension()).isNull();
+        assertThat(funnel.dimensions()).isEmpty();
+    }
+
+    @Test
+    void single_dimension_keeps_legacy_fields_and_also_fills_dimension_groups() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend", "Frontend");
+        JobPosition backend = position(jobPosting, "Backend");
+        JobPosition frontend = position(jobPosting, "Frontend");
+        saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
+        submittedApplication(jobPosting, backend, "App1");
+        submittedApplication(jobPosting, frontend, "App2");
+
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), "POSITION");
+
+        assertThat(funnel.dimension().name()).isEqualTo("POSITION");
+        assertThat(funnel.dimensions()).hasSize(2);
+        assertThat(funnel.dimensionGroups()).hasSize(1);
+        assertThat(funnel.dimensionGroups().get(0).dimension().name()).isEqualTo("POSITION");
+        // 두 표현의 내용은 동일해야 한다 — 하위호환 필드가 신규 필드의 부분집합이 아니라 같은 값이다.
+        assertThat(funnel.dimensionGroups().get(0).groups()).isEqualTo(funnel.dimensions());
+    }
+
+    @Test
+    void no_dimension_returns_empty_dimension_groups() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
+
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), null);
+
+        assertThat(funnel.dimensionGroups()).isEmpty();
+        assertThat(funnel.dimension()).isNull();
+        assertThat(funnel.dimensions()).isEmpty();
+    }
+
+    @Test
+    void dimension_parsing_normalizes_case_whitespace_and_duplicates() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        JobPosition backend = position(jobPosting, "Backend");
+        saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
+        submittedApplication(jobPosting, backend, "App1");
+
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), " position , POSITION ,school ");
+
+        // 중복은 접히고 입력 순서는 유지된다.
+        assertThat(funnel.dimensionGroups())
+                .extracting(group -> group.dimension().name())
+                .containsExactly("POSITION", "SCHOOL");
+        // 중복 제거로 단일 축이 아니게 되었으므로 하위호환 필드는 비어 있다.
+        assertThat(funnel.dimension()).isNull();
+    }
+
+    @Test
+    void multiple_dimensions_with_one_invalid_value_returns_bad_request() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/statistics/funnel", jobPosting.getId())
+                        .param("dimension", "POSITION,NOT_A_DIMENSION")
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void dimension_with_no_valid_token_returns_bad_request() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/statistics/funnel", jobPosting.getId())
+                        .param("dimension", ",")
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isBadRequest());
+    }
+
+    // ---------- 평균 체류일 ----------
+
+    @Test
+    void average_dwell_days_uses_submitted_at_for_first_stage_and_previous_decided_at_after() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        JobPosition backend = position(jobPosting, "Backend");
+        Stage stage1 = saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
+        Stage stage2 = saveStage(jobPosting, "Interview", StageType.FIRST_INTERVIEW, 2);
+
+        // 두 지원서 모두 2026-05-10 10:00 제출.
+        JobApplication app1 = submittedApplication(jobPosting, backend, "App1");
+        JobApplication app2 = submittedApplication(jobPosting, backend, "App2");
+
+        result(stage1, app1, StageResultStatus.PASSED, LocalDateTime.of(2026, 5, 15, 10, 0)); // 5일
+        result(stage1, app2, StageResultStatus.PASSED, LocalDateTime.of(2026, 5, 13, 10, 0)); // 3일
+        result(stage2, app1, StageResultStatus.PASSED, LocalDateTime.of(2026, 5, 25, 10, 0)); // 직전 5/15 → 10일
+
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), null);
+
+        assertThat(funnel.stages().get(0).averageDwellDays()).isEqualTo(4.0); // (5 + 3) / 2
+        // app2는 stage2 결과가 없어 표본에서 빠지고, app1만 직전 stage decidedAt 기준으로 집계된다.
+        assertThat(funnel.stages().get(1).averageDwellDays()).isEqualTo(10.0);
+    }
+
+    @Test
+    void average_dwell_days_is_null_when_no_decided_sample() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        JobPosition backend = position(jobPosting, "Backend");
+        Stage stage1 = saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
+
+        JobApplication app1 = submittedApplication(jobPosting, backend, "App1");
+        result(stage1, app1, StageResultStatus.PENDING); // decidedAt 없음
+
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), null);
+
+        // "즉시 처리(0일)"와 "표본 없음"은 다르므로 0.0이 아니라 null이다.
+        assertThat(funnel.stages().get(0).averageDwellDays()).isNull();
+    }
+
+    @Test
+    void average_dwell_days_excludes_rows_without_previous_stage_decision() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        JobPosition backend = position(jobPosting, "Backend");
+        Stage stage1 = saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
+        Stage stage2 = saveStage(jobPosting, "Interview", StageType.FIRST_INTERVIEW, 2);
+
+        JobApplication app1 = submittedApplication(jobPosting, backend, "App1");
+
+        // stage1은 미확정인데 stage2에만 결과가 있다 → stage2의 기준시각을 만들 수 없어 표본 제외.
+        result(stage1, app1, StageResultStatus.PENDING);
+        result(stage2, app1, StageResultStatus.PASSED, LocalDateTime.of(2026, 5, 25, 10, 0));
+
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), null);
+
+        assertThat(funnel.stages().get(1).averageDwellDays()).isNull();
+    }
+
+    // ---------- 일자별 지원 접수 추이 ----------
+
+    @Test
+    void applications_daily_fills_missing_days_with_zero_and_keeps_cumulative_monotonic() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        JobPosition backend = position(jobPosting, "Backend");
+
+        submittedApplication(jobPosting, backend, "App1", LocalDateTime.of(2026, 5, 3, 9, 0));
+        submittedApplication(jobPosting, backend, "App2", LocalDateTime.of(2026, 5, 3, 18, 0));
+        submittedApplication(jobPosting, backend, "App3", LocalDateTime.of(2026, 5, 6, 9, 0));
+
+        ApplicationDailyResponse daily = getApplicationsDaily(jobPosting.getId());
+
+        assertThat(daily.from()).isEqualTo(LocalDate.of(2026, 5, 1)); // 공고 접수 시작일
+        assertThat(daily.totalSubmitted()).isEqualTo(3);
+
+        assertThat(pointOf(daily, LocalDate.of(2026, 5, 1)).submittedCount()).isZero();
+        assertThat(pointOf(daily, LocalDate.of(2026, 5, 3)).submittedCount()).isEqualTo(2);
+        assertThat(pointOf(daily, LocalDate.of(2026, 5, 4)).submittedCount()).isZero(); // 제출 없는 날도 채운다
+        assertThat(pointOf(daily, LocalDate.of(2026, 5, 6)).submittedCount()).isEqualTo(1);
+
+        // 날짜가 하루 간격으로 연속하고 누적이 단조 증가한다.
+        for (int i = 1; i < daily.days().size(); i++) {
+            ApplicationDailyPointResponse previous = daily.days().get(i - 1);
+            ApplicationDailyPointResponse current = daily.days().get(i);
+            assertThat(current.date()).isEqualTo(previous.date().plusDays(1));
+            assertThat(current.cumulativeCount()).isGreaterThanOrEqualTo(previous.cumulativeCount());
+        }
+        assertThat(daily.days().get(daily.days().size() - 1).cumulativeCount()).isEqualTo(3);
+    }
+
+    @Test
+    void applications_daily_includes_withdrawn_excludes_draft_and_matches_funnel_population() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        JobPosition backend = position(jobPosting, "Backend");
+
+        submittedApplication(jobPosting, backend, "App1");
+        submittedApplication(jobPosting, backend, "App2");
+        withdrawnApplication(jobPosting, backend, "App3"); // 제출 사실은 있었으므로 포함
+        draftApplication(jobPosting, backend, "App4");     // submittedAt null → 제외
+
+        ApplicationDailyResponse daily = getApplicationsDaily(jobPosting.getId());
+        FunnelResponse funnel = getFunnel(jobPosting.getId(), null);
+
+        assertThat(daily.totalSubmitted()).isEqualTo(3);
+        // funnel과 모집단 기준이 같아야 두 위젯의 총계가 어긋나지 않는다.
+        assertThat(daily.totalSubmitted()).isEqualTo(funnel.population().p());
+    }
+
+    @Test
+    void applications_daily_blocks_applicant_and_anonymous() throws Exception {
+        JobPosting jobPosting = saveJobPosting("Backend");
+        Applicant applicant = saveApplicant("blocked-daily");
+
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/statistics/applications-daily", jobPosting.getId())
+                        .with(authentication(applicantAuthentication(applicant))))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/statistics/applications-daily", jobPosting.getId())
+                        .with(anonymous()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void applications_daily_unknown_job_posting_returns_not_found() throws Exception {
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/statistics/applications-daily", 999999L)
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isNotFound());
+    }
+
     // ---------- helpers ----------
+
+    private ApplicationDailyResponse getApplicationsDaily(Long jobPostingId) throws Exception {
+        String body = mockMvc.perform(
+                        get("/api/admin/job-postings/{jobPostingId}/statistics/applications-daily", jobPostingId)
+                                .with(authentication(adminAuthentication())))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode data = objectMapper.readTree(body).get("data");
+        return objectMapper.treeToValue(data, ApplicationDailyResponse.class);
+    }
+
+    private ApplicationDailyPointResponse pointOf(ApplicationDailyResponse daily, LocalDate date) {
+        return daily.days().stream()
+                .filter(point -> date.equals(point.date()))
+                .findFirst().orElseThrow();
+    }
 
     private FunnelResponse getFunnel(Long jobPostingId, String dimension) throws Exception {
         return getFunnel(jobPostingId, dimension, null);
@@ -569,8 +820,17 @@ class AdminStatisticsControllerTest {
     }
 
     private JobApplication submittedApplication(JobPosting jobPosting, JobPosition jobPosition, String name) {
+        return submittedApplication(jobPosting, jobPosition, name, LocalDateTime.of(2026, 5, 10, 10, 0));
+    }
+
+    private JobApplication submittedApplication(
+            JobPosting jobPosting,
+            JobPosition jobPosition,
+            String name,
+            LocalDateTime submittedAt
+    ) {
         JobApplication application = newApplication(jobPosting, jobPosition, name);
-        application.submit(LocalDateTime.of(2026, 5, 10, 10, 0));
+        application.submit(submittedAt);
         return jobApplicationRepository.saveAndFlush(application);
     }
 
@@ -600,9 +860,18 @@ class AdminStatisticsControllerTest {
     }
 
     private void result(Stage stage, JobApplication application, StageResultStatus status) {
+        result(stage, application, status, LocalDateTime.of(2026, 6, 1, 12, 0));
+    }
+
+    private void result(
+            Stage stage,
+            JobApplication application,
+            StageResultStatus status,
+            LocalDateTime decidedAt
+    ) {
         StageResult stageResult = StageResult.initialize(stage, application);
         if (status != StageResultStatus.PENDING) {
-            stageResult.updateResult(status, null, null, LocalDateTime.of(2026, 6, 1, 12, 0), "tester");
+            stageResult.updateResult(status, null, null, decidedAt, "tester");
         }
         stageResultRepository.saveAndFlush(stageResult);
     }

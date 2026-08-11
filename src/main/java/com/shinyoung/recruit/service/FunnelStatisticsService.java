@@ -11,6 +11,7 @@ import com.shinyoung.recruit.domain.repository.SchoolRepository;
 import com.shinyoung.recruit.domain.repository.StageRepository;
 import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.dto.response.DimensionFunnelResponse;
+import com.shinyoung.recruit.dto.response.DimensionGroupResponse;
 import com.shinyoung.recruit.dto.response.FunnelCertificateRow;
 import com.shinyoung.recruit.dto.response.FunnelCohortRow;
 import com.shinyoung.recruit.dto.response.FunnelPopulationResponse;
@@ -28,11 +29,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -44,8 +48,11 @@ import java.util.stream.Collectors;
  *
  * <p>모집단 P = 제출 이력(submittedAt != null) 보유 지원서 코호트. 각 stage에서 P 전체를 raw 7-bucket
  * (PASSED/FAILED/ABSENT/HOLD/PENDING/WITHDRAWN + synthetic NO_RESULT)으로 분류(합=|P|)하고, 순차 통과
- * 집합 S_k = S_(k-1) ∩ {stage k PASSED}로 funnelPassedCount·두 비율을 계산한다. overall은 항상,
- * dimension=POSITION이면 분야별 그룹 funnel을 추가로 산출한다. statistics는 audit를 남기지 않는다.
+ * 집합 S_k = S_(k-1) ∩ {stage k PASSED}로 funnelPassedCount·두 비율을 계산한다. 각 stage는 평균 체류일
+ * (직전 기준시각 → decidedAt)도 함께 산출한다. overall은 항상 산출하고, 요청한 dimension 축들의 그룹 funnel을
+ * 추가로 담는다. statistics는 audit를 남기지 않는다.
+ *
+ * <p>dimension은 콤마 구분 다중 값을 허용한다. 축이 몇 개든 코호트·단계결과 로드는 1회이며 축별 분할만 반복한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -67,38 +74,62 @@ public class FunnelStatisticsService {
     public FunnelResponse getFunnel(Long jobPostingId, String dimensionParam, Integer topN) {
         JobPosting jobPosting = jobPostingRepository.findById(jobPostingId)
                 .orElseThrow(() -> new JobPostingNotFoundException("채용공고를 찾을 수 없습니다. id=" + jobPostingId));
-        FunnelDimension dimension = parseSupportedDimension(dimensionParam);
+        List<FunnelDimension> requestedDimensions = parseSupportedDimensions(dimensionParam);
 
+        /*
+         * 코호트·단계결과 로드는 요청한 축 개수와 무관하게 1회다. 대시보드가 여러 축을 한 번에 요청해도
+         * 같은 데이터를 다시 읽지 않고 축별 분할만 반복한다.
+         */
         List<Stage> stages = stageRepository.findByJobPostingIdOrderByStageOrderAscIdAsc(jobPostingId);
         List<FunnelCohortRow> cohort = jobApplicationRepository.findFunnelCohort(jobPostingId);
-        Map<Long, Map<Long, StageResultStatus>> resultsByStage = indexResults(
+        Map<Long, Map<Long, FunnelStageResultRow>> resultsByStage = indexResults(
                 stageResultRepository.findFunnelStageResults(jobPostingId));
 
         CohortFunnel overall = computeCohort(stages, cohort, resultsByStage);
 
-        // switch expression으로 exhaustiveness를 강제한다 — FunnelDimension에 새 값이 추가되면 컴파일 에러로 dispatch 누락을 막는다.
-        List<DimensionFunnelResponse> dimensions = dimension == null
-                ? List.of()
-                : switch (dimension) {
-            case POSITION -> computePositionDimension(stages, cohort, resultsByStage);
-            case SCHOOL -> computeSchoolDimension(stages, cohort, resultsByStage, jobPostingId, topN);
-            case CERTIFICATE -> computeCertificateDimension(stages, cohort, resultsByStage, jobPostingId, topN);
-        };
+        List<DimensionGroupResponse> dimensionGroups = requestedDimensions.stream()
+                .map(dimension -> new DimensionGroupResponse(
+                        dimension,
+                        computeDimension(dimension, stages, cohort, resultsByStage, jobPostingId, topN)))
+                .toList();
+
+        /*
+         * 하위호환: 단일 축 요청이면 기존 dimension/dimensions 필드를 종전과 똑같이 채운다.
+         * 다중 축 요청은 이 두 필드로 표현할 수 없으므로 null/빈 리스트로 두고 dimensionGroups만 쓴다.
+         */
+        boolean singleDimension = requestedDimensions.size() == 1;
 
         return new FunnelResponse(
                 jobPostingId,
                 resolveTitle(jobPosting),
-                dimension,
+                singleDimension ? requestedDimensions.get(0) : null,
                 overall.population(),
                 overall.stages(),
-                dimensions
+                singleDimension ? dimensionGroups.get(0).groups() : List.of(),
+                dimensionGroups
         );
+    }
+
+    // switch expression으로 exhaustiveness를 강제한다 — FunnelDimension에 새 값이 추가되면 컴파일 에러로 dispatch 누락을 막는다.
+    private List<DimensionFunnelResponse> computeDimension(
+            FunnelDimension dimension,
+            List<Stage> stages,
+            List<FunnelCohortRow> cohort,
+            Map<Long, Map<Long, FunnelStageResultRow>> resultsByStage,
+            Long jobPostingId,
+            Integer topN
+    ) {
+        return switch (dimension) {
+            case POSITION -> computePositionDimension(stages, cohort, resultsByStage);
+            case SCHOOL -> computeSchoolDimension(stages, cohort, resultsByStage, jobPostingId, topN);
+            case CERTIFICATE -> computeCertificateDimension(stages, cohort, resultsByStage, jobPostingId, topN);
+        };
     }
 
     private List<DimensionFunnelResponse> computePositionDimension(
             List<Stage> stages,
             List<FunnelCohortRow> cohort,
-            Map<Long, Map<Long, StageResultStatus>> resultsByStage
+            Map<Long, Map<Long, FunnelStageResultRow>> resultsByStage
     ) {
         Map<Long, List<FunnelCohortRow>> byPosition = cohort.stream()
                 .collect(Collectors.groupingBy(FunnelCohortRow::jobPositionId, LinkedHashMap::new, Collectors.toList()));
@@ -130,7 +161,7 @@ public class FunnelStatisticsService {
     private List<DimensionFunnelResponse> computeSchoolDimension(
             List<Stage> stages,
             List<FunnelCohortRow> cohort,
-            Map<Long, Map<Long, StageResultStatus>> resultsByStage,
+            Map<Long, Map<Long, FunnelStageResultRow>> resultsByStage,
             Long jobPostingId,
             Integer topN
     ) {
@@ -193,7 +224,7 @@ public class FunnelStatisticsService {
     private List<DimensionFunnelResponse> computeCertificateDimension(
             List<Stage> stages,
             List<FunnelCohortRow> cohort,
-            Map<Long, Map<Long, StageResultStatus>> resultsByStage,
+            Map<Long, Map<Long, FunnelStageResultRow>> resultsByStage,
             Long jobPostingId,
             Integer topN
     ) {
@@ -288,7 +319,7 @@ public class FunnelStatisticsService {
     private CohortFunnel computeCohort(
             List<Stage> stages,
             List<FunnelCohortRow> cohort,
-            Map<Long, Map<Long, StageResultStatus>> resultsByStage
+            Map<Long, Map<Long, FunnelStageResultRow>> resultsByStage
     ) {
         long p = cohort.size();
         long currentlySubmittedCount = cohort.stream()
@@ -302,15 +333,27 @@ public class FunnelStatisticsService {
         Set<Long> survivors = new HashSet<>(applicationIds); // S0 = P
         long previousSurvivorCount = p;
 
+        /*
+         * 평균 체류일의 기준시각. 첫 stage는 제출 시각에서 출발하고, 이후에는 직전 stage의 decidedAt으로 갱신된다.
+         * 직전 stage에서 결과가 확정되지 않은 지원서는 기준시각을 만들 수 없으므로 다음 stage 표본에서 빠진다.
+         */
+        Map<Long, LocalDateTime> dwellBaseline = new HashMap<>();
+        for (FunnelCohortRow row : cohort) {
+            if (row.submittedAt() != null) {
+                dwellBaseline.put(row.applicationId(), row.submittedAt());
+            }
+        }
+
         List<StageFunnelResponse> stageResponses = new ArrayList<>();
         for (Stage stage : stages) {
-            Map<Long, StageResultStatus> resultMap = resultsByStage.getOrDefault(stage.getId(), Map.of());
+            Map<Long, FunnelStageResultRow> resultMap = resultsByStage.getOrDefault(stage.getId(), Map.of());
 
             StageDistributionResponse distribution = distribution(applicationIds, resultMap);
 
             Set<Long> nextSurvivors = new HashSet<>();
             for (Long applicationId : survivors) {
-                if (resultMap.get(applicationId) == StageResultStatus.PASSED) {
+                FunnelStageResultRow result = resultMap.get(applicationId);
+                if (result != null && result.resultStatus() == StageResultStatus.PASSED) {
                     nextSurvivors.add(applicationId);
                 }
             }
@@ -320,6 +363,8 @@ public class FunnelStatisticsService {
                     ? 0.0
                     : (double) funnelPassedCount / previousSurvivorCount;
 
+            DwellResult dwell = averageDwellDays(applicationIds, resultMap, dwellBaseline);
+
             stageResponses.add(new StageFunnelResponse(
                     stage.getStageOrder(),
                     stage.getId(),
@@ -328,11 +373,13 @@ public class FunnelStatisticsService {
                     distribution,
                     funnelPassedCount,
                     cumulativeRate,
-                    stepConversionRate
+                    stepConversionRate,
+                    dwell.averageDays()
             ));
 
             survivors = nextSurvivors;
             previousSurvivorCount = funnelPassedCount;
+            dwellBaseline = dwell.nextBaseline();
         }
 
         return new CohortFunnel(
@@ -341,7 +388,48 @@ public class FunnelStatisticsService {
         );
     }
 
-    private StageDistributionResponse distribution(List<Long> applicationIds, Map<Long, StageResultStatus> resultMap) {
+    /**
+     * 한 stage의 평균 체류일과, 다음 stage가 쓸 기준시각 맵을 함께 산출한다.
+     *
+     * <p>표본 조건: 이 stage의 {@code decidedAt}이 있고 기준시각도 있는 건. 둘 중 하나라도 없으면 제외한다.
+     * 음수(데이터 오류)도 제외한다. 표본이 없으면 null을 반환한다 — 즉시 처리(0일)와 구분해야 한다.
+     */
+    private DwellResult averageDwellDays(
+            List<Long> applicationIds,
+            Map<Long, FunnelStageResultRow> resultMap,
+            Map<Long, LocalDateTime> baseline
+    ) {
+        double totalDays = 0.0;
+        long sampleCount = 0;
+        Map<Long, LocalDateTime> nextBaseline = new HashMap<>();
+
+        for (Long applicationId : applicationIds) {
+            FunnelStageResultRow result = resultMap.get(applicationId);
+            if (result == null || result.decidedAt() == null) {
+                continue;
+            }
+            nextBaseline.put(applicationId, result.decidedAt());
+
+            LocalDateTime from = baseline.get(applicationId);
+            if (from == null) {
+                continue;
+            }
+            double days = Duration.between(from, result.decidedAt()).toMillis() / (double) Duration.ofDays(1).toMillis();
+            if (days < 0) {
+                continue;
+            }
+            totalDays += days;
+            sampleCount++;
+        }
+
+        Double averageDays = sampleCount == 0
+                ? null
+                : Math.round(totalDays / sampleCount * 10.0) / 10.0;
+
+        return new DwellResult(averageDays, nextBaseline);
+    }
+
+    private StageDistributionResponse distribution(List<Long> applicationIds, Map<Long, FunnelStageResultRow> resultMap) {
         long passed = 0;
         long failed = 0;
         long absent = 0;
@@ -350,11 +438,12 @@ public class FunnelStatisticsService {
         long withdrawn = 0;
         long noResult = 0;
         for (Long applicationId : applicationIds) {
-            StageResultStatus status = resultMap.get(applicationId);
-            if (status == null) {
+            FunnelStageResultRow result = resultMap.get(applicationId);
+            if (result == null) {
                 noResult++;
                 continue;
             }
+            StageResultStatus status = result.resultStatus();
             switch (status) {
                 case PASSED -> passed++;
                 case FAILED -> failed++;
@@ -367,26 +456,44 @@ public class FunnelStatisticsService {
         return new StageDistributionResponse(passed, failed, absent, hold, pending, withdrawn, noResult);
     }
 
-    private Map<Long, Map<Long, StageResultStatus>> indexResults(List<FunnelStageResultRow> rows) {
-        Map<Long, Map<Long, StageResultStatus>> byStage = new HashMap<>();
+    private Map<Long, Map<Long, FunnelStageResultRow>> indexResults(List<FunnelStageResultRow> rows) {
+        Map<Long, Map<Long, FunnelStageResultRow>> byStage = new HashMap<>();
         for (FunnelStageResultRow row : rows) {
             byStage.computeIfAbsent(row.stageId(), key -> new HashMap<>())
-                    .put(row.applicationId(), row.resultStatus());
+                    .put(row.applicationId(), row);
         }
         return byStage;
     }
 
-    private FunnelDimension parseSupportedDimension(String dimensionParam) {
+    /**
+     * dimension 파라미터를 파싱한다. 대시보드가 여러 축을 한 번에 받으려고 콤마 구분 다중 값을 허용한다
+     * (예: {@code POSITION,SCHOOL,CERTIFICATE}). 단일 값은 종전과 동일하게 동작한다.
+     *
+     * <p>정규화는 trim + 대문자 + 중복 제거(입력 순서 유지)다. 값 하나라도 {@code FunnelDimension} 밖이면 400이다.
+     * 비어 있지 않은데 유효 토큰이 하나도 없는 입력(예: {@code ","})도 잘못된 요청으로 본다.
+     */
+    private List<FunnelDimension> parseSupportedDimensions(String dimensionParam) {
         if (dimensionParam == null || dimensionParam.isBlank()) {
-            return null;
+            return List.of();
         }
-        FunnelDimension dimension;
-        try {
-            dimension = FunnelDimension.valueOf(dimensionParam.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
+
+        Set<FunnelDimension> parsed = new LinkedHashSet<>();
+        for (String token : dimensionParam.split(",")) {
+            String trimmed = token.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            try {
+                parsed.add(FunnelDimension.valueOf(trimmed.toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException e) {
+                throw new InvalidStatisticsRequestException("지원하지 않는 dimension 값입니다. dimension=" + trimmed);
+            }
+        }
+
+        if (parsed.isEmpty()) {
             throw new InvalidStatisticsRequestException("지원하지 않는 dimension 값입니다. dimension=" + dimensionParam);
         }
-        return dimension;
+        return List.copyOf(parsed);
     }
 
     private String resolveTitle(JobPosting jobPosting) {
@@ -396,6 +503,13 @@ public class FunnelStatisticsService {
     private record CohortFunnel(
             FunnelPopulationResponse population,
             List<StageFunnelResponse> stages
+    ) {
+    }
+
+    /** 한 stage의 평균 체류일과, 다음 stage가 기준시각으로 쓸 {@code decidedAt} 맵. */
+    private record DwellResult(
+            Double averageDays,
+            Map<Long, LocalDateTime> nextBaseline
     ) {
     }
 }
