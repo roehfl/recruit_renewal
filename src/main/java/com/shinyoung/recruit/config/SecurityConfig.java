@@ -53,7 +53,8 @@ public class SecurityConfig {
         CorsConfiguration corsConfiguration = new CorsConfiguration();
 //        corsConfiguration.applyPermitDefaultValues();
         corsConfiguration.setAllowedOrigins(List.of(
-                "http://localhost:5173"
+                "http://localhost:5173",
+                "https://rec.shinyoung.com"
         ));
         corsConfiguration.setAllowedMethods(Arrays.asList("POST", "GET"));
         corsConfiguration.setAllowedHeaders(List.of(
@@ -82,6 +83,10 @@ public class SecurityConfig {
         http.authorizeHttpRequests(authorizeRequests -> authorizeRequests
                 .requestMatchers("/api/auth/login", "/api/auth/logout", "/api/auth/applicants/sign-up", "/api/auth/applicants/check-email").permitAll()
                 .requestMatchers("/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**", "/h2-console/**", "/api/menu/tree").permitAll()
+                // 메뉴 관리 write — MenuController 의 base path 가 /menu 라 실제 경로가 /api/menu/admin/menu 이고,
+                // 아래 broad /api/admin/** 매처에 걸리지 않는다. 명시하지 않으면 anyRequest().permitAll() 로 흘러
+                // 비인증 사용자가 메뉴를 생성/수정할 수 있다.
+                .requestMatchers(HttpMethod.POST, "/api/menu/admin/menu", "/api/menu/admin/menu/*").hasAnyAuthority("ROLE_ADMIN", "ROLE_RECRUIT_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/job-postings/{jobPostingId}/application").hasAuthority("ROLE_APPLICANT")
                 .requestMatchers(HttpMethod.GET, "/api/job-postings/**").permitAll()
                 // client event 수집(Phase 09f) — 로그인 전/세션 만료 오류도 수집하므로 permitAll(설계 7장).
