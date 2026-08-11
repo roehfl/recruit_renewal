@@ -16,3 +16,17 @@ export interface MenuItem {
   icon: string | null
   children: MenuItem[]
 }
+
+/*
+ * 메뉴 생성/수정 요청 본문. 백엔드 MenuSaveRequest 와 같은 모양이며 생성·수정이 같은 스키마를 쓴다.
+ * parentId가 null이면 메인메뉴(대메뉴), 값이 있으면 그 메뉴의 서브메뉴(소메뉴)로 저장된다.
+ */
+export interface MenuSaveRequest {
+  site: MenuSite
+  type: MenuType
+  parentId: number | null
+  name: string
+  path: string | null
+  sortOrder: number | null
+  icon: string | null
+}

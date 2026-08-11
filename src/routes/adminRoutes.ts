@@ -19,6 +19,11 @@ export const adminRoutes: RouteRecordRaw[] = [
         name: 'AdminHome',
         component: () => import('@/views/admin/AdminHomeView.vue'),
       },
+      {
+        path: 'menus',
+        name: 'AdminMenuManage',
+        component: () => import('@/views/admin/MenuManageView.vue'),
+      },
     ],
   },
 ]
