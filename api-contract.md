@@ -180,7 +180,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 
 ### 화면: 메뉴 (Menu — 헤더/사이드바, 관리자 메뉴관리)
 
-- 프론트: `src/api/menuApi.ts`, `src/types/menu.ts`, 헤더(지원자)·관리자 사이드바(후속)
+- 프론트: `src/api/menuApi.ts`, `src/types/menu.ts`, 헤더(지원자) `src/layouts/ApplicantHeader.vue`, 관리자 사이드바 `src/layouts/AdminSidebar.vue`
 - 백엔드: `com.shinyoung.recruit.controller.MenuController`
 
 #### GET `/menu/tree` · `/menu/{menuId}` · `/menu/breadcrumb`, POST `/menu/admin/menu` · `/menu/admin/menu/{menuId}`  🟢
@@ -190,7 +190,12 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 저장 요청(`MenuSaveRequest`): `{ site, type, parentId?, name, path?, sortOrder?, icon? }` → 응답 `ApiResponse<{ id }>`.
 - 조회 응답(`MenuResponse`): 위 메뉴 노드 모양. `GET /menu/tree?site=`, `GET /menu/breadcrumb?site=&path=`, `GET /menu/{menuId}`.
 - 매핑: front `menuApi.getMenuTree()`/`getBreadcrumb()` ↔ back `MenuController.getTree()`/`getBreadcrumb()`. 생성/수정 API는 프론트 미반영(관리 화면은 후속 슬라이스).
-- 범위 밖(후속): 메뉴 관리 CRUD 화면 + 아이콘 피커, 아이콘 실제 렌더링(관리자 사이드바), 삭제(요청 시 DELETE 대신 POST 사용).
+- 변경(2026-08-11, 🟢 확정): 프론트 `MenuItem`에 `icon: string | null` 반영 + 관리자 사이드바 아이콘 렌더링 구현. → **백엔드 계약 변경 없음**(응답 스키마 그대로).
+- 아이콘 허용 목록(중요): `icon` 문자열은 `src/common/antIcon.ts`의 `ADMIN_MENU_ICONS`(명시적으로 import 한 ant-design-vue 아이콘 93종)에서만 해석된다. 목록 밖 이름이거나 `null`이면 `AppstoreOutlined`로 대체되어 라벨 정렬만 유지된다(오류 아님). **DB에 넣는 `icon` 값은 이 목록 안에 있어야 실제 아이콘이 보인다.**
+  - 네임스페이스(`import * as`)로 전체 세트를 해석하지 않는 이유: 아이콘 790종이 전부 번들에 포함되고 지원자 화면까지 쓰는 공통 청크로 올라간다(측정 결과 index 청크 +1,057kB / gzip +175kB). 동적 import로 분리해도 지원자 화면이 같은 패키지를 정적 import 하고 있어 한 청크로 합쳐진다. 명시 import 방식은 공통 청크 증가 0이고 아이콘이 admin 지연 청크(113kB / gzip 26kB)에만 들어간다.
+  - 후속 메뉴 관리 화면의 **아이콘 피커는 `ADMIN_MENU_ICONS`를 선택지로 그대로 사용**한다. 아이콘을 추가하려면 이 목록에 import를 추가한다.
+- 관리자 사이드바 메뉴 운용 규약(`GET /menu/tree?site=ADMIN`): **대메뉴 = path 없는 그룹 라벨**(작은 글씨, 이동 안 함), **소메뉴 = 아이콘 + 이름의 실제 이동 대상**. 활성 표시는 `menuStore.isActiveMenu('ADMIN', ...)`(경로 trail 기반)이라 대메뉴에 path가 없어도 정상 동작한다. 하위가 없는 대메뉴는 그 자체를 이동 항목으로 표시한다.
+- 범위 밖(후속): 메뉴 관리 CRUD 화면 + 아이콘 피커, 삭제(요청 시 DELETE 대신 POST 사용), 메뉴 뱃지(설계 시안의 카운트 뱃지 — `MenuItem`에 해당 필드 없음).
 
 ### 화면: 지원서 작성 완성도 (ApplicationFormView — 상단 스텝 카운터)
 
