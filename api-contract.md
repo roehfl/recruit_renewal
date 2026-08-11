@@ -189,13 +189,26 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 메뉴 노드: `{ id, parentId, site('APPLICANT'|'ADMIN'), type('ROUTE'|'URL'), name, path, sortOrder, icon, children:[...] }`. (트리는 최대 2단계, `children` 재귀.)
 - 저장 요청(`MenuSaveRequest`): `{ site, type, parentId?, name, path?, sortOrder?, icon? }` → 응답 `ApiResponse<{ id }>`.
 - 조회 응답(`MenuResponse`): 위 메뉴 노드 모양. `GET /menu/tree?site=`, `GET /menu/breadcrumb?site=&path=`, `GET /menu/{menuId}`.
-- 매핑: front `menuApi.getMenuTree()`/`getBreadcrumb()` ↔ back `MenuController.getTree()`/`getBreadcrumb()`. 생성/수정 API는 프론트 미반영(관리 화면은 후속 슬라이스).
+- 매핑: front `menuApi.getMenuTree()`/`getBreadcrumb()` ↔ back `MenuController.getTree()`/`getBreadcrumb()`, front `menuApi.createMenu()`/`updateMenu()` ↔ back `MenuController.createMenu()`/`updateMenu()`.
 - 변경(2026-08-11, 🟢 확정): 프론트 `MenuItem`에 `icon: string | null` 반영 + 관리자 사이드바 아이콘 렌더링 구현. → **백엔드 계약 변경 없음**(응답 스키마 그대로).
 - 아이콘 허용 목록(중요): `icon` 문자열은 `src/common/antIcon.ts`의 `ADMIN_MENU_ICONS`(명시적으로 import 한 ant-design-vue 아이콘 93종)에서만 해석된다. 목록 밖 이름이거나 `null`이면 `AppstoreOutlined`로 대체되어 라벨 정렬만 유지된다(오류 아님). **DB에 넣는 `icon` 값은 이 목록 안에 있어야 실제 아이콘이 보인다.**
   - 네임스페이스(`import * as`)로 전체 세트를 해석하지 않는 이유: 아이콘 790종이 전부 번들에 포함되고 지원자 화면까지 쓰는 공통 청크로 올라간다(측정 결과 index 청크 +1,057kB / gzip +175kB). 동적 import로 분리해도 지원자 화면이 같은 패키지를 정적 import 하고 있어 한 청크로 합쳐진다. 명시 import 방식은 공통 청크 증가 0이고 아이콘이 admin 지연 청크(113kB / gzip 26kB)에만 들어간다.
   - 후속 메뉴 관리 화면의 **아이콘 피커는 `ADMIN_MENU_ICONS`를 선택지로 그대로 사용**한다. 아이콘을 추가하려면 이 목록에 import를 추가한다.
 - 관리자 사이드바 메뉴 운용 규약(`GET /menu/tree?site=ADMIN`): **대메뉴 = path 없는 그룹 라벨**(작은 글씨, 이동 안 함), **소메뉴 = 아이콘 + 이름의 실제 이동 대상**. 활성 표시는 `menuStore.isActiveMenu('ADMIN', ...)`(경로 trail 기반)이라 대메뉴에 path가 없어도 정상 동작한다. 하위가 없는 대메뉴는 그 자체를 이동 항목으로 표시한다.
-- 범위 밖(후속): 메뉴 관리 CRUD 화면 + 아이콘 피커, 삭제(요청 시 DELETE 대신 POST 사용), 메뉴 뱃지(설계 시안의 카운트 뱃지 — `MenuItem`에 해당 필드 없음).
+- 범위 밖(후속): 삭제(요청 시 DELETE 대신 POST 사용), 메뉴 뱃지(설계 시안의 카운트 뱃지 — `MenuItem`에 해당 필드 없음).
+
+#### 화면: 관리자 메뉴 관리 (MenuManageView) — 시안 1c "3단 컬럼"  🟢 확정
+
+- 프론트: `src/views/admin/MenuManageView.vue`, 라우트 `/admin/menus`(name `AdminMenuManage`, `adminRoutes` 하위 → `requiresAuth` + `ROLE_ADMIN`/`ROLE_RECRUIT_ADMIN` 상속)
+- **백엔드 계약 변경 없음.** 위 기존 엔드포인트(`GET /menu/tree`, `POST /menu/admin/menu`, `POST /menu/admin/menu/{menuId}`)를 그대로 소비한다. 요청/응답 스키마 무변경.
+- 화면 구성: 탭(지원자 `APPLICANT` / 관리자 `ADMIN`) → 3단 컬럼(메인메뉴 목록 › 서브메뉴 목록 › 상세 폼).
+- 편집 규약(시안 1c): 한 번에 **메인메뉴 또는 서브메뉴 하나만** 편집한다. 서브메뉴 추가는 **저장된 메인메뉴가 선택된 경우에만** 가능(미선택 시 `+` 비활성).
+- 폼 필드 → `MenuSaveRequest` 매핑: 메뉴명→`name`, 상위 메인메뉴(읽기 전용 표시)→`parentId`, 메뉴 유형→`type`, 경로→`path`, 정렬 순서(숫자 입력)→`sortOrder`, 아이콘→`icon`. `site`는 활성 탭에서 결정된다.
+- 아이콘 피커: `ADMIN_MENU_ICONS`(93종)를 선택지로 사용하며 **관리자 탭의 서브메뉴에서만** 노출한다(시안 1c 규약). 백엔드는 대메뉴 `icon`도 허용하므로 이는 화면 레벨 제약이다.
+- 화면에서 제외(2026-08-11 결정): 시안 1c의 **"사용 여부" 토글** — `Menu` 엔티티/`MenuResponse`에 해당 필드가 없다. 필요해지면 별도 슬라이스에서 엔티티·DDL·트리 필터링 규칙과 함께 추가한다.
+- 클라이언트 검증은 `MenuService`의 서버 검증을 그대로 미러링한다(소메뉴 `path` 필수, `ROUTE`는 `/` 시작, `URL`은 `http(s)://` 시작). 서버가 단일 출처이며 클라이언트 검증은 왕복을 줄이기 위한 것이다.
+- 보안(2026-08-11, 🟢 확정): `POST /menu/admin/menu*`는 컨트롤러 경로가 `/api/menu/admin/menu`라 `SecurityConfig`의 broad `/api/admin/**` 매처에 걸리지 않았고 `anyRequest().permitAll()`로 흘러 **비인증 생성/수정이 가능한 상태**였다. 명시 매처 `POST /api/menu/admin/menu`, `POST /api/menu/admin/menu/*` → `hasAnyAuthority("ROLE_ADMIN","ROLE_RECRUIT_ADMIN")`를 추가해 막았고 `SecurityConfigTest` 6건으로 고정했다(비인증 401 / 타권한 403 / 관리자 통과 / `GET /menu/tree` permitAll 회귀). 경로 자체(`/menu/admin/menu`)는 계약 안정성을 위해 유지한다 — 정리하려면 별도 슬라이스에서 프론트와 함께 옮긴다.
+- 부트스트랩 주의: 메뉴 데이터는 DB에만 있으므로 사이드바에 "메뉴 관리" 항목이 없는 상태에서는 `/admin/menus`로 직접 접속해 이 화면에서 자기 자신의 메뉴(대메뉴 "메뉴 관리" + 소메뉴 "메뉴 관리")를 등록한다.
 
 ### 화면: 지원서 작성 완성도 (ApplicationFormView — 상단 스텝 카운터)
 
@@ -301,3 +314,37 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - **쓰지 말 것**: `POST /applications/{applicationId}/attachments`(`replaceAttachments`)는 `METADATA_ONLY` 행만 교체하고 sortOrder가 기존 `STORED`와 겹치면 400이다. 업로드된 파일에는 무용 → 저장은 순차 delete/post 루프로 처리.
 - 매핑: front `attachmentApi.getApplicationAttachments()`/`postApplicationAttachmentsFile()`/`deleteApplicationAttachments()` ↔ back `ApplicationAttachmentController.getAttachments()`/`uploadAttachmentFile()`/`deleteAttachment()`.
 - 범위 밖: 증명사진 inline 서빙/썸네일 바인딩(BASIC_INFO 유지, 별도 슬라이스), `sectionType != ATTACHMENT`인 requirement 행 처리, 관리자 첨부 요구사항 설정 화면.
+
+### 화면: 관리자 대시보드 (AdminHomeView — 시안 2a "퍼널 중심")
+
+- 프론트: `src/views/admin/AdminHomeView.vue` + `src/views/admin/dashboard/*.vue`(위젯 카드 6종), `src/api/statisticsApi.ts`, `src/api/adminJobPostingApi.ts`, `src/types/statistics.ts`, `src/common/chartPalette.ts`. 라우트 `/admin`
+- 대시보드는 `dimension=POSITION,SCHOOL,CERTIFICATE&topN=5` 1콜 + `applications-daily` 1콜을 병렬로 호출한다. 공고 목록은 `GET /admin/job-postings`(기본 선택 = 접수 중인 첫 공고).
+- 백엔드: `com.shinyoung.recruit.controller.AdminStatisticsController`
+- 설계서: `docs/superpowers/specs/2026-08-11-admin-dashboard-statistics-api-design.md`
+- 시안 요청서: `docs/design/관리자 대시보드 시안 요청서.md`
+
+#### GET `/admin/job-postings/{jobPostingId}/statistics/funnel`  🟢 확정 (확장, front-back 반영 완료)
+
+- 기존 엔드포인트의 **하위호환 확장**. 화면 스코프는 공고 1건이다.
+- 변경: `dimension`이 **콤마 구분 다중 값**을 받는다(`?dimension=POSITION,SCHOOL,CERTIFICATE`). 대시보드 1회 로드에 4콜이 필요하던 것을 1콜로 줄인다(코호트·단계결과 로드 1회). 파싱은 trim + 대문자 + 중복 제거(입력 순서 유지), 값 하나라도 `FunnelDimension` 밖이면 **400**(기존 동작).
+- 추가 응답 필드: `dimensionGroups: [{ dimension, groups: [DimensionFunnelResponse] }]` — 항상 채운다(미지정이면 `[]`).
+- 기존 `dimension`/`dimensions`는 **단일 요청일 때만** 기존과 동일하게 채우고, 다중 요청이면 `null`/`[]`이다. `@Deprecated` 표기하며 **신규 소비자는 `dimensionGroups`만 쓴다.**
+- 추가 응답 필드: `stages[].averageDwellDays: Double | null` — 단계 간 평균 소요일. 기준시각은 첫 단계면 `JobApplication.submittedAt`, 그 외에는 직전 단계 `StageResult.decidedAt`. 미확정 건·직전 값 없는 건은 표본에서 제외하고, 표본 0이면 `null`(0.0으로 채우지 않는다).
+- `topN`은 기존 규칙 유지 — SCHOOL/CERTIFICATE에 **공통** 적용, POSITION에서는 무시. 기본 10, 상한 100.
+- 프로젝션 변경(구현 주의): `FunnelStageResultRow`에 `decidedAt`, `FunnelCohortRow`에 `submittedAt` 추가. 둘 다 JPQL `new` 프로젝션이라 **record와 쿼리를 반드시 함께** 고친다.
+
+#### GET `/admin/job-postings/{jobPostingId}/statistics/applications-daily`  🟢 확정 (신규, front-back 반영 완료)
+
+- 응답: `{ jobPostingId, jobPostingTitle, from, to, totalSubmitted, days: [{ date, submittedCount, cumulativeCount }] }`
+- 기준은 `JobApplication.submittedAt`의 날짜. `WITHDRAWN` **포함**(그날 제출 사실은 있었다), `DRAFT` 제외(`submittedAt is null`) — 퍼널 코호트와 같은 기준이라 `totalSubmitted`가 퍼널 `population.p`와 일치한다.
+- 구간은 공고 `receptionStartDateTime` 날짜 ~ `min(receptionEndDateTime, 오늘)`. **제출 0건인 날짜도 0으로 채운다**(라인 차트가 끊기지 않게).
+- 서비스는 `ApplicationTrendStatisticsService` 신설(퍼널과 관심사가 다름). 집계는 DB `GROUP BY` 1회 — 퍼널처럼 전체를 메모리에 올리지 않는다.
+- 🔴 **DB 호환성 미검증**: 그룹핑에 JPQL `cast(application.submittedAt as LocalDate)`를 쓴다. H2(테스트)에서는 검증됐으나 **운영 후보 MariaDB에서는 아직 확인되지 않았다.** 번역이 실패하면 날짜 그룹핑을 Java 계층으로 옮긴다(한 공고의 제출 건수만 읽으므로 비용 차이는 크지 않다).
+
+#### 프론트가 처리할 불일치 (백엔드 무변경)
+
+- **`distribution`의 분모는 P(공고 전체)다.** 시안 스택 막대는 "그 단계 대상자" 분모이므로, 프론트가 `noResult`를 제외한 6버킷 합(`P − noResult`)으로 **정규화**해야 한다. 정규화하지 않으면 1차 이후 막대가 전부 쪼그라든다.
+- **`pending`(미확정)을 6번째 세그먼트로 그린다.** 진행 중 공고에서는 pending이 다수일 수 있어 빠뜨리면 비율이 왜곡된다. 색은 팔레트 슬롯 6(녹색)을 쓰면 합격으로 오독되므로 중립 회색 계열로 빼는 것을 검토한다(프론트 슬라이스에서 확정).
+
+- 보안: 두 경로 모두 `/api/admin/**` 매처 → `ROLE_ADMIN`/`ROLE_RECRUIT_ADMIN`. **SecurityConfig 변경 없음.** statistics는 집계값만 노출하므로 audit 미기록(기존 규칙).
+- 범위 밖: 시안 D(진행 상태·일정)·E(처리 대기)·F(지원자 구성) 위젯, 전사 통합 퍼널(공고 횡단), 경쟁률(`JobPosition`에 모집인원 필드 없음), 캐싱(실측 후 별도 슬라이스).
