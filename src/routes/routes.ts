@@ -1,12 +1,21 @@
 import type { RouteRecordRaw } from 'vue-router'
 import { authRoutes } from './authRoutes'
 import { applicantRoutes } from './applicantRoutes'
+import { adminRoutes } from './adminRoutes'
 
 export const routes: RouteRecordRaw[] = [
   {
     path: '/samples/antd',
     name: 'AntdSample',
     component: () => import('@/views/samples/AntdSampleView.vue'),
+    meta: {
+      public: true,
+    },
+  },
+  {
+    path: '/samples/menu-icons',
+    name: 'MenuIconPreview',
+    component: () => import('@/views/samples/MenuIconPreview.vue'),
     meta: {
       public: true,
     },
@@ -29,4 +38,5 @@ export const routes: RouteRecordRaw[] = [
   },
   ...authRoutes,
   ...applicantRoutes,
+  ...adminRoutes,
 ]

@@ -48,7 +48,12 @@ apiClient.interceptors.response.use(
       window.location.href = '/login'
     }
 
-    if (status === 403) {
+    /*
+     * 401과 동일하게 skipAuthRedirect를 존중한다.
+     * 세션 복구용 조회(authApi.me)처럼 호출부가 실패를 직접 처리하는 요청까지
+     * 강제 이동시키면 화면 전환이 끊긴다. 이미 /403이면 재이동하지 않는다.
+     */
+    if (status === 403 && !skipAuthRedirect && currentPath !== '/403') {
       window.location.href = '/403'
     }
 

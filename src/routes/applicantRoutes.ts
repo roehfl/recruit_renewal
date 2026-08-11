@@ -76,6 +76,7 @@ export const applicantRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/applicant/ApplicationFormView.vue'),
         meta: {
           public: true,
+          activeMenuPath: '/applicant/recruits',
         },
       },
       {
@@ -100,6 +101,7 @@ export const applicantRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/applicant/ApplicationDetailView.vue'),
         meta: {
           public: true,
+          activeMenuPath: '/applicant/recruits',
         },
       },
       {

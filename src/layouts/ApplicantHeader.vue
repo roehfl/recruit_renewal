@@ -62,12 +62,20 @@ const goNotice = () => {
   router.push('/applicant/notifications')
 }
 
-const isActiveMenu = (menu: MenuItem): boolean => {
-  if (menu.type !== 'ROUTE') {
-    return false
-  }
+/*
+ * 메뉴에 등록되지 않은 화면(공고 상세 등)은 route meta의 activeMenuPath로
+ * 어느 메뉴를 활성으로 표시할지 지정한다.
+ */
+const activeMenuPath = computed<string>(() => {
+  return route.meta.activeMenuPath ?? route.path
+})
 
-  return menuStore.isActiveMenu('APPLICANT', menu, route.path)
+/*
+ * 메뉴 자신의 type/path가 아니라 현재 경로의 메뉴 경로에 포함되는지로 판정한다.
+ * 대메뉴를 URL 타입이나 path 없는 그룹으로 등록해도 표시가 깨지지 않는다.
+ */
+const isActiveMenu = (menu: MenuItem): boolean => {
+  return menuStore.isActiveMenu('APPLICANT', menu, activeMenuPath.value)
 }
 
 const handleUserMenuClick = async ({ key }: { key: string }) => {

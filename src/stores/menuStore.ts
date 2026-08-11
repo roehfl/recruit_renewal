@@ -11,27 +11,64 @@ interface MenuState {
   errorMessageMap: Record<MenuSite, string | null>
 }
 
-const findTrailInTree = (
+interface MenuPathEntry {
+  path: string
+  trail: MenuItem[]
+}
+
+/*
+ * 현재 경로와 비교 가능한 메뉴만 (path, 대메뉴→소메뉴 경로) 형태로 펼친다.
+ * URL 타입은 path가 http(s) 절대주소라 라우터 경로와 비교 대상이 아니다.
+ */
+const collectRoutePathEntries = (
   menuTree: MenuItem[],
-  targetPath: string,
   parents: MenuItem[] = [],
-): MenuItem[] | null => {
+): MenuPathEntry[] => {
+  const entries: MenuPathEntry[] = []
+
   for (const menu of menuTree) {
     const currentTrail = [...parents, menu]
 
-    if (menu.type === 'ROUTE' && menu.path === targetPath) {
-      return currentTrail
+    if (menu.type === 'ROUTE' && menu.path) {
+      entries.push({ path: menu.path, trail: currentTrail })
     }
 
     if (menu.children && menu.children.length > 0) {
-      const found = findTrailInTree(menu.children, targetPath, currentTrail)
-
-      if (found) {
-        return found
-      }
+      entries.push(...collectRoutePathEntries(menu.children, currentTrail))
     }
   }
-  return null
+
+  return entries
+}
+
+/*
+ * 현재 경로에 해당하는 메뉴 경로(대메뉴 → 소메뉴)를 찾는다.
+ * 1) path가 완전히 같은 메뉴를 우선한다.
+ * 2) 없으면 현재 경로의 상위 경로를 가진 메뉴 중 가장 구체적인(path가 긴) 메뉴를 쓴다.
+ *    메뉴에 등록되지 않은 하위 화면에서도 상위 메뉴 표시를 유지하기 위한 fallback이다.
+ */
+const findTrailInTree = (menuTree: MenuItem[], targetPath: string): MenuItem[] | null => {
+  const entries = collectRoutePathEntries(menuTree)
+
+  const exactEntry = entries.find((entry) => entry.path === targetPath)
+
+  if (exactEntry) {
+    return exactEntry.trail
+  }
+
+  let ancestorEntry: MenuPathEntry | null = null
+
+  for (const entry of entries) {
+    if (!targetPath.startsWith(`${entry.path}/`)) {
+      continue
+    }
+
+    if (!ancestorEntry || entry.path.length > ancestorEntry.path.length) {
+      ancestorEntry = entry
+    }
+  }
+
+  return ancestorEntry ? ancestorEntry.trail : null
 }
 
 export const useMenuStore = defineStore('menu', {
@@ -71,6 +108,10 @@ export const useMenuStore = defineStore('menu', {
       }
     },
 
+    /*
+     * 대메뉴는 자기 path가 아니라 현재 경로의 메뉴 경로에 포함되는지로 판정된다.
+     * 따라서 path 없는 그룹 대메뉴도 하위 소메뉴가 활성이면 함께 활성 처리된다.
+     */
     isActiveMenu: (state) => {
       return (site: MenuSite, menu: MenuItem, currentPath: string): boolean => {
         const trail = findTrailInTree(state.menuTreeMap[site], currentPath) ?? []
