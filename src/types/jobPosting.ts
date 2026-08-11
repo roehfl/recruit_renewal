@@ -45,3 +45,18 @@ export interface MyJobPostingDetailListItem {
   endDate: string
   postingType: string
 }
+/*
+ * 관리자 공고 목록 항목(GET /admin/job-postings). 지원자 화면용 JobPostingListItem과 필드가 달라 분리한다.
+ * 백엔드 JobPostingListResponse의 필드 중 관리자 화면이 실제로 쓰는 것만 선언한다.
+ */
+export interface AdminJobPostingListItem {
+  id: number
+  title: string
+  postingType: string
+  status: 'DRAFT' | 'PUBLISHED' | 'CLOSED'
+  receptionStatus: 'UPCOMING' | 'ACCEPTING' | 'CLOSED'
+  accepting: boolean
+  receptionStartDateTime: string
+  receptionEndDateTime: string
+  positionCount: number
+}
