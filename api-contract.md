@@ -348,3 +348,30 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 
 - 보안: 두 경로 모두 `/api/admin/**` 매처 → `ROLE_ADMIN`/`ROLE_RECRUIT_ADMIN`. **SecurityConfig 변경 없음.** statistics는 집계값만 노출하므로 audit 미기록(기존 규칙).
 - 범위 밖: 시안 D(진행 상태·일정)·E(처리 대기)·F(지원자 구성) 위젯, 전사 통합 퍼널(공고 횡단), 경쟁률(`JobPosition`에 모집인원 필드 없음), 캐싱(실측 후 별도 슬라이스).
+
+### 화면: 관리자 공고 등록/수정 + 공고 이미지 (JobPostingImage)  🟡 초안 (2026-08-12)
+
+설계: `docs/superpowers/specs/2026-08-12-job-posting-image-input-design.md`. 공고 본문은 WYSIWYG 대신 이미지 목록. `contentHtml`은 공고에서 deprecated(필드 유지, 신규 화면 미사용). 발행 조건: 이미지 ≥1장 또는 (레거시) contentHtml 존재.
+
+#### POST `/admin/job-postings` (multipart 변형 추가) 🟡
+- 기존 JSON 생성은 유지(하위호환). `consumes=multipart/form-data` 변형 추가:
+  - part `request`(application/json): 기존 `JobPostingCreateRequest` 모양 (contentHtml은 이제 optional)
+  - part `imageMetas`(application/json, optional): `[{ altText, sortOrder }]`
+  - part `imageFiles`(file[], optional): imageMetas와 개수·순서 일치
+- 응답: `ApiResponse<Long>` (생성 id). 공고+이미지 단일 트랜잭션 생성(draft).
+
+#### 이미지 단위 API (관리자, 수정 화면 diff용) 🟡
+- POST `/admin/job-postings/{id}/images` (multipart: `file` + query `altText`, `sortOrder?`) → `ApiResponse<Long>` (imageId). sortOrder 생략 시 맨 뒤.
+- POST `/admin/job-postings/{id}/images/{imageId}` body `{ altText }` → altText 수정
+- POST `/admin/job-postings/{id}/images/{imageId}/delete` → 삭제(행+파일)
+- POST `/admin/job-postings/{id}/images/order` body `{ imageIds: [..] }` → 전체 순서 재지정(배열 index = sortOrder). imageIds는 해당 공고 이미지 전체와 정확히 일치해야 함.
+- GET `/admin/job-postings/{id}/images/{imageId}/file` → 바이너리(inline). draft 포함.
+
+#### 상세 응답 확장 🟡
+- `GET /admin/job-postings/{id}`, `GET /job-postings/{id}` 응답에 `images: [{ id, altText, sortOrder, contentType, fileSize }]` 추가(sortOrder 오름차순).
+
+#### GET `/job-postings/{id}/images/{imageId}/file` (공개) 🟡
+- **발행(PUBLISHED)+공개조건 충족 공고의 이미지만** 응답(공개 상세와 동일 조건). 아니면 404. permitAll 경로이므로 이 검사가 draft 유출 차단의 2차 방어선.
+
+#### 제한/검증 🟡
+- 형식 jpg/jpeg/png/webp (Content-Type + 매직바이트), 장당 10MB, 공고당 10장, altText 필수(≤200자). 설정 prefix `recruit.posting-image.*`. storage root는 첨부와 분리(`posting-images`).
