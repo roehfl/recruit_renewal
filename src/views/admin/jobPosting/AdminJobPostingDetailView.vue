@@ -5,6 +5,7 @@ import { Modal, message } from 'ant-design-vue'
 import { adminJobPostingApi } from '@/api/adminJobPostingApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import JobPostingImageStack from '@/components/jobPosting/JobPostingImageStack.vue'
+import HtmlView from '@/views/common/htmlView.vue'
 import type { AdminJobPostingDetail } from '@/types/jobPosting'
 
 const route = useRoute()
@@ -135,6 +136,7 @@ onMounted(loadDetail)
 
         <a-card title="본문 미리보기 (지원자 화면과 동일)" :bordered="false" class="preview-card">
           <JobPostingImageStack v-if="detail.images.length > 0" :images="detail.images" :fetch-image="fetchImage" />
+          <HtmlView v-else-if="detail.contentHtml" :content="detail.contentHtml" />
           <p v-else class="state-message">
             등록된 이미지가 없습니다. 발행하려면 이미지를 최소 1장 등록해 주세요.
           </p>

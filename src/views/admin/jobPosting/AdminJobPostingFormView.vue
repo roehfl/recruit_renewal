@@ -128,9 +128,8 @@ const removeImage = (index: number) => {
   if (!removed) return
   if (removed.id !== null) {
     removedImageIds.value.push(removed.id)
-  } else {
-    URL.revokeObjectURL(removed.previewUrl)
   }
+  URL.revokeObjectURL(removed.previewUrl)
 }
 
 const moveImage = (index: number, delta: number) => {
@@ -209,9 +208,11 @@ const save = async () => {
 
     const id = editingId.value!
     await adminJobPostingApi.updateJobPosting(id, { ...buildSaveRequest(), contentHtml: contentHtmlLegacy.value })
-    // 이미지 diff: 삭제 → 추가(id 확보) → altText 변경 → 전체 순서 재지정
-    for (const removedId of removedImageIds.value) {
+    // 이미지 diff: 삭제 → 추가(id 확보) → altText 변경 → 전체 순서 재지정.
+    // 성공한 삭제는 목록에서 즉시 제거해 중간 실패 후 재시도가 404로 막히지 않게 한다.
+    for (const removedId of [...removedImageIds.value]) {
       await adminJobPostingApi.deleteImage(id, removedId)
+      removedImageIds.value = removedImageIds.value.filter((value) => value !== removedId)
     }
     for (const image of images.value) {
       if (image.id === null) {
