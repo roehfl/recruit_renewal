@@ -66,7 +66,11 @@ public class JobPostingService {
 
     public JobPostingDetailResponse getJobPosting(Long id) {
         JobPosting jobPosting = findJobPostingDetail(id);
-        return JobPostingDetailResponse.from(jobPosting, LocalDateTime.now(clock));
+        return JobPostingDetailResponse.from(
+                jobPosting,
+                LocalDateTime.now(clock),
+                jobPostingImageService.getImages(id)
+        );
     }
 
     @Transactional

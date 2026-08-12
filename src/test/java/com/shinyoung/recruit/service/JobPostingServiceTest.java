@@ -664,6 +664,20 @@ class JobPostingServiceTest {
     }
 
     @Test
+    void 상세조회에_이미지_목록이_정렬순으로_포함된다() {
+        Long id = jobPostingService.create(createRequest());
+        jobPostingImageService.addImage(id,
+                new org.springframework.mock.web.MockMultipartFile("file", "b.png", "image/png", PNG_HEAD), "포스터 2", 1);
+        jobPostingImageService.addImage(id,
+                new org.springframework.mock.web.MockMultipartFile("file", "a.png", "image/png", PNG_HEAD), "포스터 1", 0);
+
+        JobPostingDetailResponse detail = jobPostingService.getJobPosting(id);
+
+        assertThat(detail.images()).hasSize(2);
+        assertThat(detail.images().get(0).altText()).isEqualTo("포스터 1");
+    }
+
+    @Test
     void 이미지가_있으면_contentHtml_없이_발행된다() {
         JobPostingCreateRequest request = new JobPostingCreateRequest(
                 "이미지 공고",

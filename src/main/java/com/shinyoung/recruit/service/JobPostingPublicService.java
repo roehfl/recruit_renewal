@@ -37,6 +37,7 @@ public class JobPostingPublicService {
     private final JobPositionRepository jobPositionRepository;
     private final JobPostingQuestionRepository jobPostingQuestionRepository;
     private final JobPostingAttachmentRequirementRepository attachmentRequirementRepository;
+    private final JobPostingImageService jobPostingImageService;
     private final Clock clock;
 
     public PageResponse<JobPostingPublicListResponse> getJobPostings(int page, int size) {
@@ -78,7 +79,8 @@ public class JobPostingPublicService {
                 now,
                 getQuestionPolicyCount(id),
                 getAttachmentPolicyCount(id),
-                attachmentRequirements
+                attachmentRequirements,
+                jobPostingImageService.getImages(id)
         );
     }
 

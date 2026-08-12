@@ -25,14 +25,16 @@ public record JobPostingPublicDetailResponse(
         List<JobPositionPublicResponse> jobPositions,
         ApplicationFormConfigPublicResponse applicationFormConfig,
         ApplicationFormRequiredPolicyResponse applicationFormRequiredPolicy,
-        List<AttachmentRequirementPublicResponse> attachmentRequirements
+        List<AttachmentRequirementPublicResponse> attachmentRequirements,
+        List<JobPostingImageResponse> images
 ) {
     public static JobPostingPublicDetailResponse from(
             JobPosting jobPosting,
             LocalDateTime now,
             JobPostingQuestionPolicyCount questionPolicyCount,
             JobPostingAttachmentRequirementPolicyCount attachmentPolicyCount,
-            List<JobPostingAttachmentRequirement> attachmentRequirements
+            List<JobPostingAttachmentRequirement> attachmentRequirements,
+            List<JobPostingImageResponse> images
     ) {
         ReceptionStatus receptionStatus = ReceptionStatus.from(
                 jobPosting.getReceptionStartDateTime(),
@@ -65,7 +67,8 @@ public record JobPostingPublicDetailResponse(
                 ),
                 attachmentRequirements.stream()
                         .map(AttachmentRequirementPublicResponse::from)
-                        .toList()
+                        .toList(),
+                images
         );
     }
 }

@@ -40,7 +40,10 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
+@SpringBootTest(properties = {
+        "crypto.aes.key=22791194512954214612461221261067",
+        "recruit.posting-image.storage-root=build/test-posting-images"
+})
 @Transactional
 class JobPostingPublicServiceTest {
 
@@ -49,11 +52,16 @@ class JobPostingPublicServiceTest {
             ZoneId.of("UTC")
     );
 
+    private static final byte[] PNG_HEAD = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0};
+
     @Autowired
     private JobPostingService jobPostingService;
 
     @Autowired
     private JobPostingPublicService jobPostingPublicService;
+
+    @Autowired
+    private JobPostingImageService jobPostingImageService;
 
     @Autowired
     private JobPostingQuestionService jobPostingQuestionService;
@@ -528,6 +536,26 @@ class JobPostingPublicServiceTest {
         assertThat(response.applicationFormConfig().requireEducation()).isTrue();
         assertThat(response.applicationFormConfig().useAward()).isTrue();
         assertThat(response.applicationFormConfig().requireAward()).isFalse();
+    }
+
+    @Test
+    void 공개_상세조회에_이미지_목록이_포함된다() {
+        Long id = createPublishedPosting(request(
+                "이미지 공개 상세",
+                false,
+                receptionStart(),
+                receptionEnd(),
+                displayStart(),
+                displayEnd(),
+                true
+        ));
+        jobPostingImageService.addImage(id,
+                new org.springframework.mock.web.MockMultipartFile("file", "a.png", "image/png", PNG_HEAD), "채용 포스터", 0);
+
+        JobPostingPublicDetailResponse detail = jobPostingPublicService.getJobPosting(id);
+
+        assertThat(detail.images()).hasSize(1);
+        assertThat(detail.images().get(0).altText()).isEqualTo("채용 포스터");
     }
 
     @Test

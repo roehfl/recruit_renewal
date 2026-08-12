@@ -31,9 +31,18 @@ public record JobPostingDetailResponse(
         LocalDateTime updatedAt,
         int positionCount,
         List<JobPositionResponse> jobPositions,
-        ApplicationFormConfigResponse applicationFormConfig
+        ApplicationFormConfigResponse applicationFormConfig,
+        List<JobPostingImageResponse> images
 ) {
     public static JobPostingDetailResponse from(JobPosting jobPosting, LocalDateTime now) {
+        return from(jobPosting, now, List.of());
+    }
+
+    public static JobPostingDetailResponse from(
+            JobPosting jobPosting,
+            LocalDateTime now,
+            List<JobPostingImageResponse> images
+    ) {
         ReceptionStatus receptionStatus = ReceptionStatus.from(
                 jobPosting.getReceptionStartDateTime(),
                 jobPosting.getReceptionEndDateTime(),
@@ -64,7 +73,8 @@ public record JobPostingDetailResponse(
                         .sorted(Comparator.comparing(it -> it.getSortOrder()))
                         .map(JobPositionResponse::from)
                         .toList(),
-                ApplicationFormConfigResponse.from(jobPosting.getApplicationFormConfig())
+                ApplicationFormConfigResponse.from(jobPosting.getApplicationFormConfig()),
+                images
         );
     }
 }
