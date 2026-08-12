@@ -33,7 +33,10 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
+@SpringBootTest(properties = {
+        "crypto.aes.key=22791194512954214612461221261067",
+        "recruit.posting-image.storage-root=build/test-posting-images"
+})
 @Transactional
 class JobPostingServiceTest {
 
@@ -42,11 +45,16 @@ class JobPostingServiceTest {
             ZoneId.of("UTC")
     );
 
+    private static final byte[] PNG_HEAD = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0};
+
     @Autowired
     private JobPostingService jobPostingService;
 
     @Autowired
     private ApplicationFormLayoutService applicationFormLayoutService;
+
+    @Autowired
+    private JobPostingImageService jobPostingImageService;
 
     @Test
     void JobPosting_생성_성공() {
@@ -614,6 +622,71 @@ class JobPostingServiceTest {
         jobPostingService.publish(id);
 
         assertThat(jobPostingService.getJobPosting(id).status()).isEqualTo(JobPostingStatus.PUBLISHED);
+    }
+
+    @Test
+    void contentHtml_없이_공고를_생성할_수_있다() {
+        JobPostingCreateRequest request = new JobPostingCreateRequest(
+                "이미지 공고",
+                null,
+                null,
+                null,   // contentHtml 없음
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 30, 18, 0),
+                null, null, null, null, null,
+                List.of(new JobPositionRequest("백엔드", 0)),
+                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+        );
+
+        Long id = jobPostingService.create(request);
+
+        assertThat(jobPostingService.getJobPosting(id).contentHtml()).isNull();
+    }
+
+    @Test
+    void 이미지와_contentHtml_모두_없으면_발행할_수_없다() {
+        JobPostingCreateRequest request = new JobPostingCreateRequest(
+                "이미지 공고",
+                null,
+                null,
+                null,
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 30, 18, 0),
+                null, null, null, null, null,
+                List.of(new JobPositionRequest("백엔드", 0)),
+                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+        );
+        Long id = jobPostingService.create(request);
+
+        assertThatThrownBy(() -> jobPostingService.publish(id))
+                .isInstanceOf(InvalidJobPostingException.class)
+                .hasMessageContaining("이미지");
+    }
+
+    @Test
+    void 이미지가_있으면_contentHtml_없이_발행된다() {
+        JobPostingCreateRequest request = new JobPostingCreateRequest(
+                "이미지 공고",
+                null,
+                null,
+                null,
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 30, 18, 0),
+                null, null, null, null, null,
+                List.of(new JobPositionRequest("백엔드", 0)),
+                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+        );
+        Long id = jobPostingService.create(request);
+        jobPostingImageService.addImage(
+                id,
+                new org.springframework.mock.web.MockMultipartFile("file", "a.png", "image/png", PNG_HEAD),
+                "채용 포스터",
+                0
+        );
+
+        Long published = jobPostingService.publish(id);
+
+        assertThat(published).isEqualTo(id);
     }
 
     private JobPostingCreateRequest createRequest() {

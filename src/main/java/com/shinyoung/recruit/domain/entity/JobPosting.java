@@ -31,7 +31,7 @@ public class JobPosting extends BaseEntity {
     private String summary;
 
     @Lob
-    @Column(nullable = false, columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "LONGTEXT")
     private String contentHtml;
 
     @Column(nullable = false)

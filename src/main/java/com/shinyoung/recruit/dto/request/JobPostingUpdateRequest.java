@@ -15,7 +15,7 @@ public record JobPostingUpdateRequest(
         @NotBlank String title,
         JobPostingType postingType,
         @Size(max = 500) String summary,
-        @NotBlank String contentHtml,
+        String contentHtml,
         @NotNull LocalDateTime receptionStartDateTime,
         @NotNull LocalDateTime receptionEndDateTime,
         LocalDateTime displayStartDateTime,

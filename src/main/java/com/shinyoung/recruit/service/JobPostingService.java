@@ -9,6 +9,7 @@ import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
+import com.shinyoung.recruit.dto.request.JobPostingImageMetaRequest;
 import com.shinyoung.recruit.dto.request.JobPostingUpdateRequest;
 import com.shinyoung.recruit.dto.response.JobPostingDetailResponse;
 import com.shinyoung.recruit.dto.response.JobPostingListResponse;
@@ -25,6 +26,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -47,6 +49,7 @@ public class JobPostingService {
     private final JobPostingRepository jobPostingRepository;
     private final JobPositionRepository jobPositionRepository;
     private final ApplicationFormLayoutService applicationFormLayoutService;
+    private final JobPostingImageService jobPostingImageService;
     private final Clock clock;
 
     public PageResponse<JobPostingListResponse> getJobPostings(int page, int size) {
@@ -89,6 +92,17 @@ public class JobPostingService {
 
         JobPosting saved = jobPostingRepository.save(jobPosting);
         return saved.getId();
+    }
+
+    @Transactional
+    public Long create(
+            JobPostingCreateRequest request,
+            List<JobPostingImageMetaRequest> imageMetas,
+            List<MultipartFile> imageFiles
+    ) {
+        Long id = create(request);
+        jobPostingImageService.createImages(id, imageMetas, imageFiles);
+        return id;
     }
 
     @Transactional
@@ -135,6 +149,7 @@ public class JobPostingService {
         validateReceptionPeriod(jobPosting.getReceptionStartDateTime(), jobPosting.getReceptionEndDateTime());
         validateJobPositions(jobPosting.getJobPositions());
         validateLayoutForPublish(jobPosting);
+        validateContentForPublish(jobPosting);
 
         jobPosting.publish(LocalDateTime.now(clock));
         return jobPosting.getId();
@@ -157,6 +172,15 @@ public class JobPostingService {
             applicationFormLayoutService.validateLayoutForPublish(jobPosting);
         } catch (InvalidApplicationFormLayoutException e) {
             throw new InvalidJobPostingException("레이아웃 검증 실패: " + e.getMessage());
+        }
+    }
+
+    /** 발행 조건: 이미지 ≥1장 또는 (레거시 데이터 호환) contentHtml 존재. */
+    private void validateContentForPublish(JobPosting jobPosting) {
+        boolean hasImages = jobPostingImageService.countImages(jobPosting.getId()) > 0;
+        boolean hasLegacyContent = jobPosting.getContentHtml() != null && !jobPosting.getContentHtml().isBlank();
+        if (!hasImages && !hasLegacyContent) {
+            throw new InvalidJobPostingException("공고 본문 이미지가 최소 1장 필요합니다.");
         }
     }
 
@@ -234,9 +258,6 @@ public class JobPostingService {
     ) {
         if (title == null || title.isBlank()) {
             throw new InvalidJobPostingException("공고 제목은 필수입니다.");
-        }
-        if (contentHtml == null || contentHtml.isBlank()) {
-            throw new InvalidJobPostingException("공고 내용은 필수입니다.");
         }
         validateSummary(summary);
         validateDisplayOrder(displayOrder);
