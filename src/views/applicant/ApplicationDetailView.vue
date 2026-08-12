@@ -11,6 +11,8 @@ import type { ApiResponse } from '@/types/api'
 import type { MyJobPostingListItem, MyJobPostingDetailListItem } from '@/types/jobPosting'
 import { boardApi } from '@/api/boardApi'
 import HtmlView from '@/views/common/htmlView.vue'
+import JobPostingImageStack from '@/components/jobPosting/JobPostingImageStack.vue'
+import type { JobPostingImage } from '@/types/jobPosting'
 
 
 const route = useRoute();
@@ -23,6 +25,11 @@ const submitting = ref(false)
 const jobPostDetail = ref();
 // 공고 HTML
 const jobPostContentHtml = ref();
+// 공고 이미지 목록
+const jobPostImages = ref<JobPostingImage[]>([])
+
+const fetchPostingImage = (imageId: number) =>
+  boardApi.fetchJobPostingImageBlob(Number(route.params.jobPostingId), imageId).then((res) => res.data)
 
 // const jobPostingId = computed<number | null>(() => {
 //   const raw = route.params.jobPostingId //?? route.query.jobPostingId
@@ -38,6 +45,7 @@ async function loadJobPostingDetail() {
     const result = await boardApi.fetchJobPostingDetail(Number(route.params.jobPostingId))
 
     jobPostContentHtml.value = result.data.data.contentHtml;
+    jobPostImages.value = result.data.data.images ?? []
     jobPostDetail.value = result.data.data;
 
   } finally {
@@ -255,7 +263,13 @@ onMounted(async () => {
       </a-card>
 
       <a-spin :spinning="loading">
-        <template v-if="jobPostContentHtml">
+        <template v-if="jobPostImages.length > 0">
+          <a-card class="form-content-card" :bordered="false">
+            <JobPostingImageStack :images="jobPostImages" :fetch-image="fetchPostingImage" />
+          </a-card>
+        </template>
+
+        <template v-else-if="jobPostContentHtml">
           <a-card class="form-content-card" :bordered="false">
             <HtmlView :content="jobPostContentHtml" />
             <!-- <div v-html="jobPostContentHtml"></div> -->
