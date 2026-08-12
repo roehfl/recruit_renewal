@@ -1,6 +1,7 @@
 package com.shinyoung.recruit.controller;
 
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
+import com.shinyoung.recruit.dto.request.JobPostingImageMetaRequest;
 import com.shinyoung.recruit.dto.request.JobPostingUpdateRequest;
 import com.shinyoung.recruit.dto.response.ApiResponse;
 import com.shinyoung.recruit.dto.response.JobPostingDetailResponse;
@@ -9,8 +10,12 @@ import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.service.JobPostingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -35,6 +40,15 @@ public class JobPostingController {
     @PostMapping
     public ResponseEntity<ApiResponse<Long>> create(@Valid @RequestBody JobPostingCreateRequest request) {
         return ResponseEntity.ok(ApiResponse.success(jobPostingService.create(request)));
+    }
+
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<Long>> createWithImages(
+            @Valid @RequestPart("request") JobPostingCreateRequest request,
+            @RequestPart(value = "imageMetas", required = false) List<JobPostingImageMetaRequest> imageMetas,
+            @RequestPart(value = "imageFiles", required = false) List<MultipartFile> imageFiles
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(jobPostingService.create(request, imageMetas, imageFiles)));
     }
 
     @PostMapping("/{id}")
