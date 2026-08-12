@@ -32,4 +32,8 @@ export const boardApi = {
   fetchJobPostingDetail(id: number) {
     return apiClient.get<ApiResponse<JobPostingDetail>>(`/job-postings/${id}`)
   },
+
+  fetchJobPostingImageBlob(jobPostingId: number, imageId: number) {
+    return apiClient.get<Blob>(`/job-postings/${jobPostingId}/images/${imageId}/file`, { responseType: 'blob' })
+  },
 }
