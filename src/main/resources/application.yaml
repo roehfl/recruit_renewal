@@ -85,6 +85,12 @@ recruit:
     max-total-size-per-application: ${RECRUIT_ATTACHMENT_MAX_TOTAL_SIZE_PER_APPLICATION:100MB}
     allowed-extensions: ${RECRUIT_ATTACHMENT_ALLOWED_EXTENSIONS:pdf,jpg,jpeg,png,doc,docx,xls,xlsx,hwp,hwpx}
     allowed-content-types: ${RECRUIT_ATTACHMENT_ALLOWED_CONTENT_TYPES:application/pdf,image/jpeg,image/png,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/x-hwp,application/haansofthwp,application/vnd.hancom.hwpx}
+  posting-image:
+    storage-root: ${RECRUIT_POSTING_IMAGE_STORAGE_ROOT:posting-images}
+    max-file-size: ${RECRUIT_POSTING_IMAGE_MAX_FILE_SIZE:10MB}
+    max-images-per-posting: ${RECRUIT_POSTING_IMAGE_MAX_IMAGES_PER_POSTING:10}
+    allowed-extensions: ${RECRUIT_POSTING_IMAGE_ALLOWED_EXTENSIONS:jpg,jpeg,png,webp}
+    allowed-content-types: ${RECRUIT_POSTING_IMAGE_ALLOWED_CONTENT_TYPES:image/jpeg,image/png,image/webp}
 client-event-log:
   # 지원자 화면 진단 로그(Phase 09f). 감사 로그(activity_log)와 분리된 단기 운영 데이터.
   enabled: ${CLIENT_EVENT_LOG_ENABLED:true}
