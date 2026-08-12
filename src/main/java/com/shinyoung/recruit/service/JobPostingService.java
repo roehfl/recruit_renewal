@@ -224,7 +224,6 @@ public class JobPostingService {
     private void validateRequest(JobPostingCreateRequest request) {
         validateRequest(
                 request.title(),
-                request.contentHtml(),
                 request.summary(),
                 request.receptionStartDateTime(),
                 request.receptionEndDateTime(),
@@ -238,7 +237,6 @@ public class JobPostingService {
     private void validateRequest(JobPostingUpdateRequest request) {
         validateRequest(
                 request.title(),
-                request.contentHtml(),
                 request.summary(),
                 request.receptionStartDateTime(),
                 request.receptionEndDateTime(),
@@ -251,7 +249,6 @@ public class JobPostingService {
 
     private void validateRequest(
             String title,
-            String contentHtml,
             String summary,
             LocalDateTime receptionStart,
             LocalDateTime receptionEnd,

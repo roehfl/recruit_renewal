@@ -141,11 +141,12 @@ public class JobPostingImageService {
     private Long saveImage(JobPosting jobPosting, MultipartFile file, String altText, Integer sortOrder) {
         String extension = extractExtension(file.getOriginalFilename());
         StoredPostingImageFile stored = storageService.store(jobPosting.getId(), file, extension);
+        // 저장 contentType은 정규화된 값으로 고정한다(image/jpg 원본값이 서빙 헤더로 새지 않게).
         JobPostingImage image = JobPostingImage.create(
                 jobPosting,
                 sanitizeFileName(file.getOriginalFilename()),
                 stored.storagePath(),
-                stored.contentType(),
+                normalizeContentType(file.getContentType()),
                 stored.fileSize(),
                 sortOrder,
                 altText.trim()

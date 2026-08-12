@@ -90,7 +90,7 @@ public class JobPosting extends BaseEntity {
         this.title = title;
         this.postingType = defaultPostingType(postingType);
         this.summary = summary;
-        this.contentHtml = contentHtml;
+        this.contentHtml = defaultContentHtml(contentHtml);
         this.receptionStartDateTime = receptionStartDateTime;
         this.receptionEndDateTime = receptionEndDateTime;
         this.status = JobPostingStatus.DRAFT;
@@ -177,7 +177,7 @@ public class JobPosting extends BaseEntity {
         this.title = title;
         this.postingType = defaultPostingType(postingType);
         this.summary = summary;
-        this.contentHtml = contentHtml;
+        this.contentHtml = defaultContentHtml(contentHtml);
         this.receptionStartDateTime = receptionStartDateTime;
         this.receptionEndDateTime = receptionEndDateTime;
         this.displayStartDateTime = displayStartDateTime;
@@ -237,6 +237,14 @@ public class JobPosting extends BaseEntity {
 
     private static JobPostingType defaultPostingType(JobPostingType postingType) {
         return postingType == null ? JobPostingType.PUBLIC_RECRUITMENT : postingType;
+    }
+
+    /**
+     * contentHtml은 이미지 본문 도입으로 deprecated지만, ddl-auto:update는 기존 스키마의
+     * NOT NULL을 완화하지 못하므로 null 입력을 빈 문자열로 흡수해 마이그레이션 없이 안전하게 저장한다.
+     */
+    private static String defaultContentHtml(String contentHtml) {
+        return contentHtml == null ? "" : contentHtml;
     }
 
     private static Integer defaultDisplayOrder(Integer displayOrder) {

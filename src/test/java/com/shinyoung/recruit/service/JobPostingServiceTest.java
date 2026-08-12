@@ -640,7 +640,8 @@ class JobPostingServiceTest {
 
         Long id = jobPostingService.create(request);
 
-        assertThat(jobPostingService.getJobPosting(id).contentHtml()).isNull();
+        // null 입력은 빈 문자열로 저장된다(기존 스키마 NOT NULL과의 호환 — JobPosting.defaultContentHtml).
+        assertThat(jobPostingService.getJobPosting(id).contentHtml()).isEmpty();
     }
 
     @Test

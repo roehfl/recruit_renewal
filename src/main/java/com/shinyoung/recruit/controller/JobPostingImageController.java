@@ -72,6 +72,7 @@ public class JobPostingImageController {
                 .contentType(MediaType.parseMediaType(image.contentType()))
                 .contentLength(image.contentLength())
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                .header("X-Content-Type-Options", "nosniff")
                 .body(image.resource());
     }
 }
