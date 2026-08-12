@@ -24,6 +24,26 @@ export const adminRoutes: RouteRecordRaw[] = [
         name: 'AdminMenuManage',
         component: () => import('@/views/admin/MenuManageView.vue'),
       },
+      {
+        path: 'job-postings',
+        name: 'AdminJobPostingList',
+        component: () => import('@/views/admin/jobPosting/AdminJobPostingListView.vue'),
+      },
+      {
+        path: 'job-postings/new',
+        name: 'AdminJobPostingCreate',
+        component: () => import('@/views/admin/jobPosting/AdminJobPostingFormView.vue'),
+      },
+      {
+        path: 'job-postings/:id',
+        name: 'AdminJobPostingDetail',
+        component: () => import('@/views/admin/jobPosting/AdminJobPostingDetailView.vue'),
+      },
+      {
+        path: 'job-postings/:id/edit',
+        name: 'AdminJobPostingEdit',
+        component: () => import('@/views/admin/jobPosting/AdminJobPostingFormView.vue'),
+      },
     ],
   },
 ]
