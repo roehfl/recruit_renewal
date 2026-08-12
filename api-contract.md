@@ -349,29 +349,38 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 보안: 두 경로 모두 `/api/admin/**` 매처 → `ROLE_ADMIN`/`ROLE_RECRUIT_ADMIN`. **SecurityConfig 변경 없음.** statistics는 집계값만 노출하므로 audit 미기록(기존 규칙).
 - 범위 밖: 시안 D(진행 상태·일정)·E(처리 대기)·F(지원자 구성) 위젯, 전사 통합 퍼널(공고 횡단), 경쟁률(`JobPosition`에 모집인원 필드 없음), 캐싱(실측 후 별도 슬라이스).
 
-### 화면: 관리자 공고 등록/수정 + 공고 이미지 (JobPostingImage)  🟡 초안 (2026-08-12)
+### 화면: 관리자 공고 등록/수정 + 공고 이미지 (JobPostingImage)  🟢 확정 (2026-08-12, front-back 반영 완료)
 
-설계: `docs/superpowers/specs/2026-08-12-job-posting-image-input-design.md`. 공고 본문은 WYSIWYG 대신 이미지 목록. `contentHtml`은 공고에서 deprecated(필드 유지, 신규 화면 미사용). 발행 조건: 이미지 ≥1장 또는 (레거시) contentHtml 존재.
+설계: `docs/superpowers/specs/2026-08-12-job-posting-image-input-design.md`. 공고 본문은 WYSIWYG 대신 이미지 목록. `contentHtml`은 공고에서 deprecated — 엔티티 컬럼 nullable로 완화, 생성/수정 요청(`JobPostingCreateRequest`/`JobPostingUpdateRequest`)에서 optional, 신규 화면은 읽고 쓰지 않음(공지사항 Notice는 무관). **발행 조건: 이미지 ≥1장 또는 (레거시) contentHtml 존재** — 위반 시 400 "공고 본문 이미지가 최소 1장 필요합니다."
 
-#### POST `/admin/job-postings` (multipart 변형 추가) 🟡
+- 백엔드: `JobPostingImage` 엔티티(+`JobPostingImageRepository`), `JobPostingImageService`, `JobPostingImageStorageService`(전용 root, 첨부 헬스스캔과 분리), `ImageSignatureValidator`, `JobPostingImageController`.
+- 프론트: `src/views/admin/jobPosting/`(List/Form/Detail 3종), `src/components/jobPosting/JobPostingImageStack.vue`(지원자 상세·관리자 미리보기 공용), `src/api/adminJobPostingApi.ts`·`boardApi.ts` 확장, 라우트 `/admin/job-postings`, `/new`, `/:id`, `/:id/edit`. 이미지는 `<img src>` 직접 참조 대신 **blob 응답 + objectURL**(세션 쿠키 이슈 회피).
+
+#### POST `/admin/job-postings` (multipart 변형 추가) 🟢
 - 기존 JSON 생성은 유지(하위호환). `consumes=multipart/form-data` 변형 추가:
-  - part `request`(application/json): 기존 `JobPostingCreateRequest` 모양 (contentHtml은 이제 optional)
+  - part `request`(application/json): 기존 `JobPostingCreateRequest` 모양 (contentHtml optional)
   - part `imageMetas`(application/json, optional): `[{ altText, sortOrder }]`
-  - part `imageFiles`(file[], optional): imageMetas와 개수·순서 일치
-- 응답: `ApiResponse<Long>` (생성 id). 공고+이미지 단일 트랜잭션 생성(draft).
+  - part `imageFiles`(file[], optional): imageMetas와 개수·순서(index 짝) 일치 — 불일치 시 400
+- 응답: `ApiResponse<Long>` (생성 id). 공고+이미지 단일 트랜잭션 생성(draft). 파일은 전체 선검증 후 저장.
 
-#### 이미지 단위 API (관리자, 수정 화면 diff용) 🟡
-- POST `/admin/job-postings/{id}/images` (multipart: `file` + query `altText`, `sortOrder?`) → `ApiResponse<Long>` (imageId). sortOrder 생략 시 맨 뒤.
+#### 이미지 단위 API (관리자, 수정 화면 diff용) 🟢
+- POST `/admin/job-postings/{id}/images` (multipart part `file` + query `altText`, `sortOrder?`) → `ApiResponse<Long>` (imageId). sortOrder 생략 시 맨 뒤(+1). 마감(CLOSED) 공고는 400.
 - POST `/admin/job-postings/{id}/images/{imageId}` body `{ altText }` → altText 수정
-- POST `/admin/job-postings/{id}/images/{imageId}/delete` → 삭제(행+파일)
-- POST `/admin/job-postings/{id}/images/order` body `{ imageIds: [..] }` → 전체 순서 재지정(배열 index = sortOrder). imageIds는 해당 공고 이미지 전체와 정확히 일치해야 함.
-- GET `/admin/job-postings/{id}/images/{imageId}/file` → 바이너리(inline). draft 포함.
+- POST `/admin/job-postings/{id}/images/{imageId}/delete` → 삭제(행 삭제 + 파일 best-effort 삭제)
+- POST `/admin/job-postings/{id}/images/order` body `{ imageIds: [..] }` → 전체 순서 재지정(배열 index = sortOrder). imageIds가 해당 공고 이미지 전체와 정확히 일치하지 않으면 400.
+- GET `/admin/job-postings/{id}/images/{imageId}/file` → 바이너리(Content-Disposition inline). draft 포함.
+- 수정 화면 diff 적용 순서(프론트): 삭제 → 신규 추가(imageId 확보) → altText 변경 → 전체 order 재지정.
 
-#### 상세 응답 확장 🟡
-- `GET /admin/job-postings/{id}`, `GET /job-postings/{id}` 응답에 `images: [{ id, altText, sortOrder, contentType, fileSize }]` 추가(sortOrder 오름차순).
+#### 상세 응답 확장 🟢
+- `GET /admin/job-postings/{id}`(`JobPostingDetailResponse`), `GET /job-postings/{id}`(`JobPostingPublicDetailResponse`) 응답에 `images: [{ id, altText, sortOrder, contentType, fileSize }]` 추가(sortOrder asc, id asc). `storagePath`는 노출하지 않음(첨부 규약과 동일).
 
-#### GET `/job-postings/{id}/images/{imageId}/file` (공개) 🟡
-- **발행(PUBLISHED)+공개조건 충족 공고의 이미지만** 응답(공개 상세와 동일 조건). 아니면 404. permitAll 경로이므로 이 검사가 draft 유출 차단의 2차 방어선.
+#### GET `/job-postings/{id}/images/{imageId}/file` (공개) 🟢
+- **발행(PUBLISHED)+공개조건 충족 공고의 이미지만** 응답(공개 상세와 동일 조건 — `findPublicDetailById`). 아니면 404. permitAll 경로이므로 이 검사가 draft 유출 차단의 2차 방어선(MockMvc 테스트로 draft 404 검증 완료).
 
-#### 제한/검증 🟡
-- 형식 jpg/jpeg/png/webp (Content-Type + 매직바이트), 장당 10MB, 공고당 10장, altText 필수(≤200자). 설정 prefix `recruit.posting-image.*`. storage root는 첨부와 분리(`posting-images`).
+#### 제한/검증 🟢
+- 형식 jpg/jpeg/png/webp — Content-Type 허용목록(`image/jpg`→`image/jpeg` 정규화) + 확장자 허용목록 + **매직바이트**(앞 12바이트) 삼중 검증. 장당 10MB, 공고당 10장, altText 필수(trim, ≤200자). 위반은 모두 400(`InvalidJobPostingException`).
+- 설정 prefix `recruit.posting-image.*`(storage-root 기본 `posting-images` — 첨부 storage와 반드시 분리). multipart 전역 한도(25MB/105MB)는 기존 설정으로 충분.
+- ⚠️ 기존 컨트롤러 테스트 6건이 Boot 4(Jackson 3)의 null→primitive 거부로 **본 슬라이스와 무관하게 깨져 있었음** — 픽스처에 `useAttachment` 필드를 보강해 수리(백엔드 커밋 `2e683ea`). JSON으로 공고를 생성하는 클라이언트는 `applicationFormConfig`의 8개 boolean(useAttachment 포함)을 모두 보내야 한다.
+
+#### 운영 작업 (코드 아님)
+- 메뉴 등록: 메뉴 관리 화면(`/admin/menus`)에서 대메뉴 "공고 관리"(path 없는 그룹 라벨) + 소메뉴 "공고 목록"(`/admin/job-postings`), "공고 등록"(`/admin/job-postings/new`) 등록. 아이콘은 `ADMIN_MENU_ICONS`에서 선택.

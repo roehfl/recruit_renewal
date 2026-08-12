@@ -28,9 +28,9 @@
 5. **테스트**: `@SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")` + `@Transactional` 관례. MockMvc는 `@AutoConfigureMockMvc`(import는 `org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc` — Boot 4 경로) + `spring-security-test`의 `user(...).authorities(...)`. CSRF는 disable 상태.
 6. **기존 예외 매핑 재사용**: 검증 실패 = `InvalidJobPostingException`(→400), 미존재 = `JobPostingNotFoundException`(→404). 새 예외 클래스/핸들러 등록 금지.
 7. **프론트 관례**: `apiClient`(axios, `withCredentials: true`, timeout 10초 — 업로드는 호출별 override), FormData에 Content-Type 수동 지정 금지, 인증 파일은 blob 응답 + `URL.createObjectURL` 패턴(`BasicInfoSection.vue` 참조). 관리자 공고 화면·라우트는 **현재 존재하지 않음**(모두 신규).
-8. **백엔드 테스트 실행**(PowerShell, `recruit_back/recruit_backend/`에서):
+8. **백엔드 테스트 실행**(PowerShell, `recruit_back/recruit_backend/`에서 — CLAUDE.md §5 "변경 범위만": 패키지 와일드카드 금지, 변경 도메인 클래스만 지정):
    ```powershell
-   $env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "com.shinyoung.recruit.service.*" --tests "com.shinyoung.recruit.controller.*" --no-daemon
+   $env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "com.shinyoung.recruit.service.JobPosting*" --tests "com.shinyoung.recruit.service.ImageSignatureValidatorTest" --tests "com.shinyoung.recruit.controller.JobPosting*" --no-daemon
    ```
 
 ## 파일 구조 맵
@@ -1730,12 +1730,12 @@ public class JobPostingImageController {
 
 - [ ] **Step 4: 테스트 통과 확인** (Step 2 명령, PASS 7 tests)
 
-- [ ] **Step 5: 백엔드 변경 패키지 전체 테스트**
+- [ ] **Step 5: 변경 범위(JobPosting 도메인) 테스트**
 
 ```powershell
-$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "com.shinyoung.recruit.service.*" --tests "com.shinyoung.recruit.controller.*" --no-daemon
+$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "com.shinyoung.recruit.service.JobPosting*" --tests "com.shinyoung.recruit.service.ImageSignatureValidatorTest" --tests "com.shinyoung.recruit.controller.JobPosting*" --no-daemon
 ```
-Expected: PASS (기존 JobPostingControllerTest 등 회귀 포함)
+Expected: PASS (기존 JobPostingControllerTest 등 변경 도메인 회귀 포함)
 
 - [ ] **Step 6: 커밋**
 
