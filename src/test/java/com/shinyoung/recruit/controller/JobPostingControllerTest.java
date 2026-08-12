@@ -282,7 +282,8 @@ class JobPostingControllerTest {
                     "useLanguage": true,
                     "useMilitary": true,
                     "useAward": true,
-                    "useGapPeriod": true
+                    "useGapPeriod": true,
+                    "useAttachment": false
                   }
                 }
                 """;
@@ -320,7 +321,8 @@ class JobPostingControllerTest {
                     "useLanguage": false,
                     "useMilitary": false,
                     "useAward": false,
-                    "useGapPeriod": false
+                    "useGapPeriod": false,
+                    "useAttachment": false
                   }
                 }
                 """;
