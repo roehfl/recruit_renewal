@@ -384,3 +384,40 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 
 #### 운영 작업 (코드 아님)
 - 메뉴 등록: 메뉴 관리 화면(`/admin/menus`)에서 대메뉴 "공고 관리"(path 없는 그룹 라벨) + 소메뉴 "공고 목록"(`/admin/job-postings`), "공고 등록"(`/admin/job-postings/new`) 등록. 아이콘은 `ADMIN_MENU_ICONS`에서 선택.
+
+### 화면: 관리자 권한 관리 (RoleMappingView)  🟢 확정 (2026-08-13, front-back 반영 완료)
+
+- 프론트: `src/views/admin/RoleMappingView.vue`, `src/api/adminRoleMappingApi.ts`, `src/types/roleMapping.ts`, 라우트 `/admin/role-mappings`(name `AdminRoleMapping`, `adminRoutes` 하위 → `requiresAuth` + `ROLE_ADMIN`/`ROLE_RECRUIT_ADMIN` 상속)
+- 백엔드: `com.shinyoung.recruit.controller.AdminRoleMappingController`, `service.RoleMappingService`, 신규 엔티티 `UserRoleMapping`(테이블 `user_role_mapping`), 상수 `security.auth.RoleNames`
+- 설계 문서: `docs/superpowers/specs/2026-08-13-role-mapping-admin-design.md`
+
+#### 권한 모델 (계약의 전제)
+
+- 권한 5축: `ROLE_ADMIN`(IT), `ROLE_RECRUIT_ADMIN`(운영), `ROLE_PRIVACY_ADMIN`(정보보호), `ROLE_INTERVIEWER`(면접관, 이번에 부여 경로 신설), `ROLE_APPLICANT`(지원자) + 보조 `ROLE_EMPLOYEE`.
+- 최종 임직원 권한 = 부서 매핑(`dept_role_mapping`, AD 그룹명 부분일치) ∪ 개인 매핑(`user_role_mapping`, loginId 완전일치). **합집합만, revoke 없음.** 로그인/`/auth/me` 응답의 `roles` 배열 스키마는 무변경.
+- `user_role_mapping.login_id`는 FK 없는 문자열 — 최초 로그인 전(JIT 생성 전) 직원에게도 사전 부여 가능.
+
+#### GET `/admin/role-mappings/roles`  🟢
+
+- 응답 `ApiResponse<[{ name, label }]>` — 부여 가능 role 5종(지원자 제외: ADMIN, RECRUIT_ADMIN, PRIVACY_ADMIN, INTERVIEWER, EMPLOYEE). 단일 출처는 백엔드 `RoleNames`.
+
+#### 부서 매핑: GET·POST `/admin/role-mappings/dept`, POST `/dept/{id}`, POST `/dept/{id}/delete`  🟢
+
+- 목록 응답: `ApiResponse<[{ id, deptName, roleName }]>` (페이징 없음, 소규모 전제).
+- 저장 요청: `{ deptName, roleName }` → 응답 `ApiResponse<{ id }>`. 수정은 전체 교체.
+- 검증: `roleName`은 부여 가능 5종만, `deptName` trim 후 **2자 이상**(로그인 부분일치 매칭의 오매칭 방어), `(deptName, roleName)` 중복 거부(서비스 레벨).
+
+#### 사용자 매핑: GET·POST `/admin/role-mappings/user`, POST `/user/{id}`, POST `/user/{id}/delete`  🟢
+
+- 목록 응답: `ApiResponse<[{ id, loginId, roleName, userName, userDeptName }]>` — `userName`/`userDeptName`은 users에 있으면 채움, 없으면 null(화면에 "미등록" 표기).
+- 저장 요청: `{ loginId, roleName }` → 응답 `ApiResponse<{ id }>`. 검증: loginId trim 필수, roleName 5종, `(loginId, roleName)` 중복 거부.
+
+#### 보안
+
+- 경로가 전부 `/api/admin/**`라 기존 broad 매처(`hasAnyAuthority(ROLE_ADMIN, ROLE_RECRUIT_ADMIN)`)에 걸림 → **SecurityConfig 무변경.** 인가(401/403/통과)는 테스트로 고정한다.
+- 레포 관례: 수정·삭제도 POST(DELETE 동사 미사용).
+
+#### 운영 작업 (코드 아님)
+
+- 신규 테이블 `user_role_mapping` 운영 DDL: `recruit_back/recruit_backend/docs/codex/ops/` 수동 SQL 참조.
+- 메뉴 등록: 메뉴 관리 화면에서 소메뉴 "권한 관리"(`/admin/role-mappings`) 등록.
