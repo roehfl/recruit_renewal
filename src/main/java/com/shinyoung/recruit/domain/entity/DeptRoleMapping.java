@@ -18,4 +18,16 @@ public class DeptRoleMapping extends BaseEntity {
     private Long id;
     private String deptName;
     private String roleName;
+
+    public static DeptRoleMapping create(String deptName, String roleName) {
+        DeptRoleMapping mapping = new DeptRoleMapping();
+        mapping.deptName = deptName;
+        mapping.roleName = roleName;
+        return mapping;
+    }
+
+    public void update(String deptName, String roleName) {
+        this.deptName = deptName;
+        this.roleName = roleName;
+    }
 }

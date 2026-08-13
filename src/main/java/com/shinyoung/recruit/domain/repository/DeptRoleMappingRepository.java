@@ -11,6 +11,12 @@ import java.util.Optional;
 public interface DeptRoleMappingRepository extends JpaRepository<DeptRoleMapping, Long> {
     List<DeptRoleMapping> findDeptRoleMappingsByDeptName(String deptName);
 
+    List<DeptRoleMapping> findAllByOrderByIdAsc();
+
+    boolean existsByDeptNameAndRoleName(String deptName, String roleName);
+
+    boolean existsByDeptNameAndRoleNameAndIdNot(String deptName, String roleName, Long id);
+
     /**
      * 부서 그룹명 안에 매핑 부서명이 <b>포함</b>되는 행을 찾는다.
      *

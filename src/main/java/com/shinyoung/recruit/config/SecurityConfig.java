@@ -2,6 +2,7 @@ package com.shinyoung.recruit.config;
 
 import com.shinyoung.recruit.security.auth.CustomAccessDeniedHandler;
 import com.shinyoung.recruit.security.auth.CustomAuthenticationEntryPoint;
+import com.shinyoung.recruit.security.auth.RoleNames;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -86,37 +87,37 @@ public class SecurityConfig {
                 // 메뉴 관리 write — MenuController 의 base path 가 /menu 라 실제 경로가 /api/menu/admin/menu 이고,
                 // 아래 broad /api/admin/** 매처에 걸리지 않는다. 명시하지 않으면 anyRequest().permitAll() 로 흘러
                 // 비인증 사용자가 메뉴를 생성/수정할 수 있다.
-                .requestMatchers(HttpMethod.POST, "/api/menu/admin/menu", "/api/menu/admin/menu/*").hasAnyAuthority("ROLE_ADMIN", "ROLE_RECRUIT_ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/job-postings/{jobPostingId}/application").hasAuthority("ROLE_APPLICANT")
+                .requestMatchers(HttpMethod.POST, "/api/menu/admin/menu", "/api/menu/admin/menu/*").hasAnyAuthority(RoleNames.ADMIN, RoleNames.RECRUIT_ADMIN)
+                .requestMatchers(HttpMethod.GET, "/api/job-postings/{jobPostingId}/application").hasAuthority(RoleNames.APPLICANT)
                 .requestMatchers(HttpMethod.GET, "/api/job-postings/**").permitAll()
                 // client event 수집(Phase 09f) — 로그인 전/세션 만료 오류도 수집하므로 permitAll(설계 7장).
                 // anyRequest().permitAll()이 있어도 의도를 명시적으로 고정한다.
                 .requestMatchers(HttpMethod.POST, "/api/client-events").permitAll()
                 // 감사 read API(Phase 09b, ADR-0007). narrow matcher 를 broad /api/admin/** 보다 먼저 — 순서가 보안 요구사항.
                 // ip/ua 원문 vs 마스킹은 GET 통과 후 컨트롤러에서 권한별 projection 으로 추가 게이팅한다.
-                .requestMatchers(HttpMethod.GET, "/api/admin/audit/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN", "ROLE_PRIVACY_ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/admin/audit/**").hasAnyAuthority(RoleNames.RECRUIT_ADMIN, RoleNames.PRIVACY_ADMIN)
                 // Retention(Phase 09c, ADR-0007) — write 는 ROLE_PRIVACY_ADMIN 전용, GET/dry-run 은 RECRUIT 포함.
                 // method 까지 분기(설계 리뷰 #5/#7). 전부 broad /api/admin/** 보다 먼저.
-                .requestMatchers(HttpMethod.POST, "/api/admin/retention/purge-batches/execute").hasAuthority("ROLE_PRIVACY_ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/admin/retention/purge-batches/reconcile").hasAuthority("ROLE_PRIVACY_ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/admin/retention/purge-batches/dry-run").hasAnyAuthority("ROLE_RECRUIT_ADMIN", "ROLE_PRIVACY_ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/admin/retention/purge-batches/execute").hasAuthority(RoleNames.PRIVACY_ADMIN)
+                .requestMatchers(HttpMethod.POST, "/api/admin/retention/purge-batches/reconcile").hasAuthority(RoleNames.PRIVACY_ADMIN)
+                .requestMatchers(HttpMethod.POST, "/api/admin/retention/purge-batches/dry-run").hasAnyAuthority(RoleNames.RECRUIT_ADMIN, RoleNames.PRIVACY_ADMIN)
                 // 정책 create/update/delete 전부 POST(전 엔드포인트 GET/POST 정책) — /policies/** 한 줄로 커버.
-                .requestMatchers(HttpMethod.POST, "/api/admin/retention/policies/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/admin/retention/policies/**").hasAuthority(RoleNames.PRIVACY_ADMIN)
                 // hold set/release 전부 POST(release 는 /holds/{id}/release) — /holds/** 한 줄로 커버.
-                .requestMatchers(HttpMethod.POST, "/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/admin/retention/holds/**").hasAuthority(RoleNames.PRIVACY_ADMIN)
                 // hold reason 은 자유 텍스트(민감 가능) — 조회도 PRIVACY_ADMIN 전용(9c 리뷰 Medium 1, 아래 GET 보다 먼저).
-                .requestMatchers(HttpMethod.GET, "/api/admin/retention/holds/**").hasAuthority("ROLE_PRIVACY_ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/admin/retention/job-postings/*/anchor").hasAuthority("ROLE_PRIVACY_ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/admin/retention/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN", "ROLE_PRIVACY_ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/admin/retention/holds/**").hasAuthority(RoleNames.PRIVACY_ADMIN)
+                .requestMatchers(HttpMethod.POST, "/api/admin/retention/job-postings/*/anchor").hasAuthority(RoleNames.PRIVACY_ADMIN)
+                .requestMatchers(HttpMethod.GET, "/api/admin/retention/**").hasAnyAuthority(RoleNames.RECRUIT_ADMIN, RoleNames.PRIVACY_ADMIN)
                 // cleanup은 삭제(write) — retention 관례에 따라 PRIVACY_ADMIN 전용(설계 9장).
-                .requestMatchers(HttpMethod.POST, "/api/admin/client-events/cleanup").hasAuthority("ROLE_PRIVACY_ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/admin/client-events/cleanup").hasAuthority(RoleNames.PRIVACY_ADMIN)
                 // client event 조회(Phase 09f-3) — broad /api/admin/** 보다 먼저(순서가 보안 요구사항).
                 // 민감 필드 원문 vs 마스킹은 컨트롤러에서 권한별 projection으로 추가 게이팅한다.
-                .requestMatchers(HttpMethod.GET, "/api/admin/client-events/**").hasAnyAuthority("ROLE_RECRUIT_ADMIN", "ROLE_PRIVACY_ADMIN")
-                .requestMatchers("/api/admin/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_RECRUIT_ADMIN")
-                .requestMatchers("/api/applicant/**").hasAuthority("ROLE_APPLICANT")
-                .requestMatchers("/api/interviewer/**").hasAnyAuthority("ROLE_EMPLOYEE", "ROLE_ADMIN", "ROLE_RECRUIT_ADMIN", "ROLE_INTERVIEWER")
-                .requestMatchers("/api/applications/**").hasAuthority("ROLE_APPLICANT")
+                .requestMatchers(HttpMethod.GET, "/api/admin/client-events/**").hasAnyAuthority(RoleNames.RECRUIT_ADMIN, RoleNames.PRIVACY_ADMIN)
+                .requestMatchers("/api/admin/**").hasAnyAuthority(RoleNames.ADMIN, RoleNames.RECRUIT_ADMIN)
+                .requestMatchers("/api/applicant/**").hasAuthority(RoleNames.APPLICANT)
+                .requestMatchers("/api/interviewer/**").hasAnyAuthority(RoleNames.EMPLOYEE, RoleNames.ADMIN, RoleNames.RECRUIT_ADMIN, RoleNames.INTERVIEWER)
+                .requestMatchers("/api/applications/**").hasAuthority(RoleNames.APPLICANT)
                 .anyRequest().permitAll());
         http.authenticationManager(authenticationManager);
 

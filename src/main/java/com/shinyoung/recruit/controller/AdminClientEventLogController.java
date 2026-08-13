@@ -8,6 +8,7 @@ import com.shinyoung.recruit.enumeration.ClientEventSeverity;
 import com.shinyoung.recruit.enumeration.ClientEventSource;
 import com.shinyoung.recruit.enumeration.ClientEventType;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
+import com.shinyoung.recruit.security.auth.RoleNames;
 import com.shinyoung.recruit.service.ClientEventLogCleanupService;
 import com.shinyoung.recruit.service.ClientEventLogReadService;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +34,7 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class AdminClientEventLogController {
 
-    private static final String ROLE_PRIVACY_ADMIN = "ROLE_PRIVACY_ADMIN";
+    private static final String ROLE_PRIVACY_ADMIN = RoleNames.PRIVACY_ADMIN;
 
     private final ClientEventLogReadService clientEventLogReadService;
     private final ClientEventLogCleanupService clientEventLogCleanupService;

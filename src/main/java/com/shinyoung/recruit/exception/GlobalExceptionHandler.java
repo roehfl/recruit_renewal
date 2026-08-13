@@ -315,6 +315,18 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler(InvalidRoleMappingException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidRoleMapping(InvalidRoleMappingException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
+    @ExceptionHandler(RoleMappingNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRoleMappingNotFound(RoleMappingNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(InvalidStatisticsRequestException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidStatisticsRequest(InvalidStatisticsRequestException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)

@@ -7,6 +7,7 @@ import com.shinyoung.recruit.enumeration.AuditActionResult;
 import com.shinyoung.recruit.enumeration.AuditActionType;
 import com.shinyoung.recruit.enumeration.AuditTargetType;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
+import com.shinyoung.recruit.security.auth.RoleNames;
 import com.shinyoung.recruit.service.AuditActivityReadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -29,7 +30,7 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class AdminAuditController {
 
-    private static final String ROLE_PRIVACY_ADMIN = "ROLE_PRIVACY_ADMIN";
+    private static final String ROLE_PRIVACY_ADMIN = RoleNames.PRIVACY_ADMIN;
 
     private final AuditActivityReadService auditActivityReadService;
 

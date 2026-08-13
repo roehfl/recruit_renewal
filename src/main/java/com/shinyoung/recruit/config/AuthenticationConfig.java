@@ -3,6 +3,7 @@ package com.shinyoung.recruit.config;
 import com.shinyoung.recruit.domain.repository.DeptRoleMappingRepository;
 import com.shinyoung.recruit.domain.repository.EmployeeRepository;
 import com.shinyoung.recruit.domain.repository.UserRepository;
+import com.shinyoung.recruit.domain.repository.UserRoleMappingRepository;
 import com.shinyoung.recruit.security.auth.CustomLdapUserDetailsMapper;
 import com.shinyoung.recruit.security.auth.CustomUserDetailsService;
 import com.shinyoung.recruit.security.auth.RoutingAuthenticationProvider;
@@ -108,7 +109,10 @@ public class AuthenticationConfig {
     }
 
     @Bean
-    public CustomLdapUserDetailsMapper customLdapUserDetailsMapper(DeptRoleMappingRepository deptRoleMappingRepository) {
-        return new CustomLdapUserDetailsMapper(deptRoleMappingRepository);
+    public CustomLdapUserDetailsMapper customLdapUserDetailsMapper(
+            DeptRoleMappingRepository deptRoleMappingRepository,
+            UserRoleMappingRepository userRoleMappingRepository
+    ) {
+        return new CustomLdapUserDetailsMapper(deptRoleMappingRepository, userRoleMappingRepository);
     }
 }

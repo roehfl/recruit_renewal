@@ -85,4 +85,58 @@ public class SecurityConfigTest {
                         .content(MENU_SAVE_BODY))
                 .andExpect(status().is(allOf(not(401), not(403))));
     }
+
+    /*
+     * 권한 관리 API(/api/admin/role-mappings/**)는 전용 매처 없이 broad /api/admin/**
+     * (ROLE_ADMIN, ROLE_RECRUIT_ADMIN) 매처에 걸리는 것이 계약이다. 매처 순서가 바뀌거나
+     * 경로가 broad 매처 밖으로 이동하면 아래 테스트가 깨진다.
+     */
+    private static final String ROLE_MAPPING_DEPT_PATH = "/api/admin/role-mappings/dept";
+    private static final String ROLE_MAPPING_DEPT_BODY = """
+            {"deptName":"내부채널","roleName":"ROLE_RECRUIT_ADMIN"}
+            """;
+
+    @Test
+    void 권한관리_조회는_비인증이면_401() throws Exception {
+        mockMvc.perform(get(ROLE_MAPPING_DEPT_PATH))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 권한관리_생성은_비인증이면_401() throws Exception {
+        mockMvc.perform(post(ROLE_MAPPING_DEPT_PATH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ROLE_MAPPING_DEPT_BODY))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 권한관리는_지원자_권한이면_403() throws Exception {
+        mockMvc.perform(get(ROLE_MAPPING_DEPT_PATH)
+                        .with(user("applicant").authorities(() -> "ROLE_APPLICANT")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 권한관리는_면접관_권한으로도_접근할_수_없다() throws Exception {
+        mockMvc.perform(get(ROLE_MAPPING_DEPT_PATH)
+                        .with(user("interviewer").authorities(() -> "ROLE_INTERVIEWER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 권한관리_조회는_IT관리자_권한이면_인가를_통과() throws Exception {
+        mockMvc.perform(get(ROLE_MAPPING_DEPT_PATH)
+                        .with(user("admin").authorities(() -> "ROLE_ADMIN")))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
+
+    @Test
+    void 권한관리_생성은_운영관리자_권한이면_인가를_통과() throws Exception {
+        mockMvc.perform(post(ROLE_MAPPING_DEPT_PATH)
+                        .with(user("recruitAdmin").authorities(() -> "ROLE_RECRUIT_ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ROLE_MAPPING_DEPT_BODY))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
 }

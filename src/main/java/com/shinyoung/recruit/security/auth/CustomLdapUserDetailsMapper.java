@@ -1,24 +1,27 @@
 package com.shinyoung.recruit.security.auth;
 
 import com.shinyoung.recruit.domain.entity.DeptRoleMapping;
+import com.shinyoung.recruit.domain.entity.UserRoleMapping;
 import com.shinyoung.recruit.domain.repository.DeptRoleMappingRepository;
+import com.shinyoung.recruit.domain.repository.UserRoleMappingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ldap.core.DirContextAdapter;
 import org.springframework.ldap.core.DirContextOperations;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.ldap.userdetails.LdapUserDetailsImpl;
 import org.springframework.security.ldap.userdetails.UserDetailsContextMapper;
 import org.springframework.util.StringUtils;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.stream.Stream;
 
 @RequiredArgsConstructor
 public class CustomLdapUserDetailsMapper implements UserDetailsContextMapper {
 
     private final DeptRoleMappingRepository deptRoleMappingRepository;
+    private final UserRoleMappingRepository userRoleMappingRepository;
 
     @Override
     public UserDetails mapUserFromContext(DirContextOperations ctx, String username, Collection<? extends GrantedAuthority> authorities) {
@@ -39,8 +42,19 @@ public class CustomLdapUserDetailsMapper implements UserDetailsContextMapper {
                 .flatMap(groupName -> deptRoleMappingRepository.findByDeptNameContainedIn(groupName).stream())
                 .toList();
 
-        List<SimpleGrantedAuthority> grantedAuthorities = matchedMappings.stream()
-                .map(DeptRoleMapping::getRoleName)
+        /*
+         * 최종 권한 = 부서 매핑 role ∪ 개인 매핑 role (추가 부여만, revoke 없음).
+         * 개인 매핑(user_role_mapping)은 loginId 완전일치로 조회한다 — 면접관처럼
+         * 부서 단위가 아니라 사람 단위로 부여해야 하는 권한의 통로다.
+         */
+        Stream<String> deptRoleNames = matchedMappings.stream()
+                .map(DeptRoleMapping::getRoleName);
+
+        Stream<String> userRoleNames = StringUtils.hasText(loginId)
+                ? userRoleMappingRepository.findByLoginId(loginId).stream().map(UserRoleMapping::getRoleName)
+                : Stream.empty();
+
+        List<SimpleGrantedAuthority> grantedAuthorities = Stream.concat(deptRoleNames, userRoleNames)
                 .filter(StringUtils::hasText)
                 .distinct()
                 .map(SimpleGrantedAuthority::new)

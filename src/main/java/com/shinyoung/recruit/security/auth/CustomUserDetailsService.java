@@ -28,7 +28,7 @@ public class CustomUserDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("Not an applicant user.");
         }
 
-        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_APPLICANT"));
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(RoleNames.APPLICANT));
         return CustomUserDetails.fromUser(user, authorities);
     }
 }

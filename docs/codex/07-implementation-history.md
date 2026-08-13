@@ -4415,3 +4415,24 @@
   - Stage announce pending-result guard
   - security, authorization, audit logging
 - Next recommended phase: Phase 03d-2 StageResult update commands and announcement integration policy.
+
+## 권한 관리 슬라이스 (2026-08-13, 통합 화면 슬라이스 — recruit/api-contract.md "관리자 권한 관리" 섹션 기준)
+
+- Scope: 관리자 권한 관리 API + 사용자별 role 매핑 + 면접관 권한(ROLE_INTERVIEWER) 부여 경로 신설.
+- New classes:
+  - `security.auth.RoleNames` (role 문자열 단일 출처, 부여 가능 5종 + 라벨)
+  - `domain.entity.UserRoleMapping` + `domain.repository.UserRoleMappingRepository`
+  - `service.RoleMappingService`, `controller.AdminRoleMappingController`
+  - `dto.request.DeptRoleMappingSaveRequest`/`UserRoleMappingSaveRequest`
+  - `dto.response.AssignableRoleResponse`/`DeptRoleMappingResponse`/`UserRoleMappingResponse`/`RoleMappingIdResponse`
+  - `exception.InvalidRoleMappingException`(400)/`RoleMappingNotFoundException`(404)
+- Modified classes:
+  - `CustomLdapUserDetailsMapper` — 최종 권한 = 부서 매핑 ∪ 개인 매핑(loginId 완전일치, 합집합만)
+  - `AuthenticationConfig`(매퍼 빈에 UserRoleMappingRepository 주입), `DeptRoleMapping`(+create/update),
+    `DeptRoleMappingRepository`/`UserRepository`(조회 메서드 추가), `GlobalExceptionHandler`
+  - role 리터럴 상수 치환: `SecurityConfig`, `CustomUserDetailsService`, `AdminAuditController`, `AdminClientEventLogController`
+- APIs: `GET /admin/role-mappings/roles`, dept/user 각 `GET`·`POST`·`POST /{id}`·`POST /{id}/delete` (전부 broad `/api/admin/**` 매처 — SecurityConfig 무변경)
+- Business rules: roleName은 RoleNames 부여 가능 5종만, (deptName|loginId, roleName) 중복 거부(서비스 검증), deptName trim 후 2자 이상(부분일치 오매칭 방어), loginId는 FK 없는 문자열(JIT 생성 전 사전 부여 허용).
+- **수동 DDL 필요**: `docs/codex/ops/role-mapping-user-role-mapping-ddl.sql` (`user_role_mapping` 테이블 + login_id 인덱스)
+- Tests: `RoleMappingServiceTest`, `CustomLdapUserDetailsMapperTest`, `SecurityConfigTest`(권한관리 인가 6건 추가)
+- Documentation: 통합 슬라이스라 recruit/CLAUDE.md §7에 따라 api-contract.md 갱신으로 갈음(HTML 리포트 생략).
