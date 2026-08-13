@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -27,6 +28,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -119,7 +121,8 @@ class JobPostingImageControllerTest {
         Long imageId = jobPostingImageService.addImage(postingId, pngPart("file", "poster.png"), "포스터", 0);
 
         mockMvc.perform(get("/api/admin/job-postings/" + postingId + "/images/" + imageId + "/file").with(admin()))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "private, max-age=3600"));
     }
 
     @Test
@@ -138,7 +141,8 @@ class JobPostingImageControllerTest {
         jobPostingService.publish(postingId);
 
         mockMvc.perform(get("/api/job-postings/" + postingId + "/images/" + imageId + "/file"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "private, max-age=3600"));
     }
 
     @Test

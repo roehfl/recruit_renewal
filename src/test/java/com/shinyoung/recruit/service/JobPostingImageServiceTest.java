@@ -47,6 +47,17 @@ class JobPostingImageServiceTest {
         ));
     }
 
+    private Long createPostingWithoutContent() {
+        return jobPostingService.create(new JobPostingCreateRequest(
+                "2026 채용",
+                null,
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 30, 18, 0),
+                List.of(new JobPositionRequest("백엔드", 0)),
+                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
+        ));
+    }
+
     private MultipartFile png(String name) {
         return new MockMultipartFile("file", name, "image/png", PNG_HEAD);
     }
@@ -141,6 +152,50 @@ class JobPostingImageServiceTest {
     @Test
     void 이미지를_삭제한다() {
         Long postingId = createPosting();
+        Long imageId = jobPostingImageService.addImage(postingId, png("a.png"), "포스터", 0);
+
+        jobPostingImageService.deleteImage(postingId, imageId);
+
+        assertThat(jobPostingImageService.getImages(postingId)).isEmpty();
+    }
+
+    @Test
+    void 게시중_공고의_마지막_본문_이미지는_삭제할_수_없다() {
+        Long postingId = createPostingWithoutContent();
+        Long imageId = jobPostingImageService.addImage(postingId, png("a.png"), "포스터", 0);
+        jobPostingService.publish(postingId);
+
+        assertThatThrownBy(() -> jobPostingImageService.deleteImage(postingId, imageId))
+                .isInstanceOf(InvalidJobPostingException.class)
+                .hasMessageContaining("마지막 본문 이미지");
+    }
+
+    @Test
+    void 게시중이라도_이미지가_더_남으면_삭제할_수_있다() {
+        Long postingId = createPostingWithoutContent();
+        Long first = jobPostingImageService.addImage(postingId, png("a.png"), "포스터 1", 0);
+        jobPostingImageService.addImage(postingId, png("b.png"), "포스터 2", 1);
+        jobPostingService.publish(postingId);
+
+        jobPostingImageService.deleteImage(postingId, first);
+
+        assertThat(jobPostingImageService.getImages(postingId)).hasSize(1);
+    }
+
+    @Test
+    void 게시중이라도_레거시_contentHtml이_있으면_마지막_이미지를_삭제할_수_있다() {
+        Long postingId = createPosting();
+        Long imageId = jobPostingImageService.addImage(postingId, png("a.png"), "포스터", 0);
+        jobPostingService.publish(postingId);
+
+        jobPostingImageService.deleteImage(postingId, imageId);
+
+        assertThat(jobPostingImageService.getImages(postingId)).isEmpty();
+    }
+
+    @Test
+    void draft_공고는_마지막_이미지도_삭제할_수_있다() {
+        Long postingId = createPostingWithoutContent();
         Long imageId = jobPostingImageService.addImage(postingId, png("a.png"), "포스터", 0);
 
         jobPostingImageService.deleteImage(postingId, imageId);

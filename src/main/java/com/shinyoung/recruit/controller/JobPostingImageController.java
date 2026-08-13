@@ -68,9 +68,11 @@ public class JobPostingImageController {
     }
 
     static ResponseEntity<Resource> toImageResponse(PostingImageResource image) {
+        // imageId 경로의 내용은 불변이므로 브라우저 캐시를 허용한다(private — 공유 캐시 저장 금지).
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(image.contentType()))
                 .contentLength(image.contentLength())
+                .header(HttpHeaders.CACHE_CONTROL, "private, max-age=3600")
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
                 .header("X-Content-Type-Options", "nosniff")
                 .body(image.resource());

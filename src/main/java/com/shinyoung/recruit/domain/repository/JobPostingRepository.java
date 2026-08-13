@@ -84,4 +84,20 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
             @Param("status") JobPostingStatus status,
             @Param("now") LocalDateTime now
     );
+
+    /** findPublicDetailById와 동일 공개조건의 경량 exists — 이미지 서빙처럼 발행 여부만 필요할 때 사용한다. */
+    @Query("""
+            select count(jobPosting.id) > 0
+            from JobPosting jobPosting
+            where jobPosting.id = :id
+              and jobPosting.status = :status
+              and jobPosting.visible = true
+              and (jobPosting.displayStartDateTime is null or jobPosting.displayStartDateTime <= :now)
+              and (jobPosting.displayEndDateTime is null or jobPosting.displayEndDateTime >= :now)
+            """)
+    boolean existsPublicById(
+            @Param("id") Long id,
+            @Param("status") JobPostingStatus status,
+            @Param("now") LocalDateTime now
+    );
 }

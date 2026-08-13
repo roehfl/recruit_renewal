@@ -100,8 +100,10 @@ public class JobPostingImageService {
 
     @Transactional
     public void deleteImage(Long jobPostingId, Long imageId) {
-        rejectClosed(findJobPosting(jobPostingId));
+        JobPosting jobPosting = findJobPosting(jobPostingId);
+        rejectClosed(jobPosting);
         JobPostingImage image = findImage(jobPostingId, imageId);
+        rejectDeletingLastPublishedContent(jobPosting);
         String storagePath = image.getStoragePath();
         jobPostingImageRepository.delete(image);
         storageService.deleteIfExists(storagePath);
@@ -133,8 +135,9 @@ public class JobPostingImageService {
     /** 공개 서빙: 발행+공개조건 충족 공고만. draft 유출 차단의 2차 방어선. */
     public PostingImageResource loadPublicImage(Long jobPostingId, Long imageId) {
         LocalDateTime now = LocalDateTime.now(clock);
-        jobPostingRepository.findPublicDetailById(jobPostingId, JobPostingStatus.PUBLISHED, now)
-                .orElseThrow(() -> new JobPostingNotFoundException("공고 이미지를 찾을 수 없습니다."));
+        if (!jobPostingRepository.existsPublicById(jobPostingId, JobPostingStatus.PUBLISHED, now)) {
+            throw new JobPostingNotFoundException("공고 이미지를 찾을 수 없습니다.");
+        }
         return loadAdminImage(jobPostingId, imageId);
     }
 
@@ -243,6 +246,18 @@ public class JobPostingImageService {
                 .mapToInt(JobPostingImage::getSortOrder)
                 .max()
                 .orElse(-1) + 1;
+    }
+
+    /** 발행 조건(이미지 ≥1장 또는 레거시 contentHtml)이 삭제로 깨지지 않게 막는다. */
+    private void rejectDeletingLastPublishedContent(JobPosting jobPosting) {
+        if (jobPosting.getStatus() != JobPostingStatus.PUBLISHED) {
+            return;
+        }
+        boolean lastImage = jobPostingImageRepository.countByJobPostingId(jobPosting.getId()) == 1;
+        boolean hasLegacyContent = jobPosting.getContentHtml() != null && !jobPosting.getContentHtml().isBlank();
+        if (lastImage && !hasLegacyContent) {
+            throw new InvalidJobPostingException("게시 중인 공고의 마지막 본문 이미지는 삭제할 수 없습니다.");
+        }
     }
 
     private void rejectClosed(JobPosting jobPosting) {
