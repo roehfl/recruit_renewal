@@ -10,26 +10,40 @@ const props = defineProps<{
 const objectUrls = ref<Record<number, string>>({})
 const failedIds = ref<Set<number>>(new Set())
 
+// images 변경/언마운트 시 세대를 올려, 진행 중이던 병렬 로딩이 stale objectURL을 남기지 않게 한다.
+let loadGeneration = 0
+
 const revokeAll = () => {
   Object.values(objectUrls.value).forEach((url) => URL.revokeObjectURL(url))
   objectUrls.value = {}
 }
 
 const loadImages = async (images: JobPostingImage[]) => {
+  const generation = ++loadGeneration
   revokeAll()
   failedIds.value = new Set()
-  for (const image of images) {
+  await Promise.all(images.map(async (image) => {
     try {
       const response = await props.fetchImage(image.id)
-      objectUrls.value = { ...objectUrls.value, [image.id]: URL.createObjectURL(response) }
+      const url = URL.createObjectURL(response)
+      if (generation !== loadGeneration) {
+        URL.revokeObjectURL(url)
+        return
+      }
+      objectUrls.value = { ...objectUrls.value, [image.id]: url }
     } catch {
-      failedIds.value = new Set([...failedIds.value, image.id])
+      if (generation === loadGeneration) {
+        failedIds.value = new Set([...failedIds.value, image.id])
+      }
     }
-  }
+  }))
 }
 
 watch(() => props.images, (images) => { void loadImages(images) }, { immediate: true })
-onBeforeUnmount(revokeAll)
+onBeforeUnmount(() => {
+  loadGeneration++
+  revokeAll()
+})
 </script>
 
 <template>

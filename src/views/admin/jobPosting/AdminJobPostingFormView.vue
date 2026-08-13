@@ -92,6 +92,8 @@ const formSections: { useKey: keyof AdminApplicationFormConfig; requireKey: keyo
 ]
 
 let imageKeySeq = 0
+// 언마운트 시 세대를 올려, 진행 중이던 병렬 이미지 로딩이 stale objectURL을 남기지 않게 한다.
+let imageLoadGeneration = 0
 
 const openFilePicker = () => fileInput.value?.click()
 
@@ -253,17 +255,26 @@ const loadForEdit = async () => {
     contentHtmlLegacy.value = detail.contentHtml
     jobPositions.value = detail.jobPositions.map(({ id: _id, ...position }) => position)
     formConfig.value = detail.applicationFormConfig
-    const loaded: EditableImage[] = []
-    for (const image of detail.images) {
+    const generation = ++imageLoadGeneration
+    const settled = await Promise.allSettled(detail.images.map(async (image): Promise<EditableImage> => {
       const blob = await adminJobPostingApi.fetchImageBlob(editingId.value!, image.id)
-      loaded.push({
+      return {
         key: `existing-${image.id}`,
         id: image.id,
         file: null,
         altText: image.altText,
         originalAltText: image.altText,
         previewUrl: URL.createObjectURL(blob.data),
-      })
+      }
+    }))
+    const loaded = settled
+      .filter((result): result is PromiseFulfilledResult<EditableImage> => result.status === 'fulfilled')
+      .map((result) => result.value)
+    const rejected = settled.find((result) => result.status === 'rejected')
+    if (generation !== imageLoadGeneration || rejected) {
+      loaded.forEach((image) => URL.revokeObjectURL(image.previewUrl))
+      if (rejected) throw (rejected as PromiseRejectedResult).reason
+      return
     }
     images.value = loaded
   } catch (error) {
@@ -275,6 +286,7 @@ const loadForEdit = async () => {
 
 onMounted(loadForEdit)
 onBeforeUnmount(() => {
+  imageLoadGeneration++
   images.value.forEach((image) => URL.revokeObjectURL(image.previewUrl))
 })
 </script>
