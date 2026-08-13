@@ -25,6 +25,11 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/MenuManageView.vue'),
       },
       {
+        path: 'role-mappings',
+        name: 'AdminRoleMapping',
+        component: () => import('@/views/admin/RoleMappingView.vue'),
+      },
+      {
         path: 'job-postings',
         name: 'AdminJobPostingList',
         component: () => import('@/views/admin/jobPosting/AdminJobPostingListView.vue'),
