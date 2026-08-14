@@ -1,11 +1,17 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.Applicant;
+import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
+import com.shinyoung.recruit.domain.entity.ApplicationBasicInfo;
+import com.shinyoung.recruit.domain.entity.ApplicationEducation;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPositionRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
@@ -19,12 +25,14 @@ import com.shinyoung.recruit.dto.response.AdminApplicationSummaryResponse;
 import com.shinyoung.recruit.dto.response.ApplicationDetailResponse;
 import com.shinyoung.recruit.dto.response.MyApplicationResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
+import com.shinyoung.recruit.enumeration.AttachmentType;
 import com.shinyoung.recruit.enumeration.EducationLevel;
 import com.shinyoung.recruit.enumeration.FinalSchoolCondition;
 import com.shinyoung.recruit.enumeration.GraduationStatus;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.JobPositionApplicationType;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
+import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.enumeration.ReceptionStatus;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
@@ -39,7 +47,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -58,6 +68,9 @@ public class JobApplicationService {
     private final JobPostingRepository jobPostingRepository;
     private final JobPositionRepository jobPositionRepository;
     private final StageResultRepository stageResultRepository;
+    private final ApplicationBasicInfoRepository applicationBasicInfoRepository;
+    private final ApplicationEducationRepository applicationEducationRepository;
+    private final ApplicationAttachmentRepository applicationAttachmentRepository;
     private final ApplicationSubmitValidator applicationSubmitValidator;
     private final Clock clock;
 
@@ -186,7 +199,7 @@ public class JobApplicationService {
             int page,
             int size
     ) {
-        return PageResponse.from(jobApplicationRepository.searchForAdmin(
+        Page<JobApplication> applications = jobApplicationRepository.searchForAdmin(
                 condition.jobPostingId(),
                 condition.jobPositionId(),
                 condition.status(),
@@ -206,7 +219,87 @@ public class JobApplicationService {
                 condition.stageType(),
                 condition.stageResultStatus(),
                 createPageRequest(page, size)
-        ).map(AdminApplicationSummaryResponse::from));
+        );
+        Map<Long, AdminApplicationSummaryResponse.Enrichment> enrichments =
+                loadAdminSummaryEnrichments(applications.getContent());
+
+        return PageResponse.from(applications.map(application -> AdminApplicationSummaryResponse.from(
+                application,
+                enrichments.getOrDefault(application.getId(), AdminApplicationSummaryResponse.Enrichment.empty())
+        )));
+    }
+
+    /**
+     * 목록 파생 필드(생년월일/나이, 최종학력·최종학교, 최신 전형 결과, 경력기술서 다운로드 링크)를
+     * 페이지 지원서 id 들로 배치 조회해 조합한다(페이지 최대 100건 — N+1 없음).
+     */
+    private Map<Long, AdminApplicationSummaryResponse.Enrichment> loadAdminSummaryEnrichments(
+            List<JobApplication> applications
+    ) {
+        List<Long> applicationIds = applications.stream()
+                .map(JobApplication::getId)
+                .toList();
+        if (applicationIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, ApplicationBasicInfo> basicInfos = applicationBasicInfoRepository
+                .findByJobApplicationIdIn(applicationIds).stream()
+                .collect(Collectors.toMap(info -> info.getJobApplication().getId(), info -> info));
+
+        // 최종학력 행 = 최고 EducationLevel(선언 순서 = 서열), 동률이면 id 가 큰 행 — 검색 필터의 최종 판정과 동일 기준.
+        Comparator<ApplicationEducation> finalEducationComparator = Comparator
+                .comparingInt((ApplicationEducation education) -> education.getEducationLevel().ordinal())
+                .thenComparing(ApplicationEducation::getId);
+        Map<Long, ApplicationEducation> finalEducations = applicationEducationRepository
+                .findByJobApplicationIdIn(applicationIds).stream()
+                .collect(Collectors.toMap(
+                        education -> education.getJobApplication().getId(),
+                        education -> education,
+                        (left, right) -> finalEducationComparator.compare(left, right) >= 0 ? left : right
+                ));
+
+        // 최신 전형 결과 = stageOrder(동률이면 stage id) 최대 — 발표 여부 무관(관리자 화면).
+        Comparator<StageResult> latestResultComparator = Comparator
+                .comparing((StageResult result) -> result.getStage().getStageOrder())
+                .thenComparing(result -> result.getStage().getId());
+        Map<Long, StageResult> latestResults = stageResultRepository
+                .findWithStageByJobApplicationIdIn(applicationIds).stream()
+                .collect(Collectors.toMap(
+                        result -> result.getJobApplication().getId(),
+                        result -> result,
+                        (left, right) -> latestResultComparator.compare(left, right) >= 0 ? left : right
+                ));
+
+        // 경력기술서: 다운로드 가능한(STORED·미삭제) 첨부 중 최신(id 최대) 1건.
+        Map<Long, Long> careerAttachmentIds = applicationAttachmentRepository
+                .findByJobApplicationIdInAndAttachmentTypeAndPhysicalFileStatusAndDeletedAtIsNull(
+                        applicationIds, AttachmentType.CAREER_DESCRIPTION, PhysicalFileStatus.STORED
+                ).stream()
+                .collect(Collectors.toMap(
+                        attachment -> attachment.getJobApplication().getId(),
+                        ApplicationAttachment::getId,
+                        Long::max
+                ));
+
+        LocalDate today = LocalDate.now(clock);
+        return applicationIds.stream().collect(Collectors.toMap(applicationId -> applicationId, applicationId -> {
+            ApplicationBasicInfo basicInfo = basicInfos.get(applicationId);
+            LocalDate birthDate = basicInfo == null ? null : basicInfo.getBirthDate();
+            ApplicationEducation finalEducation = finalEducations.get(applicationId);
+            StageResult latestResult = latestResults.get(applicationId);
+            Long careerAttachmentId = careerAttachmentIds.get(applicationId);
+            return new AdminApplicationSummaryResponse.Enrichment(
+                    birthDate,
+                    birthDate == null ? null : Period.between(birthDate, today).getYears(),
+                    finalEducation == null ? null : finalEducation.getEducationLevel(),
+                    finalEducation == null ? null : finalEducation.getSchoolName(),
+                    latestResult == null ? null : latestResult.getStage().getStageType(),
+                    latestResult == null ? null : latestResult.getResultStatus(),
+                    careerAttachmentId == null ? null : "/admin/applications/%d/attachments/%d/download"
+                            .formatted(applicationId, careerAttachmentId)
+            );
+        }));
     }
 
     private AdminApplicationSearchCondition buildSearchCondition(Long jobPostingId, AdminApplicationSearchRequest request) {

@@ -39,6 +39,13 @@ public interface ApplicationAttachmentRepository extends JpaRepository<Applicati
 
     List<ApplicationAttachment> findByJobApplicationId(Long applicationId);
 
+    /** 관리자 지원현황 목록 enrichment — 다운로드 가능한(STORED, 미삭제) 특정 타입 첨부 배치 조회. */
+    List<ApplicationAttachment> findByJobApplicationIdInAndAttachmentTypeAndPhysicalFileStatusAndDeletedAtIsNull(
+            Collection<Long> applicationIds,
+            AttachmentType attachmentType,
+            PhysicalFileStatus physicalFileStatus
+    );
+
     List<ApplicationAttachment> findByPhysicalFileStatusIn(Collection<PhysicalFileStatus> physicalFileStatuses);
 
     Optional<ApplicationAttachment> findByIdAndJobApplicationId(Long attachmentId, Long jobApplicationId);

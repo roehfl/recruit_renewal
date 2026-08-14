@@ -445,6 +445,12 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
   - `stageType` — 전형 단계. `StageType` (DOCUMENT | FIRST_INTERVIEW | SECOND_INTERVIEW | FINAL_INTERVIEW | ETC)
   - `stageResultStatus` — 전형 결과. `StageResultStatus` (PENDING | PASSED | FAILED | ABSENT | WITHDRAWN | HOLD)
   - 전형별결과 화면 값 매핑: "서류지원" → `status=SUBMITTED`(stage 조건 없이), 그 외 → `stageType` + `stageResultStatus` 조합 (예: 서류전형합격 = DOCUMENT+PASSED, 1차면접결시 = FIRST_INTERVIEW+ABSENT)
-- 응답(200): `ApiResponse<PageResponse<AdminApplicationSummaryResponse>>` — **무변경** (수험번호는 `applicationId`로 대체. 그리드 컬럼 확장은 별도 슬라이스)
+- 응답(200): `ApiResponse<PageResponse<AdminApplicationSummaryResponse>>` — 기존 필드 유지 + 그리드용 파생 필드 추가(2026-08-14, 백엔드 검증 완료):
+  - `jobGroup`, `jobTitle`(직무), `workLocation`(근무지) — `JobPosition` 속성
+  - `birthDate`, `age` — `ApplicationBasicInfo.birthDate` + 조회 시점(오늘, 서버 Clock) 기준 만 나이. basic info 없으면 null
+  - `finalEducationLevel`(최종학력), `finalSchoolName`(최종대학교) — 최고 EducationLevel 학력 행(검색 필터와 동일 판정). 학력 없으면 null
+  - `stageType`, `stageResultStatus` — 최신(stageOrder 최대) 전형 결과, 검색 조건과 동일 값 체계. 발표 여부 무관(관리자 화면). 결과 없으면 null(서류지원 상태는 `status=SUBMITTED`로 판별)
+  - `careerDescriptionDownloadUrl` — 경력기술서(`AttachmentType.CAREER_DESCRIPTION`, STORED·미삭제, 복수면 최신 1건) 다운로드 상대 URL `/admin/applications/{id}/attachments/{attachmentId}/download`. 없으면 null
+  - 수험번호는 `applicationId`로 대체. 파생 필드는 페이지 단위 배치 조회 4회로 채움(N+1 없음)
 - 오류: 400(page/size 범위 위반, enum 값 오류), 404(`jobPostingId` 미존재)
 - 제외 확정: 성별(도메인 없음), 연락처(암호화 컬럼 검색 불가), 채용구분 연도

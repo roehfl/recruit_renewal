@@ -2,6 +2,7 @@ package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
+import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
 import com.shinyoung.recruit.domain.entity.ApplicationBasicInfo;
 import com.shinyoung.recruit.domain.entity.ApplicationCertificate;
 import com.shinyoung.recruit.domain.entity.ApplicationEducation;
@@ -10,6 +11,7 @@ import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
@@ -34,6 +36,8 @@ import com.shinyoung.recruit.dto.response.AdminApplicationSummaryResponse;
 import com.shinyoung.recruit.dto.response.ApplicationDetailResponse;
 import com.shinyoung.recruit.dto.response.MyApplicationResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
+import com.shinyoung.recruit.enumeration.ApplicationSectionType;
+import com.shinyoung.recruit.enumeration.AttachmentType;
 import com.shinyoung.recruit.enumeration.DayNightType;
 import com.shinyoung.recruit.enumeration.DisabilityStatus;
 import com.shinyoung.recruit.enumeration.EducationLevel;
@@ -122,6 +126,9 @@ class JobApplicationServiceTest {
 
     @Autowired
     private ApplicationLanguageRepository languageRepository;
+
+    @Autowired
+    private ApplicationAttachmentRepository attachmentRepository;
 
     @Test
     void create_application_success() {
@@ -1194,6 +1201,60 @@ class JobApplicationServiceTest {
         assertThat(pendingResponse.content()).extracting(AdminApplicationSummaryResponse::applicationId)
                 .contains(pendingApplicationId)
                 .doesNotContain(passedApplicationId);
+    }
+
+    @Test
+    void admin_search_response_includes_enriched_fields() {
+        Applicant applicant = createApplicant("search-enrich", "Enrich Target");
+        Long jobPostingId = createPublishedJobPosting("Search Enrich Posting");
+        Long applicationId = createApplication(applicant, jobPostingId);
+        seedBasicInfo(applicationId, LocalDate.of(1995, 1, 1));
+        seedEducation(applicationId, EducationLevel.HIGH_SCHOOL, "Enrich High",
+                GraduationStatus.GRADUATED, DayNightType.DAY, null, 0);
+        seedEducation(applicationId, EducationLevel.UNIVERSITY, "Enrich Univ",
+                GraduationStatus.GRADUATED, DayNightType.DAY, null, 1);
+        JobApplication application = jobApplicationRepository.findById(applicationId).orElseThrow();
+        Long attachmentId = attachmentRepository.save(ApplicationAttachment.createStored(
+                application, AttachmentType.CAREER_DESCRIPTION, ApplicationSectionType.ATTACHMENT, null,
+                "career.pdf", "stored-career.pdf", "attachments/career.pdf", "application/pdf", 1024L, 0)).getId();
+        jobApplicationService.submit(applicant.getId(), applicationId);
+        Long stageId = createStage(jobPostingId, 1, false);
+        decideResult(jobPostingId, stageId, StageResultStatus.PASSED);
+
+        AdminApplicationSummaryResponse row = jobApplicationService
+                .getApplicationsForAdmin(jobPostingId, emptySearchRequest(), 0, 20)
+                .content().get(0);
+
+        assertThat(row.applicationId()).isEqualTo(applicationId);
+        assertThat(row.birthDate()).isEqualTo(LocalDate.of(1995, 1, 1));
+        // FIXED_CLOCK = 2026-06-15 기준 만 나이
+        assertThat(row.age()).isEqualTo(31);
+        assertThat(row.finalEducationLevel()).isEqualTo(EducationLevel.UNIVERSITY);
+        assertThat(row.finalSchoolName()).isEqualTo("Enrich Univ");
+        assertThat(row.stageType()).isEqualTo(StageType.DOCUMENT);
+        assertThat(row.stageResultStatus()).isEqualTo(StageResultStatus.PASSED);
+        assertThat(row.careerDescriptionDownloadUrl()).isEqualTo(
+                "/admin/applications/%d/attachments/%d/download".formatted(applicationId, attachmentId));
+    }
+
+    @Test
+    void admin_search_response_enriched_fields_are_null_when_no_related_data() {
+        Applicant applicant = createApplicant("search-enrich-empty", "Enrich Empty");
+        Long jobPostingId = createPublishedJobPosting("Search Enrich Empty Posting");
+        Long applicationId = createApplication(applicant, jobPostingId);
+
+        AdminApplicationSummaryResponse row = jobApplicationService
+                .getApplicationsForAdmin(jobPostingId, emptySearchRequest(), 0, 20)
+                .content().get(0);
+
+        assertThat(row.applicationId()).isEqualTo(applicationId);
+        assertThat(row.birthDate()).isNull();
+        assertThat(row.age()).isNull();
+        assertThat(row.finalEducationLevel()).isNull();
+        assertThat(row.finalSchoolName()).isNull();
+        assertThat(row.stageType()).isNull();
+        assertThat(row.stageResultStatus()).isNull();
+        assertThat(row.careerDescriptionDownloadUrl()).isNull();
     }
 
     private List<Long> searchApplicationIds(Long jobPostingId, AdminApplicationSearchRequest request) {

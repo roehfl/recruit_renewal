@@ -88,6 +88,16 @@ public interface StageResultRepository extends JpaRepository<StageResult, Long> 
             @Param("visibleStatuses") Collection<StageStatus> visibleStatuses
     );
 
+    /** 관리자 지원현황 목록 enrichment — 발표 여부와 무관하게 지원서들의 전체 전형 결과를 stage 와 함께 배치 조회한다. */
+    @Query("""
+            select result
+            from StageResult result
+            join fetch result.stage stage
+            join fetch result.jobApplication application
+            where application.id in :jobApplicationIds
+            """)
+    List<StageResult> findWithStageByJobApplicationIdIn(@Param("jobApplicationIds") Collection<Long> jobApplicationIds);
+
     default List<StageResult> findVisibleByJobApplicationIdsForApplicantSummary(Collection<Long> jobApplicationIds) {
         return findVisibleByJobApplicationIdsForApplicantSummary(
                 jobApplicationIds,
