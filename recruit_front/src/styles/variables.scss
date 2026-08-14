@@ -1,0 +1,86 @@
+:root {
+  --app-color-primary: #0f4726;
+  --app-color-primary-hover: #146135;
+  --app-color-primary-active: #0a321b;
+  --app-color-primary-emerald: #2f6f55;
+  --app-color-primary-olive: #6f8f3d;
+  --app-color-primary-olive-dark: #536d2f;
+
+  --app-color-error: #ff4d4f;
+  --app-color-success: #2f855a;
+  --app-color-warning: #d97706;
+  --app-color-info: #1677ff;
+
+  --app-text-primary: #1f2937;
+  --app-text-secondary: #6b7280;
+  --app-text-muted: #9ca3af;
+  --app-text-disabled: #bfbfbf;
+
+  --app-bg-page: #f5f7fa;
+  --app-bg-surface: #ffffff;
+  --app-bg-muted: #f9fafb;
+  --app-bg-soft: #f8faf6;
+  --app-bg-selected: #f4f8f0;
+  --app-bg-btn-hover: #eaf8f3;
+
+  --app-border-default: #e5e7eb;
+  --app-border-strong: #d1d5db;
+  --app-border-soft: #d6dbe0;
+  --app-border-subtle: #eeeeee;
+
+  --app-header-height: 56px;
+  --app-sidebar-width: 240px;
+  --app-content-padding: 24px;
+
+  --app-border-radius: 8px;
+  --app-border-radius-sm: 4px;
+  --app-border-radius-lg: 12px;
+
+  --app-control-height: 32px;
+  --app-control-height-lg: 40px;
+
+  --app-shadow-soft: 0 4px 14px rgba(0, 0, 0, 0.04);
+  --app-shadow-soft-2: 0 4px 14px rgba(0, 0, 0, 0.045);
+  --app-shadow-panel: 0 8px 24px rgba(31, 41, 55, 0.06);
+  --app-shadow-brand-soft: 0 8px 20px rgb(15 71 38 / 10%);
+  --app-shadow-brand-medium: 0 12px 24px rgb(15 71 38 / 8%);
+
+  /* compatibility aliases */
+  --app-primary-color: var(--app-color-primary);
+  --app-primary-hover-color: var(--app-color-primary-hover);
+  --app-primary-active-color: var(--app-color-primary-active);
+  --app-danger-color: var(--app-color-error);
+  --app-success-color: var(--app-color-success);
+  --app-warning-color: var(--app-color-warning);
+  --app-info-color: var(--app-color-info);
+  --app-text-color: var(--app-text-primary);
+  --app-sub-text-color: var(--app-text-secondary);
+  --app-placeholder-color: var(--app-text-muted);
+  --app-disabled-text-color: var(--app-text-disabled);
+  --app-bg-color: var(--app-bg-page);
+  --app-content-bg-color: var(--app-bg-surface);
+  --app-header-bg-color: var(--app-bg-surface);
+  --app-sidebar-bg-color: var(--app-bg-surface);
+  --app-white-color: var(--app-bg-surface);
+  --app-border-color: var(--app-border-default);
+  --app-border-dark-color: var(--app-border-strong);
+  --app-divider-color: var(--app-border-subtle);
+  --app-box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+  --app-card-shadow: 0 1px 3px rgb(0 0 0 / 6%);
+
+  --tap-color-primary-hover: #146135;
+  --tap-color-primary: #0f4726;
+  --tap-color-primary-dark: #0a321b;
+  --tap-muted-soft: #f9f9f9;
+  --tap-text: #202a32;
+  --tap-muted: #9ca3af;
+  
+  --tap-panel-shadow: rgba(31, 41, 55, 0.06);
+
+  /* 안내 화면(복리후생/교육/평가) 카드·칩 액센트 */
+  --tap-accent-bar: #cfe0c8;    /* 카드 좌측 강조바 */
+  --tap-card-divider: #eef1ee;  /* 카드 하단 구분선 */
+  --tap-chip-border: #dfe5dc;   /* 비활성 칩 테두리 */
+  --tap-chip-text: #5b6b5f;     /* 비활성 칩 글씨 */
+  --tap-chip-count: #9aa896;    /* 비활성 칩 개수 배지 */
+}
