@@ -201,6 +201,35 @@ class AdminApplicationControllerTest {
     }
 
     @Test
+    void get_admin_applications_filters_by_search_params() throws Exception {
+        Applicant targetApplicant = createApplicant("admin-api-search-target", "Admin Api Search Target");
+        Applicant otherApplicant = createApplicant("admin-api-search-other", "Admin Api Search Other");
+        Long jobPostingId = createPublishedJobPosting("Admin Api Search Posting");
+        Long targetApplicationId = createApplication(targetApplicant, jobPostingId);
+        createApplication(otherApplicant, jobPostingId);
+
+        mockMvc.perform(get("/api/admin/applications")
+                        .param("jobPostingId", String.valueOf(jobPostingId))
+                        .param("name", "Search Target"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].applicationId").value(targetApplicationId));
+
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/applications", jobPostingId)
+                        .param("name", "Search Target"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.totalElements").value(1));
+
+        mockMvc.perform(get("/api/admin/applications")
+                        .param("finalEducationLevel", "BAD_VALUE"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
     void admin_application_write_methods_are_not_supported() throws Exception {
         mockMvc.perform(put("/api/admin/applications/{applicationId}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)

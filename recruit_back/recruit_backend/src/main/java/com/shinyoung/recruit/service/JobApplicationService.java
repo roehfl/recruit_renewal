@@ -11,6 +11,7 @@ import com.shinyoung.recruit.domain.repository.JobPositionRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.dto.condition.AdminApplicationSearchCondition;
+import com.shinyoung.recruit.dto.request.AdminApplicationSearchRequest;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationUpdateRequest;
 import com.shinyoung.recruit.dto.response.AdminApplicationDetailResponse;
@@ -18,10 +19,15 @@ import com.shinyoung.recruit.dto.response.AdminApplicationSummaryResponse;
 import com.shinyoung.recruit.dto.response.ApplicationDetailResponse;
 import com.shinyoung.recruit.dto.response.MyApplicationResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
+import com.shinyoung.recruit.enumeration.EducationLevel;
+import com.shinyoung.recruit.enumeration.FinalSchoolCondition;
+import com.shinyoung.recruit.enumeration.GraduationStatus;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
+import com.shinyoung.recruit.enumeration.JobPositionApplicationType;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.enumeration.ReceptionStatus;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
+import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
@@ -147,8 +153,7 @@ public class JobApplicationService {
 
     public PageResponse<AdminApplicationSummaryResponse> getApplicationsForAdmin(
             Long jobPostingId,
-            Long jobPositionId,
-            String status,
+            AdminApplicationSearchRequest request,
             int page,
             int size
     ) {
@@ -156,18 +161,7 @@ public class JobApplicationService {
         if (jobPostingId != null) {
             validateJobPostingExists(jobPostingId);
         }
-        AdminApplicationSearchCondition condition = new AdminApplicationSearchCondition(
-                jobPostingId,
-                jobPositionId,
-                parseStatus(status)
-        );
-
-        return PageResponse.from(jobApplicationRepository.searchForAdmin(
-                condition.jobPostingId(),
-                condition.jobPositionId(),
-                condition.status(),
-                createPageRequest(page, size)
-        ).map(AdminApplicationSummaryResponse::from));
+        return searchForAdmin(buildSearchCondition(jobPostingId, request), page, size);
     }
 
     public AdminApplicationDetailResponse getApplicationForAdmin(Long applicationId) {
@@ -178,25 +172,87 @@ public class JobApplicationService {
 
     public PageResponse<AdminApplicationSummaryResponse> getApplicationsByJobPostingForAdmin(
             Long jobPostingId,
-            Long jobPositionId,
-            String status,
+            AdminApplicationSearchRequest request,
             int page,
             int size
     ) {
         validatePageRequest(page, size);
         validateJobPostingExists(jobPostingId);
-        AdminApplicationSearchCondition condition = new AdminApplicationSearchCondition(
-                jobPostingId,
-                jobPositionId,
-                parseStatus(status)
-        );
+        return searchForAdmin(buildSearchCondition(jobPostingId, request), page, size);
+    }
 
-        return PageResponse.from(jobApplicationRepository.searchByJobPostingForAdmin(
+    private PageResponse<AdminApplicationSummaryResponse> searchForAdmin(
+            AdminApplicationSearchCondition condition,
+            int page,
+            int size
+    ) {
+        return PageResponse.from(jobApplicationRepository.searchForAdmin(
                 condition.jobPostingId(),
                 condition.jobPositionId(),
                 condition.status(),
+                condition.applicationType(),
+                condition.jobGroup(),
+                condition.workLocation(),
+                condition.name(),
+                condition.birthDateFrom(),
+                condition.birthDateTo(),
+                condition.finalEducationRank(),
+                condition.schoolName(),
+                condition.graduationStatus(),
+                condition.finalSchoolConditionName(),
+                condition.certificateName(),
+                condition.languageName(),
+                condition.languageLevel(),
+                condition.stageType(),
+                condition.stageResultStatus(),
                 createPageRequest(page, size)
         ).map(AdminApplicationSummaryResponse::from));
+    }
+
+    private AdminApplicationSearchCondition buildSearchCondition(Long jobPostingId, AdminApplicationSearchRequest request) {
+        if (request.birthDateFrom() != null && request.birthDateTo() != null
+                && request.birthDateFrom().isAfter(request.birthDateTo())) {
+            throw new InvalidJobApplicationException("생년월일 검색 범위가 올바르지 않습니다.");
+        }
+        return new AdminApplicationSearchCondition(
+                jobPostingId,
+                request.jobPositionId(),
+                parseStatus(request.status()),
+                parseSearchEnum(JobPositionApplicationType.class, request.applicationType(), "지원구분"),
+                normalizeSearchText(request.jobGroup()),
+                normalizeSearchText(request.workLocation()),
+                normalizeSearchText(request.name()),
+                request.birthDateFrom(),
+                request.birthDateTo(),
+                parseSearchEnum(EducationLevel.class, request.finalEducationLevel(), "최종학력"),
+                normalizeSearchText(request.schoolName()),
+                parseSearchEnum(GraduationStatus.class, request.graduationStatus(), "졸업여부"),
+                parseSearchEnum(FinalSchoolCondition.class, request.finalSchoolCondition(), "최종학교조건"),
+                normalizeSearchText(request.certificateName()),
+                normalizeSearchText(request.languageName()),
+                normalizeSearchText(request.languageLevel()),
+                parseSearchEnum(StageType.class, request.stageType(), "전형단계"),
+                parseSearchEnum(StageResultStatus.class, request.stageResultStatus(), "전형결과")
+        );
+    }
+
+    private <E extends Enum<E>> E parseSearchEnum(Class<E> type, String value, String label) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Enum.valueOf(type, value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new InvalidJobApplicationException(label + " 값이 올바르지 않습니다. value=" + value);
+        }
+    }
+
+    private String normalizeSearchText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private JobApplication findApplication(Long applicantId, Long applicationId) {

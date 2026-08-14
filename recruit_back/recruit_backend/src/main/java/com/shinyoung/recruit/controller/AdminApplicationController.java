@@ -1,5 +1,6 @@
 package com.shinyoung.recruit.controller;
 
+import com.shinyoung.recruit.dto.request.AdminApplicationSearchRequest;
 import com.shinyoung.recruit.dto.response.AdminApplicationDetailResponse;
 import com.shinyoung.recruit.dto.response.AdminApplicationSummaryResponse;
 import com.shinyoung.recruit.dto.response.ApiResponse;
@@ -8,6 +9,7 @@ import com.shinyoung.recruit.service.JobApplicationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,15 +23,13 @@ public class AdminApplicationController {
     @GetMapping("/admin/applications")
     public ResponseEntity<ApiResponse<PageResponse<AdminApplicationSummaryResponse>>> getApplications(
             @RequestParam(required = false) Long jobPostingId,
-            @RequestParam(required = false) Long jobPositionId,
-            @RequestParam(required = false) String status,
+            @ModelAttribute AdminApplicationSearchRequest searchRequest,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
         return ResponseEntity.ok(ApiResponse.success(jobApplicationService.getApplicationsForAdmin(
                 jobPostingId,
-                jobPositionId,
-                status,
+                searchRequest,
                 page,
                 size
         )));
@@ -45,15 +45,13 @@ public class AdminApplicationController {
     @GetMapping("/admin/job-postings/{jobPostingId}/applications")
     public ResponseEntity<ApiResponse<PageResponse<AdminApplicationSummaryResponse>>> getApplicationsByJobPosting(
             @PathVariable Long jobPostingId,
-            @RequestParam(required = false) Long jobPositionId,
-            @RequestParam(required = false) String status,
+            @ModelAttribute AdminApplicationSearchRequest searchRequest,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
         return ResponseEntity.ok(ApiResponse.success(jobApplicationService.getApplicationsByJobPostingForAdmin(
                 jobPostingId,
-                jobPositionId,
-                status,
+                searchRequest,
                 page,
                 size
         )));

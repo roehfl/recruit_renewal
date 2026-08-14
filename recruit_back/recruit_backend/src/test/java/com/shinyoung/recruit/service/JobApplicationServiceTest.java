@@ -2,13 +2,22 @@ package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
+import com.shinyoung.recruit.domain.entity.ApplicationBasicInfo;
+import com.shinyoung.recruit.domain.entity.ApplicationCertificate;
+import com.shinyoung.recruit.domain.entity.ApplicationEducation;
+import com.shinyoung.recruit.domain.entity.ApplicationLanguage;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationLanguageRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPositionRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.dto.request.AdminApplicationSearchRequest;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationAnswerReplaceRequest;
 import com.shinyoung.recruit.dto.request.ApplicationAnswerRequest;
@@ -25,12 +34,18 @@ import com.shinyoung.recruit.dto.response.AdminApplicationSummaryResponse;
 import com.shinyoung.recruit.dto.response.ApplicationDetailResponse;
 import com.shinyoung.recruit.dto.response.MyApplicationResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
+import com.shinyoung.recruit.enumeration.DayNightType;
+import com.shinyoung.recruit.enumeration.DisabilityStatus;
+import com.shinyoung.recruit.enumeration.EducationLevel;
+import com.shinyoung.recruit.enumeration.GraduationStatus;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
+import com.shinyoung.recruit.enumeration.NationalityType;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
 import com.shinyoung.recruit.enumeration.QuestionCategory;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
+import com.shinyoung.recruit.enumeration.VeteranStatus;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
@@ -46,6 +61,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Comparator;
@@ -94,6 +110,18 @@ class JobApplicationServiceTest {
 
     @Autowired
     private JobPositionRepository jobPositionRepository;
+
+    @Autowired
+    private ApplicationBasicInfoRepository basicInfoRepository;
+
+    @Autowired
+    private ApplicationEducationRepository educationRepository;
+
+    @Autowired
+    private ApplicationCertificateRepository certificateRepository;
+
+    @Autowired
+    private ApplicationLanguageRepository languageRepository;
 
     @Test
     void create_application_success() {
@@ -350,6 +378,7 @@ class JobApplicationServiceTest {
                 applicationId,
                 new ApplicationUpdateRequest(jobPositionIds.get(1))
         );
+        seedBasicInfo(applicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(applicant.getId(), applicationId);
         jobApplicationService.withdraw(applicant.getId(), applicationId);
 
@@ -369,6 +398,7 @@ class JobApplicationServiceTest {
                 submittedApplicant.getId(),
                 new ApplicationCreateRequest(submittedPostingId, submittedPositionIds.get(0))
         );
+        seedBasicInfo(submittedApplicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
         assertThatThrownBy(() -> jobApplicationService.updateDraft(
@@ -384,6 +414,7 @@ class JobApplicationServiceTest {
                 withdrawnApplicant.getId(),
                 new ApplicationCreateRequest(withdrawnPostingId, withdrawnPositionIds.get(0))
         );
+        seedBasicInfo(withdrawnApplicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);
 
@@ -490,6 +521,7 @@ class JobApplicationServiceTest {
                 applicant.getId(),
                 new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
         );
+        seedBasicInfo(applicationId, LocalDate.of(1995, 1, 1));
 
         Long submittedId = jobApplicationService.submit(applicant.getId(), applicationId);
 
@@ -512,6 +544,7 @@ class JobApplicationServiceTest {
         assertThatThrownBy(() -> jobApplicationService.submit(otherApplicant.getId(), applicationId))
                 .isInstanceOf(JobApplicationNotFoundException.class);
 
+        seedBasicInfo(applicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(applicant.getId(), applicationId);
 
         assertThatThrownBy(() -> jobApplicationService.submit(applicant.getId(), applicationId))
@@ -640,6 +673,7 @@ class JobApplicationServiceTest {
                 applicationId,
                 new ApplicationAnswerReplaceRequest(List.of(new ApplicationAnswerRequest(question.questionId(), "submitted answer")))
         );
+        seedBasicInfo(applicationId, LocalDate.of(1995, 1, 1));
 
         Long submittedId = jobApplicationService.submit(applicant.getId(), applicationId);
 
@@ -675,6 +709,7 @@ class JobApplicationServiceTest {
                 applicant.getId(),
                 new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
         );
+        seedBasicInfo(applicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(applicant.getId(), applicationId);
         LocalDateTime submittedAt = jobApplicationRepository.findById(applicationId).orElseThrow().getSubmittedAt();
 
@@ -699,6 +734,7 @@ class JobApplicationServiceTest {
         assertThatThrownBy(() -> jobApplicationService.withdraw(applicant.getId(), applicationId))
                 .isInstanceOf(InvalidJobApplicationException.class);
 
+        seedBasicInfo(applicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(applicant.getId(), applicationId);
 
         assertThatThrownBy(() -> jobApplicationService.withdraw(otherApplicant.getId(), applicationId))
@@ -718,6 +754,7 @@ class JobApplicationServiceTest {
                 beforeApplicant.getId(),
                 new ApplicationCreateRequest(beforePostingId, firstJobPositionId(beforePostingId))
         );
+        seedBasicInfo(beforeApplicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(beforeApplicant.getId(), beforeApplicationId);
         setReceptionPeriod(
                 beforePostingId,
@@ -734,6 +771,7 @@ class JobApplicationServiceTest {
                 afterApplicant.getId(),
                 new ApplicationCreateRequest(afterPostingId, firstJobPositionId(afterPostingId))
         );
+        seedBasicInfo(afterApplicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(afterApplicant.getId(), afterApplicationId);
         setReceptionPeriod(
                 afterPostingId,
@@ -750,6 +788,7 @@ class JobApplicationServiceTest {
                 draftApplicant.getId(),
                 new ApplicationCreateRequest(draftPostingId, firstJobPositionId(draftPostingId))
         );
+        seedBasicInfo(draftApplicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(draftApplicant.getId(), draftApplicationId);
         setJobPostingStatus(draftPostingId, JobPostingStatus.DRAFT);
 
@@ -762,6 +801,7 @@ class JobApplicationServiceTest {
                 closedApplicant.getId(),
                 new ApplicationCreateRequest(closedPostingId, firstJobPositionId(closedPostingId))
         );
+        seedBasicInfo(closedApplicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(closedApplicant.getId(), closedApplicationId);
         jobPostingService.close(closedPostingId);
 
@@ -780,8 +820,10 @@ class JobApplicationServiceTest {
 
         Long draftApplicationId = createApplication(applicant, draftPostingId);
         Long submittedApplicationId = createApplication(applicant, submittedPostingId);
+        seedBasicInfo(submittedApplicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(applicant.getId(), submittedApplicationId);
         Long withdrawnApplicationId = createApplication(applicant, withdrawnPostingId);
+        seedBasicInfo(withdrawnApplicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(applicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(applicant.getId(), withdrawnApplicationId);
         jobPostingService.close(withdrawnPostingId);
@@ -847,6 +889,7 @@ class JobApplicationServiceTest {
         Applicant applicant = createApplicant("my-list-result", "My List Result");
         Long jobPostingId = createPublishedJobPosting("My List Result Posting");
         Long applicationId = createApplication(applicant, jobPostingId);
+        seedBasicInfo(applicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(applicant.getId(), applicationId);
         Long readyStageId = createStage(jobPostingId, 0, false);
         Long inProgressStageId = createStage(jobPostingId, 1, false);
@@ -899,8 +942,7 @@ class JobApplicationServiceTest {
 
         PageResponse<AdminApplicationSummaryResponse> response = jobApplicationService.getApplicationsForAdmin(
                 null,
-                null,
-                null,
+                emptySearchRequest(),
                 0,
                 20
         );
@@ -924,26 +966,24 @@ class JobApplicationServiceTest {
                 submittedApplicant.getId(),
                 new ApplicationCreateRequest(jobPostingId, jobPositionIds.get(1))
         );
+        seedBasicInfo(submittedApplicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
         PageResponse<AdminApplicationSummaryResponse> statusResponse = jobApplicationService.getApplicationsForAdmin(
                 null,
-                null,
-                " submitted ",
+                searchRequest(null, " submitted "),
                 0,
                 20
         );
         PageResponse<AdminApplicationSummaryResponse> postingResponse = jobApplicationService.getApplicationsForAdmin(
                 jobPostingId,
-                null,
-                null,
+                emptySearchRequest(),
                 0,
                 20
         );
         PageResponse<AdminApplicationSummaryResponse> positionResponse = jobApplicationService.getApplicationsForAdmin(
                 null,
-                jobPositionIds.get(0),
-                null,
+                searchRequest(jobPositionIds.get(0), null),
                 0,
                 20
         );
@@ -980,8 +1020,7 @@ class JobApplicationServiceTest {
 
         PageResponse<AdminApplicationSummaryResponse> response = jobApplicationService.getApplicationsByJobPostingForAdmin(
                 jobPostingId,
-                null,
-                null,
+                emptySearchRequest(),
                 0,
                 20
         );
@@ -1012,22 +1051,233 @@ class JobApplicationServiceTest {
 
     @Test
     void admin_get_applications_fails_when_paging_or_status_is_invalid() {
-        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(null, null, null, -1, 20))
+        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(null, emptySearchRequest(), -1, 20))
                 .isInstanceOf(InvalidJobApplicationException.class);
-        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(null, null, null, 0, 0))
+        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(null, emptySearchRequest(), 0, 0))
                 .isInstanceOf(InvalidJobApplicationException.class);
-        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(null, null, null, 0, 101))
+        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(null, emptySearchRequest(), 0, 101))
                 .isInstanceOf(InvalidJobApplicationException.class);
-        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(null, null, "UNKNOWN", 0, 20))
+        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(null, searchRequest(null, "UNKNOWN"), 0, 20))
+                .isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
+    void admin_get_applications_fails_when_search_condition_is_invalid() {
+        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(
+                null, search().finalEducationLevel("BAD_LEVEL").build(), 0, 20))
+                .isInstanceOf(InvalidJobApplicationException.class);
+        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(
+                null, search().stageType("BAD_STAGE").build(), 0, 20))
+                .isInstanceOf(InvalidJobApplicationException.class);
+        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(
+                null,
+                search().birthDateFrom(LocalDate.of(2000, 1, 1)).birthDateTo(LocalDate.of(1990, 1, 1)).build(),
+                0,
+                20))
                 .isInstanceOf(InvalidJobApplicationException.class);
     }
 
     @Test
     void admin_get_applications_by_job_posting_fails_when_job_posting_does_not_exist() {
-        assertThatThrownBy(() -> jobApplicationService.getApplicationsByJobPostingForAdmin(99999L, null, null, 0, 20))
+        assertThatThrownBy(() -> jobApplicationService.getApplicationsByJobPostingForAdmin(99999L, emptySearchRequest(), 0, 20))
                 .isInstanceOf(JobPostingNotFoundException.class);
-        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(99999L, null, null, 0, 20))
+        assertThatThrownBy(() -> jobApplicationService.getApplicationsForAdmin(99999L, emptySearchRequest(), 0, 20))
                 .isInstanceOf(JobPostingNotFoundException.class);
+    }
+
+    @Test
+    void admin_search_filters_by_name_and_birth_date() {
+        Applicant kimApplicant = createApplicant("search-name-kim", "Kim Search");
+        Applicant leeApplicant = createApplicant("search-name-lee", "Lee Search");
+        Long jobPostingId = createPublishedJobPosting("Search Name Posting");
+        Long kimApplicationId = createApplication(kimApplicant, jobPostingId);
+        Long leeApplicationId = createApplication(leeApplicant, jobPostingId);
+        seedBasicInfo(kimApplicationId, LocalDate.of(1990, 1, 1));
+        seedBasicInfo(leeApplicationId, LocalDate.of(2000, 5, 5));
+
+        PageResponse<AdminApplicationSummaryResponse> nameResponse = jobApplicationService.getApplicationsForAdmin(
+                jobPostingId, search().name("Kim").build(), 0, 20);
+        PageResponse<AdminApplicationSummaryResponse> birthResponse = jobApplicationService.getApplicationsForAdmin(
+                jobPostingId, search().birthDateFrom(LocalDate.of(1995, 1, 1)).build(), 0, 20);
+
+        assertThat(nameResponse.content()).extracting(AdminApplicationSummaryResponse::applicationId)
+                .containsExactly(kimApplicationId);
+        assertThat(birthResponse.content()).extracting(AdminApplicationSummaryResponse::applicationId)
+                .containsExactly(leeApplicationId);
+    }
+
+    @Test
+    void admin_search_filters_by_final_education() {
+        Applicant multiApplicant = createApplicant("search-edu-multi", "Edu Multi");
+        Applicant singleApplicant = createApplicant("search-edu-single", "Edu Single");
+        Long jobPostingId = createPublishedJobPosting("Search Education Posting");
+        Long multiApplicationId = createApplication(multiApplicant, jobPostingId);
+        Long singleApplicationId = createApplication(singleApplicant, jobPostingId);
+        // multi: 고교(야간, 국내, 졸업) + 대학(주간, 해외 US, 졸업예정) — 최종학력 행은 대학
+        seedEducation(multiApplicationId, EducationLevel.HIGH_SCHOOL, "Seoul High",
+                GraduationStatus.GRADUATED, DayNightType.NIGHT, null, 0);
+        seedEducation(multiApplicationId, EducationLevel.UNIVERSITY, "Global Univ",
+                GraduationStatus.EXPECTED, DayNightType.DAY, "US", 1);
+        // single: 대학(야간, 국내, 졸업) 하나
+        seedEducation(singleApplicationId, EducationLevel.UNIVERSITY, "Korea Univ",
+                GraduationStatus.GRADUATED, DayNightType.NIGHT, null, 0);
+
+        assertThat(searchApplicationIds(jobPostingId, search().finalEducationLevel("UNIVERSITY").build()))
+                .containsExactlyInAnyOrder(multiApplicationId, singleApplicationId);
+        assertThat(searchApplicationIds(jobPostingId, search().finalEducationLevel("HIGH_SCHOOL").build()))
+                .isEmpty();
+        assertThat(searchApplicationIds(jobPostingId, search().graduationStatus("EXPECTED").build()))
+                .containsExactly(multiApplicationId);
+        assertThat(searchApplicationIds(jobPostingId, search().finalSchoolCondition("OVERSEAS").build()))
+                .containsExactly(multiApplicationId);
+        assertThat(searchApplicationIds(jobPostingId, search().finalSchoolCondition("DOMESTIC").build()))
+                .containsExactly(singleApplicationId);
+        // NIGHT 는 최종학력 행 기준 — multi 의 야간은 고교 행이라 제외된다
+        assertThat(searchApplicationIds(jobPostingId, search().finalSchoolCondition("NIGHT").build()))
+                .containsExactly(singleApplicationId);
+        assertThat(searchApplicationIds(jobPostingId, search().schoolName("Seoul").build()))
+                .containsExactly(multiApplicationId);
+    }
+
+    @Test
+    void admin_search_filters_by_certificate_and_language() {
+        Applicant certApplicant = createApplicant("search-cert", "Cert Search");
+        Applicant plainApplicant = createApplicant("search-plain", "Plain Search");
+        Long jobPostingId = createPublishedJobPosting("Search Certificate Posting");
+        Long certApplicationId = createApplication(certApplicant, jobPostingId);
+        Long plainApplicationId = createApplication(plainApplicant, jobPostingId);
+        JobApplication certApplication = jobApplicationRepository.findById(certApplicationId).orElseThrow();
+        certificateRepository.save(ApplicationCertificate.create(
+                certApplication, "정보처리기사", "한국산업인력공단",
+                LocalDate.of(2024, 3, 1), "12345", null, null, 0));
+        languageRepository.save(ApplicationLanguage.create(
+                certApplication, "영어", "OPIc", "IH", "HIGH",
+                LocalDate.of(2025, 1, 1), null, "ACTFL", 0));
+
+        assertThat(searchApplicationIds(jobPostingId, search().certificateName("정보처리").build()))
+                .containsExactly(certApplicationId);
+        assertThat(searchApplicationIds(jobPostingId, search().languageName("영어").languageLevel("HIGH").build()))
+                .containsExactly(certApplicationId);
+        assertThat(searchApplicationIds(jobPostingId, search().languageName("영어").languageLevel("LOW").build()))
+                .isEmpty();
+        assertThat(searchApplicationIds(jobPostingId, search().certificateName("없는자격증").build()))
+                .doesNotContain(certApplicationId, plainApplicationId);
+    }
+
+    @Test
+    void admin_search_filters_by_stage_result() {
+        Applicant passedApplicant = createApplicant("search-stage-passed", "Stage Passed");
+        Applicant pendingApplicant = createApplicant("search-stage-pending", "Stage Pending");
+        Long passedJobPostingId = createPublishedJobPosting("Search Stage Passed Posting");
+        Long pendingJobPostingId = createPublishedJobPosting("Search Stage Pending Posting");
+        Long passedApplicationId = createApplication(passedApplicant, passedJobPostingId);
+        Long pendingApplicationId = createApplication(pendingApplicant, pendingJobPostingId);
+        // StageResult initialize 는 제출된 지원서만 대상이므로 제출을 선행한다
+        seedBasicInfo(passedApplicationId, LocalDate.of(1995, 1, 1));
+        seedBasicInfo(pendingApplicationId, LocalDate.of(1995, 1, 1));
+        jobApplicationService.submit(passedApplicant.getId(), passedApplicationId);
+        jobApplicationService.submit(pendingApplicant.getId(), pendingApplicationId);
+        Long passedStageId = createStage(passedJobPostingId, 1, false);
+        Long pendingStageId = createStage(pendingJobPostingId, 1, false);
+        decideResult(passedJobPostingId, passedStageId, StageResultStatus.PASSED);
+        stageService.start(pendingJobPostingId, pendingStageId);
+        stageResultService.initialize(pendingStageId);
+
+        PageResponse<AdminApplicationSummaryResponse> passedResponse = jobApplicationService.getApplicationsForAdmin(
+                null, search().stageType("DOCUMENT").stageResultStatus("PASSED").build(), 0, 100);
+        PageResponse<AdminApplicationSummaryResponse> pendingResponse = jobApplicationService.getApplicationsForAdmin(
+                null, search().stageType("DOCUMENT").stageResultStatus("PENDING").build(), 0, 100);
+
+        assertThat(passedResponse.content()).extracting(AdminApplicationSummaryResponse::applicationId)
+                .contains(passedApplicationId)
+                .doesNotContain(pendingApplicationId);
+        assertThat(pendingResponse.content()).extracting(AdminApplicationSummaryResponse::applicationId)
+                .contains(pendingApplicationId)
+                .doesNotContain(passedApplicationId);
+    }
+
+    private List<Long> searchApplicationIds(Long jobPostingId, AdminApplicationSearchRequest request) {
+        return jobApplicationService.getApplicationsForAdmin(jobPostingId, request, 0, 100).content().stream()
+                .map(AdminApplicationSummaryResponse::applicationId)
+                .toList();
+    }
+
+    private void seedBasicInfo(Long applicationId, LocalDate birthDate) {
+        JobApplication application = jobApplicationRepository.findById(applicationId).orElseThrow();
+        basicInfoRepository.save(ApplicationBasicInfo.create(
+                application, application.getApplicantNameSnapshot(), null, NationalityType.DOMESTIC, null, birthDate,
+                "01012345678", null, "test@example.com", VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT,
+                null, null, null, null, null));
+    }
+
+    private void seedEducation(
+            Long applicationId,
+            EducationLevel educationLevel,
+            String schoolName,
+            GraduationStatus graduationStatus,
+            DayNightType dayNightType,
+            String countryCode,
+            int sortOrder
+    ) {
+        JobApplication application = jobApplicationRepository.findById(applicationId).orElseThrow();
+        educationRepository.save(ApplicationEducation.create(
+                application, educationLevel, schoolName, null, null, null, null,
+                null, null, graduationStatus, dayNightType, null, false, countryCode, sortOrder));
+    }
+
+    private AdminApplicationSearchRequest emptySearchRequest() {
+        return search().build();
+    }
+
+    private AdminApplicationSearchRequest searchRequest(Long jobPositionId, String status) {
+        return search().jobPositionId(jobPositionId).status(status).build();
+    }
+
+    private static SearchRequestBuilder search() {
+        return new SearchRequestBuilder();
+    }
+
+    private static final class SearchRequestBuilder {
+        private Long jobPositionId;
+        private String status;
+        private String applicationType;
+        private String jobGroup;
+        private String workLocation;
+        private String name;
+        private LocalDate birthDateFrom;
+        private LocalDate birthDateTo;
+        private String finalEducationLevel;
+        private String schoolName;
+        private String graduationStatus;
+        private String finalSchoolCondition;
+        private String certificateName;
+        private String languageName;
+        private String languageLevel;
+        private String stageType;
+        private String stageResultStatus;
+
+        SearchRequestBuilder jobPositionId(Long value) { this.jobPositionId = value; return this; }
+        SearchRequestBuilder status(String value) { this.status = value; return this; }
+        SearchRequestBuilder name(String value) { this.name = value; return this; }
+        SearchRequestBuilder birthDateFrom(LocalDate value) { this.birthDateFrom = value; return this; }
+        SearchRequestBuilder birthDateTo(LocalDate value) { this.birthDateTo = value; return this; }
+        SearchRequestBuilder finalEducationLevel(String value) { this.finalEducationLevel = value; return this; }
+        SearchRequestBuilder schoolName(String value) { this.schoolName = value; return this; }
+        SearchRequestBuilder graduationStatus(String value) { this.graduationStatus = value; return this; }
+        SearchRequestBuilder finalSchoolCondition(String value) { this.finalSchoolCondition = value; return this; }
+        SearchRequestBuilder certificateName(String value) { this.certificateName = value; return this; }
+        SearchRequestBuilder languageName(String value) { this.languageName = value; return this; }
+        SearchRequestBuilder languageLevel(String value) { this.languageLevel = value; return this; }
+        SearchRequestBuilder stageType(String value) { this.stageType = value; return this; }
+        SearchRequestBuilder stageResultStatus(String value) { this.stageResultStatus = value; return this; }
+
+        AdminApplicationSearchRequest build() {
+            return new AdminApplicationSearchRequest(
+                    jobPositionId, status, applicationType, jobGroup, workLocation, name,
+                    birthDateFrom, birthDateTo, finalEducationLevel, schoolName, graduationStatus,
+                    finalSchoolCondition, certificateName, languageName, languageLevel,
+                    stageType, stageResultStatus);
+        }
     }
 
     private Applicant createApplicant(String loginId, String applicantName) {

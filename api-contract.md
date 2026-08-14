@@ -421,3 +421,30 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 
 - 신규 테이블 `user_role_mapping` 운영 DDL: `recruit_back/recruit_backend/docs/codex/ops/` 수동 SQL 참조.
 - 메뉴 등록: 메뉴 관리 화면에서 소메뉴 "권한 관리"(`/admin/role-mappings`) 등록.
+
+### 화면: 지원현황 조회 (관리자 — 지원서 검색)
+
+- 프론트: (후속 슬라이스) 지원현황 조회 화면 + `src/api/adminApplicationApi.ts`
+- 백엔드: `com.shinyoung.recruit.controller.AdminApplicationController`, `service.JobApplicationService`
+
+#### GET `/admin/applications`, GET `/admin/job-postings/{jobPostingId}/applications`  🟡 검색 조건 확장 — 백엔드 구현·검증 완료(2026-08-14) / 프론트 미반영
+
+- 기존 페이징 목록 API의 **하위호환 확장**. 기존 파라미터(`jobPostingId`(전자만)·`jobPositionId`·`status`·`page`·`size`) 유지, 아래 검색 조건 추가. 모든 조건 optional, 빈 문자열은 미적용으로 간주. enum 계열 값이 정의 밖이면 400.
+- 추가 요청 파라미터(query):
+  - `applicationType` — 지원구분. `JobPositionApplicationType` (NEW_GRADUATE | EXPERIENCED | NEW_GRADUATE_OR_EXPERIENCED)
+  - `jobGroup`, `workLocation` — 직무/근무지. `JobPosition` 필드 완전일치
+  - `name` — 이름. `applicantNameSnapshot` 부분일치(LIKE)
+  - `birthDateFrom`, `birthDateTo` — 생년월일 범위(ISO date). `ApplicationBasicInfo.birthDate`
+  - `finalEducationLevel` — 최종학력. `EducationLevel` (HIGH_SCHOOL~DOCTOR). 지원서 학력 중 **최고 레벨**이 일치해야 함
+  - `schoolName` — 학교명 부분일치(학력 행 아무거나)
+  - `graduationStatus` — 졸업여부. `GraduationStatus`. **최종학력 행** 기준
+  - `finalSchoolCondition` — 최종학교조건. DOMESTIC(countryCode 없음) | OVERSEAS(countryCode 있음) | TRANSFER(편입) | BRANCH(분교) | NIGHT(야간). **최종학력 행** 기준
+  - `certificateName` — 자격증명 부분일치
+  - `languageName` — 외국어구사. `ApplicationLanguage.languageName` 완전일치
+  - `languageLevel` — 외국어수준. `conversationalAbility` 완전일치 (값 체계는 CommonCode 그룹 `LANGUAGE_LEVEL`(상/중/하)로 관리자 등록 — 별도 백엔드 코드 없음)
+  - `stageType` — 전형 단계. `StageType` (DOCUMENT | FIRST_INTERVIEW | SECOND_INTERVIEW | FINAL_INTERVIEW | ETC)
+  - `stageResultStatus` — 전형 결과. `StageResultStatus` (PENDING | PASSED | FAILED | ABSENT | WITHDRAWN | HOLD)
+  - 전형별결과 화면 값 매핑: "서류지원" → `status=SUBMITTED`(stage 조건 없이), 그 외 → `stageType` + `stageResultStatus` 조합 (예: 서류전형합격 = DOCUMENT+PASSED, 1차면접결시 = FIRST_INTERVIEW+ABSENT)
+- 응답(200): `ApiResponse<PageResponse<AdminApplicationSummaryResponse>>` — **무변경** (수험번호는 `applicationId`로 대체. 그리드 컬럼 확장은 별도 슬라이스)
+- 오류: 400(page/size 범위 위반, enum 값 오류), 404(`jobPostingId` 미존재)
+- 제외 확정: 성별(도메인 없음), 연락처(암호화 컬럼 검색 불가), 채용구분 연도

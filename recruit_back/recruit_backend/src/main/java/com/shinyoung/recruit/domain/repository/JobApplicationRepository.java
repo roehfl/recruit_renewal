@@ -4,8 +4,12 @@ import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.dto.response.ApplicationDailyCountRow;
 import com.shinyoung.recruit.dto.response.ApplicationExportRow;
 import com.shinyoung.recruit.dto.response.FunnelCohortRow;
+import com.shinyoung.recruit.enumeration.GraduationStatus;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
+import com.shinyoung.recruit.enumeration.JobPositionApplicationType;
 import com.shinyoung.recruit.enumeration.PurgeResult;
+import com.shinyoung.recruit.enumeration.StageResultStatus;
+import com.shinyoung.recruit.enumeration.StageType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -13,6 +17,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -73,6 +78,14 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
             @Param("applicantId") Long applicantId
     );
 
+    /**
+     * 관리자 지원현황 조회 통합 검색. 모든 조건은 null 이면 미적용(null-guard) — 공고 지정/비지정 목록이 이 쿼리 하나를 공유한다.
+     *
+     * <p>최종학력 판정은 지원서 학력 행들의 최고 레벨 기준이며, CASE rank(HIGH_SCHOOL=0…DOCTOR=4)는
+     * {@code EducationLevel} 선언 순서(= {@code AdminApplicationSearchCondition.finalEducationRank()})와 일치해야 한다.
+     * 졸업여부/최종학교조건도 같은 최종학력 행 기준으로 판정한다. {@code finalSchoolCondition} 은 enum 5분기 비교를 위해
+     * name 문자열로 받는다.
+     */
     @EntityGraph(attributePaths = {"applicant", "jobPosting", "jobPosition"})
     @Query("""
             select application
@@ -80,26 +93,90 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
             where (:jobPostingId is null or application.jobPosting.id = :jobPostingId)
               and (:jobPositionId is null or application.jobPosition.id = :jobPositionId)
               and (:status is null or application.status = :status)
+              and (:applicationType is null or application.jobPosition.applicationType = :applicationType)
+              and (:jobGroup is null or application.jobPosition.jobGroup = :jobGroup)
+              and (:workLocation is null or application.jobPosition.workLocation = :workLocation)
+              and (:name is null or application.applicantNameSnapshot like concat('%', :name, '%'))
+              and ((:birthDateFrom is null and :birthDateTo is null) or exists (
+                    select 1 from ApplicationBasicInfo basicInfo
+                    where basicInfo.jobApplication = application
+                      and (:birthDateFrom is null or basicInfo.birthDate >= :birthDateFrom)
+                      and (:birthDateTo is null or basicInfo.birthDate <= :birthDateTo)))
+              and (:finalEducationRank is null or (
+                    select max(case
+                        when education.educationLevel = com.shinyoung.recruit.enumeration.EducationLevel.HIGH_SCHOOL then 0
+                        when education.educationLevel = com.shinyoung.recruit.enumeration.EducationLevel.COLLEGE then 1
+                        when education.educationLevel = com.shinyoung.recruit.enumeration.EducationLevel.UNIVERSITY then 2
+                        when education.educationLevel = com.shinyoung.recruit.enumeration.EducationLevel.MASTER then 3
+                        else 4 end)
+                    from ApplicationEducation education
+                    where education.jobApplication = application) = :finalEducationRank)
+              and (:schoolName is null or exists (
+                    select 1 from ApplicationEducation schoolEducation
+                    where schoolEducation.jobApplication = application
+                      and schoolEducation.schoolName like concat('%', :schoolName, '%')))
+              and ((:graduationStatus is null and :finalSchoolCondition is null) or exists (
+                    select 1 from ApplicationEducation finalEducation
+                    where finalEducation.jobApplication = application
+                      and (case
+                        when finalEducation.educationLevel = com.shinyoung.recruit.enumeration.EducationLevel.HIGH_SCHOOL then 0
+                        when finalEducation.educationLevel = com.shinyoung.recruit.enumeration.EducationLevel.COLLEGE then 1
+                        when finalEducation.educationLevel = com.shinyoung.recruit.enumeration.EducationLevel.UNIVERSITY then 2
+                        when finalEducation.educationLevel = com.shinyoung.recruit.enumeration.EducationLevel.MASTER then 3
+                        else 4 end) = (
+                          select max(case
+                            when other.educationLevel = com.shinyoung.recruit.enumeration.EducationLevel.HIGH_SCHOOL then 0
+                            when other.educationLevel = com.shinyoung.recruit.enumeration.EducationLevel.COLLEGE then 1
+                            when other.educationLevel = com.shinyoung.recruit.enumeration.EducationLevel.UNIVERSITY then 2
+                            when other.educationLevel = com.shinyoung.recruit.enumeration.EducationLevel.MASTER then 3
+                            else 4 end)
+                          from ApplicationEducation other
+                          where other.jobApplication = application)
+                      and (:graduationStatus is null or finalEducation.graduationStatus = :graduationStatus)
+                      and (:finalSchoolCondition is null
+                           or (:finalSchoolCondition = 'DOMESTIC'
+                               and (finalEducation.countryCode is null or finalEducation.countryCode = ''))
+                           or (:finalSchoolCondition = 'OVERSEAS'
+                               and finalEducation.countryCode is not null and finalEducation.countryCode <> '')
+                           or (:finalSchoolCondition = 'TRANSFER' and finalEducation.transfer = true)
+                           or (:finalSchoolCondition = 'BRANCH'
+                               and finalEducation.campusType = com.shinyoung.recruit.enumeration.CampusType.BRANCH)
+                           or (:finalSchoolCondition = 'NIGHT'
+                               and finalEducation.dayNightType = com.shinyoung.recruit.enumeration.DayNightType.NIGHT))))
+              and (:certificateName is null or exists (
+                    select 1 from ApplicationCertificate certificate
+                    where certificate.jobApplication = application
+                      and certificate.certificateName like concat('%', :certificateName, '%')))
+              and ((:languageName is null and :languageLevel is null) or exists (
+                    select 1 from ApplicationLanguage applicationLanguage
+                    where applicationLanguage.jobApplication = application
+                      and (:languageName is null or applicationLanguage.languageName = :languageName)
+                      and (:languageLevel is null or applicationLanguage.conversationalAbility = :languageLevel)))
+              and ((:stageType is null and :stageResultStatus is null) or exists (
+                    select 1 from StageResult stageResult
+                    where stageResult.jobApplication = application
+                      and (:stageType is null or stageResult.stage.stageType = :stageType)
+                      and (:stageResultStatus is null or stageResult.resultStatus = :stageResultStatus)))
             """)
     Page<JobApplication> searchForAdmin(
             @Param("jobPostingId") Long jobPostingId,
             @Param("jobPositionId") Long jobPositionId,
             @Param("status") JobApplicationStatus status,
-            Pageable pageable
-    );
-
-    @EntityGraph(attributePaths = {"applicant", "jobPosting", "jobPosition"})
-    @Query("""
-            select application
-            from JobApplication application
-            where application.jobPosting.id = :jobPostingId
-              and (:jobPositionId is null or application.jobPosition.id = :jobPositionId)
-              and (:status is null or application.status = :status)
-            """)
-    Page<JobApplication> searchByJobPostingForAdmin(
-            @Param("jobPostingId") Long jobPostingId,
-            @Param("jobPositionId") Long jobPositionId,
-            @Param("status") JobApplicationStatus status,
+            @Param("applicationType") JobPositionApplicationType applicationType,
+            @Param("jobGroup") String jobGroup,
+            @Param("workLocation") String workLocation,
+            @Param("name") String name,
+            @Param("birthDateFrom") LocalDate birthDateFrom,
+            @Param("birthDateTo") LocalDate birthDateTo,
+            @Param("finalEducationRank") Integer finalEducationRank,
+            @Param("schoolName") String schoolName,
+            @Param("graduationStatus") GraduationStatus graduationStatus,
+            @Param("finalSchoolCondition") String finalSchoolCondition,
+            @Param("certificateName") String certificateName,
+            @Param("languageName") String languageName,
+            @Param("languageLevel") String languageLevel,
+            @Param("stageType") StageType stageType,
+            @Param("stageResultStatus") StageResultStatus stageResultStatus,
             Pageable pageable
     );
 
