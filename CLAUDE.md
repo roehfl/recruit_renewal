@@ -5,8 +5,9 @@
 
 ## 1. 구성
 
-- 백엔드: `recruit_back/recruit_backend/` — Spring Boot. 자체 git. 권위 문서: `recruit_back/recruit_backend/CLAUDE.md` + `docs/codex/`.
-- 프론트: `recruit_front/` — Vue 3 + Vite + TS. 자체 git. 권위 문서: `recruit_front/AGENTS.md`.
+- 백엔드: `recruit_back/recruit_backend/` — Spring Boot. 권위 문서: `recruit_back/recruit_backend/CLAUDE.md` + `docs/codex/`.
+- 프론트: `recruit_front/` — Vue 3 + Vite + TS. 권위 문서: `recruit_front/AGENTS.md`.
+- 세 영역 모두 이 폴더(`recruit/`)를 루트로 하는 **단일 git 모노레포**로 관리한다(§6).
 - 계약 문서: `recruit/api-contract.md` — front-back API 동기화의 단일 기준.
 
 ## 2. 읽기 순서
@@ -64,11 +65,12 @@ npm run build          # 필요시 (type-check 포함)
 
 ## 6. git 안전 규칙
 
-- `recruit/`는 **로컬 전용** git 저장소다(원격 없음). 통합 하네스 문서만 추적한다.
-- `recruit_back/`, `recruit_front/`는 **각자 자체 git**으로 관리한다. recruit/ 저장소는 이들을 `.gitignore`로 제외한다.
-- 백엔드/프론트 변경은 각 저장소 안에서 커밋한다(해당 저장소의 git 규칙 준수).
+- `recruit/`는 하네스 문서 + `recruit_front/` + `recruit_back/recruit_backend/`를 모두 추적하는 **단일 모노레포**다(2026-08-14 통합, 히스토리 subtree 병합). 원격은 GitHub private 저장소 `origin` 하나다.
+- 과거의 `roehfl/recruit`(프론트)·`roehfl/recruit_backend`(백엔드) 저장소는 **아카이브**다. 그쪽으로 push하지 않는다.
+- 프론트/백엔드 변경도 이 모노레포에서 커밋한다. 커밋 메시지 규칙(`feat(job-posting): ...` 등)은 기존 각 레포 관례를 유지한다.
 - 명확한 요청 없이 `git commit`/`git push`/브랜치 조작을 하지 않는다.
-- 홈 디렉토리(`C:/Users/roehf`)에는 별개의 `fit.git`이 있다. recruit/ 안에서는 recruit 로컬 저장소가 우선되지만, **홈에서 직접 git 명령을 실행하지 않는다.**
+- 운영 비밀값(AES 키·LDAP·DB 접속정보)은 절대 커밋하지 않는다(예시 값만).
+- 홈 디렉토리(`C:/Users/roehf`)에는 별개의 `fit.git`이 있다. **홈에서 직접 git 명령을 실행하지 않는다.**
 
 ## 7. 기존 하네스와의 관계 (override/명확화)
 
