@@ -1,0 +1,129 @@
+package com.shinyoung.recruit.domain.entity;
+
+import com.shinyoung.recruit.enumeration.EmploymentType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
+
+@Entity
+@Table(
+        name = "application_career",
+        indexes = {
+                @Index(name = "idx_application_career_application", columnList = "job_application_id"),
+                @Index(name = "idx_application_career_sort", columnList = "job_application_id,sort_order")
+        }
+)
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class ApplicationCareer extends BaseEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "job_application_id", nullable = false)
+    private JobApplication jobApplication;
+
+    @Column(nullable = false)
+    private String companyName;
+
+    private String departmentName;
+
+    private String positionTitle;
+
+    @Enumerated(EnumType.STRING)
+    private EmploymentType employmentType;
+
+    // 파기(NULLIFY 안 A — 정확 날짜 보존 금지, PII 인벤토리 §4) 대상이라 nullable — 입력 필수는 request 검증이 보장한다(9d-1).
+    private LocalDate startDate;
+
+    private LocalDate endDate;
+
+    // 진급일(최종 직급으로의 진급 시점). 선택 입력이며 파기 시 NULLIFY 대상이다.
+    private LocalDate promotionDate;
+
+    @Column(nullable = false)
+    private Boolean currentlyEmployed;
+
+    // 현재연봉(만원 단위). 선택 입력이며 파기(NULLIFY) 대상이다(PII 인벤토리 §Career).
+    private Integer currentSalary;
+
+    @Column(length = 2000)
+    private String resignationReason;
+
+    @Column(nullable = false)
+    private Integer sortOrder;
+
+    private ApplicationCareer(
+            JobApplication jobApplication,
+            String companyName,
+            String departmentName,
+            String positionTitle,
+            EmploymentType employmentType,
+            LocalDate startDate,
+            LocalDate endDate,
+            LocalDate promotionDate,
+            Boolean currentlyEmployed,
+            Integer currentSalary,
+            String resignationReason,
+            Integer sortOrder
+    ) {
+        this.jobApplication = jobApplication;
+        this.companyName = companyName;
+        this.departmentName = departmentName;
+        this.positionTitle = positionTitle;
+        this.employmentType = employmentType;
+        this.startDate = startDate;
+        this.endDate = endDate;
+        this.promotionDate = promotionDate;
+        this.currentlyEmployed = currentlyEmployed;
+        this.currentSalary = currentSalary;
+        this.resignationReason = resignationReason;
+        this.sortOrder = sortOrder;
+    }
+
+    public static ApplicationCareer create(
+            JobApplication jobApplication,
+            String companyName,
+            String departmentName,
+            String positionTitle,
+            EmploymentType employmentType,
+            LocalDate startDate,
+            LocalDate endDate,
+            LocalDate promotionDate,
+            Boolean currentlyEmployed,
+            Integer currentSalary,
+            String resignationReason,
+            Integer sortOrder
+    ) {
+        return new ApplicationCareer(
+                jobApplication,
+                companyName,
+                departmentName,
+                positionTitle,
+                employmentType,
+                startDate,
+                endDate,
+                promotionDate,
+                currentlyEmployed,
+                currentSalary,
+                resignationReason,
+                sortOrder
+        );
+    }
+}

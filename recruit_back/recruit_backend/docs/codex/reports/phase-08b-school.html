@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 08b - School</title>
+<style>
+  :root { --blue:#1d4ed8; --green:#15803d; --amber:#b45309; --red:#b91c1c;
+    --muted:#6b7280; --bg:#f8fafc; --card:#fff; --border:#e2e8f0; --ink:#0f172a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.6; }
+  .wrap { max-width:1080px; margin:0 auto; padding:32px 20px 64px; }
+  header.page { background:linear-gradient(135deg,#3730a3,#6d28d9); color:#fff; border-radius:16px; padding:28px 32px; margin-bottom:28px; }
+  header.page h1 { margin:0 0 6px; font-size:24px; }
+  header.page .sub { opacity:.9; font-size:14px; }
+  .badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+  .badge.done { background:#dcfce7; color:var(--green); }
+  .badge.oos { background:#fee2e2; color:var(--red); }
+  .badge.white { background:rgba(255,255,255,.18); color:#fff; }
+  section { margin-bottom:26px; }
+  h2 { font-size:18px; border-left:4px solid #6d28d9; padding-left:10px; margin:0 0 14px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px 18px; }
+  .card h3 { margin:0 0 8px; font-size:14px; }
+  .card ul { margin:6px 0 0; padding-left:18px; font-size:13px; }
+  .card.kpi { text-align:center; }
+  .card.kpi .num { font-size:30px; font-weight:700; color:#6d28d9; }
+  .card.kpi .lbl { font-size:12px; color:var(--muted); }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--border); border-radius:12px; overflow:hidden; font-size:13px; }
+  th,td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { background:#f1f5f9; font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  code { background:#f1f5f9; padding:1px 6px; border-radius:5px; font-size:12px; }
+  .summary { background:var(--card); border:1px solid var(--border); border-left:4px solid var(--green); border-radius:10px; padding:16px 20px; font-size:14px; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  .note { font-size:12px; color:var(--muted); }
+  .ok { color:var(--green); font-weight:600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Phase 08b · School <span class="badge white">완료</span></h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · 학교 master 검색/CRUD · 생성일 2026-06-02</div>
+</header>
+
+<section>
+  <h2>요약</h2>
+  <div class="summary">
+    학교 master(<strong>School</strong>)를 추가형으로 도입했다. public 자동완성(<code>GET /api/schools</code>, 활성·prefix 우선·top-N)
+    + admin CRUD(비활성 포함 페이지 목록, 생성/수정 POST). <code>schoolCode</code>(있으면 unique)는 식별 키라 불변, soft delete.
+    <code>ApplicationEducation.schoolId</code> 링크와 xlsx import 는 08c. 테스트 <span class="ok">BUILD SUCCESSFUL</span>(10).
+  </div>
+</section>
+
+<section>
+  <h2>지표</h2>
+  <div class="cards">
+    <div class="card kpi"><div class="num">4</div><div class="lbl">신규 API</div></div>
+    <div class="card kpi"><div class="num">10</div><div class="lbl">신규 클래스(main)</div></div>
+    <div class="card kpi"><div class="num">12</div><div class="lbl">테스트(통과)</div></div>
+    <div class="card kpi"><div class="num">1</div><div class="lbl">신규 테이블</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>범위</h2>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="badge done">완료</span> Implemented</h3>
+      <ul>
+        <li>School 엔티티(schoolCode nullable unique)</li>
+        <li>public 자동완성(활성·prefix 우선·contains·top-N)</li>
+        <li>admin CRUD(비활성 포함 페이지)</li>
+        <li>schoolCode 불변 + soft delete + 중복 거부</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="badge oos">제외</span> Out of scope</h3>
+      <ul>
+        <li>xlsx import(upsert) — 08c</li>
+        <li>ApplicationEducation.schoolId 링크 — 08c</li>
+        <li>schoolType CommonCode 백엔드 validation</li>
+        <li>SCHOOL funnel 통계(07c 보류)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>API</h2>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>접근</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td class="mono">/api/schools?q=&amp;schoolType=</td><td>public</td><td>활성 자동완성(prefix 우선+contains, top-N 20)</td></tr>
+      <tr><td>GET</td><td class="mono">/api/admin/schools?q=&amp;schoolType=&amp;page=&amp;size=</td><td>admin</td><td>비활성 포함 페이지 목록</td></tr>
+      <tr><td>POST</td><td class="mono">/api/admin/schools</td><td>admin</td><td>생성(중복 schoolCode 400)</td></tr>
+      <tr><td>POST</td><td class="mono">/api/admin/schools/{id}</td><td>admin</td><td>수정 + soft delete(schoolCode 불변)</td></tr>
+    </tbody>
+  </table>
+  <p class="note">public 검색 응답은 경량(id/name/type/region). 보안은 기존 매처로 자동 → SecurityConfig 변경 없음.</p>
+</section>
+
+<section>
+  <h2>비즈니스 규칙</h2>
+  <table>
+    <thead><tr><th>항목</th><th>규칙</th></tr></thead>
+    <tbody>
+      <tr><td>필수/유일</td><td>schoolName 필수, schoolCode 있으면 unique. 중복 schoolCode 400(선검사 + DataIntegrityViolation→400)</td></tr>
+      <tr><td>불변</td><td>schoolCode 생성 후 불변(수정 요청 미포함)</td></tr>
+      <tr><td>검색</td><td>활성만, prefix 우선 정렬 후 name asc, top-N(20), blank q → 빈 목록</td></tr>
+      <tr><td>삭제</td><td>soft delete(active=false). public 제외 / admin 포함</td></tr>
+      <tr><td>코드값</td><td>schoolType/educationMode 는 코드 문자열(프론트가 CommonCode group 으로 표시, 백엔드 validation 미결합)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>테스트</h2>
+  <div class="summary" style="border-left-color:var(--green);">
+    <div><strong>명령</strong>: <span class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*SchoolControllerTest" --no-daemon</span></div>
+    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — 12건 통과.</div>
+  </div>
+  <p class="note">검색 prefix 우선/활성만/타입 필터/LIKE wildcard escape(q="%" literal)/blank q, create+중복 400/다중 null 코드/blank name 400, update+soft delete(검색 제외, schoolCode 유지)/extra schoolCode 무시(불변), 404, admin 목록 비활성 포함(paged), 인가(403/401).</p>
+</section>
+
+<section>
+  <h2>리뷰 반영 (instruction.md · 3건)</h2>
+  <table>
+    <thead><tr><th>등급</th><th>지적</th><th>반영</th></tr></thead>
+    <tbody>
+      <tr><td>Medium</td><td>검색 q 의 LIKE 특수문자(%,_) 미이스케이프 → q="%" 가 전체 매칭</td><td>service <code>escapeLike</code>(%,_,\) + 쿼리 <code>escape '\'</code>. q="%" 가 literal '%' 매칭만 하도록 회귀 테스트 추가.</td></tr>
+      <tr><td>Low</td><td>admin page size 상한 없음(size=100000 등)</td><td>service 에서 size 를 [1,200]로 clamp, page 최소 0.</td></tr>
+      <tr><td>Low</td><td>schoolCode 불변 extra-field 테스트 없음</td><td>수정 body 에 schoolCode 를 넣어도 기존 값 유지되는 회귀 테스트 추가(10→12).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>다음 단계</h2>
+  <div class="summary" style="border-left-color:var(--blue);">
+    <strong>Phase 08c</strong> — School xlsx import(upsert: schoolCode 우선 + (name,type,region) fallback) + <code>ApplicationEducation.schoolId</code> optional 링크.
+  </div>
+</section>
+
+</div>
+</body>
+</html>

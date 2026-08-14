@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>Phase 03i-3 Attachment File Download</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; color: #1f2937; background: #f5f7fb; }
+    header { background: #103b66; color: #fff; padding: 28px 36px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px; }
+    h1, h2, h3 { margin: 0 0 14px; }
+    h2 { margin-top: 28px; color: #103b66; }
+    p { line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; margin: 12px 0 24px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e5edf5; text-align: left; vertical-align: top; }
+    th { background: #eaf2fb; color: #15395b; }
+    code { background: #eef2f7; padding: 2px 5px; border-radius: 4px; }
+    .badge { display: inline-block; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .completed { background: #d8f3dc; color: #176c36; }
+    .pending { background: #f3f4f6; color: #4b5563; }
+    .out { background: #fde2e2; color: #9b1c1c; }
+    .warning { background: #fff3cd; color: #8a5a00; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 18px; box-shadow: 0 1px 2px rgba(16, 59, 102, 0.06); }
+    .summary { background: #fff; border-left: 5px solid #2563eb; padding: 18px; margin: 20px 0; }
+    .list { margin: 0; padding-left: 18px; line-height: 1.7; }
+    .muted { color: #64748b; }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } main { padding: 18px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="muted">Recruit Backend</div>
+    <h1>Phase 03i-3 - Attachment File Download</h1>
+    <span class="badge completed">Completed</span>
+    <span class="badge warning">Generated 2026-05-20</span>
+  </header>
+  <main>
+    <section class="summary">
+      <h2>Executive Summary</h2>
+      <p>Applicant and admin attachment download endpoints were implemented for <code>physicalFileStatus=STORED</code> rows. Success responses stream file bytes directly, while error and security failures continue to use the existing JSON failure handlers. Storage paths, stored filenames, storage roots, and local absolute paths remain internal.</p>
+      <p>The phase can move forward. Targeted download/storage/attachment tests and the full clean test suite passed.</p>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h3>Completed Scope</h3>
+        <ul class="list">
+          <li>Applicant download endpoint</li>
+          <li>Admin download endpoint</li>
+          <li>Storage load abstraction</li>
+          <li>Safe download headers</li>
+          <li>Korean filename support</li>
+          <li>404 handling for non-downloadable rows</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Not Implemented</h3>
+        <ul class="list">
+          <li>Delete endpoint</li>
+          <li>Admin upload</li>
+          <li>Orphan cleanup</li>
+          <li>Automatic <code>MISSING</code> transition</li>
+          <li><code>downloadAvailable</code> metadata field</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Deferred</h3>
+        <ul class="list">
+          <li>S3/NAS/object storage</li>
+          <li>Virus scan and DLP</li>
+          <li>Attachment required policy</li>
+          <li>Dashboard readiness changes</li>
+          <li>Submit validator changes</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>API List</h2>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr></thead>
+        <tbody>
+          <tr><td>GET</td><td><code>/applications/{applicationId}/attachments/{attachmentId}/download</code></td><td>Applicant-owned file download</td><td>Path ids</td><td>Streaming file response</td></tr>
+          <tr><td>GET</td><td><code>/admin/applications/{applicationId}/attachments/{attachmentId}/download</code></td><td>Admin file download</td><td>Path ids</td><td>Streaming file response</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <table>
+        <thead><tr><th>File</th><th>Status</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>ApplicationAttachmentDownloadService.java</code></td><td><span class="badge completed">New</span></td><td>Applicant/admin download policy and storage load</td></tr>
+          <tr><td><code>AttachmentDownloadResponseFactory.java</code></td><td><span class="badge completed">New</span></td><td>Content headers and safe filename handling</td></tr>
+          <tr><td><code>AdminApplicationAttachmentController.java</code></td><td><span class="badge completed">New</span></td><td>Admin download route</td></tr>
+          <tr><td><code>ApplicationAttachmentController.java</code></td><td><span class="badge completed">Modified</span></td><td>Applicant download route</td></tr>
+          <tr><td><code>LocalAttachmentStorageService.java</code></td><td><span class="badge completed">Modified</span></td><td>Load, absolute path rejection, and root containment checks</td></tr>
+          <tr><td><code>ApplicationAttachmentRepository.java</code></td><td><span class="badge completed">Modified</span></td><td>Scoped attachment lookup methods</td></tr>
+          <tr><td><code>ApplicationAttachmentDownloadControllerTest.java</code></td><td><span class="badge completed">New</span></td><td>HTTP, header, role, and non-exposure tests</td></tr>
+          <tr><td><code>ApplicationAttachmentDownloadServiceTest.java</code></td><td><span class="badge completed">New</span></td><td>Service policy tests</td></tr>
+          <tr><td><code>LocalAttachmentStorageServiceTest.java</code></td><td><span class="badge completed">New</span></td><td>Storage load tests</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Domain And Ownership</h2>
+      <div class="card">
+        <p><code>JobApplication</code> owns <code>ApplicationAttachment</code> rows. A download is valid only when the attachment belongs to the requested application and the row is <code>STORED</code>. Applicant download also requires current-applicant ownership. Admin download verifies application existence and attachment scope under the existing admin authorization policy.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Validation Rules</h2>
+      <table>
+        <thead><tr><th>Rule</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td><code>STORED</code> row with existing physical file</td><td><span class="badge completed">Download allowed</span></td></tr>
+          <tr><td><code>METADATA_ONLY</code> or <code>MISSING</code> row</td><td><span class="badge pending">404</span></td></tr>
+          <tr><td>Missing physical file</td><td><span class="badge pending">Controlled 404, no DB status mutation</span></td></tr>
+          <tr><td>Other applicant or attachment/application mismatch</td><td><span class="badge pending">Hidden 404</span></td></tr>
+          <tr><td>Absolute storage key</td><td><span class="badge pending">Controlled 404 before root resolution</span></td></tr>
+          <tr><td>Anonymous request</td><td><span class="badge pending">401 JSON</span></td></tr>
+          <tr><td>Wrong role</td><td><span class="badge pending">403 JSON</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Response Headers</h2>
+      <table>
+        <thead><tr><th>Header</th><th>Policy</th></tr></thead>
+        <tbody>
+          <tr><td><code>Content-Type</code></td><td>DB value, fallback <code>application/octet-stream</code></td></tr>
+          <tr><td><code>Content-Length</code></td><td>Actual physical file size</td></tr>
+          <tr><td><code>Content-Disposition</code></td><td><code>attachment</code> with ASCII <code>filename</code> and UTF-8 <code>filename*</code></td></tr>
+          <tr><td><code>X-Content-Type-Options</code></td><td><code>nosniff</code></td></tr>
+          <tr><td><code>Cache-Control</code></td><td><code>no-store</code></td></tr>
+          <tr><td><code>Pragma</code></td><td><code>no-cache</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Test Results</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Status</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>test --tests "*ApplicationAttachmentDownload*" --no-daemon</code></td><td><span class="badge completed">Success</span></td><td>Download service/controller tests passed</td></tr>
+          <tr><td><code>test --tests "*AttachmentStorage*" --no-daemon</code></td><td><span class="badge completed">Success</span></td><td>Storage load tests passed</td></tr>
+          <tr><td><code>test --tests "*ApplicationAttachment*" --no-daemon</code></td><td><span class="badge completed">Success</span></td><td>Upload, metadata, and download attachment regression passed</td></tr>
+          <tr><td><code>clean test --no-daemon</code></td><td><span class="badge completed">Success</span></td><td>Full regression passed</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Remaining Issues</h2>
+      <ul class="list">
+        <li>Define orphan cleanup and admin repair policy for missing physical files.</li>
+        <li>Define explicit delete endpoint and audit behavior.</li>
+        <li>Decide whether metadata responses should later include computed download availability.</li>
+        <li>Define admin upload/replace policy.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Next Phase</h2>
+      <div class="card">
+        <p>Recommended next phase: Phase 03i-4 attachment delete, orphan cleanup, and admin repair policy. The highest-risk open decision is how to reconcile DB rows and physical storage when files are deleted or missing.</p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

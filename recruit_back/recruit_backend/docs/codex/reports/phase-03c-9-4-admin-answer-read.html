@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03c-9-4 Admin Answer Read Report</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --ink: #1f2937;
+      --muted: #5f6b7a;
+      --line: #d9e2ec;
+      --ok: #146c43;
+      --warn: #9a5b00;
+      --hold: #596170;
+      --blue: #1d5fb8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Arial, "Malgun Gothic", sans-serif;
+      line-height: 1.55;
+    }
+    header {
+      background: #182436;
+      color: #fff;
+      padding: 34px 40px 28px;
+    }
+    header h1 { margin: 0; font-size: 30px; letter-spacing: 0; }
+    header p { margin: 8px 0 0; color: #d6e2ef; max-width: 980px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 48px; }
+    section { margin-top: 18px; }
+    h2 { margin: 0 0 12px; font-size: 20px; }
+    h3 { margin: 0 0 8px; font-size: 16px; }
+    .grid { display: grid; gap: 16px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      padding: 3px 9px;
+      margin-right: 6px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .ok { color: var(--ok); background: #e8f6ee; border-color: #b8dfc8; }
+    .warn { color: var(--warn); background: #fff4dd; border-color: #edcf92; }
+    .hold { color: var(--hold); background: #eef1f5; border-color: #d7dde5; }
+    .info { color: var(--blue); background: #eaf2ff; border-color: #bfd5f5; }
+    table { width: 100%; border-collapse: collapse; background: var(--panel); }
+    th, td { border: 1px solid var(--line); padding: 10px 12px; vertical-align: top; text-align: left; }
+    th { background: #eef3f9; font-weight: 700; }
+    code { font-family: Consolas, "Courier New", monospace; background: #eef3f9; border-radius: 4px; padding: 1px 4px; }
+    ul, ol { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 4px 0; }
+    .note { color: var(--muted); font-size: 14px; }
+    .callout { border-left: 4px solid var(--blue); padding-left: 14px; }
+    @media (max-width: 840px) {
+      header { padding: 28px 22px; }
+      main { padding: 20px 14px 36px; }
+      .grid.two, .grid.three { grid-template-columns: 1fr; }
+      table { font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Phase 03c-9-4: Admin Application Answer Lazy Read API</h1>
+    <p>관리자 지원서 상세 화면에서 질문답변 영역을 별도 lazy API로 조회할 수 있도록 read-only endpoint를 추가했다.</p>
+  </header>
+
+  <main>
+    <section class="grid three">
+      <div class="card">
+        <span class="badge ok">Implemented</span>
+        <h2>API</h2>
+        <p><code>GET /admin/applications/{applicationId}/answers</code></p>
+      </div>
+      <div class="card">
+        <span class="badge info">Lazy Detail</span>
+        <h2>Scope</h2>
+        <p>관리자 상세 화면 전용이다. 목록, 검색, 통계 응답에는 답변 원문을 추가하지 않았다.</p>
+      </div>
+      <div class="card">
+        <span class="badge hold">Deferred</span>
+        <h2>Security TODO</h2>
+        <p>원문 열람 권한, 마스킹, 감사 로그, export 포함 정책은 목록/검색/통계/리포트로 answerText를 넓히기 전 우선 보강한다.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Changed Files</h2>
+      <table>
+        <thead><tr><th>File</th><th>Change</th></tr></thead>
+        <tbody>
+          <tr><td><code>AdminApplicationAnswerResponse.java</code></td><td>New admin DTO for one question row and current answer.</td></tr>
+          <tr><td><code>AdminApplicationSectionService.java</code></td><td>Added <code>getAnswers</code> using active questions and answer merge.</td></tr>
+          <tr><td><code>AdminApplicationSectionController.java</code></td><td>Added GET answers endpoint.</td></tr>
+          <tr><td><code>AdminApplicationSectionServiceTest.java</code></td><td>Added answer read service policy tests, including state checks with actual active answer rows.</td></tr>
+          <tr><td><code>AdminApplicationSectionControllerTest.java</code></td><td>Added API response and unsupported method tests.</td></tr>
+          <tr><td><code>docs/codex/**</code></td><td>Updated design/history and added implementation/report docs.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid two">
+      <div class="card">
+        <span class="badge ok">Read Policy</span>
+        <h2>조회 정책</h2>
+        <ul>
+          <li><code>applicationId</code> 존재 여부만 확인한다.</li>
+          <li>DRAFT, SUBMITTED, WITHDRAWN 모두 조회 가능하다.</li>
+          <li>공고 상태, 접수기간, form config flag와 무관하게 조회한다.</li>
+          <li>active <code>JobPostingQuestion</code> 기준으로 row를 만든다.</li>
+          <li>정렬은 <code>sortOrder ASC, id ASC</code>다.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <span class="badge warn">Privacy</span>
+        <h2>원문 노출 정책</h2>
+        <ul>
+          <li><code>answerText</code>는 관리자 상세 lazy 응답에만 포함한다.</li>
+          <li>관리자 목록/검색/통계/root detail에는 포함하지 않는다.</li>
+          <li>자유서술에는 민감정보가 포함될 수 있다.</li>
+          <li>권한, 마스킹, 감사 로그는 후속 보안 Phase에서 처리한다.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Response DTO</h2>
+      <table>
+        <thead><tr><th>Field</th><th>Source</th><th>Policy</th></tr></thead>
+        <tbody>
+          <tr><td><code>questionId</code></td><td>Active question</td><td>Always populated</td></tr>
+          <tr><td><code>questionText</code></td><td>Answer snapshot, fallback question</td><td>Snapshot preferred when answer exists</td></tr>
+          <tr><td><code>category</code></td><td>Answer snapshot, fallback question</td><td>Snapshot preferred</td></tr>
+          <tr><td><code>answerType</code></td><td>Answer snapshot, fallback question</td><td>Snapshot preferred</td></tr>
+          <tr><td><code>required</code></td><td>Answer snapshot, fallback question</td><td>Snapshot preferred</td></tr>
+          <tr><td><code>minLength</code></td><td>Answer snapshot, fallback question</td><td>Stored policy only</td></tr>
+          <tr><td><code>maxLength</code></td><td>Answer snapshot, fallback question</td><td>Length policy</td></tr>
+          <tr><td><code>sortOrder</code></td><td>Answer snapshot, fallback question</td><td>Display metadata</td></tr>
+          <tr><td><code>answerId</code></td><td>ApplicationAnswer</td><td>Null when unanswered</td></tr>
+          <tr><td><code>answerText</code></td><td>ApplicationAnswer</td><td>Original text in admin detail only</td></tr>
+          <tr><td><code>answerUpdatedAt</code></td><td>ApplicationAnswer</td><td>Null when unanswered</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid two">
+      <div class="card callout">
+        <h2>Excluded In This Phase</h2>
+        <ul>
+          <li>Inactive question answers</li>
+          <li>Orphan answers outside the active question set</li>
+          <li>Revision/history display</li>
+          <li>Admin answer write command</li>
+          <li>PUT/DELETE endpoints</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>Review Note Recorded</h2>
+        <p>답변 타입이 늘어나면 <code>SHORT_TEXT</code>/<code>LONG_TEXT</code> 길이 상한을 <code>QuestionAnswerPolicy</code> 같은 공통 정책 클래스로 추출하는 리팩토링을 검토한다. 이번 Phase에서는 범위가 작아 그대로 유지했다.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Test Results</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td><code>$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.service.AdminApplicationSectionServiceTest --tests com.shinyoung.recruit.controller.AdminApplicationSectionControllerTest</code></td><td><span class="badge ok">Success</span></td></tr>
+          <tr><td><code>$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.service.ApplicationAnswerServiceTest --tests com.shinyoung.recruit.controller.ApplicationAnswerControllerTest --tests com.shinyoung.recruit.service.ApplicationSubmitValidatorTest --tests com.shinyoung.recruit.service.JobApplicationServiceTest --tests com.shinyoung.recruit.controller.ApplicationControllerTest</code></td><td><span class="badge ok">Success</span></td></tr>
+          <tr><td><code>$env:AES_SECRET_KEY='***'; .\gradlew.bat clean test --no-daemon</code></td><td><span class="badge ok">Success</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Next</h2>
+      <p>다음 후보는 answer 원문 열람 권한, 감사 로그, 마스킹 정책 보강 또는 StageResult 구현 순서 확정이다.</p>
+      <p class="note">This report is self-contained and does not replace the source markdown document.</p>
+    </section>
+  </main>
+</body>
+</html>

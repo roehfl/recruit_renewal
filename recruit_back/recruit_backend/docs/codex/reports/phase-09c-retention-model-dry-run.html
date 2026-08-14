@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 09c — Retention 모델 + Dry-run 구현 리포트</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; margin: 0; background: #f4f6f9; color: #1f2937; line-height: 1.6; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 60px; }
+  header.page { background: linear-gradient(135deg, #1e3a5f, #2c5282); color: #fff; border-radius: 12px; padding: 28px 32px; margin-bottom: 24px; }
+  header.page h1 { margin: 0 0 6px; font-size: 1.5rem; }
+  header.page .sub { opacity: .85; font-size: .95rem; }
+  .badge { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: .78rem; font-weight: 700; vertical-align: middle; }
+  .b-blue { background: #dbeafe; color: #1d4ed8; }
+  .b-green { background: #dcfce7; color: #15803d; }
+  .b-gray { background: #e5e7eb; color: #4b5563; }
+  .b-red { background: #fee2e2; color: #b91c1c; }
+  .b-amber { background: #fef3c7; color: #b45309; }
+  .b-navy { background: #e0e7ff; color: #3730a3; }
+  header.page .badge { margin-right: 8px; }
+  section { background: #fff; border-radius: 12px; padding: 24px 28px; margin-bottom: 22px; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+  section h2 { margin: 0 0 14px; font-size: 1.15rem; color: #1e3a5f; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; }
+  section h3 { margin: 18px 0 8px; font-size: 1rem; color: #2c5282; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: .9rem; }
+  th { background: #f1f5f9; text-align: left; padding: 8px 10px; border: 1px solid #e2e8f0; white-space: nowrap; }
+  td { padding: 8px 10px; border: 1px solid #e2e8f0; vertical-align: top; }
+  code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: .85em; font-family: Consolas, 'Courier New', monospace; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: .85rem; }
+  pre code { background: none; padding: 0; color: inherit; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 10px; }
+  .card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; background: #fafbfc; }
+  .card h4 { margin: 0 0 8px; font-size: .95rem; }
+  .card ul { margin: 0; padding-left: 18px; font-size: .88rem; }
+  .card li { margin-bottom: 4px; }
+  .summary-box { background: #eff6ff; border-left: 4px solid #2563eb; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  .warn-box { background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  footer { text-align: center; color: #94a3b8; font-size: .8rem; margin-top: 30px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Phase 09c — Retention 모델 + Eligibility Scan + Dry-run</h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · Privacy/Audit 슬라이스 9c · 2026-06-05</div>
+  <div style="margin-top:12px">
+    <span class="badge b-green">구현 완료</span>
+    <span class="badge b-green">신규 34 + 회귀 91 passed</span>
+    <span class="badge b-navy">ADR-0005 / ADR-0007</span>
+  </div>
+</header>
+
+<section>
+  <h2>1. Executive Summary</h2>
+  <div class="summary-box">
+    보존/파기의 <strong>산정 기반</strong> 슬라이스. ① <code>RetentionPolicy</code>(전역+override, overlap 금지,
+    scanAt 기준 선택 규칙 + fail-safe POLICY_CONFLICT), ② <code>RetentionHold</code>(<strong>manual only</strong>,
+    release=마킹), ③ <code>JobPosting.hiringEndedAt</code> 수동 anchor 명령(자동 세팅·암묵 closedAt fallback 금지),
+    ④ <code>RetentionEligibilityService</code>(설계 terminal query 계약 — 판정 순서 고정), ⑤ <strong>무변경 dry-run</strong>
+    <code>PurgeBatch</code>/<code>PurgeJobItem</code>(delete 금지 ledger) + <code>PURGE_SCAN</code> coarse 감사.
+    파기 실행(execute)·tombstone 은 09d-1.
+    <br><br>
+    <strong>2026-06-05 구현 리뷰 반영(Medium 2 + Low 3):</strong> hold 조회를 <strong>PRIVACY_ADMIN 전용</strong>으로
+    좁힘(자유 텍스트 reason 노출 차단 — 권장안), retention write/dry-run 4개 서비스에 <code>requireActor</code>
+    (ANONYMOUS 감사 차단), batch 목록 <strong>page/size 가드</strong>(max 100, <code>PageResponse</code> 전환),
+    서비스 레벨 null 필드 방어(Bean Validation 우회 경로 대비), active hold 중복 race 는 후속 항목으로 문서화.
+  </div>
+  <table>
+    <tr><th>구현 문서</th><td><code>docs/codex/implementation/phase-09c-retention-model-dry-run.md</code></td></tr>
+    <tr><th>운영 DDL</th><td><code>docs/codex/ops/phase-09c-retention-ddl.sql</code> — 신규 테이블 4 + 컬럼 4(수동 적용)</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>2. 완료 범위</h2>
+  <div class="cards">
+    <div class="card">
+      <h4><span class="badge b-green">모델</span> Retention 도메인</h4>
+      <ul>
+        <li><code>RetentionPolicy</code> — periodDays/baselineType(HIRING_ENDED_AT|CLOSED_AT)/enabled/effective window</li>
+        <li><code>RetentionHold</code> — manual only · active 중복 금지 · 사유 원문은 도메인만</li>
+        <li><code>JobPosting.hiringEndedAt</code> + 수동 anchor 명령</li>
+        <li><code>JobApplication</code> 파기 marker 3컬럼(09c 읽기 전용)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-green">산정</span> 선택 규칙 + Eligibility</h4>
+      <ul>
+        <li>override > global · scanAt 기준 window · 부재=NOT_FOUND · 2+ 후보=<strong>POLICY_CONFLICT(fail-safe)</strong></li>
+        <li>판정 순서 고정: PURGED→HOLD→POLICY→ANCHOR→NOT_DUE→STAGE_CONFIG→NOT_TERMINAL</li>
+        <li>terminal = WITHDRAWN OR (finalStage 1개·발표/확정·결과 결정)</li>
+        <li>Clock 주입 scanAt — 판정 컴포넌트는 시계 비의존</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-green">Dry-run</span> 무변경 preview</h4>
+      <ul>
+        <li><code>PurgeBatch(DRY_RUN)</code> + item(ELIGIBLE/SKIPPED+reason) — <strong>도메인 무변경</strong></li>
+        <li>집계: total/eligible/skipped/<strong>policyConflictCount</strong></li>
+        <li>ledger delete 금지(repository 계약)</li>
+        <li>감사 = batch 단위 <code>PURGE_SCAN</code> coarse index 만(in-tx)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-green">인가</span> ADR-0007 matcher</h4>
+      <ul>
+        <li>write(정책 CUD/hold/anchor) = <strong>ROLE_PRIVACY_ADMIN</strong></li>
+        <li>GET·dry-run = RECRUIT·PRIVACY</li>
+        <li>HTTP method 분기 narrow matcher 8종 — broad 보다 먼저</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>3. API</h2>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>권한</th><th>상태</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td><code>/admin/retention/policies</code></td><td>RECRUIT·PRIVACY</td><td><span class="badge b-green">완료</span></td></tr>
+      <tr><td>POST</td><td><code>/admin/retention/policies</code> · <code>/policies/{id}</code> · <code>/policies/{id}/delete</code></td><td><strong>PRIVACY</strong></td><td><span class="badge b-green">완료</span> (GET/POST 만 — 과거 PUT/DELETE)</td></tr>
+      <tr><td>GET / POST</td><td><code>/admin/retention/holds</code> · <code>/holds/{id}/release</code></td><td><strong>전부 PRIVACY</strong>(reason 자유 텍스트 — 리뷰 Medium 1 반영, 조회도 전용화)</td><td><span class="badge b-green">완료</span> (release 는 POST)</td></tr>
+      <tr><td>POST</td><td><code>/admin/retention/job-postings/{id}/anchor</code></td><td><strong>PRIVACY</strong></td><td><span class="badge b-green">완료</span></td></tr>
+      <tr><td>POST</td><td><code>/admin/retention/purge-batches/dry-run</code></td><td>RECRUIT·PRIVACY</td><td><span class="badge b-green">완료</span></td></tr>
+      <tr><td>GET</td><td><code>/admin/retention/purge-batches?page&amp;size</code>(+<code>/{id}</code>)</td><td>RECRUIT·PRIVACY — 목록 size≤100 가드(리뷰 Low 2)</td><td><span class="badge b-green">완료</span></td></tr>
+      <tr><td>POST</td><td><code>/admin/retention/purge-batches/execute</code></td><td>—</td><td><span class="badge b-gray">09d-1</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>4. 감사 계측 / Validation 규칙</h2>
+  <table>
+    <thead><tr><th>#</th><th>규칙</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>정책: periodDays≥1 · from≤to · 같은 scope enabled <strong>overlap 금지</strong> · 적용 대상 변경 금지</td></tr>
+      <tr><td>2</td><td>anchor 암묵 fallback 금지 — HIRING_ENDED_AT 정책은 closedAt 이 있어도 ANCHOR_NOT_FIXED</td></tr>
+      <tr><td>3</td><td>eligibility = anchor 종료 + period 경과 + not purged + not hold + terminal(설계 query 계약)</td></tr>
+      <tr><td>4</td><td>dry-run 무변경 — JobApplication marker 미세팅(execute 09d-1 전용)</td></tr>
+      <tr><td>5</td><td>감사: 정책 CUD=<code>RETENTION_POLICY_UPDATE</code>+typed metadata · hold=<code>RETENTION_HOLD_SET/RELEASE</code>(사유 원문 금지) · anchor=<code>RETENTION_ANCHOR_SET</code> · dry-run=<code>PURGE_SCAN</code> coarse(전부 in-tx)</td></tr>
+      <tr><td>6</td><td>PurgeBatch/Item = delete 금지 mutable ledger(append-only 는 ActivityLog 만)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>5. 테스트 결과</h2>
+  <p><span class="badge b-green">신규/보강 34 + 회귀 91 — 전부 통과(잔존 실패 0)</span></p>
+  <table>
+    <thead><tr><th>테스트</th><th>건수</th><th>내용</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr><td><code>RetentionEligibilityServiceTest</code></td><td>10</td><td>reasonCode 전 경로 + terminal 계약 + CLOSED_AT + fallback 금지</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>RetentionPolicyServiceTest</code></td><td>9</td><td>선택 규칙 7종 + overlap 검증 + 감사</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>RetentionDryRunServiceTest</code></td><td>1</td><td>통합 — 4건 산정/집계/무변경/PURGE_SCAN coarse 감사</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>AdminRetentionControllerTest</code></td><td>11</td><td>권한 매트릭스(method 분기 matcher 실검증) + 401/403/400</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>AuditMetadataContractTest</code></td><td>3</td><td>permits 9종 + 신규 record allowlist</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td>회귀(JobApplication 36 · JobPosting 27+7 · Audit 10+10 · StageAudit 1)</td><td>91</td><td>엔티티 컬럼 추가/SecurityConfig 변경 영향 영역</td><td><span class="badge b-green">passed</span></td></tr>
+    </tbody>
+  </table>
+  <pre><code>$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*Retention*" --tests "*AdminRetentionControllerTest" --tests "*AuditMetadataContractTest" --no-daemon</code></pre>
+  <p style="font-size:.9rem">전체 회귀는 프로젝트 규칙상 명시 요청 시에만 실행.</p>
+</section>
+
+<section>
+  <h2>6. 한계 / 다음 단계</h2>
+  <table>
+    <thead><tr><th>구분</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge b-amber">운영</span></td><td>수동 DDL 적용 필요(<code>phase-09c-retention-ddl.sql</code>) · purge ledger 테이블 DELETE 권한 부여 금지 권고 · <code>ROLE_PRIVACY_ADMIN</code> DeptRoleMapping 매핑 협의</td></tr>
+      <tr><td><span class="badge b-gray">후속</span></td><td>dry-run 풀스캔(페이징 후속, 09e 하드닝 후보) · batch 응답 권한별 projection(09d) · overlap DB 제약 없음(fail-safe 가 흡수) · <strong>active hold 중복 race(리뷰 Low 1)</strong> — generated column unique/repair API/pessimistic lock 후속 검토 · 스케줄 auto-scan disabled-by-default(자동 실행은 SYSTEM actor 정책 필요)</td></tr>
+      <tr><td><span class="badge b-navy">다음</span></td><td><strong>09d-1 — Purge execute core</strong>: execute(confirmation+sourceDryRunBatchId+재검증), 관계형 PII tombstone/ref-count(인벤토리 allowlist), marker 쓰기. 바이너리 소멸 확인 전 PURGED 승격 금지</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>Phase 09c — Retention 모델 + Dry-run 구현 리포트 · 2026-06-05</footer>
+</div>
+</body>
+</html>

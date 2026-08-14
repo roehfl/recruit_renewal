@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 09 — Privacy Purge / Audit / Retention 설계 리포트</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#ffffff; --ink:#1e293b; --muted:#64748b; --line:#e2e8f0;
+    --blue:#2563eb; --green:#16a34a; --amber:#d97706; --red:#b91c1c; --gray:#94a3b8;
+    --soft:#f8fafc;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
+    color:var(--ink);background:#eef2f7;line-height:1.55;font-size:14px}
+  header{background:linear-gradient(135deg,#0f172a,#1e3a8a);color:#fff;padding:28px 32px}
+  header h1{margin:0 0 6px;font-size:22px}
+  header .sub{color:#cbd5e1;font-size:13px}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 20px 60px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin:18px 0;
+    box-shadow:0 1px 2px rgba(15,23,42,.04)}
+  h2{font-size:17px;margin:0 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+  h3{font-size:14px;margin:16px 0 8px;color:#334155}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.3px;
+    vertical-align:middle}
+  .b-blue{background:#dbeafe;color:#1d4ed8}
+  .b-green{background:#dcfce7;color:#15803d}
+  .b-amber{background:#fef3c7;color:#b45309}
+  .b-red{background:#fee2e2;color:#b91c1c}
+  .b-gray{background:#e2e8f0;color:#475569}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .card{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--soft)}
+  .card h4{margin:0 0 8px;font-size:13px}
+  .card ul{margin:6px 0 0;padding-left:18px} .card li{margin:3px 0}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12.5px}
+  th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:#f1f5f9;font-weight:700}
+  code{background:#f1f5f9;padding:1px 5px;border-radius:5px;font-size:12px;color:#9333ea}
+  .pill{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px}
+  .note{background:#fffbeb;border-left:4px solid var(--amber);padding:10px 14px;border-radius:0 8px 8px 0;margin:10px 0}
+  .crit{background:#fef2f2;border-left:4px solid var(--red);padding:10px 14px;border-radius:0 8px 8px 0;margin:10px 0}
+  .ok{background:#f0fdf4;border-left:4px solid var(--green);padding:10px 14px;border-radius:0 8px 8px 0;margin:10px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  .muted{color:var(--muted)}
+  .kvs{font-size:12.5px}
+  .flow{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:#0f172a;color:#e2e8f0;
+    padding:12px 14px;border-radius:8px;overflow-x:auto;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<header>
+  <h1>Phase 09 — 개인정보 파기 / 감사 / 보존 (Privacy Purge · Audit · Retention)</h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · 설계 리포트 ·
+    <span class="badge b-blue">설계 확정</span>
+    <span class="badge b-amber">구현 대기</span>
+    · 생성일 2026-06-04 (grill-with-docs) · rev 2026-06-04 (instruction.md 리뷰 #1~#7 반영)</div>
+</header>
+
+<div class="wrap">
+
+  <!-- 1. Executive Summary -->
+  <section>
+    <h2>1. Executive Summary</h2>
+    <p>Phase 09 는 두 기둥을 <b>감사 우선(audit-first)</b> 순서로 설계했다. ① 현재 SLF4J 로만 남는 감사 이벤트를 영속
+       <code>ActivityLog</code>(append-only)로 이관하고 정보 반출·핵심 관리자 변경·파기 lifecycle 을 증적으로 남긴다.
+       ② 보존기간이 경과한 지원자 개인정보를 <b>tombstone 익명화 + 첨부 바이너리 물리삭제</b> 방식으로 파기하고
+       <code>PurgeBatch</code>/<code>PurgeJobItem</code> 원장과 감사로 남긴다.</p>
+    <div class="ok"><b>진행 가능 여부</b>: 설계·용어(glossary)·ADR(0005/0006/0007)이 확정되어 구현 슬라이스
+      <span class="pill">9a → 9b → 9c → 9d-1 → 9d-2 → 9e</span> 착수 가능. 비가역 파기는 검증된 감사 기반 위에서만 실행.</div>
+    <div class="crit"><b>불변 원칙</b>: "DB 는 PURGED 인데 디스크에 파일 바이트 잔존" 상태는 <b>절대 불허</b>.
+      <code>PURGED</code> = 관계형 PII 제거 <b>AND</b> 첨부 바이너리 소멸 확인까지 완료된 최종 상태.</div>
+    <div class="note"><b>2026-06-04 리뷰 1차 반영(instruction.md)</b>: ① <b>PII 필드 인벤토리</b>를 9d 선행 산출물로 격상 →
+      <code>docs/codex/implementation/phase-09-pii-field-inventory.md</code>(전 application 엔티티 필드 분류). ② terminal query 구체화(실제 enum 검증).
+      ③ <code>metadataJson</code> → typed <code>AuditMetadata</code>. ④ <code>PhysicalFileStatus.DELETED</code> → <code>SOFT_DELETED</code> 분리. ⑤ requestMatcher HTTP method 분기.
+      ⑥ 9b read API 가드. ⑦ ADR accepted 게이트(ADR-0005 = accepted-with-implementation-gate).</div>
+    <div class="crit"><b>2026-06-04 리뷰 2차 반영(instruction.md)</b>: ① <b>Blocker — <code>ciHash</code> 보존 금지</b>(plain SHA-256 + 중복가입 차단 →
+      ref0 시 <code>ci=null</code>, <code>ciHash="PURGED:"+UUID</code> overwrite). ② upload <code>sourceFileName</code> → hash+확장자(파일명 PII). ③ export fail-close <b>temp file 누수 방지</b> 패턴.
+      ④ RetentionPolicy 선택 규칙 6개 + <code>POLICY_NOT_FOUND</code>. ⑤ <code>hiringEndedAt</code> <b>수동 anchor 명령</b>(자동 세팅 없음). ⑥ RetentionHold <b>manual only</b>.
+      ⑦ holds matcher GET/write 분기. ⑧ 학력·경력 <b>정확 날짜 보존 금지</b>. ⑨ storage-health-scan 상태별 정책. ⑩ PurgeBatch/Item = "delete 금지 ledger"(append-only 아님).</div>
+    <div class="note"><b>2026-06-04 리뷰 3차 반영(instruction.md)</b>: ① <code>PhysicalFileStatus</code> 개명 <b>3단계 안전 마이그레이션</b>(DELETED+SOFT_DELETED 공존 → DB UPDATE → 후속 제거; 운영 row enum 매핑 오류 방지).
+      ② <code>applicantRefHash = HMAC_SHA256(pepper, "APPLICANT:"+applicantId)</code> — 입력 applicantId 만(ci/email/phone 금지).
+      ③ 학력·경력 날짜 <b>안 A 확정</b>(전부 null, 일반화 컬럼 없음 — 현 통계 미사용).
+      ④ RetentionPolicy <b>fail-safe</b>: active 2개↑ = <code>POLICY_CONFLICT</code> SKIP + policyConflictCount.
+      ⑤ <code>Interview.memo</code> 운영 가이드(실명/연락처/평가 자유서술 금지, 평가는 InterviewEvaluation.comment 로만).</div>
+  </section>
+
+  <!-- 2. Scope Cards -->
+  <section>
+    <h2>2. 범위</h2>
+    <div class="cards">
+      <div class="card">
+        <h4><span class="badge b-green">설계 확정</span> 포함</h4>
+        <ul>
+          <li>영속 <code>ActivityLog</code> + 2경로 기록 서비스</li>
+          <li>기존 Export/Pdf/Upload 로거 흡수(dual-write)</li>
+          <li>정보 반출 <b>fail-close</b></li>
+          <li>핵심 관리자 변경 감사 계측</li>
+          <li>RetentionPolicy / RetentionHold</li>
+          <li>eligibility 산정 + dry-run/execute</li>
+          <li>tombstone 익명화 + ref-count(Applicant)</li>
+          <li>첨부 바이너리 saga + reconciliation</li>
+          <li>ROLE_PRIVACY_ADMIN 권한 분리</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4><span class="badge b-red">범위 제외</span> Out of scope</h4>
+        <ul>
+          <li>AOP blanket 접근/페이지 감사(VIEW_PAGE/ACCESS_API)</li>
+          <li>ActivityLog 자체 lifecycle(보존/회전/ip·ua 마스킹)</li>
+          <li>forced purge(정보주체 삭제요청) — enum 슬롯만</li>
+          <li>파기 후 통지 메일(hook 만)</li>
+          <li>스케줄 auto-execute(설계만·disabled)</li>
+          <li>per-subject envelope key / crypto-shred</li>
+          <li>Messaging·통계·엑셀 신규 기능</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4><span class="badge b-amber">후속</span> Deferred</h4>
+        <ul>
+          <li>ActivityLog lifecycle policy 설계</li>
+          <li>forced purge 실제 endpoint/로직</li>
+          <li>스케줄 자동 파기 실행 활성화</li>
+          <li>파기/결과 통지 Messaging 연동</li>
+          <li><code>traceId</code>(OpenTelemetry) 연동</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Architecture / Domain -->
+  <section>
+    <h2>3. 아키텍처 / 도메인</h2>
+    <h3>신규 엔티티 · 관계</h3>
+    <div class="flow">RetentionPolicy (global default + per-JobPosting override)
+JobPosting.hiringEndedAt ──▶ retentionAnchorAt ──▶ eligibility(Clock)
+RetentionHold ──▶ (Phase 9: manual hold only — onboarded 자동 hold 는 후속)
+
+PurgeBatch (DRY_RUN | EXECUTE)
+  └─ 1:N PurgeJobItem (delete 금지 ledger, application 별 결과)
+        └─ targetType / status / reasonCode / erased counts
+
+JobApplication ─(tombstone)─ purgeBatchId · purgeResult · purgedAt
+  ├─ sections/answers : 원문 PII 익명화
+  └─ ApplicationAttachment : physicalFileStatus saga + filenameHash
+
+ActivityLog (append-only) ── purge 는 batch 단위 coarse index 만
+  ├─ applicationId / applicantRefHash(HMAC) 로 연결
+  └─ 지원자 파기 job 이 수정·삭제·마스킹하지 않음</div>
+    <h3>데이터 소유 / 보존 규칙</h3>
+    <ul>
+      <li><b>ActivityLog</b> = 영속 감사 증적 source of truth. SLF4J <code>recruit.audit.*</code> 는 보조.
+        지원자 원문 PII 미저장(단 actorId/ip/ua/applicationId/applicantRefHash 포함 → "완전 PII-free" 아님).</li>
+      <li><b>PurgeBatch/PurgeJobItem</b> = 파기 상세 원장(무엇을 파기했나). ActivityLog 는 coarse index(누가 했나).</li>
+      <li><b>tombstone</b> = 비식별 골격(ids/posting/position/stage·result code/날짜차원/purge 메타). 원문 PII 없음.</li>
+      <li><b>ref-count</b>: Applicant 공통 PII 는 그 Applicant 의 모든 JobApplication 파기 시에만 익명화.</li>
+    </ul>
+    <div class="note"><b>핵심 클래스(계획)</b>: <code>ActivityLogService</code>(recordInCurrentTx/recordRequiresNew),
+      <code>RetentionEligibilityService</code>(Clock), <code>PurgeExecutionService</code>(item-level tx),
+      <code>AttachmentPurgeSagaService</code>, <code>StorageHealthScanService</code>(확장),
+      <code>AdminAuditController</code>, <code>AdminRetentionController</code>.</div>
+  </section>
+
+  <!-- 4. Purge saga -->
+  <section>
+    <h2>4. 파기 saga (stateful saga + reconciliation)</h2>
+    <p class="muted">첨부 바이너리 삭제는 DB 트랜잭션과 원자화 불가 → 트랜잭션이 아니라 saga.
+      관계형 PII 제거만으로 PURGED 보고하지 않는다.</p>
+    <div class="flow">① DB tx  : PII·originalFilename 제거, attachment/item = BINARY_DELETE_PENDING,
+            JobApplication.purgeResult = PURGE_PENDING → commit
+② 파일삭제: deleteIfExists(멱등) + 존재 재확인 (이미 없음 = MISSING_AS_SUCCESS)
+③ DB tx  : 소멸 확인 → PURGED / purgedAt 확정
+           실패     → BINARY_DELETE_FAILED / PARTIAL_FAILED (재시도 대상)
+reconciliation sweep : PENDING/FAILED 재처리
+storage-health-scan  : "DB PURGED 인데 파일 존재" = 치명적 불일치 탐지</div>
+    <div class="ok">"파일 소멸 + DB pending" = 프라이버시상 <b>안전</b>(나중에 PURGED 승격).</div>
+    <div class="crit">"DB PURGED + 파일 잔존" = <b>불허</b>(역방향).</div>
+    <table>
+      <tr><th>트랜잭션 입도</th><td>application 1건 = item tx(all-or-nothing). batch = 비원자 집계(<code>COMPLETED</code>/<code>PARTIAL_FAILED</code>). batch <code>FAILED</code> = 시작/criteria 생성 실패만. <code>ALREADY_PURGED</code> = idempotent skip.</td></tr>
+      <tr><th>dry-run vs execute</th><td>별도 batch. execute 에 <code>sourceDryRunBatchId</code>(bulk 필수). <b>execute 는 dry-run 을 믿지 않고 실행시 eligibility 재검증.</b></td></tr>
+    </table>
+  </section>
+
+  <!-- 5. API -->
+  <section>
+    <h2>5. API (계획)</h2>
+    <p class="muted">경로 prefix <code>/api</code>. <b>narrow PRIVACY 경로를 broad <code>/api/admin/**</code> matcher 보다 먼저 등록(보안 요구사항).</b>
+      requestMatcher 는 <b>HTTP method 까지 분기</b>(같은 <code>/retention/policies/**</code>: GET=RECRUIT, POST/PUT/DELETE=PRIVACY).</p>
+    <table>
+      <thead><tr><th>Method</th><th>Path</th><th>권한</th><th>목적</th></tr></thead>
+      <tbody>
+        <tr><td>GET</td><td class="pill">/api/admin/audit/activities</td><td><span class="badge b-gray">RECRUIT(마스킹) / PRIVACY(원문)</span></td><td>감사 로그 검색(actor/action/result/target/posting/application/date)</td></tr>
+        <tr><td>GET</td><td class="pill">/api/admin/audit/activities/{id}</td><td>동일</td><td>감사 단건(권한별 ip/ua 마스킹)</td></tr>
+        <tr><td>GET</td><td class="pill">/api/admin/retention/policies</td><td><span class="badge b-gray">RECRUIT</span></td><td>RetentionPolicy 조회</td></tr>
+        <tr><td>POST/PUT/DELETE</td><td class="pill">/api/admin/retention/policies/** (write)</td><td><span class="badge b-blue">PRIVACY</span></td><td>RetentionPolicy CUD (in-tx 감사)</td></tr>
+        <tr><td>GET/POST/DELETE</td><td class="pill">/api/admin/retention/holds/**</td><td><span class="badge b-blue">PRIVACY</span>(write) / RECRUIT(read)</td><td>RetentionHold 관리/조회</td></tr>
+        <tr><td>POST</td><td class="pill">/api/admin/retention/purge-batches/dry-run</td><td><span class="badge b-gray">RECRUIT</span></td><td>dry-run scan(무변경, eligibility 산정)</td></tr>
+        <tr><td>GET</td><td class="pill">/api/admin/retention/purge-batches/{id}</td><td>RECRUIT(요약) / PRIVACY(원문)</td><td>PurgeBatch 상세 + PurgeJobItem</td></tr>
+        <tr><td>POST</td><td class="pill">/api/admin/retention/purge-batches/execute</td><td><span class="badge b-blue">PRIVACY</span></td><td>purge execute(confirmation + bulk=sourceDryRunBatchId + 재검증)</td></tr>
+      </tbody>
+    </table>
+    <div class="note">응답에 지원자 PII·<code>ci</code>·<code>password</code> 노출 금지. <code>ipAddress</code>/<code>userAgent</code> 는 ROLE_PRIVACY_ADMIN 에게만 원문, 그 외 마스킹.</div>
+  </section>
+
+  <!-- 6. Validation / Policy -->
+  <section>
+    <h2>6. 검증 / 정책 규칙</h2>
+    <div class="grid2">
+      <div class="card">
+        <h4>감사 트랜잭션 (ADR-0006)</h4>
+        <ul>
+          <li>커밋 변경 성공 → <b>in-tx</b>(원자적, afterCommit 금지)</li>
+          <li>실패/거부/충돌/스킵 → <b>REQUIRES_NEW</b></li>
+          <li>정보 반출 → 별도 tx + <b>fail-close</b></li>
+          <li>append-only(정정=correction event), <code>@Version</code> 불필요</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>파기 eligibility</h4>
+        <ul>
+          <li>anchor 종료 + retentionPeriod 경과 + not purged + not hold + <b>terminal</b></li>
+          <li>terminal = WITHDRAWN ∨ (finalStage 1개 ∧ status∈{RESULT_ANNOUNCED,CLOSED} ∧ StageResult.resultStatus≠PENDING ∧ decidedAt≠null)</li>
+          <li>finalStage 부재/2개↑ = INVALID_STAGE_CONFIGURATION SKIP</li>
+          <li>anchor 암묵 fallback 금지 → <code>ANCHOR_NOT_FIXED</code></li>
+          <li>SKIP reasonCode: RETENTION_NOT_DUE / RETENTION_HOLD / ALREADY_PURGED / ANCHOR_NOT_FIXED / APPLICATION_NOT_TERMINAL / INVALID_STAGE_CONFIGURATION / POLICY_NOT_FOUND / POLICY_CONFLICT</li>
+          <li>RetentionPolicy: override&gt;global, effective@scanAt, overlap 금지, active 2개↑ = POLICY_CONFLICT</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>actionResult enum</h4>
+        <ul>
+          <li><code>SUCCESS</code> / <code>FAILURE</code> / <code>DENIED</code> / <code>SKIPPED</code> / <code>CONFLICT</code></li>
+          <li>CONFLICT(낙관적 락/버전) = FAILURE 와 분리</li>
+          <li>상태성(STARTED/REQUESTED/COMPLETED) = actionType 으로</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>RetentionHold (보존 예외)</h4>
+        <ul>
+          <li><b>Phase 9 = manual hold only</b> (onboarded/HR 상태 도메인 부재 → 자동 hold 후속)</li>
+          <li>중간 전형 PASSED 는 제외 기준 <b>아님</b></li>
+          <li>불합격·전형포기·미응시·입사포기·미확정 종료 = retention 경과 시 파기 대상</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note"><b>권한 분리(ADR-0007)</b>: purge execute / RetentionPolicy·Hold write / 감사 원문(ip·ua)·purge 원장 원문 = <b>ROLE_PRIVACY_ADMIN</b>.
+      dry-run/scan · retention 조회 · 마스킹 audit 목록 · policy read = ROLE_RECRUIT_ADMIN. DeptRoleMapping 파생(하드코딩 금지).</div>
+  </section>
+
+  <!-- Schema -->
+  <section>
+    <h2>7. 스키마 / DDL 변경 <span class="badge b-amber">수동 DDL 필요</span></h2>
+    <p class="muted">migration framework 없음 → 영속 DB 반영은 전부 수동 DDL.</p>
+    <table>
+      <thead><tr><th>대상</th><th>변경</th></tr></thead>
+      <tbody>
+        <tr><td>신규 테이블 (5)</td><td><code>ActivityLog</code>, <code>RetentionPolicy</code>, <code>RetentionHold</code>, <code>PurgeBatch</code>, <code>PurgeJobItem</code></td></tr>
+        <tr><td><code>JobApplication</code></td><td>+ <code>purgeBatchId</code>, <code>purgeResult</code>(PURGE_PENDING/PARTIAL_PENDING/PARTIAL_FAILED/PURGED), <code>purgedAt</code>(최종 PURGED 시점에만). <b>JobApplicationStatus enum 불변</b></td></tr>
+        <tr><td><code>ApplicationAttachment</code></td><td>PhysicalFileStatus <b>재정의</b>: 기존 <code>DELETED</code>→<code>SOFT_DELETED</code> 개명(soft-delete↔purge 분리) + <code>BINARY_DELETE_PENDING/BINARY_DELETED/BINARY_DELETE_FAILED</code> 추가. <b>3단계 안전 마이그레이션</b>: ①DELETED+SOFT_DELETED 공존(둘 다 soft-deleted 취급) →②DB UPDATE+잔존 0건 확인 →③후속 phase DELETED 제거. + <code>filenameHash</code>·<code>binaryDeletedAt</code> 신규, <code>originalFileName</code>(NOT NULL)→PLACEHOLDER, <code>storagePath</code>(NOT NULL)→ALTER nullable 후 최종 null</td></tr>
+        <tr><td><code>JobPosting</code></td><td>+ <code>hiringEndedAt</code>(retentionAnchorAt 소스, 암묵 fallback 없음)</td></tr>
+        <tr><td>섹션/answers PII 컬럼</td><td><code>phase-09-pii-field-inventory.md</code> 전 필드 분류 완료. NOT NULL String→PLACEHOLDER, NOT NULL date→ALTER nullable+null. 학력·경력 날짜=<b>안 A(전부 null, 일반화 컬럼 없음)</b>. <code>createdBy</code>(updatable=false)=JPQL/native update</td></tr>
+        <tr><td>권한 / 비밀</td><td><code>ROLE_PRIVACY_ADMIN</code>(DeptRoleMapping + SecurityConfig matcher), <code>AUDIT_HMAC_SECRET</code> pepper(env, prod 누락=기동실패, test=전용값)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Slices -->
+  <section>
+    <h2>8. 슬라이스 (build order)</h2>
+    <table>
+      <thead><tr><th>Slice</th><th>상태</th><th>범위</th></tr></thead>
+      <tbody>
+        <tr><td><b>9a</b> ActivityLog Foundation</td><td><span class="badge b-amber">구현 대기</span></td><td>schema/enums/repo, ActivityLogService(2경로), correlationId filter, applicantRefHash(HMAC)</td></tr>
+        <tr><td><b>9b</b> 로그 흡수 + 관리자 변경 audit + read API</td><td><span class="badge b-amber">구현 대기</span></td><td>Export/Pdf/Upload adapter(dual-write), egress fail-close, reopen·StageResult·첨부 admin 계측, typed AuditMetadata, audit read(마스킹/원문). read 가드: page size max / occurredAt range max / default recent range / ip·ua 마스킹·metadataJson PII 금지·projection 분리 테스트</td></tr>
+        <tr><td><b>9c</b> Retention 모델 + eligibility scan + dry-run</td><td><span class="badge b-amber">구현 대기</span></td><td>RetentionPolicy/Hold, JobPosting.hiringEndedAt, eligibility(Clock), dry-run PurgeBatch</td></tr>
+        <tr><td><b>9d-1</b> Purge execute core</td><td><span class="badge b-amber">구현 대기</span></td><td>PRIVACY_ADMIN, confirmation/sourceDryRunBatchId, 재검증, 관계형 PII tombstone, ref-count, coarse index. (바이너리 전 PURGED 승격 금지)</td></tr>
+        <tr><td><b>9d-2</b> Attachment binary delete saga</td><td><span class="badge b-amber">구현 대기</span></td><td>physicalFileStatus 전이, 파일 물리삭제(멱등), 소멸 확인 후 최종 PURGED 승격</td></tr>
+        <tr><td><b>9e</b> Reconciliation + 안정화</td><td><span class="badge b-amber">구현 대기</span></td><td>storage-health-scan 확장, 치명 불일치 탐지, 회귀(PII 부재/권한/멱등/Clock)</td></tr>
+      </tbody>
+    </table>
+    <p class="muted">문서상 9d 는 한 장이나 <b>구현 지시문은 9d-1/9d-2 로 분리</b>.</p>
+  </section>
+
+  <!-- 9. Test -->
+  <section>
+    <h2>9. 테스트</h2>
+    <h3>명령</h3>
+    <div class="flow">$env:AES_SECRET_KEY='********'; $env:AUDIT_HMAC_SECRET='********'; .\gradlew.bat clean test --no-daemon</div>
+    <p class="muted"><code>AUDIT_HMAC_SECRET</code> 은 Phase 09 부터 필요(test 전용 값). 날짜 의존 회귀는 fixed <code>Clock</code> 으로 작성.</p>
+    <h3>결과</h3>
+    <p><span class="badge b-gray">설계 단계</span> 구현/테스트 미실행 — 각 슬라이스 구현 문서에서 실제 결과 기록.</p>
+    <h3>회귀 포커스</h3>
+    <ul>
+      <li>감사 트랜잭션 3-way(in-tx / REQUIRES_NEW / fail-close) 동작</li>
+      <li>파기 후 <b>PII 부재</b> 검증 + "DB PURGED인데 파일 존재" 탐지</li>
+      <li>권한 매트릭스(PRIVACY vs RECRUIT) + requestMatcher 순서</li>
+      <li>idempotent re-run(ALREADY_PURGED), ref-count 익명화</li>
+    </ul>
+  </section>
+
+  <!-- 10. Remaining -->
+  <section>
+    <h2>10. 남은 이슈 / 결정 보류</h2>
+    <ul>
+      <li>섹션/answers NOT NULL PII 컬럼 nullable 화 여부 — 실제 DDL 확인 후 확정</li>
+      <li>entity 별 field-level 익명화 allowlist(quasi-identifier 포함) — 구현 시 확정</li>
+      <li>ActivityLog 자체 lifecycle(보존/회전/ip·ua 마스킹) — 후속</li>
+      <li>forced purge(정보주체 삭제요청) — enum 슬롯만, 후속</li>
+      <li>스케줄 auto-execute — disabled by default, 운영검증 후 활성</li>
+      <li>운영 ROLE_PRIVACY_ADMIN dept 매핑 최종 확정 — 운영 협의</li>
+    </ul>
+  </section>
+
+  <!-- 11. Next -->
+  <section>
+    <h2>11. 다음 Phase 권고</h2>
+    <ul>
+      <li>Phase 09 완료 후: ActivityLog lifecycle policy, forced purge(정보주체 삭제요청), 스케줄 auto-execute 활성, Messaging(파기/결과 통지) 도메인</li>
+      <li>9a 착수 시 <b>ADR-0006/0007</b> → <code>accepted</code>. <b>ADR-0005</b> 는 PII 인벤토리(§9 DDL·§10 확인항목) 확정 전까지 <code>accepted-with-implementation-gate</code></li>
+    </ul>
+    <p class="muted">관련 문서: design markdown <code>docs/codex/design/phase-09-privacy-purge-audit-retention-design.md</code>,
+      <b>PII 인벤토리 <code>docs/codex/implementation/phase-09-pii-field-inventory.md</code></b>,
+      ADR-0005/0006/0007, CONTEXT.md (Privacy/Audit glossary).</p>
+  </section>
+
+</div>
+</body>
+</html>

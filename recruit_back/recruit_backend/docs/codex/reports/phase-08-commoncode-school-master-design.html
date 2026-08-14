@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 08 - CommonCode &amp; School Master (Design)</title>
+<style>
+  :root { --blue:#1d4ed8; --green:#15803d; --amber:#b45309; --red:#b91c1c;
+    --muted:#6b7280; --bg:#f8fafc; --card:#fff; --border:#e2e8f0; --ink:#0f172a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.6; }
+  .wrap { max-width:1080px; margin:0 auto; padding:32px 20px 64px; }
+  header.page { background:linear-gradient(135deg,#3730a3,#6d28d9); color:#fff; border-radius:16px; padding:28px 32px; margin-bottom:28px; }
+  header.page h1 { margin:0 0 6px; font-size:24px; }
+  header.page .sub { opacity:.9; font-size:14px; }
+  .badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+  .badge.design { background:#ede9fe; color:#6d28d9; }
+  .badge.done { background:#dcfce7; color:var(--green); }
+  .badge.oos { background:#fee2e2; color:var(--red); }
+  .badge.pending { background:#f1f5f9; color:var(--muted); }
+  .badge.white { background:rgba(255,255,255,.18); color:#fff; }
+  section { margin-bottom:26px; }
+  h2 { font-size:18px; border-left:4px solid #6d28d9; padding-left:10px; margin:0 0 14px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px 18px; }
+  .card h3 { margin:0 0 8px; font-size:14px; }
+  .card ul { margin:6px 0 0; padding-left:18px; font-size:13px; }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--border); border-radius:12px; overflow:hidden; font-size:13px; }
+  th,td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { background:#f1f5f9; font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  code { background:#f1f5f9; padding:1px 6px; border-radius:5px; font-size:12px; }
+  .summary { background:var(--card); border:1px solid var(--border); border-left:4px solid #6d28d9; border-radius:10px; padding:16px 20px; font-size:14px; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  .note { font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Phase 08 · CommonCode &amp; School Master <span class="badge white">설계</span></h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · documentation-only 설계(grill-with-docs) · 생성일 2026-06-02</div>
+</header>
+
+<section>
+  <h2>요약</h2>
+  <div class="summary">
+    관리자가 런타임에 관리하는 코드성 lookup(<strong>CommonCode</strong>)과 학교 자동완성/통계 기반(<strong>School</strong>) master 를
+    <strong>추가형(비파괴)</strong>으로 도입한다. CommonCode 는 프론트 드롭다운 소스로만 쓰고(백엔드 검증 미결합), 기존 enum 은
+    <strong>하나도 전환하지 않는다</strong>(카탈로그만). School 은 <code>ApplicationEducation</code> 에 optional <code>schoolId</code> 로만
+    연결(강한 FK 없음)해 학교별 통계 기반을 만든다. 본 단계는 설계 문서만 — 구현은 08a~08c 후속.
+  </div>
+</section>
+
+<section>
+  <h2>범위</h2>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="badge done">In</span> Scope</h3>
+      <ul>
+        <li>CommonCode 엔티티 + admin CRUD + public read</li>
+        <li>School 엔티티 + 검색/자동완성 + admin CRUD + xlsx import(upsert)</li>
+        <li>ApplicationEducation optional <code>schoolId</code></li>
+        <li>enum 전환 후보 카탈로그(STAY/CANDIDATE)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="badge oos">Out</span> of scope</h3>
+      <ul>
+        <li>기존 enum → CommonCode 전환(0건)</li>
+        <li>CommonCode ↔ 백엔드 필드 validation 결합</li>
+        <li>SCHOOL/CERTIFICATE funnel dimension(07c 보류)</li>
+        <li>외부 학교 API, 강한 FK, free-text 소급 매칭</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="badge design">slice</span> 계획</h3>
+      <ul>
+        <li><strong>08a</strong> CommonCode</li>
+        <li><strong>08b</strong> School 검색/CRUD</li>
+        <li><strong>08c</strong> xlsx import + schoolId 링크</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>API (구현 슬라이스 후보)</h2>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>접근</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td class="mono">/api/codes?groupCode=</td><td>public</td><td>active 코드 목록(sortOrder 순)</td></tr>
+      <tr><td>GET/POST</td><td class="mono">/api/admin/codes[/{id}]</td><td>admin</td><td>코드 관리(생성/수정 POST, 비활성 포함, code 불변)</td></tr>
+      <tr><td>GET</td><td class="mono">/api/schools?q=&amp;schoolType=</td><td>public</td><td>이름 검색 top-N(active)</td></tr>
+      <tr><td>GET/POST/PUT</td><td class="mono">/api/admin/schools</td><td>admin</td><td>학교 관리</td></tr>
+      <tr><td>POST</td><td class="mono">/api/admin/schools/import</td><td>admin</td><td>xlsx 일괄 upsert(07d parser 재사용)</td></tr>
+    </tbody>
+  </table>
+  <p class="note">public read 는 SecurityConfig <code>anyRequest().permitAll()</code> 로, admin 은 <code>/api/admin/**</code> 로 자동 커버 — 보안 설정 변경 불필요.</p>
+</section>
+
+<section>
+  <h2>핵심 결정</h2>
+  <table>
+    <thead><tr><th>#</th><th>결정</th><th>근거</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>CommonCode 추가형, enum 전환 0</td><td>타입 안전성/분기 보존, blast radius 0, CLAUDE.md §4.3 (ADR 0003)</td></tr>
+      <tr><td>2</td><td>CommonCode 독립 lookup(백엔드 검증 미결합)</td><td>최소·비파괴, 프론트 드롭다운이 핵심 가치</td></tr>
+      <tr><td>3</td><td>public read + admin CRUD, group=string</td><td>코드는 비민감 라벨</td></tr>
+      <tr><td>4</td><td>code 불변 + soft delete</td><td>저장된 code dangling 방지</td></tr>
+      <tr><td>5</td><td>School ↔ ApplicationEducation = optional schoolId(app-level, FK 없음)</td><td>비파괴 + 학교별 통계 기반 (ADR 0004)</td></tr>
+      <tr><td>6</td><td>School 적재 = admin CRUD + xlsx upsert</td><td>수천 학교 현실 적재, 외부 의존 회피</td></tr>
+      <tr><td>7</td><td>School 식별 = schoolCode 우선 + (name,type,region) fallback</td><td>재import 멱등</td></tr>
+      <tr><td>8</td><td>SCHOOL 통계 dimension 별도 후속</td><td>Phase 08 = master+링크 집중</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>enum 전환 후보 카탈로그 (전환 0)</h2>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="badge done">STAY</span> enum 유지</h3>
+      <ul>
+        <li>상태머신: *Status 전부</li>
+        <li>분기/정책: StageResultStatus, EducationLevel, MilitarySubjectType, Question*/Section* 등</li>
+        <li>척도: EvaluationGrade/Recommendation</li>
+        <li>내부/API: Funnel/Upload/Menu/Notice</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="badge pending">CANDIDATE</span> 표시 전용</h3>
+      <ul>
+        <li>MilitaryBranch/Rank/ServiceType</li>
+        <li>EmploymentType, JobPositionApplicationType</li>
+        <li>DayNightType, CampusType</li>
+        <li>(borderline 재검증: GraduationStatus, StageType, AttachmentType)</li>
+      </ul>
+    </div>
+  </div>
+  <p class="note">CANDIDATE 도 Phase 08 에선 전환하지 않는다 — "관리자 런타임 추가" 요구가 생긴 group 만 별도 전환.</p>
+</section>
+
+<section>
+  <h2>남은 이슈 / 다음 단계</h2>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="badge pending">open</span> 구현 슬라이스에서 확정</h3>
+      <ul><li>School import preview/commit 분리 여부, schoolType 를 CommonCode group 으로, CommonCode seeding(무-seed vs dev data.sql).</li></ul>
+    </div>
+    <div class="card">
+      <h3><span class="badge design">next</span> 후속</h3>
+      <ul><li>08a CommonCode 구현 → 08b/08c. 이후 SCHOOL/CERTIFICATE 통계, 메시지 발송, 개인정보 파기/감사.</li></ul>
+    </div>
+  </div>
+</section>
+
+</div>
+</body>
+</html>

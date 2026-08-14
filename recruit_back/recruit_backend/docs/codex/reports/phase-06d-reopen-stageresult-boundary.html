@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 06d 평가 재개 + StageResult 경계</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .method { background: #1d4ed8; color: #fff; font-family: Consolas, monospace; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>신영증권 채용 Renewal 백엔드</div>
+  <h1>Phase 06d - 평가 재개 + StageResult 경계</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge muted">작성일: 2026-05-29</span>
+</header>
+
+<main>
+
+  <!-- 요약 + 현황 -->
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>Phase 06d는 관리자 <strong>평가 재개(reopen)</strong> 커맨드를 추가합니다. SUBMITTED 평가를 DRAFT로 되돌리고 <code>submittedAt</code>을 초기화하면, 해당 면접관이 06b API로 다시 수정·제출할 수 있습니다.</p>
+      <p>재개 동작은 감사 로그(actor, 평가 id, 면접 id, 이전 제출시각, 재개시각)로 기록됩니다. 등급/추천/코멘트는 보존되고 상태와 제출시각만 바뀝니다.</p>
+      <p>핵심 정책: 평가 도메인은 <code>StageResult</code>를 어디서도 참조/주입/변경하지 않습니다. 최종 합불은 기존 StageResult 수동 확정 워크플로우가 담당합니다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">재개 API</span></p>
+      <p><span class="badge done">SUBMITTED→DRAFT 전이</span></p>
+      <p><span class="badge done">CONFIRMED·ASSIGNED 재개 가드</span></p>
+      <p><span class="badge done">감사 로그 기록</span></p>
+      <p><span class="badge out">StageResult 비참조 보장</span></p>
+      <p><span class="badge done">테스트 65건 통과</span></p>
+    </div>
+  </section>
+
+  <!-- 범위 -->
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>관리자 재개 커맨드 API</li>
+          <li>SUBMITTED→DRAFT 전이 + <code>submittedAt</code> 초기화</li>
+          <li>SUBMITTED만 재개 가능(아니면 400), 면접 소속 검증(아니면 404)</li>
+          <li>재개 대상 상태 가드: interview CONFIRMED + 후보자/면접관 ASSIGNED(아니면 400)</li>
+          <li>재개 감사 로그 기록(actor 포함)</li>
+          <li>StageResult 비변경 보장(구조적 보장)</li>
+          <li>서비스 6건 + 컨트롤러 2건 테스트</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현 (다음 slice)</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>안정화/회귀 하드닝 — 06e</li>
+          <li>영속 ActivityLog 도메인 (감사 저장소)</li>
+          <li>StageResult 반영(reflect) 커맨드</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>StageResult 변경/반영</li>
+          <li>엔티티 reopen 전용 필드 추가(설계 결정 9)</li>
+          <li>Excel/PDF/통계</li>
+          <li>DB 마이그레이션 / DDL</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- API 목록 -->
+  <section>
+    <h2>API 목록</h2>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>권한</th><th>요청</th><th>응답</th></tr>
+      <tr>
+        <td><span class="badge method">POST</span></td>
+        <td><code>/admin/interviews/{interviewId}/evaluations/{evaluationId}/reopen</code></td>
+        <td>ADMIN / RECRUIT_ADMIN</td>
+        <td>-</td>
+        <td><code>AdminEvaluationItemResponse</code></td>
+      </tr>
+    </table>
+    <p class="small">응답은 <code>ApiResponse&lt;T&gt;</code>로 감쌉니다. 재개 후 <code>status=DRAFT</code>, <code>submittedAt=null</code>.</p>
+  </section>
+
+  <!-- 상태 전이 -->
+  <section>
+    <h2>상태 전이</h2>
+    <div class="card">
+      <div class="transition">
+        <span class="state">SUBMITTED</span>
+        <span class="arrow">&rarr;</span>
+        <span class="action">(admin reopen)</span>
+        <span class="arrow">&rarr;</span>
+        <span class="state">DRAFT</span>
+        <span class="arrow">&rarr;</span>
+        <span class="action">(interviewer save/submit · 06b)</span>
+        <span class="arrow">&rarr;</span>
+        <span class="state">SUBMITTED</span>
+      </div>
+      <p class="small">재개는 <code>submittedAt</code>을 초기화하고 등급/추천/코멘트는 보존합니다. DRAFT만 수정 가능하므로 재개 후 면접관이 다시 작성·제출할 수 있습니다.</p>
+    </div>
+  </section>
+
+  <!-- 비즈니스 규칙 -->
+  <section>
+    <h2>검증 및 비즈니스 규칙</h2>
+    <table>
+      <tr><th>#</th><th>규칙</th></tr>
+      <tr><td>1</td><td>평가가 경로의 면접에 속해야 함, 아니면 404</td></tr>
+      <tr><td>2</td><td>SUBMITTED만 재개 가능, DRAFT 재개 시 400</td></tr>
+      <tr><td>3</td><td>재개 대상 재제출 가능 상태 보장: interview CONFIRMED + 후보자 ASSIGNED + 면접관 ASSIGNED, 아니면 400</td></tr>
+      <tr><td>4</td><td>재개 시 <code>status=DRAFT</code>, <code>submittedAt=null</code>. 등급/추천/코멘트 보존</td></tr>
+      <tr><td>5</td><td>재개 후 면접관은 06b API로 재작성/재제출 가능</td></tr>
+      <tr><td>6</td><td>actor 필수(인증 관리자에서 추출), 재개는 감사 로그에 기록</td></tr>
+      <tr><td>7</td><td>평가 도메인은 <code>StageResult</code>를 어디서도 참조/주입/변경하지 않음(구조적 보장)</td></tr>
+      <tr><td>8</td><td>재개·평가 동작이 StageResult 자동 반영을 유발하지 않음</td></tr>
+    </table>
+  </section>
+
+  <!-- StageResult 경계 -->
+  <section>
+    <h2>StageResult 경계 정책</h2>
+    <div class="card">
+      <p><span class="badge out">비변경 보장</span> <code>InterviewEvaluation</code> · <code>InterviewEvaluationAdminService</code> · <code>InterviewerEvaluationService</code> · 컨트롤러 어디에도 <code>StageResult</code>/<code>StageResultRepository</code>/<code>StageResultService</code>에 대한 필드·파라미터·import·호출이 없습니다. 보장은 구조적으로 성립합니다.</p>
+      <p>StageResult 반영(reflect) 커맨드(<code>POST /admin/stages/{stageId}/results/reflect-interview-evaluations</code> 등)는 명시적으로 보류합니다(설계 §12.3). 점수화 기준이 아직 정의되지 않았고, 기존 StageResult 수동 update/bulk-update 워크플로우로 충분합니다.</p>
+    </div>
+  </section>
+
+  <!-- 변경 파일 -->
+  <section>
+    <h2>변경 파일</h2>
+    <h3>수정 파일</h3>
+    <table>
+      <tr><th>파일</th><th>변경</th></tr>
+      <tr><td><code>domain/repository/InterviewEvaluationRepository.java</code></td><td><code>findAdminDetailByIdAndInterviewId</code> 추가</td></tr>
+      <tr><td><code>service/InterviewEvaluationAdminService.java</code></td><td><code>reopen</code> + validateActor, Clock·logger 추가</td></tr>
+      <tr><td><code>controller/InterviewEvaluationAdminController.java</code></td><td>reopen POST 엔드포인트, CurrentEmployeeService 주입</td></tr>
+      <tr><td><code>test/.../service/InterviewEvaluationAdminServiceTest.java</code></td><td>재개 테스트 3건 추가</td></tr>
+      <tr><td><code>test/.../controller/InterviewEvaluationAdminControllerTest.java</code></td><td>재개 테스트 2건 추가</td></tr>
+      <tr><td><code>docs/codex/07-implementation-history.md</code></td><td>06d 이력 추가</td></tr>
+      <tr><td><code>docs/codex/06-implementation-roadmap.md</code></td><td>06d 상태 Completed</td></tr>
+    </table>
+    <p class="small">신규 응답 DTO 없음 — 재개 응답은 06c의 <code>AdminEvaluationItemResponse</code> 재사용.</p>
+  </section>
+
+  <!-- 테스트 결과 -->
+  <section>
+    <h2>테스트 결과</h2>
+    <div class="card">
+      <p>명령어: <code>$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*Evaluation*" --no-daemon</code></p>
+      <p>결과: <span class="badge done">BUILD SUCCESSFUL</span> (65 tests, 0 failures, 0 skipped — 06d 신규 8 + 06a/06b/06c 회귀)</p>
+      <p class="small">요청에 따라 평가 관련 패키지 테스트만 부분 실행했습니다(전체 스위트 미실행).</p>
+      <table>
+        <tr><th>테스트 클래스</th><th>건수</th><th>상태</th></tr>
+        <tr><td><code>InterviewEvaluationAdminServiceTest</code></td><td>13 (06d 신규 6)</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>InterviewEvaluationAdminControllerTest</code></td><td>8 (06d 신규 2)</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>InterviewerEvaluationServiceTest</code> (06b)</td><td>13</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>InterviewerEvaluationControllerTest</code> (06b)</td><td>4</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>InterviewEvaluationTest</code> (06a)</td><td>23</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>InterviewEvaluationRepositoryTest</code> (06a)</td><td>4</td><td><span class="badge done">통과</span></td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- 남은 이슈 -->
+  <section>
+    <h2>남은 이슈</h2>
+    <table>
+      <tr><th>이슈</th><th>상태</th></tr>
+      <tr><td>재개 이력이 영속 저장소가 아닌 애플리케이션 감사 로그(SLF4J)에 기록됨. ActivityLog 도메인 구현 시 이관 필요</td><td><span class="badge warn">보류</span></td></tr>
+      <tr><td>initialize 동시 호출 멱등성(06b 한계) 유지</td><td><span class="badge warn">MVP 한계</span></td></tr>
+      <tr><td>StageResult 반영(reflect) 커맨드 미구현(점수화 기준 미정)</td><td><span class="badge muted">보류</span></td></tr>
+      <tr><td>DB 마이그레이션 파일 없음 (테스트는 H2 생성 스키마)</td><td><span class="badge muted">보류</span></td></tr>
+    </table>
+  </section>
+
+  <!-- 다음 Phase -->
+  <section>
+    <h2>다음 Phase 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>Phase 06e - 안정화 / 테스트 하드닝</strong></p>
+      <p>N×M 매트릭스 회귀, 취소된 면접/참가자 가드, 재개→재제출 사이클, SUBMITTED 불변성, StageResult 비변경 회귀를 보강합니다.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

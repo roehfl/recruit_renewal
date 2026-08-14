@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 08a - CommonCode</title>
+<style>
+  :root { --blue:#1d4ed8; --green:#15803d; --amber:#b45309; --red:#b91c1c;
+    --muted:#6b7280; --bg:#f8fafc; --card:#fff; --border:#e2e8f0; --ink:#0f172a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.6; }
+  .wrap { max-width:1080px; margin:0 auto; padding:32px 20px 64px; }
+  header.page { background:linear-gradient(135deg,#3730a3,#6d28d9); color:#fff; border-radius:16px; padding:28px 32px; margin-bottom:28px; }
+  header.page h1 { margin:0 0 6px; font-size:24px; }
+  header.page .sub { opacity:.9; font-size:14px; }
+  .badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+  .badge.done { background:#dcfce7; color:var(--green); }
+  .badge.oos { background:#fee2e2; color:var(--red); }
+  .badge.pending { background:#f1f5f9; color:var(--muted); }
+  .badge.white { background:rgba(255,255,255,.18); color:#fff; }
+  section { margin-bottom:26px; }
+  h2 { font-size:18px; border-left:4px solid #6d28d9; padding-left:10px; margin:0 0 14px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px 18px; }
+  .card h3 { margin:0 0 8px; font-size:14px; }
+  .card ul { margin:6px 0 0; padding-left:18px; font-size:13px; }
+  .card.kpi { text-align:center; }
+  .card.kpi .num { font-size:30px; font-weight:700; color:#6d28d9; }
+  .card.kpi .lbl { font-size:12px; color:var(--muted); }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--border); border-radius:12px; overflow:hidden; font-size:13px; }
+  th,td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { background:#f1f5f9; font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  code { background:#f1f5f9; padding:1px 6px; border-radius:5px; font-size:12px; }
+  .summary { background:var(--card); border:1px solid var(--border); border-left:4px solid var(--green); border-radius:10px; padding:16px 20px; font-size:14px; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  .note { font-size:12px; color:var(--muted); }
+  .ok { color:var(--green); font-weight:600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Phase 08a · CommonCode <span class="badge white">완료</span></h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · 관리자 코드 lookup master · 생성일 2026-06-02</div>
+</header>
+
+<section>
+  <h2>요약</h2>
+  <div class="summary">
+    관리자가 런타임에 관리하는 코드성 lookup master(<strong>CommonCode</strong>)를 <strong>추가형</strong>으로 도입했다.
+    <code>groupCode + code</code>(불변) + displayName/sortOrder/active/description, public read(드롭다운) + admin CRUD,
+    soft delete. 기존 enum 은 전환하지 않는다(ADR 0003). 테스트 <span class="ok">BUILD SUCCESSFUL</span>(6).
+  </div>
+</section>
+
+<section>
+  <h2>지표</h2>
+  <div class="cards">
+    <div class="card kpi"><div class="num">4</div><div class="lbl">신규 API</div></div>
+    <div class="card kpi"><div class="num">9</div><div class="lbl">신규 클래스(main)</div></div>
+    <div class="card kpi"><div class="num">7</div><div class="lbl">테스트(통과)</div></div>
+    <div class="card kpi"><div class="num">1</div><div class="lbl">신규 테이블</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>범위</h2>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="badge done">완료</span> Implemented</h3>
+      <ul>
+        <li>CommonCode 엔티티((groupCode,code) unique)</li>
+        <li>public read(active+정렬)</li>
+        <li>admin CRUD(비활성 포함)</li>
+        <li>code 불변 + soft delete + 중복 거부</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="badge oos">제외</span> Out of scope</h3>
+      <ul>
+        <li>기존 enum 전환(0, 카탈로그만)</li>
+        <li>백엔드 필드 validation 결합</li>
+        <li>seeding(무-seed)</li>
+        <li>School / import (08b/08c)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>API</h2>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>접근</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td class="mono">/api/codes?groupCode=</td><td>public</td><td>활성 코드(sortOrder 순)</td></tr>
+      <tr><td>GET</td><td class="mono">/api/admin/codes?groupCode=</td><td>admin</td><td>비활성 포함(groupCode 선택)</td></tr>
+      <tr><td>POST</td><td class="mono">/api/admin/codes</td><td>admin</td><td>코드 생성(중복 400)</td></tr>
+      <tr><td>POST</td><td class="mono">/api/admin/codes/{id}</td><td>admin</td><td>수정 + soft delete(code 불변)</td></tr>
+    </tbody>
+  </table>
+  <p class="note">public read 는 <code>anyRequest().permitAll()</code>, admin 은 <code>/api/admin/**</code> → SecurityConfig 변경 없음.</p>
+</section>
+
+<section>
+  <h2>비즈니스 규칙</h2>
+  <table>
+    <thead><tr><th>항목</th><th>규칙</th></tr></thead>
+    <tbody>
+      <tr><td>필수/유일</td><td>groupCode/code/displayName 필수, (groupCode,code) unique, 중복 생성 400</td></tr>
+      <tr><td>불변</td><td>code/groupCode 생성 후 불변(수정 API 미포함)</td></tr>
+      <tr><td>삭제</td><td>soft delete(active=false). public=active만, admin=비활성 포함</td></tr>
+      <tr><td>전환</td><td>기존 enum 전환 0(추가형, ADR 0003)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>테스트</h2>
+  <div class="summary" style="border-left-color:var(--green);">
+    <div><strong>명령</strong>: <span class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*CommonCode*" --no-daemon</span></div>
+    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — 7건 통과.</div>
+  </div>
+  <p class="note">public read active+정렬+비활성 제외, create+중복 400, blank 400, update+soft delete(public 제외/admin 포함), code 불변(extra 필드 무시), 404, 인가(403/401). 동시 생성 race 는 DataIntegrityViolation→400 변환. JSON body 수기 문자열 + UTF-8.</p>
+</section>
+
+<section>
+  <h2>다음 단계</h2>
+  <div class="summary" style="border-left-color:var(--blue);">
+    <strong>Phase 08b</strong> — School(엔티티/검색·자동완성/admin CRUD). 이후 08c(xlsx import + <code>ApplicationEducation.schoolId</code> 링크).
+  </div>
+</section>
+
+</div>
+</body>
+</html>

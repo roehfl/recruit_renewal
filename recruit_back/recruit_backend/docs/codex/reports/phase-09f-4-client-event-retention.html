@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 09f-4 — Client Event Retention Cleanup 구현 리포트</title>
+<style>
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
+    color:#1e293b;background:#eef2f7;line-height:1.55;font-size:14px}
+  header{background:linear-gradient(135deg,#0f172a,#1e40af);color:#fff;padding:28px 32px}
+  header h1{margin:0 0 6px;font-size:21px}
+  header .sub{color:#bfdbfe;font-size:13px}
+  .wrap{max-width:1060px;margin:0 auto;padding:24px 20px 60px}
+  section{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px 22px;margin:18px 0;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+  h2{font-size:16px;margin:0 0 14px;padding-bottom:8px;border-bottom:2px solid #e2e8f0}
+  h3{font-size:13.5px;margin:14px 0 7px;color:#334155}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;vertical-align:middle}
+  .b-green{background:#dcfce7;color:#15803d}
+  .b-blue{background:#dbeafe;color:#1d4ed8}
+  .b-amber{background:#fef3c7;color:#b45309}
+  .b-gray{background:#e2e8f0;color:#475569}
+  .b-red{background:#fee2e2;color:#b91c1c}
+  .b-orange{background:#ffedd5;color:#c2410c}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:8px 0}
+  .card{border:1px solid #e2e8f0;border-radius:10px;padding:14px;background:#f8fafc}
+  .card h4{margin:0 0 8px;font-size:13px}
+  .card ul{margin:6px 0 0;padding-left:18px}
+  .card li{margin:3px 0;font-size:13px}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12.5px}
+  th,td{border:1px solid #e2e8f0;padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:#f1f5f9;font-weight:700}
+  code{background:#f1f5f9;padding:1px 5px;border-radius:5px;font-size:12px;color:#7c3aed}
+  pre{background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:8px;overflow-x:auto;white-space:pre-wrap;font-size:12px;margin:8px 0}
+  .ok{background:#f0fdf4;border-left:4px solid #16a34a;padding:10px 14px;border-radius:0 8px 8px 0;margin:10px 0;font-size:13px}
+  .note{background:#fffbeb;border-left:4px solid #d97706;padding:10px 14px;border-radius:0 8px 8px 0;margin:10px 0;font-size:13px}
+  .warn{background:#fff7ed;border-left:4px solid #ea580c;padding:10px 14px;border-radius:0 8px 8px 0;margin:10px 0;font-size:13px}
+  .muted{color:#64748b;font-size:12.5px}
+  .class-block{border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;margin:10px 0;background:#fafafa}
+  .class-block h4{margin:0 0 6px;font-size:13.5px;color:#0f172a}
+  .class-block .meta{font-size:11.5px;color:#64748b;margin-bottom:8px}
+  .row-even{background:#f8fafc}
+  .pipeline{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:#1e293b;color:#e2e8f0;padding:12px 14px;border-radius:8px;overflow-x:auto;white-space:pre;margin:8px 0}
+  .phase-complete{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:2px solid #16a34a;border-radius:10px;padding:16px 20px;margin:14px 0}
+  .phase-complete h3{color:#15803d;margin:0 0 10px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Phase 09f-4 — Client Event Retention Cleanup</h1>
+  <div class="sub">
+    신영증권 채용 Renewal 백엔드 · 구현 리포트 ·
+    <span class="badge b-green">구현 완료</span>
+    <span class="badge b-green">테스트 통과 (67)</span>
+    <span class="badge b-blue">Phase 09f 전체 완료</span>
+    · 2026-06-11
+  </div>
+</header>
+<div class="wrap">
+
+  <!-- Phase 09f 전체 완료 요약 -->
+  <div class="phase-complete">
+    <h3>Phase 09f — Client Event Log BE 전체 완료</h3>
+    <table>
+      <tr><th>슬라이스</th><th>내용</th><th>상태</th></tr>
+      <tr><td><b>09f-1</b></td><td>수집(ingest) 파이프라인 — Entity, Repository, Sanitizer, Rate Limiter, Service, Controller, Security</td><td><span class="badge b-green">완료</span></td></tr>
+      <tr class="row-even"><td><b>09f-2</b></td><td>프론트엔드 연동 (별도 FE 프로젝트)</td><td><span class="badge b-red">Out of scope (BE 범위 외)</span></td></tr>
+      <tr><td><b>09f-3</b></td><td>관리자 조회 API — 검색/단건 조회, 권한별 민감 필드 projection</td><td><span class="badge b-green">완료</span></td></tr>
+      <tr class="row-even"><td><b>09f-4</b></td><td>Retention Cleanup — bulk delete, CleanupService, 스케줄러, 수동 트리거 API</td><td><span class="badge b-green">완료 (이 슬라이스)</span></td></tr>
+    </table>
+  </div>
+
+  <!-- 1. 요약 -->
+  <section>
+    <h2>1. 요약</h2>
+    <p>Phase 09f(지원자 화면 진단 로그)의 네 번째 슬라이스이자 <b>마지막 BE 슬라이스</b>. <b>retention cleanup 파이프라인</b>을 구현했다 —
+      bulk delete(<code>@Modifying(flushAutomatically=true)</code> JPQL DELETE),
+      <code>ClientEventLogCleanupService</code>,
+      <code>SchedulingConfig</code>(<code>@EnableScheduling</code> <b>프로젝트 최초 도입</b>),
+      <code>ClientEventLogCleanupScheduler</code>(매일 04:00),
+      관리자 수동 트리거 <code>POST /api/admin/client-events/cleanup</code>.</p>
+    <div class="ok">
+      <b>Phase 09f 전 BE 슬라이스(09f-1/09f-3/09f-4)가 이 슬라이스로 완료됨.</b>
+      프론트엔드 연동은 별도 FE 프로젝트(09f-2).
+    </div>
+    <div class="note">
+      <b>strict &lt; 경계</b>: <code>receivedAt &lt; threshold</code>이므로 <code>receivedAt == threshold</code>(정확히 90일 경과 시점)인 로그는 유지됨.
+      경계 로그의 race 방지 설계.<br>
+      <b>@EnableScheduling 최초 도입</b>: <code>SchedulingConfig</code>가 <code>@SpringBootTest</code> 컨텍스트에도 스케줄러를 활성화. cron이 매일 04:00이라 테스트 실행 간섭 위험 낮음.
+    </div>
+    <table>
+      <tr><th>총 커밋</th><td>5 (91c8f38, ca19479, 7ecf2e6, cd8629f, 62d3b82)</td></tr>
+      <tr class="row-even"><th>신규 클래스</th><td>4종 (ClientEventLogCleanupService, SchedulingConfig, ClientEventLogCleanupScheduler, ClientEventLogCleanupResponse)</td></tr>
+      <tr><th>수정 클래스</th><td>3종 (ClientEventLogRepository, AdminClientEventLogController, SecurityConfig)</td></tr>
+      <tr class="row-even"><th>헤더 주석 정리</th><td>09f-1 파일 9개 — <code>// src/...</code> 경로 주석 제거(프로젝트 스타일 정렬)</td></tr>
+      <tr><th>테스트</th><td>09f-4 신규 4건(CleanupService 2 + Scheduler 2) + 기존 AdminController +2건 + 2차 리뷰 6건(SchedulingConfigTest 2, ControllerTest +4) + 3차 리뷰 1건(ServiceTest) = 총 09f 67건 통과</td></tr>
+    </table>
+  </section>
+
+  <!-- 2. 구현 범위 -->
+  <section>
+    <h2>2. 구현 범위</h2>
+    <div class="cards">
+      <div class="card">
+        <h4><span class="badge b-green">구현 완료</span></h4>
+        <ul>
+          <li><code>ClientEventLogRepository.deleteByReceivedAtBefore</code> — <code>@Modifying(flushAutomatically=true)</code>, JPQL DELETE, int 반환</li>
+          <li><code>ClientEventLogCleanupService</code> — threshold 계산, strict &lt;, Clock/retentionDays 주입</li>
+          <li><code>SchedulingConfig</code> — <code>@EnableScheduling</code> 프로젝트 최초 도입</li>
+          <li><code>ClientEventLogCleanupScheduler</code> — <code>@Scheduled(cron)</code>, 예외 무전파</li>
+          <li><code>ClientEventLogCleanupResponse</code> — <code>record(deletedCount)</code></li>
+          <li><code>POST /admin/client-events/cleanup</code> — PRIVACY_ADMIN 전용 수동 트리거</li>
+          <li>SecurityConfig narrow matcher — <code>POST /api/admin/client-events/cleanup → ROLE_PRIVACY_ADMIN</code></li>
+          <li>09f-1 파일 9개 헤더 주석 정리(커밋 62d3b82)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4><span class="badge b-red">Out of scope</span></h4>
+        <ul>
+          <li>프론트엔드 연동 (09f-2 별도 FE 프로젝트)</li>
+          <li>cleanup 행위자 ActivityLog 계측 (설계상 제외 — 진단 로그)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. API 목록 -->
+  <section>
+    <h2>3. API 목록</h2>
+
+    <h3>POST /api/admin/client-events/cleanup — retention cleanup 수동 트리거 (09f-4 신규)</h3>
+    <table>
+      <tr><th>항목</th><th>내용</th></tr>
+      <tr><td>Method</td><td>POST</td></tr>
+      <tr class="row-even"><td>Path</td><td><code>/api/admin/client-events/cleanup</code></td></tr>
+      <tr><td>Base Prefix</td><td><code>/api</code> (<code>WebMvcConfig</code>가 controller 패키지에 일괄 부여)</td></tr>
+      <tr class="row-even"><td>인증/인가</td><td><code>ROLE_PRIVACY_ADMIN</code> 전용 (narrow matcher — <code>ROLE_RECRUIT_ADMIN</code>은 403)</td></tr>
+      <tr><td>요청 Body</td><td>없음</td></tr>
+      <tr class="row-even"><td>응답</td><td><code>ApiResponse&lt;ClientEventLogCleanupResponse&gt;</code> — <code>{"deletedCount": N}</code></td></tr>
+    </table>
+
+    <h3>오류 조건</h3>
+    <table>
+      <tr><th>조건</th><th>HTTP</th></tr>
+      <tr><td>미인증</td><td>401</td></tr>
+      <tr class="row-even"><td><code>ROLE_RECRUIT_ADMIN</code> / <code>ROLE_APPLICANT</code> 등 <code>ROLE_PRIVACY_ADMIN</code> 미보유</td><td>403</td></tr>
+    </table>
+
+    <h3>응답 예시</h3>
+    <pre>{
+  "success": true,
+  "data": {
+    "deletedCount": 42
+  }
+}</pre>
+
+    <h3>기존 GET 엔드포인트 (09f-3, 변경 없음)</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>인가</th><th>설명</th></tr>
+      <tr><td>GET</td><td><code>/api/admin/client-events</code></td><td>RECRUIT_ADMIN / PRIVACY_ADMIN</td><td>검색 (11파라미터)</td></tr>
+      <tr class="row-even"><td>GET</td><td><code>/api/admin/client-events/{id}</code></td><td>RECRUIT_ADMIN / PRIVACY_ADMIN</td><td>단건 조회</td></tr>
+    </table>
+  </section>
+
+  <!-- 4. 변경 파일 -->
+  <section>
+    <h2>4. 변경 파일</h2>
+
+    <h3>커밋 91c8f38 — retention cleanup service</h3>
+    <table>
+      <tr><th>파일</th><th>변경</th></tr>
+      <tr><td><code>service/ClientEventLogCleanupService.java</code></td><td>신규 — @Transactional, threshold 계산, repository 위임</td></tr>
+      <tr class="row-even"><td><code>domain/repository/ClientEventLogRepository.java</code></td><td>수정 — <code>deleteByReceivedAtBefore</code> @Modifying 추가</td></tr>
+      <tr><td><code>test/.../ClientEventLogCleanupServiceTest.java</code></td><td>신규 — 2건</td></tr>
+    </table>
+
+    <h3>커밋 ca19479 — bulk delete flushAutomatically 정렬(프로젝트 @Modifying 관례)</h3>
+    <table>
+      <tr><th>파일</th><th>변경</th></tr>
+      <tr><td><code>domain/repository/ClientEventLogRepository.java</code></td><td>수정 — <code>@Modifying</code> → <code>@Modifying(flushAutomatically = true)</code></td></tr>
+    </table>
+
+    <h3>커밋 7ecf2e6 — scheduling 도입 + cleanup scheduler</h3>
+    <table>
+      <tr><th>파일</th><th>변경</th></tr>
+      <tr><td><code>config/SchedulingConfig.java</code></td><td>신규 — @EnableScheduling 프로젝트 최초 도입</td></tr>
+      <tr class="row-even"><td><code>service/ClientEventLogCleanupScheduler.java</code></td><td>신규 — @Scheduled(cron), 예외 무전파</td></tr>
+      <tr><td><code>test/.../ClientEventLogCleanupSchedulerTest.java</code></td><td>신규 — 2건(Mock 단위 테스트)</td></tr>
+      <tr class="row-even"><td><code>test/.../config/SchedulingConfigTest.java</code></td><td>신규(2차 리뷰 Major 1) — @EnableScheduling 활성/cron 등록 검증 2건</td></tr>
+    </table>
+
+    <h3>커밋 cd8629f — cleanup 수동 트리거</h3>
+    <table>
+      <tr><th>파일</th><th>변경</th></tr>
+      <tr><td><code>dto/response/ClientEventLogCleanupResponse.java</code></td><td>신규 — record(deletedCount)</td></tr>
+      <tr class="row-even"><td><code>controller/AdminClientEventLogController.java</code></td><td>수정 — POST cleanup 엔드포인트 + CleanupService 의존성</td></tr>
+      <tr><td><code>config/SecurityConfig.java</code></td><td>수정 — POST cleanup narrow matcher 삽입</td></tr>
+      <tr class="row-even"><td><code>test/.../AdminClientEventLogControllerTest.java</code></td><td>수정 — cleanup 테스트 2건 추가(총 10건)</td></tr>
+    </table>
+
+    <h3>커밋 62d3b82 — 09f 파일 헤더 경로 주석 제거(프로젝트 스타일 정렬)</h3>
+    <table>
+      <tr><th>파일</th><th>변경</th></tr>
+      <tr><td><code>controller/ClientEventLogController.java</code></td><td>수정 — 첫 줄 <code>// src/...</code> 제거</td></tr>
+      <tr class="row-even"><td><code>dto/request/ClientEventLogRequest.java</code></td><td>수정 — 첫 줄 제거</td></tr>
+      <tr><td><code>dto/response/ClientEventLogIngestResponse.java</code></td><td>수정 — 첫 줄 제거</td></tr>
+      <tr class="row-even"><td><code>service/ClientEventLogService.java</code></td><td>수정 — 첫 줄 제거</td></tr>
+      <tr><td><code>service/ClientEventRateLimiter.java</code></td><td>수정 — 첫 줄 제거</td></tr>
+      <tr class="row-even"><td><code>test/.../ClientEventLogControllerTest.java</code></td><td>수정 — 첫 줄 제거</td></tr>
+      <tr><td><code>test/.../ClientEventLogRateLimitControllerTest.java</code></td><td>수정 — 첫 줄 제거</td></tr>
+      <tr class="row-even"><td><code>test/.../ClientEventLogServiceTest.java</code></td><td>수정 — 첫 줄 제거</td></tr>
+      <tr><td><code>test/.../ClientEventRateLimiterTest.java</code></td><td>수정 — 첫 줄 제거</td></tr>
+    </table>
+  </section>
+
+  <!-- 5. 도메인 / 클래스 구조 -->
+  <section>
+    <h2>5. 도메인 / 클래스 구조</h2>
+
+    <div class="pipeline">client_event_log (독립)
+  ← POST /client-events               [수집, permitAll]
+  ← GET /admin/client-events          [조회, RECRUIT_ADMIN/PRIVACY_ADMIN]
+  ← GET /admin/client-events/{id}     [단건, RECRUIT_ADMIN/PRIVACY_ADMIN]
+  ← POST /admin/client-events/cleanup [bulk delete, PRIVACY_ADMIN 전용]
+  ← @Scheduled(cron 04:00)            [자동 bulk delete]</div>
+
+    <div class="class-block">
+      <h4>ClientEventLogRepository (수정)</h4>
+      <div class="meta">domain.repository · Repository 마커 · 09f-1 기존 + deleteByReceivedAtBefore 추가</div>
+      <p><code>@Modifying(flushAutomatically = true) @Query("DELETE FROM ClientEventLog c WHERE c.receivedAt &lt; :threshold")</code> 단일 JPQL DELETE. 엔티티 로딩 없음. <code>flushAutomatically</code>는 프로젝트 <code>@Modifying</code> 관례 정렬.</p>
+    </div>
+
+    <div class="class-block">
+      <h4>ClientEventLogCleanupService</h4>
+      <div class="meta">service · @Service · @Transactional · 신규</div>
+      <p>threshold = <code>LocalDateTime.now(clock).minusDays(retentionDays)</code>. <code>retentionDays</code> 기본 90(<code>client-event-log.retention-days</code>). strict <code>&lt;</code> — <code>receivedAt == threshold</code> 로그 유지. 스케줄러와 수동 트리거 양쪽에서 호출됨.</p>
+    </div>
+
+    <div class="class-block">
+      <h4>SchedulingConfig</h4>
+      <div class="meta">config · @Configuration · @EnableScheduling · 신규 · 프로젝트 최초</div>
+      <p><code>@EnableScheduling</code> 프로젝트 최초 도입. 현재 사용처는 <code>ClientEventLogCleanupScheduler</code> 하나. <code>@SpringBootTest</code> 컨텍스트에도 스케줄러가 활성화됨(cron 04:00 — 테스트 시간대 간섭 위험 낮음).</p>
+    </div>
+
+    <div class="class-block">
+      <h4>ClientEventLogCleanupScheduler</h4>
+      <div class="meta">service · @Component · @Scheduled · 신규</div>
+      <p><code>@Scheduled(cron = "${client-event-log.cleanup-cron:0 0 4 * * *}")</code>. 예외 무전파 — <code>try-catch</code>로 모든 예외를 <code>log.error</code>만. 스케줄링 스레드/다음 실행 보호.</p>
+    </div>
+
+    <div class="class-block">
+      <h4>ClientEventLogCleanupResponse</h4>
+      <div class="meta">dto.response · Response DTO · Java record · 신규</div>
+      <p><code>record(int deletedCount)</code>. cleanup 결과 단순 응답. <code>ApiResponse&lt;ClientEventLogCleanupResponse&gt;</code>로 래핑됨.</p>
+    </div>
+
+    <div class="class-block">
+      <h4>AdminClientEventLogController (수정)</h4>
+      <div class="meta">controller · @RestController · 09f-3 기존 + cleanup POST 추가</div>
+      <p><code>POST /admin/client-events/cleanup</code> 추가. <code>ClientEventLogCleanupService.cleanup()</code> 위임. 컨트롤러 내 인증 로직 없음 — SecurityConfig narrow matcher가 <code>ROLE_PRIVACY_ADMIN</code> 전용으로 게이팅(retention write 관례와 동일).</p>
+    </div>
+
+    <div class="class-block">
+      <h4>SecurityConfig (수정)</h4>
+      <div class="meta">config · 수정 · narrow matcher 삽입</div>
+      <p><code>POST /api/admin/client-events/cleanup → hasAuthority("ROLE_PRIVACY_ADMIN")</code>를 기존 <code>GET /api/admin/client-events/**</code> matcher 앞, broad <code>/api/admin/**</code> matcher 앞에 삽입. matcher 평가 순서가 보안 요구사항. <code>ROLE_RECRUIT_ADMIN</code>은 cleanup POST에서 403.</p>
+    </div>
+  </section>
+
+  <!-- 6. 비즈니스 규칙 -->
+  <section>
+    <h2>6. 비즈니스 규칙</h2>
+
+    <h3>Retention 삭제 기준</h3>
+    <div class="pipeline">threshold = LocalDateTime.now(clock).minusDays(retentionDays)  // 기본 90일
+DELETE FROM ClientEventLog c WHERE c.receivedAt &lt; threshold
+
+// receivedAt &lt; threshold  → 삭제
+// receivedAt == threshold → 유지 (strict &lt;, 경계 race 방지)
+// receivedAt &gt; threshold  → 유지</div>
+
+    <h3>규칙 목록</h3>
+    <table>
+      <tr><th>#</th><th>규칙</th><th>근거</th></tr>
+      <tr><td>1</td><td>보존 기간 기본 90일 (<code>client-event-log.retention-days</code>)</td><td>설계 §9. yaml 외부 설정으로 운영 환경 조정 가능</td></tr>
+      <tr class="row-even"><td>2</td><td>strict <code>&lt;</code> 경계 — <code>receivedAt == threshold</code> 유지</td><td>경계 시점 로그의 조회 중 삭제 race 방지</td></tr>
+      <tr><td>3</td><td><code>flushAutomatically = true</code> — 동일 트랜잭션 미 flush 엔티티 포함</td><td>프로젝트 <code>@Modifying</code> 관례 정렬 (retention purge 선례)</td></tr>
+      <tr class="row-even"><td>4</td><td>bulk JPQL DELETE — 엔티티 로딩 없음</td><td>대량 진단 로그 처리 효율</td></tr>
+      <tr><td>5</td><td>스케줄러 예외 무전파 — <code>log.error</code>만</td><td>진단 로그 정리 실패가 채용 서비스 주요 기능에 영향 금지</td></tr>
+      <tr class="row-even"><td>6</td><td>cleanup write → <code>ROLE_PRIVACY_ADMIN</code> 전용</td><td>retention write 관례 (<code>POST /api/admin/retention/**</code> 선례)</td></tr>
+      <tr><td>7</td><td>narrow matcher 위치가 보안 요구사항</td><td>matcher 평가 선언 순서 기준 — broad <code>/api/admin/**</code> 앞에 위치해야 함</td></tr>
+    </table>
+  </section>
+
+  <!-- 7. 테스트 결과 -->
+  <section>
+    <h2>7. 테스트 결과</h2>
+    <div class="ok"><b>09f-4 신규 4건 + 기존 AdminController +2건 + 2차 리뷰 6건 + 3차 리뷰 1건 = 09f 전체 67건 통과</b> (scoped 실행). 회귀 AdminAuditControllerTest 10건 통과.</div>
+
+    <h3>ClientEventLogCleanupServiceTest (2건) — @SpringBootTest + @Transactional</h3>
+    <table>
+      <tr><th>테스트명</th><th>검증 내용</th></tr>
+      <tr><td>보존기간이_지난_로그만_삭제된다</td><td>now-91d 1건 삭제, now-89d/now-1d 2건 유지. 91/89일 쌍으로 경계 검증(90일 exact는 Clock ms 오차로 비결정적이므로 제외)</td></tr>
+      <tr class="row-even"><td>삭제_대상이_없으면_0을_반환한다</td><td>now-1d 로그 1건만 존재 → cleanup 결과 0</td></tr>
+    </table>
+
+    <h3>ClientEventLogCleanupSchedulerTest (2건) — 단위 테스트(Mockito)</h3>
+    <table>
+      <tr><th>테스트명</th><th>검증 내용</th></tr>
+      <tr><td>정상_실행시_cleanup을_위임한다</td><td>mock cleanupService.cleanup() 호출 verify</td></tr>
+      <tr class="row-even"><td>cleanup_실패는_로그만_남기고_전파하지_않는다</td><td>cleanup() throw → runCleanup() doesNotThrowAnyException</td></tr>
+    </table>
+
+    <h3>SchedulingConfigTest (2건, 2차 리뷰 Major 1 반영) — @SpringBootTest</h3>
+    <table>
+      <tr><th>테스트명</th><th>검증 내용</th></tr>
+      <tr><td>스케줄링이_활성화되어_있다</td><td>ScheduledAnnotationBeanPostProcessor 빈 존재</td></tr>
+      <tr class="row-even"><td>cleanup_스케줄러의_cron_작업이_등록되어_있다</td><td>등록된 ScheduledTask 목록에 ClientEventLogCleanupScheduler 대상 작업 포함</td></tr>
+    </table>
+    <p class="muted">배경: @EnableScheduling이 빠지면 @Scheduled cron이 기동 오류 없이 조용히 미동작 — 누락 회귀를 컨텍스트 수준에서 고정.</p>
+
+    <h3>AdminClientEventLogControllerTest (10건, 09f-3 8건 + 09f-4 신규 2건) — @SpringBootTest</h3>
+    <table>
+      <tr><th>테스트명</th><th>검증 내용</th><th>슬라이스</th></tr>
+      <tr><td>RECRUIT_ADMIN은_민감_필드가_마스킹된다</td><td>4필드 <code>***</code>, clientSessionId 노출</td><td>09f-3</td></tr>
+      <tr class="row-even"><td>PRIVACY_ADMIN은_원문을_본다</td><td>ipAddress/stackSummary 원문</td><td>09f-3</td></tr>
+      <tr><td>단건_조회와_404를_지원한다</td><td>존재 id → 200, 미존재 id → 404</td><td>09f-3</td></tr>
+      <tr class="row-even"><td>applicationId_필터가_동작한다</td><td>applicationId=999 → totalElements=0</td><td>09f-3</td></tr>
+      <tr><td>최신순으로_정렬된다</td><td>now-1h content[0], now-1d content[1]</td><td>09f-3</td></tr>
+      <tr class="row-even"><td>size_초과는_400이다</td><td>size=101 → 400</td><td>09f-3</td></tr>
+      <tr><td>APPLICANT_권한은_403이다</td><td>ROLE_APPLICANT → 403</td><td>09f-3</td></tr>
+      <tr class="row-even"><td>미인증은_401이다</td><td>미인증 → 401</td><td>09f-3</td></tr>
+      <tr><td><b>PRIVACY_ADMIN은_cleanup을_수동_트리거할_수_있다</b></td><td>now-120d 로그 seed → POST cleanup → deletedCount=1</td><td><span class="badge b-blue">09f-4 신규</span></td></tr>
+      <tr class="row-even"><td><b>RECRUIT_ADMIN은_cleanup을_트리거할_수_없다</b></td><td>ROLE_RECRUIT_ADMIN → POST cleanup → 403</td><td><span class="badge b-blue">09f-4 신규</span></td></tr>
+    </table>
+
+    <h3>09f 전체 scoped 테스트 (67건)</h3>
+    <table>
+      <tr><th>테스트 클래스</th><th>건수</th><th>슬라이스</th></tr>
+      <tr><td>ClientEventLogRepositoryTest</td><td>5</td><td>09f-1/09f-3</td></tr>
+      <tr class="row-even"><td>ClientEventMetadataSanitizerTest</td><td>11</td><td>09f-1</td></tr>
+      <tr><td>ClientEventRateLimiterTest</td><td>6</td><td>09f-1</td></tr>
+      <tr class="row-even"><td>ClientEventLogServiceTest</td><td>8</td><td>09f-1 (3차 리뷰 Minor로 1건 추가)</td></tr>
+      <tr><td>ClientEventLogControllerTest</td><td>14</td><td>09f-1 (2차 리뷰 Major 2로 4건 추가)</td></tr>
+      <tr class="row-even"><td>ClientEventLogRateLimitControllerTest</td><td>1</td><td>09f-1</td></tr>
+      <tr><td>ClientEventLogReadServiceTest</td><td>6</td><td>09f-3</td></tr>
+      <tr class="row-even"><td>AdminClientEventLogControllerTest</td><td>10</td><td>09f-3/09f-4</td></tr>
+      <tr><td>ClientEventLogCleanupServiceTest</td><td>2</td><td>09f-4</td></tr>
+      <tr class="row-even"><td>ClientEventLogCleanupSchedulerTest</td><td>2</td><td>09f-4</td></tr>
+      <tr><td>SchedulingConfigTest</td><td>2</td><td>09f-4 (2차 리뷰 Major 1로 추가)</td></tr>
+      <tr><th>합계</th><th>67</th><td></td></tr>
+    </table>
+
+    <h3>실행 명령</h3>
+    <pre>$env:AES_SECRET_KEY="22791194512954214612461221261067"
+.\gradlew.bat test `
+  "--tests=com.shinyoung.recruit.domain.repository.ClientEventLogRepositoryTest" `
+  "--tests=com.shinyoung.recruit.service.ClientEvent*" `
+  "--tests=com.shinyoung.recruit.controller.ClientEventLog*" `
+  "--tests=com.shinyoung.recruit.controller.AdminClientEventLogControllerTest" `
+  "--tests=com.shinyoung.recruit.config.SchedulingConfigTest" `
+  --no-daemon
+
+# 인접 회귀
+.\gradlew.bat test --tests "com.shinyoung.recruit.controller.AdminAuditControllerTest" --no-daemon</pre>
+  </section>
+
+  <!-- 8. 남은 이슈 -->
+  <section>
+    <h2>8. 남은 이슈</h2>
+
+    <div class="warn">
+      <b>수동 cleanup 트리거의 행위자 감사 추적 없음</b><br>
+      <code>POST /api/admin/client-events/cleanup</code>은 삭제 건수만 반환하며 <code>ActivityLog</code>에 행위자를 기록하지 않는다.
+      진단 로그 정리는 운영 진단 목적이라 설계상 ActivityLog 계측 제외. 규정 요건 발생 시 후속 phase 추가 가능.
+    </div>
+
+    <div class="note">
+      <b>경계값(정확히 90일) 테스트의 결정성</b><br>
+      <code>receivedAt == threshold</code>(정확히 90일 경과 시점) 시나리오는 시스템 Clock의 ms 오차로 비결정적.
+      91일/89일 쌍으로 경계를 검증하는 방식 사용.
+    </div>
+
+    <div class="note">
+      <b>PRIVACY_ADMIN 조회 원문 테스트 부분 커버리지</b><br>
+      <code>AdminClientEventLogControllerTest.PRIVACY_ADMIN은_원문을_본다</code>는 <code>ipAddress</code>/<code>stackSummary</code> 2필드만 검증.
+      <code>userAgent</code>/<code>principalHash</code> 원문은 <code>ClientEventLogReadServiceTest</code>에서 커버됨(09f-3 Known Limitations 동일).
+    </div>
+
+    <div class="note">
+      <b>@EnableScheduling과 통합 테스트 컨텍스트</b><br>
+      <code>SchedulingConfig</code>가 주 컨텍스트에 포함되므로 <code>@SpringBootTest</code> 통합 테스트에서도 스케줄러가 활성화된다.
+      cron이 <code>0 0 4 * * *</code>(매일 04:00)이므로 현재 테스트 실행 시간대 간섭 위험은 낮다.
+      추후 단기 주기 스케줄러가 추가될 경우 해당 테스트에서 <code>@MockBean</code>이나 프로파일 분리로 격리할 것.
+    </div>
+  </section>
+
+  <!-- 9. 다음 단계 -->
+  <section>
+    <h2>9. 다음 단계</h2>
+    <div class="ok"><b>Phase 09f 전 BE 슬라이스가 완료됨.</b> 프론트엔드 연동은 별도 FE 프로젝트(09f-2).</div>
+
+    <h3>운영 고려사항</h3>
+    <table>
+      <tr><th>항목</th><th>내용</th></tr>
+      <tr><td>yaml 설정 명시</td><td><code>application-prod.yaml</code>에 <code>client-event-log.retention-days</code>, <code>client-event-log.cleanup-cron</code> 명시적 선언 권장</td></tr>
+      <tr class="row-even"><td>cleanup 결과 모니터링</td><td>현재 <code>log.info</code>에만 기록됨. 운영 모니터링 필요 시 Actuator metrics 또는 AlertManager 연동 고려</td></tr>
+      <tr><td>cleanup 행위자 추적</td><td>규정 요건 발생 시 <code>ActivityLog</code> 계측 후속 phase 추가</td></tr>
+    </table>
+  </section>
+
+</div>
+</body>
+</html>

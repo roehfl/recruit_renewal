@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 05 Application Form Page Layout Design</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #12324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 22px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d8e1eb; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e7edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #edf2f7; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 14px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f4d7da; color: #842029; }
+    .muted { background: #e8edf2; color: #536171; }
+    .warn { background: #fdecc8; color: #8a5a00; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d8e1eb; border-radius: 8px; padding: 16px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .section { margin-top: 24px; }
+    .small { font-size: 13px; color: #526173; }
+    @media (max-width: 860px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>Shinyoung Recruit Backend</div>
+  <h1>Phase 05 - Application Form Page Layout Design</h1>
+  <span class="badge done">Design Complete</span>
+  <span class="badge muted">Generated: 2026-05-26</span>
+</header>
+
+<main>
+  <section class="summary">
+    <div class="card">
+      <h2>Executive Summary</h2>
+      <p>Phase 05 designs a backend page-layout contract for applicant application forms. It keeps section data persistence and submit validation in the existing section APIs and policy services.</p>
+      <p>The design adds <code>ApplicationFormPage</code> and <code>ApplicationFormPageItem</code> as page/section placement concepts under <code>JobPosting</code>.</p>
+      <p><code>ApplicationFormConfig</code> remains responsible for use/required policy, <code>JobPostingQuestion</code> remains responsible for question required policy, and <code>JobPostingAttachmentRequirement</code> remains responsible for attachment required policy.</p>
+      <p>Phase 05a domain implementation is now complete; this design can move forward to 05b admin layout management.</p>
+    </div>
+    <div class="card">
+      <h2>Status</h2>
+      <p><span class="badge done">Markdown design created</span></p>
+      <p><span class="badge done">HTML report created</span></p>
+      <p><span class="badge pending">Java implementation pending</span></p>
+      <p><span class="badge pending">Runtime APIs pending</span></p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Scope Cards</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Completed Scope</h3>
+        <ul class="list">
+          <li>Page and page item domain design.</li>
+          <li>Section enum reuse policy, including <code>QUESTION_ANSWER</code> and <code>ATTACHMENT</code> cautions.</li>
+          <li>Admin and applicant API contracts.</li>
+          <li>Validation, fallback, and publish guard policy.</li>
+          <li>Implementation slice breakdown.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Not Implemented</h3>
+        <ul class="list">
+          <li>Entities, repositories, services, controllers, DTOs.</li>
+          <li>Runtime API behavior.</li>
+          <li>DB migration files.</li>
+          <li>Automated tests.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Deferred</h3>
+        <ul class="list">
+          <li>Frontend Vue implementation.</li>
+          <li>Drag and drop editor.</li>
+          <li>Page-level save API.</li>
+          <li>Field-level form builder.</li>
+          <li>Published layout versioning.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Changed Files</h2>
+    <table>
+      <tr><th>Path</th><th>Change</th><th>Status</th></tr>
+      <tr><td><code>docs/codex/design/phase-05-application-form-page-layout-design.md</code></td><td>Codex reference design document.</td><td><span class="badge done">Completed</span></td></tr>
+      <tr><td><code>docs/codex/reports/phase-05-application-form-page-layout-design.html</code></td><td>Self-contained human-readable report.</td><td><span class="badge done">Completed</span></td></tr>
+      <tr><td><code>docs/codex/06-implementation-roadmap.md</code></td><td>Phase sequence update.</td><td><span class="badge done">Completed</span></td></tr>
+      <tr><td><code>docs/codex/07-implementation-history.md</code></td><td>Design history entry and next-phase notes.</td><td><span class="badge done">Completed</span></td></tr>
+      <tr><td><code>docs/codex/reports/current-implementation-status.html</code></td><td>Current next phase and remaining-work table update.</td><td><span class="badge done">Completed</span></td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Architecture / Domain</h2>
+    <div class="two">
+      <div class="card">
+        <h3>Entity Relationship</h3>
+        <pre>JobPosting 1 --- N ApplicationFormPage
+ApplicationFormPage 1 --- N ApplicationFormPageItem
+
+ApplicationFormConfig:
+  useXxx / requireXxx policy
+
+JobPostingAttachmentRequirement:
+  attachment enabled / required policy
+
+JobPostingQuestion:
+  question/answer enabled / required policy</pre>
+      </div>
+      <div class="card">
+        <h3>Data Ownership Rules</h3>
+        <ul class="list">
+          <li>Layout owns page placement only.</li>
+          <li><code>ApplicationFormConfig</code> owns non-attachment section enable/required policy.</li>
+          <li><code>JobPostingQuestion</code> owns question/answer enable/required policy.</li>
+          <li><code>JobPostingAttachmentRequirement</code> owns attachment policy.</li>
+          <li>Existing section APIs own application data saves.</li>
+          <li>The backend does not store Vue component names.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Section Policy</h2>
+    <table>
+      <tr><th>Section</th><th>Enabled Source</th><th>Required Source</th><th>Layout Rule</th></tr>
+      <tr><td><code>BASIC_INFO</code></td><td>Always enabled</td><td>Always required</td><td>Must appear once.</td></tr>
+      <tr><td><code>EDUCATION</code>, <code>CAREER</code>, <code>CERTIFICATE</code>, <code>LANGUAGE</code>, <code>MILITARY</code>, <code>AWARD</code>, <code>GAP_PERIOD</code></td><td><code>ApplicationFormConfig.useXxx</code></td><td><code>ApplicationFormConfig.requireXxx</code></td><td>Enabled sections must appear exactly once.</td></tr>
+      <tr><td><code>QUESTION_ANSWER</code></td><td>At least one active posting question</td><td>At least one active required posting question</td><td>Enabled only when active questions exist.</td></tr>
+      <tr><td><code>ATTACHMENT</code></td><td>At least one attachment requirement row</td><td>At least one required attachment requirement row</td><td>Enabled only when attachment policy exists.</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>API List</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/job-postings/{jobPostingId}/application-form-layout</code></td><td>Admin layout read with available sections.</td><td>Path id</td><td>Pages plus <code>availableSections</code>.</td></tr>
+      <tr><td><code>PUT</code> or <code>POST</code></td><td><code>/admin/job-postings/{jobPostingId}/application-form-layout</code></td><td>Replace full layout.</td><td>Pages/items only.</td><td>Saved layout projection.</td></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/job-postings/{jobPostingId}/application-form-layout/preview</code></td><td>Admin applicant-facing preview.</td><td>Path id</td><td>Applicant-safe projection.</td></tr>
+      <tr><td><code>GET</code></td><td><code>/applicant/applications/{applicationId}/form-layout</code></td><td>Applicant-owned layout read.</td><td>Path id</td><td>Enabled placed sections only.</td></tr>
+    </table>
+    <p class="small"><code>BASIC_INFO</code> save is backed by the existing root draft update endpoint <code>POST /applications/{applicationId}</code>. The current request updates <code>jobPositionId</code>; broader personal basic-info fields require a later endpoint or request expansion.</p>
+    <p class="small"><code>QUESTION_ANSWER</code> uses <code>GET /applications/{applicationId}/questions</code> and <code>POST /applications/{applicationId}/answers</code>.</p>
+  </section>
+
+  <section class="section">
+    <h2>Validation / Policy</h2>
+    <div class="two">
+      <div class="card">
+        <h3>Business Rules</h3>
+        <ul class="list">
+          <li>At least one page is required.</li>
+          <li>Every page must have at least one item.</li>
+          <li>Page numbers and page sort orders are unique per posting.</li>
+          <li>Item sort order is unique within a page.</li>
+          <li>Section type is unique across the full layout.</li>
+          <li>Disabled sections cannot be placed.</li>
+          <li>Enabled sections must be placed once.</li>
+          <li>Required sections must be placed.</li>
+          <li><code>QUESTION_ANSWER</code> is placed when active questions exist.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>State Rules</h3>
+        <ul class="list">
+          <li>DRAFT postings can edit layout structure.</li>
+          <li>Reception-started postings block structure mutation.</li>
+          <li>Published posting layout edits need a later explicit policy.</li>
+          <li>Publish must validate layout consistency.</li>
+          <li>Existing postings may use deterministic fallback until migration is complete.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Test Section</h2>
+    <table>
+      <tr><th>Command</th><th>Result</th><th>Notes</th></tr>
+      <tr><td><code>Gradle tests</code></td><td><span class="badge muted">Not run</span></td><td>Documentation-only design phase.</td></tr>
+      <tr><td><code>git diff --check -- &lt;changed docs&gt;</code></td><td><span class="badge done">Passed</span></td><td>Documentation-scope whitespace check only.</td></tr>
+      <tr><td><code>git diff --check</code></td><td><span class="badge warn">Existing issue</span></td><td>Full check reports trailing whitespace in pre-existing local <code>instruction.md</code> changes.</td></tr>
+    </table>
+    <p class="small">Recommended implementation command: <code>$env:AES_SECRET_KEY='22791194512954214612461261067'; .\gradlew.bat test --tests "*ApplicationFormLayout*" --no-daemon</code></p>
+    <p class="small">Full <code>clean test</code> is not required by default for Phase 05 slices because the current development PC has full-suite timeout issues. Run targeted tests for modified packages only.</p>
+  </section>
+
+  <section class="section">
+    <h2>Slice Plan</h2>
+    <table>
+      <tr><th>Slice</th><th>Purpose</th><th>Status</th></tr>
+      <tr><td>05a</td><td>Application Form Layout Domain</td><td><span class="badge done">Completed</span></td></tr>
+      <tr><td>05b</td><td>Admin Layout Management</td><td><span class="badge pending">Pending</span></td></tr>
+      <tr><td>05c</td><td>Applicant Layout Read</td><td><span class="badge pending">Pending</span></td></tr>
+      <tr><td>05d</td><td>Publish/Layout Guard Integration</td><td><span class="badge pending">Pending</span></td></tr>
+      <tr><td>05e</td><td>Layout Stabilization / Test Hardening</td><td><span class="badge pending">Pending</span></td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Remaining Issues</h2>
+    <div class="card">
+      <ul class="list">
+        <li>Persistent MariaDB migration remains manual.</li>
+        <li>Existing postings without stored layout need fallback or migration.</li>
+        <li><code>ApplicationSectionType.APPLICATION</code> must remain compatible with current attachment metadata.</li>
+        <li>Phase 05a added <code>BASIC_INFO</code>, <code>QUESTION_ANSWER</code>, and <code>ATTACHMENT</code> to the Java enum and kept <code>APPLICATION</code>/<code>ETC</code> outside the layout subset.</li>
+        <li>Published layout amendment policy may need versioning and audit later.</li>
+        <li>Page title/description edit rules after reception start need product confirmation.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Next Phase Recommendation</h2>
+    <div class="card">
+      <p>Proceed with <code>Phase 05b - Admin Layout Management</code>.</p>
+      <p>Keep 05b focused on admin layout read/save/preview APIs, available-section responses, validator integration, and exception mapping. Applicant runtime APIs should follow in 05c.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

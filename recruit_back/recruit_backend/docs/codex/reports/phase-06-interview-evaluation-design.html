@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 06 면접 평가 설계</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>신영증권 채용 Renewal 백엔드</div>
+  <h1>Phase 06 - 면접 평가 설계</h1>
+  <span class="badge done">설계 완료</span>
+  <span class="badge muted">작성일: 2026-05-27 (등급 체계 반영: 2026-05-28)</span>
+</header>
+
+<main>
+
+  <!-- 요약 -->
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>Phase 06은 <strong>면접 평가</strong> 도메인을 설계합니다. 각 면접관이 확정된 면접에서 후보자별로 등급을 부여하고 추천 의견을 제출합니다.</p>
+      <p>이 설계에서 <code>InterviewEvaluation</code>은 평가 근거 자료이며, 최종 합격/불합격 결정인 <code>StageResult</code>와 엄격히 분리됩니다. 면접관의 제출은 <code>StageResult</code>를 절대 변경하지 않습니다.</p>
+      <p>관리자가 평가 행을 초기화하고, 면접관이 평가를 저장/제출하며, 관리자가 그룹별 요약을 조회합니다. 기존 <code>StageResult</code> 수정/일괄수정 API가 최종 결과 확정의 유일한 경로로 유지됩니다.</p>
+      <p>구현은 5개 slice로 분할됩니다: 도메인(06a), 초기화 + 면접관 입력(06b), 관리자 조회(06c), 재개 + 경계(06d), 안정화(06e).</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">설계 문서 추가됨</span></p>
+      <p><span class="badge done">HTML 리포트 추가됨</span></p>
+      <p><span class="badge info">문서만 변경</span></p>
+      <p><span class="badge pending">Java 구현 대기</span></p>
+      <p><span class="badge out">StageResult 변경 제외</span></p>
+    </div>
+  </section>
+
+  <!-- 범위 -->
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>설계 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li><code>InterviewEvaluation</code> 엔티티 설계</li>
+          <li><code>EvaluationStatus</code>, <code>EvaluationGrade</code>, <code>EvaluationRecommendation</code> enum</li>
+          <li>관리자 초기화 커맨드</li>
+          <li>면접관 저장/제출 API</li>
+          <li>관리자 평가 조회 (면접/전형단계/지원서 단위)</li>
+          <li>관리자 재개 커맨드</li>
+          <li>요약 집계 설계</li>
+          <li>StageResult 비변경 보장</li>
+          <li>유니크 제약조건 및 인덱스 후보</li>
+          <li>5단계 slice 구현 계획</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>Java 엔티티, 리포지토리, 서비스, 컨트롤러, DTO, 테스트 코드 없음</li>
+          <li>데이터베이스 마이그레이션 또는 DDL 파일 없음</li>
+          <li>런타임 API 동작 변경 없음</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>StageResult 변경 또는 반영 커맨드</li>
+          <li>Excel/PDF/통계</li>
+          <li>평가 템플릿 관리</li>
+          <li>가중치 등급 또는 항목별 채점</li>
+          <li>자동 합격/불합격 판정</li>
+          <li>평가 행에 관리자 메모</li>
+          <li>메시지, 알림, 프론트엔드</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 도메인 모델 -->
+  <section>
+    <h2>도메인 모델</h2>
+    <div class="two">
+      <div class="card">
+        <h3>InterviewEvaluation</h3>
+        <p><span class="badge info">엔티티 후보</span></p>
+        <p>한 면접관이 한 면접에서 한 후보자에 대해 수행한 평가.</p>
+        <table>
+          <tr><th>필드</th><th>타입</th><th>규칙</th></tr>
+          <tr><td><code>id</code></td><td>Long</td><td>PK, identity 생성</td></tr>
+          <tr><td><code>interview</code></td><td>Interview</td><td>필수, lazy ManyToOne</td></tr>
+          <tr><td><code>candidateParticipant</code></td><td>InterviewParticipant</td><td>필수, role=CANDIDATE</td></tr>
+          <tr><td><code>interviewerParticipant</code></td><td>InterviewParticipant</td><td>필수, role=INTERVIEWER</td></tr>
+          <tr><td><code>jobApplication</code></td><td>JobApplication</td><td>비정규화, 초기화 시 설정</td></tr>
+          <tr><td><code>stage</code></td><td>Stage</td><td>비정규화, 초기화 시 설정</td></tr>
+          <tr><td><code>grade</code></td><td>EvaluationGrade</td><td>DRAFT 시 nullable, SUBMIT 시 필수, 5등급 enum</td></tr>
+          <tr><td><code>recommendation</code></td><td>EvaluationRecommendation</td><td>DRAFT 시 nullable, SUBMIT 시 필수</td></tr>
+          <tr><td><code>comment</code></td><td>String(2000)</td><td>항상 선택</td></tr>
+          <tr><td><code>status</code></td><td>EvaluationStatus</td><td>기본값 DRAFT</td></tr>
+          <tr><td><code>submittedAt</code></td><td>LocalDateTime</td><td>제출 시 설정, 재개 시 초기화</td></tr>
+        </table>
+        <p class="small"><code>BaseEntity</code>를 상속하여 createdAt/updatedAt 자동 관리.</p>
+        <p><strong>유니크 제약조건:</strong> <code>(interview_id, candidate_participant_id, interviewer_participant_id)</code></p>
+      </div>
+      <div class="card">
+        <h3>관계 구조</h3>
+        <p><span class="badge info">엔티티 그래프</span></p>
+        <pre>
+JobPosting
+  └── Stage
+       └── Interview
+            ├── InterviewParticipant (CANDIDATE)
+            │    └── JobApplication
+            ├── InterviewParticipant (INTERVIEWER)
+            │    └── Employee
+            └── InterviewEvaluation
+                 ├── candidateParticipant ──► InterviewParticipant
+                 ├── interviewerParticipant ──► InterviewParticipant
+                 ├── jobApplication ──► JobApplication (비정규화)
+                 └── stage ──► Stage (비정규화)</pre>
+        <h3 style="margin-top:16px;">설계 결정</h3>
+        <ul class="list">
+          <li>후보자와 면접관 FK 모두 <code>Employee</code>가 아닌 <code>InterviewParticipant</code>를 참조</li>
+          <li><code>jobApplication</code>과 <code>stage</code>는 조회 성능을 위해 비정규화</li>
+          <li>엔티티 내에서 <code>StageResult</code>를 어디서도 참조하지 않음</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Enum -->
+  <section>
+    <h2>Enum 설계</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>EvaluationStatus</h3>
+        <table>
+          <tr><th>값</th><th>설명</th></tr>
+          <tr><td><code>DRAFT</code></td><td>평가 작성 중, 면접관이 수정 가능</td></tr>
+          <tr><td><code>SUBMITTED</code></td><td>평가 제출 완료, 관리자 재개 전까지 수정 불가</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>EvaluationGrade</h3>
+        <table>
+          <tr><th>값</th><th>설명</th></tr>
+          <tr><td><code>VG</code></td><td>최고 등급</td></tr>
+          <tr><td><code>G_PLUS</code></td><td>우수</td></tr>
+          <tr><td><code>G</code></td><td>양호</td></tr>
+          <tr><td><code>G_MINUS</code></td><td>보통</td></tr>
+          <tr><td><code>F</code></td><td>미흡</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>EvaluationRecommendation</h3>
+        <table>
+          <tr><th>값</th><th>설명</th></tr>
+          <tr><td><code>STRONG_YES</code></td><td>강력 추천</td></tr>
+          <tr><td><code>YES</code></td><td>추천</td></tr>
+          <tr><td><code>NEUTRAL</code></td><td>중립 / 의견 없음</td></tr>
+          <tr><td><code>NO</code></td><td>비추천</td></tr>
+          <tr><td><code>STRONG_NO</code></td><td>강력 비추천</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 상태 전이 -->
+  <section>
+    <h2>상태 전이</h2>
+    <div class="card">
+      <h3>EvaluationStatus 생애주기</h3>
+      <div class="transition">
+        <span class="action">(초기화)</span>
+        <span class="arrow">&rarr;</span>
+        <span class="state">DRAFT</span>
+        <span class="arrow">&rarr;</span>
+        <span class="action">(저장)</span>
+        <span class="arrow">&rarr;</span>
+        <span class="state">DRAFT</span>
+        <span class="arrow">&rarr;</span>
+        <span class="action">(제출)</span>
+        <span class="arrow">&rarr;</span>
+        <span class="state">SUBMITTED</span>
+      </div>
+      <div class="transition">
+        <span class="state">SUBMITTED</span>
+        <span class="arrow">&rarr;</span>
+        <span class="action">(관리자 재개)</span>
+        <span class="arrow">&rarr;</span>
+        <span class="state">DRAFT</span>
+        <span class="arrow">&rarr;</span>
+        <span class="action">(재제출)</span>
+        <span class="arrow">&rarr;</span>
+        <span class="state">SUBMITTED</span>
+      </div>
+      <p class="small">재개 시 <code>submittedAt</code>이 초기화됩니다. 재개 이력은 별도 엔티티 필드가 아닌 <code>ActivityLog</code>에 기록됩니다.</p>
+    </div>
+  </section>
+
+  <!-- API 목록 -->
+  <section>
+    <h2>API 후보</h2>
+
+    <h3>관리자 API</h3>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>Slice</th></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/interviews/{interviewId}/evaluations/initialize</code></td><td>ASSIGNED 후보자 x 면접관 조합으로 DRAFT 평가 행 생성</td><td><span class="badge info">06b</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/interviews/{interviewId}/evaluations</code></td><td>면접 단위 평가 조회 (후보자별 그룹 및 요약)</td><td><span class="badge info">06c</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/stages/{stageId}/interview-evaluations</code></td><td>전형단계 단위 평가 조회 (모든 면접 포함)</td><td><span class="badge info">06c</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/applications/{applicationId}/interview-evaluations</code></td><td>지원서 단위 평가 조회 (모든 면접 포함)</td><td><span class="badge info">06c</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/interviews/{interviewId}/evaluations/{evaluationId}/reopen</code></td><td>SUBMITTED 평가를 DRAFT로 재개</td><td><span class="badge info">06d</span></td></tr>
+    </table>
+
+    <h3>면접관 API</h3>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>Slice</th></tr>
+      <tr><td><code>GET</code></td><td><code>/interviewer/interviews/{interviewId}/evaluations</code></td><td>본인 평가 목록 조회</td><td><span class="badge info">06b</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/interviewer/interviews/{interviewId}/evaluations/{evaluationId}</code></td><td>본인 평가 상세 조회</td><td><span class="badge info">06b</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/interviewer/interviews/{interviewId}/evaluations/{evaluationId}</code></td><td>평가 임시저장</td><td><span class="badge info">06b</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/interviewer/interviews/{interviewId}/evaluations/{evaluationId}/submit</code></td><td>평가 제출 (grade + recommendation 필수)</td><td><span class="badge info">06b</span></td></tr>
+    </table>
+
+    <h3>컨트롤러 배치</h3>
+    <table>
+      <tr><th>컨트롤러</th><th>담당 API</th></tr>
+      <tr><td><code>InterviewEvaluationAdminController</code></td><td>초기화, 면접/전형단계/지원서 단위 조회, 재개</td></tr>
+      <tr><td><code>InterviewerEvaluationController</code></td><td>면접관 목록, 상세, 저장, 제출</td></tr>
+    </table>
+  </section>
+
+  <!-- StageResult 경계 -->
+  <section>
+    <h2>StageResult 경계 정책</h2>
+    <div class="card" style="border-left: 4px solid #842029;">
+      <h3><span class="badge out">핵심 정책</span> 비변경 보장</h3>
+      <ul class="list">
+        <li><code>InterviewEvaluation</code>은 평가 근거 자료이며, 최종 전형 결과가 아닙니다.</li>
+        <li><code>StageResult</code>가 최종 결정 레코드(PASS/FAIL/PENDING)로서 유일합니다.</li>
+        <li>면접관의 <code>submit</code>은 <code>StageResult</code>를 생성, 수정, 발표, 정정, 게시하지 않습니다.</li>
+        <li><code>InterviewEvaluation</code>의 엔티티, 서비스, 컨트롤러는 <code>StageResultRepository</code> 또는 <code>StageResultService</code>를 주입하거나 호출하지 않습니다.</li>
+        <li>자동 또는 반자동 StageResult 반영 커맨드는 Phase 06에 포함되지 않습니다.</li>
+      </ul>
+      <h3 style="margin-top:14px;">관리자 워크플로우</h3>
+      <ol class="list">
+        <li>확정된 면접에 대해 평가 행을 초기화합니다.</li>
+        <li>면접관들이 평가를 제출할 때까지 대기합니다.</li>
+        <li>관리자 조회 API를 통해 평가 요약을 확인합니다.</li>
+        <li>기존 <code>POST /admin/stages/{stageId}/results/{resultId}</code> 또는 <code>.../results/bulk</code>를 사용하여 수동으로 최종 결과를 확정합니다.</li>
+      </ol>
+      <p class="small">전용 반영 커맨드(예: <code>reflect-interview-evaluations</code>)는 향후 Phase로 명시적으로 연기되었습니다.</p>
+    </div>
+  </section>
+
+  <!-- 검증 및 비즈니스 규칙 -->
+  <section>
+    <h2>검증 및 비즈니스 규칙</h2>
+
+    <h3>초기화 가드</h3>
+    <table>
+      <tr><th>규칙</th><th>설명</th></tr>
+      <tr><td>Interview CONFIRMED 필수</td><td>DRAFT 및 CANCELLED 면접은 초기화 불가</td></tr>
+      <tr><td>ASSIGNED 참가자만</td><td>CANCELLED 참가자는 행 생성에서 제외</td></tr>
+      <tr><td>멱등성</td><td>재호출 시 기존 행은 건너뜀</td></tr>
+    </table>
+
+    <h3>면접관 저장 가드</h3>
+    <table>
+      <tr><th>규칙</th><th>설명</th></tr>
+      <tr><td>본인 소유 확인</td><td>로그인한 면접관이 해당 interviewer participant의 소유자여야 함. 요청에 employeeId 없음</td></tr>
+      <tr><td>면접관 ASSIGNED</td><td><code>participantStatus = ASSIGNED</code></td></tr>
+      <tr><td>후보자 ASSIGNED</td><td><code>participantStatus = ASSIGNED</code></td></tr>
+      <tr><td>Interview CONFIRMED</td><td>DRAFT/CANCELLED 면접에서는 저장 차단</td></tr>
+      <tr><td>평가 DRAFT</td><td>SUBMITTED 평가는 저장 불가</td></tr>
+      <tr><td>등급 값</td><td>유효한 <code>EvaluationGrade</code> enum 값, DRAFT 시 nullable</td></tr>
+      <tr><td>코멘트 길이</td><td>최대 2000자</td></tr>
+    </table>
+
+    <h3>면접관 제출 가드 (저장 규칙 + 추가)</h3>
+    <table>
+      <tr><th>규칙</th><th>설명</th></tr>
+      <tr><td>등급 필수</td><td><code>grade</code>가 null이면 안 됨</td></tr>
+      <tr><td>추천 의견 필수</td><td><code>recommendation</code>이 null이면 안 됨</td></tr>
+      <tr><td>상태 전이</td><td>DRAFT &rarr; SUBMITTED, <code>submittedAt</code> 설정</td></tr>
+    </table>
+
+    <h3>취소된 면접/참가자 처리</h3>
+    <table>
+      <tr><th>시나리오</th><th>기존 데이터</th><th>신규 입력</th></tr>
+      <tr><td>Interview CANCELLED + 평가 DRAFT</td><td><span class="badge done">보존</span></td><td><span class="badge out">차단</span></td></tr>
+      <tr><td>Interview CANCELLED + 평가 SUBMITTED</td><td><span class="badge done">보존</span></td><td>해당 없음</td></tr>
+      <tr><td>면접관 CANCELLED + 평가 DRAFT</td><td><span class="badge done">보존</span></td><td><span class="badge out">차단</span></td></tr>
+      <tr><td>후보자 CANCELLED + 평가 DRAFT</td><td><span class="badge done">보존</span></td><td><span class="badge out">차단</span></td></tr>
+      <tr><td>신규 참가자 + 재초기화</td><td><span class="badge done">신규 행 생성</span></td><td><span class="badge done">허용</span></td></tr>
+    </table>
+
+    <h3>면접관 정보 격리</h3>
+    <div class="card">
+      <p>면접관은 <strong>본인의 평가만</strong> 조회할 수 있습니다. 다른 면접관의 등급, 추천 의견, 코멘트, 제출 상태를 볼 수 없습니다. 이는 평가의 독립성을 보장하고 편향을 방지하기 위함입니다.</p>
+    </div>
+  </section>
+
+  <!-- 요약 집계 -->
+  <section>
+    <h2>요약 집계</h2>
+    <div class="card">
+      <h3>후보자별 요약 (관리자 화면)</h3>
+      <table>
+        <tr><th>필드</th><th>타입</th><th>산출 기준</th></tr>
+        <tr><td><code>submittedCount</code></td><td>int</td><td>SUBMITTED 평가 수</td></tr>
+        <tr><td><code>totalEvaluatorCount</code></td><td>int</td><td>전체 평가 행 수 (DRAFT + SUBMITTED)</td></tr>
+        <tr><td><code>gradeDistribution</code></td><td>GradeDistribution</td><td>SUBMITTED 평가의 등급별 수</td></tr>
+        <tr><td><code>recommendationDistribution</code></td><td>RecommendationDistribution</td><td>SUBMITTED 평가의 추천 의견별 수</td></tr>
+      </table>
+      <p class="small">DRAFT 평가는 평가 목록에는 포함되지만, 모든 요약 계산에서는 제외됩니다.</p>
+
+      <h3 style="margin-top:14px;">GradeDistribution DTO</h3>
+      <pre>public record GradeDistribution(
+    int vg,
+    int gPlus,
+    int g,
+    int gMinus,
+    int f
+) {}</pre>
+      <p class="small">5개 필드가 항상 존재하는 타입 안전 record. 해당 등급이 없으면 0. 높은 등급부터 나열.</p>
+
+      <h3 style="margin-top:14px;">RecommendationDistribution DTO</h3>
+      <pre>public record RecommendationDistribution(
+    int strongYes,
+    int yes,
+    int neutral,
+    int no,
+    int strongNo
+) {}</pre>
+      <p class="small">5개 필드가 항상 존재하는 타입 안전 record. 해당 추천 의견이 없으면 0.</p>
+    </div>
+  </section>
+
+  <!-- Slice 계획 -->
+  <section>
+    <h2>Slice 계획</h2>
+    <table>
+      <tr><th>Slice</th><th>범위</th><th>상태</th></tr>
+      <tr>
+        <td><strong>06a</strong><br>도메인</td>
+        <td>
+          <code>InterviewEvaluation</code> 엔티티, <code>EvaluationStatus</code>, <code>EvaluationGrade</code>, <code>EvaluationRecommendation</code> enum, 리포지토리, 유니크 제약조건, 엔티티 검증, 상태 전이, 대상 테스트
+        </td>
+        <td><span class="badge pending">대기</span></td>
+      </tr>
+      <tr>
+        <td><strong>06b</strong><br>초기화 + 면접관 입력</td>
+        <td>
+          관리자 초기화 커맨드, 면접관 목록/상세/저장/제출 API, 소유권 가드, Interview CONFIRMED 가드, 참가자 ASSIGNED 가드, SUBMITTED 불변성, 정보 격리, 대상 테스트
+        </td>
+        <td><span class="badge pending">대기</span></td>
+      </tr>
+      <tr>
+        <td><strong>06c</strong><br>관리자 조회</td>
+        <td>
+          면접/전형단계/지원서 단위 평가 조회 API, 후보자별 그룹 응답, 후보자별 요약, <code>GradeDistribution</code> DTO, <code>RecommendationDistribution</code> DTO, 대상 테스트
+        </td>
+        <td><span class="badge pending">대기</span></td>
+      </tr>
+      <tr>
+        <td><strong>06d</strong><br>재개 + 경계</td>
+        <td>
+          관리자 재개 커맨드 (SUBMITTED &rarr; DRAFT), ActivityLog 이력, StageResult 비변경 보장 문서화 및 적용, 대상 테스트
+        </td>
+        <td><span class="badge pending">대기</span></td>
+      </tr>
+      <tr>
+        <td><strong>06e</strong><br>안정화</td>
+        <td>
+          N&times;M 매트릭스 회귀, 취소된 면접/참가자 가드, SUBMITTED 불변성, 재개 사이클, 비배정 가드, StageResult 비변경 회귀 테스트
+        </td>
+        <td><span class="badge pending">대기</span></td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- 미결 사항 -->
+  <section>
+    <h2>미결 사항</h2>
+    <table>
+      <tr><th>#</th><th>질문</th><th>현재 입장</th></tr>
+      <tr><td>1</td><td>면접당 최대 면접관 수는?</td><td>하드 리밋 없음. 실질적 기대: 5~10명.</td></tr>
+      <tr><td>2</td><td>제출 엔드포인트에서 최종 수정을 위한 request body를 받아야 하는가?</td><td>06b 구현 시 결정 예정.</td></tr>
+    </table>
+  </section>
+
+  <!-- 결정 로그 -->
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>후보자와 면접관 모두 <code>InterviewParticipant</code> FK 사용</td><td>대칭적 설계, 기존 모델과 일관성, 가드 체크 단순화</td></tr>
+      <tr><td>2</td><td>관리자 명시적 초기화 커맨드 (lazy 생성 아님)</td><td>조회 부작용 없음, StageResult 패턴과 일관</td></tr>
+      <tr><td>3</td><td>초기화와 면접 확정을 분리</td><td>다른 관심사: 일정 vs 평가 준비</td></tr>
+      <tr><td>4</td><td>등급: <code>EvaluationGrade</code> enum, 5등급 (<code>F</code>, <code>G_MINUS</code>, <code>G</code>, <code>G_PLUS</code>, <code>VG</code>)</td><td>면접관에게 직관적; enum 변경 시 영향 최소 (enum 파일 + DB 마이그레이션)</td></tr>
+      <tr><td>5</td><td>추천 의견: 5단계 enum</td><td>뉘앙스 포착, 분포 분석에 유용</td></tr>
+      <tr><td>6</td><td>코멘트는 DRAFT와 SUBMIT 모두 선택</td><td>등급 + 추천 의견이 정량 데이터 제공; 강제 코멘트는 형식적 내용 생산</td></tr>
+      <tr><td>7</td><td>관리자 메모는 Phase 06에서 제외</td><td>평가 수집 안정화에 집중; 저빈도 시나리오</td></tr>
+      <tr><td>8</td><td>재개를 Phase 06(06d)에 포함</td><td>실질적 필요; ActivityLog를 활용한 단순 상태 전이</td></tr>
+      <tr><td>9</td><td>재개 전용 엔티티 필드 없음</td><td>상태 전이만 수행; 엔티티 복잡도 최소화</td></tr>
+      <tr><td>10</td><td>DRAFT와 SUBMITTED 상태만 (CANCELLED 없음)</td><td>취소 처리는 면접/참가자 상태 체크로 대응</td></tr>
+      <tr><td>11</td><td>요약에 <code>GradeDistribution</code> 사용 (averageScore/scoreSum 대체)</td><td>등급 기반 평가는 산술 평균 불가; 등급별 분포가 자연스러운 집계 방식</td></tr>
+      <tr><td>12</td><td><code>GradeDistribution</code>과 <code>RecommendationDistribution</code>을 타입 DTO로</td><td>타입 안전, 프론트엔드 친화적, 항상 5개 필드</td></tr>
+      <tr><td>13</td><td>jobApplication과 stage FK 비정규화</td><td>전형단계/지원서 단위 조회를 위한 직접 인덱스 쿼리</td></tr>
+      <tr><td>14</td><td>StageResult 반영 커맨드 제외</td><td>채점 기준 미정의; 수동 워크플로우로 충분</td></tr>
+      <tr><td>15</td><td>취소 시: 입력 차단, 데이터 보존</td><td>평가 데이터는 감사 가치가 있음</td></tr>
+      <tr><td>16</td><td>면접관은 다른 면접관의 평가를 볼 수 없음</td><td>평가 독립성 및 편향 방지</td></tr>
+      <tr><td>17</td><td>전형단계/지원서 단위 조회에 전체 상세 포함</td><td>drill-down 회피; 데이터 양 관리 가능</td></tr>
+    </table>
+  </section>
+
+  <!-- 다음 Phase -->
+  <section>
+    <h2>다음 Phase 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>Phase 06a - InterviewEvaluation 도메인</strong></p>
+      <p>엔티티, enum, 리포지토리, 유니크 제약조건, 대상 테스트를 구현합니다.</p>
+      <p class="small">향후 Phase: Phase 07 (Excel/PDF/통계), StageResult 반영 커맨드, 평가 템플릿 관리.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

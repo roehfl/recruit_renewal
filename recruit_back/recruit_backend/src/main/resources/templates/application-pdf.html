@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>지원서</title>
+    <style>
+        @page { size: A4; margin: 18mm 14mm; }
+        body { font-family: 'ApplicationPdfFont', sans-serif; font-size: 10pt; color: #111; }
+        h1 { font-size: 16pt; margin: 0 0 2pt; }
+        .meta { color: #555; font-size: 8pt; margin-bottom: 10pt; }
+        table.header { width: 100%; border-collapse: collapse; margin-bottom: 12pt; }
+        table.header td { border: 1px solid #999; padding: 4pt 6pt; vertical-align: top; }
+        td.label { background: #f0f0f0; width: 18%; font-weight: bold; }
+        h2 { font-size: 12pt; border-bottom: 2px solid #333; padding-bottom: 2pt; margin: 14pt 0 6pt; }
+        .record { border: 1px solid #bbb; margin-bottom: 6pt; }
+        .record table { width: 100%; border-collapse: collapse; }
+        .record td { border-bottom: 1px solid #eee; padding: 3pt 6pt; vertical-align: top; }
+        .record td.label { background: #fafafa; width: 18%; }
+        .value { white-space: pre-wrap; word-break: break-all; }
+        .empty { color: #888; font-style: italic; padding: 2pt 0; }
+    </style>
+</head>
+<body>
+    <h1 th:text="${header.applicantName()}">applicant</h1>
+    <div class="meta">지원서 ID: <span th:text="${header.applicationId()}">0</span></div>
+
+    <table class="header">
+        <tr>
+            <td class="label">이름</td><td class="value" th:text="${header.applicantName()}"></td>
+            <td class="label">상태</td><td class="value" th:text="${header.status()}"></td>
+        </tr>
+        <tr>
+            <td class="label">연락처</td><td class="value" th:text="${header.phoneNumber()}"></td>
+            <td class="label">이메일</td><td class="value" th:text="${header.email()}"></td>
+        </tr>
+        <tr>
+            <td class="label">지원공고</td><td class="value" th:text="${header.jobPostingTitle()}"></td>
+            <td class="label">지원분야</td><td class="value" th:text="${header.jobPositionName()}"></td>
+        </tr>
+        <tr>
+            <td class="label">제출일시</td><td class="value" colspan="3" th:text="${header.submittedAt()}"></td>
+        </tr>
+    </table>
+
+    <div th:each="section : ${sections}">
+        <h2 th:text="${section.title()}">section</h2>
+        <div class="empty" th:if="${section.records().isEmpty()}" th:text="${section.emptyMessage()}">없음</div>
+        <div class="record" th:each="rec : ${section.records()}">
+            <table>
+                <tr th:each="f : ${rec.fields()}">
+                    <td class="label" th:text="${f.label()}">label</td>
+                    <td class="value" th:text="${f.value()}">value</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

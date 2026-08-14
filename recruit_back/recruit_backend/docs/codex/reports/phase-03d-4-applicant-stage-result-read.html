@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03d-4 Applicant StageResult Read</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --ink: #202936;
+      --muted: #607085;
+      --line: #d9e2ef;
+      --navy: #172238;
+      --blue: #1e5ba8;
+      --green: #176a45;
+      --amber: #986100;
+      --red: #a33b3b;
+      --gray: #657184;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Arial, "Malgun Gothic", sans-serif;
+      line-height: 1.56;
+    }
+    header {
+      background: var(--navy);
+      color: #fff;
+      padding: 34px 42px 30px;
+    }
+    header h1 { margin: 0; font-size: 28px; letter-spacing: 0; }
+    header p { margin: 8px 0 0; max-width: 1040px; color: #d9e8fb; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 52px; }
+    section { margin-top: 18px; }
+    h2 { margin: 0 0 12px; font-size: 20px; }
+    h3 { margin: 14px 0 8px; font-size: 16px; }
+    .grid { display: grid; gap: 16px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+    .badge {
+      display: inline-block;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      padding: 3px 9px;
+      margin: 0 6px 8px 0;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .ok { color: var(--green); background: #e8f6ee; border-color: #b7dfc8; }
+    .info { color: var(--blue); background: #eaf2ff; border-color: #bfd5f5; }
+    .warn { color: var(--amber); background: #fff4dc; border-color: #edcd8f; }
+    .out { color: var(--red); background: #fbeaea; border-color: #e9c1c1; }
+    .hold { color: var(--gray); background: #eef1f5; border-color: #d7dde5; }
+    table { width: 100%; border-collapse: collapse; background: var(--panel); }
+    th, td { border: 1px solid var(--line); padding: 10px 12px; vertical-align: top; text-align: left; }
+    th { background: #eef3f9; font-weight: 700; }
+    code { font-family: Consolas, "Courier New", monospace; background: #eef3f9; border-radius: 4px; padding: 1px 4px; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 4px 0; }
+    .note { color: var(--muted); font-size: 14px; }
+    .callout { border-left: 4px solid var(--blue); padding-left: 14px; }
+    @media (max-width: 860px) {
+      header { padding: 28px 22px; }
+      main { padding: 20px 14px 36px; }
+      .grid.two, .grid.three { grid-template-columns: 1fr; }
+      table { font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Phase 03d-4: Applicant StageResult Read</h1>
+    <p>지원자가 본인 지원서의 발표 완료된 전형 결과만 조회하는 read-only API 구현 결과 보고서다. Updated: 2026-05-19</p>
+  </header>
+
+  <main>
+    <section class="grid three">
+      <div class="card">
+        <span class="badge ok">Completed</span>
+        <h2>Phase Summary</h2>
+        <p><code>GET /applications/{applicationId}/stage-results</code>를 추가해 지원자 본인 발표 결과만 조회하도록 구현했다.</p>
+      </div>
+      <div class="card">
+        <span class="badge info">Read Only</span>
+        <h2>API</h2>
+        <p>POST, PUT, PATCH, DELETE는 추가하지 않았다. 조회 중 StageResult를 생성하거나 보정하지 않는다.</p>
+      </div>
+      <div class="card">
+        <span class="badge warn">Limited</span>
+        <h2>Exposure</h2>
+        <p><code>score</code>, <code>comment</code>, <code>decidedBy</code>, <code>stageResultId</code>는 지원자 응답에서 제외했다.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Executive Summary</h2>
+      <ul>
+        <li>지원자 결과 조회는 기존 applicant 인증 패턴과 <code>CurrentApplicantService</code>를 사용한다.</li>
+        <li>Service는 <code>applicantId + applicationId</code>로 지원서 소유권을 검증한다.</li>
+        <li><code>DRAFT</code> 지원서는 전형 결과 조회 대상에서 제외하고 비즈니스 예외로 처리한다.</li>
+        <li><code>SUBMITTED</code>, <code>WITHDRAWN</code> 지원서는 <code>RESULT_ANNOUNCED</code>, <code>CLOSED</code> stage 결과만 조회할 수 있다.</li>
+        <li><code>resultAnnouncementDateTime</code>은 표시용이며 예약 발표 guard는 구현하지 않았다.</li>
+      </ul>
+    </section>
+
+    <section class="grid three">
+      <div class="card">
+        <span class="badge ok">Implemented</span>
+        <h2>Completed Scope</h2>
+        <ul>
+          <li>Applicant DTO</li>
+          <li>Repository visible query</li>
+          <li>Ownership/visibility service</li>
+          <li>GET controller</li>
+          <li>Service and controller tests</li>
+        </ul>
+      </div>
+      <div class="card">
+        <span class="badge out">Not Implemented</span>
+        <h2>Out of Scope</h2>
+        <ul>
+          <li>Correction/history</li>
+          <li>DB schema change</li>
+          <li>SecurityConfig change</li>
+          <li>Notification sending</li>
+        </ul>
+      </div>
+      <div class="card">
+        <span class="badge hold">Deferred</span>
+        <h2>Deferred</h2>
+        <ul>
+          <li>Scheduled release guard</li>
+          <li>Read audit logging</li>
+          <li>Correction notification</li>
+          <li>Pass/fail wording template</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Changed Files</h2>
+      <table>
+        <thead><tr><th>Path</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>ApplicantStageResultResponse.java</code></td><td>New</td><td>Applicant-safe response DTO</td></tr>
+          <tr><td><code>StageResultRepository.java</code></td><td>Modified</td><td>Applicant-visible query added</td></tr>
+          <tr><td><code>ApplicationStageResultService.java</code></td><td>New</td><td>Ownership and visibility policy</td></tr>
+          <tr><td><code>ApplicationStageResultController.java</code></td><td>New</td><td>Applicant GET endpoint</td></tr>
+          <tr><td><code>ApplicationStageResultServiceTest.java</code></td><td>New</td><td>Service tests</td></tr>
+          <tr><td><code>ApplicationStageResultControllerTest.java</code></td><td>New</td><td>Controller tests</td></tr>
+          <tr><td><code>docs/codex/implementation/phase-03d-4-applicant-stage-result-read.md</code></td><td>New</td><td>Codex reference document</td></tr>
+          <tr><td><code>docs/codex/reports/phase-03d-4-applicant-stage-result-read.html</code></td><td>New</td><td>Human report</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>API List</h2>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>Response</th></tr></thead>
+        <tbody>
+          <tr><td><code>GET</code></td><td><code>/applications/{applicationId}/stage-results</code></td><td>지원자 본인 발표 결과 조회</td><td><code>ApiResponse&lt;List&lt;ApplicantStageResultResponse&gt;&gt;</code></td></tr>
+        </tbody>
+      </table>
+      <p class="note">POST, PUT, PATCH, DELETE는 method not allowed로 유지한다.</p>
+    </section>
+
+    <section class="grid two">
+      <div class="card callout">
+        <h2>Applicant Response</h2>
+        <table>
+          <thead><tr><th>Exposed</th><th>Not Exposed</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>stageName</code>, <code>stageType</code>, <code>stageOrder</code>, <code>resultStatus</code>, <code>resultAnnouncementDateTime</code>, <code>decidedAt</code></td>
+              <td><code>stageResultId</code>, <code>score</code>, <code>comment</code>, <code>decidedBy</code>, audit fields, correction history</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h2>Repository Query</h2>
+        <ul>
+          <li>StageResult 기준 조회</li>
+          <li><code>Stage</code> fetch join</li>
+          <li><code>Stage.status in (RESULT_ANNOUNCED, CLOSED)</code></li>
+          <li><code>stageOrder ASC, stage.id ASC</code> 정렬</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Visibility Matrix</h2>
+      <table>
+        <thead>
+          <tr><th>Application Status</th><th>READY</th><th>IN_PROGRESS</th><th>RESULT_ANNOUNCED</th><th>CLOSED</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>DRAFT</code></td><td>blocked</td><td>blocked</td><td>blocked</td><td>blocked</td></tr>
+          <tr><td><code>SUBMITTED</code></td><td>no row</td><td>no row</td><td>latest result</td><td>latest result</td></tr>
+          <tr><td><code>WITHDRAWN</code></td><td>no row</td><td>no row</td><td>latest result</td><td>latest result</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Domain Structure</h2>
+      <ul>
+        <li><code>JobApplication N : 1 Applicant</code></li>
+        <li><code>StageResult N : 1 JobApplication</code></li>
+        <li><code>StageResult N : 1 Stage</code></li>
+        <li><code>Stage N : 1 JobPosting</code></li>
+        <li>No new collection was added to <code>Stage</code> or <code>JobApplication</code>.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Validation Rules</h2>
+      <table>
+        <thead><tr><th>Area</th><th>Rule</th></tr></thead>
+        <tbody>
+          <tr><td>Ownership</td><td><code>applicationId + applicantId</code> lookup is required.</td></tr>
+          <tr><td>Application status</td><td><code>DRAFT</code> fails. <code>SUBMITTED</code> and <code>WITHDRAWN</code> can read visible results.</td></tr>
+          <tr><td>Stage status</td><td>Only <code>RESULT_ANNOUNCED</code> and <code>CLOSED</code> are exposed.</td></tr>
+          <tr><td>Missing rows</td><td>Missing StageResult rows are not represented as null applicant rows.</td></tr>
+          <tr><td>Announcement time</td><td><code>resultAnnouncementDateTime</code> is display-only.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Test Results</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td><code>.\gradlew.bat test --tests ApplicationStageResultServiceTest --tests ApplicationStageResultControllerTest</code></td><td><span class="badge ok">Success</span></td></tr>
+          <tr><td><code>.\gradlew.bat test --tests StageResultServiceTest --tests StageResultControllerTest --tests StageServiceTest --tests StageControllerTest</code></td><td><span class="badge ok">Success</span></td></tr>
+          <tr><td><code>.\gradlew.bat clean test --no-daemon</code></td><td><span class="badge ok">Success</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Remaining Issues</h2>
+      <ul>
+        <li>Phase 03d-5 correction/history는 아직 구현하지 않았다.</li>
+        <li>예약 발표 guard는 구현하지 않았다.</li>
+        <li>SecurityConfig는 변경하지 않았고, 이번 phase는 service-level ownership guard를 유지한다.</li>
+        <li>Read audit logging은 후속 보안/감사 phase에서 처리한다.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Next Phase Recommendation</h2>
+      <p>다음 구현 후보는 Phase 03d-5 result correction history다. 정정 관리자 identity source와 <code>CLOSED</code> stage correction 허용 여부를 먼저 확정해야 한다.</p>
+    </section>
+  </main>
+</body>
+</html>

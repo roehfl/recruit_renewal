@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Phase 03i-5-2 - Attachment Required Policy Implementation</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --ink: #1f2937;
+      --muted: #667085;
+      --line: #d8dee9;
+      --green: #177245;
+      --green-bg: #e8f5ee;
+      --blue: #175cd3;
+      --blue-bg: #e8f0ff;
+      --amber: #b54708;
+      --amber-bg: #fff4e5;
+      --red: #b42318;
+      --red-bg: #feeceb;
+      --gray: #475467;
+      --gray-bg: #eef2f6;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.55;
+    }
+    header {
+      padding: 34px 42px;
+      background: #111827;
+      color: #ffffff;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+    h1, h2, h3 { margin: 0; }
+    h1 { font-size: 30px; line-height: 1.2; }
+    h2 {
+      margin-top: 30px;
+      margin-bottom: 12px;
+      font-size: 21px;
+    }
+    h3 { font-size: 16px; margin-bottom: 8px; }
+    p { margin: 8px 0; }
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: #eef2f6;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 0.92em;
+    }
+    pre {
+      overflow-x: auto;
+      padding: 14px;
+      border-radius: 8px;
+      background: #101828;
+      color: #eef2f6;
+      font-size: 13px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }
+    th {
+      background: #eef2f6;
+      color: #344054;
+      font-weight: 700;
+    }
+    tr:last-child td { border-bottom: 0; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 4px 0; }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .complete { color: var(--green); background: var(--green-bg); }
+    .info { color: var(--blue); background: var(--blue-bg); }
+    .pending { color: var(--gray); background: var(--gray-bg); }
+    .warning { color: var(--amber); background: var(--amber-bg); }
+    .out { color: var(--red); background: var(--red-bg); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 14px;
+      margin-top: 18px;
+    }
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      margin-top: 16px;
+    }
+    .kv {
+      display: grid;
+      grid-template-columns: 210px 1fr;
+      gap: 8px 12px;
+      font-size: 14px;
+    }
+    .kv strong { color: #344054; }
+    @media (max-width: 820px) {
+      header { padding: 26px 22px; }
+      main { padding: 18px; }
+      .grid, .summary { grid-template-columns: 1fr; }
+      .kv { grid-template-columns: 1fr; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p>Shinyoung Recruit Backend Renewal</p>
+    <h1>Phase 03i-5-2 - Attachment Required Policy Implementation</h1>
+    <div class="meta">
+      <span class="badge complete">Completed</span>
+      <span class="badge info">Generated 2026-05-22</span>
+      <span class="badge info">Spring Boot Backend</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="summary">
+      <div class="card">
+        <h2>Executive Summary</h2>
+        <p>This phase implements a dedicated per-posting attachment requirement policy without adding attachment flags to <code>ApplicationFormConfig</code>.</p>
+        <p>Admins can read and replace requirement rows for DRAFT postings. Public list responses expose only aggregate required policy, while public detail responses expose a safe <code>attachmentRequirements</code> list.</p>
+        <p>Dashboard and final submit now count active stored attachment metadata rows by application, type, and section. Required rows can block submit; optional rows never block submit.</p>
+        <p>Review fix: when required and optional attachment rows are mixed, the dashboard keeps only the required <code>ATTACHMENT</code> group and suppresses optional missing attachment issues to keep completion counts consistent.</p>
+      </div>
+      <div class="card">
+        <h2>Status</h2>
+        <div class="kv">
+          <strong>Phase</strong><span>03i-5-2</span>
+          <strong>Primary Domain</strong><span>Job posting attachment requirements</span>
+          <strong>Runtime Impact</strong><span>New admin API, public policy/detail additions, dashboard and submit validation integration</span>
+          <strong>Migration</strong><span>Manual DDL candidate documented; no migration file added</span>
+          <strong>Target Test</strong><span><span class="badge complete">Passed</span></span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Scope Cards</h2>
+      <div class="grid">
+        <div class="card">
+          <h3><span class="badge complete">Completed</span> Implemented</h3>
+          <ul>
+            <li><code>JobPostingAttachmentRequirement</code> entity and repository.</li>
+            <li>Admin DRAFT-only replace-all API.</li>
+            <li>Public aggregate policy and safe detail exposure.</li>
+            <li>Dashboard readiness checks for required and optional attachment rows, including mixed required/optional count consistency.</li>
+            <li>Final submit blocking only for missing required attachments.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="badge out">Out of scope</span> Not Implemented</h3>
+          <ul>
+            <li>No <code>useAttachment</code> or <code>requireAttachment</code> on <code>ApplicationFormConfig</code>.</li>
+            <li>No <code>sectionRecordId</code>-level policy.</li>
+            <li>No filesystem existence checks during dashboard or submit.</li>
+            <li>No upload, download, delete, or storage scan behavior changes.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="badge pending">Deferred</span> Later Decisions</h3>
+          <ul>
+            <li>Persistent database DDL deployment process.</li>
+            <li>Published posting policy amendment/versioning.</li>
+            <li>Conditional or applicant-type-specific attachment requirements.</li>
+            <li>Template-linked attachment requirement configuration.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Architecture And Domain</h2>
+      <pre>JobPosting 1 --- N JobPostingAttachmentRequirement
+
+JobApplication 1 --- N ApplicationAttachment
+
+Requirement satisfaction:
+  same job application
+  + same attachment type
+  + same section type
+  + physicalFileStatus = STORED
+  + deletedAt = null</pre>
+      <table>
+        <thead>
+          <tr><th>Class</th><th>Type</th><th>Responsibility</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>JobPostingAttachmentRequirement</code></td><td>Entity</td><td>Stores per-posting policy rows for attachment type, section type, required flag, min count, display name, and order.</td></tr>
+          <tr><td><code>JobPostingAttachmentRequirementRepository</code></td><td>Repository</td><td>Reads sorted rows, deletes rows for replace-all, reads required rows, and returns aggregate policy counts.</td></tr>
+          <tr><td><code>JobPostingAttachmentRequirementService</code></td><td>Service</td><td>Validates DRAFT-only replace-all requests and normalizes defaults.</td></tr>
+          <tr><td><code>JobPostingAttachmentRequirementController</code></td><td>Controller</td><td>Exposes admin GET/POST endpoints under <code>/admin/job-postings</code>.</td></tr>
+          <tr><td><code>ApplicationCompletionReadChecker</code></td><td>Service</td><td>Builds dashboard <code>ATTACHMENT</code> readiness issues and suppresses optional missing attachment issues when a required attachment group exists.</td></tr>
+          <tr><td><code>ApplicationSubmitValidator</code></td><td>Service</td><td>Blocks final submit only when required attachment rows are missing.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>API List</h2>
+      <table>
+        <thead>
+          <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>GET</td><td><code>/admin/job-postings/{jobPostingId}/attachment-requirements</code></td><td>Read admin requirement rows.</td><td>None</td><td><code>ApiResponse&lt;List&lt;JobPostingAttachmentRequirementResponse&gt;&gt;</code></td></tr>
+          <tr><td>POST</td><td><code>/admin/job-postings/{jobPostingId}/attachment-requirements</code></td><td>Replace all rows for a DRAFT posting.</td><td><code>AttachmentRequirementReplaceRequest</code></td><td><code>ApiResponse&lt;List&lt;JobPostingAttachmentRequirementResponse&gt;&gt;</code></td></tr>
+          <tr><td>GET</td><td><code>/job-postings</code></td><td>Public list.</td><td>None</td><td>Aggregate <code>applicationFormRequiredPolicy</code>; no full <code>attachmentRequirements</code>.</td></tr>
+          <tr><td>GET</td><td><code>/job-postings/{id}</code></td><td>Public detail.</td><td>None</td><td>Safe <code>attachmentRequirements</code> list plus aggregate policy.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Validation And Policy</h2>
+      <table>
+        <thead>
+          <tr><th>Area</th><th>Rule</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Admin mutation</td><td>Replace-all allowed only for <code>DRAFT</code> postings.</td><td><span class="badge complete">Completed</span></td></tr>
+          <tr><td>Duplicate row</td><td><code>(attachmentType, sectionType)</code> must be unique per request.</td><td><span class="badge complete">Completed</span></td></tr>
+          <tr><td>Required row</td><td><code>minCount</code> defaults to 1 and must be at least 1.</td><td><span class="badge complete">Completed</span></td></tr>
+          <tr><td>Optional row</td><td><code>minCount</code> defaults to 0 and must not be negative.</td><td><span class="badge complete">Completed</span></td></tr>
+          <tr><td>Public list</td><td>Aggregate policy only; no full attachment requirement rows.</td><td><span class="badge complete">Completed</span></td></tr>
+          <tr><td>Public detail</td><td>Safe policy fields only; no file storage fields or deletion metadata.</td><td><span class="badge complete">Completed</span></td></tr>
+          <tr><td>Dashboard</td><td>Required rows block; optional <code>minCount&gt;0</code> rows are non-blocking only when there are no required rows; optional <code>minCount=0</code> rows are guide-only. Mixed required/optional policies report one required <code>ATTACHMENT</code> group only.</td><td><span class="badge complete">Completed</span></td></tr>
+          <tr><td>Submit</td><td>Only required rows can block final submit.</td><td><span class="badge complete">Completed</span></td></tr>
+          <tr><td>Storage health</td><td>No filesystem checks; DB file status is trusted and storage repair is operational.</td><td><span class="badge warning">Documented</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Changed Files</h2>
+      <table>
+        <thead>
+          <tr><th>Category</th><th>Files</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Domain/Repository</td><td><code>JobPostingAttachmentRequirement</code>, <code>JobPostingAttachmentRequirementRepository</code>, <code>JobPostingAttachmentRequirementPolicyCount</code>, <code>ApplicationAttachmentRepository</code></td></tr>
+          <tr><td>DTO</td><td><code>AttachmentRequirementRequest</code>, <code>AttachmentRequirementReplaceRequest</code>, <code>JobPostingAttachmentRequirementResponse</code>, <code>AttachmentRequirementPublicResponse</code>, <code>ApplicationFormRequiredPolicyResponse</code>, public list/detail responses</td></tr>
+          <tr><td>Service/Controller</td><td><code>JobPostingAttachmentRequirementService</code>, <code>JobPostingAttachmentRequirementController</code>, <code>JobPostingPublicService</code>, <code>ApplicationCompletionReadChecker</code>, <code>ApplicationSubmitValidator</code></td></tr>
+          <tr><td>Tests</td><td>Admin requirement service/controller tests, public service/controller tests, policy DTO tests, dashboard tests, submit validator tests</td></tr>
+          <tr><td>Docs</td><td><code>docs/codex/implementation/phase-03i-5-2-attachment-required-policy.md</code>, this report, implementation history</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Manual DB Notes</h2>
+      <p>No migration framework is active in this repository. The Java implementation enforces duplicates at service level; the DB unique key below is a recommended persistent schema candidate.</p>
+      <pre>CREATE TABLE job_posting_attachment_requirement (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    job_posting_id BIGINT NOT NULL,
+    attachment_type VARCHAR(50) NOT NULL,
+    section_type VARCHAR(50) NOT NULL,
+    required BOOLEAN NOT NULL,
+    min_count INT NOT NULL,
+    sort_order INT NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+    description VARCHAR(500),
+    created_at DATETIME(6),
+    updated_at DATETIME(6),
+    created_by VARCHAR(255),
+    updated_by VARCHAR(255),
+    CONSTRAINT fk_job_posting_attachment_requirement_posting
+        FOREIGN KEY (job_posting_id) REFERENCES job_posting(id),
+    CONSTRAINT uk_job_posting_attachment_requirement_type_section
+        UNIQUE (job_posting_id, attachment_type, section_type)
+);</pre>
+    </section>
+
+    <section class="section">
+      <h2>Test Results</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Result</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>.\gradlew.bat test --tests "*AttachmentRequirement*" --tests ApplicationSubmitValidatorTest --tests ApplicationDashboardServiceTest --tests JobPostingPublicServiceTest --tests JobPostingPublicControllerTest --no-daemon</code></td>
+            <td><span class="badge complete">BUILD SUCCESSFUL</span></td>
+            <td>Target Phase 03i-5-2 tests passed; rerun after the mixed required/optional dashboard review fix completed in 2m 56s.</td>
+          </tr>
+          <tr>
+            <td><code>.\gradlew.bat test --tests com.shinyoung.recruit.service.ApplicationDashboardServiceTest --no-daemon</code></td>
+            <td><span class="badge complete">BUILD SUCCESSFUL</span></td>
+            <td>Review fix test passed for mixed required/optional attachment dashboard readiness.</td>
+          </tr>
+          <tr>
+            <td><code>.\gradlew.bat test --tests "*ApplicationAttachment*" --tests "*AttachmentStorage*" --no-daemon</code></td>
+            <td><span class="badge complete">BUILD SUCCESSFUL</span></td>
+            <td>Existing attachment upload, download, delete, and storage regression tests passed.</td>
+          </tr>
+          <tr>
+            <td><code>.\gradlew.bat clean test --no-daemon</code></td>
+            <td><span class="badge complete">BUILD SUCCESSFUL</span></td>
+            <td>Full verification passed in 12m 49s.</td>
+          </tr>
+          <tr>
+            <td>Initial non-escalated Gradle run</td>
+            <td><span class="badge warning">Sandbox blocked</span></td>
+            <td>Gradle wrapper attempted a network download and was rerun with approved escalation.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Remaining Issues</h2>
+      <ul>
+        <li><span class="badge warning">Open</span> Persistent database DDL is manual for this phase.</li>
+        <li><span class="badge pending">Deferred</span> Published posting requirement changes remain blocked.</li>
+        <li><span class="badge pending">Deferred</span> Section-record-level or conditional attachment rules are not supported yet.</li>
+        <li><span class="badge pending">Deferred</span> Mixed required/optional attachment guidance is not exposed as a separate optional dashboard incomplete issue in this phase.</li>
+        <li><span class="badge warning">Operational</span> Missing physical files under <code>STORED</code> metadata must be handled by storage health scan/repair, not submit/dashboard validation.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Next Phase Recommendation</h2>
+      <p>Decide whether published postings require versioned attachment policy amendments. Keep filesystem reconciliation in the storage health scan/repair path.</p>
+    </section>
+  </main>
+</body>
+</html>

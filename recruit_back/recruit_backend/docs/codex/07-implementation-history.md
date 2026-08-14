@@ -1,0 +1,4438 @@
+# 07. Implementation History
+
+## 2026-06-30 - 학력 전체(평균) 평점 4필드 추가 (education-overall-gpa)
+
+- Date: 2026-06-30
+- Work type: 소규모 기능 추가 (백엔드 전용 슬라이스).
+- 학력(education):
+  - `ApplicationEducation`에 전체/전공 평점 4필드(`overallGradePoint`, `overallMaxGradePoint`, `overallMajorGradePoint`, `overallMajorMaxGradePoint`, 모두 `BigDecimal` DB nullable) 추가. 수동 입력 전용, 자동 평균 계산 없음.
+  - `ApplicationEducation.create()` 20-arg 오버로드 추가 (기존 15/16-arg 오버로드 유지, 하위 호환).
+  - `EducationRequest`(record) 4 컴포넌트 + `@DecimalMin` 추가; 15-arg/16-arg 호환 생성자(신규 4필드 null 기본값).
+  - `EducationResponse` / `AdminEducationResponse` 4 컴포넌트 + `from()` 매핑.
+  - `ApplicationEducationService.validateOverallGrades(EducationRequest)` 신규 — overall pair 필수(비고교) / 선택(고교), major pair 선택(전 레벨), 쌍 일관성·범위(max>0, point>=0, point<=max) 검증; 위반 시 `InvalidJobApplicationException`.
+  - `ApplicationEducationSemesterGrade` 변경 없음.
+- APIs: 경로 변경 없음 (`GET·POST /api/applications/{applicationId}/educations`, `GET /api/admin/applications/{applicationId}/educations`), 페이로드 4필드 추가.
+- 커밋: Entity `4422ad2`, DTO `19058f6`·`b9661a3`, Service+ServiceTest `006e663`, ControllerTest `bfc9ca2`.
+- Tests: `ApplicationEducationServiceTest`(16건, 4 신규) · `ApplicationEducationControllerTest`(8건) 그린. 인접 리그레션(AdminSection*/PiiPurge/Pdf/Statistics) scoped 통과. 전체 리그레션 미실행(하네스 §5).
+- 잔여: 프론트 학력 입력 UI 미구현(후속 슬라이스); 자동 평균 계산 없음; education.ts stale 필드 정리 범위 외.
+
+## 2026-06-23 - 어학 scoreOrGrade·conversationalAbility / 기본정보 veteranType
+
+- Date: 2026-06-23
+- Work type: refactor + 소규모 기능 추가 (백엔드 전용 슬라이스, 브랜치 `feature/language-veteran-fields`).
+- 어학(language):
+  - `ApplicationLanguage.score`/`grade` 제거 → `scoreOrGrade`(평문 nullable String, `ApplicationCertificate`와 동일 패턴) 1필드로 합침.
+  - `conversationalAbility`(평문 nullable String) 추가. 공통코드 그룹 `LANGUAGE_CONVERSATION` 코드값이나 백엔드 validation 미결합(SCHOOL_TYPE 선례), 코드 시드 안 함.
+  - DTO(LanguageRequest/LanguageResponse/AdminLanguageResponse)·서비스 매핑·PDF "점수/등급"+"회화능력" 행·`purgeLanguages` NULLIFY 반영. 둘 다 선택값.
+- 기본정보(basic info):
+  - `ApplicationBasicInfo.veteranType`(평문 nullable String, `@Column(length=200)`) 추가 — 보훈은 일반 PII(민감정보 아님)라 암호화하지 않음(`veteranStatus` 평문 enum과 동일 취급).
+  - 조건부 검증 `validateVeteran`: `veteranStatus==SUBJECT`면 종류 필수, `NOT_SUBJECT`면 값 금지(`validateDisability` 구조 미러, 공통코드 조회 제외).
+  - BasicInfoSaveRequest/BasicInfoResponse/AdminBasicInfoResponse·서비스 create/update·`purgeBasicInfo` NULLIFY 반영.
+- 계약: `recruit/api-contract.md`에 어학·기본정보(보훈) 섹션 기록(🔴 백엔드 구현됨/프론트 미반영). 프론트는 후속 슬라이스.
+- Tests: 어학(LanguageService/LanguageController/PiiPurge/AdminSection*/Pdf) + 기본정보(BasicInfoService/BasicInfoController/Encryption/Dashboard/Pdf/PiiPurge/SubmitValidatorBasicInfo) scoped 통과. 전체 리그레션 미실행(하네스 §5).
+
+## 2026-06-23 - 경력 careerType 제거·진급일 추가 / School schoolCode 제거·schoolCategory 추가
+
+- Date: 2026-06-23
+- Work type: refactor (백엔드 전용 슬라이스, 브랜치 `feature/career-school-cleanup`).
+- 경력(career):
+  - `careerType`(enum) + `ApplicationCareerProfile` 엔티티·리포지토리 + `CareerType` enum 완전 제거. 타입 기반 검증(저장 시 EXPERIENCED-only, 제출 게이트, 완료판정) 제거 → 경력은 선택 목록(0개 허용).
+  - `ApplicationCareer.promotionDate`(진급일, LocalDate nullable) 추가. PDF 진급일 행, `purgeCareers` NULLIFY 반영. `purgeCareerProfile` 제거.
+  - DTO 정리(CareerReplaceRequest/CareerResponse/AdminCareerResponse에서 careerType 제거; CareerRequest/CareerItemResponse/AdminCareerItemResponse에 promotionDate 추가), `AdminApplicationSectionService.getCareers`·`ApplicationSubmitValidator.validateCareer`·`ApplicationCompletionReadChecker.checkCareer` 제거.
+- School(마스터):
+  - `schoolCode` + `uk_school_code` unique + `existsBySchoolCode`/`findBySchoolCode` 제거 → 중복제거는 `(schoolName, schoolType, region)` fallback 단일화(ADR 0004 개정).
+  - `schoolCategory`(코드 문자열) 추가. xlsx import 헤더 7열(schoolCode 제외, schoolCategory 포함). DTO/서비스/파서 반영.
+  - `schoolType`/`schoolCategory`는 CommonCode 그룹(`SCHOOL_TYPE`/`SCHOOL_CATEGORY`)으로 표시(백엔드 validation 미결합, 코드값은 운영 admin 등록).
+- 계약: 응답/요청 변경으로 프론트 연동 영향 → `recruit/api-contract.md`에 기록, 프론트는 후속 슬라이스.
+- Tests: 경력 관련(CareerService/CareerController/AdminSection*/Dashboard/PiiPurge/Pdf/Completion) + 학교(School/SchoolImport/Statistics) scoped 통과. ※ `ApplicationSubmitValidatorTest`는 basicInfo @Mock 누락으로 본 변경 이전부터 NPE 실패하던 상태(별도 이슈). 전체 리그레션 미실행.
+
+## 2026-06-12 - Phase 10 ApplicationBasicInfo (지원자 기본정보 섹션) 구현 완료
+
+- Date: 2026-06-12
+- Work type: implementation. 지원서 기본정보 섹션 전체 수직 슬라이스 (11개 커밋 `76793f8` … `98d33b9`).
+- Scope: 신규 도메인 엔티티 + 지원자/관리자 API + 제출·완성도·PDF·파기 통합 배선.
+- Implemented:
+  - **Enum 3종**: `NationalityType`(DOMESTIC/FOREIGN), `VeteranStatus`(SUBJECT/NOT_SUBJECT), `DisabilityStatus`(SUBJECT/NOT_SUBJECT).
+  - **엔티티 `ApplicationBasicInfo`**: `JobApplication` 1:1 @OneToOne(LAZY) unique, 모든 문자열 PII(`nameKorean`, `nameEnglish`, `countryCode`, `mobilePhone`, `emergencyPhone`, `email`, `disabilityGradeCode`, `disabilityTypeCode`, `zipCode`, `addressBasic`, `addressDetail`) `AesAttributeConverter` at-rest 암호화. enum(`nationalityType`, `veteranStatus`, `disabilityStatus`)·`birthDate` 평문. DB NOT NULL은 FK만. static create + update 메서드.
+  - **`ApplicationBasicInfoRepository`**: `findByJobApplicationId`, `existsByJobApplicationId`.
+  - **`ApplicationBasicInfoService`**: 조회+prefill(Applicant 기반, persisted=false)+upsert+조건부 검증(국적/장애/나이 만14~100세/전화 `^[0-9-]{9,20}$`). `CommonCodeRepository.existsByGroupCodeAndCodeAndActiveTrue` 활성 코드 검증.
+  - **`ApplicationBasicInfoController`**: `GET /applications/{applicationId}/basic-info` (persisted/prefill), `POST /applications/{applicationId}/basic-info` (upsert).
+  - **DTOs**: `BasicInfoSaveRequest`(record, Bean Validation), `BasicInfoResponse`(of+prefill), `AdminBasicInfoResponse`(from).
+  - **`CommonCodeRepository.existsByGroupCodeAndCodeAndActiveTrue`**: 활성 코드 파생 쿼리 추가.
+  - **`ApplicationSubmitValidator.validateBasicInfo`**: `ApplicationFormConfig` 검사보다 최우선 항상 실행. 필수 7개 필드 + 조건부 검증.
+  - **`ApplicationCompletionReadChecker` BASIC_INFO 그룹**: config 무관 항상 필수 그룹 등록. checkBasicInfo 추가.
+  - **관리자 API**: `AdminApplicationSectionService.getBasicInfo` + `AdminApplicationSectionController GET /admin/applications/{applicationId}/basic-info`. 장애 등급·유형 포함(민감정보, 관리자 전용).
+  - **PDF 스냅샷 배선**: `ApplicationPdfService.buildHeader` — BasicInfo 행 존재 시 이름/휴대폰/이메일 source of truth = BasicInfo. 행 부재 시에만 fallback. 파기 후 필드 null이어도 fallback 금지(회귀 방지 테스트 포함).
+  - **파기**: `ApplicationPiiPurgeRepository.purgeBasicInfo`(전 PII 컬럼 + createdBy/updatedBy null, JPQL bulk update), `ApplicationPiiPurgeService.purgeRelationalPii` 첫 번째 호출.
+- APIs:
+  - `GET /applications/{applicationId}/basic-info` — 지원자(본인), `BasicInfoResponse`
+  - `POST /applications/{applicationId}/basic-info` — 지원자(본인), upsert
+  - `GET /admin/applications/{applicationId}/basic-info` — 관리자, `AdminBasicInfoResponse`
+- Business rules: FOREIGN→countryCode 필수+활성 NATIONALITY 코드; DOMESTIC→countryCode 금지; SUBJECT→grade+type 필수+활성 코드; 나이 만 14~100세(Clock); 전화 숫자·하이픈 9~20자; 제출 최우선; PDF row-based source; 파기 null-only(AES 랜덤 IV).
+- Tests: scoped 실행 — `ApplicationBasicInfoEncryptionTest`(1) · `ApplicationBasicInfoServiceTest`(11) · `ApplicationBasicInfoControllerTest`(4) · `ApplicationSubmitValidatorBasicInfoTest`(2) · `ApplicationCompletionReadCheckerTest`(보강) · `ApplicationPdfServiceTest`(+3) · `ApplicationPiiPurgeServiceTest`(보강). 전체 `clean test` 는 로컬 타임아웃으로 미실행.
+- Documentation:
+  - `docs/codex/implementation/phase-10-application-basic-info.md`
+  - `docs/codex/reports/phase-10-application-basic-info.html`
+  - `docs/codex/implementation/phase-09-pii-field-inventory.md` — §10 ApplicationBasicInfo 섹션 추가 (전 필드 NULLIFY)
+- Deferred: 증명사진(PHOTO) 첨부, CommonCode 시드 데이터, Excel export BasicInfo 반영, 전화번호 normalize.
+- Notes: `addressBasic/addressDetail` 컬럼 length 스펙 1000 vs 구현 2000 (widen 커밋 `8fc642f`). 운영 DDL 시 2000 기준.
+
+## 2026-06-11 - Phase 09f 3차 리뷰 반영 (Minor — service message 검증)
+
+- Date: 2026-06-11
+- Work type: review fix. `instruction.md`의 09f 3차 리뷰(남은 Minor) 반영 — 서비스 단위 테스트가 새 message 계약과 불일치하고, 서비스 자체는 safe code 검증을 하지 않던 문제.
+- Implemented:
+  - **ClientEventLogService.safeMessage()**: DTO `@Pattern`과 동일한 `^[A-Z][A-Z0-9_]{2,80}$` 검증을 서비스에도 추가(리뷰 권장 코드 그대로). 위반 시 `InvalidClientEventLogException(400)`. 컨트롤러 `@Valid`를 거치지 않는 내부 호출 경로가 생겨도 자유 문자열이 저장되지 않는다.
+  - **숫자 마스킹 유지**: `maskLongDigitRuns`는 검증 통과 후에도 적용 — 코드 형태로 위장한 숫자열(`P01012345678` 등) 방어.
+  - **ClientEventLogServiceTest 정렬**: `정상_수집시...` 픽스처 message를 `API_REQUEST_FAILED`로 교체. 자유 문자열 마스킹 테스트를 제거하고 `자유_문자열_message는_서비스에서도_거부된다`(신규) + `safe_code_안의_7자리_이상_연속_숫자는_마스킹된다`(`ERR_01012345678` → `ERR_*`)로 대체. 총 8건.
+- Tests: scoped — `ClientEventLogServiceTest`(8) · `ClientEventLogControllerTest`(14). 09f 전체 67건.
+- Documentation: 09f-1 md/html(safeMessage·테스트 표·44건), 09f-4 md/html(합계 67건), design 문서(서비스 양쪽 검증 명시).
+- 상태: 반영 완료.
+
+## 2026-06-11 - Phase 09f 2차 리뷰 반영 (Major 1/Major 2/Minor 1)
+
+- Date: 2026-06-11
+- Work type: review fix. `instruction.md`의 09f 2차 리뷰 3건 반영.
+- Implemented:
+  - **Major 1 — 스케줄링 활성 검증 테스트**: `SchedulingConfig`(@EnableScheduling)는 09f-4에서 이미 도입된 상태였으므로 코드 변경 없이, 누락 회귀를 잡는 `SchedulingConfigTest` 2건 추가(`ScheduledAnnotationBeanPostProcessor` 존재 + `ClientEventLogCleanupScheduler` cron 작업 등록 확인).
+  - **Major 2 — message safe code allowlist 강화(리뷰 안 A)**: `ClientEventLogRequest.message` 패턴을 `^[A-Za-z0-9 _.:\\-]*$`(영문 자유 문자열 통과) → `^[A-Z][A-Z0-9_]{2,80}$`(대문자 코드만)로 교체, `@Size(max=200)` 제거(패턴이 길이 상한). 영문 이름/회사명/주소성 문자열·소문자 문장·axios 기본 문구 모두 400. FE는 messageCode만 전송. 컨트롤러 테스트 4건 추가(영문 자유 문장 400 / 소문자 400 / axios 문구 400 / `API_REQUEST_FAILED` 200). 서비스 숫자 마스킹은 2차 방어로 유지(주석 명시).
+  - **Minor 1 — reverse proxy 정책 문서 보강**: 09f-1 문서/리포트의 reverse proxy 한계 항목에 trusted proxy 기준 `ForwardedHeaderFilter`/`X-Forwarded-For` 처리 정책 및 "public endpoint에서 임의 X-Forwarded-For 신뢰 금지(rate limit 우회 가능)" 명시. 코드 변경 없음(운영 배치 시 결정 사항).
+- Tests: scoped — `SchedulingConfigTest`(2) · `ClientEventLogControllerTest`(14 = 기존 10 + 신규 4) · `ClientEventLogServiceTest`(7) · `ClientEventLogCleanupSchedulerTest`(2). 09f 전체 66건.
+- Documentation:
+  - `docs/codex/implementation/phase-09f-1-client-event-ingest.md` / `docs/codex/reports/phase-09f-1-client-event-ingest.html` (message 계약·proxy 정책)
+  - `docs/codex/implementation/phase-09f-4-client-event-retention.md` / `docs/codex/reports/phase-09f-4-client-event-retention.html` (SchedulingConfigTest)
+- 상태: 반영 완료. FE 연동 시 message → messageCode 계약 변경 공지 필요.
+
+## 2026-06-11 - Phase 09f-4 Client Event Retention (구현 완료)
+
+- Date: 2026-06-11
+- Work type: implementation. Phase 09f(지원자 화면 진단 로그) 네 번째/마지막 BE 슬라이스 — retention cleanup 파이프라인.
+- Scope: bulk delete(`@Modifying(flushAutomatically=true)` JPQL DELETE) + `ClientEventLogCleanupService` + `SchedulingConfig`(@EnableScheduling 프로젝트 최초 도입) + `ClientEventLogCleanupScheduler` + `POST /api/admin/client-events/cleanup` + 09f-1 파일 헤더 주석 정리(62d3b82). retention cleanup 행위자 ActivityLog 계측 제외(설계상, 진단 로그).
+- Implemented:
+  - **ClientEventLogRepository.deleteByReceivedAtBefore**: `@Modifying(flushAutomatically = true)` + 단일 JPQL DELETE. 엔티티 로딩 없이 삭제 건수(`int`) 반환. `flushAutomatically` = 프로젝트 `@Modifying` 관례 정렬(리뷰 반영 커밋 ca19479).
+  - **ClientEventLogCleanupService**: `@Transactional`. `threshold = now(clock) - retentionDays`. 기본 90일(`client-event-log.retention-days`). strict `<` — `receivedAt == threshold` 유지. 스케줄러와 수동 트리거 양쪽에서 호출.
+  - **SchedulingConfig**: `@EnableScheduling` 프로젝트 최초 도입. `@SpringBootTest` 컨텍스트에도 활성. cron 04:00이라 간섭 위험 낮음.
+  - **ClientEventLogCleanupScheduler**: `@Scheduled(cron = "${client-event-log.cleanup-cron:0 0 4 * * *}")`. 예외 무전파(`log.error`만).
+  - **ClientEventLogCleanupResponse**: `record(int deletedCount)`.
+  - **AdminClientEventLogController**: `POST /admin/client-events/cleanup` 추가. SecurityConfig narrow matcher 게이팅 — 컨트롤러 내 인증 로직 없음(retention write 관례).
+  - **SecurityConfig**: `POST /api/admin/client-events/cleanup → hasAuthority("ROLE_PRIVACY_ADMIN")` narrow matcher 삽입. GET matcher 앞, broad `/api/admin/**` 앞.
+  - **헤더 주석 정리(62d3b82)**: 09f-1 슬라이스 파일 9개의 `// src/...` 경로 주석 제거(프로젝트 스타일 정렬).
+- APIs: `POST /api/admin/client-events/cleanup` — `ROLE_PRIVACY_ADMIN` 전용(narrow matcher). 401(미인증), 403(`ROLE_PRIVACY_ADMIN` 미보유). 응답: `{"deletedCount": N}`.
+- Business rules: strict `<` 경계(receivedAt == threshold 유지), flushAutomatically 관례 정렬, 예외 무전파, cleanup write = PRIVACY_ADMIN 전용, matcher 순서 = 보안 요구사항.
+- Tests: scoped **60건 통과** — 09f-4 신규: `ClientEventLogCleanupServiceTest`(2) · `ClientEventLogCleanupSchedulerTest`(2) · `AdminClientEventLogControllerTest`(+2 = 10). 09f 전체: 10개 클래스 60건. 회귀 `AdminAuditControllerTest`(10) 통과.
+- Plan deviations: 없음(cleanup 경계값 91/89일 쌍 검증은 계획 취지와 동일).
+- Documentation:
+  - `docs/codex/implementation/phase-09f-4-client-event-retention.md`
+  - `docs/codex/reports/phase-09f-4-client-event-retention.html`
+- 상태: 구현 완료. **Phase 09f 전 BE 슬라이스(09f-1/09f-3/09f-4) 종료.** 프론트엔드 연동은 별도 FE 프로젝트(09f-2).
+
+## 2026-06-10 - Phase 09f-3 Admin Client Event Read API (구현 완료)
+
+- Date: 2026-06-10
+- Work type: implementation. Phase 09f(지원자 화면 진단 로그) 세 번째 슬라이스 — 관리자 조회 파이프라인.
+- Scope: `GET /api/admin/client-events`(검색 11파라미터) + `GET /api/admin/client-events/{id}`(단건 조회). 권한별 민감 필드 projection + 조회 가드. retention cleanup(09f-4)은 이월.
+- Implemented:
+  - **예외 2종**: `ClientEventLogNotFoundException`(404), `InvalidClientEventQueryException`(400). `GlobalExceptionHandler` 핸들러 2건 추가.
+  - **Repository 검색 쿼리**: `ClientEventLogRepository.search` — JPQL `@Query`, 9 필터 파라미터 + `Pageable`, `ORDER BY c.receivedAt DESC, c.id DESC` 고정 정렬. 기존 마커 Repository에 추가.
+  - **Repository 테스트 보강**: `search는_필터와_최신순_정렬을_지원한다` 1건 추가(총 5건).
+  - **ClientEventLogResponse**: 34필드 `record`. `from(log, includeSensitive)` 정적 팩토리. `includeSensitive=false` 시 `ipAddress`/`userAgent`/`principalHash`/`stackSummary` → `"***"`. `message`(safe code)/`metadataJson`(exact allowlist)/`stackHash` 양 권한 노출. null 원문 null 유지.
+  - **ClientEventLogReadService**: `@Transactional(readOnly=true)`. 가드 — `MAX_PAGE_SIZE=100`, `MAX_RANGE_DAYS=90`, `DEFAULT_RANGE_DAYS=7`. Duration 비교(소수 버림 없음, 09b 선례). `normalize(trim + blank→null)`.
+  - **AdminClientEventLogController**: `GET /admin/client-events`(11파라미터) + `GET /admin/client-events/{id}`. `includeSensitive` = `ROLE_PRIVACY_ADMIN` 보유 시만 `true`. `AdminAuditController` 선례.
+  - **SecurityConfig**: `GET /api/admin/client-events/**` → `ROLE_RECRUIT_ADMIN/ROLE_PRIVACY_ADMIN` narrow matcher 삽입. broad `/api/admin/**` 앞. `ROLE_ADMIN` 단독 → 403(의도적 privacy-tightening).
+- APIs: `GET /api/admin/client-events`(검색, 11파라미터) + `GET /api/admin/client-events/{id}`(단건). 인가: RECRUIT_ADMIN/PRIVACY_ADMIN. 400(가드 위반), 401(미인증), 403(권한 미보유/ROLE_ADMIN), 404(미존재 id).
+- Business rules: page size ≤100, 범위 ≤90일, default 7일, normalize, 마스킹 4필드(ipAddress/userAgent/principalHash/stackSummary) PRIVACY_ADMIN 전용, matcher 순서=보안 요구사항, ROLE_ADMIN 403 의도적.
+- Tests: scoped **19 passed** — `ClientEventLogRepositoryTest`(5 — 09f-3 search 1건 추가) · `ClientEventLogReadServiceTest`(6) · `AdminClientEventLogControllerTest`(8 — 플랜 7 + 정렬 검증 1건 추가). 전체 회귀 미실행(프로젝트 규칙).
+- Deferred: retention bulk delete + 스케줄러(09f-4), FE 연동(09f-2 별도 프로젝트).
+- Documentation:
+  - `docs/codex/implementation/phase-09f-3-admin-client-event-read.md`
+  - `docs/codex/reports/phase-09f-3-admin-client-event-read.html`
+- 상태: 구현 완료. 다음 = **09f-4**(Retention Cleanup — bulk delete, CleanupService, 스케줄러, 관리자 수동 트리거 API).
+
+## 2026-06-10 - Phase 09f-1 Client Event Ingest Foundation (구현 완료)
+
+- Date: 2026-06-10
+- Work type: implementation. Phase 09f(지원자 화면 진단 로그) 첫 슬라이스 — 수집(ingest) 파이프라인 기반.
+- Scope: `POST /api/client-events` 수집 API + `client_event_log` 엔티티 + 3단 rate limit + metadata allowlist sanitizer. 조회(09f-3)/retention cleanup(09f-4)는 이월.
+- Implemented:
+  - **enum 3종**: `ClientEventType`(14종 — PAGE_OPENED/CHECKPOINT/API_ERROR/API_TIMEOUT/NETWORK_ERROR/SESSION_EXPIRED/FORBIDDEN/JS_ERROR/UNHANDLED_REJECTION/APPLICATION_DRAFT_SAVE_FAILED/APPLICATION_SUBMIT_CLICKED/APPLICATION_SUBMIT_FAILED/ATTACHMENT_UPLOAD_FAILED/CLIENT_VALIDATION_FAILED), `ClientEventSeverity`(INFO/WARN/ERROR), `ClientEventSource`(APPLICANT_WEB/ADMIN_WEB).
+  - **예외 2종**: `InvalidClientEventLogException`(400), `ClientEventRateLimitExceededException`(429). `GlobalExceptionHandler` 핸들러 2건 추가.
+  - **Entity**: `ClientEventLog` — insert-only, `BaseEntity` 미상속, `receivedAt`(Clock). unique `(client_session_id, client_event_id)`, 7 인덱스. `principalHash`=HMAC, `ipAddress`/`userAgent` 서버 추출 전용.
+  - **Repository**: `ClientEventLogRepository` — 마커 `Repository<ClientEventLog, Long>`. `save`/`saveAndFlush`/`findById`/`count`/`existsByClientSessionIdAndClientEventId`.
+  - **ClientEventMetadataSanitizer**: eventType별 exact allowlist 14종(빈 Set 포함 — SESSION_EXPIRED 등은 key 보내면 400) + 2차 금지 key 방어선 21종(PII성, 대소문자 무시). value String 200자/nested 금지. 직렬화 결과 4000자 이하. 전용 `JsonMapper`(앱 Jackson 분리).
+  - **ClientEventRateLimiter**: in-memory 고정 윈도우(60초) 3단 — ip 300/분, ip+session 60/분, principal 120/분. 맵 크기 가드(10,000 상한 + 만료 lazy eviction, fail-closed).
+  - **DTO**: `ClientEventLogRequest`(record, `clientSessionId`/`clientEventId` `@Pattern ^[A-Za-z0-9-]{8,80}$`, `message` safe code `@Pattern`+200자), `ClientEventLogIngestResponse`(`ofAccepted`/`ofDuplicate`/`ofDisabled`).
+  - **ClientEventLogService**: 의도적 `@Transactional` 미사용(saveAndFlush DataIntegrityViolationException catch가 rollback-only에 깨지지 않도록). source=APPLICANT_WEB 강제. 서버 추출 ip/ua. principalHash=`AuditHmac.hmacHex("CLIENT_PRINCIPAL:"+username)`. message 7자리+ 숫자열 마스킹. stripQuery. 중복 선확인 + race catch → duplicate 흡수.
+  - **ClientEventLogController**: `POST /client-events`, `consumes=APPLICATION_JSON_VALUE`, `permitAll`, `@Valid`.
+  - **SecurityConfig**: `POST /api/client-events` permitAll matcher 추가. CORS `setExposedHeaders(X-Request-Id)`.
+  - **application.yaml**: `client-event-log` 블록(enabled/retention-days/max-metadata-json-length/cleanup-cron/rate-limit 3종). 전부 환경변수 주입 + 기본값.
+- APIs: `POST /api/client-events` — permitAll, JSON-only, 200(accepted/duplicate), 400(source위조/ID형식/message/metadata), 415(non-JSON), 429(rate limit).
+- Business rules: source=APPLICANT_WEB만, metadata exact allowlist+2차금지key, safe message code, 3단 rate limit, 중복 race 흡수, 서버 추출값만 신뢰, principalHash=HMAC, routePath/apiPath query 제거.
+- Tests: scoped **39 passed** — `ClientEventLogRepositoryTest`(4) · `ClientEventMetadataSanitizerTest`(11) · `ClientEventRateLimiterTest`(6) · `ClientEventLogServiceTest`(7) · `ClientEventLogControllerTest`(10) · `ClientEventLogRateLimitControllerTest`(1). 전체 회귀 미실행(프로젝트 규칙).
+- Plan deviations: ① 정적 팩토리 `ofAccepted`/`ofDuplicate`/`ofDisabled`(플랜 `accepted()`/`duplicate()`/`disabled()`는 record 접근자 충돌로 컴파일 불가) ② sanitize 정규식 `\p{Cntrl}+`(연속 collapse) ③ `ClientEventRateLimiter` primary 생성자 `@Autowired` 추가(다중 생성자 Spring 해석 실패 해결) ④ 엔티티 주석 3필드 보강.
+- Deferred: 관리자 조회 API(09f-3), retention bulk delete + 스케줄러(09f-4), FE 연동(09f-2 별도 프로젝트).
+- Documentation:
+  - `docs/codex/implementation/phase-09f-1-client-event-ingest.md`
+  - `docs/codex/reports/phase-09f-1-client-event-ingest.html`
+- 상태: 구현 완료. 다음 = **09f-3**(관리자 조회 API — Repository 검색 쿼리, ClientEventLogResponse 민감 필드 projection, AdminClientEventLogController, SecurityConfig narrow matcher).
+
+## Phase 09e - Reconciliation + 안정화 (구현 완료 — Phase 09 종료)
+
+- Date: 2026-06-08
+- Work type: implementation. 설계 §6 reconciliation·§6.1 storage-health-scan 상태별 정책, 계약 = PII 인벤토리(ADR-0005/0006/0007).
+- Implemented:
+  - **Reconciliation sweep**(ROLE_PRIVACY_ADMIN): `POST /api/admin/retention/purge-batches/reconcile`(narrow matcher). `PurgeReconciliationService`(무트랜잭션) — `findByPurgeResult(PURGE_PENDING)` → 원 `purgeBatchId` 로 9d-2 saga `completeBinaryDeletion` 재구동 → 전부 소멸 확인 시 최종 PURGED 승격, 실패 시 PENDING 유지(다음 sweep 재시도). execute 재실행은 ALREADY_PURGED skip 이라 **유일한 재처리 경로**. 단건 실패/null batchId 격리. coarse 감사 `PURGE_RECONCILE`+`PurgeReconcileMetadata`(scanned/promoted/stillPending/errors, recordRequiresNew, stillPending||errors→FAILURE). `PurgeReconcileResponse`(PII-free).
+  - **storage-health-scan §6.1 상태별 정책**: 신규 issue `PURGED_PHYSICAL_FILE_PRESENT`(치명) — orphan 후보 파일의 applicationId 파싱→`findIdsByIdInAndPurgeResult(ids, PURGED)` 대조로 "DB PURGED+파일 잔존" 탐지. BINARY_DELETED+null=정상(오탐 금지, Low 1), BINARY_DELETE_PENDING/FAILED=retry(issue 아님)+`pendingBinaryDeleteRowCount` 집계. 이슈는 fileKeyHash 만(PII 미노출). 응답 +2 카운트.
+  - **Low 2 — row 수준 실패코드**: `ApplicationAttachment.binaryDeleteFailureCode`(sanitized, nullable) — `markBinaryDeleteFailed(code)` 세팅/`markBinaryDeleted` 해소. saga `deletePhysicalFile` boolean→실패코드 반환(EMPTY_STORAGE_PATH/STILL_EXISTS/INVALID_STORAGE_PATH/DELETE_FAILED/EXCEPTION), `finalizeBinaryDeletion` `Set`→`Map<Long,String>`. 전부 PII-free.
+- **적대적 검증(3-agent)**: health-scan 치명탐지·Low 2/회귀 두 영역 **confirmed(clean)**. reconcile 지적 다수는 false positive(null batchId 여도 saga 는 applicationId 기준 조회 + item 부재 시 orElseThrow 롤백으로 오승격 차단; empty-target 승격은 실제 소멸이라 의도된 복구) 또는 동시성(직렬 실행 전제로 범위 외). 실반영 1건 — **null batchId 조기 가드**.
+- Tests: 1차 scoped **42 passed** + 구현 리뷰 반영 **28 재실행 passed**(Reconciliation 4 — chunk/STARTED 감사 포함 · HealthScan 7 · Execution 2 · RetentionController 15). 전체 회귀 미실행(프로젝트 규칙).
+- 구현 리뷰 1차 반영(2026-06-08, Medium 1·2 + Low 1): ① **Medium 1 — chunk 처리**: 전체 PURGE_PENDING 일괄 조회 → `findByPurgeResultOrderByIdAsc(..., PageRequest)` + `limit`(기본 100, 1..1000 clamp). `scannedCount==limit` = 잔여 → 재호출. ② **Medium 2 — STARTED 선행 감사(방안 A)**: sweep 시작 시 `PURGE_RECONCILE` STARTED 감사 → 완료 시 SUMMARY 감사. summary 실패해도 'STARTED 만 있고 SUMMARY 없음' 으로 미완 sweep 탐지. ③ **Low 1 — 실패코드 sanitize 엔티티 강제**: `markBinaryDeleteFailed` 가 `[A-Z0-9_]` 외 치환 + len100 절단(미래 S3/NAS 긴 메시지·경로 차단).
+- 구현 리뷰 2차 반영(2026-06-08, **Major — 치명탐지 누락 보정** + 문서 Low): `PURGED_PHYSICAL_FILE_PRESENT` 분류가 orphan 후보로만 제한돼 "PURGED 지원서 + STORED(또는 DELETED/MISSING) row + 실파일 잔존"을 놓치던 구멍(STORED row 파일은 orphan 후보 제외 → 무이슈 통과)을 보정. **치명탐지를 전체 물리파일 기준 선행 분기**로 분리(`addPurgedFilePresentIssues`) — `scanDryRun` 이 모든 파일의 applicationId 로 `purgedApplicationIds`/`purgedFileKeys` 선계산, deleted-remaining/orphan 분기는 해당 키 skip(중복 방지). row 상태 무관 치명 1회 분류. 적대 검증 **9 케이스 전수 confirmed**(중복/누락/회귀 없음). 회귀 테스트 추가(PURGED+STORED row+실파일 → `purgedPhysicalFilePresentCount==1`, orphan/STORED_MISSING 아님). 문서 Low — Major 보정 완료로 "Phase 09 종료" 유지.
+- 운영 주의: 수동 DDL `docs/codex/ops/phase-09e-reconciliation-ddl.sql`(`binary_delete_failure_code` 1컬럼, 신규 테이블 없음). reconcile 은 수동 트리거(동시 실행 금지 권고 — 직렬 전제), 대량 시 `limit` chunk 반복.
+- Documentation:
+  - `docs/codex/implementation/phase-09e-reconciliation.md`
+  - `docs/codex/reports/phase-09e-reconciliation.html`
+- 상태: 구현 완료. **Phase 09(감사+보존/파기) 9a~9e 전 슬라이스 종료.** 후속(별도 phase): legacy `DELETED` enum 제거(3단계), reconcile 자동 스케줄러(SYSTEM actor), 동시성 제어(@Version).
+
+## Phase 09d-2 - Attachment Binary Delete Saga (구현 완료)
+
+- Date: 2026-06-05
+- Work type: implementation. 설계 §5.4 첨부 saga·slice 9d-2, 계약 = PII 인벤토리 §6/§8(ADR-0005).
+- Implemented:
+  - **PhysicalFileStatus 재정의 + 1단계 안전 마이그레이션**(인벤토리 §8): +`SOFT_DELETED`/`BINARY_DELETE_PENDING`/`BINARY_DELETED`/`BINARY_DELETE_FAILED`(legacy `DELETED` 병존·동일 취급). `markDeleted()`→SOFT_DELETED. 전 사용처 호환 — 활성/목록 판정은 `HIDDEN_FROM_LISTING`, health scan 은 DELETED·SOFT_DELETED 동일 집계(BINARY_* 는 scan 대상 외 — BINARY_DELETED null storagePath 오탐 방지, 본격 확장 9e). 의미 집합 상수(`SOFT_DELETED_FAMILY`/`HIDDEN_FROM_LISTING`/`BINARY_OUTSTANDING`).
+  - **saga ①(item tx 통합)**: 첨부 PII §6 — `filenameHash=HMAC("FILE_NAME:"+원문)` 을 **원문 제거 전** 계산 → `originalFileName="__PURGED__"`·deletedBy/deletionReason null·createdBy/updatedBy bulk. **모든 첨부 행** 적용. 바이너리 미확인(`BINARY_OUTSTANDING`)은 `markBinaryDeletePending()`.
+  - **saga ②③**: `AttachmentPurgeSagaService` — 멱등 `deleteIfExists`+**`exists()` 존재 재확인**(이미 없음=성공, invalid/예외=실패) → `PurgeItemProcessor.finalizeBinaryDeletion`(REQUIRES_NEW) — 성공=`markBinaryDeleted`(**storagePath null·binaryDeletedAt 은 이 시점에만**), 실패=`markBinaryDeleteFailed`(경로 보존). **전부 소멸 확인 시에만** `markPurged(purgedAt)`+`promoteToPurged`(PENDING 전제, **fail-loud**). ②③ 사이 crash = "파일 소멸+DB pending"(설계 명시 안전 상태 — 9e 승격). "DB PURGED+파일 잔존" 경로 없음.
+  - **execute 통합/집계**: PENDING item 커밋 후 saga 실행(예외도 실패 흡수) — 승격=purged, 실패=pending 유지+`binary_delete_failed_count`(신규 컬럼) → batch **PARTIAL_FAILED**. metadata/응답 전파.
+- **적대적 검증(3-agent)**: 첨부 PII §6 커버리지 **confirmed**. REAL 1건 반영 — `promoteToPurged` silent skip→`orElseThrow`(item 부재=ledger 불변식 위반, tx 롤백으로 마커-원장 정합). false positive 반박(allCleared 코드 오독/동일 tx 원자성/②③ crash 안전 상태/제출검증·legacy 기처리). 관찰(9e scan 확장 시 null path 오탐 주의·직렬 전제) 문서화.
+- Tests: scoped **48 passed** — `PurgeExecutionServiceTest` 2(saga 완주: STORED·soft-deleted→최종 PURGED+BINARY_DELETED+storagePath null+filenameHash / 실패(traversal invalid)→PENDING+FAILED+PARTIAL_FAILED+집계 1 / drift·ref-count·멱등 유지) · `ApplicationAttachmentDeleteServiceTest` 12(SOFT_DELETED 전환) · health scan 4+3 · attachment controller 9 · retention 14 · PiiPurge 1 · contract 3(+binaryDeleteFailedCount). 전체 회귀 미실행(프로젝트 규칙).
+- 구현 리뷰 반영(2026-06-05, instruction.md, Major 1 + Medium 2 + Low 2): ① **Major 1 — 빈 storagePath 삭제 대상의 오승격 차단**: BINARY_DELETE_PENDING/FAILED 인데 storagePath null/blank 면 성공이 아니라 **데이터 불일치 = 실패**(warn + 9e 재처리) — 미확인 PURGED 승격 경로 봉쇄. 정상 "이미 소멸"은 BINARY_DELETED 로 대상 조회에서 제외. ② **Medium 1 — health scan ORPHAN 오탐 방지**: BINARY_DELETE_PENDING/FAILED row 의 storageKey 를 "known but deferred" 집합으로 수집(이슈/카운트 미반영)해 orphan 판정 제외 + 회귀 테스트 추가. ③ **Medium 2 — 실파일 삭제 실증**: storage root 실파일 생성→execute→`Files.exists=false`+BINARY_DELETED 검증(핵심 경로 — MISSING_AS_SUCCESS 만으로 불충분). ④ Low 1/2 — 9e 의무 고정(BINARY_DELETED+null path 정상 분류 테스트 / row 수준 failureCode·reasonMessage 위치 결정). 반영 후 재실행 **22 passed**(PurgeExecution 2 — 실파일 실증 포함 · health scan 5 — 오탐 방지 포함 · health controller 3 · AttachmentDelete 12).
+- 운영 주의: 수동 DDL `docs/codex/ops/phase-09d-2-attachment-saga-ddl.sql`(storage_path nullable·filename_hash·binary_deleted_at·집계 컬럼). **2단계 UPDATE(DELETED→SOFT_DELETED)는 1단계 코드 배포 후 별도 시점**(스크립트 주석 고정), 3단계 enum 제거는 후속 phase.
+- Documentation:
+  - `docs/codex/implementation/phase-09d-2-attachment-binary-delete-saga.md`
+  - `docs/codex/reports/phase-09d-2-attachment-binary-delete-saga.html`
+- 상태: 구현 완료(리뷰 1차 반영 포함). 다음 = **09e**(reconciliation sweep — PENDING/FAILED 재처리(유일 재처리 경로), scan §6.1 확장, 하드닝).
+
+## Phase 09d-1 - Purge Execute Core (구현 완료)
+
+- Date: 2026-06-05
+- Work type: implementation. 설계 §5.2/§5.4·slice 9d-1, **계약 = `phase-09-pii-field-inventory.md`**(ADR-0005 게이트 산출물). 첨부 바이너리 saga 는 09d-2.
+- Implemented:
+  - **Execute API**: `POST /api/admin/retention/purge-batches/execute`(PRIVACY_ADMIN narrow matcher). 안전장치 — **confirm=true 필수**, bulk=`sourceDryRunBatchId`(DRY_RUN 검증, 그 batch 의 ELIGIBLE item 만 후보)/단건=applicationId XOR, requireActor. criteria 실패는 batch 생성 전 400/404.
+  - **실행 시 eligibility 재검증**(dry-run 불신뢰) — 9c `RetentionEligibilityService` 재사용. 재검증 탈락(drift) = SKIPPED+reasonCode, `ALREADY_PURGED` = 멱등 skip.
+  - **트랜잭션 구조**: item 1건 = REQUIRES_NEW all-or-nothing(`PurgeItemProcessor`, 실패 증적 `recordFailure` 별도 tx) / batch = 비원자 집계(`PurgeBatchLifecycleService` — RUNNING→COMPLETED·**PARTIAL_FAILED**·FAILED 각 독립 tx) / orchestrator(`PurgeExecutionService`) 무트랜잭션. 감사는 batch coarse 만(`PURGE_EXECUTE`+`PurgeExecuteMetadata`, 부분실패=FAILURE).
+  - **관계형 PII tombstone**: 전용 `ApplicationPiiPurgeRepository`(bulk JPQL 12종 — `createdBy` updatable=false 는 bulk 만 가능) + `ApplicationPiiPurgeService`. 인벤토리 §3~§7 분류표 1:1 — PLACEHOLDER `__PURGED__`/NULLIFY/자격번호 **HMAC HASH_ONLY**/학력·경력 정확 날짜 전부 null(안 A)/평가 comment per-candidate 만(Interview 공유 텍스트 불가침)/KEEP_TOMBSTONE 불가침. NOT NULL date PII 6필드 엔티티 nullable 완화.
+  - **PURGED 승격 가드**: 바이너리 소멸 미확인(`STORED`+**soft-`DELETED`** — after-commit 물리삭제 실패 시 파일 잔존 가능) 시 `markPurgePending`(purgedAt 미세팅)+item PENDING, 미보유 시 `markPurged`+purgedAt. "DB PURGED+파일 잔존" 불허.
+  - **Applicant ref-count 익명화**(§2): 모든 지원서 파기 대상일 때만 `purgePersonalData` — loginId/name/userName/email/password/phoneNumber/ci null + **ciHash=`"PURGED:"+UUID`** sentinel(리뷰 2차 #1, 재가입 허용=파기 우선).
+- **적대적 검증(5-agent 워크플로)**: 안전장치 confirmed. REAL 1건 반영 — **soft-DELETED 를 outstanding 에 포함**(+테스트). false positive 2건 실측 반박(applicantNameSnapshot 은 markPurge* 처리 / ref-count 는 동일 영속성 컨텍스트+id-fallback). tx 관찰 3건 문서화(직렬 전제·재실행 ledger·FAILED 해석).
+- Tests: 9d-1 scoped **22 passed**(인벤토리 field-level 계약 대형 1 · 비-tx 통합 2 — drift/PENDING×2/PURGED/ref-count/멱등/단건 · controller 14 · contract 3 · dry-run 회귀 2) + 영향 영역 회귀 통과(섹션 controller 5종/ApplicantSignUp·Account/JobApplicationService 36). 전체 회귀 미실행(프로젝트 규칙).
+- 운영 주의: 수동 DDL `docs/codex/ops/phase-09d-1-purge-execute-ddl.sql`(date PII 6컬럼 nullable + purge_batch 집계 3컬럼). **인벤토리 갭 flag**: `StageResult.comment`/CorrectionHistory comment 미분류 — 인벤토리 갱신 후 처리 권고.
+- 구현 리뷰 반영(2026-06-05, instruction.md, Major 1 + Medium 2 + Low 2): ① **Major 1 — StageResult comment 계열 소거**: `StageResult.comment` NULLIFY + `StageResultCorrectionHistory`(reason `__PURGED__`/previousComment·newComment null/감사필드 null, 상태·점수·correctedBy 직원은 KEEP) bulk 2종을 tombstone 에 포함 — PURGED marker 의 완전성 보장. **인벤토리 §7-1 정식 분류**(갭 해소) + field-level 테스트 보강. ② complete/audit 실패 시 RUNNING 방치 방지 — orchestrator 가 catch 후 `failExecute` 베스트 에포트(실패 시 error 로그) 후 전파. ③ bulk 근거 = **COMPLETED DRY_RUN 만**(RUNNING dry-run/EXECUTE batch 거부 + 테스트 2건). ④ `AuditReasonCode.PURGE_ITEM_FAILED` 추가 — FAILED item 추적성(9e reasonMessage 컬럼 TODO 고정). ⑤ 재실행 ledger 연결성 = `sourceDryRunBatchId` 강조(운영 UI 가이드 문서화). 반영 후 scoped 재실행 **42 passed**(PiiPurge 1 — StageResult/이력 검증 포함 · Execution 2 — 상태 거부 포함 · StageResult 회귀 16+18+5).
+- Documentation:
+  - `docs/codex/implementation/phase-09d-1-purge-execute-core.md`
+  - `docs/codex/reports/phase-09d-1-purge-execute-core.html`
+  - `docs/codex/implementation/phase-09-pii-field-inventory.md`(§7-1 추가)
+- 상태: 구현 완료(리뷰 1차 반영 포함). 다음 = **09d-2**(첨부 바이너리 삭제 saga — PhysicalFileStatus 3단계 마이그레이션, §6 첨부 PII, 물리삭제 멱등, PENDING→PURGED 최종 승격).
+
+## Phase 09c - Retention 모델 + eligibility scan + dry-run (구현 완료)
+
+- Date: 2026-06-05
+- Work type: implementation. 설계 §5.3~5.4·§6 slice 9c(ADR-0005/0007) 기준. execute 는 09d-1.
+- Implemented:
+  - **Retention 도메인**: `RetentionPolicy`(전역+override, periodDays/baselineType/enabled/effective window, 같은 scope enabled **overlap 금지** 검증, 적용 대상 변경 금지) · `RetentionHold`(**manual only**, release=releasedAt 마킹, active 중복 금지, 사유 원문은 도메인만) · `JobPosting.hiringEndedAt` + 수동 anchor 명령(`POST .../anchor`, 자동 세팅·암묵 closedAt fallback 금지) · `JobApplication` 파기 marker 3컬럼(purgeBatchId/purgeResult/purgedAt — 09c 읽기 전용, 쓰기는 09d-1).
+  - **정책 선택 규칙(9c 계약)**: override 우선 → global, effective window 는 scanAt 기준, 부재=`POLICY_NOT_FOUND`, active 후보 2+ = **fail-safe `POLICY_CONFLICT`**(batch `policyConflictCount` 집계, 리뷰 3차 #4).
+  - **eligibility(`RetentionEligibilityService`)**: 판정 순서 고정(PURGED→HOLD→POLICY→ANCHOR→NOT_DUE→STAGE_CONFIG→NOT_TERMINAL). terminal = 설계 확정 query 그대로(WITHDRAWN OR finalStage 정확히 1개·RESULT_ANNOUNCED/CLOSED·StageResult 존재·≠PENDING·decidedAt≠null, finalStage 0/2+ = INVALID_STAGE_CONFIGURATION). 순수 판정 컴포넌트(시계/DB 비의존 — Clock 산출 scanAt 주입).
+  - **dry-run(무변경 preview)**: `PurgeBatch(DRY_RUN)`+`PurgeJobItem(ELIGIBLE/SKIPPED+reason)` — **delete 금지 mutable ledger**(repository 가 delete 미노출). 도메인 무변경. 감사 = batch 단위 `PURGE_SCAN` coarse index 만(in-tx + `PurgeBatchMetadata` 집계).
+  - **API/인가(ADR-0007)**: policies CRUD·holds set/release·anchor·dry-run·batch 조회. SecurityConfig 에 **HTTP method 분기 narrow matcher 8종**(write=PRIVACY_ADMIN, GET·dry-run=RECRUIT·PRIVACY)을 broad `/api/admin/**` 보다 먼저 등록. 감사 계측: `RETENTION_POLICY_UPDATE`(+typed metadata)/`RETENTION_HOLD_SET·RELEASE`/`RETENTION_ANCHOR_SET`/`PURGE_SCAN` 전부 in-tx, actor 명시 전달. `AuditMetadata` permits +2(`RetentionPolicyChangeMetadata`/`PurgeBatchMetadata` — 설계 §5.1 목록 완성).
+- Tests: 신규/보강 **34 passed**(Eligibility 10 · Policy 9 · DryRun 통합 1 · Controller 권한 매트릭스 11 · MetadataContract 3) + 영향 영역 회귀 **91 passed**(JobApplication 36/JobPosting 27+7/Audit 20/StageAudit 1). 전체 회귀 미실행(프로젝트 규칙).
+- 운영 주의: 수동 DDL `docs/codex/ops/phase-09c-retention-ddl.sql`(테이블 4 + 컬럼 4). purge ledger 테이블 운영 DELETE 권한 부여 금지 권고. `ROLE_PRIVACY_ADMIN` DeptRoleMapping 매핑은 운영 협의.
+- 구현 리뷰 반영(2026-06-05, instruction.md, Medium 2 + Low 3): ① **hold 조회 PRIVACY_ADMIN 전용화(권장안)** — reason 자유 텍스트의 RECRUIT_ADMIN 원문 노출 차단(`GET /api/admin/retention/holds/**` narrow matcher, 광의 GET 보다 먼저). ② **requireActor** — retention write/dry-run 4개 서비스 전 write 메서드에서 actor null/blank → 400(`InvalidRetentionRequestException`), ANONYMOUS 감사 차단(스케줄러는 SYSTEM actor 정책 후속). ③ **batch 목록 페이지네이션** — page/size(default 20·max 100) + `PageResponse`, repository 무제한 finder 제거. ④ 서비스 레벨 null 필드 방어(policy/hold/anchor — Bean Validation 우회 대비). ⑤ active hold 중복 race(Low 1)는 후속 문서화. 반영 후 scoped 재실행 **39/39 통과**(Eligibility 10 · Policy 11 · DryRun 2 · Controller 13 · MetadataContract 3).
+- Documentation:
+  - `docs/codex/implementation/phase-09c-retention-model-dry-run.md`
+  - `docs/codex/reports/phase-09c-retention-model-dry-run.html`
+- 상태: 구현 완료. 다음 = **09d-1**(Purge execute core — confirmation/sourceDryRunBatchId/재검증, tombstone/ref-count, marker 쓰기. 바이너리 소멸 확인 전 PURGED 승격 금지).
+
+## Phase 09b - 기존 로그 흡수 + 핵심 관리자 변경 audit + read API (구현 완료)
+
+- Date: 2026-06-05
+- Work type: implementation. 설계 §6 slice 9b(ADR-0006/0007) 기준. 스키마 변경 없음(09a `activity_log` 그대로).
+- Implemented:
+  - **typed AuditMetadata sealed 전환** + 구체 record 7종(Export/Pdf/Upload/UploadConflict/StageResultChange/EvaluationReopen/AttachmentAdmin). 업로드 파일명 원문 금지(hash+확장자, SLF4J 포함). `EXPORT_STAGE_RESULT_TEMPLATE` actionType 추가. `AuditMetadataContractTest` 로 taxonomy/PII-금지 고정.
+  - **dual-write adapter**: Export/Pdf/Upload 로거가 ActivityLog 먼저 기록(DB = source of truth) 후 SLF4J 보조. **egress fail-close** — 감사 실패 시 반출물 미전송 + export 컨트롤러 5곳 temp xlsx 정리(`deleteQuietly`, 리뷰 2차 #3 패턴).
+  - **upload commit 감사를 service tx 내부로 이동**(ADR-0006): APPLIED=`recordInCurrentTx`(원자적), REJECTED_VALIDATION=FAILURE/VALIDATION_FAILED, REJECTED_STALE·낙관락=CONFLICT/VERSION_MISMATCH. 수동 정정과 이중 기록 방지(`bulkUpdateResults(..., recordAudit=false)`).
+  - **관리자 변경 in-tx 계측**: 정정(STAGE_RESULT_CORRECT, 단건+bulk) · 발표(ANNOUNCE) · 확정(close→CONFIRM) · reopen(EVALUATION_REOPEN) · 첨부 admin 삭제(ATTACHMENT_ADMIN_DELETE) · 첨부 admin 다운로드(ATTACHMENT_ADMIN_DOWNLOAD, fail-close). `AuditRequestContextResolver` 신설(SecurityContext/RequestContext 해석, 시그니처 오염 없음). APPLICANT 자가행위 비계측. `ActivityLogService`에 EMPLOYEE/APPLICANT→actorId 필수 검증 추가(9a 2차 리뷰 예고분).
+  - **read API**: `GET /api/admin/audit/activities`(+단건) — 필터/페이지네이션, **가드**(size≤100, range≤90일, default 최근 30일), **권한별 projection**(ip/ua 는 ROLE_PRIVACY_ADMIN 만 원문, RECRUIT_ADMIN 은 `***`). SecurityConfig 에 narrow matcher(`GET /api/admin/audit/**`)를 broad `/api/admin/**` 보다 먼저 등록. `ActivityLogRepository.search` JPQL finder(append-only 불변).
+- Tests: scoped **136 — 134 passed / 2 failed(기존 결함)**. 신규 22(AdminAuditController 10 · ReadService 8 · MetadataContract 3 · StageAuditInstrumentation 1) + 09a 회귀 17 + 계측 경로 통합 81 전부 통과. 실패 2건 = `StageControllerTest` announce/close — 접수기간 2026-05 하드코딩 픽스처의 **날짜 의존 사전-실패**(9b 무관, 기지 한계). 해당 계측 경로는 동적 접수기간의 신규 `StageAuditInstrumentationTest` 로 실증.
+- 구현 리뷰 반영(2026-06-05, instruction.md, Medium 2 + Low 2): ① **range 상한 엄밀화** — `toDays()` 절삭(90일 23:59 통과)을 `Duration.compareTo(ofDays(90))` 비교로 교정 + 경계 테스트 2건(90일+1분 거부/정확히 90일 허용). ② **export audit raw status 차단** — `ApplicationExportService.parseStatus` public 전환 후 canonical enum name 을 audit filter 로 전달, `ExportAuditLogger.toJson` 을 수동 문자열 조합 → 값 sanitize(제어문자 제거)+ObjectMapper 직렬화로 교체. ③ **announce/close actor 명시화** — StageController 가 `getCurrentEmployeeActor()` actor 를 3-arg `announce/close(..., actor)` 로 전달(2-arg 위임 overload 유지), 계측 테스트가 EMPLOYEE actor 검증. ④ **Stage 픽스처 하드닝** — `StageControllerTest`/`StageServiceTest` 접수기간을 동적(now-1d~now+30d)으로 전환 → **기존 날짜 의존 사전-실패 8건 해소**(16/16·46/46). 리뷰 반영 후 scoped 재실행 111/111 통과(잔존 실패 0).
+- Documentation:
+  - `docs/codex/implementation/phase-09b-audit-instrumentation-read-api.md`
+  - `docs/codex/reports/phase-09b-audit-instrumentation-read-api.html`
+- 상태: 구현 완료(리뷰 1차 반영 포함). 다음 = **9c**(Retention 모델 + eligibility scan + dry-run). `ROLE_PRIVACY_ADMIN` DeptRoleMapping 운영 매핑은 운영 협의 후.
+
+## Fix - Employee.deptName unique 제약 제거 (구현 완료)
+
+- Date: 2026-06-05
+- Work type: small fix phase — Phase 05y 구현 리뷰 3차 후속 권고 처리.
+- 문제: `Employee.deptName`의 `@Column(unique = true)` 때문에 같은 부서의 다른 임직원이 최초 로그인(LDAP JIT)하면 deptName unique 충돌로 저장 실패 → 로그인 실패. 05y race 복구는 이 경우를 정확히 "복구 대상 아님"으로 전파하지만 결함은 제약 자체.
+- 수정: `deptName` 일반 컬럼화(unique 제거). JIT/인증 로직·race 복구 semantics(loginId race만 복구, 그 외 전파) 불변. `RoutingAuthenticationProvider`/테스트의 deptName unique 예시 주석 정리. `EmployeeRepositoryTest`에 동일 deptName 임직원 2명 저장 검증 추가.
+- Tests: scoped **BUILD SUCCESSFUL — 10 tests / 0 failures** (`EmployeeRepositoryTest` 2 · `RoutingAuthenticationProviderTest` 4 · `UserRepositoryTest` 4). deptName unique 의존 코드/테스트 없음 전체 검색 확인. 전체 회귀 미실행(프로젝트 규칙).
+- 운영 주의: 운영 MariaDB의 기존 unique 인덱스는 수동 제거 필요(`INFORMATION_SCHEMA.TABLE_CONSTRAINTS` 조회 → `ALTER TABLE employee DROP INDEX`). **05y `uk_users_login_id` 추가와 같은 DDL 묶음으로 처리 권장.**
+- Documentation:
+  - `docs/codex/implementation/fix-employee-dept-name-unique-removal.md`
+  - `docs/codex/reports/fix-employee-dept-name-unique-removal.html`
+
+## Phase 05y - Applicant Account Hardening 구현 (구현 완료)
+
+- Date: 2026-06-05
+- Work type: implementation. 설계(`phase-05y-applicant-account-hardening-design.md`, 리뷰 2차 반영본) 그대로 구현.
+- Implemented:
+  - **Scope A(loginId 무결성)**: `User.loginId` `@Column(unique=true)`, `UserRepository.existsByLoginId` 신설, signUp 중복체크 User 레벨 전환(메시지 불변), `ApplicantRepository.existsByLoginId` 제거. JIT race 복구 — `processLdapAndJit()` save의 `DataIntegrityViolationException` catch → `findUserByLoginId` 재조회 → Employee면 `buildEmployeeAuthentication(user, ldapUser)`로 **LDAP 재인증 없이** 복구, 아니면(부재/비-Employee — deptName unique 등 loginId race 외 위반 포함) 원본 예외 전파. `processLdap()` 토큰 생성부도 동일 helper로 추출.
+  - **Scope B**: `GET /auth/applicants/check-email`(permitAll 명시, `@Validated` + `@NotBlank @Email @Size(255)`, signUp normalizeEmail 재사용, `{available}`만 응답).
+  - **Scope C/D**: `POST /applicant/account/password`(currentPassword 확인 + 동일 새 비밀번호 거부 + BCrypt), `POST /applicant/account/phone-number`(currentPassword 재확인 + trim). 신규 `ApplicantAccountController`/`ApplicantAccountService`/request DTO 2종/`InvalidApplicantAccountException`(→400).
+  - **Scope E**: `DataIntegrityViolationException` → 409 generic + 원인 warn 로그(전 엔드포인트 적용), `Applicant.changePassword/changePhoneNumber` 의미 메서드(기존 @Setter 유지 — 점진 개선).
+- Tests: scoped 실행 **BUILD SUCCESSFUL — 40 tests / 0 failures** (`ApplicantSignUpServiceTest` 10 · `ApplicantSignUpControllerTest` 8 · `ApplicantAccountServiceTest` 7 · `ApplicantAccountControllerTest` 7 · `RoutingAuthenticationProviderTest` 4 — race 복구 시 `ldapProvider.authenticate()` 1회 호출 검증 포함, LDAP mock · `UserRepositoryTest` 4 — JOINED 부모 테이블 unique 충돌/null 비충돌 실증). 전체 회귀 미실행(프로젝트 규칙).
+- 운영 주의: MariaDB `uk_users_login_id` 수동 DDL 적용 필요(설계 §4 사전 점검 — 중복/null·blank/`INFORMATION_SCHEMA.COLUMNS` collation 확인 포함).
+- 구현 리뷰 3차 반영(2026-06-05, instruction.md, Low 2 + 후속 리스크 1): ① `ApplicantAccountControllerTest`에 `springSecurity()` filter chain 적용 — 미인증 401/임직원 403이 실제 `/api/applicant/**` matcher(+EntryPoint/AccessDeniedHandler)로 검증되도록 전환, 인증은 `with(authentication(...))` post-processor(기존 `ApplicantInterviewControllerTest` 관례). 재실행 7/7 통과. ② 본 히스토리 설계 항목 stale "구현 미착수" 문구 정정. ③ **`Employee.deptName` unique 제약 = 구조적 리스크 기록** — 동일 부서의 다른 임직원 최초 로그인(JIT) 시 deptName unique 충돌로 저장 실패 가능(05y는 복구하지 않고 예외 전파 — 정확한 동작). 05y 범위 밖, **별도 작은 Fix phase로 제약 제거 권고**(9b 전 처리 권장).
+- Documentation:
+  - `docs/codex/implementation/phase-05y-applicant-account-hardening.md`
+  - `docs/codex/reports/phase-05y-applicant-account-hardening.html`
+- 상태: 구현 완료. 다음 = Phase 09b(영향 없음). loginId 정책 결정은 가입 화면 프론트 작업 전 timebox 권장.
+
+## Phase 05y - Applicant Account Hardening (설계 완료 → 구현 완료, 위 항목 참조)
+
+- Date: 2026-06-05
+- Work type: design. 코드 변경 없음 — 설계 문서/리포트 산출. **9b 착수 전 선행 슬라이스.**
+- 배경: 지원자 loginId 정책(이메일=loginId vs 별도 ID) **미결정** → 어느 안이 채택돼도 유효한 **결정-독립** 계정 작업만 분리해 설계. 내부 인증 계약(`loginId+password`, `findUserByLoginId`, 세션 principal)은 두 안 모두 동일함을 확인.
+- 수정 대상 결함(코드 검증 완료):
+  - **loginId 중복체크 범위 결함** — 로그인 해석은 `UserRepository.findUserByLoginId()`(users 전체)인데 가입 체크는 `ApplicantRepository.existsByLoginId()`(Applicant만). 임직원(LDAP JIT) loginId와 동일 값으로 가입 가능 → `findUserByLoginId` 2건 → **양쪽 모두 로그인 영구 장애**.
+  - `User.loginId` DB 유니크 제약 부재(email/ciHash와 달리) — 동시 가입 race·동시 JIT 중복 Employee row 무방비.
+  - `DataIntegrityViolationException` 핸들러 부재 — race 시 500 + 비-ApiResponse 포맷.
+- 설계 범위: ① `User.loginId` `unique=true` + `UserRepository.existsByLoginId` + signUp 체크 User 레벨 전환 + 운영 수동 DDL(`uk_users_login_id`), ② `GET /auth/applicants/check-email`(permitAll 명시, advisory 전용, signUp과 동일 trim 정규화, `{available}` 만 응답), ③ `POST /applicant/account/password`(현재 비밀번호 확인 + 동일 새 비밀번호 거부), ④ `POST /applicant/account/phone-number`(currentPassword 재확인 + phoneNumber 변경), ⑤ `DataIntegrityViolationException`→409 generic + `Applicant.changePassword/changePhoneNumber` 의미 메서드.
+- 인가 설계: 계정 변경 API는 기존 `requestMatchers("/api/applicant/**").hasAuthority("ROLE_APPLICANT")` 보호 네임스페이스 하위(`/applicant/account/**`)에 배치 — `anyRequest().permitAll()` fall-through 에서 matcher 누락 위험을 구조적으로 제거. 심층 방어 = `CurrentApplicantService` 401/403.
+- 범위 제외(결정-의존): check-login-id, 이메일 변경 API(안 1에서 자격증명 변경), 가입 email `@NotBlank` 전환(실제 분기점), 아이디 찾기. 기타 제외: NICE 본인인증/rate limiting(05x 한계 승계), ActivityLog 계측(9b 이후 스윕 — taxonomy 충돌 방지), name/ci 변경, email lowercase 정규화(별도 검토), `nullable=false`(픽스처 영향 — 후속).
+- 리뷰 1차 반영(2026-06-05, instruction.md, Major 3 + Medium 3): ① **loginId 정규화 정책 명시** — 05y는 trim only, 대소문자 semantics는 DB collation 의존 제거를 후속 phase에서 명시 결정(MariaDB CI collation ↔ H2 CS 동작 차이 인지), `normalizeLoginId()` 공통 적용은 LDAP sAMAccountName 정책 영향으로 보류. ② **LDAP JIT 동시 생성 race 복구(선택 B 채택)** — `processLdapAndJit()` save 시 `DataIntegrityViolationException` catch → `findUserByLoginId` 재조회 → Employee면 `processLdap` 복구, 아니면 예외 전파("중복 데이터 방지"에서 "정상 로그인 복구"까지). ③ **전화번호 변경 currentPassword 재확인 채택(권장안)** — `ApplicantPhoneNumberChangeRequest(currentPassword, phoneNumber)`, 통지 채널 변조 방지. ④ check-email은 "email 입력값이 있을 때만 호출하는 advisory"로 명확화(가입 email optional 정책과 충돌 방지). ⑤ 운영 DDL 사전 점검 보강(중복 + null/blank 현황 + SHOW INDEX/collation). ⑥ 테스트 계획에 RoutingAuthenticationProvider JIT race/복구 단위 테스트 추가(LDAP mock).
+- 리뷰 2차 반영(2026-06-05, instruction.md, Major 1 + Medium 2 + Low 1): ① **JIT race 복구의 LDAP 이중 인증 제거** — 복구 시 `processLdap()` 재호출(내부에서 `ldapProvider.authenticate()` 재수행) 대신, 이미 인증 성공한 `ldapUser`로 토큰만 생성하는 `buildEmployeeAuthentication(user, ldapUser)` helper 호출로 정정. 테스트에 race 복구 경로에서 `ldapProvider.authenticate()` 1회 호출 검증 추가. ② **collation 점검 쿼리 교체** — `SHOW INDEX`의 Collation은 인덱스 정렬 방향이므로 `INFORMATION_SCHEMA.COLUMNS`(COLLATION_NAME) 또는 `SHOW FULL COLUMNS`로 교체. ③ **복구 범위 한정** — `Employee.deptName`도 unique라 JIT save의 `DataIntegrityViolationException`이 loginId race가 아닐 수 있음. loginId race만 양쪽 로그인 성공으로 복구, 그 외 제약 위반은 예외 전파("한 요청도 실패 없이" 표현 정정). ④ 본 히스토리 상단 요약 ④ 항목에 currentPassword 재확인 반영.
+- 적대적 검증(5-lens 워크플로, 48 findings): **blocker 0.** 코드 주장 10건 중 9건 confirmed(라인 번호 포함), 결함 시나리오 재현성 확정. 실증 — `@Column(unique=true)` 임시 적용 후 위험 테스트 27건 통과 + DDL `login_id` unique 생성 확인(JOINED 부모 테이블 정상), src/test `setLoginId` ~80곳 전수조사 결과 깨지는 픽스처 없음, `existsByLoginId` 프로덕션 사용처 1곳뿐(제거 안전), 500 기대 제약위반 테스트 없음(409 핸들러 안전). 반영 보정: 예외 타입 표기 `IncorrectResultSizeDataAccessException`(원인 NonUniqueResultException)으로 정정, 409 핸들러에 원인 warn 로깅+전 엔드포인트 회귀 영향 명시, School/CommonCode 로컬 catch 예외 명시, §7 한계에 brute-force 시도 제한/연락처 변경 알림/CSRF 우선 검토 추가.
+- Documentation:
+  - `docs/codex/design/phase-05y-applicant-account-hardening-design.md`
+  - `docs/codex/reports/phase-05y-applicant-account-hardening-design.html`
+  - `CONTEXT.md` (Flagged ambiguities — loginId 정책 미결정 추가)
+- 상태: **설계 완료. 구현은 상단 "Phase 05y - Applicant Account Hardening 구현" 항목 참조.** 결정 후 추가 비용: 안 1 = signUp `loginId=email` + email 필수화 / 안 2 = check-login-id API 1개. loginId 정책 결정은 가입 화면 프론트 작업 전 timebox 권장.
+
+## Phase 09a-RF2 - ActivityLog Foundation 2차 리뷰 보완 (구현 완료)
+
+- Date: 2026-06-04
+- Work type: review fix (09a-RF 에 대한 2차 리뷰 Low 2건 — `instruction.md`).
+- 반영: `CorrelationIdFilter.resolve()` 거부 범위 CR/LF → **ISO 제어문자 전체**(`Character::isISOControl`) 확대 — 필터가 echo 하는 응답 헤더에 TAB 등 제어문자가 실려 WAS 에서 reject 되는 것 방지. 테스트 +1(`CorrelationIdFilterTest` 7 tests 통과).
+- 이연(9b 요구사항으로 문서 고정): `actorType=EMPLOYEE/APPLICANT → actorId 필수` 검증 — 리뷰어 지침("9b 계측 시점에 추가, 9a 는 허용 가능")대로 emitter 가 actorId 를 보장하는 시점에 추가(선반영 시 emitter 부재 상태에서 insert-실패 경로만 생성).
+- Modified: `CorrelationIdFilter`, `CorrelationIdFilterTest`, 09a/09a-RF 문서·리포트 정합 갱신.
+- Tests: `--tests "*CorrelationIdFilterTest"` 통과(exit 0). 전체 회귀 미실행(사용자 지시).
+
+## Fix - 수동 인증/인가 상태코드 정정 400→401/403 (구현 완료)
+
+- Date: 2026-06-04
+- Work type: cross-cutting fix (Phase 외 — API 오류 상태코드 계약 정정).
+- 문제: 서비스 레이어 수동 인증 체크(`CurrentEmployeeService`/`CurrentApplicantService`)가 400 매핑 도메인 예외를 재사용해 "Authentication is required" 가 400 으로 응답. SecurityConfig `anyRequest().permitAll()` 로 미인증 요청이 컨트롤러까지 도달하는 fall-through 경로에서 발생.
+- 반영: 미인증 → `AuthenticationRequiredException`(**401**), 타입 불일치 → `AccessForbiddenException`(**403**). `GlobalExceptionHandler` 매핑 2건 추가. 메시지·ApiResponse 포맷 불변. 백엔드 redirect 없음 — 로그인 이동은 프론트(401 분기) 책임.
+- Created: `exception/{AuthenticationRequiredException,AccessForbiddenException}.java`, `service/CurrentApplicantServiceTest.java`
+- Modified: `GlobalExceptionHandler`, `CurrentEmployeeService`(2곳), `CurrentApplicantService`(1곳), `CurrentEmployeeServiceTest`(+2), `ApplicationControllerTest`(1건 400→403 정정)
+- Tests: scoped 97 tests / 0 failures (8 클래스). 전체 회귀는 사용자 지시로 미실행.
+- Documentation: `docs/codex/implementation/fix-auth-status-codes-401-403.md`, `docs/codex/reports/fix-auth-status-codes-401-403.html`
+- 미해결(별도 슬라이스): `anyRequest().permitAll()` → authenticated + allowlist 전환(공개 API 전수 확인 필요, ADR-0007 의 URL 1차 방어선 원칙 — 9b audit matcher 작업과 병합 검토).
+
+## Phase 09a-RF - ActivityLog Foundation 리뷰 보완 (구현 완료)
+
+- Date: 2026-06-04
+- Work type: review fix (9a 코드 리뷰 5건 반영 — `instruction.md`. 9b 선행 조건).
+- 반영 내역:
+  - **Major** request-derived 문자열 길이 제한/sanitize: `CorrelationIdFilter` 엄격 resolve(100자 초과/CRLF 헤더 → UUID 대체), `ActivityLogService.safe()` 저장 직전 normalize(CR/LF/TAB→공백, trim, 컬럼 길이 truncate, blank→null — actorId 100/roleSnapshot 255/reasonMessage 1000/correlationId 100/ip 64/ua 512). 외부 입력 길이로 audit insert 실패 → 비즈니스 rollback·egress fail-close 차단(9b) 전이 방지.
+  - **Medium** 운영 DDL: `docs/codex/ops/phase-09a-activity-log-ddl.sql` 신규(테이블 + 인덱스 7종).
+  - **Medium** 인덱스: `idx_activity_log_action_result_occurred (action_result, occurred_at)` 추가(9b read API actionResult+기간 검색 대비 — 단독 대신 복합 채택).
+  - **Low** ADR-0006/0007 → **accepted** 전환(본 히스토리의 "9a 착수 시 accepted" 기준 정합).
+  - **Low** fallback secret 게이트를 profile 이름 의존에서 property 기반으로: `audit.allow-fallback-secret`(env `AUDIT_ALLOW_FALLBACK_SECRET`, 기본 false=기동 실패) 명시 시에만 fallback. prod profile 은 flag 무관 거부(이중 가드). **local 개발 영향**: `AUDIT_HMAC_SECRET` 또는 `AUDIT_ALLOW_FALLBACK_SECRET=true` 필요.
+- Modified: `CorrelationIdFilter`, `ActivityLogService`, `ActivityLog`(index 7종), `AuditConfig`, `application.yaml`(main), 테스트 3종(CorrelationIdFilterTest 3→6, AuditConfigTest 3→5, ActivityLogServiceTest 6→10), ADR-0006/0007.
+- Tests: scoped 28 tests 전부 통과(BUILD SUCCESSFUL). 전체 회귀는 사용자 지시로 미실행(scoped 만). 적대적 검증 워크플로(6 agents)가 리뷰 5개 항목 반영·문서-코드 정합·회귀 위험을 전부 통과로 판정(blocker/major 0).
+- Documentation: `docs/codex/implementation/phase-09a-review-fix.md`, `docs/codex/reports/phase-09a-review-fix.html`, 9a 문서 stale 기술 보정.
+- Next: 9b(로거 흡수+관리자 변경 audit+read API) 진행 가능.
+
+## Phase 09a - ActivityLog Foundation (구현 완료)
+
+- Date: 2026-06-04
+- Work type: implementation (Phase 09 첫 슬라이스 — 영속 감사 기반).
+- Goal: 영속 `ActivityLog`(append-only) + 기록 서비스 2경로 + correlationId + applicantRefHash(HMAC) 기반 구축. 업무 이벤트 계측·API·보존/파기는 범위 밖(9b+).
+- Created (main):
+  - `domain/entity/ActivityLog.java`(append-only, BaseEntity 미상속, 자체 occurredAt, @Lob metadataJson, index 6)
+  - `enumeration/{ActorType,AuditActionType,AuditActionResult,AuditTargetType,AuditReasonCode}.java`
+  - `domain/repository/ActivityLogRepository.java`(Repository 마커 — save/findById/count 만, delete/update 미노출)
+  - `service/ActivityLogService.java`(recordInCurrentTx=REQUIRED / recordRequiresNew=REQUIRES_NEW, 전용 ObjectMapper 직렬화)
+  - `service/AuditEvent.java`(@Builder record), `service/AuditMetadata.java`(marker — 9b sealed+record)
+  - `common/hash/AuditHmac.java`(HMAC-SHA256+pepper, applicantId 입력만), `config/AuditConfig.java`(prod 누락=기동실패, 비운영 fallback)
+  - `config/CorrelationIdFilter.java`(OncePerRequestFilter, MDC correlationId, X-Request-Id echo)
+  - `exception/InvalidActivityLogException.java`
+- Modified:
+  - `src/main/resources/application.yaml`(+`audit.hmac-secret: ${AUDIT_HMAC_SECRET:}`)
+  - `src/test/resources/application.yaml`(+`audit.hmac-secret` 테스트 전용 값)
+- APIs: 없음(foundation — read API 는 9b).
+- Key decisions:
+  - 트랜잭션 2경로(ADR-0006): 커밋변경=in-tx(원자적), 실패/거부/충돌/스킵·반출=REQUIRES_NEW.
+  - `applicantRefHash` = HMAC+pepper, 입력 applicantId 만(plain SHA-256 `ciHash` 와 분리).
+  - 감사 metadata 직렬화는 **앱 web Jackson 빈에 의존하지 않고 서비스 자체 ObjectMapper** 사용(컨텍스트에 ObjectMapper 빈 부재 + 포맷 안정). typed `AuditMetadata` 만 허용.
+  - append-only: repository 가 delete/update 미노출, 엔티티 setter/@Version 없음.
+  - `AUDIT_HMAC_SECRET` fail-safe: prod 누락 시 기동 실패, 비운영 fallback(예측가능 — 운영 금지).
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*ActivityLog*" --tests "*AuditHmacTest" --tests "*AuditConfigTest" --tests "*CorrelationIdFilterTest" --no-daemon`
+  - 결과: **19 tests 전부 통과**(AuditHmac 5/CorrelationIdFilter 3/AuditConfig 3/ActivityLogRepository 2/ActivityLogService 6). 특히 recordInCurrentTx 롤백 시 소멸 / recordRequiresNew 롤백에도 잔존(REQUIRES_NEW) 검증. fixed Clock.
+  - 전체 회귀: 신규 필터/빈이 모든 full-context 테스트에 로드되므로 전체 스위트 별도 실행으로 확인(본 작업 보고 참조).
+- Documentation:
+  - `docs/codex/implementation/phase-09a-activity-log-foundation.md`
+  - `docs/codex/reports/phase-09a-activity-log-foundation.html`
+- Known limitations: 계측 없어 실데이터 미적재(9b), AuditMetadata 비-sealed, traceId null(OTel deferred), 운영 activity_log 수동 DDL.
+- 관찰: 컨텍스트에 Quartz 스케줄러 존재 → 9c/9e retention 스케줄에 활용 가능(별도 검토). 설계 문서의 "@Scheduled 없음" 가정은 정정 필요.
+- Next: 9b(로거 흡수+관리자 변경 audit+read API).
+
+## Phase 09 - 개인정보 파기/감사/보존 (설계 완료, 구현 미착수)
+
+- Date: 2026-06-04
+- Work type: design (grill-with-docs). 코드 변경 없음 — 설계 문서/ADR/glossary 산출.
+- Decision: Phase 09 를 **감사 우선(audit-first)** 으로 설계. 두 기둥 모두 Phase 09 설계 범위에 포함하되 빌드는 ActivityLog 감사 기반 먼저, 파기/보존 다음.
+- 확정 핵심:
+  - **감사**: 영속 `ActivityLog`(append-only, 지원자 원문 PII 미저장). 기록 트랜잭션 3-way — 커밋변경=in-tx, 실패/거부/충돌/스킵=REQUIRES_NEW, 정보 반출=fail-close(ADR-0006). 기존 SLF4J Export/Pdf/Upload 로거 흡수(dual-write). emission 은 명시적 2경로(AOP blanket 제외). actionResult 5종(SUCCESS/FAILURE/DENIED/SKIPPED/CONFLICT, CONFLICT 독립). `applicantRefHash`=HMAC-SHA256+pepper.
+  - **파기**: **tombstone 익명화 + 첨부 바이너리 물리삭제**(ADR-0005). crypto-shred·전면 hard delete 기각. `PURGED` = 관계형 PII 제거 + 바이너리 소멸 확인까지 완료(stateful saga + reconciliation). "DB PURGED인데 파일 잔존" 불허. Applicant ref-count 익명화.
+  - **보존**: `RetentionPolicy`(전역+공고 override)·`RetentionHold`(onboarded/입사확정만 자동 제외)·`retentionAnchorAt`(=`JobPosting.hiringEndedAt`, 암묵 closedAt fallback 금지). eligibility=anchor 종료+retentionPeriod 경과+not purged+not hold+terminal. manual dry-run/execute(스케줄 auto-execute disabled-by-default).
+  - **원장**: `PurgeBatch` 1:N `PurgeJobItem`(2-level), item-level 원자성·batch 비원자. ActivityLog 는 batch 단위 coarse index 만.
+  - **인가**: `ROLE_PRIVACY_ADMIN` 분리(ADR-0007), narrow requestMatcher 우선 배치. execute=confirmation+bulk sourceDryRunBatchId+실행시 재검증.
+- 범위 제외: AOP blanket 접근감사, ActivityLog 자체 lifecycle, forced purge(정보주체 삭제요청, enum 슬롯만), 파기 후 통지메일(hook만), per-subject envelope key, Messaging 신규.
+- 슬라이스: **9a(ActivityLog foundation) → 9b(로그 흡수+관리자 변경 audit+read API) → 9c(retention 모델+eligibility scan+dry-run) → 9d-1(purge execute core) → 9d-2(attachment binary saga) → 9e(reconciliation+안정화)**. 9d 는 문서상 한 장이나 구현 지시문은 9d-1/9d-2 분리.
+- 스키마: 신규 5 테이블 + JobApplication/ApplicationAttachment/JobPosting 컬럼 확장 + `ROLE_PRIVACY_ADMIN`/`AUDIT_HMAC_SECRET`. migration framework 없음 → 전부 수동 DDL.
+- Documentation:
+  - `docs/codex/design/phase-09-privacy-purge-audit-retention-design.md`
+  - `docs/codex/reports/phase-09-privacy-purge-audit-retention-design.html`
+  - `docs/adr/0005-retention-purge-mode-tombstone-anonymization-binary-deletion.md`
+  - `docs/adr/0006-audit-transaction-policy.md`
+  - `docs/adr/0007-privacy-admin-role-separation.md`
+  - `CONTEXT.md` (Privacy/Audit glossary 추가)
+- 리뷰 반영(2026-06-04, instruction.md, 7건): ① **Blocker** — PII 필드 인벤토리를 9d 선행 산출물로 격상, `docs/codex/implementation/phase-09-pii-field-inventory.md` 생성(전 application 엔티티 필드를 KEEP_TOMBSTONE/NULLIFY/PLACEHOLDER/ALTER_NULLABLE+NULLIFY/HASH_ONLY/RETAIN_UNTIL_REF0 로 분류, NOT NULL PII·`ciHash`·`createdBy` updatable=false 처리 명시). ② terminal query 구체화(실제 enum 검증: StageStatus RESULT_ANNOUNCED/CLOSED, StageResultStatus PENDING 실존 → 쿼리 satisfiable, finalStage 부재/다수=INVALID_STAGE_CONFIGURATION). ③ `metadataJson` → sealed `AuditMetadata` typed record(직렬화는 ActivityLogService 내부, raw Map 금지). ④ `PhysicalFileStatus.DELETED`→`SOFT_DELETED` 개명 + BINARY_DELETE_* 추가(기존 row 마이그레이션). ⑤ requestMatcher HTTP method 분기(GET=RECRUIT, write=PRIVACY). ⑥ 9b read API 가드(page/range/마스킹/projection 테스트). ⑦ ADR status: 9a 착수 시 0006/0007 accepted, **0005 = accepted-with-implementation-gate**(인벤토리 확정 게이트).
+- 리뷰 2차 반영(2026-06-04, instruction.md, 10건): ① **Blocker — ciHash 보존 금지**(`HashUtil.sha256`=plain SHA-256 확인, `ApplicantSignUpService.existsByCiHash` 중복가입 차단 확인 → ref0 시 `ci=null`+`ciHash="PURGED:"+UUID` overwrite, 중복가입차단은 파기 후 미보장). ② upload `sourceFileName`→`sourceFileNameHash`+`sourceFileExtension`(파일명 PII). ③ export/PDF fail-close **temp file 누수 방지**(try/catch `deleteIfExists`, `ExcelExportResponseFactory` 가 stream 내부에서만 삭제 확인). ④ RetentionPolicy 선택 규칙 6개 + `POLICY_NOT_FOUND`. ⑤ `hiringEndedAt` **수동 anchor 명령**(`POST /retention/job-postings/{id}/anchor`, `RETENTION_ANCHOR_SET` 감사) — `close()` 가 안 채움 확인, 자동 세팅 금지. ⑥ RetentionHold **manual only**(StageResultStatus 에 HIRED/ONBOARDED 없음 확인). ⑦ holds matcher GET/write method 분기. ⑧ 학력 admission/graduation·경력 start/end **정확 날짜 보존 금지** → 연/year-month 일반화. ⑨ storage-health-scan 상태별 정책(BINARY_DELETED+null storagePath 오탐 방지). ⑩ PurgeBatch/PurgeJobItem = "delete 금지 mutable ledger"(append-only 아님).
+- 리뷰 3차 반영(2026-06-04, instruction.md, 5건): ① PhysicalFileStatus 개명 **3단계 안전 마이그레이션**(DELETED+SOFT_DELETED 공존→DB UPDATE→후속 제거; 운영 enum 매핑 오류 방지). ② `applicantRefHash` 입력 확정 = `HMAC_SHA256(pepper,"APPLICANT:"+applicantId)`(ci/email/phone 입력 금지). ③ 학력·경력 날짜 **안 A 확정**(전부 null, 일반화 컬럼 없음 — 현 funnel 통계 미사용). ④ RetentionPolicy **fail-safe**(active 2개↑ = `POLICY_CONFLICT` SKIP + policyConflictCount). ⑤ `Interview.memo` 운영 가이드(실명/연락처/평가 자유서술 금지, 평가는 InterviewEvaluation.comment 로만·purge nullify).
+- 별건: `CryptoConfig.java:12` `@Value("${crypto.aes.key")` 닫는 `}` 누락 수정(`compileJava` 성공 검증) — 선재 빌드 차단 버그, Phase 9 외.
+- 상태: **구현 미착수.** 다음 작업 = PII 인벤토리(3차 반영본) 확정 → 슬라이스 9a 구현. ADR-0006/0007 은 9a 착수 시 accepted, ADR-0005 는 인벤토리 확정 시 accepted 전환.
+
+## Phase 08e - CERTIFICATE Funnel Dimension
+
+- Date: 2026-06-02
+- Work type: implementation (Phase 08 다섯 번째 슬라이스 — 07c 보류 자격별 funnel dimension 해소).
+- Goal: 07c funnel 통계에 CERTIFICATE dimension 추가. 자격명(free-text) 정규화 → 자격명별 보유 지원자 distinct + topN/'기타'.
+- Created (main):
+  - `dto/response/FunnelCertificateRow.java` (projection)
+- Modified (main):
+  - `service/FunnelStatisticsService.java` (`computeCertificateDimension`/`normalizeCertificateName`/`rowsOf`, `ApplicationCertificateRepository` 주입, dimension 상수 일반화, `parseSupportedDimension` CERTIFICATE 허용 — 전 dimension 지원·잘못된 값만 400)
+  - `domain/repository/ApplicationCertificateRepository.java` (`findFunnelCertificates`)
+  - `enumeration/FunnelDimension.java`, `controller/AdminStatisticsController.java` (javadoc)
+- Modified (test):
+  - `controller/AdminStatisticsControllerTest.java` (unsupported dimension을 잘못된 값으로 변경, CERTIFICATE 3건 추가)
+- APIs:
+  - `GET /api/admin/job-postings/{jobPostingId}/statistics/funnel?dimension=CERTIFICATE&topN=` (admin)
+- Key decisions:
+  - 그룹 키 = 정규화(trim + 내부 공백 압축) 자격명, 빈 자격명 제외. 그룹 = 자격 보유 지원자 distinct(P 내).
+  - SCHOOL/POSITION 과 달리 **그룹 중복 허용**(한 지원자 여러 자격 → 여러 그룹). 그룹 population 합이 |P| 초과 가능(overall은 |P| 그대로).
+  - 보유자 수 desc·이름 asc, topN 기본 10(최대 100, 0/null→10) 개별, 초과 자격 보유자 distinct='기타'. 무보유 지원자 미포함(보유 의미).
+  - 응답은 기존 `DimensionFunnelResponse(groupId=null, groupName=정규화 자격명, …)`, 기타=null/"기타". 전 dimension(POSITION/SCHOOL/CERTIFICATE) 지원 → 잘못된 dimension 값만 400.
+  - 자격명 비민감 → audit 없음(07c 정책).
+- Review 반영 (instruction.md, 3건):
+  - (Medium) top 그룹 ↔ '기타' 중복 허용 테스트 추가(app1=Common+Rare1, topN=1 → Common p=2 + '기타' p=1, app1이 양쪽에 distinct).
+  - (Medium) 자격명 정규화 한계(동의어/표기차)는 현 phase 문제 아님 — 자격 master/표준화 별도 후속 phase로 문서 명시.
+  - (Low) `dimension` dispatch를 `switch expression`으로 전환 → exhaustiveness 강제(FunnelDimension 값 추가 시 dispatch 누락이 컴파일 에러, 빈 dimensions 누출 방지).
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*AdminStatisticsControllerTest" --no-daemon`
+  - 결과: BUILD SUCCESSFUL — 기존 funnel + SCHOOL 5 + CERTIFICATE 3(자격명별 distinct/정규화 병합/중복 집계/무보유 제외, topN='기타', top↔'기타' 중복) 통과. 통계 테스트는 엔티티 직접 영속화로 클럭 의존 없이 안정적.
+- Documentation:
+  - `docs/codex/implementation/phase-08e-certificate-funnel-dimension.md`
+  - `docs/codex/reports/phase-08e-certificate-funnel-dimension.html`
+- Known limitations: 정규화(trim+공백)만 → 동의어/표기차 분리(자격 master/표준화 후속 phase), 그룹 중복으로 합≠|P|(설계 의도), 대형 공고 GROUP BY 전환(후속).
+- Next recommended: (선택) 자격 master/표준화 또는 메시지 발송, 개인정보 파기/감사.
+
+## Phase 08d - SCHOOL Funnel Dimension
+
+- Date: 2026-06-02
+- Work type: implementation (Phase 08 네 번째 슬라이스 — 07c 보류 학교별 funnel dimension 해소).
+- Goal: 07c funnel 통계에 SCHOOL dimension 추가. 08c `ApplicationEducation.schoolId`(최종학력 매칭) 기반 학교별 funnel + 미매칭/topN 초과='기타'.
+- Created (main):
+  - `dto/response/FunnelSchoolEducationRow.java` (projection)
+- Modified (main):
+  - `service/FunnelStatisticsService.java` (`computeSchoolDimension`/`finalSchoolByApplication`/`pickFinalEducation`, `ApplicationEducationRepository`·`SchoolRepository` 주입, `parseSupportedDimension` SCHOOL 허용)
+  - `domain/repository/ApplicationEducationRepository.java` (`findFunnelSchoolEducations`)
+  - `enumeration/FunnelDimension.java`, `controller/AdminStatisticsController.java` (javadoc 갱신)
+- Modified (test):
+  - `controller/AdminStatisticsControllerTest.java` (unsupported dimension을 `CERTIFICATE`로 변경, SCHOOL 5건 추가)
+- APIs:
+  - `GET /api/admin/job-postings/{jobPostingId}/statistics/funnel?dimension=SCHOOL&topN=` (admin)
+- Key decisions:
+  - 학교 = 지원자 **최종학력(가장 높은 `EducationLevel`) 1교**의 schoolId. 그 학력 schoolId가 null이면 미매칭='기타'. application 단위 distinct.
+  - 동률 레벨이면 schoolId 보유 학력 우선(`pickFinalEducation`). 학교 그룹 정렬 인원 desc·schoolId asc, topN 기본 10(최대 100), 초과 학교 + 미매칭='기타' 1그룹(항상 마지막).
+  - 그룹별 funnel은 기존 `computeCohort` 재사용, 응답은 기존 `DimensionFunnelResponse(groupId, groupName, …)` 재사용(기타=null/"기타"). 학교명은 `SchoolRepository.findAllById`.
+  - `CERTIFICATE`는 master 부재로 미지원(400) 유지. statistics audit 없음(07c 정책).
+  - topN은 SCHOOL에서만 적용(POSITION 무시).
+- Review 반영 (instruction.md, 3건):
+  - (Medium) dangling schoolId(School 미존재)가 groupName=null 로 새던 문제 → 후보 schoolId 선조회로 **실재 학교만 개별 그룹**, dangling은 미매칭과 함께 '기타'로 합산(개별 그룹 groupName non-null 보장).
+  - (Low) 같은 EducationLevel tie-break 테스트(UNIVERSITY 2개 null+Alpha → Alpha 그룹핑).
+  - (Low) topN clamp 테스트(topN=0 → `limit(0)` 아니라 기본 10 동작, 폴딩 안 함).
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*AdminStatisticsControllerTest" --no-daemon`
+  - 결과: BUILD SUCCESSFUL — 기존 funnel 회귀 + SCHOOL 5건(최종학력 1교 매칭/미매칭='기타'/topN=1 합산 + tie-break/topN=0 clamp/dangling='기타') 통과. 통계 테스트는 엔티티 직접 영속화로 클럭 의존 없이 안정적.
+- Documentation:
+  - `docs/codex/implementation/phase-08d-school-funnel-dimension.md`
+  - `docs/codex/reports/phase-08d-school-funnel-dimension.html`
+- Known limitations: 최종학력이 free-text면 '기타'(설계 정의), dangling schoolId는 '기타'로 합산(처리됨), 대형 공고 GROUP BY 전환(후속), CERTIFICATE 미지원.
+- Next recommended: (선택) CERTIFICATE dimension(자격명 정규화 후) 또는 메시지 발송, 개인정보 파기/감사.
+
+## Phase 08c - School xlsx import + ApplicationEducation.schoolId 링크
+
+- Date: 2026-06-02
+- Work type: implementation (Phase 08 세 번째 슬라이스, Phase 08 종료). 설계 §6.3/§6.4, ADR 0004.
+- Goal: (A) `ApplicationEducation` optional `schoolId`(app-level 참조) 추가, (B) School xlsx 일괄 import(upsert).
+- Created (main):
+  - `dto/request/SchoolImportRowRequest.java`
+  - `dto/response/SchoolImportRowError.java`, `dto/response/SchoolImportResponse.java`
+  - `service/SchoolImportParser.java`, `service/SchoolImportService.java`
+- Modified (main):
+  - `domain/entity/ApplicationEducation.java` (nullable `schoolId` + `create` 14-arg 오버로드; 기존 13-arg 비파괴)
+  - `dto/request/EducationRequest.java` (`schoolId` 컴포넌트 + 13-arg back-compat 생성자)
+  - `service/ApplicationEducationService.java` (`toEducation` 에서 `schoolId` 전달)
+  - `dto/response/EducationResponse.java`, `dto/response/AdminEducationResponse.java` (`schoolId` 추가)
+  - `domain/repository/SchoolRepository.java` (`findBySchoolCode`, `findByNaturalKey` — null 필드 IS NULL 매칭)
+  - `controller/AdminSchoolController.java` (`POST /admin/schools/import`)
+  - `domain/entity/ApplicationEducation.java` (리뷰: `idx_application_education_school` 인덱스)
+  - `service/SchoolImportService.java` (리뷰: 행 길이 검증 + natural key 모호성 skip)
+- Created (test):
+  - `controller/SchoolImportControllerTest.java` (9)
+  - `service/SchoolImportParserTest.java` (5, 파일 방어 단위)
+  - `service/ApplicationEducationServiceTest.java` (+1, schoolId)
+- APIs:
+  - `POST /api/admin/schools/import` (admin, multipart `file`)
+- Key decisions:
+  - `ApplicationEducation.schoolId` nullable, 강한 FK 없음(app-level 참조, ADR 0004). 자동완성 선택 시에만 채움, 직접입력 null. `schoolName` free-text snapshot 유지. **존재 검증 안 함**(설계 일관).
+  - 비파괴: `ApplicationEducation.create` 오버로드 + `EducationRequest` back-compat 생성자(JSON 은 name 기반이라 schoolId optional, 기존 Java 호출부/테스트 그대로 컴파일).
+  - import = 행 단위 upsert(전체 거부 아님). schoolCode 우선 + (name,type,region) fallback. 기존=update(active 보존), 신규=insert. blank schoolName/formula 셀 행 skip + 사유. 파일 방어(.xlsx/크기/행수/header)는 07d 패턴 재사용(`UploadProperties`), 파일 레벨 오류 400.
+  - import preview/STALE 미도입(단일 commit + 요약). 라우팅 `/admin/schools/import` literal 우선.
+- Review 반영 (instruction.md, 5건):
+  - (Blocking) import 행 길이 미검증 → 컬럼 length 초과 행이 DB flush 시 `DataIntegrityViolationException` 으로 전체 rollback 가능 → `validateRow`(필수+길이)로 초과 행만 skip+사유.
+  - (Blocking) natural key 중복 시 임의 첫 행 update(조용한 master 오염) → fallback 매칭 2건 이상이면 `ExistingMatch.ambiguous` 로 해당 행 skip+사유.
+  - (Medium) import 방어 테스트 부족 → formula/길이/모호 skip(controller) + maxRows/maxFileSize/확장자/header(parser unit) 회귀 추가.
+  - (Medium) `ApplicationEducation.schoolId` 인덱스 없음 → `idx_application_education_school` 추가(SCHOOL funnel dimension 기반).
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*School*" --tests "*ApplicationEducation*" --tests "*AdminApplicationSection*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL — School import 9 + parser unit 5 + School 12 + ApplicationEducation(신규 schoolId) + AdminApplicationSection 회귀 통과(education 응답 schoolId 추가 비파괴).
+- Documentation:
+  - `docs/codex/implementation/phase-08c-school-import-education-link.md`
+  - `docs/codex/reports/phase-08c-school-import-education-link.html`
+- Known limitations: schoolId 존재/active 검증 미수행(dangling 가능), import max-rows 는 `recruit.upload.max-rows` 재사용(대형 데이터셋 env 상향), 단일 commit(preview 없음), free-text 소급 매칭 없음.
+- Phase 08(CommonCode/School) 08a~08c 완료.
+- Next recommended: SCHOOL/CERTIFICATE funnel 통계(07c 보류, schoolId 기반) 또는 메시지 발송, 개인정보 파기/감사.
+
+## Phase 08b - School (검색/자동완성 + admin CRUD)
+
+- Date: 2026-06-02
+- Work type: implementation (Phase 08 두 번째 슬라이스). 설계 §6 기준.
+- Goal: 학교 master(`School`) 추가형 도입 — public 자동완성/검색 + admin CRUD. import/링크는 08c.
+- Created (main):
+  - `domain/entity/School.java`, `domain/repository/SchoolRepository.java`
+  - `exception/SchoolNotFoundException.java`, `exception/InvalidSchoolException.java`
+  - `dto/request/SchoolCreateRequest.java`, `dto/request/SchoolUpdateRequest.java`
+  - `dto/response/SchoolResponse.java`(admin 전체), `dto/response/SchoolSearchResponse.java`(public 경량)
+  - `service/SchoolService.java`
+  - `controller/SchoolSearchController.java`(public), `controller/AdminSchoolController.java`(admin)
+- Modified (main):
+  - `exception/GlobalExceptionHandler.java` (`SchoolNotFoundException` 404, `InvalidSchoolException` 400)
+- Created (test):
+  - `controller/SchoolControllerTest.java` (10)
+- APIs:
+  - `GET /api/schools?q=&schoolType=` (permitAll, 활성 prefix 우선+contains, top-N 20)
+  - `GET /api/admin/schools?q=&schoolType=&page=&size=` (admin, 비활성 포함 페이지)
+  - `POST /api/admin/schools` / `POST /api/admin/schools/{id}` (admin; 수정 POST 컨벤션)
+- Key decisions:
+  - `School` = `schoolCode`(nullable unique, 불변)+`schoolName`+`schoolType`+`educationMode`+`region`+`address`+`countryCode`+`active`. 강한 FK 없음.
+  - public 검색은 활성만, prefix 일치 우선 정렬 후 name asc, top-N(20), blank q → 빈 목록(전건 매칭 방지). 응답 경량(id/name/type/region).
+  - `schoolCode` 식별 키 불변(수정 요청 미포함), soft delete(`active=false`). 중복 schoolCode → 선검사 + `saveAndFlush` DataIntegrityViolation→400(08a 패턴 상속).
+  - `schoolType`/`educationMode` 는 코드 문자열(표시는 프론트 CommonCode group), 백엔드 validation 미결합(설계 Q3 일관).
+  - 보안은 `anyRequest().permitAll()`/`/api/admin/**` 자동 → SecurityConfig 변경 없음. 스키마 `ddl-auto`(update) 자동 생성.
+- Review 반영 (instruction.md, 3건):
+  - (Medium) 검색 q 의 LIKE 특수문자(%,_) 미이스케이프 → `SchoolService.escapeLike`(%,_,\) + 쿼리 `escape '\'`. `q="%"` 가 전체 매칭으로 새지 않고 literal '%' 매칭만 함을 회귀 테스트로 고정.
+  - (Low) admin page size 상한 없음 → service 에서 `size` 를 [1,200]로 clamp, `page` 최소 0.
+  - (Low) schoolCode 불변 extra-field 테스트 → 수정 body 에 schoolCode 를 넣어도 기존 식별 키 유지되는 회귀 추가(10→12).
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*SchoolControllerTest" --no-daemon`
+  - 결과: BUILD SUCCESSFUL — 12건. 검색 prefix 우선/활성/타입 필터/LIKE wildcard escape/blank q, create+중복 400/다중 null 코드/blank name 400, update+soft delete(검색 제외/schoolCode 유지)/extra schoolCode 무시, 404, admin 목록 비활성 포함(paged), 인가(403/401).
+- Documentation:
+  - `docs/codex/implementation/phase-08b-school.md`
+  - `docs/codex/reports/phase-08b-school.html`
+- Known limitations: (name,type,region) fallback 멱등은 08c(import), schoolId 미연결(08c).
+- Next recommended: Phase 08c - School xlsx import(upsert) + `ApplicationEducation.schoolId` 링크.
+
+## Phase 08a - CommonCode
+
+- Date: 2026-06-02
+- Work type: implementation (Phase 08 첫 슬라이스). 설계 `docs/codex/design/phase-08-commoncode-school-master-design.md` 기준.
+- Goal: 관리자 코드성 lookup master(`CommonCode`) 추가형 도입. public read(드롭다운) + admin CRUD. 기존 enum 전환 0(ADR 0003).
+- Created (main):
+  - `domain/entity/CommonCode.java`
+  - `domain/repository/CommonCodeRepository.java`
+  - `exception/CommonCodeNotFoundException.java`, `exception/InvalidCommonCodeException.java`
+  - `dto/request/CommonCodeCreateRequest.java`, `dto/request/CommonCodeUpdateRequest.java`
+  - `dto/response/CommonCodeResponse.java`
+  - `service/CommonCodeService.java`
+  - `controller/CommonCodeController.java`(public read), `controller/AdminCommonCodeController.java`(admin CRUD)
+- Modified (main):
+  - `exception/GlobalExceptionHandler.java` (`CommonCodeNotFoundException` 404, `InvalidCommonCodeException` 400)
+  - `src/main/resources/application.yaml` (`spring.jpa.hibernate.ddl-auto: ${SPRING_JPA_DDL_AUTO:update}` 명시 — 리뷰)
+- Created (test):
+  - `controller/CommonCodeControllerTest.java` (7)
+- APIs:
+  - `GET /api/codes?groupCode=` (permitAll, active+sortOrder)
+  - `GET /api/admin/codes?groupCode=` (admin, 비활성 포함)
+  - `POST /api/admin/codes` / `POST /api/admin/codes/{id}` (admin; 수정은 admin 커맨드 컨벤션상 POST)
+- Key decisions:
+  - `CommonCode` = `groupCode`+`code`(불변)+`displayName`+`sortOrder`+`active`+`description`, `(groupCode,code)` unique, 강한 FK 없음(application-level).
+  - code/groupCode 불변(수정 API 미포함), 삭제는 soft delete(`active=false`). 중복 생성 → 400(InvalidCommonCode, 409 미사용·컨벤션 일치).
+  - public read 는 active 만 sortOrder 순, admin read 는 비활성 포함. 보안은 `anyRequest().permitAll()`/`/api/admin/**` 로 자동 → SecurityConfig 변경 없음.
+  - 기존 enum 전환 0(카탈로그만), 백엔드 필드 validation 미결합, seeding 무-seed.
+  - 스키마: 수동 DDL 없음 — `ddl-auto`(update)로 `common_code` 자동 생성.
+- Review 반영 (instruction.md, 4건):
+  - (확정) ddl-auto 사용 명시(application.yaml `spring.jpa.hibernate.ddl-auto`), 08a 문서에 "수동 DDL 없음, ddl-auto 생성" 명시.
+  - (변경) 수정 API `PUT` → `POST`(controller/test/문서 일괄).
+  - (Medium) 중복 생성 race → `create` 를 `saveAndFlush` + `DataIntegrityViolationException` catch → `InvalidCommonCodeException`(400) service-local 변환(선검사로 못 잡는 동시성 unique violation의 500 누출 방지).
+  - (Minor) code 불변 회귀 테스트 추가 — 수정 body 에 `code`/`groupCode` 가 와도 무시되고 기존 값 유지(6→7).
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*CommonCode*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL — 7건. public read active+정렬+비활성 제외, create+중복 400, blank 400, update+soft delete(public 제외/admin 포함), code 불변(extra 필드 무시), 404, 인가(403/401).
+  - JSON body 는 컨벤션대로 수기 문자열(ObjectMapper 빈 미autowire) + UTF-8 인코딩.
+- Documentation:
+  - `docs/codex/implementation/phase-08a-commoncode.md`
+  - `docs/codex/reports/phase-08a-commoncode.html`
+- Next recommended: Phase 08b - School(엔티티/검색·자동완성/admin CRUD).
+
+## Phase 08 - CommonCode & School Master (Design)
+
+- Date: 2026-06-02
+- Work type: documentation-only 설계 단계 (grill-with-docs 세션). Java/test/migration 미구현.
+- Goal: 관리자 코드성 lookup(`CommonCode`)과 학교 자동완성/통계 기반(`School`) master 를 추가형(비파괴)으로 도입하는 백엔드 범위·API·검증·슬라이스를 확정한다.
+- Created:
+  - `docs/codex/design/phase-08-commoncode-school-master-design.md`
+  - `docs/codex/reports/phase-08-commoncode-school-master-design.html`
+  - `docs/adr/0003-commoncode-additive-no-enum-migration.md`
+  - `docs/adr/0004-school-optional-application-level-link.md`
+- Modified:
+  - `CONTEXT.md` (CommonCode/School 용어 추가, "학교별 통계" 모호성 항목을 School master 기반으로 갱신)
+- Key design decisions (grill Q1~Q10):
+  - CommonCode 추가형 도입, **기존 enum 전환 0**(카탈로그만, STAY vs CANDIDATE). 전환은 "관리자 런타임 추가" 요구 group 에 한해 별도. (ADR 0003)
+  - CommonCode 는 독립 lookup(백엔드 필드 validation 미결합), 프론트 드롭다운 소비. `groupCode`=string 컬럼, `(groupCode,code)` unique, `code` 불변 + soft delete. public read + admin CRUD.
+  - School ↔ ApplicationEducation = **optional nullable `schoolId`**(application-level 참조, 강한 FK 없음). `schoolName` free-text snapshot 유지, 자동완성 선택 시에만 매칭. (ADR 0004)
+  - School 적재 = admin CRUD + **xlsx upsert**(07d parser 재사용), 외부 API 미연동. 식별 = `schoolCode` 우선 + `(schoolName,schoolType,region)` fallback(재import 멱등).
+  - SCHOOL/CERTIFICATE funnel dimension(07c 보류)은 Phase 08 범위 밖(별도 후속).
+  - 산출물 = 설계 문서만. 슬라이스: 08a CommonCode, 08b School(검색/CRUD), 08c xlsx import + schoolId 링크.
+- 보안: `/api/codes`·`/api/schools` public read 는 `anyRequest().permitAll()`, `/api/admin/**` 자동 admin → SecurityConfig 변경 불필요.
+- Tests: documentation-only 단계라 Gradle 테스트 미실행.
+- Open questions: School import preview/commit 분리, `schoolType` 를 CommonCode group(`SCHOOL_TYPE`)으로, CommonCode seeding(무-seed vs dev data.sql).
+- Next recommended: Phase 08a - CommonCode 구현(엔티티/CRUD/public read).
+
+## Phase 07f - Stabilization / Test Hardening
+
+- Date: 2026-06-02
+- Work type: 테스트 전용 stabilization slice (운영 코드 변경 없음). Phase 07 종료.
+- Goal: 설계 §16.2 Test Strategy 중 07a~07e에서 비어 있던 경계/보안 회귀를 채운다 — upload 파일 레벨 경계(maxUploadRows/maxUploadFileSize/확장자/header) parser 단위 회귀, Application PDF 보안 불변식(th:utext 미사용·외부 resource 차단·free-text escape·audit) 회귀.
+- Created (test):
+  - `service/StageResultUploadParserTest.java` (5) — maxUploadRows 초과 거부, maxUploadFileSize 초과 거부, `.xls` 확장자 거부, header signature 불일치 거부, 정상 파싱. (unit, no Spring)
+  - `controller/ApplicationPdfSecurityHardeningTest.java` (3) — 템플릿 `th:utext` 미사용 + 외부 resource(src/href/url http) 미참조 convention, applicant free-text HTML escape(injection 방어), PDF 생성 audit 로그 기록(logback ListAppender).
+- Modified: 없음(운영 코드 무변경).
+- Key decisions:
+  - 07f는 신규 운영 코드/엔티티/마이그레이션 없이, 이미 성립하는 불변식을 회귀 테스트로 잠그는 stabilization slice.
+  - upload 경계는 parser를 작은 `UploadProperties` 한도로 직접 생성해 컨텍스트 없이 빠르게 검증(maxRows/maxFileSize/확장자/header).
+  - PDF 외부 resource 차단은 템플릿 convention(정적 검사) + free-text escape 회귀로 보장(baseUri=null, 외부 참조 없는 입력). audit는 `recruit.audit.pdf` 로거에 ListAppender를 붙여 `eventType=APPLICATION_PDF applicationId=...` 기록 단언.
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*ApplicationPdf*" --tests "*Upload*" --tests "*Export*" --tests "*Statistics*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL — 07f 신규 8건(parser 5 + PDF 보안 3) + 07a~07e 회귀(export/upload/statistics/PDF) 전부 통과.
+  - 부분 실행(Phase 07 영역). 전체 스위트는 본 슬라이스 범위상 미실행(`Infra 01` 날짜 의존 사전-실패 8건 별도 과제).
+- Review 반영 (instruction.md, locking):
+  - (Locking) 폰트 OFL.txt 누락 — 폰트 바이너리 번들 시 SIL OFL 1.1은 저작권 고지 + 라이선스 전문 동봉을 요구(현재 커밋 포함 조건). `src/main/resources/fonts/OFL.txt` 추가(NanumGothic=`Copyright (c) 2011 NHN Corporation` Reserved Font Name "Nanum"/"NanumGothic", Noto Sans KR=`Copyright (c) 2014-2021 Adobe` Reserved Font Name 'Source' — name table에서 확인 + OFL 1.1 전문). `fonts/README.md` "권장"→"동봉됨" 정정. Phase 07 종료 조건으로 폰트 라이선스 파일 포함 완료 명시.
+- Documentation:
+  - `docs/codex/implementation/phase-07f-stabilization-test-hardening.md`
+  - `docs/codex/reports/phase-07f-stabilization-test-hardening.html`
+  - `src/main/resources/fonts/OFL.txt` (신규, 폰트 라이선스 전문), `fonts/README.md` (정정)
+- Known limitations: 외부 resource 차단은 convention + escape 회귀로 보장(런타임 fetch sandbox 미도입), 전체 스위트 일괄 green은 날짜 의존 fixture 안정화 이후.
+- Phase 07(Export/Upload/PDF/Statistics) 07a~07f 완료(폰트 라이선스 동봉 포함).
+- Next recommended: Phase 08(CommonCode/School master) 또는 메시지 배치/발송 이력, privacy purge/retention/activity audit.
+
+## Phase 07e - Application PDF (admin)
+
+- Date: 2026-06-02
+- Work type: implementation (Phase 07 다섯 번째 슬라이스, read-only, admin 전용).
+- Goal: 지원자 1명의 지원서를 PDF 1개로 출력. Thymeleaf XHTML → jsoup 정규화 → openhtmltopdf(PDFBox) 렌더, CJK 폰트 임베드(번들 시), 생성 시 audit.
+- Created (main):
+  - `config/PdfProperties.java`
+  - `exception/PdfGenerationException.java`
+  - `dto/response/ApplicationPdfView.java` (Header/Section/RecordRow/Field generic 표시 모델)
+  - `service/ApplicationPdfDocument.java`, `service/ApplicationPdfRenderer.java`, `service/ApplicationPdfService.java`, `service/PdfAuditLogger.java`
+  - `controller/ApplicationPdfController.java`
+  - `src/main/resources/templates/application-pdf.html`
+- Modified (main):
+  - `build.gradle` (`spring-boot-starter-thymeleaf`, `com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10` → PDFBox 2.0.24)
+  - `exception/GlobalExceptionHandler.java` (`PdfGenerationException` 500)
+  - `src/main/resources/application.yaml` (`recruit.pdf.font-classpath` 기본 `fonts/NanumGothic-Regular.ttf`)
+- Created (resources):
+  - `src/main/resources/fonts/NanumGothic-Regular.ttf`, `NotoSansKR[wght].ttf` (SIL OFL 1.1, 사용자 배치) + `fonts/README.md`
+- Created (test):
+  - `controller/ApplicationPdfControllerTest.java` (4)
+- API:
+  - `GET /api/admin/applications/{applicationId}/pdf` → `application/pdf` (attachment)
+- Key decisions:
+  - 렌더 스택 = Thymeleaf(Apache-2.0) → jsoup(이미 의존, well-formed XHTML 정규화) → openhtmltopdf(LGPL, AGPL 아님) + PDFBox(Apache-2.0). iText(AGPL) 미사용.
+  - 섹션 데이터는 `AdminApplicationSectionService` 재사용(자격번호/병역 면제사유 마스킹 정책 상속). 기본정보 name/phone/email은 PII surface, `ci`/`ciHash`/`password`는 미포함.
+  - 표시 모델은 generic record(label/value 평탄화) → 템플릿은 `th:text`만으로 순회(injection 차단), free-text 줄바꿈은 CSS pre-wrap, 외부 resource 미로드.
+  - 템플릿은 record accessor를 메서드 호출(`${header.applicantName()}`)로 참조해 SpEL property-accessor 버전 차이에 비의존.
+  - CJK 폰트를 `src/main/resources/fonts/`에 번들(jar/classpath 배포) → 시스템 폰트 없이 한글 출력. 기본 정적 `NanumGothic-Regular.ttf`, 고정 패밀리 `ApplicationPdfFont`로 등록(템플릿 CSS 일치).
+  - 응답 보안 헤더 `no-store`/`no-cache`/`nosniff` + attachment. 생성 시 SLF4J audit(actor/applicationId/jobPostingId/jobPositionId).
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*ApplicationPdfControllerTest" --no-daemon`
+  - 결과: BUILD SUCCESSFUL — 4건 통과. 생성(한글: 200/헤더/`%PDF-`/PDFBox 추출로 "홍길동"+"학력" 존재=번들 폰트 임베드 + ci/password 부재), 전형결과 제외, 404, 인가(403/401).
+- Review 반영 (instruction.md, 2 blocking):
+  - (Blocking) CJK 폰트 임베드 미보장(경고만) → SIL OFL 폰트를 resources에 번들, 기본 정적 NanumGothic + 고정 패밀리 `ApplicationPdfFont` 결합, 테스트를 한글 데이터로 전환해 PDFBox 추출로 한글 렌더 회귀 고정, `fonts/README.md` 문서화.
+  - (Blocking) 설계 범위 밖 `전형결과` 섹션 포함(StageResult.comment 내부 정보 유출 위험) → `stageResultSection` 제거, 추출 텍스트 "전형결과" 부재 테스트 고정. 필요 시 별도 admin report 분리.
+- Documentation:
+  - `docs/codex/implementation/phase-07e-application-pdf.md`
+  - `docs/codex/reports/phase-07e-application-pdf.html`
+  - `src/main/resources/fonts/README.md`
+- Known limitations: 변수폰트 Noto는 PDFBox 2.x 이슈로 기본값 제외(정적 NanumGothic 사용), OFL.txt 배포 동봉, 학기별 성적 요약 필드, PDF byte[] 메모리 보유(1인 단위), audit SLF4J.
+- Deferred: 07f(stabilization), 지원자 본인 PDF, attachment 목록.
+- Next recommended: Phase 07f - Stabilization / Test Hardening.
+
+## Phase 07d - Stage Result Excel Upload (preview/commit)
+
+- Date: 2026-06-02
+- Work type: implementation (Phase 07 네 번째 슬라이스, Phase 07의 유일한 쓰기 경로).
+- Goal: 운영자가 `upload-template`으로 받은 xlsx로 `StageResult`를 bulk 변경. stateless preview/commit, all-or-nothing, 3중 교차검증, 낙관적 동시성, 기존 `bulkUpdateResults` 위임. 새 entity/table 없음(리뷰2/3로 `StageResult.@Version` 컬럼 1개 추가, 운영 DDL은 `docs/codex/ops/`에 수동 반영).
+- Created (main):
+  - `enumeration/StageResultUploadRowStatus.java`, `enumeration/StageResultUploadCommitOutcome.java`
+  - `exception/InvalidStageResultUploadException.java`
+  - `config/UploadProperties.java`
+  - `dto/request/StageResultUploadRowRequest.java`
+  - `dto/response/StageResultUploadDiff.java`, `StageResultUploadRowResult.java`, `StageResultUploadPreviewResponse.java`, `StageResultUploadCommitResponse.java`, `StageResultUploadTemplateRow.java`
+  - `service/StageResultUploadParser.java`, `service/StageResultUploadService.java`, `service/UploadAuditLogger.java`
+  - `controller/StageResultUploadController.java`
+- Modified (main):
+  - `dto/response/ApiResponse.java` (`fail(message, data)` 오버로드 — 거부 응답 body에 행 detail 동봉)
+  - `common/hash/HashUtil.java` (`sha256Bytes(byte[])` — `sha256(String)`과 오버로드 모호성 회피 위해 별도 이름; 파일 contentHash용)
+  - `exception/GlobalExceptionHandler.java` (`InvalidStageResultUploadException` 400)
+  - `src/main/resources/application.yaml` (`recruit.upload.max-rows` 10,000 / `recruit.upload.max-file-size` 5MB)
+- Created (test):
+  - `controller/StageResultUploadControllerTest.java` (14)
+- APIs:
+  - `GET  /api/admin/stages/{stageId}/results/upload-template`
+  - `POST /api/admin/stages/{stageId}/results/upload/preview`
+  - `POST /api/admin/stages/{stageId}/results/upload/commit`
+- Key decisions:
+  - 업로드 소스는 `upload-template`만(applications/stage results export는 소스 아님). `stageId`는 path로만 판단(row 컬럼 없음).
+  - 3중 교차검증(`stageResultId` 존재 + `applicationId` 일치 + path `stageId` 소속). 기존 `StageResultBulkUpdateItemRequest`는 불변 — echo/토큰 필드는 upload row DTO에만.
+  - 빈칸: resultStatus blank=행 오류, score/comment blank=null clear. 변경 없는 row=UNCHANGED → commit 제외(stale check도 변경 row에만).
+  - 낙관적 동시성: `stageResultUpdatedAt`(ISO-8601 string) ↔ 현재 `StageResult.updatedAt` normalize 후 비교, 불일치 → STALE. ERROR=400(REJECTED_VALIDATION), STALE=409(REJECTED_STALE), 전부 통과 시 변경 행만 단일 tx로 `bulkUpdateResults` 위임 → APPLIED.
+  - 파일 방어: `.xlsx`만(.xls/.csv/.xlsm 거부), maxRows/maxFileSize, 첫 sheet, header signature, formula 셀 거부, 중복 `stageResultId` 거부, 셀 string 판독(로케일 의존 제거), 빈 행 skip.
+  - commit은 기존 `bulkUpdateResults` 경유로 Stage `IN_PROGRESS` guard·PENDING 금지·comment ≤ 2000·actor 필수·정정 이력/audit 상속. `InterviewEvaluation` upload 영구 제외(Phase 06 경계).
+  - upload commit SLF4J 구조적 audit(outcome/카운트/sourceFileName/Size/contentHash; PII 값 미기록).
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*StageResultUpload*" --tests "*HashUtil*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL — `StageResultUploadControllerTest` 14건 + `HashUtilTest` 회귀 통과.
+  - 검증: template prefill/토큰/PII 컬럼 부재·404, preview changed/unchanged/error 집계·blank/PENDING·applicationId 불일치·중복 id·formula 셀·wrong header 400, commit changed 적용+unchanged 제외·blank clear·all-or-nothing 미적용·STALE 409 미적용·비-xlsx 400, 인가(403/401).
+  - 엔티티를 repository로 직접 영속화해 클럭 의존(접수기간) 없이 안정적. 부분 실행(upload + HashUtil); 전체 스위트는 본 슬라이스 범위상 미실행.
+- Review 반영 (instruction.md, 4 findings):
+  - (High) 토큰 in-memory 비교만으론 두 관리자 동시 commit이 모두 stale check 통과 후 덮어쓰는 lost update 발생 → commit에서 변경 행을 `PESSIMISTIC_WRITE`로 잠그고 DB 최신값으로 `refresh` 후 토큰 재비교(PESSIMISTIC 자체는 schema 변경 불필요; upload-vs-upload만 보호 → 리뷰2에서 `@Version` 보강). 잠금 id 오름차순으로 deadlock 회피. (`StageResultRepository` 신규 쿼리 없이 `EntityManager.refresh(entity, PESSIMISTIC_WRITE)` 사용.)
+  - (High) `ExcelExportWriter` formula-escape가 template comment를 변형 → 미수정 재업로드가 CHANGED 오판/오염 → template은 `escapeFormulaPrefix=false`(비변형 string cell)로 작성하도록 writer/service 오버로드 추가. 토큰 포맷은 service `formatToken` 단일 소스로 통일. 일반 export 경로는 default escape=true 유지(회귀 확인).
+  - (Medium) 변경 0건 파일이 Stage `IN_PROGRESS`/actor guard 우회 → commit 선두에서 `StageResultService.validateBulkUpdatable(stageId, actor)` 선검증.
+  - (Low) 토큰 셀이 NUMERIC일 때만 오류이던 것을 STRING/blank 외 모든 타입(NUMERIC/date/BOOLEAN 등) row error로 강화.
+  - 테스트: 14→17(+3, 특수문자 시작 comment round-trip 비오염/변경 0건 비-IN_PROGRESS 거부/numeric 토큰 셀). 토큰을 template 다운로드에서 읽어 비교(normalize/precision 비의존). `ExcelExportServiceTest` 3-arg writer 매처로 갱신. upload+export+statistics+HashUtil 재실행 전부 통과.
+- Review 반영 2 (instruction.md, 동시성 판단):
+  - (지적) "lost update 자체는 `PESSIMISTIC_WRITE`로 차단"은 과한 표현. `PESSIMISTIC_WRITE`는 upload commit 내부 변경 행만 잠가 **upload-vs-upload**만 보호하고, `StageResult`에 `@Version`이 없어 기존 비-locking 수동 경로(`updateResult`/`bulkUpdateResults`)와의 lost update는 미차단.
+  - (반영, 안전 수정 채택) `StageResult`에 `@Version` 추가 → 전 write 경로 flush 버전 검사, 충돌 시 `ObjectOptimisticLockingFailureException` → 409 매핑(`GlobalExceptionHandler`). upload의 PESSIMISTIC_WRITE+토큰은 upload-vs-upload row-level STALE UX로 유지(2계층).
+  - 테스트: stale 스냅샷(version 0) 후행 반영 시 `ObjectOptimisticLockingFailureException` 회귀 추가(17→18). `@Version` 추가 후 StageResult 전 write 경로 113건 회귀 비파괴 확인(총 114 tests 통과).
+  - 잔여: HMAC opaque 토큰(Open Q#7), 영속 DB 기존 행 `version` backfill 운영 절차.
+- Review 반영 3 (instruction.md, 2 blocking):
+  - (Blocking) `@Version` ↔ "migration 없음" 문서 모순 + 운영 DDL 부재 → (a) 요약/리뷰 문구를 "새 entity/table 없음 + `@Version` 컬럼 1개"로 정정, PESSIMISTIC의 "migration 불필요"는 PESSIMISTIC 자체로 한정. (b) 엔티티를 `@Version @Column(nullable = false)`로 명확화. (c) Flyway/Liquibase 미사용이라 수동 DDL을 `docs/codex/ops/phase-07d-stage-result-version-column.sql`(`ALTER TABLE stage_result ADD COLUMN version BIGINT NOT NULL DEFAULT 0;`)로 추가.
+  - (Blocking) 낙관적 잠금 충돌이 upload audit에 누락(충돌은 service tx commit 시 예외 → controller audit 라인 미도달) → controller가 `ObjectOptimisticLockingFailureException`을 잡아 `UploadAuditLogger.logUploadConflict`(outcome=OPTIMISTIC_LOCK_CONFLICT) audit 후 rethrow(GlobalExceptionHandler 409).
+- Documentation:
+  - `docs/codex/implementation/phase-07d-stage-result-excel-upload.md`
+  - `docs/codex/reports/phase-07d-stage-result-excel-upload.html`
+  - `docs/codex/ops/phase-07d-stage-result-version-column.sql` (신규, @Version 수동 DDL)
+- Known limitations: 토큰은 원문 ISO-8601(HMAC opaque 미적용, Open Q#7). lost update는 upload-vs-upload=`PESSIMISTIC_WRITE`+토큰(row-level STALE), 전 write 경로=`@Version`(409) 2계층으로 차단. audit는 SLF4J(영속 ActivityLog 미도입).
+- Deferred: 07e(PDF), 07f(stabilization), HMAC 토큰, 영속 audit.
+- Next recommended: Phase 07e - Application PDF.
+
+## Phase 07c - 공고 단위 전형 Funnel 통계
+
+- Date: 2026-06-01
+- Work type: implementation (Phase 07 세 번째 슬라이스, read-only 통계).
+- Goal: 공고 단위 전형 funnel(모집단 P, stage별 7-bucket 분포, 순차 통과 비율, 분야별 dimension).
+- Created (main):
+  - `enumeration/FunnelDimension.java`
+  - `exception/InvalidStatisticsRequestException.java`
+  - `dto/response/FunnelCohortRow.java`, `FunnelStageResultRow.java` (projection)
+  - `dto/response/FunnelPopulationResponse.java`, `StageDistributionResponse.java`, `StageFunnelResponse.java`, `DimensionFunnelResponse.java`, `FunnelResponse.java`
+  - `service/FunnelStatisticsService.java`
+  - `controller/AdminStatisticsController.java`
+- Modified (main):
+  - `domain/repository/JobApplicationRepository.java` (`findFunnelCohort`)
+  - `domain/repository/StageResultRepository.java` (`findFunnelStageResults`)
+  - `exception/GlobalExceptionHandler.java` (`InvalidStatisticsRequestException` 400)
+- Created (test):
+  - `controller/AdminStatisticsControllerTest.java` (5)
+- API:
+  - `GET /api/admin/job-postings/{jobPostingId}/statistics/funnel?dimension=POSITION&topN=`
+- Key decisions:
+  - 모집단 P = `submittedAt != null` 코호트(현재 status 무관, 재현 가능). currentlySubmitted/withdrawn 부가 카운트.
+  - stage별 raw 7-bucket(PASSED/FAILED/ABSENT/HOLD/PENDING/WITHDRAWN + 응답 전용 synthetic NO_RESULT), 합=|P|. NO_RESULT(결과 row 없음)와 PENDING(row 있음) 구분.
+  - 순차 통과 집합 `S_k = S_(k-1) ∩ {stage k PASSED}` → funnelPassedCount, cumulativeRate=|S_k|/|P|, stepConversionRate=|S_k|/|S_(k-1)|. raw distribution.passed와 분리.
+  - distribution.withdrawn(stage status) ≠ population.withdrawnCount(application status).
+  - dimension=POSITION만 활성(application 단위 distinct). SCHOOL/CERTIFICATE·잘못된 값 → 400.
+  - projection page 없이 공고 단위 in-memory 산출(bounded). 집계값만이라 audit 없음.
+- Tests:
+  - `AdminStatisticsControllerTest`(5): 응답을 FunnelResponse로 역직렬화해 population/distribution/funnelPassedCount/비율 정밀 검증(소수 isCloseTo), POSITION dimension, 400(미지원 dimension)/404, 인가(403/401).
+  - statistics 테스트는 엔티티를 repository로 직접 영속화해 클럭 의존(접수기간) 없이 안정적.
+- Documentation:
+  - `docs/codex/implementation/phase-07c-statistics-funnel.md`
+  - `docs/codex/reports/phase-07c-statistics-funnel.html`
+- Review 반영 (instruction.md, 7 findings):
+  - (Medium) POSITION dimension 정렬을 `JobPosition.sortOrder`(동률 id)로, 표시명을 현재 `JobPosition.positionName`으로 변경(`FunnelCohortRow`에 sortOrder 추가 + 쿼리 수정). raw passed ≠ funnelPassedCount 테스트, PENDING/ABSENT/HOLD/NO_RESULT 버킷 테스트, withdrawn 분리 테스트, DRAFT 제외 테스트 추가.
+  - (Low) topN은 POSITION에서 무시됨을 controller에 명시(안2). 0명 모집분야는 정책 A(P 존재 분야만) 유지·문서화.
+  - 테스트: `AdminStatisticsControllerTest` 5→9(+4), 전부 통과.
+- Deferred: SCHOOL(Phase 08 School master 이후)/CERTIFICATE dimension, 대형 공고 GROUP BY 전환, 07d(upload)/07e(PDF).
+- Next recommended: Phase 07d - Excel upload(StageResult) preview/commit.
+
+## Enhancement - form-page sections에 pageNo/pageTitle 추가
+
+- Date: 2026-06-01
+- Work type: 소규모 응답 enhancement (`/applications/{id}/form-page`).
+- Goal: 평탄화된 `sections` 각 항목에 소속 페이지의 `pageNo`/`pageTitle`을 노출(프론트 멀티페이지 그룹핑용).
+- Modified:
+  - `dto/response/ApplicationFormSectionResponse.java` (`pageNo`, `pageTitle` 컴포넌트 + `of()` 시그니처)
+  - `service/ApplicationFormPageService.java` (`toSectionResponses`에서 page의 `pageNo`/`title` 전달; flatMap 내부 map으로 page 스코프 유지)
+  - `test/.../service/ApplicationFormPageServiceTest.java` (default/stored 레이아웃에 pageNo/pageTitle 단언)
+  - `test/.../controller/ApplicationControllerTest.java` (form-page sections[*] pageNo/pageTitle jsonPath)
+- Key notes:
+  - `ApplicationFormPage`는 `pageNo`/`title`을 이미 보유 → DB/엔티티/마이그레이션 변경 없음.
+  - `ApplicationFormSectionResponse.of(...)` 호출처는 서비스 1곳뿐이라 파급 국소적. 서비스 생성자 미변경.
+  - 섹션별 `completed`(완료 플래그)는 `ApplicationCompletionReadChecker` 재사용 + 의미 결정(BASIC_INFO/optional-empty/코드 매핑)이 필요해 **후속 과제로 보류**.
+- Tests: `ApplicationFormPageServiceTest` + `ApplicationControllerTest` 통과(대상 실행).
+- Documentation: `docs/codex/implementation/phase-05b-application-form-page-layout.md` + `.../reports/phase-05b-application-form-page-layout.html` 갱신.
+
+## Phase 07b - 나머지 Dataset Export (Stage Results / Interviews / Interview Evaluations)
+
+- Date: 2026-06-01
+- Work type: implementation (Phase 07 두 번째 슬라이스, read-only, 07a 인프라 재사용).
+- Goal: stage results / interviews / interview evaluations의 list-parity xlsx download 추가.
+- Created (main):
+  - `service/ExcelExportService.java` (materialize list → row cap + writer)
+  - `service/AdminDatasetExportService.java` (3개 dataset export + 컬럼 spec)
+  - `dto/response/InterviewEvaluationExportRow.java` (평가 평탄 row)
+- Modified (main):
+  - `service/ExportRowSource.java` (`ofList(List)` 정적 팩토리)
+  - `service/ExportAuditLogger.java` (공통 `logExport(datasetType, context, filters, file)`, `logApplicationsExport` 위임)
+  - `controller/AdminExportController.java` (export 엔드포인트 3개 + dataset audit)
+- Created (test):
+  - `controller/AdminDatasetExportControllerTest.java` (8)
+  - `service/ExcelExportServiceTest.java` (2)
+- APIs:
+  - `GET /api/admin/stages/{stageId}/results/export`
+  - `GET /api/admin/job-postings/{jobPostingId}/interviews/export` (필터 stageId/status/from/to)
+  - `GET /api/admin/stages/{stageId}/interview-evaluations/export` (읽기 전용)
+- Key decisions:
+  - list-parity를 위해 각 dataset이 대응 admin list의 기존 쿼리/서비스를 재사용(필터·정렬·면접 인원 카운트 동일).
+  - 07a applications(unbounded global, count+page-fetch)와 달리 07b는 stage/posting-scoped이므로 materialize 후 row cap 적용(기존 list 엔드포인트도 materialize). size > max면 writer 미호출 = workbook 미생성.
+  - 평가 export는 읽기 전용(Phase 06 경계: 평가 작성/변경은 배정 면접관 본인만). `InterviewEvaluation` upload는 영구 제외.
+  - `ci`/`ciHash`/`password` 전 dataset 금지. 본 3개 dataset은 list-parity상 연락처 미포함.
+  - audit를 공통 `logExport`로 일반화(07a applications는 위임), 필터 allowlist + filtersHash.
+- Tests:
+  - `AdminDatasetExportControllerTest`(8) + `ExcelExportServiceTest`(2): 10 passed.
+  - 검증: dataset별 헤더 POI read-back parity, stage results 민감컬럼 부재·행수, interviews 카운트·status 필터, evaluations 평탄 행·면접관 식별, 404(unknown stage/posting), 인가(403/401), row cap writer never-called.
+  - export 테스트는 엔티티를 repository로 직접 영속화(`start()`=2026-06-01)해 클럭 의존(접수기간) 없이 안정적.
+- Documentation:
+  - `docs/codex/implementation/phase-07b-remaining-dataset-export.md`
+  - `docs/codex/reports/phase-07b-remaining-dataset-export.html`
+- Review 반영 (instruction.md, 7 findings):
+  - (Medium) `exportStageEvaluations` 조회/매핑만 `TransactionTemplate`(readOnly)으로 감싸고 xlsx 생성은 tx 밖으로. row cap의 memory bound 표현 정정 + 07f 전환 기준(특히 stage results) 문서화. 설계 §7.4/Decision #24를 `StreamingResponseBody`로 정정. interviews 필터 테스트 보강(stageId/from·to/from>to 400). interviews export N+1(list-parity 상속)을 07f count projection 전환 대상으로 문서화.
+  - (Low) interviews/evaluations 테스트에 nosniff/no-store/content-type 단언 추가. interviews `groupName` formula escape 회귀 추가.
+  - 테스트: `AdminDatasetExportControllerTest` 8→12(+4), 07b 신규 14개 전부 통과.
+- Deferred: 07c(funnel), 07d(upload), 07e(PDF). 대량 stage results page-fetch 전환은 수요 시.
+- Next recommended: Phase 07c - 공고 단위 전형 funnel statistics.
+
+## Phase 07a - Excel Export 공통 인프라 + Applications Download
+
+- Date: 2026-06-01
+- Work type: implementation (Phase 07 첫 슬라이스, read-only).
+- Goal: POI SXSSF 기반 Excel export 공통 인프라 + applications 목록 xlsx download(연락처 포함).
+- Created (main):
+  - `config/ExportProperties.java`
+  - `exception/ExportRowLimitExceededException.java`, `exception/ExportGenerationException.java`
+  - `dto/response/ApplicationExportRow.java`
+  - `service/ExportColumn.java`, `service/ExcelExportSpec.java`, `service/ExcelExportFile.java`
+  - `service/ExcelExportWriter.java`, `service/ExportAuditLogger.java`, `service/ApplicationExportService.java`
+  - `controller/ExcelExportResponseFactory.java`, `controller/AdminExportController.java`
+- Modified (main):
+  - `build.gradle` (`org.apache.poi:poi-ooxml:5.3.0`)
+  - `src/main/resources/application.yaml` (`recruit.export.max-rows`, 기본 50,000)
+  - `domain/repository/JobApplicationRepository.java` (`countExportApplications`, `streamExportApplications`)
+  - `exception/GlobalExceptionHandler.java` (export 예외 2개 핸들러: 400/500)
+- Created (test):
+  - `controller/AdminExportControllerTest.java`, `controller/AdminExportRowCapTest.java`
+- APIs:
+  - `GET /api/admin/applications/export` (필터: jobPostingId/jobPositionId/status, page 무시)
+  - `GET /api/admin/job-postings/{jobPostingId}/applications/export`
+- Key decisions:
+  - SXSSF streaming writer + 컬럼 spec 추상화(`ExcelExportSpec`/`ExportColumn`)로 07b dataset 추가 비용 최소화.
+  - row cap: 생성 전 count 선검증, 초과 시 `400 EXPORT_ROW_LIMIT_EXCEEDED`(workbook 미생성).
+  - projection DTO + `Stream` 조회로 entity/lazy를 writer에 미전달(streaming tx 경계 보호).
+  - temp file 선생성 후 controller가 `StreamingResponseBody`로 전송하고 finally에서 삭제(service 미삭제).
+  - 전 셀 string cell + formula injection 위험 prefix(`=`,`+`,`-`,`@`, tab, CR/LF) apostrophe escape.
+  - 연락처(phoneNumber/email)는 평문 저장이라 `Applicant`에서 직접 조회. `ci`/`ciHash`/`password` 영구 금지.
+  - export SLF4J 구조적 audit(필터는 allowlist 비-PII 값만, PII 값 미기록).
+- Tests:
+  - `AdminExportControllerTest`(7) + `AdminExportRowCapTest`(1) + `ApplicationExportServiceTest`(2): 10 passed.
+  - 검증: 헤더 + POI read-back header/연락처/민감컬럼 부재, status·jobPositionId 필터, per-posting 분리, 404, formula escape, 인가(403/401), row cap 400 + writer never-called 단위.
+  - export 테스트는 `JobApplication`을 repository로 직접 영속화해 클럭 의존(접수기간) 없이 안정적.
+- Review 반영 (instruction.md, 8 findings):
+  - (Major) SXSSF temp 누수 → `finally` dispose/close. JPA `Stream` → `ExportRowSource` page fetch(1,000). export 정렬을 admin list와 동일 `createdAt desc, id desc`로 parity.
+  - (Medium) audit schema 확장(`ExportAuditContext` + timestamp/authority/clientIp/userAgent/requestId/filtersHash). writer try에서 `RuntimeException`도 `ExportGenerationException` 감쌈. row cap writer never-called 단위 테스트. jobPositionId 필터 테스트.
+  - (Low) Content-Disposition 파일명 `"`→`_`. 공유 `getCurrentEmployeeActor` 오류 문구 일반화.
+  - 신규: `service/ExportRowSource.java`, `service/ExportAuditContext.java`. 수정: `CurrentEmployeeService.java`, `JobApplicationRepository`(stream→page).
+- Documentation:
+  - `docs/codex/implementation/phase-07a-excel-export-infra-applications.md`
+  - `docs/codex/reports/phase-07a-excel-export-infra-applications.html`
+- Deferred: 07b(나머지 dataset export), 07c(funnel), 07d(upload), 07e(PDF), 영속 audit, 파일명 timestamp.
+- Next recommended: Phase 07b - 동일 인프라로 stage results / interviews / interview evaluations export 추가.
+
+## Infra 01 - 전역 `/api` 경로 Prefix
+
+- Date: 2026-06-01
+- Work type: cross-cutting infra (routing/security/test 정렬).
+- Goal: 모든 컨트롤러 엔드포인트 앞에 공통 `/api` prefix를 부여하고, Security 매처와 컨트롤러 테스트 경로를 정렬한다.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/config/WebMvcConfig.java`
+    (`addPathPrefix("/api", HandlerTypePredicate.forBasePackage("com.shinyoung.recruit.controller"))`)
+  - `docs/codex/implementation/infra-01-api-path-prefix.md`
+  - `docs/codex/reports/infra-01-api-path-prefix.html`
+- Modified:
+  - `src/main/java/com/shinyoung/recruit/config/SecurityConfig.java`
+    (컨트롤러 대상 `requestMatchers` 8개 `/api` 정렬, swagger/api-docs/h2-console은 유지)
+  - 컨트롤러 MockMvc 테스트 28개 파일(요청 경로 리터럴 375개 `/api` 정렬)
+- Key decisions:
+  - 컨트롤러 25개를 개별 수정하지 않고 `WebMvcConfigurer.configurePathMatch`로 중앙 적용.
+  - `forBasePackage`로 우리 컨트롤러 패키지에 한정 → springdoc/H2 콘솔 엔드포인트는 prefix 미적용.
+  - 보안 인가는 의미 변화 없이 경로만 `/api`로 이동(권한 매핑 동일).
+  - H2 datasource 미변경: 메인 `application.yaml`의 `jdbc:h2:~/recruit`는 이미 파일(인디스크) 모드(`~/recruit.mv.db` 영속)라 현 설정 유지(사용자 확인). 테스트용 `jdbc:h2:mem:testdb`는 ephemeral 목적상 인메모리 유지.
+- Tests:
+  - `./gradlew.bat test`: 848 tests, 840 passed, 8 failed.
+  - 8개 실패 전부 `InvalidJobApplicationException: 접수기간 내에만 지원서를 처리할 수 있습니다`(`StageControllerTest` 2 + `StageServiceTest` 6). 시스템 날짜(2026-06-01)가 fixture 접수기간(2026-05-30)을 지나 발생한 클럭 의존 사전-실패로, `/api` 라우팅과 무관(라우팅 실패 0건; `StageServiceTest`는 HTTP 미사용 순수 서비스 테스트).
+- Deferred:
+  - 날짜 의존 fixture 안정화(고정 `Clock` 주입/동적 접수기간) — 테스트 하드닝 별도 과제.
+- Next recommended: 테스트 클럭/접수기간 fixture 안정화, 프론트엔드/프록시 base URL `/api` 정렬 확인.
+
+## Phase 07 - Export, PDF, Statistics Design
+
+- Date: 2026-05-29
+- Work type: documentation-only design phase (grill-with-docs 세션 기반).
+- Goal: 운영자 reporting 계층(Excel download/upload, Application PDF, 전형 funnel 통계)의 백엔드 범위·API·검증 규칙·슬라이스를 확정한다. 구현/테스트/migration은 하지 않는다.
+- Created:
+  - `docs/codex/design/phase-07-export-pdf-statistics-design.md`
+  - `docs/codex/reports/phase-07-export-pdf-statistics-design.html`
+  - `docs/adr/0001-application-pdf-openhtmltopdf-avoid-itext-agpl.md`
+  - `docs/adr/0002-phase07-export-readonly-upload-stageresult-only.md`
+- Modified:
+  - `CONTEXT.md` (Excel upload 범위를 StageResult로 축소, 모집단 P 코호트 정의, `funnel 단계 분포`/`NO_RESULT` 용어 추가, `password` 제외 보강)
+  - `docs/codex/06-implementation-roadmap.md` (Phase 07 슬라이스 분할/설계 결정/산출물)
+  - `docs/codex/07-implementation-history.md`
+- Key design decisions (13 + refinements):
+  - 4개 기둥 모두 Phase 07, 읽기(export/statistics) 먼저 · 쓰기(upload) · PDF 나중. 슬라이스 07a~07f.
+  - Excel = Apache POI + SXSSF(streaming) + 하드 row cap(생성 전 count 선검증, 초과 시 `400 EXPORT_ROW_LIMIT_EXCEEDED`, 조용한 truncation 금지).
+  - download 전부 list-parity(1:N 평탄화 없음). applications export만 `name`/`phoneNumber`/`email` 연락처 확장 — export가 admin이 phone/email을 보는 최초 surface.
+  - 모집단 P = `submittedAt != null` 코호트(현재 status 무관, 재현 가능). `withdraw()`가 submittedAt 보존함을 코드로 확인.
+  - funnel 단계 분포 = 7-bucket(6 `StageResultStatus` + 응답 전용 synthetic `NO_RESULT`), 합 = |P|. `NO_RESULT`는 DB enum/ upload 입력값 아님. PASSED 기준 누적·전환 두 비율.
+  - dimension = 전체+분야별(FK) 먼저. 학교별 Phase 08 이후, 자격별 free-text는 07 후속 또는 P08(미확정). topN 기본 10 + 기타.
+  - Excel upload = `StageResult`만. `InterviewEvaluation`은 Phase 06 경계(배정 면접관만 평가 작성, 평가 독립성)로 영구 제외.
+  - upload = stateless preview/commit(새 테이블 없음), all-or-nothing, `stageResultId`+`applicationId`+path `stageId` 3중 교차검증, 기존 `StageResultService.bulkUpdateResults` 경유(공유 `StageResultBulkUpdateItemRequest` 불변, echo 필드는 upload row DTO에만).
+  - PDF = Thymeleaf + openhtmltopdf(PDFBox) + CJK 폰트 임베드, iText(AGPL) 회피, admin 전용, 1 지원자 1 PDF, 생성 시 audit.
+  - `ci`/`ciHash`/`password`는 어떤 export/PDF/statistics에도 절대 미포함. statistics는 집계값만(audit 없음).
+  - 새 entity/table/migration 없음(read-only 또는 기존 명령 재사용).
+- Design review:
+  - 4-critic adversarial 리뷰(consistency / completeness / PII·security / code-grounding) 실행, 17 findings.
+  - 반영: Changed Files·Test Results·Component Summary 섹션 추가, PDF audit 명시, upload 3중매칭을 upload row DTO+service 교차검증으로 정리(공유 DTO 불변), `password` 누락 3곳 보강, CERTIFICATE dimension을 07c 미확정으로 명시, API 표 Purpose/DTO 타입 보강, dimension enum 매핑 문서화.
+  - 코드 근거 확인: `StageResultService.bulkUpdateResults(stageId, request, actor)`, `StageResultStatus{PENDING,PASSED,FAILED,ABSENT,WITHDRAWN,HOLD}`, `AdminApplicationSummaryResponse`에 phone/email 부재, `JobApplication.submittedAt` 철회 후 보존 — 모두 실재 확인.
+- Review 반영 (instruction.md, 10 findings):
+  - (High) upload 소스를 stage results export / `upload-template`로 제한, applications export는 소스 아님으로 명시(stage-specific하지 않아 `stageResultId` 미보장). upload-template 엔드포인트 추가.
+  - (High) stateless lost update 방어: upload row에 `stageResultUpdatedAt` 토큰 추가 → commit 시 현재 `StageResult.updatedAt`와 불일치하면 `STALE_ROW`로 전체 거부(409).
+  - (High) export streaming 트랜잭션 경계 고정: temp file 선생성(read-only tx + projection DTO) 채택, JPA entity/lazy를 writer에 넘기지 않음.
+  - (High) funnel raw 분포(`distribution`, 합=|P|)와 순차 통과 집합(`funnelPassedCount`, S0=P, Sk=S(k-1)∩PASSED) 분리, 비율은 후자 기준.
+  - (Med) Excel formula injection 방어(export string cell/escaping, upload formula cell 거부), upload 파일 레벨 방어(.xlsx만/첫 sheet/header 검증/duplicate 거부/maxUploadRows·Size).
+  - (Med) PDF 템플릿 보안(`th:text`만·`th:utext` 금지, 외부 resource 차단, CSS pre-wrap, attachment embed 범위 밖, no-store 헤더).
+  - (Med) audit schema 구체화(§14.1: 공통/export/PDF/upload commit 필드, PII 직접 기록 금지).
+  - (Med) statistics `distribution.withdrawn`(stage result status) ≠ `population.withdrawnCount`(application status) 분리·덮어쓰기 금지 명시.
+  - (Low) `EXPORT_APPLICATION_PII` 권한 정책 상수 여지 명시(SecurityConfig 세분화는 보류).
+  - Decision Log 15~20 추가, HTML 리포트 funnel/upload/보안 구획 동기화.
+- Review 반영 2 (instruction.md, 7 findings):
+  - (Major) upload 소스를 `upload-template` **하나로만** 한정(stage results export도 소스에서 제외) — 목록 export와 upload sheet 분리, 컬럼 계약 충돌 제거. §9.3 row 모델 표로 정리.
+  - (Major) upload 빈칸 의미 확정: resultStatus blank=row error, score/comment blank=null clear, 변경 없는 row는 commit 제외(stale check도 변경 row만), template은 현재값 prefill.
+  - (Major) `stageResultUpdatedAt` = ISO-8601 **string cell**, normalize 후 비교, date/numeric/formula면 row error, read-only token 표시. (옵션) HMAC opaque token → Open Q#7.
+  - (Med) upload row에 `stageId` 컬럼 제거 — stageId는 path로만 판단(3중 검증 유지).
+  - (Med) export 응답 = `ResponseEntity<Resource>`로 정정(API/HTML 일치), temp 삭제는 controller 전송 후 finally(service finally 금지).
+  - (Med) Test Strategy 보강: STALE_ROW(핵심)/formula cell/파일타입/header/maxRows·Size/blank 정책/헤더/th:utext/외부 resource 차단.
+  - (Low) audit `filtersSafeJson` allowlist 기반 + PII성 필터 마스킹/제외 명시.
+  - Decision Log 15 수정 + 21~25 추가, Open Q#7 추가, HTML 리포트 동기화.
+- Tests:
+  - documentation-only 단계라 Gradle 테스트 미실행.
+- Deferred:
+  - Java 구현/테스트/schema, 자격별 dimension 정규화, stage/interview export 연락처 확장, 영속 ActivityLog.
+- Next recommended phase:
+  - Phase 07a - Excel Export Infra + Applications Download.
+
+## Phase 06e - Stabilization / Test Hardening
+
+- Date: 2026-05-29
+- Work type: 회귀/안정화 테스트 slice (테스트 전용, 운영 코드 변경 없음).
+- Goal: 면접 평가 기능을 교차 경로 회귀 테스트로 하드닝하고, StageResult 비변경 보장을 실행 가능한 회귀 테스트로 고정한다. Phase 06 종료.
+- Created (test):
+  - `src/test/java/com/shinyoung/recruit/service/InterviewEvaluationStabilizationTest.java` (5 tests)
+- Created (docs):
+  - `docs/codex/implementation/phase-06e-stabilization-test-hardening.md`
+  - `docs/codex/reports/phase-06e-stabilization-test-hardening.html`
+- Modified (docs):
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/06-implementation-roadmap.md`
+- Implemented (테스트):
+  - N×M 매트릭스: 3 후보자 × 4 면접관 → 12 평가 생성, 관리자 면접 조회의 후보자 그룹/요약 집계 검증(SUBMITTED 전용 분포 합산).
+  - reopen → 재제출 사이클: interviewer submit → admin reopen(DRAFT) → interviewer 재제출(SUBMITTED, 신규 값) end-to-end.
+  - StageResult 비변경 회귀(06d 리뷰 항목): 실제 PENDING StageResult row 생성 후 submit/reopen/조회(면접·단계·지원서) 수행 → StageResult 불변(resultStatus=PENDING, score/comment/decidedAt/decidedBy=null, row count=1) 단언.
+  - 기존 가드(취소 면접/참가자, 가시성, SUBMITTED 불변성, 비참가자 차단)는 06a~06d 스위트로 재검증.
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*Evaluation*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL (70 tests, 0 failures, 0 skipped) — 06e 신규 5건 + 06a~06d 회귀.
+  - 요청에 따라 평가 관련 패키지만 부분 실행(전체 스위트 미실행).
+- Phase 06 (Interview Evaluation) 06a~06e 완료.
+- Deferred (Phase 06 범위 외 후속):
+  - ActivityLog 도메인 루트 → 재개 감사 이관.
+  - StageResult 반영(reflect) 커맨드(점수화 기준 정의 시).
+  - 평가 데이터 Excel/PDF 내보내기(통계/리포팅 phase).
+
+## Phase 06d - Reopen + StageResult Boundary
+
+- Date: 2026-05-29
+- Work type: 관리자 커맨드 구현 slice + 대상 테스트.
+- Goal: 관리자 평가 재개(SUBMITTED→DRAFT) 커맨드를 추가하고, 감사 로그로 기록하며, StageResult 비변경 보장을 enforce/문서화한다.
+- Modified (source):
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewEvaluationRepository.java` (`findAdminDetailByIdAndInterviewId`)
+  - `src/main/java/com/shinyoung/recruit/service/InterviewEvaluationAdminService.java` (`reopen` + validateActor, Clock·logger)
+  - `src/main/java/com/shinyoung/recruit/controller/InterviewEvaluationAdminController.java` (reopen POST, CurrentEmployeeService 주입)
+- Modified (test):
+  - `src/test/java/com/shinyoung/recruit/service/InterviewEvaluationAdminServiceTest.java` (3건 추가 → 10건)
+  - `src/test/java/com/shinyoung/recruit/controller/InterviewEvaluationAdminControllerTest.java` (2건 추가 → 8건)
+- Created (docs):
+  - `docs/codex/implementation/phase-06d-reopen-stageresult-boundary.md`
+  - `docs/codex/reports/phase-06d-reopen-stageresult-boundary.html`
+- Modified (docs):
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/06-implementation-roadmap.md`
+- APIs:
+  - `POST /admin/interviews/{interviewId}/evaluations/{evaluationId}/reopen`
+- Business rules:
+  - 평가가 경로 면접 소속이어야 함(아니면 404), SUBMITTED만 재개 가능(DRAFT→400).
+  - 재개 대상 재제출 가능 상태 보장: interview CONFIRMED + 후보자/면접관 ASSIGNED, 아니면 400.
+  - 재개 시 status=DRAFT, submittedAt 초기화, 등급/추천/코멘트 보존. 재개 후 면접관 재작성/재제출 가능(06b).
+  - actor 필수(인증 관리자에서 추출), 재개는 감사 로그 기록. 재개 응답은 06c `AdminEvaluationItemResponse` 재사용.
+  - 평가 도메인은 `StageResult`를 어디서도 참조/주입/변경하지 않음(구조적 보장). reflect 커맨드는 보류.
+- Review 반영 (instruction.md):
+  - (보완) reopen에 interview CONFIRMED + 후보자/면접관 ASSIGNED 가드 추가. cancelled 상태로 reopen하면 06b write 가드 때문에 재제출 불가한 DRAFT가 생기는 문제 차단.
+  - `findAdminDetailByIdAndInterviewId` 쿼리에 candidateParticipant fetch join 추가.
+  - 가드 테스트 3건 추가(cancelled interview / candidate / interviewer).
+  - StageResult 비변경 회귀 테스트(reopen/submit/read 전후 StageResult 불변)와 영속 ActivityLog는 리뷰 합의대로 06e/후속으로 유지.
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*Evaluation*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL (65 tests, 0 failures, 0 skipped) — 06d 신규 8건 + 06a~06c 회귀.
+  - 요청에 따라 평가 관련 패키지만 부분 실행(전체 스위트 미실행).
+- Deferred:
+  - 영속 ActivityLog 도메인 — 재개 이력은 현재 SLF4J 감사 로그에 기록, 도메인 구현 시 이관.
+  - StageResult 반영(reflect) 커맨드(점수화 기준 미정).
+  - N×M 매트릭스/가드 회귀 하드닝 (06e).
+- Next recommended phase: Phase 06e - 안정화 / 테스트 하드닝.
+
+## Phase 06c - Admin Evaluation Read
+
+- Date: 2026-05-29
+- Work type: 조회 API / 응답 DTO 구현 slice + 대상 테스트.
+- Goal: 관리자 면접 평가 조회를 면접/단계/지원서 세 레벨로 제공하고, 후보자별 그룹 응답과 요약 집계를 구현한다.
+- Created (source):
+  - `src/main/java/com/shinyoung/recruit/dto/response/GradeDistribution.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/RecommendationDistribution.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminEvaluationItemResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminEvaluationSummaryResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminEvaluationCandidateResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminInterviewEvaluationResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminApplicationEvaluationResponse.java`
+- Modified (source):
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewEvaluationRepository.java` (admin 조회 쿼리 3종)
+  - `src/main/java/com/shinyoung/recruit/service/InterviewEvaluationAdminService.java` (조회 메서드 3종 + groupByInterview, Stage/JobApplication 리포지토리 주입)
+  - `src/main/java/com/shinyoung/recruit/controller/InterviewEvaluationAdminController.java` (클래스 base 매핑 제거, GET 3종 추가)
+- Modified (test):
+  - `src/test/java/com/shinyoung/recruit/service/InterviewEvaluationAdminServiceTest.java` (4건 추가 → 7건)
+  - `src/test/java/com/shinyoung/recruit/controller/InterviewEvaluationAdminControllerTest.java` (3건 추가 → 6건)
+- Created (docs):
+  - `docs/codex/implementation/phase-06c-admin-evaluation-read.md`
+  - `docs/codex/reports/phase-06c-admin-evaluation-read.html`
+- Modified (docs):
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/06-implementation-roadmap.md`
+- APIs:
+  - `GET /admin/interviews/{interviewId}/evaluations`
+  - `GET /admin/stages/{stageId}/interview-evaluations`
+  - `GET /admin/applications/{applicationId}/interview-evaluations`
+- Business rules:
+  - interview/stage/application 미존재 시 404.
+  - 면접 레벨은 후보자 participant 기준 그룹화, 후보자별 요약 포함.
+  - `submittedCount`=SUBMITTED 수, `totalEvaluatorCount`=DRAFT+SUBMITTED 전체. 등급/추천 분포는 SUBMITTED만 집계(DRAFT는 목록 포함, 분포 제외).
+  - 분포 DTO는 항상 5개 필드 포함(없으면 0). 관리자 view는 interviewerName 노출.
+  - 단계/지원서 조회는 평가 행이 있는 면접만 노출. 06a 비정규화 FK(stage/jobApplication)로 직접 인덱스 쿼리.
+  - `StageResult`를 어디서도 참조/주입/변경하지 않음.
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*Evaluation*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL (57 tests, 0 failures, 0 skipped) — 06c 신규 7건 + 06b/06a 회귀.
+  - 요청에 따라 평가 관련 패키지만 부분 실행(전체 스위트 미실행).
+- Deferred:
+  - 관리자 재개(reopen) API · ActivityLog (06d)
+  - StageResult 비변경 보장 명시 강화 (06d)
+  - N×M 매트릭스/가드 회귀 하드닝 (06e)
+- Next recommended phase: Phase 06d - 재개(reopen) + StageResult 경계.
+
+## Phase 06b - Admin Initialize + Interviewer Evaluation Write
+
+- Date: 2026-05-29
+- Work type: 서비스/컨트롤러/DTO 구현 slice + 대상 테스트.
+- Goal: Phase 06a `InterviewEvaluation` 도메인 위에 관리자 평가 초기화 커맨드와 면접관 평가 목록/상세/저장/제출 API를 추가한다.
+- Created (source):
+  - `src/main/java/com/shinyoung/recruit/service/InterviewEvaluationAdminService.java`
+  - `src/main/java/com/shinyoung/recruit/service/InterviewerEvaluationService.java`
+  - `src/main/java/com/shinyoung/recruit/controller/InterviewEvaluationAdminController.java`
+  - `src/main/java/com/shinyoung/recruit/controller/InterviewerEvaluationController.java`
+  - `src/main/java/com/shinyoung/recruit/dto/request/InterviewEvaluationSaveRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/InterviewEvaluationInitializeResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/InterviewerEvaluationListResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/InterviewerEvaluationSummaryResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/InterviewerEvaluationDetailResponse.java`
+  - `src/main/java/com/shinyoung/recruit/exception/InterviewEvaluationNotFoundException.java`
+  - `src/main/java/com/shinyoung/recruit/exception/InvalidInterviewEvaluationException.java`
+- Created (test):
+  - `src/test/java/com/shinyoung/recruit/service/InterviewEvaluationAdminServiceTest.java` (3 tests)
+  - `src/test/java/com/shinyoung/recruit/service/InterviewerEvaluationServiceTest.java` (13 tests)
+  - `src/test/java/com/shinyoung/recruit/controller/InterviewEvaluationAdminControllerTest.java` (3 tests)
+  - `src/test/java/com/shinyoung/recruit/controller/InterviewerEvaluationControllerTest.java` (4 tests)
+- Modified (source):
+  - `src/main/java/com/shinyoung/recruit/exception/GlobalExceptionHandler.java` (404/400 핸들러 2종 추가)
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewEvaluationRepository.java` (면접관 목록/상세 조회 쿼리 2종)
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepository.java` (interview+role+status 조회 쿼리)
+- Created (docs):
+  - `docs/codex/implementation/phase-06b-admin-initialize-interviewer-evaluation-write.md`
+  - `docs/codex/reports/phase-06b-admin-initialize-interviewer-evaluation-write.html`
+- Modified (docs):
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/06-implementation-roadmap.md`
+- APIs:
+  - `POST /admin/interviews/{interviewId}/evaluations/initialize`
+  - `GET /interviewer/interviews/{interviewId}/evaluations`
+  - `GET /interviewer/interviews/{interviewId}/evaluations/{evaluationId}`
+  - `POST /interviewer/interviews/{interviewId}/evaluations/{evaluationId}`
+  - `POST /interviewer/interviews/{interviewId}/evaluations/{evaluationId}/submit`
+- Business rules:
+  - 초기화는 CONFIRMED 면접에서만 가능, ASSIGNED 후보자×면접관 조합만 생성, 순차 호출 기준 멱등.
+  - 면접관 조회/저장/제출은 먼저 visible(CONFIRMED/CANCELLED) ASSIGNED 면접관 participant를 찾고, 그 participant id로 평가를 조회 → cancelled/비참가자는 404.
+  - 저장/제출은 CONFIRMED + 양측 ASSIGNED + DRAFT 가드, 제출은 grade/recommendation 필수 + `submittedAt` 설정, 이후 수정 불가(reopen은 06d). 제출 body 미전달 시 기존 저장값 사용.
+  - 면접관 정보 격리: 목록·상세 모두 participant id 기준, 본인 평가만 노출. cancelled 면접관은 본인 과거 평가 상세도 조회 불가.
+  - `StageResult`를 어디서도 참조/주입/변경하지 않음.
+- Review 반영 (instruction.md):
+  - (Blocking) `getMyEvaluationDetail`/save/submit가 visible/assigned participant 검증을 우회하던 문제 수정. employeeId 소유권 검사 대신 `findVisibleInterviewer` → participant id 기준 조회로 통일.
+  - Repository 메서드를 participant id 기준으로 교체(`findByInterviewIdAndInterviewerParticipantId`, `findDetailByIdAndInterviewIdAndInterviewerParticipantId`).
+  - 동시 initialize 멱등성은 known limitation으로 명시(보강안: interview row 비관적 락 또는 위반 예외 캐치).
+  - 누락 테스트 6건 추가(cancelled 면접관 상세 404, DRAFT 면접 상세 404, cancelled 면접관 목록 404, body 없는 제출 정상/필수값 400, candidate cancelled 저장 400).
+- Tests:
+  - 명령: `$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*Evaluation*" --no-daemon`
+  - 결과: BUILD SUCCESSFUL (50 tests, 0 failures, 0 skipped) — 06b 신규 23건 + 06a 회귀 27건.
+  - 요청에 따라 평가 관련 패키지만 부분 실행(전체 스위트 미실행).
+- Deferred:
+  - 관리자 조회 API · 후보자별 요약 집계 · GradeDistribution/RecommendationDistribution (06c)
+  - 관리자 재개(reopen) API · ActivityLog (06d)
+- Next recommended phase: Phase 06c - 관리자 평가 조회.
+
+## Phase 06a - InterviewEvaluation Domain
+
+- Date: 2026-05-28
+- Work type: 도메인/enum/리포지토리 구현 slice + 대상 테스트.
+- Goal: Phase 04 면접 일정 인프라 위에 면접 평가 도메인의 영속성 모델을 구현한다. API/서비스/컨트롤러는 추가하지 않는다.
+- Created (source):
+  - `src/main/java/com/shinyoung/recruit/enumeration/EvaluationStatus.java` (DRAFT, SUBMITTED)
+  - `src/main/java/com/shinyoung/recruit/enumeration/EvaluationGrade.java` (F, G_MINUS, G, G_PLUS, VG)
+  - `src/main/java/com/shinyoung/recruit/enumeration/EvaluationRecommendation.java` (STRONG_YES, YES, NEUTRAL, NO, STRONG_NO)
+  - `src/main/java/com/shinyoung/recruit/domain/entity/InterviewEvaluation.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewEvaluationRepository.java`
+- Created (test):
+  - `src/test/java/com/shinyoung/recruit/domain/entity/InterviewEvaluationTest.java` (23 tests)
+  - `src/test/java/com/shinyoung/recruit/domain/repository/InterviewEvaluationRepositoryTest.java` (4 tests)
+- Created (docs):
+  - `docs/codex/implementation/phase-06a-interview-evaluation-domain.md`
+  - `docs/codex/reports/phase-06a-interview-evaluation-domain.html`
+- Modified (docs):
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/06-implementation-roadmap.md`
+- Implemented:
+  - `InterviewEvaluation` 엔티티: interview/candidateParticipant/interviewerParticipant FK, jobApplication/stage 비정규화, grade/recommendation/comment/status/submittedAt 필드.
+  - 유니크 제약 `(interview_id, candidate_participant_id, interviewer_participant_id)` + 4개 인덱스.
+  - 검증: 참가자 role 체크, 동일 interview 소속 체크, comment 최대 2000자, submit 시 grade+recommendation 필수.
+  - 상태 전이: `initialize` → DRAFT, `updateContent` (DRAFT만), `submit` (DRAFT→SUBMITTED), `reopen` (SUBMITTED→DRAFT, submittedAt 초기화).
+  - 등급 체계(`EvaluationGrade`)를 반영. 점수(BigDecimal) 대신 enum 등급 사용.
+  - 엔티티는 `StageResult`를 어디서도 참조하지 않음 (경계 정책 준수).
+- StageResult policy:
+  - Phase 06a는 `StageResultRepository`/`StageResultService`를 주입하거나 호출하지 않는다.
+- Tests:
+  - Command: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*InterviewEvaluation*" --no-daemon`
+  - Result: BUILD SUCCESSFUL (27 tests, 0 failures, 0 skipped)
+- Deferred:
+  - 관리자 초기화 커맨드/API, 면접관 저장/제출/조회 API (06b)
+  - 관리자 조회 API, GradeDistribution/RecommendationDistribution 요약 (06c)
+  - 재개 API 엔드포인트 (06d)
+  - DB 마이그레이션 파일
+- Next recommended phase:
+  - Phase 06b - Admin Initialize + Interviewer Evaluation Write
+
+## JobPosition headcount 필드 제거
+
+- Date: 2026-05-28
+- Work type: 도메인 필드 제거, 관련 코드/문서 정리.
+- Goal: 불필요하다고 판단된 `JobPosition.headcount` 필드를 제거한다. 프론트엔드 호환성과 DB 마이그레이션은 이번 범위에서 고려하지 않는다.
+- Modified (source):
+  - `src/main/java/com/shinyoung/recruit/domain/entity/JobPosition.java` (headcount 필드, 생성자/팩토리 인자 제거)
+  - `src/main/java/com/shinyoung/recruit/dto/request/JobPositionRequest.java` (headcount 필드 및 @NotNull @Min(1) 검증 제거, 단축 생성자 시그니처 변경)
+  - `src/main/java/com/shinyoung/recruit/dto/response/JobPositionResponse.java` (headcount 필드 제거)
+  - `src/main/java/com/shinyoung/recruit/dto/response/JobPositionPublicResponse.java` (headcount 필드 제거)
+  - `src/main/java/com/shinyoung/recruit/service/JobPostingService.java` (headcount 검증 블록 및 JobPosition.create 인자 제거)
+- Modified (test): `JobPositionRequest`/`JobPosition.create` 호출과 JSON fixture에서 headcount 인자를 제거 (약 50개 테스트 파일). `JobPostingServiceTest`의 headcount 검증 케이스 2건 제거.
+- Modified (docs): phase-01a, phase-01b, phase-02, phase-03, phase-03j 계열 설계/구현/리포트 문서에서 headcount 참조 제거 또는 갱신 노트 추가.
+- Behavior change:
+  - 모집분야(`JobPosition`)에서 채용 인원 정보를 더 이상 저장/응답하지 않는다.
+  - 모집분야 단위 채용 인원 개념 자체가 제거되었다.
+- Out of scope:
+  - 프론트엔드 변경.
+  - 운영 DB 컬럼 drop 마이그레이션.
+- Tests:
+  - Command: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --no-daemon`
+  - Result: BUILD SUCCESSFUL (전체 테스트 통과, 회귀 없음)
+
+## Current Progress Snapshot - 2026-05-26
+
+- Purpose: align implementation history with the actual codebase and the updated roadmap.
+- Roadmap source updated:
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/reports/current-implementation-status.html`
+- Current completed implementation groups:
+  - Foundation:
+    - session-based auth baseline
+    - DB/LDAP authentication route baseline
+    - menu APIs
+    - notice APIs
+    - common response/exception/auditing/crypto/hash baseline
+  - Job posting:
+    - admin CRUD
+    - publish/close commands
+    - public list/detail
+    - job position metadata
+    - posting display policy and public exposure/sort/filter contract
+    - application form use/required policy split
+    - attachment requirement policy
+  - Stage and result:
+    - stage CRUD/reorder/status commands
+    - stage result initialize/list/update/bulk update
+    - applicant result read
+    - admin application stage result timeline
+    - result correction and correction history
+  - Application:
+    - create/read/update/submit/withdraw
+    - applicant my applications
+    - applicant dashboard
+    - admin application list/detail
+    - admin section lazy read
+  - Application detail sections:
+    - education
+    - career
+    - certificate
+    - language
+    - military
+    - award
+    - gap period
+  - Question and answer:
+    - question template
+    - job posting question
+    - applicant answer save/read
+    - answer submit validator
+    - admin answer read
+  - Attachment:
+    - metadata replace/read
+    - local file upload
+    - applicant/admin download
+    - applicant/admin soft delete
+    - storage health scan dry-run
+    - required attachment policy integrated with public policy, dashboard, and submit validator
+  - Application form page layout domain:
+    - `ApplicationSectionType` layout values and explicit layout subset
+    - `ApplicationFormPage` and `ApplicationFormPageItem` entities
+    - page/item repositories
+    - layout validator, effective section policy helper, and default layout factory
+    - targeted entity/repository/validator/helper tests
+  - Application form page layout applicant read:
+    - applicant-owned `GET /applications/{applicationId:[0-9]+}/form-page`
+    - selected single `JobPosition` response
+    - `ApplicationFormConfig` flag response
+    - effective enabled/required section layout response
+    - default/stored layout validation and targeted service/controller tests
+  - Admin layout management:
+    - admin layout read with stored/default fallback and `availableSections` metadata
+    - admin layout save with replace-all semantics and full validation
+    - admin applicant-facing preview projection with page structure
+    - state guard: CLOSED and reception-started block save
+    - targeted service unit tests and controller integration tests
+  - Interview scheduling domain:
+    - `Interview` schedule/group entity
+    - `InterviewParticipant` candidate/interviewer assignment entity
+    - interview method/status and participant role/status enums
+    - schedule and participant repositories
+    - entity/repository targeted tests
+  - Interview schedule admin management:
+    - admin schedule list/detail APIs
+    - admin DRAFT create/update APIs
+    - DRAFT participant replace command
+    - confirm/cancel commands
+    - candidate eligibility, previous-result visibility, duplicate, and time collision guards
+  - Applicant interview schedule read:
+    - applicant-owned schedule list/detail APIs
+    - DRAFT hiding and CONFIRMED/CANCELLED exposure
+    - candidate role and assigned participant status visibility guard
+    - admin memo, interviewer identity, other candidate, and StageResult field hiding
+  - Interviewer interview schedule read:
+    - interviewer-owned schedule list/detail APIs
+    - DRAFT hiding and CONFIRMED/CANCELLED exposure
+    - interviewer role and assigned participant status visibility guard
+    - assigned candidate list in interviewer detail
+    - admin memo, other interviewer, and StageResult field hiding
+  - Interview scheduling stabilization:
+    - cross-slice cancellation regression across admin/applicant/interviewer services
+    - participant lifecycle regression for cancelled schedules
+    - StageResult non-mutation regression for scheduling cancel/read flows
+    - admin/applicant/interviewer authorization matrix review
+- Current partial implementation groups:
+  - Auth/authorization hardening:
+    - URL authorization and JSON 401/403 are implemented.
+    - full operating role matrix, interviewer-specific authorization, and production LDAP/role mapping validation remain.
+  - Audit:
+    - StageResult actor propagation exists.
+    - general immutable activity/access audit is not implemented.
+  - Attachment lifecycle:
+    - dry-run scan exists.
+    - cleanup/repair commit command and optional deletion history table remain.
+  - DB operations:
+    - H2 generated schema and tests are available.
+    - persistent MariaDB migration files are not in place.
+- Current completed design groups:
+  - Phase 04 Interview Scheduling:
+    - `Interview` schedule/group design.
+    - `InterviewParticipant` candidate/interviewer assignment design.
+    - admin, applicant, and interviewer API draft.
+    - visibility, candidate eligibility, stage status, participant lifecycle, confirmation, collision, and `StageResult` non-mutation policies.
+  - Phase 05 Application Form Page Layout:
+    - `ApplicationFormPage` and `ApplicationFormPageItem` design.
+    - admin layout read/save/preview API contract.
+    - applicant-owned layout read API contract.
+    - use/require/layout consistency validation policy.
+    - attachment requirement and application required policy relationship.
+    - default layout, fallback, publish guard, and slice breakdown.
+  - Layout stabilization / test hardening:
+    - validation matrix fully covered (boundary values, negative numbers, max lengths, enum filtering)
+    - `validateLayoutForPublish()` unit tests (fallback, valid stored, stale stored, question/attachment missing)
+    - attachment/question required policy regression tests (enabled-but-not-required)
+    - default factory edge cases (null guards, sparse section page numbering)
+    - section policy edge cases (null config + externals, minimal config)
+    - 27 new tests added + 2 existing tests strengthened, total layout tests: 72
+  - Publish/layout guard integration:
+    - layout validation integrated into `JobPostingService.publish()` workflow
+    - stored layout validated against current effective enabled/required sections
+    - deterministic fallback accepted when no stored layout exists
+    - `InvalidApplicationFormLayoutException` wrapped as `InvalidJobPostingException` for consistent publish API contract
+    - targeted publish guard tests added to `JobPostingServiceTest`
+- Current completed design groups (continued):
+  - Phase 06 Interview Evaluation:
+    - `InterviewEvaluation` entity design with `InterviewParticipant` FK references.
+    - `EvaluationStatus` (DRAFT, SUBMITTED), `EvaluationGrade` (F, G_MINUS, G, G_PLUS, VG), and `EvaluationRecommendation` (5-level) enum design.
+    - Admin initialize command, interviewer save/submit, admin read (interview/stage/application level) API candidates.
+    - Admin reopen command design.
+    - StageResult non-mutation guarantee policy.
+    - Cancelled interview/participant handling: write blocked, data preserved.
+    - Interviewer information isolation policy.
+    - Summary aggregation with GradeDistribution and RecommendationDistribution (enum-based, no arithmetic average).
+    - 5-slice implementation plan: 06a domain, 06b write, 06c admin read, 06d reopen+boundary, 06e stabilization.
+- Current remaining major work:
+  - Phase 06 implementation: 06a domain completed; 06b~06e pending.
+  - Phase 07 candidate: Excel/PDF/statistics.
+  - Phase 08 candidate: CommonCode and School master data.
+  - Backlog candidate: message batch/send log and provider adapter boundary.
+  - Backlog candidate: privacy purge, retention, and activity audit.
+- Consistency note:
+  - The previous roadmap treated JobPosting, Stage, Application, application detail sections, and attachment file handling as pending.
+  - As of this snapshot, those areas are implemented and documented under `docs/codex/implementation/`.
+  - The roadmap now treats Phase 01 through Phase 03k implementation slices as completed or partially completed according to the actual codebase.
+- Latest full verification known from implementation records:
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat clean test --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Date recorded: 2026-05-22
+
+## Phase 05x - Applicant Sign-Up API
+
+- Date: 2026-05-27
+- Work type: frontend integration support / temporary applicant signup API.
+- Goal: implement a minimal applicant sign-up API (`POST /auth/applicants/sign-up`) for frontend development. NICE identity verification is not in scope.
+- Important: temporary signup API; production identity verification flow must replace client-provided ci.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/dto/request/ApplicantSignUpRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicantSignUpResponse.java`
+  - `src/main/java/com/shinyoung/recruit/exception/InvalidApplicantSignUpException.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicantSignUpService.java`
+  - `src/main/java/com/shinyoung/recruit/controller/ApplicantSignUpController.java`
+  - `src/test/java/com/shinyoung/recruit/service/ApplicantSignUpServiceTest.java`
+  - `src/test/java/com/shinyoung/recruit/controller/ApplicantSignUpControllerTest.java`
+  - `docs/codex/implementation/phase-05x-applicant-sign-up.md`
+  - `docs/codex/reports/phase-05x-applicant-sign-up.html`
+- Modified:
+  - `src/main/java/com/shinyoung/recruit/domain/repository/ApplicantRepository.java` (added existsByLoginId, existsByEmail, existsByCiHash)
+  - `src/main/java/com/shinyoung/recruit/exception/GlobalExceptionHandler.java` (added InvalidApplicantSignUpException handler)
+  - `src/main/java/com/shinyoung/recruit/config/SecurityConfig.java` (added /auth/applicants/sign-up to permitAll)
+  - `docs/codex/07-implementation-history.md`
+- Implemented:
+  - `POST /auth/applicants/sign-up` with validation, duplicate checks (loginId, email, ciHash), BCrypt password encoding, SHA-256 CI hashing.
+  - Response returns applicantId, loginId, name only. No password, ci, ciHash, phoneNumber, email exposed.
+  - No auto-login or session creation after signup.
+  - email is optional (nullable). Blank/whitespace normalized to null.
+  - All string inputs trimmed.
+- Tests:
+  - Command: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*ApplicantSignUp*" --no-daemon`
+  - Result: BUILD SUCCESSFUL (10 tests: 6 service + 4 controller)
+  - Related auth/application regression: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*Auth*" --tests "*ApplicationControllerTest" --no-daemon`
+  - Result: BUILD SUCCESSFUL
+- Deferred:
+  - NICE identity verification integration
+  - Email/SMS verification
+  - Password strength policy
+  - Rate limiting / CAPTCHA
+- Next recommended phase:
+  - Phase 06a - InterviewEvaluation Domain (or production auth hardening)
+
+## Phase 06 - Interview Evaluation Design
+
+- Date: 2026-05-27
+- Work type: documentation-only design phase.
+- Goal: define the backend design for interviewer evaluation capture, admin evaluation read, and StageResult boundary policy on top of the existing interview scheduling infrastructure.
+- Created:
+  - `docs/codex/design/phase-06-interview-evaluation-design.md`
+  - `docs/codex/reports/phase-06-interview-evaluation-design.html`
+- Updated:
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+- Key design decisions:
+  - `InterviewEvaluation` is evaluation evidence; `StageResult` remains the final decision record.
+  - Interviewer `submit` never creates, updates, announces, or corrects `StageResult`.
+  - Unique constraint: `(interview_id, candidate_participant_id, interviewer_participant_id)`.
+  - Both candidate and interviewer FKs reference `InterviewParticipant`, not `Employee` directly.
+  - `jobApplication` and `stage` denormalized on entity for query performance.
+  - Grade: `EvaluationGrade` enum (F, G_MINUS, G, G_PLUS, VG), nullable in DRAFT, required on SUBMIT. Changed from `BigDecimal` score (1~100) to enum-based grade on 2026-05-28.
+  - Recommendation: 5-level enum (STRONG_YES, YES, NEUTRAL, NO, STRONG_NO), nullable in DRAFT, required on SUBMIT.
+  - Comment: optional always, max 2000 characters.
+  - Status: DRAFT and SUBMITTED only. No CANCELLED status.
+  - Admin explicit initialize command (not lazy creation). Same pattern as StageResult initialize.
+  - Initialize separate from interview confirm.
+  - Admin reopen command (SUBMITTED -> DRAFT) included in Phase 06 (06d slice).
+  - No reopen-specific fields on entity. ActivityLog for history.
+  - Summary aggregation uses `GradeDistribution` (grade count per level) and `RecommendationDistribution` as typed DTOs. No averageScore or scoreSum (arithmetic aggregation not applicable to enum grades).
+  - StageResult reflect command excluded from Phase 06.
+  - Cancelled interview/participant: write blocked, data preserved.
+  - Interviewer cannot see other interviewers' evaluations (evaluation independence).
+  - Admin memo on evaluation rows deferred to future phase.
+- Slice plan:
+  - 06a: InterviewEvaluation Domain (entity, enums, repository, constraints, tests)
+  - 06b: Admin Initialize + Interviewer Evaluation Write (initialize, save, submit, guards)
+  - 06c: Admin Evaluation Read (interview/stage/application level, summary)
+  - 06d: Reopen + StageResult Boundary (reopen command, non-mutation guarantee)
+  - 06e: Stabilization / Test Hardening (regression matrix)
+- Tests:
+  - Gradle tests were not run because this phase changed documentation only.
+- Deferred:
+  - Java implementation, tests, schema, and runtime API behavior.
+  - StageResult reflection command.
+  - Excel/PDF/statistics.
+  - Evaluation template management.
+  - Weighted grading.
+  - Automatic pass/fail determination.
+  - Message delivery.
+- Next recommended phase:
+  - Phase 06a - InterviewEvaluation Domain
+
+## Phase 05e - Layout Stabilization / Test Hardening
+
+- Date: 2026-05-27
+- Work type: test hardening, no production code changes, documentation.
+- Goal: harden validation matrix, cover fallback edge cases, verify attachment/question required policy regression, add `validateLayoutForPublish()` unit tests.
+- Modified:
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutValidatorTest.java` (+8 tests)
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutServiceTest.java` (+8 tests)
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutDefaultFactoryTest.java` (+4 tests)
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutSectionPolicyTest.java` (+3 tests)
+  - `docs/codex/07-implementation-history.md`
+- Created:
+  - `docs/codex/implementation/phase-05e-layout-stabilization-test-hardening.md`
+  - `docs/codex/reports/phase-05e-layout-stabilization-test-hardening.html`
+- Tests added: 27 new tests across 4 test classes, 2 existing tests strengthened.
+- Test:
+  - Command: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*ApplicationFormLayout*" --tests "*JobPostingServiceTest" --no-daemon`
+  - Result: BUILD SUCCESSFUL (99 tests, 0 failures)
+  - Layout tests: 72 total (validator 22, service 26, factory 7, policy 6, controller 11)
+  - JobPostingServiceTest: 27 tests
+- Notes:
+  - No production source code was modified.
+  - Validation matrix is now fully covered (21/21 rules).
+  - `validateLayoutForPublish()` has dedicated unit tests.
+  - Attachment/question required policy regression verified.
+  - Phase 05 (Application Form Page Layout) is now complete.
+- Next recommended phase:
+  - Phase 06 - Interview Evaluation
+
+## Phase 05d - Publish/Layout Guard Integration
+
+- Date: 2026-05-27
+- Work type: service integration, targeted tests, and documentation.
+- Goal: integrate layout validation into the job posting publish workflow so a posting cannot be published with a stale or invalid layout.
+- Modified:
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationFormLayoutService.java`
+  - `src/main/java/com/shinyoung/recruit/service/JobPostingService.java`
+  - `src/test/java/com/shinyoung/recruit/service/JobPostingServiceTest.java`
+  - `docs/codex/07-implementation-history.md`
+- Created:
+  - `docs/codex/implementation/phase-05d-publish-layout-guard-integration.md`
+  - `docs/codex/reports/phase-05d-publish-layout-guard-integration.html`
+- Implemented:
+  - Added `validateLayoutForPublish(JobPosting)` to `ApplicationFormLayoutService`.
+  - Modified `JobPostingService.publish()` to call layout validation after existing status/reception/position checks.
+  - Stored layout is validated against current effective enabled/required sections.
+  - Deterministic fallback is accepted when no stored layout exists (migration compatibility).
+  - `InvalidApplicationFormLayoutException` is wrapped as `InvalidJobPostingException` for consistent publish API contract.
+  - Added 3 tests to `JobPostingServiceTest`:
+    - publish with valid stored layout succeeds
+    - publish with stale layout (config changed after layout save) fails
+    - publish with fallback layout (no stored layout) succeeds
+- Test:
+  - Command: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*JobPostingServiceTest" --no-daemon`
+  - Result: BUILD SUCCESSFUL
+  - Layout regression: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*ApplicationFormLayout*" --no-daemon`
+  - Result: BUILD SUCCESSFUL
+- Notes:
+  - No new API endpoints added. Existing publish command behavior was extended.
+  - Fallback layout is still accepted. After migration, consider requiring stored layout only.
+  - Auto-creation of default layout on posting create/update is not implemented.
+- Next recommended phase:
+  - Phase 05e - Layout Stabilization / Test Hardening
+
+## Phase 05c - Admin Layout Management
+
+- Date: 2026-05-27
+- Work type: admin layout read/save/preview API, service, DTOs, controller, targeted tests, and documentation.
+- Goal: implement admin-facing layout management APIs for configuring the page arrangement of applicant application forms.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/dto/request/ApplicationFormLayoutSaveRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminApplicationFormLayoutResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormLayoutPreviewResponse.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationFormLayoutService.java`
+  - `src/main/java/com/shinyoung/recruit/controller/AdminApplicationFormLayoutController.java`
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutServiceTest.java`
+  - `src/test/java/com/shinyoung/recruit/controller/AdminApplicationFormLayoutControllerTest.java`
+  - `docs/codex/implementation/phase-05c-admin-layout-management.md`
+  - `docs/codex/reports/phase-05c-admin-layout-management.html`
+- Modified:
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+- APIs added:
+  - `GET /admin/job-postings/{jobPostingId}/application-form-layout`
+  - `POST /admin/job-postings/{jobPostingId}/application-form-layout`
+  - `GET /admin/job-postings/{jobPostingId}/application-form-layout/preview`
+- Test:
+  - Command: `$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*ApplicationFormLayout*" --no-daemon`
+  - Result: BUILD SUCCESSFUL (43 tests passed: 32 service-layer + 11 controller)
+- Notes:
+  - Admin read returns stored layout or deterministic default with `availableSections` metadata.
+  - Save validates state guard (CLOSED/reception-started blocks), form config existence, and full layout structure.
+  - Preview filters disabled sections and returns page-structured applicant-facing projection.
+  - No existing source files were modified (all Phase 05a infrastructure was already in place).
+  - HTTP method POST로 확정 (프로젝트 command/update API 정책에 따름).
+  - Publish guard integration remains Phase 05d scope.
+
+## Phase 05b - Application Form Page Layout Backend Slice
+
+- Date: 2026-05-26
+- Work type: backend read model, DTO, service, repository support, controller endpoint, targeted test, and documentation implementation slice.
+- Goal: implement the applicant-owned application form-page bootstrap API without changing application creation, section save, submit, or attachment policies.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormPageResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormSectionResponse.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationFormPageService.java`
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormPageServiceTest.java`
+  - `docs/codex/implementation/phase-05b-application-form-page-layout.md`
+  - `docs/codex/reports/phase-05b-application-form-page-layout.html`
+- Updated:
+  - `src/main/java/com/shinyoung/recruit/controller/ApplicationController.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobApplicationRepository.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingQuestionRepository.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingAttachmentRequirementRepository.java`
+  - `src/main/java/com/shinyoung/recruit/exception/GlobalExceptionHandler.java`
+  - `src/test/java/com/shinyoung/recruit/controller/ApplicationControllerTest.java`
+  - `docs/codex/07-implementation-history.md`
+- Implemented:
+  - Added `GET /applications/{applicationId:[0-9]+}/form-page`.
+  - Added `ApiResponse<ApplicationFormPageResponse>` response contract.
+  - Added applicant-owned fetch method `JobApplicationRepository.findFormPageByIdAndApplicantId`.
+  - Added active/required active question existence checks.
+  - Added attachment requirement existence check.
+  - Added form-page service that resolves the current applicant-owned application, verifies selected job position ownership by posting, and builds response data.
+  - Reused Phase 05a effective section policy, default layout factory, and layout validator.
+  - Returned selected single `jobPositionId` and `jobPositionName`.
+  - Calculated `accepting` as `JobPosting.status == PUBLISHED` and current time inside reception period.
+  - Calculated `editable` as `DRAFT + accepting`.
+  - Returned only enabled sections and derived required flags from existing policies.
+  - Added `InvalidApplicationFormLayoutException` HTTP mapping to `400 + ApiResponse.fail(...)`.
+- Preserved:
+  - Existing Application create/update/submit/withdraw behavior.
+  - Existing applicant dashboard/list/stage-result response shapes.
+  - Existing section save APIs.
+  - Existing `/applications/**` applicant security policy.
+  - Existing submit validator and attachment required policy.
+  - DB schema and migration state.
+- Explicitly excluded:
+  - frontend/static resources.
+  - admin layout read/save/preview APIs.
+  - application page-level save API.
+  - job position change feature after application creation.
+  - submit validator changes.
+  - attachment upload/download or required policy changes.
+  - StageResult, message, notification, audit, and Swagger changes.
+- Tests:
+  - Initial sandbox commands failed because the Gradle wrapper distribution download requires network access.
+  - Initial targeted service test failed because the test fixture expected `requireMilitary=false` while the short-form config factory defaults required to enabled; fixture was corrected.
+  - Final service command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.ApplicationFormPageServiceTest --no-daemon`
+  - Service result: `BUILD SUCCESSFUL`
+  - Final controller command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.controller.ApplicationControllerTest --no-daemon`
+  - Controller result: `BUILD SUCCESSFUL`
+  - Full `test` and `clean test` were intentionally not run per Phase 5b targeted-test instruction.
+- Next recommended phase:
+  - Admin layout management or publish/layout guard integration.
+
+## Phase 05a - Application Form Layout Domain
+
+- Date: 2026-05-26
+- Work type: domain, repository, validator/helper, targeted test, and documentation implementation slice.
+- Goal: implement the backend domain foundation for page-level arrangement of applicant application form sections without adding APIs or changing existing section save behavior.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/domain/entity/ApplicationFormPage.java`
+  - `src/main/java/com/shinyoung/recruit/domain/entity/ApplicationFormPageItem.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/ApplicationFormPageRepository.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/ApplicationFormPageItemRepository.java`
+  - `src/main/java/com/shinyoung/recruit/exception/InvalidApplicationFormLayoutException.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationFormLayoutValidator.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationFormLayoutSectionPolicy.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationFormLayoutDefaultFactory.java`
+  - `src/test/java/com/shinyoung/recruit/domain/entity/ApplicationFormPageTest.java`
+  - `src/test/java/com/shinyoung/recruit/domain/entity/ApplicationFormPageItemTest.java`
+  - `src/test/java/com/shinyoung/recruit/domain/repository/ApplicationFormPageRepositoryTest.java`
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutValidatorTest.java`
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutSectionPolicyTest.java`
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationFormLayoutDefaultFactoryTest.java`
+  - `docs/codex/implementation/phase-05a-application-form-layout-domain.md`
+  - `docs/codex/reports/phase-05a-application-form-layout-domain.html`
+- Updated:
+  - `src/main/java/com/shinyoung/recruit/enumeration/ApplicationSectionType.java`
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+- Implemented:
+  - Added layout section values `BASIC_INFO`, `QUESTION_ANSWER`, and `ATTACHMENT`.
+  - Kept existing `APPLICATION` attachment metadata semantics unchanged.
+  - Added explicit layout subset helpers and rejected `APPLICATION`/`ETC` as layout items.
+  - Added `ApplicationFormPage` as a `JobPosting` child entity.
+  - Added `ApplicationFormPageItem` as a page-owned section placement entity.
+  - Added repositories for page aggregate and optional direct item lookup.
+  - Added `ApplicationFormLayoutValidator` for stored layout shape and effective section consistency.
+  - Added review fix validation so `ApplicationFormLayoutValidator` rejects effective enabled/required section sets that do not contain `BASIC_INFO`.
+  - Added `ApplicationFormLayoutSectionPolicy` to compute effective enabled/required sets from `ApplicationFormConfig`, attachment policy flags, and question policy flags.
+  - Added `ApplicationFormLayoutDefaultFactory` with default groups:
+    - Page 1: `BASIC_INFO`, `MILITARY`
+    - Page 2: `EDUCATION`, `CAREER`
+    - Page 3: `CERTIFICATE`, `LANGUAGE`, `AWARD`, `GAP_PERIOD`
+    - Page 4: `QUESTION_ANSWER`
+    - Page 5: `ATTACHMENT`
+- Explicitly excluded:
+  - admin layout API.
+  - applicant layout API.
+  - publish guard integration.
+  - page-level application save API.
+  - existing section save API refactoring.
+  - attachment required policy changes.
+  - question/answer logic changes.
+  - frontend/static resources.
+  - migration files and production DDL.
+- Tests:
+  - Initial sandbox command failed because Gradle wrapper network access was blocked.
+  - A later run failed because a previous timed-out Gradle process held `build/test-results/test/binary/output.bin`; `.\gradlew.bat --stop` cleared it.
+  - Final command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.domain.entity.ApplicationFormPageTest --tests com.shinyoung.recruit.domain.entity.ApplicationFormPageItemTest --tests com.shinyoung.recruit.domain.repository.ApplicationFormPageRepositoryTest --tests com.shinyoung.recruit.service.ApplicationFormLayoutValidatorTest --tests com.shinyoung.recruit.service.ApplicationFormLayoutSectionPolicyTest --tests com.shinyoung.recruit.service.ApplicationFormLayoutDefaultFactoryTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Review fix command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.ApplicationFormLayoutValidatorTest --no-daemon --rerun-tasks`
+  - Review fix result: `BUILD SUCCESSFUL`
+  - Full `test` and `clean test` were not run because `instruction.md` forbids full-suite execution for Phase 05a due current development PC full-suite timeout concerns.
+- Next recommended phase:
+  - `Phase 05b - Admin Layout Management`
+
+## Phase 05 - Application Form Page Layout Design
+
+- Date: 2026-05-26
+- Work type: documentation-only design phase.
+- Goal: define backend domain and API policy for page-level arrangement of applicant application form sections without changing existing application section persistence.
+- Created:
+  - `docs/codex/design/phase-05-application-form-page-layout-design.md`
+  - `docs/codex/reports/phase-05-application-form-page-layout-design.html`
+- Updated:
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+- Designed:
+  - `ApplicationFormPage` as a `JobPosting`-owned page aggregate candidate.
+  - `ApplicationFormPageItem` as the section placement row.
+  - reuse and extension of existing `ApplicationSectionType` with layout values such as `BASIC_INFO`, `QUESTION_ANSWER`, and `ATTACHMENT`.
+  - effective enabled section set from `BASIC_INFO`, `ApplicationFormConfig.useXxx`, active `JobPostingQuestion`, and attachment requirement rows.
+  - effective required section set from `BASIC_INFO`, `ApplicationFormConfig.requireXxx`, active required `JobPostingQuestion`, and required attachment rows.
+  - `BASIC_INFO` save contract through the current root application draft update endpoint, with a note that broader basic-info fields need a future endpoint or request expansion.
+  - 05a enum compatibility caution because current `ApplicationSectionType` does not contain `QUESTION_ANSWER` or `ATTACHMENT`.
+  - admin layout read/save/preview API candidates.
+  - applicant-owned layout read API candidate.
+  - page/item validation matrix and reception-start mutation guard.
+  - default/fallback layout and publish guard policy.
+  - Phase 05 slices: 05a domain, 05b admin management, 05c applicant read, 05d publish guard, 05e stabilization.
+- Explicitly excluded:
+  - frontend Vue implementation.
+  - drag and drop UI.
+  - field-level form builder.
+  - page-level application save API.
+  - application section command API refactoring.
+  - attachment required policy redesign.
+  - runtime Java/API behavior changes.
+- Tests:
+  - Gradle tests were not run because this phase changed documentation only.
+  - Phase 05 implementation guidance now recommends targeted tests only by default because the current development PC has full-suite timeout issues.
+  - Documentation verification: targeted `git diff --check -- <changed docs>` passed.
+  - Full `git diff --check` was not clean because pre-existing `instruction.md` local changes contain trailing whitespace.
+- Next recommended phase:
+  - `Phase 05a - Application Form Layout Domain`
+
+## Phase 04e - Interview Scheduling Stabilization / Test Hardening
+
+- Date: 2026-05-26
+- Work type: stabilization and targeted regression slice.
+- Goal: close Phase 04 by hardening cross-slice scheduling behavior and documenting the authorization matrix before the next roadmap phase.
+- Created:
+  - `src/test/java/com/shinyoung/recruit/service/InterviewSchedulingStabilizationServiceTest.java`
+  - `docs/codex/implementation/phase-04e-interview-scheduling-stabilization.md`
+  - `docs/codex/reports/phase-04e-interview-scheduling-stabilization.html`
+- Updated:
+  - `src/test/java/com/shinyoung/recruit/controller/InterviewAdminControllerTest.java`
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+  - `docs/codex/implementation/phase-04b-admin-interview-schedule-management.md`
+  - `docs/codex/implementation/phase-04c-applicant-interview-read.md`
+  - `docs/codex/implementation/phase-04d-interviewer-interview-read.md`
+- Implemented:
+  - Cross-slice test that creates, assigns, confirms, and cancels an interview through `InterviewService`.
+  - Applicant detail read remains visible after cancel and returns `CANCELLED`.
+  - Interviewer detail read remains visible after cancel and returns assigned candidate list.
+  - Participant rows remain `ASSIGNED` after schedule cancellation.
+  - Previous-stage `StageResult` remains `PASSED`.
+  - Admin interview list route accepts admin auth, rejects applicant with 403, and rejects anonymous with 401.
+- StageResult policy:
+  - Phase 04e does not change production `StageResult` behavior.
+  - The new stabilization test verifies scheduling cancel/read flows do not mutate previous-stage result state.
+- Tests:
+  - Initial sandbox command failed while Gradle wrapper tried to download Gradle because network access was restricted.
+  - Command after approved escalation: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.InterviewSchedulingStabilizationServiceTest --tests com.shinyoung.recruit.controller.InterviewAdminControllerTest --tests com.shinyoung.recruit.service.InterviewerInterviewServiceTest --tests com.shinyoung.recruit.controller.InterviewerInterviewControllerTest --tests com.shinyoung.recruit.service.ApplicantInterviewServiceTest --tests com.shinyoung.recruit.controller.ApplicantInterviewControllerTest --tests com.shinyoung.recruit.domain.repository.InterviewParticipantRepositoryTest --tests com.shinyoung.recruit.service.InterviewServiceTest --tests com.shinyoung.recruit.service.CurrentEmployeeServiceTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Full `test` and `clean test` were not run because current `instruction.md` still limits Phase 04 work to targeted tests and records development PC performance/full-suite timeout concerns.
+- Deferred:
+  - `InterviewEvaluation`.
+  - interviewer evaluation draft/save/submit.
+  - admin evaluation read.
+  - message, Excel, PDF, calendar, frontend, and migration files.
+- Next recommended phase:
+  - `Phase 05 - Application Form Page Layout`
+
+## Phase 04d - Interviewer Interview Read
+
+- Date: 2026-05-26
+- Work type: service/API implementation slice.
+- Goal: implement read-only interviewer interview schedule APIs for the current authenticated employee.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/dto/response/InterviewerInterviewSummaryResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/InterviewerInterviewDetailResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/InterviewerInterviewCandidateResponse.java`
+  - `src/main/java/com/shinyoung/recruit/service/InterviewerInterviewService.java`
+  - `src/main/java/com/shinyoung/recruit/controller/InterviewerInterviewController.java`
+  - `src/test/java/com/shinyoung/recruit/service/InterviewerInterviewServiceTest.java`
+  - `src/test/java/com/shinyoung/recruit/controller/InterviewerInterviewControllerTest.java`
+  - `docs/codex/implementation/phase-04d-interviewer-interview-read.md`
+  - `docs/codex/reports/phase-04d-interviewer-interview-read.html`
+- Updated:
+  - `src/main/java/com/shinyoung/recruit/domain/repository/EmployeeRepository.java`
+  - `src/main/java/com/shinyoung/recruit/service/CurrentEmployeeService.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepository.java`
+  - `src/main/java/com/shinyoung/recruit/config/SecurityConfig.java`
+  - `src/test/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepositoryTest.java`
+  - `src/test/java/com/shinyoung/recruit/service/CurrentEmployeeServiceTest.java`
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+- Implemented APIs:
+  - `GET /interviewer/interviews?status=&from=&to=`
+  - `GET /interviewer/interviews/{interviewId}`
+- Implemented:
+  - Current employee ownership guard through `CurrentEmployeeService`.
+  - `EmployeeRepository.findByLoginId` to resolve principal login id to employee id.
+  - No request path/query/body accepts employee id or user id.
+  - Interviewer visibility query is rooted in `InterviewParticipant`.
+  - `Interview.status` visible values are `CONFIRMED` and `CANCELLED`.
+  - `DRAFT` schedules are hidden; `status=DRAFT` list requests return 400.
+  - Only `role=INTERVIEWER` and `participantStatus=ASSIGNED` rows are visible.
+  - Detail reads return 404 for DRAFT, non-owned, non-assigned, or candidate-only records.
+  - Detail candidate list is loaded only after interviewer ownership is verified.
+  - Candidate list includes only assigned `CANDIDATE` participant rows.
+  - Response DTOs expose schedule, posting, stage, method, place/URL, status, cancelled flag, and assigned candidate summary only.
+  - Interviewer response excludes admin memo, other interviewer details, and `StageResult` internals.
+  - `/interviewer/**` now requires employee-family authorities; assignment still controls final visibility.
+- StageResult policy:
+  - Phase 04d does not inject or call `StageResultRepository`.
+  - Phase 04d does not create, update, delete, initialize, announce, correct, or publish `StageResult`.
+- Tests:
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.InterviewerInterviewServiceTest --tests com.shinyoung.recruit.controller.InterviewerInterviewControllerTest --tests com.shinyoung.recruit.domain.repository.InterviewParticipantRepositoryTest --tests com.shinyoung.recruit.service.ApplicantInterviewServiceTest --tests com.shinyoung.recruit.service.InterviewServiceTest --tests com.shinyoung.recruit.service.CurrentEmployeeServiceTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Full `test` and `clean test` were not run because `instruction.md` limited this phase to targeted tests and records development PC performance concerns for full-suite execution.
+- Deferred:
+  - `InterviewEvaluation`.
+  - message, Excel, PDF, calendar, frontend, and migration files.
+- Next recommended phase:
+  - `Phase 04e - Interview Scheduling Stabilization / Test Hardening`
+
+## Phase 04c - Applicant Interview Read
+
+- Date: 2026-05-26
+- Work type: service/API implementation slice.
+- Goal: implement read-only applicant interview schedule APIs for the current authenticated applicant.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicantInterviewSummaryResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicantInterviewDetailResponse.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicantInterviewService.java`
+  - `src/main/java/com/shinyoung/recruit/controller/ApplicantInterviewController.java`
+  - `src/test/java/com/shinyoung/recruit/service/ApplicantInterviewServiceTest.java`
+  - `src/test/java/com/shinyoung/recruit/controller/ApplicantInterviewControllerTest.java`
+  - `docs/codex/implementation/phase-04c-applicant-interview-read.md`
+  - `docs/codex/reports/phase-04c-applicant-interview-read.html`
+- Updated:
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepository.java`
+  - `src/main/java/com/shinyoung/recruit/config/SecurityConfig.java`
+  - `src/test/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepositoryTest.java`
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+- Implemented APIs:
+  - `GET /applicant/interviews?status=&from=&to=`
+  - `GET /applicant/applications/{applicationId}/interviews?status=&from=&to=`
+  - `GET /applicant/interviews/{interviewId}`
+- Implemented:
+  - Current applicant ownership guard through `CurrentApplicantService`.
+  - No request path/query/body accepts applicant id or user id.
+  - Applicant visibility query is rooted in `InterviewParticipant`.
+  - `Interview.status` visible values are `CONFIRMED` and `CANCELLED`.
+  - `DRAFT` schedules are hidden; `status=DRAFT` list requests return 400.
+  - Only `role=CANDIDATE` and `participantStatus=ASSIGNED` rows are visible.
+  - Withdrawn applications are inaccessible.
+  - Per-application reads verify `JobApplication` ownership.
+  - Detail reads return 404 for DRAFT, non-owned, non-assigned, or interviewer-only records.
+  - Response DTOs expose schedule, posting, position, stage, method, place/URL, status, and cancelled flag only.
+  - Applicant response excludes admin memo, other candidates, interviewer identity, and `StageResult` internals.
+  - `/applicant/**` now requires `ROLE_APPLICANT`.
+- StageResult policy:
+  - Phase 04c does not inject or call `StageResultRepository`.
+  - Phase 04c does not create, update, delete, initialize, announce, correct, or publish `StageResult`.
+- Tests:
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.ApplicantInterviewServiceTest --tests com.shinyoung.recruit.controller.ApplicantInterviewControllerTest --tests com.shinyoung.recruit.domain.repository.InterviewParticipantRepositoryTest --tests com.shinyoung.recruit.service.InterviewServiceTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Full `test` and `clean test` were not run because `instruction.md` limited this phase to targeted tests and records development PC performance concerns for full-suite execution.
+- Deferred:
+  - interviewer interview read API.
+  - `InterviewEvaluation`.
+  - message, Excel, PDF, calendar, frontend, and migration files.
+- Next recommended phase:
+  - Completed by `Phase 04d - Interviewer Interview Read`.
+  - Current next phase is `Phase 05 - Application Form Page Layout`.
+
+## Phase 04b - Admin Interview Schedule Management
+
+- Date: 2026-05-26
+- Work type: service/API implementation slice.
+- Goal: implement administrator interview schedule management on top of the Phase 04a interview domain.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/dto/request/InterviewCreateRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/request/InterviewUpdateRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/request/InterviewParticipantReplaceRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/request/InterviewCandidateParticipantRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/request/InterviewInterviewerParticipantRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminInterviewSummaryResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminInterviewDetailResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/AdminInterviewParticipantResponse.java`
+  - `src/main/java/com/shinyoung/recruit/service/InterviewService.java`
+  - `src/main/java/com/shinyoung/recruit/controller/InterviewAdminController.java`
+  - `src/main/java/com/shinyoung/recruit/exception/InterviewNotFoundException.java`
+  - `src/main/java/com/shinyoung/recruit/exception/InvalidInterviewException.java`
+  - `src/test/java/com/shinyoung/recruit/service/InterviewServiceTest.java`
+  - `src/test/java/com/shinyoung/recruit/controller/InterviewAdminControllerTest.java`
+  - `docs/codex/implementation/phase-04b-admin-interview-schedule-management.md`
+  - `docs/codex/reports/phase-04b-admin-interview-schedule-management.html`
+- Updated:
+  - `src/main/java/com/shinyoung/recruit/domain/entity/Interview.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewRepository.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepository.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/StageResultRepository.java`
+  - `src/main/java/com/shinyoung/recruit/exception/GlobalExceptionHandler.java`
+  - `src/test/java/com/shinyoung/recruit/domain/repository/InterviewRepositoryTest.java`
+  - `src/test/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepositoryTest.java`
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+- Implemented:
+  - Admin list/detail:
+    - `GET /admin/job-postings/{jobPostingId}/interviews?stageId=&status=&from=&to=`
+    - `GET /admin/interviews/{interviewId}`
+  - Admin commands:
+    - `POST /admin/job-postings/{jobPostingId}/interviews`
+    - `POST /admin/interviews/{interviewId}`
+    - `POST /admin/interviews/{interviewId}/participants`
+    - `POST /admin/interviews/{interviewId}/confirm`
+    - `POST /admin/interviews/{interviewId}/cancel`
+  - `StageType` allowlist guard: `FIRST_INTERVIEW`, `SECOND_INTERVIEW`, `FINAL_INTERVIEW`.
+  - `StageStatus` guard: create/update/replace/confirm allowed only in `READY` and `IN_PROGRESS`.
+  - DRAFT-only update and participant replacement.
+  - Participant replacement uses `Interview.clearParticipantsForDraft()` and JPA `orphanRemoval` rather than a duplicate repository `deleteAll` path.
+  - Confirm requires at least one assigned candidate and interviewer.
+  - Candidate same posting and `SUBMITTED` status checks.
+  - Previous-stage visible `PASSED` result eligibility check.
+  - Duplicate candidate/interviewer and duplicate role sort-order rejection.
+  - Confirmed schedule time collision checks for candidate and interviewer.
+  - Cancel changes only `Interview.status` from `CONFIRMED` to `CANCELLED`.
+  - Cancel is allowed only while the stage is `READY` or `IN_PROGRESS`; `RESULT_ANNOUNCED` and `CLOSED` reject cancel.
+  - Confirm/cancel commands do not accept request body until an audit/history model exists for memo or cancel reason.
+- StageResult policy:
+  - `StageResult` is read only for previous-stage eligibility.
+  - Phase 04b does not create, update, announce, correct, publish, or initialize `StageResult`.
+- Tests:
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.InterviewServiceTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.controller.InterviewAdminControllerTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.domain.repository.InterviewRepositoryTest --tests com.shinyoung.recruit.domain.repository.InterviewParticipantRepositoryTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Full `test` and `clean test` were not run because `instruction.md` limited this phase to targeted tests.
+- Deferred:
+  - applicant interview read API.
+  - interviewer interview read API.
+  - `InterviewEvaluation`.
+  - message, Excel, PDF, calendar, frontend, and migration files.
+- Next recommended phase:
+  - Completed by `Phase 04c - Applicant Interview Read`.
+  - Current next phase is `Phase 05 - Application Form Page Layout`.
+
+## Phase 04a - Interview Scheduling Domain
+
+- Date: 2026-05-26
+- Work type: domain/repository implementation slice.
+- Goal: add the domain foundation for interview schedules, interview groups, candidate assignments, and interviewer assignments.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/enumeration/InterviewMethod.java`
+  - `src/main/java/com/shinyoung/recruit/enumeration/InterviewStatus.java`
+  - `src/main/java/com/shinyoung/recruit/enumeration/InterviewParticipantRole.java`
+  - `src/main/java/com/shinyoung/recruit/enumeration/InterviewParticipantStatus.java`
+  - `src/main/java/com/shinyoung/recruit/domain/entity/Interview.java`
+  - `src/main/java/com/shinyoung/recruit/domain/entity/InterviewParticipant.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewRepository.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepository.java`
+  - `src/test/java/com/shinyoung/recruit/domain/entity/InterviewTest.java`
+  - `src/test/java/com/shinyoung/recruit/domain/entity/InterviewParticipantTest.java`
+  - `src/test/java/com/shinyoung/recruit/domain/repository/InterviewRepositoryTest.java`
+  - `src/test/java/com/shinyoung/recruit/domain/repository/InterviewParticipantRepositoryTest.java`
+  - `docs/codex/implementation/phase-04a-interview-scheduling-domain.md`
+  - `docs/codex/reports/phase-04a-interview-scheduling-domain.html`
+- Updated:
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/07-implementation-history.md`
+  - `docs/codex/reports/current-implementation-status.html`
+  - `docs/codex/design/phase-04-interview-scheduling-design.md`
+- Implemented:
+  - `Interview` belongs to one `JobPosting` and one `Stage`.
+  - `Interview.stage.jobPosting` must match `Interview.jobPosting`.
+  - `Interview.groupName`, `startDateTime`, `endDateTime`, and `method` are required.
+  - `Interview.endDateTime` must be after `startDateTime`.
+  - `IN_PERSON` and `HYBRID` require `locationName`.
+  - `ONLINE` and `HYBRID` require `onlineMeetingUrl`.
+  - `Interview.status` defaults to `DRAFT`.
+  - `InterviewParticipant` candidate rows require `JobApplication` and no `Employee`.
+  - `InterviewParticipant` interviewer rows require `Employee` and no `JobApplication`.
+  - `InterviewParticipant.participantStatus` defaults to `ASSIGNED`.
+  - repository methods were added for schedule lookup, participant lookup, and duplicate-check candidates.
+- StageType check:
+  - Actual source values on 2026-05-26: `DOCUMENT`, `FIRST_INTERVIEW`, `SECOND_INTERVIEW`, `FINAL_INTERVIEW`, `ETC`.
+  - Phase 04a did not modify `StageType`.
+  - Later service validation should allow only `FIRST_INTERVIEW`, `SECOND_INTERVIEW`, and `FINAL_INTERVIEW`.
+- StageResult policy:
+  - `StageResult` source was not modified.
+  - Interview Scheduling still does not create, update, announce, or correct `StageResult`.
+- APIs:
+  - No API was added in Phase 04a.
+  - No controller, request DTO, response DTO, or service command was added.
+- Tests:
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.domain.entity.InterviewTest --tests com.shinyoung.recruit.domain.entity.InterviewParticipantTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.domain.repository.InterviewRepositoryTest --tests com.shinyoung.recruit.domain.repository.InterviewParticipantRepositoryTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.StageServiceTest --tests com.shinyoung.recruit.service.StageResultServiceTest --tests com.shinyoung.recruit.service.JobApplicationServiceTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Full `test` and `clean test` were not run because `instruction.md` explicitly forbids full suite execution for this slice.
+- Deferred:
+  - admin schedule CRUD and participant replace command.
+  - confirmation/cancellation service validation.
+  - applicant and interviewer read APIs.
+  - `InterviewEvaluation`.
+  - message, Excel, PDF, calendar, frontend, and migration files.
+- Next recommended phase:
+  - Completed by `Phase 04b - Admin Interview Schedule Management`.
+  - Current next phase is `Phase 05 - Application Form Page Layout`.
+
+## Phase 04 - Interview Scheduling Design
+
+- Date: 2026-05-26
+- Work type: documentation-only design phase.
+- Goal: define the backend design for interview schedules, interview groups, candidate assignment, and interviewer assignment.
+- Created:
+  - `docs/codex/design/phase-04-interview-scheduling-design.md`
+  - `docs/codex/reports/phase-04-interview-scheduling-design.html`
+- Updated:
+  - `docs/codex/06-implementation-roadmap.md`
+  - `docs/codex/reports/current-implementation-status.html`
+  - `docs/codex/01-project-context.md`
+- Key design decisions:
+  - `Interview` is the schedule/group root connected to `JobPosting` and `Stage`.
+  - `InterviewParticipant` represents both candidate and interviewer assignment rows.
+  - Candidate rows require `jobApplication` and do not use `employee`.
+  - Interviewer rows require `employee` and do not use `jobApplication`.
+  - `Interview.stage.stageType` must be one of `FIRST_INTERVIEW`, `SECOND_INTERVIEW`, or `FINAL_INTERVIEW`.
+  - As of the Phase 04a implementation check on 2026-05-26, source `StageType` contains `DOCUMENT`, `FIRST_INTERVIEW`, `SECOND_INTERVIEW`, `FINAL_INTERVIEW`, and `ETC`; service validation should allow interview scheduling only for the three interview values.
+  - `groupName` is required. A single-group schedule can use a default such as `1조`.
+  - Interview schedule status is `DRAFT`, `CONFIRMED`, or `CANCELLED`.
+  - Participant status is `ASSIGNED` or `CANCELLED`.
+  - First implementation uses participant `ASSIGNED`; participant `CANCELLED` is reserved for later partial participant cancellation/amendment unless explicitly implemented.
+  - `StageResult` remains responsible only for pass/fail/pending result decisions, announcement, and correction history.
+  - Interview Scheduling does not create, update, announce, or correct `StageResult`.
+  - Admin confirmation may read `StageResult` to verify candidate eligibility; applicant interview reads do not expose or mutate `StageResult`.
+  - Applicant and interviewer reads hide `DRAFT` schedules and return only assigned `CONFIRMED` or `CANCELLED` schedules.
+  - Applicant responses hide other candidates, interviewer lists, and admin internal memo.
+  - Interviewer responses are assignment-only and may include candidate lists, but not admin internal memo.
+- API draft:
+  - `GET /admin/job-postings/{jobPostingId}/interviews?stageId=&status=&from=&to=`
+  - `GET /admin/interviews/{interviewId}`
+  - `POST /admin/job-postings/{jobPostingId}/interviews`
+  - `POST /admin/interviews/{interviewId}`
+  - `POST /admin/interviews/{interviewId}/participants`
+  - `POST /admin/interviews/{interviewId}/confirm`
+  - `POST /admin/interviews/{interviewId}/cancel`
+  - `GET /applicant/applications/{applicationId}/interviews`
+  - `GET /interviewer/interviews?from=&to=&jobPostingId=&stageId=`
+  - `GET /interviewer/interviews/{interviewId}`
+- Validation policy:
+  - confirmation requires at least one assigned candidate and one assigned interviewer.
+  - end time must be after start time.
+  - stage and candidate applications must belong to the same job posting.
+  - interview creation and confirmation require stage status `READY` or `IN_PROGRESS`.
+  - `RESULT_ANNOUNCED` and `CLOSED` stages reject new creation, participant replacement, and confirmation.
+  - cancelling a confirmed interview is allowed until the stage becomes `CLOSED`.
+  - candidate eligibility requires same posting, `SUBMITTED` application status, and previous-stage pass when a previous stage exists.
+  - duplicate assignment and confirmed-schedule time collision must be rejected.
+  - collision checks target `CONFIRMED` schedules with `ASSIGNED` participants, same candidate application or same interviewer employee, excluding the current interview, with overlap condition `existing.startDateTime < requested.endDateTime && requested.startDateTime < existing.endDateTime`.
+  - cancelled schedules are ignored by collision checks.
+  - DRAFT participant replacement may delete and recreate rows.
+  - cancelling a confirmed interview changes only `Interview.status`; participant rows remain `ASSIGNED`.
+  - confirmed schedules are not mutable in the first implementation slice; cancel/recreate is the initial policy.
+  - candidate/interviewer uniqueness candidates are documented, but final duplicate protection remains in service because nullable role-specific FKs can weaken DB uniqueness.
+- Tests:
+  - Gradle tests were not run because this phase changed documentation only.
+  - Documentation consistency was checked with text search after edits.
+- Deferred:
+  - Java implementation, tests, schema, and runtime API behavior.
+  - `InterviewEvaluation`.
+  - message delivery.
+  - Excel/PDF/calendar/frontend work.
+- Next recommended phase:
+  - Superseded by the completed `Phase 04a - Interview Scheduling Domain` and `Phase 04b - Admin Interview Schedule Management` entries above.
+  - Current next phase is `Phase 05 - Application Form Page Layout`.
+
+## Phase 03i-5-2 - Attachment Required Policy Implementation
+
+- Date: 2026-05-22
+- Goal: implement the dedicated per-posting attachment required policy designed in Phase 03i-5.
+- Implemented:
+  - Added `JobPostingAttachmentRequirement` as the attachment requirement model for the first unit:
+    - `jobPosting + attachmentType + sectionType`
+  - Added admin APIs:
+    - `GET /admin/job-postings/{jobPostingId}/attachment-requirements`
+    - `POST /admin/job-postings/{jobPostingId}/attachment-requirements`
+  - Implemented DRAFT-only replace-all behavior for admin configuration.
+  - Rejected duplicate `(attachmentType, sectionType)` rows in service validation.
+  - Kept public list aggregate-only and exposed safe `attachmentRequirements` only in public detail.
+  - Derived `ApplicationFormRequiredPolicyResponse.attachmentRequired` from actual requirement rows.
+  - Mapped attachment policy as:
+    - no rows: `DISABLED`
+    - optional-only rows: `OPTIONAL`
+    - any required row: `REQUIRED`
+  - Added dashboard `ATTACHMENT` readiness integration:
+    - required rows create blocking `REQUIRED_ATTACHMENT_MISSING`.
+    - optional rows with `minCount > 0` create non-blocking `OPTIONAL_ATTACHMENT_MISSING` only when the posting has no required attachment rows.
+    - optional rows with `minCount = 0` are guide-only.
+    - review fix: when required and optional attachment rows are mixed, dashboard readiness keeps only the required `ATTACHMENT` group and suppresses optional missing attachment issues so `optionalIncompleteCount` cannot increase without an optional group.
+  - Added final submit validation for required attachments only.
+  - Counted only active stored metadata rows:
+    - same application
+    - same attachment type
+    - same section type
+    - `physicalFileStatus=STORED`
+    - `deletedAt == null`
+  - Did not add filesystem checks to dashboard or submit validation.
+- Created:
+  - `docs/codex/implementation/phase-03i-5-2-attachment-required-policy.md`
+  - `docs/codex/reports/phase-03i-5-2-attachment-required-policy.html`
+- Tests:
+  - Target Phase 03i-5-2 Gradle test group passed.
+  - Existing attachment upload/download/delete/storage regression test group passed.
+  - Full `clean test` passed in 12m 49s.
+  - Review fix targeted `ApplicationDashboardServiceTest` passed.
+  - Review fix target Phase 03i-5-2 Gradle test group passed in 2m 56s.
+  - Initial non-escalated Gradle run failed because the wrapper attempted a network download inside the sandbox.
+- Deferred:
+  - Migration file or formal migration framework.
+  - Published posting policy amendment/versioning.
+  - `sectionRecordId`, `maxCount`, conditional, per-position, per-applicant-type, active/versioned, or template-linked requirements.
+  - Filesystem storage health validation inside dashboard or submit.
+- Next recommended phase:
+  - Continue with Interview Scheduling design/implementation, then revisit versioned published-posting attachment policy edits if needed.
+
+## Phase 03i-5-1 - Attachment Required Policy Design
+
+- Date: 2026-05-22
+- Work type: documentation-only design phase.
+- Goal: design the dedicated attachment required policy that will later integrate public policy, applicant dashboard readiness, and final submit validation.
+- Created:
+  - `docs/codex/design/phase-03i-5-attachment-required-policy-design.md`
+  - `docs/codex/reports/phase-03i-5-attachment-required-policy-design.html`
+- Key design decisions:
+  - Do not add `useAttachment` or `requireAttachment` to `ApplicationFormConfig`.
+  - Use a dedicated per-posting policy model: `JobPostingAttachmentRequirement`.
+  - Recommended first required unit: `jobPosting + attachmentType + sectionType`.
+  - Recommended first fields:
+    - `id`
+    - `jobPosting`
+    - `attachmentType`
+    - `sectionType`
+    - `required`
+    - `minCount`
+    - `sortOrder`
+    - `displayName`
+    - `description`
+    - auditing fields from `BaseEntity`
+  - Defer `sectionRecordId`, `maxCount`, conditional requirements, per applicant type, per position, active/versioning, and template linkage.
+  - A requirement is satisfied only by `ApplicationAttachment` rows for the same application with matching `attachmentType`, matching `sectionType`, `physicalFileStatus=STORED`, and no delete lifecycle marker.
+  - `METADATA_ONLY`, `MISSING`, `DELETED`, and orphan physical files do not satisfy requirements.
+  - Recommended admin API shape is replace-all for DRAFT postings:
+    - `GET /admin/job-postings/{jobPostingId}/attachment-requirements`
+    - `POST /admin/job-postings/{jobPostingId}/attachment-requirements`
+  - Published posting mutation is deferred because it can affect in-progress applicants.
+  - Public policy should derive `applicationFormRequiredPolicy.attachmentRequired` from required attachment rows.
+  - Public detail should expose a separate safe attachment requirement list; public list should keep aggregate policy only unless frontend requirements change.
+  - Dashboard should use one `ATTACHMENT` readiness group and `REQUIRED_ATTACHMENT_MISSING` issues for missing required rows.
+  - Submit validation should count matching stored, non-deleted attachments and fail when count is below `minCount`.
+  - Review update: optional attachment rows with `required=false, minCount=0` are guidance only and do not create dashboard optional incomplete issues.
+  - Review update: optional attachment rows with `required=false, minCount>0` can create dashboard optional incomplete issues but never block submit.
+  - Review update: `STORED` rows whose physical files are missing are treated as an operational risk handled by storage health scan/repair; Phase 03i-5-2 does not need filesystem checks inside submit/dashboard.
+  - Review update: public detail `attachmentRequirements`, public aggregate policy, dashboard readiness, and submit validator integration must ship in the same externally visible implementation slice.
+- Tests:
+  - Not run. This phase changed documentation only and intentionally did not modify Java, test, config, schema, or runtime API files.
+- Deferred:
+  - Java implementation
+  - database migration or manual DDL
+  - published posting policy mutation
+  - submitted application status impact after admin evidence deletion
+  - row-level, conditional, per-position, per-applicant-type, and template-linked requirements
+- Next recommended phase:
+  - `Phase 03i-5-2 - Attachment Required Policy Implementation`
+
+## Phase 03k-2 - Application Form Required Policy
+
+- Date: 2026-05-22
+- Goal: implement the end-to-end `ApplicationFormConfig.useXxx` and `requireXxx` policy split.
+- Implemented:
+  - Added seven persisted `ApplicationFormConfig.requireXxx` fields:
+    - `requireEducation`
+    - `requireCareer`
+    - `requireCertificate`
+    - `requireLanguage`
+    - `requireMilitary`
+    - `requireAward`
+    - `requireGapPeriod`
+  - Extended `ApplicationFormConfigRequest` with nullable `Boolean requireXxx` fields while keeping the 7-argument compatibility constructor.
+  - Added create defaults:
+    - education, career, and military default to matching `useXxx`.
+    - certificate, language, award, and gap period default to `false`.
+  - Added update rules:
+    - explicit `requireXxx` values are applied and validated.
+    - omitted values are preserved while the section stays enabled.
+    - omitted values reset to `false` when the section is disabled.
+  - Rejected `useXxx=false && requireXxx=true` via `InvalidJobPostingException`.
+  - Extended admin and public detail application form config responses with `requireXxx`.
+  - Kept public list `applicationFormConfig` hidden.
+  - Extended public list projection/query to include nullable `requireXxx` values for `applicationFormRequiredPolicy`.
+  - Converted public required policy to `enabled=useXxx`, `required=useXxx && requireXxx`.
+  - Converted final submit validation to use explicit required flags.
+  - Added submit-blocking existence checks for required certificate, language, award, and gap period sections.
+  - Converted dashboard completion readiness to separate required and optional enabled groups by explicit required flags.
+  - Preserved `ApplicationSectionAccessService` behavior: section access remains controlled by `useXxx`.
+- Created:
+  - `src/test/java/com/shinyoung/recruit/service/ApplicationSectionAccessServiceTest.java`
+  - `docs/codex/implementation/phase-03k-2-application-form-required-policy.md`
+  - `docs/codex/reports/phase-03k-2-application-form-required-policy.html`
+- Modified:
+  - `src/main/java/com/shinyoung/recruit/domain/entity/ApplicationFormConfig.java`
+  - `src/main/java/com/shinyoung/recruit/domain/entity/JobPosting.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingPublicListProjection.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingRepository.java`
+  - `src/main/java/com/shinyoung/recruit/dto/request/ApplicationFormConfigRequest.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormConfigResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormConfigPublicResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormRequiredPolicyResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/JobPostingPublicListResponse.java`
+  - `src/main/java/com/shinyoung/recruit/service/JobPostingService.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationSubmitValidator.java`
+  - `src/main/java/com/shinyoung/recruit/service/ApplicationCompletionReadChecker.java`
+  - related service/controller/DTO tests.
+- API impact:
+  - `POST /admin/job-postings`: `applicationFormConfig.requireXxx` may be provided or omitted.
+  - `POST /admin/job-postings/{id}`: omitted required flags preserve/reset according to section enablement.
+  - `GET /admin/job-postings/{id}`: returns `requireXxx` in `applicationFormConfig`.
+  - `GET /job-postings`: still hides `applicationFormConfig`; returns policy derived from explicit require flags.
+  - `GET /job-postings/{id}`: returns `requireXxx` in public detail config and policy.
+- Tests:
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.JobPostingServiceTest --tests com.shinyoung.recruit.service.ApplicationSubmitValidatorTest --tests com.shinyoung.recruit.service.ApplicationDashboardServiceTest --tests com.shinyoung.recruit.service.ApplicationSectionAccessServiceTest --tests com.shinyoung.recruit.dto.response.ApplicationFormPolicyResponseTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.service.JobPostingPublicServiceTest --tests com.shinyoung.recruit.controller.JobPostingPublicControllerTest --tests com.shinyoung.recruit.controller.JobPostingControllerTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Full check attempted: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat clean test --no-daemon`
+  - Full check result after review fix: `BUILD SUCCESSFUL` in 15m 4s.
+  - Review fix: optional dashboard incomplete messages no longer use submit-blocking wording such as `required before submit`.
+- Operational note:
+  - No migration framework is active. The implementation document includes required manual MariaDB DDL and backfill SQL for persistent databases.
+- Deferred:
+  - attachment required enforcement
+  - persistent DB DDL remains manual
+  - optional-section frontend copy review
+- Next recommended phase:
+  - Extend the same policy model to attachment requirements or continue with the next applicant/interview workflow phase.
+
+## Phase 03k-1 - Public Application Form Required Policy
+
+- Date: 2026-05-22
+- Goal: expose the current effective application form required/optional policy in public job posting list/detail responses without changing schema or submit/dashboard behavior.
+- Implemented:
+  - Added `applicationFormRequiredPolicy` to public `GET /job-postings` list items.
+  - Added `applicationFormRequiredPolicy` to public `GET /job-postings/{id}` detail responses.
+  - Derived section policy from existing `ApplicationFormConfig.useXxx` values:
+    - `EDUCATION`, `CAREER`, `MILITARY`: required when enabled.
+    - `CERTIFICATE`, `LANGUAGE`, `AWARD`, `GAP_PERIOD`: optional when enabled.
+  - Derived question policy from active `JobPostingQuestion.required` values.
+  - Added deferred attachment policy with `attachmentRequired=false`.
+  - Added batch active/required question count projection to avoid per-posting count queries in public list responses.
+  - Review fix: converted `requirementType` from a raw Java string to `ApplicationFormRequirementType` enum while preserving JSON enum-name strings.
+  - Review fix: added DTO-level null config guard tests.
+  - Review fix: added controller JSON coverage for non-zero required/optional question counts.
+  - Kept public list `applicationFormConfig` hidden.
+  - Kept public detail `applicationFormConfig` for compatibility and added policy beside it.
+  - Added a null-config public response guard for legacy data.
+- Created:
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingQuestionPolicyCount.java`
+  - `src/main/java/com/shinyoung/recruit/enumeration/ApplicationFormRequirementType.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormRequiredPolicyResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormSectionPolicyResponse.java`
+  - `src/test/java/com/shinyoung/recruit/dto/response/ApplicationFormPolicyResponseTest.java`
+  - `docs/codex/implementation/phase-03k-1-application-form-required-policy.md`
+  - `docs/codex/reports/phase-03k-1-application-form-required-policy.html`
+- Modified:
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingRepository.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingPublicListProjection.java`
+  - `src/main/java/com/shinyoung/recruit/domain/repository/JobPostingQuestionRepository.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/ApplicationFormConfigPublicResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/JobPostingPublicListResponse.java`
+  - `src/main/java/com/shinyoung/recruit/dto/response/JobPostingPublicDetailResponse.java`
+  - `src/main/java/com/shinyoung/recruit/service/JobPostingPublicService.java`
+  - `src/test/java/com/shinyoung/recruit/service/JobPostingPublicServiceTest.java`
+  - `src/test/java/com/shinyoung/recruit/controller/JobPostingPublicControllerTest.java`
+  - `docs/codex/design/phase-03k-application-form-required-policy-design.md`
+  - `docs/codex/reports/phase-03k-application-form-required-policy-design.html`
+- Design conflict note:
+  - The Phase 03k design describes an end-to-end `requireXxx` target model.
+  - The Phase 03k-1 instruction explicitly limited implementation to a public read-only compatibility slice and prohibited DB/entity/submit/dashboard changes.
+  - This phase therefore exposes the current effective policy only and does not complete the target `requireXxx` design.
+- Tests:
+  - Command: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat test --tests com.shinyoung.recruit.dto.response.ApplicationFormPolicyResponseTest --tests com.shinyoung.recruit.service.JobPostingPublicServiceTest --tests com.shinyoung.recruit.controller.JobPostingPublicControllerTest --no-daemon`
+  - Result: `BUILD SUCCESSFUL`
+  - Targeted test count: 19 tests, 0 failures, 0 skipped.
+  - Full check attempted: `AES_SECRET_KEY=<test-example-key> .\gradlew.bat clean test --no-daemon`
+  - Full check result: timed out after 10 minutes before test result XML was produced; Gradle processes were stopped with `.\gradlew.bat --stop`.
+- Deferred:
+  - `requireXxx` DB/entity fields
+  - admin required policy configuration
+  - final-submit validator conversion
+  - dashboard completion conversion
+  - attachment required policy
+- Next recommended phase:
+  - Either implement the full Phase 03k target model end-to-end, or keep the compatibility policy and move to the next applicant workflow phase.
+
+## Phase 03k - ApplicationFormConfig Use/Required Policy Split Design
+
+- Date: 2026-05-22
+- Work type: documentation-only design phase.
+- Goal: design how `ApplicationFormConfig` separates section usage policy from final-submit required policy.
+- Created:
+  - `docs/codex/design/phase-03k-application-form-required-policy-design.md`
+  - `docs/codex/reports/phase-03k-application-form-required-policy-design.html`
+- Key design decisions:
+  - Keep existing `useXxx` fields as the section visibility and applicant section API access policy.
+  - Add explicit `requireXxx` fields as the final-submit blocking and dashboard required-readiness policy.
+  - Recommended new fields:
+    - `requireEducation`
+    - `requireCareer`
+    - `requireCertificate`
+    - `requireLanguage`
+    - `requireMilitary`
+    - `requireAward`
+    - `requireGapPeriod`
+  - Use nullable `Boolean requireXxx` fields in `ApplicationFormConfigRequest` for backward compatibility.
+  - Create requests default omitted required fields to preserve current behavior:
+    - `requireEducation = useEducation`
+    - `requireCareer = useCareer`
+    - `requireMilitary = useMilitary`
+    - `requireCertificate = false`
+    - `requireLanguage = false`
+    - `requireAward = false`
+    - `requireGapPeriod = false`
+  - Update requests preserve existing `requireXxx` values when the fields are omitted.
+  - Update requests force the matching `requireXxx=false` when `useXxx` is changed to false, while explicit `useXxx=false && requireXxx=true` remains invalid.
+  - Reject `useXxx=false && requireXxx=true` as a 400-equivalent validation failure; do not silently coerce it.
+  - Review fix: do not expose `requireXxx` in admin/public request or response payloads before submit validator and dashboard readiness also use `requireXxx`.
+  - Recommend Phase 03k-1 as an end-to-end implementation:
+    - add/backfill fields,
+    - extend admin create/update requests,
+    - extend admin/public detail responses,
+    - validate `requireXxx -> useXxx`,
+    - convert `ApplicationSubmitValidator`,
+    - convert `ApplicationCompletionReadChecker`,
+    - keep `ApplicationSectionAccessService` on `useXxx`.
+  - Extend admin detail and public detail `applicationFormConfig` responses with required flags only in the same implementation slice that converts submit/dashboard policy.
+  - Keep public list excluding `applicationFormConfig`.
+  - Keep `ApplicationSectionAccessService` based on `useXxx`, because optional sections must remain writable.
+  - Keep active `JobPostingQuestion.required` as the question-level required policy; do not add question required flags to `ApplicationFormConfig`.
+  - Exclude attachment requiredness from Phase 03k implementation and split it into a later attachment policy phase.
+- API impact designed:
+  - No endpoint path changes.
+  - Existing admin posting create/update config payloads get optional required fields in the same phase that converts submit/dashboard policy.
+  - Existing admin posting detail and public posting detail config responses get required fields in the same phase that converts submit/dashboard policy.
+  - Existing dashboard and submit APIs change behavior together with required-field exposure.
+- Tests:
+  - Not run.
+  - Reason: documentation-only design phase with no Java source, test source, DB schema, or runtime API behavior changes.
+- Deferred:
+  - Java implementation
+  - test implementation
+  - DB migration file
+  - attachment required policy
+  - SMS/EMAIL and LDAP integration
+- Next recommended phase:
+  - Phase 03k-1 end-to-end required policy implementation.
+  - Phase 03k-2 only for optional hardening or migration follow-up if needed.
+
+## Phase 03j-2 - Public JobPosting Exposure, Filter, Sort, and Response Contract
+
+- Date: 2026-05-22
+- Goal: implement the public `JobPosting` list/detail exposure contract from the Phase 03j design without adding endpoint paths.
+- Implemented:
+  - Applied public exposure filters to `GET /job-postings` and `GET /job-postings/{id}`:
+    - `status = PUBLISHED`
+    - `visible = true`
+    - current time is inside optional display period
+  - Kept reception period separate from exposure so closed reception postings remain visible when display policy allows them.
+  - Added public list DB sorting:
+    - `pinned desc`
+    - `ACCEPTING`, `UPCOMING`, `CLOSED`
+    - `displayOrder asc`
+    - `receptionEndDateTime asc`
+    - `publishedAt desc`
+    - `id desc`
+  - Expanded public list response with `postingType`, `summary`, `receptionStatus`, `pinned`, and `positions`.
+  - Expanded public detail response with `postingType`, `summary`, `receptionStatus`, and `pinned`.
+  - Expanded public position response with `applicationType`, `jobGroup`, `jobTitle`, `workLocation`, and `employmentType`.
+  - Excluded admin/internal fields from public responses:
+    - `status`
+    - `visible`
+    - `displayStartDateTime`
+    - `displayEndDateTime`
+    - `displayOrder`
+    - audit fields
+  - Added page-level public position batch lookup to avoid list N+1.
+  - Added service/controller tests for exposure, sorting, response fields, and not-found behavior.
+  - Review fix: split the broad public sorting test into narrower coverage and added isolated checks for `receptionEndDateTime asc` and final `id desc` tie-break ordering.
+  - Review fix: removed unused `JobPostingRepository.findAllByStatusOrderByCreatedAtDesc(...)` after public reads moved to `findPublicList(...)`.
+- APIs:
+  - No endpoint path was added.
+  - Existing `GET /job-postings` response shape changed for public applicant-facing fields.
+  - Existing `GET /job-postings/{id}` response shape changed for public applicant-facing fields.
+- Tests:
+  - `$env:AES_SECRET_KEY='<test-value>'; .\gradlew.bat cleanTest test --tests com.shinyoung.recruit.service.JobPostingPublicServiceTest --tests com.shinyoung.recruit.controller.JobPostingPublicControllerTest --no-daemon`: success
+  - `$env:AES_SECRET_KEY='<test-value>'; .\gradlew.bat clean test --no-daemon`: success, 572 tests, 0 failures, 0 ignored, 100% successful
+- Documentation:
+  - `docs/codex/implementation/phase-03j-2-public-job-posting-exposure-status.md`
+  - `docs/codex/reports/phase-03j-2-public-job-posting-exposure-report.html`
+- Deferred:
+  - persistent DB migration scripts
+  - public frontend rendering rules for nullable position metadata
+  - `ApplicationFormConfig` usage/required policy split
+- Next recommended phase:
+  - Phase 03k ApplicationFormConfig use/required policy split.
+
+## Phase 03j-1 - JobPosting Domain Expansion Status
+
+- Date: 2026-05-22
+- Goal: implement the internal and admin-side `JobPosting` and `JobPosition` domain expansion from the Phase 03j design.
+- Implemented:
+  - Added `JobPostingType`, `JobPositionApplicationType`, and `ReceptionStatus`.
+  - Added `JobPosting` fields: `postingType`, `summary`, `displayStartDateTime`, `displayEndDateTime`, `visible`, `pinned`, and `displayOrder`.
+  - Added `JobPosition` fields: `applicationType`, `jobGroup`, `jobTitle`, `workLocation`, and `employmentType`.
+  - Extended admin create/update request DTOs and admin list/detail/position response DTOs.
+  - Added `summary` HTML tag rejection, display-period validation, and duplicate position `sortOrder` validation.
+  - Review fix: added Service direct-call validation for `summary` length, `displayOrder`, and `JobPositionRequest` field constraints that were previously covered only by Controller Bean Validation.
+  - Review fix: added `JobPositionCountProjection` and grouped `JobPositionRepository.countByJobPostingIds(...)` so admin list `positionCount` does not trigger lazy collection N+1.
+  - Review fix: corrected implementation report wording for `JobPositionApplicationType` to match the actual three enum constants.
+  - Added defaulting for omitted new fields to preserve existing caller compatibility.
+  - Added new application creation guard for `visible` and display period while keeping existing update/submit/withdraw guards unchanged.
+  - Updated `ApplicationFormConfig` to mutate the existing one-to-one row on update.
+- APIs:
+  - No new endpoint path was added.
+  - Existing `/admin/job-postings` create/update/list/detail responses now include the new admin fields.
+- Tests:
+  - `$env:AES_SECRET_KEY='<test-value>'; .\gradlew.bat test --tests com.shinyoung.recruit.service.JobPostingServiceTest --tests com.shinyoung.recruit.controller.JobPostingControllerTest --tests com.shinyoung.recruit.service.JobApplicationServiceTest --no-daemon`: success
+  - `$env:AES_SECRET_KEY='<test-value>'; .\gradlew.bat clean test --no-daemon`: success
+- Documentation:
+  - `docs/codex/implementation/phase-03j-1-job-posting-domain-expansion-status.md`
+  - `docs/codex/reports/phase-03j-1-job-posting-domain-expansion-report.html`
+- Deferred:
+  - public job posting visible/display filtering
+  - public pinned/display-order sorting
+  - public response field subset
+  - persistent DB migration scripts
+- Next recommended phase:
+  - Phase 03j-2 public job posting exposure and sorting.
+
+## Phase 03j - JobPosting Domain Display & Position Metadata Expansion Design
+
+- Date: 2026-05-22
+- Work type: documentation-only design phase.
+- Goal: design a safe expansion of `JobPosting` display metadata and `JobPosition` classification metadata for applicant-facing job posting pages and admin job posting management.
+- Created:
+  - `docs/codex/design/phase-03j-job-posting-domain-expansion-design.md`
+  - `docs/codex/reports/phase-03j-job-posting-domain-expansion-design.html`
+- Key decisions:
+  - Keep `JobPostingStatus` as the admin operating state and add separate public display controls: `visible`, `displayStartDateTime`, and `displayEndDateTime`.
+  - Apply `visible/display` conditions to new application creation so hidden postings cannot receive new applications by direct id, while preserving existing application update/submit/withdraw commands with the current `PUBLISHED + reception period` guard.
+  - Add response-only `ReceptionStatus` as a derived value and keep the existing `accepting` boolean for public API compatibility.
+  - Clarify that `accepting` is only the compatibility boolean for `status=PUBLISHED + reception period`; it does not include `visible/display` and must not be treated as new-application creatability.
+  - Do not add `creatable`, `applicationCreatable`, or `publiclyVisible` response booleans in this design; new-application creatability stays in the service guard.
+  - Sort public postings by `pinned desc`, derived reception-status priority, `displayOrder`, reception end, published time, and id so closed postings do not appear above accepting postings.
+  - Use `PUBLIC_RECRUITMENT`, `EXPERIENCED_RECRUITMENT`, `INTERN_RECRUITMENT`, and `ROLLING_RECRUITMENT` for `JobPostingType` candidates to avoid conflict with employment-type naming.
+  - Keep `JobPosition.positionName` as the display/snapshot source and add separate metadata for application type, job group, job title, work location, and employment type.
+  - Start `jobGroup` and `workLocation` as nullable metadata and let the public screen hide null values instead of storing temporary placeholder strings.
+  - Reuse the existing `EmploymentType` enum for position employment type.
+  - Keep `displayOrder` internal/admin-facing; public APIs may expose `pinned` but should not expose `displayOrder`.
+  - Reject HTML tags in `summary` rather than storing sanitized HTML.
+  - Avoid QueryDSL introduction in the next implementation slice; use projection expansion plus batch position lookup to avoid N+1.
+- Deferred:
+  - Java source implementation.
+  - Test implementation.
+  - DB migration file creation.
+  - CommonCode management UI/API.
+  - Excel/PDF/statistics/messaging integrations.
+- Tests:
+  - Not run.
+  - Reason: documentation-only design phase with no Java source, test source, configuration, schema, or runtime API changes.
+- Next recommended phase:
+  - Phase 03j-1 Entity/DTO/Service expansion, followed by Phase 03j-2 public query filter/sort/response expansion.
+  - Phase 03j-1 must not implement public list filtering, public sorting, or public response contract changes; those remain Phase 03j-2 scope.
+
+## Phase 03i-4-3 - Attachment Storage Health Scan Dry-Run
+
+- Date: 2026-05-20
+- Goal: implement the dry-run storage health scan slice from the Phase 03i-4 attachment lifecycle design.
+- Implemented:
+  - Added admin dry-run scan API:
+    - `POST /admin/attachments/storage-health/scan`
+  - Added `AttachmentStorageHealthScanService`.
+  - Added `AttachmentStorageHealthScanResponse`.
+  - Added `AttachmentStorageHealthIssueResponse`.
+  - Added `AttachmentStorageHealthIssueType`.
+  - Added `StorageHealthScanException`.
+  - Added status-list lookup to `ApplicationAttachmentRepository`.
+  - Scan compares local managed physical files with `ApplicationAttachment` rows in `STORED`, `DELETED`, and `MISSING`.
+  - `METADATA_ONLY` rows are excluded from physical file comparison.
+  - Implemented issue categories:
+    - `STORED_MISSING_PHYSICAL_FILE`
+    - `DELETED_PHYSICAL_FILE_REMAINING`
+    - `ORPHAN_PHYSICAL_FILE`
+    - `INVALID_STORAGE_PATH`
+    - `MISSING_ROW_PHYSICAL_FILE_PRESENT`
+    - `IGNORED_UNMANAGED_FILE`
+  - Scan is dry-run only and does not delete files.
+  - Scan does not mutate DB rows or mark `STORED` rows as `MISSING`.
+  - Issue responses expose hashed file keys through `fileKeyHash` and do not expose raw storage keys or paths.
+  - Added `AttachmentStorageDeleteResult`.
+  - Added `AttachmentStorageService.deleteIfExistsWithResult(...)` while preserving `deleteIfExists(...)` as a compatibility default method.
+  - Updated `LocalAttachmentStorageService` to return structured delete results for deleted, absent, invalid-path, and failed delete attempts.
+  - Updated `ApplicationAttachmentDeleteService` to log post-commit physical delete result metadata without changing delete API responses.
+- API:
+  - `POST /admin/attachments/storage-health/scan`
+  - Request: none
+  - Response: `ApiResponse<AttachmentStorageHealthScanResponse>`
+- Security:
+  - Reuses existing `/admin/**` authorization.
+  - `SecurityConfig` was not modified.
+  - `ROLE_ADMIN` and `ROLE_RECRUIT_ADMIN` can scan.
+  - Applicant users receive 403; anonymous users receive 401.
+- Preserved:
+  - Upload API structure.
+  - Download API structure.
+  - Delete API response shape.
+  - Metadata response field exposure.
+  - Dashboard readiness and submit validator.
+- Deferred:
+  - Actual orphan cleanup/delete.
+  - Scheduler.
+  - Quarantine/move before delete.
+  - Admin repair and mark-missing commands.
+  - Persisted scan history.
+  - Include-deleted metadata read.
+  - Object storage scanner.
+- Tests:
+  - `test --tests "*AttachmentStorageHealth*" --no-daemon`: success after sandbox Gradle wrapper network approval and test fixes.
+  - `test --tests "*LocalAttachmentStorageServiceTest*" --no-daemon`: success.
+  - `test --tests "*ApplicationAttachmentDelete*" --no-daemon`: success.
+  - `test --tests "*ApplicationAttachment*" --no-daemon`: success.
+  - `clean test --no-daemon`: success after rerun with a longer timeout.
+- Documentation:
+  - `docs/codex/implementation/phase-03i-4-3-attachment-storage-health-scan.md`
+  - `docs/codex/reports/phase-03i-4-3-attachment-storage-health-scan.html`
+  - `docs/codex/design/phase-03i-4-attachment-delete-cleanup-repair-design.md`
+  - `docs/codex/design/phase-03i-attachment-file-upload-download-design.md`
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Next recommended phase:
+  - Phase 03i-4-4 admin cleanup/repair after dry-run output policy is reviewed.
+
+## Phase 03i-4-2 - Attachment Soft Delete Command
+
+- Date: 2026-05-20
+- Goal: implement the attachment delete command slice from the Phase 03i-4 lifecycle design.
+- Implemented:
+  - Added `PhysicalFileStatus.DELETED`.
+  - Added `AttachmentDeleteActorType` with `APPLICANT` and `EMPLOYEE`.
+  - Added `ApplicationAttachment.deletedAt`, `deletedBy`, `deletedByType`, and `deletionReason`.
+  - Added `ApplicationAttachment.markDeleted(...)`.
+  - Added applicant delete command:
+    - `POST /applications/{applicationId}/attachments/{attachmentId}/delete`
+  - Added admin delete command:
+    - `POST /admin/applications/{applicationId}/attachments/{attachmentId}/delete`
+  - Added admin delete request validation with required reason and 1000-character max.
+  - Added `AttachmentDeleteResponse` without storage internals or physical status exposure.
+  - Added `ApplicationAttachmentDeleteService`.
+  - Updated applicant/admin normal metadata lists to exclude `DELETED`.
+  - Preserved download API shape; `DELETED` rows remain controlled 404 because download only accepts `STORED`.
+  - Kept upload append sort order based on all attachment rows, including `DELETED`.
+  - Kept metadata replace free from deleted-row sort-order conflicts.
+  - DB row is marked `DELETED` before physical file deletion.
+  - Physical file deletion for previously `STORED` rows runs after transaction commit.
+  - Physical delete failure is log-only and does not roll back DB soft delete.
+  - Storage failure logs avoid storage path exposure.
+- APIs:
+  - `POST /applications/{applicationId}/attachments/{attachmentId}/delete`
+  - `POST /admin/applications/{applicationId}/attachments/{attachmentId}/delete`
+- Preserved:
+  - `SecurityConfig`
+  - Upload API structure
+  - Download API structure
+  - Metadata replace API structure
+  - Dashboard readiness
+  - Submit validator
+  - Attachment required policy
+  - `downloadAvailable` omission
+- Deferred:
+  - Orphan scan dry-run
+  - Orphan cleanup execution
+  - Admin repair and mark-missing commands
+  - Include-deleted metadata read
+  - Separate deletion history table
+  - S3/NAS/object storage migration
+  - Virus scan/DLP
+  - HTTP DELETE method
+- Tests:
+  - `test --tests "*ApplicationAttachmentDelete*" --no-daemon`: success
+  - `test --tests "*ApplicationAttachment*" --no-daemon`: success
+  - `test --tests "*AdminApplicationSection*" --no-daemon`: success after sandbox network block rerun with approval
+  - `clean test --no-daemon`: success
+- Documentation:
+  - `docs/codex/implementation/phase-03i-4-2-attachment-delete-command.md`
+  - `docs/codex/reports/phase-03i-4-2-attachment-delete-command.html`
+  - `docs/codex/design/phase-03i-4-attachment-delete-cleanup-repair-design.md`
+  - `docs/codex/design/phase-03i-attachment-file-upload-download-design.md`
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Next recommended phase:
+  - Phase 03i-4-3 orphan storage scan dry-run.
+
+## Phase 03i-4 - Attachment Delete / Orphan Cleanup / Admin Repair Design
+
+- Date: 2026-05-20
+- Work type: documentation-only design phase.
+- Goal: design attachment delete, orphan cleanup, and admin repair policy after Phase 03i-2 upload and Phase 03i-3 download.
+- Created:
+  - `docs/codex/design/phase-03i-4-attachment-delete-cleanup-repair-design.md`
+  - `docs/codex/reports/phase-03i-4-attachment-delete-cleanup-repair-design.html`
+- Updated:
+  - `docs/codex/design/phase-03i-attachment-file-upload-download-design.md`
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/07-implementation-history.md`
+- Key decisions:
+  - Use POST command endpoints for delete candidates:
+    - `POST /applications/{applicationId}/attachments/{attachmentId}/delete`
+    - `POST /admin/applications/{applicationId}/attachments/{attachmentId}/delete`
+  - Choose soft lifecycle delete as the default, not hard DB row deletion.
+  - Phase 03i-4-2 later added `PhysicalFileStatus.DELETED`, kept the DB row, excluded deleted rows from normal metadata lists, and rejected deleted rows from download.
+  - Already `DELETED` rows should return 404 on repeated delete command calls.
+  - Upload append `sortOrder` should include `DELETED` rows in the max calculation.
+  - Metadata replace sort-order conflict checks should use active rows only and ignore `DELETED` rows.
+  - Applicant delete should be allowed only for the current applicant's own `DRAFT` application while accepting.
+  - Applicant delete should reject `SUBMITTED` and `WITHDRAWN`.
+  - Admin delete should be allowed for authorized admin/recruit-admin users on `DRAFT`, `SUBMITTED`, and `WITHDRAWN`, with reason required.
+  - Admin delete reason should be persisted on `ApplicationAttachment` through minimal delete fields; Phase 03i-4-2 uses `deletedAt`, `deletedBy`, `deletedByType`, and `deletionReason`, while a separate deletion history table remains deferred.
+  - DB lifecycle state should be updated before physical file deletion.
+  - Physical file deletion should run after DB transaction commit.
+  - Physical delete failure should create cleanup work rather than rolling back the committed DB deleted state.
+  - `MISSING` is a DB row state where the file is absent; orphan physical files have no active DB reference and should not be represented as a DB enum.
+  - Orphan cleanup and admin repair should start with dry-run scan and remain separate phases.
+  - Storage internals must remain hidden in metadata, delete, cleanup, and repair responses.
+- Phase split:
+  - Phase 03i-4-1: design only.
+  - Phase 03i-4-2: applicant DRAFT delete + admin delete command with persisted minimal delete audit fields.
+  - Phase 03i-4-3: orphan scan dry-run.
+  - Phase 03i-4-4: admin cleanup/repair command.
+  - Phase 03i-5: attachment required policy + dashboard/submit integration.
+- Tests:
+  - Not run.
+  - Reason: documentation-only design phase with no Java, test, config, schema, or runtime API changes.
+- Next recommended phase:
+  - Phase 03i-4-2 applicant DRAFT delete and admin delete command using soft deleted lifecycle state.
+
+## Phase 03i-3 - Attachment File Download
+
+- Date: 2026-05-20
+- Goal: implement applicant/admin physical attachment download for Phase 03i-2 `STORED` rows.
+- Implemented:
+  - Added `AttachmentStorageResource`.
+  - Added `AttachmentDownloadResource`.
+  - Extended `AttachmentStorageService.load(...)`.
+  - Added local storage load with root-containment validation.
+  - Added review fix to reject absolute `storagePath` values before root resolution.
+  - Added `ApplicationAttachmentDownloadService`.
+  - Added `AttachmentDownloadResponseFactory`.
+  - Added applicant download endpoint in `ApplicationAttachmentController`.
+  - Added `AdminApplicationAttachmentController`.
+  - Added repository scoped lookup methods for attachment/application matching.
+  - Returned streaming `ResponseEntity<Resource>` for successful downloads.
+  - Added safe `Content-Disposition` with ASCII `filename` fallback and UTF-8 `filename*`.
+  - Added `Content-Type`, actual physical `Content-Length`, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`, and `Pragma: no-cache`.
+  - Logged DB file-size mismatch and used actual physical file size in the response.
+  - Returned controlled 404 for `METADATA_ONLY`, `MISSING`, attachment/application mismatch, and missing physical files.
+  - Kept missing physical file handling read-only; no automatic DB status update to `MISSING`.
+- APIs:
+  - `GET /applications/{applicationId}/attachments/{attachmentId}/download`
+  - `GET /admin/applications/{applicationId}/attachments/{attachmentId}/download`
+- Preserved:
+  - Upload API
+  - Metadata replace behavior
+  - Metadata response field exposure
+  - Admin metadata read response shape
+  - `SecurityConfig`
+  - Dashboard readiness
+  - Submit validator
+  - `downloadAvailable` omission
+- Deferred:
+  - Delete endpoint
+  - Admin upload
+  - Orphan cleanup/admin repair
+  - S3/NAS/object storage
+  - Virus scan/DLP
+  - Attachment required policy
+- Tests:
+  - `test --tests "*ApplicationAttachmentDownload*" --no-daemon`: success
+  - `test --tests "*AttachmentStorage*" --no-daemon`: success
+  - `test --tests "*ApplicationAttachment*" --no-daemon`: success
+  - `clean test --no-daemon`: success
+- Documentation:
+  - `docs/codex/implementation/phase-03i-3-attachment-file-download.md`
+  - `docs/codex/reports/phase-03i-3-attachment-file-download.html`
+  - `docs/codex/design/phase-03i-attachment-file-upload-download-design.md`
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Next recommended phase:
+  - Phase 03i-4 attachment delete/orphan cleanup/admin repair policy.
+
+## Phase 03i-2 - Attachment File Upload
+
+- Date: 2026-05-20
+- Goal: implement applicant-owned single physical attachment upload while preserving the existing metadata-only APIs.
+- Implemented:
+  - Added `PhysicalFileStatus` enum.
+  - Added `ApplicationAttachment.physicalFileStatus` with `METADATA_ONLY` default and `STORED` upload state.
+  - Added `AttachmentProperties`.
+  - Enabled multipart parsing and configured parser size limits.
+  - Added local filesystem storage behind `AttachmentStorageService`.
+  - Added `AttachmentFilePolicy`.
+  - Added `ApplicationAttachmentFileService`.
+  - Added `POST /applications/{applicationId}/attachments/files`.
+  - Hardened metadata replace so it replaces only `METADATA_ONLY` rows.
+  - Preserved `STORED` rows during metadata replace.
+  - Added metadata replace validation to reject `sortOrder` conflicts with existing `STORED` rows.
+  - Rejected client-supplied `storedFileName` and `storagePath` with 400.
+  - Rejected upload request parts `sortOrder`, `displayName`, `originalFileName`, `storedFileName`, and `storagePath` with 400.
+  - Assigned upload `sortOrder` append-only server-side.
+  - Enforced file count/total-size limits from `physicalFileStatus=STORED` rows only.
+  - Added rollback cleanup for just-stored physical files.
+  - Added `@Param` to repository named query parameters and startup validation to `AttachmentProperties`.
+- API:
+  - `POST /applications/{applicationId}/attachments/files`
+  - Request: `multipart/form-data` with `file`, `attachmentType`, `sectionType`, optional `sectionRecordId`
+  - Response: `ApiResponse<AttachmentResponse>`
+- Preserved:
+  - `GET /applications/{applicationId}/attachments`
+  - `POST /applications/{applicationId}/attachments` response shape
+  - Admin metadata read response shape
+  - `SecurityConfig`
+  - Dashboard readiness
+  - Submit validator
+  - `AttachmentResponse` storage-field exclusion
+- Deferred:
+  - Applicant/admin download
+  - Admin upload
+  - Delete endpoint
+  - Orphan cleanup
+  - S3/NAS/object storage
+  - Virus scan/DLP
+  - `downloadAvailable`
+  - Attachment required policy
+- Tests:
+  - Targeted attachment tests passed:
+    - `ApplicationAttachmentServiceTest`
+    - `ApplicationAttachmentFileServiceTest`
+    - `ApplicationAttachmentControllerTest`
+  - Added review-fix coverage for metadata `sortOrder` conflict with existing `STORED` rows.
+  - Full `clean test --no-daemon`: success after review fix rerun with a longer timeout.
+- Documentation:
+  - `docs/codex/implementation/phase-03i-2-attachment-file-upload.md`
+  - `docs/codex/reports/phase-03i-2-attachment-file-upload.html`
+  - `docs/codex/design/phase-03i-attachment-file-upload-download-design.md`
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Next recommended phase:
+  - Phase 03i-3 applicant/admin download for `physicalFileStatus=STORED` rows.
+
+## Phase 03i-1 - Attachment File Upload/Download Design
+
+- Date: 2026-05-20
+- Work type: documentation-only design phase.
+- Goal: design real attachment file upload/download policy on top of the current metadata-only attachment slice.
+- Created:
+  - `docs/codex/design/phase-03i-attachment-file-upload-download-design.md`
+  - `docs/codex/reports/phase-03i-attachment-file-upload-download-design.html`
+- Updated:
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+  - `docs/codex/design/phase-03h-3-applicant-application-dashboard-design.md`
+- Current metadata state:
+  - Applicant metadata APIs remain `GET /applications/{applicationId}/attachments` and `POST /applications/{applicationId}/attachments`.
+  - Admin metadata API remains `GET /admin/applications/{applicationId}/attachments`.
+  - `ApplicationAttachment` already stores `originalFileName`, `storedFileName`, `storagePath`, `contentType`, `fileSize`, type, section, and ordering metadata.
+  - Applicant/admin metadata responses do not expose `storedFileName`, `storagePath`, absolute paths, or download URLs.
+- Recommended upload API:
+  - `POST /applications/{applicationId}/attachments/files`
+  - single-file `multipart/form-data`
+  - add `ApplicationAttachment.physicalFileStatus` as `@Enumerated(EnumType.STRING)`, `nullable=false`, default `METADATA_ONLY`; existing rows and test fixtures are `METADATA_ONLY`.
+  - values are `METADATA_ONLY`, `STORED`, and `MISSING`; only `STORED` server-uploaded rows are downloadable.
+  - keep existing metadata replace API separate from physical file upload, but harden it before upload ships so only `METADATA_ONLY` rows are replaced, file-backed rows are preserved, and client-supplied `storedFileName`/`storagePath` are rejected with 400.
+  - keep forbidden storage fields in `AttachmentRequest` or otherwise detect them explicitly for 400; do not rely on global Jackson unknown-property failure.
+  - file-backed row `sortOrder`, `attachmentType`, and `sectionType` edits are out of scope for Phase 03i-2 and need a later explicit reorder/update endpoint.
+  - derive `originalFileName` from sanitized multipart original filename; do not accept display/original filename override in Phase 03i-2.
+  - do not accept `sortOrder` in upload requests; upload is append-only and the server assigns the next `sortOrder`.
+  - include server-assigned `sortOrder` when reusing `AttachmentResponse`; do not add `downloadAvailable` until Phase 03i-3.
+- Recommended download APIs:
+  - applicant: `GET /applications/{applicationId}/attachments/{attachmentId}/download`
+  - admin: `GET /admin/applications/{applicationId}/attachments/{attachmentId}/download`
+  - use streaming response headers with safe `Content-Disposition`.
+  - allow download only for `physicalFileStatus=STORED` rows; legacy metadata-only rows are non-downloadable.
+- Storage policy:
+  - start with local filesystem storage behind `AttachmentStorageService`;
+  - generate UUID/ULID stored filenames server-side;
+  - store under a generated relative key such as `applications/{applicationId}/{yyyy}/{MM}/{dd}/{uuid}.{ext}`;
+  - prevent path traversal by normalizing and verifying final paths stay under `storageRoot`.
+  - local filesystem storage assumes single-node or shared-volume deployment; multi-node production needs NAS, S3/object storage, or another shared durable store.
+  - register transaction rollback cleanup after file save and use `saveAndFlush(...)` to catch DB failures before return when possible.
+- Validation policy:
+  - property-backed max file size, recommended default 20 MB;
+  - separate Spring multipart parser limits from business attachment limits and handle `MaxUploadSizeExceededException`;
+  - add per-application file count and total-size limits based only on `physicalFileStatus=STORED` rows;
+  - extension allowlist candidate: `pdf`, `jpg`, `jpeg`, `png`, `doc`, `docx`, `xls`, `xlsx`, `hwp`, `hwpx`;
+  - validate content type conservatively;
+  - reject blank filenames, path separators, control characters, and Windows reserved names;
+  - virus scan is deferred but documented as a production security requirement.
+- Phase split:
+  - Phase 03i-2: `physicalFileStatus` schema addition, metadata replace hardening, storage abstraction, applicant single-file upload, and DB-failure/rollback file cleanup compensation.
+  - Phase 03i-3: applicant/admin download.
+  - Phase 03i-4 candidate: admin upload/replace, delete, orphan cleanup.
+  - Phase 03i-5 candidate: attachment submit-required policy and dashboard readiness integration.
+- Tests:
+  - Not run.
+  - Reason: design/documentation-only phase with no Java, test, security, build, YAML, schema, or runtime API changes.
+
+## Phase 03h-4 - Applicant Application Dashboard API
+
+- Date: 2026-05-19
+- Goal: implement a read-only applicant dashboard summary API for one owned application detail screen.
+- Implemented:
+  - Added `ApplicationDashboardResponse`.
+  - Added `ApplicationCompletionSummaryResponse`.
+  - Added `ApplicationSectionReadinessResponse`.
+  - Added `ApplicationCompletionReadChecker`.
+  - Added `ApplicationDashboardService`.
+  - Added applicant-owned dashboard fetch query to `JobApplicationRepository`.
+  - Added optional section `existsByJobApplicationId` methods for certificate, language, award, and gap period repositories.
+  - Added `GET /applications/{applicationId:[0-9]+}/dashboard` to `ApplicationController`.
+  - Added `ApplicationDashboardServiceTest`.
+  - Expanded `ApplicationControllerTest` for dashboard response, security, ownership hiding, forbidden fields, and unsupported methods.
+- API:
+  - `GET /applications/{applicationId:[0-9]+}/dashboard`
+  - Response: `ApiResponse<ApplicationDashboardResponse>`
+- Action flag policy:
+  - `accepting = PUBLISHED posting + current time inside reception period`.
+  - `editable = DRAFT + accepting`.
+  - `submittable = DRAFT + accepting + submitBlockingIssueCount == 0`.
+  - `withdrawable = SUBMITTED + accepting`.
+  - `WITHDRAWN` returns all command flags as `false`.
+- Completion checker policy:
+  - Read-only checker mirrors current submit validator policy without calling submit or changing state.
+  - Missing `ApplicationFormConfig` is reported as `FORM_CONFIG / MISSING_CONFIG` and blocks `submittable`, matching submit command policy.
+  - Blocking readiness includes education, career, military, required question answers, and answer length.
+  - Optional guidance includes certificate, language, award, and gap period.
+  - Count policy is group-based; `requiredCompletionRate` uses integer floor and returns 100 when no required group exists.
+- Result summary policy:
+  - Uses existing applicant-visible StageResult query.
+  - Summary includes only `Stage.status == RESULT_ANNOUNCED || CLOSED`.
+  - Latest result uses `stageOrder DESC, stage.id DESC`.
+  - Detailed result rows remain in `GET /applications/{applicationId}/stage-results`.
+- Exposure policy:
+  - The dashboard response does not expose applicant personal data, `applicantId`, `stageResultId`, `score`, `comment`, `decidedBy`, `correctedBy`, correction history, `answerText`, `exemptionReason`, `certificateNumber`, or storage fields.
+- Preserved:
+  - `SecurityConfig`.
+  - `ApplicationSubmitValidator`.
+  - `POST /applications/{applicationId}/submit`.
+  - Detailed section save APIs.
+  - `GET /applications/{applicationId}/stage-results`.
+  - Applicant result response DTOs.
+  - Admin APIs.
+  - DB schema.
+  - Attachment readiness, per-question detailed error payloads, message/notification, and read audit logging remain unimplemented.
+- Tests:
+  - `ApplicationDashboardServiceTest`: success after test helper fix.
+  - `ApplicationControllerTest`: success.
+  - `JobApplicationServiceTest`: success.
+  - `ApplicationSubmitValidatorTest`: success.
+  - `ApplicationStageResultServiceTest` + `ApplicationStageResultControllerTest`: success.
+  - `.\gradlew.bat clean test --no-daemon`: success.
+- Documentation:
+  - `docs/codex/implementation/phase-03h-4-applicant-application-dashboard.md`
+  - `docs/codex/reports/phase-03h-4-applicant-application-dashboard.html`
+  - `docs/codex/design/phase-03h-3-applicant-application-dashboard-design.md`
+  - `docs/codex/design/phase-03h-applicant-my-applications-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Deferred:
+  - Attachment readiness policy.
+  - Per-question detailed error payload.
+  - Fine-grained completion details.
+  - Shared read/write validation policy extraction.
+  - Read audit logging.
+  - Message/notification.
+- Next recommended phase:
+  - Phase 03h-5 completion checker/detail improvement if frontend UX needs richer missing-section guidance.
+
+## Phase 03h-3 - Applicant Application Dashboard Design
+
+- Date: 2026-05-19
+- Goal: design a read-only applicant dashboard summary API for one owned application detail screen.
+- Work type: documentation-only design phase.
+- Created:
+  - `docs/codex/design/phase-03h-3-applicant-application-dashboard-design.md`
+  - `docs/codex/reports/phase-03h-3-applicant-application-dashboard-design.html`
+- Updated:
+  - `docs/codex/design/phase-03h-applicant-my-applications-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/07-implementation-history.md`
+- API design conclusion:
+  - `GET /applications/{applicationId}/dashboard`
+  - Applicant-only endpoint under the existing `/applications/**` security policy.
+  - Recommended response: `ApiResponse<ApplicationDashboardResponse>`.
+  - Recommended implementation mapping: `/applications/{applicationId:[0-9]+}/dashboard`.
+  - The request must not accept `applicantId`.
+- Response field conclusion:
+  - Include application/posting/position display summary.
+  - Include `applicationStatus`, `accepting`, `editable`, `submittable`, and `withdrawable`.
+  - Include `submittedAt` and `withdrawnAt`.
+  - Include `completionSummary`, `requiredMissingSections`, and `optionalIncompleteSections`.
+  - Include compact result summary fields: `latestAnnouncedStageName`, `latestResultStatus`.
+  - Do not expose applicant personal data, `stageResultId`, `score`, `comment`, actor fields, correction history, or storage fields.
+- Action flag policy:
+  - `accepting = PUBLISHED posting + current time inside reception period`.
+  - `editable = DRAFT + accepting`.
+  - `submittable = DRAFT + accepting + no submit-blocking readiness issue`.
+  - `withdrawable = SUBMITTED + accepting`.
+  - `WITHDRAWN` returns all command flags as `false`.
+- Completion and missing-section policy:
+  - Phase 03h-4 should add a read-only checker aligned with current `ApplicationSubmitValidator`.
+  - Required readiness includes `useEducation`, `useCareer`, `useMilitary`, active required question answers, and answer length checks.
+  - `useCertificate`, `useLanguage`, `useAward`, and `useGapPeriod` are optional guidance under the current submit policy.
+  - Attachment readiness is deferred until a config flag or explicit business rule exists.
+- Result summary policy:
+  - Same as Phase 03h-2: summary includes only stages with `Stage.status == RESULT_ANNOUNCED || CLOSED`.
+  - Detailed result rows remain in `GET /applications/{applicationId}/stage-results`.
+  - `score`, `comment`, actor fields, and correction history remain hidden.
+- Tests:
+  - Not executed.
+  - Reason: design/documentation-only phase with no Java, test, build, security, YAML, schema, submit validator, or StageResult API changes.
+- Recommended Phase 03h-4 implementation:
+  - Add dashboard response DTO records.
+  - Add a read-only completion checker.
+  - Add dashboard service orchestration.
+  - Add applicant-owned controller endpoint.
+  - Add service/controller tests for ownership, action flags, completion policy, result summary, and 401/403 behavior.
+- Deferred:
+  - Runtime API implementation.
+  - Attachment readiness policy.
+  - Fine-grained completion details.
+  - Per-question detailed errors.
+  - Shared policy extraction between submit validation and read-only dashboard checking.
+
+## Phase 03h-2 - Applicant My Applications API
+
+- Date: 2026-05-19
+- Goal: implement `GET /applications/me` so an applicant can read their own application list with compact announced-result summary.
+- Implemented:
+  - Added `MyApplicationResponse`.
+  - Added applicant-owned pageable list query to `JobApplicationRepository`.
+  - Added batch visible result summary query to `StageResultRepository`.
+  - Added `JobApplicationService.getMyApplications`.
+  - Added `GET /applications/me` to `ApplicationController`.
+  - Narrowed numeric application id routes in `ApplicationController` to prevent `/applications/me` from being treated as `{applicationId}` for unsupported methods.
+  - Added service tests for owned list, other applicant exclusion, all statuses, closed postings, sorting, page/size validation, `accepting`, visible result summary, and empty page.
+  - Added controller tests for response wrapper, page metadata, hidden fields, empty page, 401/403 JSON, and unsupported methods.
+- API:
+  - `GET /applications/me?page=0&size=20`
+  - Response: `ApiResponse<PageResponse<MyApplicationResponse>>`
+- Page/size policy:
+  - `page` default: `0`
+  - `size` default: `20`
+  - `page < 0` fails.
+  - `size <= 0` fails.
+  - `size > 100` fails.
+  - Sort: `createdAt DESC, id DESC`.
+- Result summary policy:
+  - Summary includes `announcedResultCount`, `latestAnnouncedStageName`, and `latestResultStatus`.
+  - Summary uses only `Stage.status == RESULT_ANNOUNCED || CLOSED`.
+  - `READY` and `IN_PROGRESS` are excluded.
+  - Latest visible result uses `stageOrder DESC, stage.id DESC`.
+  - Missing result rows are not synthesized.
+  - Detailed results remain in `GET /applications/{applicationId}/stage-results`.
+- Exposure policy:
+  - The list response does not expose applicant personal data.
+  - The list response does not expose `stageResultId`, `score`, `comment`, `decidedBy`, `correctedBy`, correction reason/history, or storage fields.
+- Preserved:
+  - `SecurityConfig`.
+  - Existing applicant result detail API.
+  - Applicant result response DTO.
+  - Admin APIs.
+  - DB schema.
+  - LDAP/security handlers.
+  - Message/notification and read audit behavior.
+- Tests:
+  - `JobApplicationServiceTest`: success after retry.
+  - `ApplicationControllerTest`: success.
+  - `ApplicationStageResultServiceTest` + `ApplicationStageResultControllerTest`: success.
+  - `StageResultServiceTest` + `StageResultCorrectionServiceTest`: success.
+  - `.\gradlew.bat clean test --no-daemon`: success.
+- Documentation:
+  - `docs/codex/implementation/phase-03h-2-applicant-my-applications.md`
+  - `docs/codex/reports/phase-03h-2-applicant-my-applications.html`
+  - `docs/codex/design/phase-03h-applicant-my-applications-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Deferred:
+  - Status filter.
+  - Custom sort query parameter.
+  - Dashboard completion rate.
+  - Missing-section guidance.
+  - Scheduled release guard by `resultAnnouncementDateTime`.
+  - Message/notification.
+  - Read audit logging.
+- Next recommended phase:
+  - Phase 03h-3 applicant my-page dashboard summary if frontend UX requires aggregate cards or completion guidance.
+
+## Phase 03h-1 - Applicant My Applications Design
+
+- Date: 2026-05-19
+- Goal: design the applicant-owned application list API `GET /applications/me` before implementation.
+- Work type: documentation-only design phase.
+- Created:
+  - `docs/codex/design/phase-03h-applicant-my-applications-design.md`
+  - `docs/codex/reports/phase-03h-applicant-my-applications-design.html`
+- Updated:
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/07-implementation-history.md`
+- API design conclusion:
+  - `GET /applications/me`
+  - Applicant-only endpoint under the existing `/applications/**` security policy.
+  - Recommended response: `ApiResponse<PageResponse<MyApplicationResponse>>`.
+  - Recommended request parameters: `page`, `size`.
+  - Recommended default sorting: `createdAt DESC, id DESC`.
+- Response field conclusion:
+  - Include application/posting/position identifiers and display names.
+  - Include application status and timestamps.
+  - Include posting reception period and `accepting`.
+  - Include compact result summary fields: `announcedResultCount`, `latestAnnouncedStageName`, `latestResultStatus`.
+  - Do not expose applicant personal data, `stageResultId`, `score`, `comment`, `decidedBy`, `correctedBy`, correction reason, or correction history.
+- Business policy:
+  - `DRAFT`, `SUBMITTED`, and `WITHDRAWN` applications are all listed.
+  - Existing applications remain visible when the posting is `CLOSED`.
+  - Result summary uses only stages with `Stage.status == RESULT_ANNOUNCED || CLOSED`.
+  - Detailed applicant stage results remain in `GET /applications/{applicationId}/stage-results`.
+- Recommended Phase 03h-2 implementation:
+  - Extend `JobApplicationService`.
+  - Add applicant-owned pageable list query to `JobApplicationRepository`.
+  - Add batch visible result summary query to avoid N+1 loading.
+  - Add `MyApplicationResponse`.
+  - Add `GET /applications/me` to `ApplicationController`.
+  - Add service/controller tests for ownership, included statuses, sorting, `accepting`, result summary visibility, and 401/403 behavior.
+- Tests:
+  - Not executed.
+  - Reason: design/documentation-only phase with no Java, test, build, security, YAML, or schema changes.
+- Deferred:
+  - Runtime API implementation.
+  - Dashboard summary.
+  - Completion rate and missing-section guidance.
+  - Status filters.
+  - Scheduled release guard by `resultAnnouncementDateTime`.
+- Next recommended phase:
+  - Phase 03h-2 - implement `GET /applications/me` basic pageable list and compact announced-result summary.
+
+## Phase 03e-4 - Security Exception JSON Response
+
+- Date: 2026-05-19
+- Goal: return Spring Security authentication and authorization failures in the existing JSON `ApiResponse.fail(...)` response shape.
+- Implemented:
+  - Added `CustomAuthenticationEntryPoint` for unauthenticated protected requests.
+  - Added `CustomAccessDeniedHandler` for authenticated users without sufficient authority.
+  - Registered both handlers in `SecurityConfig.exceptionHandling(...)`.
+  - 401 responses now use `ApiResponse.fail("Authentication is required.")`.
+  - 403 responses now use `ApiResponse.fail("Access is denied.")`.
+  - Security failure responses set JSON content type with UTF-8 encoding.
+  - Responses are serialized through `ObjectMapper.writeValue(...)`.
+  - Used `ObjectProvider<ObjectMapper>` to avoid requiring a global `ObjectMapper` bean in the current Boot 4 context.
+  - Added 401/403 JSON response assertions to StageResult, Stage, and applicant StageResult controller tests.
+- APIs affected:
+  - `/admin/**` security failure responses.
+  - `/applications/**` security failure responses.
+  - `GET /job-postings/{jobPostingId}/application` security failure responses.
+- Preserved:
+  - Phase 03e-3 URL authorization rules.
+  - StageResult actor propagation.
+  - `GlobalExceptionHandler` business exception behavior.
+  - `ApiResponse` structure.
+  - DTO shapes, DB schema, LDAP settings, and fallback `anyRequest().permitAll()`.
+- Tests:
+  - Initial sandbox test attempt failed because Gradle needed network access to download the wrapper distribution.
+  - First approved retry failed because no global `ObjectMapper` bean existed in the test context.
+  - After switching handlers to `ObjectProvider<ObjectMapper>`, targeted tests passed.
+  - `ApplicationStageResultControllerTest` + `StageResultControllerTest` + `StageControllerTest`: success, 37 tests completed.
+  - `StageResultServiceTest` + `StageResultCorrectionServiceTest`: success.
+  - Full `clean test --no-daemon`: attempted twice and timed out. No XML failures/errors were found in generated partial results, but the full suite did not complete.
+- Documentation:
+  - `docs/codex/implementation/phase-03e-4-security-exception-json-response.md`
+  - `docs/codex/reports/phase-03e-4-security-exception-json-response.html`
+  - `docs/codex/design/phase-03e-admin-auth-hardening-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Deferred:
+  - Classifying remaining API families.
+  - Replacing fallback `permitAll`.
+  - Profile-gating Swagger/OpenAPI and H2 console.
+  - Centralized security error code/message policy.
+- Next recommended phase:
+  - Classify remaining public/authenticated API families before tightening the fallback authorization rule.
+
+## Phase 03e-3 - URL Authorization Hardening
+
+- Date: 2026-05-19
+- Goal: protect admin and applicant API families with Spring Security URL authorization while keeping the current session-based authentication structure.
+- Implemented:
+  - Verified `DeptRoleMapping.roleName` uses full authority names such as `ROLE_ADMIN`.
+  - Used `hasAnyAuthority("ROLE_ADMIN", "ROLE_RECRUIT_ADMIN")` for `/admin/**`.
+  - Used `hasAuthority("ROLE_APPLICANT")` for `/applications/**`.
+  - Protected `GET /job-postings/{jobPostingId}/application` as an applicant-owned endpoint.
+  - Preserved public access for `/auth/login`, `/auth/logout`, Swagger/OpenAPI, H2 console, `/menu/tree`, and public `GET /job-postings/**`.
+  - Kept `anyRequest().permitAll()` as a conservative fallback for unclassified APIs.
+  - Added `spring-security-test` for MockMvc security tests.
+  - Updated StageResult, ApplicationStageResult, and Stage controller tests to run through Spring Security filters.
+- APIs affected:
+  - `/admin/**`
+  - `/applications/**`
+  - `GET /job-postings/{jobPostingId}/application`
+  - `GET /job-postings/**`
+- Tests:
+  - `StageResultControllerTest`: success
+  - `ApplicationStageResultControllerTest`: success
+  - `StageControllerTest`: success
+  - `StageResultServiceTest` + `StageResultCorrectionServiceTest`: success
+  - `.\gradlew.bat clean test --no-daemon`: success
+- Documentation:
+  - `docs/codex/implementation/phase-03e-3-url-authorization-hardening.md`
+  - `docs/codex/reports/phase-03e-3-url-authorization-hardening.html`
+  - `docs/codex/design/phase-03e-admin-auth-hardening-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Deferred:
+  - 401/403 JSON `ApiResponse.fail` handlers
+  - `AuthenticationEntryPoint`
+  - `AccessDeniedHandler`
+  - `CurrentAdminService`
+  - `AdminStageResultResponse.decidedBy`
+  - Employee FK or audit actor entity
+  - Replacing fallback `permitAll` after remaining API classification
+- Next recommended phase:
+  - Phase 03e-4 security exception response hardening.
+
+## Phase 03e-2 - StageResult Actor Propagation
+
+- Date: 2026-05-19
+- Goal: replace temporary StageResult `"SYSTEM"` actor values with the authenticated employee login id for admin result commands.
+- Implemented:
+  - Added `CurrentEmployeeService`.
+  - `CurrentEmployeeService` validates null principal, employee user type, and blank username.
+  - Actor value is `CustomUserDetails.getUsername()`.
+  - `StageResultService.updateResult(...)` now requires an actor.
+  - `StageResultService.bulkUpdateResults(...)` now requires an actor.
+  - `StageResultCorrectionService.correctResult(...)` now requires an actor.
+  - Single and bulk update save `StageResult.decidedBy = actor`.
+  - Correction saves latest `StageResult.decidedBy = actor`.
+  - Correction history saves `StageResultCorrectionHistory.correctedBy = actor`.
+  - `StageResultController` resolves actor from `@AuthenticationPrincipal CustomUserDetails` for update, bulk update, and correction endpoints.
+  - Applicant result-read tests verify actor fields are not exposed.
+- APIs affected:
+  - `POST /admin/stages/{stageId}/results/{resultId}`
+  - `POST /admin/stages/{stageId}/results/bulk`
+  - `POST /admin/stages/{stageId}/results/{resultId}/correct`
+- APIs unchanged:
+  - `GET /admin/stages/{stageId}/results`
+  - `POST /admin/stages/{stageId}/results/initialize`
+  - `GET /admin/stages/{stageId}/results/{resultId}/histories`
+  - `GET /applications/{applicationId}/stage-results`
+- Tests:
+  - `CurrentEmployeeServiceTest`: success
+  - `StageResultServiceTest` + `StageResultCorrectionServiceTest`: success
+  - `StageResultControllerTest`: success
+  - `ApplicationStageResultServiceTest` + `ApplicationStageResultControllerTest`: success
+  - `.\gradlew.bat clean test --no-daemon`: success
+- Documentation:
+  - `docs/codex/implementation/phase-03e-2-stage-result-actor-propagation.md`
+  - `docs/codex/reports/phase-03e-2-stage-result-actor-propagation.html`
+  - `docs/codex/design/phase-03e-admin-auth-hardening-design.md`
+  - `docs/codex/design/phase-03d-stage-result-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- Deferred:
+  - `SecurityConfig` changes
+  - URL authorization for `/admin/**` and `/applications/**`
+  - 401/403 JSON security handlers
+  - `CurrentAdminService`
+  - `AdminStageResultResponse.decidedBy`
+  - Employee FK or audit actor entity
+  - LDAP configuration changes
+- Note:
+  - The first full `clean test` attempt timed out and left Gradle report files locked. After `.\gradlew.bat --stop`, the same full command passed.
+- Next recommended phase:
+  - Phase 03e-3 URL authorization hardening.
+
+## Phase 03e-1 - Admin/Auth Hardening Design
+
+- 작업일: 2026-05-19
+- 작업 성격: 설계 문서 전용
+- 목적: 현재 개발 편의 중심의 인증/인가 구조를 운영 전환 전에 정리하기 위해 `/admin/**` 보호, applicant/admin 접근 분리, StageResult actor 전파, 401/403 응답 정책을 설계했다.
+- 생성 문서:
+  - `docs/codex/design/phase-03e-admin-auth-hardening-design.md`
+  - `docs/codex/reports/phase-03e-admin-auth-hardening-design.html`
+- 갱신 문서:
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/design/phase-03d-stage-result-design.md`
+  - `docs/codex/07-implementation-history.md`
+- 현재 보안/권한 문제 요약:
+  - `SecurityConfig`가 현재 `anyRequest().permitAll()` 상태라 `/admin/**`와 `/applications/**`가 URL authorization으로 보호되지 않는다.
+  - applicant 쪽은 `CurrentApplicantService`가 있지만 employee/admin current-user resolver는 아직 없다.
+  - `StageResultService.updateResult`는 `decidedBy = "SYSTEM"`을 사용한다.
+  - `StageResultCorrectionService.correctResult`는 `correctedBy = "SYSTEM"`과 `decidedBy = "SYSTEM"`을 사용한다.
+  - Spring Security 인증/인가 실패가 controller 진입 전 발생할 경우 `GlobalExceptionHandler`만으로는 `ApiResponse.fail` 응답을 보장할 수 없다.
+- 추천 정책 요약:
+  - `/admin/**`는 인증된 employee/admin 권한만 허용한다.
+  - applicant가 `/admin/**`에 접근하면 403으로 응답한다.
+  - 미로그인 사용자가 보호 API에 접근하면 401로 응답한다.
+  - `/applications/**`는 `ROLE_APPLICANT`만 허용한다.
+  - employee/admin은 applicant API 대신 admin API를 사용한다.
+  - 지원서 소유권 검증은 SecurityConfig가 아니라 service 계층에서 계속 유지한다.
+  - 다른 지원자의 지원서 접근은 기존처럼 404 숨김 정책을 유지한다.
+  - 401/403은 Spring Security `AuthenticationEntryPoint`, `AccessDeniedHandler`에서 JSON `ApiResponse.fail`로 처리한다.
+- StageResult identity 설계:
+  - Phase 03e-2에서 `CurrentEmployeeService` 또는 `CurrentAdminService`를 추가한다.
+  - Controller에서 `@AuthenticationPrincipal CustomUserDetails`를 받아 actor를 추출한다.
+  - StageResult service method에 `actor` 또는 `adminLoginId`를 전달한다.
+  - 초기 actor 값은 `CustomUserDetails.getUsername()` 기반 문자열을 추천한다.
+  - 추후 Employee FK 또는 AuditActor로 확장 가능하게 설계한다.
+  - applicant response에는 `decidedBy`, `correctedBy`, correction history를 계속 노출하지 않는다.
+- Phase 분리:
+  - Phase 03e-1: 설계 문서만 작성
+  - Phase 03e-2: current admin identity resolver + StageResult `decidedBy`/`correctedBy` 적용
+  - Phase 03e-3: `SecurityConfig`에서 `/admin/**`, `/applications/**` 접근 제어 적용
+  - Phase 03e-4: 401/403 `ApiResponse.fail` 처리와 테스트 보강
+- 검증:
+  - 문서 전용 작업이므로 Gradle 테스트는 실행하지 않았다.
+  - Java source, test source, `SecurityConfig`, build, YAML, DB schema 변경 없음.
+- 다음 작업:
+  - Phase 03e-2에서 employee/admin identity resolver와 StageResult actor propagation 구현
+
+## Phase 03d-5 - Result Correction History
+
+- 작업일: 2026-05-19
+- 목적: 발표 후 `StageResult` 변경을 일반 update API가 아니라 별도 correction command로 처리하고, 변경 전후 값을 append-only history로 보존한다.
+- 구현 범위:
+  - `StageResultCorrectionHistory` Entity 추가
+  - `StageResultCorrectionHistoryRepository` 추가
+  - `StageResultCorrectionRequest` DTO 추가
+  - `StageResultCorrectionHistoryResponse` DTO 추가
+  - `StageResultCorrectionService` 추가
+  - `StageResultController`에 correction/history endpoint 추가
+  - `POST /admin/stages/{stageId}/results/{resultId}/correct` 추가
+  - `GET /admin/stages/{stageId}/results/{resultId}/histories` 추가
+  - `resultId + stageId` 기준 StageResult 조회
+  - `Stage.status == RESULT_ANNOUNCED || CLOSED`일 때만 correction 허용
+  - `READY`, `IN_PROGRESS` correction 차단
+  - correction reason 필수화
+  - 최신 `StageResult` row를 정정 결과로 갱신
+  - 이전/신규 `status`, `score`, `comment`, `decidedAt` snapshot 이력 저장
+  - correction history는 `correctedAt DESC, id DESC` 순서로 조회
+  - `correctedBy`, `decidedBy`는 Phase 03d-2 정책과 동일하게 임시 `SYSTEM` 사용
+- API:
+  - `POST /admin/stages/{stageId}/results/{resultId}/correct`
+  - `GET /admin/stages/{stageId}/results/{resultId}/histories`
+- 정책:
+  - 일반 `StageResultService.updateResult`는 기존처럼 `IN_PROGRESS` 전형에서만 허용
+  - 발표 후 변경은 correction command로만 허용
+  - correction은 중복 `StageResult` row를 만들지 않음
+  - `StageResult`에는 history collection을 추가하지 않음
+  - cascade/orphanRemoval 사용하지 않음
+  - 지원자 API는 정정 후 최신 결과만 보여주고 history는 노출하지 않음
+- 테스트 결과:
+  - `StageResultCorrectionServiceTest` + `StageResultControllerTest`: 성공
+  - `ApplicationStageResultServiceTest` + `ApplicationStageResultControllerTest`: 성공
+  - `StageResultServiceTest` + `StageServiceTest`: 성공
+  - `./gradlew.bat clean test --no-daemon`: 성공
+- 문서:
+  - `docs/codex/implementation/phase-03d-5-result-correction-history.md`
+  - `docs/codex/reports/phase-03d-5-result-correction-history.html`
+  - `docs/codex/design/phase-03d-stage-result-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- 보류:
+  - 실제 관리자 identity 기반 `correctedBy`, `decidedBy`
+  - SecurityConfig 변경
+  - 정정 알림/message 발송
+  - 별도 audit log
+  - interview/evaluation aggregation
+  - 명시적 migration script
+- 다음 작업:
+  - 관리자 identity 연결, 정정 알림 정책, 권한/audit 강화
+
+## Phase 03d-4 - Applicant StageResult Read API
+
+- 작업일: 2026-05-19
+- 목적: 지원자가 본인 지원서의 발표 완료된 전형 결과만 조회할 수 있도록 read-only API를 추가했다.
+- 구현 범위:
+  - `ApplicantStageResultResponse` DTO 추가
+  - `ApplicationStageResultService` 추가
+  - `ApplicationStageResultController` 추가
+  - `StageResultRepository.findVisibleByJobApplicationIdForApplicant` 추가
+  - `GET /applications/{applicationId}/stage-results` 추가
+  - `applicationId + applicantId` 기반 소유자 검증
+  - `DRAFT` 지원서 결과 조회 차단
+  - `SUBMITTED`, `WITHDRAWN` 지원서 결과 조회 허용
+  - `Stage.status == RESULT_ANNOUNCED || CLOSED` 결과만 노출
+  - `READY`, `IN_PROGRESS` stage row 미노출
+  - Stage 기준 null row 미생성
+  - read-time StageResult 생성/upsert 금지
+  - `resultAnnouncementDateTime`은 표시용으로만 응답
+  - `score`, `comment`, `decidedBy`, `stageResultId` 응답 제외
+- API:
+  - `GET /applications/{applicationId}/stage-results`
+- 테스트 결과:
+  - `ApplicationStageResultServiceTest` + `ApplicationStageResultControllerTest`: 성공
+  - `StageResultServiceTest` + `StageResultControllerTest` + `StageServiceTest` + `StageControllerTest`: 성공
+  - `./gradlew.bat clean test --no-daemon`: 성공
+- 문서:
+  - `docs/codex/implementation/phase-03d-4-applicant-stage-result-read.md`
+  - `docs/codex/reports/phase-03d-4-applicant-stage-result-read.html`
+  - `docs/codex/design/phase-03d-stage-result-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- 보류:
+  - Phase 03d-5 correction/history
+  - `StageResultCorrectionHistory`
+  - correction API
+  - DB schema 변경
+  - SecurityConfig 변경
+  - 메시지/알림 발송
+  - 예약 발표 guard
+  - read audit logging
+- 다음 작업:
+  - Phase 03d-5 result correction history 설계 기반 구현
+
+## Phase 03d-4/03d-5 - Result Read and Correction Design
+
+- 작업일: 2026-05-19
+- 목적: Phase 03d-3 이후 남은 applicant-facing 결과 조회와 발표 후 결과 정정 이력을 하나의 구현으로 섞지 않고, Phase 03d-4와 Phase 03d-5로 분리 설계했다.
+- 작업 성격: 설계 문서 전용
+- 생성 문서:
+  - `docs/codex/design/phase-03d-4-5-result-read-correction-design.md`
+  - `docs/codex/reports/phase-03d-4-5-result-read-correction-design.html`
+- 갱신 문서:
+  - `docs/codex/design/phase-03d-stage-result-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/07-implementation-history.md`
+- 주요 설계 결정:
+  - Phase 03d-4는 `GET /applications/{applicationId}/stage-results` 지원자 본인 결과 조회로 분리한다.
+  - 지원자 결과 조회는 본인 지원서만 허용하고 `DRAFT`는 조회 대상에서 제외한다.
+  - `SUBMITTED`와 `WITHDRAWN`은 조회 가능하되, 노출 대상 Stage는 `RESULT_ANNOUNCED` 또는 `CLOSED`로 제한한다.
+  - `READY`와 `IN_PROGRESS` 단계는 발표 전 row로도 지원자에게 노출하지 않는다.
+  - 지원자 응답은 `stageName`, `stageType`, `stageOrder`, `resultStatus`, `resultAnnouncementDateTime`, `decidedAt` 중심으로 제한한다.
+  - 지원자 응답에는 `score`, `comment`, `decidedBy`, correction history를 노출하지 않는다.
+  - Phase 03d-5는 발표 후 결과 변경을 별도 correction command로 분리하고, correction reason을 필수로 둔다.
+  - 정정 이력 Entity 후보명은 `StageResultCorrectionHistory`로 정리했다.
+  - 지원자 API는 정정 후 최신 결과만 보여주고 정정 이력은 관리자 API에만 노출한다.
+- API 후보:
+  - `GET /applications/{applicationId}/stage-results`
+  - `POST /admin/stages/{stageId}/results/{resultId}/correct`
+  - `GET /admin/stages/{stageId}/results/{resultId}/histories`
+- 미구현/보류:
+  - Java 코드, Entity, Repository, Service, Controller, DTO, Test, DB schema, SecurityConfig 변경 없음
+  - 메시지/알림 발송, 예약 발표 복합 guard, read audit logging, 면접/평가 집계는 보류
+- 검증:
+  - 문서 전용 Phase이므로 Gradle 테스트는 실행하지 않았다.
+  - 문서 정합성만 확인했다.
+- 다음 작업:
+  - Phase 03d-4 applicant-facing result read 구현
+  - 이후 Phase 03d-5 result correction history 구현
+
+## Phase 03d-3 - Admin Application StageResult Timeline Lazy API
+
+- 작업일: 2026-05-19
+- 목적: 관리자 지원서 상세 화면에서 전형 단계별 결과 이력을 lazy 방식으로 조회할 수 있도록 `GET /admin/applications/{applicationId}/stage-results` API를 추가했다.
+- 구현 범위:
+  - `AdminApplicationStageResultResponse` DTO 추가
+  - `AdminApplicationSectionService.getStageResults` 추가
+  - `AdminApplicationSectionController.getStageResults` 추가
+  - `StageResultRepository.findByJobApplicationIdAndStageIdInForTimeline` 추가
+  - application의 `JobPosting`에 속한 Stage 목록 기준 row 생성
+  - StageResult가 있으면 result 정보 merge
+  - StageResult가 없으면 result field null
+  - `stageOrder ASC, id ASC` 정렬
+  - 다른 공고 StageResult merge 방지
+  - `decidedBy` 응답 제외
+- API:
+  - `GET /admin/applications/{applicationId}/stage-results`
+- 테스트 결과:
+  - `AdminApplicationSectionServiceTest` + `AdminApplicationSectionControllerTest`: 성공
+  - `StageResultServiceTest` + `StageResultControllerTest` + `StageServiceTest` + `StageControllerTest`: 성공
+  - `./gradlew.bat clean test --no-daemon`: 성공
+- 문서:
+  - `docs/codex/implementation/phase-03d-3-admin-application-stage-result-timeline.md`
+  - `docs/codex/reports/phase-03d-3-admin-application-stage-result-timeline.html`
+  - `docs/codex/design/phase-03d-stage-result-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- 보류:
+  - applicant-facing result read
+  - result correction/history
+  - message/notification
+  - SecurityConfig 변경
+  - admin root detail 응답에 stageResults 포함
+  - 관리자 상세 section read audit logging
+- 다음 작업:
+  - applicant-facing 결과 조회 발표 정책 또는 결과 정정 이력 설계/구현 검토
+
+## Phase 03d-0 - StageResult Domain Design
+
+- 작업일: 2026-05-18
+- 목적: Phase 02에서 보류했던 `StageResult`를 `Stage + JobApplication` 기준 전형 결과 record로 구현하기 전에 도메인 관계, 상태 정책, 생성 방식, API 후보를 정리했다.
+- 작업 성격: 설계 문서 전용
+- 생성 문서:
+  - `docs/codex/design/phase-03d-stage-result-design.md`
+  - `docs/codex/reports/phase-03d-stage-result-design.html`
+- 갱신 문서:
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/design/phase-02-stage-design.md`
+  - `docs/codex/07-implementation-history.md`
+- 주요 설계 결정:
+  - `StageResult`는 `Stage + JobApplication` 기준 N:M 연결 결과 record로 본다.
+  - 관계는 `StageResult -> Stage`, `StageResult -> JobApplication` N:1 단방향을 추천한다.
+  - `Stage`와 `JobApplication`에는 `StageResult` 컬렉션을 추가하지 않는 방향을 추천한다.
+  - cascade/orphanRemoval은 사용하지 않는다.
+  - `stage_id + job_application_id` unique 후보를 추천한다.
+  - result status 후보는 `PENDING`, `PASSED`, `FAILED`, `ABSENT`, `WITHDRAWN`, `HOLD`로 정리했다.
+  - 초기 생성 방식은 명시적 initialize command로 `SUBMITTED` 지원서의 누락된 `PENDING` 결과를 생성하는 방식을 추천한다.
+- API 후보:
+  - `GET /admin/stages/{stageId}/results`
+  - `POST /admin/stages/{stageId}/results/initialize`
+  - `POST /admin/stages/{stageId}/results/{resultId}`
+  - `POST /admin/stages/{stageId}/results/bulk`
+  - `GET /admin/applications/{applicationId}/stage-results`
+- 미구현/보류:
+  - Java 코드, Entity, Repository, Service, Controller, DTO, Test, DB schema, SecurityConfig 변경 없음
+  - 기존 Stage/Application/AdminApplicationSection/QuestionAnswer API 변경 없음
+  - correction history, applicant-facing result read, message/notification integration, interview/evaluation score aggregation, fine-grained security/audit logging은 후속 Phase로 보류
+- 검증:
+  - 문서 전용 Phase이므로 테스트는 실행하지 않았다.
+  - HTML report는 외부 CDN/JS/CSS 없이 self-contained로 작성한다.
+- 다음 작업:
+  - Phase 03d-1: StageResult Entity + initialize/list admin API
+
+## Phase 03c-9-4 - Admin Application Answer Lazy Read API
+
+- 작업일: 2026-05-18
+- 목적: 관리자 지원서 상세 화면에서 자기소개서/질문답변 영역을 lazy 방식으로 조회할 수 있도록 `GET /admin/applications/{applicationId}/answers` API를 추가했다.
+- 구현 범위:
+  - `AdminApplicationAnswerResponse` DTO 추가
+  - `AdminApplicationSectionService.getAnswers` 추가
+  - `AdminApplicationSectionController.getAnswers` 추가
+  - active `JobPostingQuestion` 기준 row 생성
+  - `ApplicationAnswer`가 있으면 answer id/text/updatedAt merge
+  - 답변이 없는 active 질문도 null answer field로 반환
+  - 답변 존재 시 question metadata는 answer snapshot 우선, current question fallback
+  - inactive question answer와 active 질문 외 orphan answer는 응답 제외
+- API:
+  - `GET /admin/applications/{applicationId}/answers`
+- 테스트 결과:
+  - `AdminApplicationSectionServiceTest` 성공
+  - `AdminApplicationSectionControllerTest` 성공
+  - DRAFT/SUBMITTED/WITHDRAWN 상태 조회는 active question row가 실제 반환되는 방식으로 보강
+  - `ApplicationAnswerServiceTest`, `ApplicationAnswerControllerTest` 성공
+  - `ApplicationSubmitValidatorTest`, `JobApplicationServiceTest`, `ApplicationControllerTest` 성공
+  - `./gradlew.bat clean test --no-daemon` 성공
+- 보류:
+  - 관리자 목록/검색/통계/root detail 응답에 `answerText` 추가 금지
+  - answer 원문 열람 권한, 마스킹, 감사 로그는 다음 단계 전 우선순위 높게 검토
+  - inactive/orphan answer 표시 및 revision/history 정책
+  - 선택형 option, 파일형 답변, Attachment 연동, StageResult
+- 리뷰 기록:
+  - `SHORT_TEXT_MAX_LENGTH`, `LONG_TEXT_MAX_LENGTH`는 `ApplicationAnswerService`와 submit validator 쪽에 중복될 수 있다. 답변 타입이 늘어나는 시점에 `QuestionAnswerPolicy` 같은 공통 정책 클래스로 추출하는 리팩토링을 검토한다.
+
+## Phase 03c-9-3 - ApplicationSubmitValidator Question/Answer Integration
+
+- 작업일: 2026-05-18
+- 목적: 최종제출 시 active `JobPostingQuestion` 기준으로 지원자 답변 누락, blank, 길이 초과를 검증하도록 `ApplicationSubmitValidator`에 질문답변 검증을 연결했다.
+- 구현 범위:
+  - `ApplicationSubmitValidator`에 `JobPostingQuestionRepository`, `ApplicationAnswerRepository` 의존성 추가
+  - active 질문 목록 조회 후 required 질문의 answer row/null/blank 검증
+  - optional 질문은 미답변/blank 허용
+  - `JobPostingQuestion.maxLength` 및 answerType 상한(`SHORT_TEXT` 500, `LONG_TEXT` 5000) 재검증
+  - inactive 질문과 active 질문 외 answer row는 검증 대상에서 제외
+  - validator 실패 시 기존 `InvalidJobApplicationException` 400 정책 유지
+  - validator 실패 시 submit 상태 전이가 일어나지 않도록 기존 `JobApplicationService.submit()` 흐름 유지
+- 주요 수정 클래스:
+  - `ApplicationSubmitValidator`
+  - `ApplicationSubmitValidatorTest`
+  - `JobApplicationServiceTest`
+  - `ApplicationControllerTest`
+  - `ApplicationAnswerServiceTest`
+  - `ApplicationAnswerControllerTest`
+- API:
+  - 신규 API 없음
+  - 기존 `POST /applications/{applicationId}/submit`의 제출 검증만 보강
+- 테스트 결과:
+  - `ApplicationSubmitValidatorTest` 성공
+  - `JobApplicationServiceTest`, `ApplicationControllerTest` 성공
+  - `ApplicationAnswerServiceTest`, `ApplicationAnswerControllerTest` 성공
+  - `QuestionTemplateServiceTest`, `QuestionTemplateControllerTest` 성공
+  - `JobPostingQuestionServiceTest`, `JobPostingQuestionControllerTest` 성공
+  - `./gradlew.bat clean test --no-daemon` 성공
+- 미구현/보류:
+  - 관리자 답변 조회 API `GET /admin/applications/{applicationId}/answers`
+  - `GET /applications/{applicationId}/answers`
+  - 선택형 답변 option, 파일형 답변, Attachment 연동, QuestionSet
+  - `minLength` submit 강제
+  - active 질문 외 answer row 정합성 검증
+- 후속 반영: Phase 03c-9-4에서 관리자 답변 lazy read API를 구현했다.
+
+## Phase 03c-9-2 - ApplicationAnswer + Applicant Question/Answer API
+
+- 작업일: 2026-05-18
+- 목적: 지원자가 본인 지원서의 공고 질문 목록과 현재 답변을 조회하고, DRAFT 상태에서 답변을 replace 저장할 수 있도록 `ApplicationAnswer` 기반 applicant API를 추가했다.
+- 구현 범위:
+  - `ApplicationAnswer` Entity 추가
+  - `ApplicationAnswerRepository` 추가
+  - `ApplicationAnswerRequest`, `ApplicationAnswerReplaceRequest`, `ApplicationQuestionResponse` 추가
+  - `ApplicationAnswerService`, `ApplicationAnswerController` 추가
+  - `InvalidApplicationAnswerException` 추가 및 `GlobalExceptionHandler` 400 매핑
+  - `GET /applications/{applicationId}/questions` 구현
+  - `POST /applications/{applicationId}/answers` 구현
+  - active `JobPostingQuestion` 목록 기준 질문 조회와 현재 답변 merge 구현
+  - 답변 replace 저장 시 applicationId 기준 기존 답변 삭제 후 새 답변 저장
+  - 답변 저장 시 질문 문구/category/answerType/required/minLength/maxLength/sortOrder snapshot 보존
+  - DRAFT 저장 시 null/blank 답변 허용, maxLength/SHORT_TEXT/LONG_TEXT 길이 초과 차단
+- 주요 클래스:
+  - `ApplicationAnswer`
+  - `ApplicationAnswerRepository`
+  - `ApplicationAnswerService`
+  - `ApplicationAnswerController`
+  - `ApplicationQuestionResponse`
+  - `ApplicationAnswerServiceTest`
+  - `ApplicationAnswerControllerTest`
+- API:
+  - `GET /applications/{applicationId}/questions`
+  - `POST /applications/{applicationId}/answers`
+- 테스트 결과:
+  - `ApplicationAnswerServiceTest` 성공
+  - `ApplicationAnswerControllerTest` 성공
+  - `QuestionTemplateServiceTest` 성공
+  - `QuestionTemplateControllerTest` 성공
+  - `JobPostingQuestionServiceTest` 성공
+  - `JobPostingQuestionControllerTest` 성공
+  - `ApplicationSubmitValidatorTest` 성공
+  - `ApplicationControllerTest` 성공
+  - `./gradlew.bat clean test` 성공
+- 미구현/보류:
+  - `ApplicationSubmitValidator` 질문답변 필수 검증 연동
+  - 관리자 답변 조회 API `GET /admin/applications/{applicationId}/answers`
+  - 지원자 답변 전용 조회 API `GET /applications/{applicationId}/answers`
+  - 선택형 option, 파일형 답변, Attachment 연동, QuestionSet, StageResult
+- 다음 작업: Phase 03c-9-3에서 active required `JobPostingQuestion` 기준 answer blank/maxLength 검증을 `ApplicationSubmitValidator`에 연결한다.
+
+## Phase 03c-9-1 - QuestionTemplate + JobPostingQuestion Admin API
+
+- 작업일: 2026-05-18
+- 목적: 자기소개서/질문답변 도메인의 첫 구현 단계로 전역 질문 템플릿과 공고별 질문 구성 관리자 API를 추가했다.
+- 구현 범위:
+  - `QuestionCategory`, `QuestionAnswerType` enum 추가
+  - `QuestionTemplate`, `JobPostingQuestion` Entity 추가
+  - `QuestionTemplateRepository`, `JobPostingQuestionRepository` 추가
+  - `QuestionTemplateService`, `JobPostingQuestionService` 추가
+  - `QuestionTemplateController`, `JobPostingQuestionController` 추가
+  - 질문 템플릿 생성/조회/수정/비활성화, 공고별 질문 생성/조회/수정/정렬/비활성화 API 구현
+  - 템플릿 기반 질문 생성 시 템플릿 값을 복사하고 요청 override를 최종 snapshot에 반영
+  - 공고 질문 구성 변경은 `JobPosting.status=DRAFT`에서만 허용
+  - 질문 삭제는 HTTP DELETE가 아니라 POST command로 `active=false` soft delete 처리
+- 주요 클래스:
+  - `QuestionTemplate`
+  - `JobPostingQuestion`
+  - `QuestionTemplateService`
+  - `JobPostingQuestionService`
+  - `QuestionTemplateController`
+  - `JobPostingQuestionController`
+  - `QuestionTemplateServiceTest`
+  - `QuestionTemplateControllerTest`
+  - `JobPostingQuestionServiceTest`
+  - `JobPostingQuestionControllerTest`
+- API:
+  - `GET /admin/question-templates`
+  - `GET /admin/question-templates/{templateId}`
+  - `POST /admin/question-templates`
+  - `POST /admin/question-templates/{templateId}`
+  - `POST /admin/question-templates/{templateId}/deactivate`
+  - `GET /admin/job-postings/{jobPostingId}/questions`
+  - `POST /admin/job-postings/{jobPostingId}/questions`
+  - `POST /admin/job-postings/{jobPostingId}/questions/{questionId}`
+  - `POST /admin/job-postings/{jobPostingId}/questions/reorder`
+  - `POST /admin/job-postings/{jobPostingId}/questions/{questionId}/delete`
+- 테스트 결과:
+  - `QuestionTemplateServiceTest` 성공
+  - `QuestionTemplateControllerTest` 성공
+  - `JobPostingQuestionServiceTest` 성공
+  - `JobPostingQuestionControllerTest` 성공
+  - `JobPostingServiceTest` 성공
+  - `JobPostingControllerTest` 성공
+  - `ApplicationSubmitValidatorTest` 성공
+  - `AdminApplicationSectionControllerTest` 성공
+  - `./gradlew.bat clean test` 성공
+- 미구현/보류:
+  - `ApplicationAnswer`
+  - 지원자 질문 목록/답변 저장 API
+  - 질문답변 submit validator 연동
+  - 관리자 답변 조회 API
+  - `QuestionSet`, 선택형 option, 파일형 답변, Attachment 연동
+- 다음 작업: Phase 03c-9-2에서 `ApplicationAnswer`와 지원자 질문 목록/답변 replace 저장 API를 구현한다.
+
+## Phase 03c-9 - Application Question/Answer Domain Design
+
+- 작업일: 2026-05-18
+- 목적: `JobApplication` 하위 자기소개서/질문답변 도메인을 구현하기 전에 공고별 질문 구성, 질문 템플릿, 지원서별 답변 저장, 제출 시 필수 답변 검증, 관리자 상세 답변 조회 확장 방향을 설계했다.
+- 핵심 설계:
+  - 추천 구조는 `QuestionTemplate` + `JobPostingQuestion` + `ApplicationAnswer`로 확정했다.
+  - `QuestionTemplate`은 전역 질문 은행으로 두고, `JobPostingQuestion`은 공고별 실제 질문 snapshot record로 둔다.
+  - `JobPostingQuestion.questionTemplate`은 nullable로 두어 템플릿 기반 질문과 직접 작성 질문을 모두 지원한다.
+  - `ApplicationAnswer`는 지원서별 답변 record이며 `job_application_id + job_posting_question_id` unique 후보를 둔다.
+  - 자기소개서는 별도 Entity가 아니라 `QuestionCategory.SELF_INTRODUCTION` 카테고리로 일반 질문답변 구조에 포함한다.
+  - 초기 답변 타입은 `SHORT_TEXT`, `LONG_TEXT`로 시작하고 선택형/파일형 답변은 후속 Phase로 보류한다.
+  - 공고 질문 구성은 `JobPosting.status=DRAFT`에서만 수정 허용하고, `PUBLISHED` 이후 변경은 revision/reopen 정책 전까지 금지하는 방향을 추천한다.
+  - 지원자 답변 저장은 `DRAFT` 상태에서만 허용하며, required 미입력은 DRAFT 저장에서는 허용하고 submit 시 실패시키는 방향으로 설계했다.
+  - 관리자 답변 조회는 Phase 03c-8 lazy section API 흐름에 맞춰 `GET /admin/applications/{applicationId}/answers` 후보로 둔다.
+- 문서:
+  - `docs/codex/design/phase-03c-9-question-answer-design.md`
+  - `docs/codex/reports/phase-03c-9-question-answer-design.html`
+  - `docs/codex/design/phase-03-application-design.md`
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+- 테스트 결과: 설계 문서 작업이므로 테스트는 실행하지 않음. Java 코드, 테스트 코드, 설정 파일, DB schema는 변경하지 않음.
+- 보정 사항:
+  - `docs/codex/design/phase-03c-application-detail-design.md`의 다음 Phase 추천을 Phase 03c-9 설계 완료 이후 구현 흐름으로 갱신했다.
+  - `docs/codex/reports/phase-03c-8-admin-application-section-read.html`의 깨진 PowerShell `AES_SECRET_KEY` 마스킹 표기를 `$env:AES_SECRET_KEY='***'; .\gradlew.bat ...` 형태로 보정했다.
+- 남은 이슈:
+  - `QuestionSet` 도입, 질문 revision/reopen 정책, 선택형 답변 option 도메인, 파일형 답변과 Attachment 연결 방식은 보류했다.
+  - 답변 원문 열람 권한과 감사 로그는 보안 Phase에서 별도 설계한다.
+- 다음 작업: Phase 03c-9-1에서 `QuestionTemplate` + `JobPostingQuestion` 관리자 질문 구성 API를 구현한다.
+
+## Phase 03c-8 - Admin Application Detail Section Read API
+
+- 작업일: 2026-05-18
+- 목적: 관리자 Application 루트 상세 조회는 유지하면서, 학력/경력/자격/어학/병역/수상/공백기간/첨부 metadata를 섹션별 lazy read-only API로 조회할 수 있게 확장했다.
+- 핵심 구현:
+  - `AdminApplicationSectionController` 추가
+  - `AdminApplicationSectionService` 추가
+  - 관리자 전용 상세 섹션 응답 DTO 10종 추가
+  - 지원자 상세 섹션 Service 재사용 없이 Repository 기반 read-only 조회 구현
+  - 목록형 섹션 빈 배열, `military` 저장 전 `data=null`, `careers` profile 없음 시 `NOT_SELECTED + []` 정책 적용
+  - 자격번호는 `certificateNumberMasked`, 병역 면제 사유는 `exemptionReasonMasked`만 응답
+  - Attachment 응답에서 `storedFileName`, `storagePath`, 다운로드 URL 비노출 유지
+  - 관리자 조회는 DRAFT/SUBMITTED/WITHDRAWN 상태와 공고 상태/접수기간에 무관하게 허용
+- 주요 클래스:
+  - `AdminApplicationSectionController`
+  - `AdminApplicationSectionService`
+  - `AdminEducationResponse`, `AdminSemesterGradeResponse`
+  - `AdminCareerResponse`, `AdminCareerItemResponse`
+  - `AdminCertificateResponse`, `AdminLanguageResponse`, `AdminMilitaryResponse`
+  - `AdminAwardResponse`, `AdminGapPeriodResponse`, `AdminAttachmentResponse`
+  - `AdminApplicationSectionServiceTest`
+  - `AdminApplicationSectionControllerTest`
+- API:
+  - `GET /admin/applications/{applicationId}/educations`
+  - `GET /admin/applications/{applicationId}/careers`
+  - `GET /admin/applications/{applicationId}/certificates`
+  - `GET /admin/applications/{applicationId}/languages`
+  - `GET /admin/applications/{applicationId}/military`
+  - `GET /admin/applications/{applicationId}/awards`
+  - `GET /admin/applications/{applicationId}/gap-periods`
+  - `GET /admin/applications/{applicationId}/attachments`
+- 테스트 결과:
+  - `AdminApplicationSectionServiceTest` 성공
+  - `AdminApplicationSectionControllerTest` 성공
+  - 기존 관리자 Application 루트 조회 테스트 성공
+  - Application submit validator 및 지원자 Application API 회귀 테스트 성공
+  - Education/Career/Certificate/Language/Military/Award/GapPeriod/Attachment 상세 섹션 회귀 테스트 성공
+  - `./gradlew.bat clean test` 성공
+- 남은 이슈:
+  - 실제 관리자 권한 세분화는 SecurityConfig 보안 Phase에서 처리한다.
+  - 자격번호/면제 사유 원문 열람 권한, 감사 로그, 다운로드 권한은 후속 보안/파일 Phase에서 검토한다.
+  - 관리자 상세 aggregate 단일 API는 아직 구현하지 않았다.
+- 다음 작업: 자기소개서/질문답변 도메인 또는 StageResult 전 Application 상세 조회 범위를 검토한다.
+
+## Phase 03c-7 - Application Submit Validator
+
+- 작업일: 2026-05-18
+- 목적: `JobApplicationService.submit()`에 `ApplicationFormConfig` 기반 상세 섹션 최종제출 검증을 연결했다.
+- 핵심 구현:
+  - `ApplicationSubmitValidator` 신규 추가
+  - `JobApplicationService.submit()`에서 기존 submit 가능 검증 이후, 상태 변경 직전에 validator 호출
+  - `ApplicationEducationRepository.existsByJobApplicationId` 추가
+  - `ApplicationCareerRepository.existsByJobApplicationId` 추가
+  - `useEducation=true`이면 Education 최소 1건 필수 검증
+  - `useCareer=true`이면 CareerProfile 필수, `NOT_SELECTED` 실패, `EXPERIENCED` Career row 필수, `NEWCOMER`/`NOT_APPLICABLE` Career row 방어 실패 검증
+  - `useMilitary=true`이면 Military record 필수, `COMPLETED` 복무기간 필수, `EXEMPTED` 면제 사유 필수 검증
+  - Certificate, Language, Award, GapPeriod, Attachment는 이번 Phase에서 선택 섹션으로 유지
+  - 기존 상세 섹션 저장 API path/method, Entity 구조, replace 저장 정책은 변경하지 않음
+- 주요 클래스:
+  - `ApplicationSubmitValidator`
+  - `ApplicationSubmitValidatorTest`
+  - `JobApplicationService`
+  - `ApplicationEducationRepository`
+  - `ApplicationCareerRepository`
+- API:
+  - 신규 API 없음
+  - `POST /applications/{applicationId}/submit` 내부 검증 강화
+- 테스트 결과:
+  - `ApplicationSubmitValidatorTest` 성공
+  - `JobApplicationServiceTest` 성공
+  - `ApplicationControllerTest` 성공
+  - Education/Career/Certificate/Language/Military/Award/GapPeriod/Attachment 상세 섹션 회귀 테스트 성공
+  - `./gradlew.bat clean test` 성공
+- 남은 이슈:
+  - Attachment 제출 필수 정책은 `ApplicationFormConfig` 확장 또는 별도 policy 도입 후 검토한다.
+  - Certificate/Language/Award/GapPeriod의 세부 required flag가 생기면 submit validator에 연결한다.
+  - 관리자 상세 섹션 API, StageResult, 자기소개서/질문답변은 후속 Phase로 유지한다.
+- 다음 작업: 관리자 상세 섹션 조회 API 또는 자기소개서/질문답변 도메인 범위를 검토한다.
+
+## Phase 03c-6 - Application Attachment Metadata
+
+- 작업일: 2026-05-15
+- 목적: `JobApplication` 하위 첨부파일 metadata를 지원자가 조회/replace 저장할 수 있게 구현했다.
+- 핵심 구현:
+  - `AttachmentType`, `ApplicationSectionType` enum 추가
+  - `ApplicationAttachment` Entity 추가
+  - `ApplicationAttachmentRepository` 추가
+  - `ApplicationAttachmentService`에서 본인 지원서, DRAFT 상태, PUBLISHED 공고, 접수기간 검증을 재사용해 첨부 metadata replace 저장 구현
+  - Attachment는 현재 `ApplicationFormConfig` flag 없이 저장 가능하도록 처리
+  - `sectionType=APPLICATION`이면 `sectionRecordId` 금지, 그 외 sectionType은 null 허용 및 값이 있으면 1 이상 검증
+  - `storedFileName`, `storagePath`는 저장하되 지원자 응답에서 제외
+  - `ApplicationAttachmentController`로 지원자 첨부 metadata 조회/저장 API 추가
+- 주요 클래스:
+  - `AttachmentType`
+  - `ApplicationSectionType`
+  - `ApplicationAttachment`
+  - `ApplicationAttachmentRepository`
+  - `AttachmentReplaceRequest`, `AttachmentRequest`
+  - `AttachmentResponse`
+  - `ApplicationAttachmentService`
+  - `ApplicationAttachmentController`
+  - `ApplicationAttachmentServiceTest`
+  - `ApplicationAttachmentControllerTest`
+- API:
+  - `GET /applications/{applicationId}/attachments`
+  - `POST /applications/{applicationId}/attachments`
+- 테스트 결과:
+  - `ApplicationAttachmentServiceTest` 성공
+  - `ApplicationAttachmentControllerTest` 성공
+  - Education/Career/Certificate/Language/Military/Award/GapPeriod 상세 섹션 회귀 테스트 성공
+  - `./gradlew.bat clean test` 성공
+- 남은 이슈:
+  - 실제 multipart 업로드/다운로드/저장소 연동은 구현하지 않았다.
+  - `sectionRecordId` 실제 상세 섹션 row 존재성 검증은 후속 정책 확정 후 보완한다.
+  - Attachment submit 필수 정책은 Phase 03c-7에서 검토한다.
+- 다음 작업: Phase 03c-7 `ApplicationSubmitValidator` 통합을 검토한다.
+
+## Phase 03c-5 - Application Award + GapPeriod
+
+- 작업일: 2026-05-15
+- 목적: `JobApplication` 하위 수상/포상사항과 공백기간을 지원자가 조회/replace 저장할 수 있게 구현했다.
+- 핵심 구현:
+  - `GapType` enum 추가
+  - `ApplicationAward`, `ApplicationGapPeriod` Entity 추가
+  - `ApplicationAwardRepository`, `ApplicationGapPeriodRepository` 추가
+  - `ApplicationSectionAccessService`에 `validateAwardEnabled`, `validateGapPeriodEnabled` 추가
+  - `ApplicationAwardService`, `ApplicationGapPeriodService`에서 본인 지원서, DRAFT 상태, PUBLISHED 공고, 접수기간, `useAward`/`useGapPeriod` 검증 구현
+  - Award/GapPeriod row는 applicationId 기준 명시 삭제 후 새 row 저장
+  - GapPeriod `startDate <= endDate`, description 2000자 제한, sortOrder 중복 검증 구현
+  - `ApplicationAwardController`, `ApplicationGapPeriodController`로 지원자 수상/공백기간 조회/저장 API 추가
+- 주요 클래스:
+  - `GapType`
+  - `ApplicationAward`
+  - `ApplicationGapPeriod`
+  - `ApplicationAwardService`
+  - `ApplicationGapPeriodService`
+  - `ApplicationAwardController`
+  - `ApplicationGapPeriodController`
+  - `AwardReplaceRequest`, `AwardRequest`, `GapPeriodReplaceRequest`, `GapPeriodRequest`
+  - `AwardResponse`, `GapPeriodResponse`
+  - `ApplicationAwardServiceTest`, `ApplicationAwardControllerTest`
+  - `ApplicationGapPeriodServiceTest`, `ApplicationGapPeriodControllerTest`
+- API:
+  - `GET /applications/{applicationId}/awards`
+  - `POST /applications/{applicationId}/awards`
+  - `GET /applications/{applicationId}/gap-periods`
+  - `POST /applications/{applicationId}/gap-periods`
+- 테스트 결과:
+  - `ApplicationAwardServiceTest`, `ApplicationAwardControllerTest`, `ApplicationGapPeriodServiceTest`, `ApplicationGapPeriodControllerTest` 성공
+  - Education/Career/Certificate/Language/Military 상세 섹션 회귀 테스트 성공
+  - `./gradlew.bat clean test` 성공
+- 남은 이슈:
+  - `ApplicationSubmitValidator`는 아직 구현하지 않았다.
+  - GapPeriod overlap 검증은 정책 확정 전까지 보류한다.
+  - 관리자 상세 섹션 API와 수상/공백기간 마스킹 정책은 후속 Phase에서 확정한다.
+- 다음 작업: Phase 03c-6 Attachment metadata vertical slice를 검토한다.
+
+## Phase 03c-4R - Application Section Access Helper
+
+- 작업일: 2026-05-15
+- 목적: Education, Career, Certificate, Language, Military 상세 섹션 Service에 반복되던 지원서 접근/쓰기 가능/config enabled 검증을 최소 helper로 추출했다.
+- 핵심 구현:
+  - `ApplicationSectionAccessService` 추가
+  - `findOwnedApplication`, `validateWritable`, 섹션별 `validateXxxEnabled` 메서드 구현
+  - `ApplicationEducationService`, `ApplicationCareerService`, `ApplicationCertificateService`, `ApplicationLanguageService`, `ApplicationMilitaryService`에서 중복 검증 제거
+  - `SectionType` enum 기반 일반화는 도입하지 않고 명시 메서드로 유지
+- 주요 클래스:
+  - `ApplicationSectionAccessService`
+  - `ApplicationEducationService`
+  - `ApplicationCareerService`
+  - `ApplicationCertificateService`
+  - `ApplicationLanguageService`
+  - `ApplicationMilitaryService`
+- API:
+  - 신규 API 없음
+- 테스트 결과:
+  - Education/Career/Certificate/Language/Military 상세 섹션 Service/Controller 회귀 테스트 성공
+  - `./gradlew.bat clean test` 성공
+- 남은 이슈:
+  - `ApplicationSubmitValidator`는 아직 구현하지 않았다.
+  - 병역 submit 필수 정책은 Phase 03c-7에서 연결한다.
+- 다음 작업: Phase 03c-5 Award + GapPeriod vertical slice에서 helper를 재사용한다.
+
+## Phase 03c-4 - Application Military
+
+- 작업일: 2026-05-15
+- 목적: `JobApplication` 하위 병역사항 단건 record를 지원자 본인이 조회하고 `DRAFT` 상태에서 저장할 수 있게 구현했다.
+- 핵심 구현:
+  - `ApplicationMilitary` Entity 추가
+  - `MilitarySubjectType`, `MilitaryServiceType`, `MilitaryBranch`, `MilitaryRank` enum 추가
+  - `ApplicationMilitaryRepository` 추가
+  - `ApplicationMilitaryService`에서 본인 지원서, DRAFT 상태, PUBLISHED 공고, 접수기간, `useMilitary` 검증 구현
+  - 병역 record는 `job_application_id` unique 단건 upsert 구조로 구현
+  - 병역 유형별 허용 필드 검증 구현
+  - `ApplicationMilitaryController`로 지원자 병역 조회/저장 API 추가
+- 주요 클래스:
+  - `ApplicationMilitary`
+  - `MilitarySubjectType`, `MilitaryServiceType`, `MilitaryBranch`, `MilitaryRank`
+  - `ApplicationMilitaryRepository`
+  - `MilitarySaveRequest`, `MilitaryResponse`
+  - `ApplicationMilitaryService`
+  - `ApplicationMilitaryController`
+  - `ApplicationMilitaryServiceTest`
+  - `ApplicationMilitaryControllerTest`
+- API:
+  - `GET /applications/{applicationId}/military`
+  - `POST /applications/{applicationId}/military`
+- 테스트 결과:
+  - `ApplicationMilitaryServiceTest`, `ApplicationMilitaryControllerTest` 성공
+  - Education/Career/Certificate/Language 상세 섹션 회귀 테스트 성공
+  - `./gradlew.bat clean test` 성공
+- 남은 이슈:
+  - submit 시 `useMilitary=true`이면 `ApplicationMilitary` 1건 필수 검증을 Phase 03c-7에서 연결한다.
+  - `COMPLETED` 복무기간 필수, `EXEMPTED` 면제 사유 필수 여부는 submit validator에서 확정한다.
+  - 면제 사유의 관리자 응답 마스킹/암호화 정책은 관리자 상세 섹션 Phase에서 확정한다.
+  - 상세 섹션 공통 접근/수정 가능 검증이 반복되므로 다음 섹션 전 최소 helper 추출을 검토한다.
+- 다음 작업: `ApplicationSectionAccessService` 같은 최소 helper 추출 후 Phase 03c-5 Award + GapPeriod vertical slice를 진행한다.
+
+## Phase 03c-3 - Application Certificate + Language
+
+- 작업일: 2026-05-15
+- 목적: `JobApplication` 하위 상세 섹션 중 자격사항과 어학사항을 지원자가 조회/replace 저장할 수 있게 구현했다.
+- 핵심 구현:
+  - `ApplicationCertificate`, `ApplicationLanguage` Entity 추가
+  - `ApplicationCertificateRepository`, `ApplicationLanguageRepository` 추가
+  - `ApplicationCertificateService`, `ApplicationLanguageService`에서 본인 지원서, DRAFT 상태, PUBLISHED 공고, 접수기간, `useCertificate`/`useLanguage` 검증 구현
+  - Certificate/Language row는 applicationId 기준 명시 삭제 후 새 row 저장
+  - Certificate 취득일/만료일, Language 응시일/만료일 교차 검증 구현
+  - `ApplicationCertificateController`, `ApplicationLanguageController`로 지원자 자격/어학 조회/저장 API 추가
+- 주요 클래스:
+  - `ApplicationCertificate`
+  - `ApplicationLanguage`
+  - `ApplicationCertificateService`
+  - `ApplicationLanguageService`
+  - `ApplicationCertificateController`
+  - `ApplicationLanguageController`
+  - `CertificateReplaceRequest`, `CertificateRequest`, `LanguageReplaceRequest`, `LanguageRequest`
+  - `CertificateResponse`, `LanguageResponse`
+  - `ApplicationCertificateServiceTest`, `ApplicationCertificateControllerTest`
+  - `ApplicationLanguageServiceTest`, `ApplicationLanguageControllerTest`
+- API:
+  - `GET /applications/{applicationId}/certificates`
+  - `POST /applications/{applicationId}/certificates`
+  - `GET /applications/{applicationId}/languages`
+  - `POST /applications/{applicationId}/languages`
+- 테스트 결과:
+  - `ApplicationCertificateServiceTest`, `ApplicationCertificateControllerTest`, `ApplicationLanguageServiceTest`, `ApplicationLanguageControllerTest` 성공
+  - `ApplicationEducationServiceTest`, `ApplicationEducationControllerTest`, `ApplicationCareerServiceTest`, `ApplicationCareerControllerTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - submit 시 Certificate/Language 최소 row 필수 여부는 Phase 03c-7에서 결정한다.
+  - Language의 score/grade 필수 여부는 DRAFT 저장에서는 강제하지 않았고 submit validator에서 재검토한다.
+  - 관리자 상세 응답에 Certificate/Language 섹션은 아직 포함하지 않았다.
+  - 자격번호 관리자 마스킹/암호화 정책은 관리자 상세 섹션 확장 시 결정한다.
+  - Education/Career/Certificate/Language의 접근/상태/접수기간/config enabled 검증이 반복되므로 Military 구현 후 최소 공통 helper 추출을 검토한다.
+  - Certificate/Language 자유 입력 문자열 길이 제한은 운영 DB schema 기준 확정 후 보완한다.
+- 다음 작업:
+  - Military vertical slice를 구현하거나, 상세 섹션 공통 접근/수정 정책 helper를 최소 범위로 추출할지 검토한다.
+
+## Phase 03c-2 - Application Career
+
+- 작업일: 2026-05-15
+- 목적: `JobApplication` 하위 상세 섹션 중 경력사항을 지원자가 조회/replace 저장할 수 있게 구현했다.
+- 핵심 구현:
+  - `ApplicationCareerProfile`, `ApplicationCareer` Entity 추가
+  - `CareerType`, `EmploymentType` enum 추가
+  - `ApplicationCareerProfileRepository`, `ApplicationCareerRepository` 추가
+  - `ApplicationCareerService`에서 본인 지원서, DRAFT 상태, PUBLISHED 공고, 접수기간, `useCareer` 검증 구현
+  - Career profile은 upsert하고, Career row는 applicationId 기준 명시 삭제 후 새 row 저장
+  - 리뷰 보완으로 `currentlyEmployed=true`이면 `endDate`를 금지하고, Service 직접 호출에서도 담당업무/퇴사사유 2000자 제한을 검증
+  - `ApplicationCareerController`로 지원자 경력 조회/저장 API 추가
+- 주요 클래스:
+  - `ApplicationCareerProfile`
+  - `ApplicationCareer`
+  - `ApplicationCareerService`
+  - `ApplicationCareerController`
+  - `CareerReplaceRequest`, `CareerRequest`
+  - `CareerResponse`, `CareerItemResponse`
+  - `ApplicationCareerServiceTest`, `ApplicationCareerControllerTest`
+- API:
+  - `GET /applications/{applicationId}/careers`
+  - `POST /applications/{applicationId}/careers`
+- 테스트 결과:
+  - `ApplicationCareerServiceTest` 성공
+  - `ApplicationCareerControllerTest` 성공
+  - `ApplicationEducationServiceTest` 성공
+  - `ApplicationEducationControllerTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - submit 시 `CareerType.NOT_SELECTED` 실패 여부와 `EXPERIENCED` 최소 1개 필수 검증은 Phase 03c-7에서 연결한다.
+  - 관리자 상세 응답에 Career 섹션은 아직 포함하지 않았다.
+  - 다음 상세 섹션에서 검증 반복이 커지면 최소 공통 helper 추출을 검토한다.
+- 다음 작업:
+  - Certificate + Language 또는 Military vertical slice를 구현한다.
+
+## Phase 03c-1 - Application Education
+
+- 작업일: 2026-05-15
+- 목적: `JobApplication` 하위 상세 섹션 중 학력사항과 학기별 성적을 지원자가 조회/replace 저장할 수 있게 구현했다.
+- 핵심 구현:
+  - `ApplicationEducation`, `ApplicationEducationSemesterGrade` Entity 추가
+  - 학력/성적 enum `EducationLevel`, `GraduationStatus`, `DayNightType`, `CampusType` 추가
+  - `ApplicationEducationRepository`, `ApplicationEducationSemesterGradeRepository` 추가
+  - `ApplicationEducationService`에서 본인 지원서, DRAFT 상태, PUBLISHED 공고, 접수기간, `useEducation` 검증 구현
+  - replace 저장 시 기존 SemesterGrade 선삭제 후 Education 삭제, 새 Education/SemesterGrade 저장
+  - 입학일/졸업일이 모두 있으면 입학일이 졸업일보다 늦지 않도록 검증
+  - `ApplicationEducationController`로 지원자 학력 조회/저장 API 추가
+  - invalid enum 요청을 `ApiResponse.fail`로 반환하도록 `HttpMessageNotReadableException` 처리 추가
+- 주요 클래스:
+  - `ApplicationEducation`
+  - `ApplicationEducationSemesterGrade`
+  - `ApplicationEducationService`
+  - `ApplicationEducationController`
+  - `EducationReplaceRequest`, `EducationRequest`, `SemesterGradeRequest`
+  - `EducationResponse`, `SemesterGradeResponse`
+  - `ApplicationEducationServiceTest`, `ApplicationEducationControllerTest`
+- API:
+  - `GET /applications/{applicationId}/educations`
+  - `POST /applications/{applicationId}/educations`
+- 테스트 결과:
+  - `ApplicationEducationServiceTest` 성공
+  - `ApplicationEducationControllerTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - submit 시 Education 최소 1개 필수 검증은 Phase 03c-7에서 연결한다.
+  - 관리자 상세 섹션 API는 아직 없다.
+  - 학교명/전공/성적의 관리자 노출/마스킹 정책은 관리자 상세 확장 시 재검토한다.
+  - 성적/학점 `BigDecimal` precision/scale 명시는 운영 DB schema 정책 확정 후 검토한다.
+  - 다음 섹션에서 접근/상태/접수기간/config enabled 검증이 반복되면 최소 공통 helper 추출을 검토한다.
+- 다음 작업:
+  - Career 구현 전 `careerApplicable`, `hasCareer`, `careerType` 중 어떤 정책을 둘지 결정한다.
+
+## Phase 03c-0 - Application Detail Design
+
+- 작업일: 2026-05-15
+- 목적: `JobApplication` 루트에 연결될 지원서 상세 섹션 도메인을 실제 구현 전 설계했다.
+- 핵심 설계:
+  - 기본 개인정보 원천은 `Applicant`/`User` 계층에 두고, 지원서에는 필요한 최소 snapshot만 둔다.
+  - 학력, 학기별 성적, 경력, 자격, 어학, 병역, 수상, 공백기간, 첨부파일 metadata를 `JobApplication` 하위 상세 섹션 후보로 정리했다.
+  - `ApplicationFormConfig.useXxx` flag는 화면 노출, 저장 허용, submit validation 분기 기준으로 사용한다.
+  - 상세 섹션 수정은 `DRAFT` 상태에서만 허용하고, `SUBMITTED`/`WITHDRAWN`은 조회만 허용한다.
+  - submit 상세 검증은 후속 Phase에서 `ApplicationSubmitValidator`와 섹션별 validator로 분리한다.
+- 문서:
+  - `docs/codex/design/phase-03c-application-detail-design.md`
+  - `docs/codex/design/phase-03-application-design.md`
+- 테스트 결과: 문서 설계 작업이므로 테스트는 실행하지 않음.
+- 남은 이슈: 상세 섹션별 required flag 세분화, 신입/경력 구분 정책, 병역 필수 정책, 첨부파일 저장소/권한 정책은 구현 전 확정 필요.
+- 리뷰 반영:
+  - replace 저장 절차를 명시 삭제 후 신규 저장 방식으로 구체화했다.
+  - Education replace 시 기존 SemesterGrade 선삭제 정책을 추가했다.
+  - `useMilitary=true`이면 submit 시 `ApplicationMilitary` 1건 필수로 정리했다.
+  - 상세 섹션 code 값은 Java enum으로 시작하는 방향을 명시했다.
+  - Career 최소 1개 검증은 `careerApplicable` 또는 지원 유형 도입 전까지 보류로 정리했다.
+- 다음 작업: Phase 03c-1에서 Education + SemesterGrade vertical slice를 구현하고, 필요한 최소 공통 helper만 함께 도입한다.
+
+## Phase 03b-1 - Admin Application Read
+
+- 작업일: 2026-05-15
+- 목적: Phase 03a에서 생성된 `JobApplication` 루트를 관리자 화면에서 목록/상세로 조회할 수 있는 최소 API를 구현했다.
+- 핵심 구현:
+  - `AdminApplicationController` 추가
+  - 관리자 전체/공고별 Application 목록 조회 API 추가
+  - 관리자 Application 상세 조회 API 추가
+  - 관리자 전용 `AdminApplicationSummaryResponse`, `AdminApplicationDetailResponse` 추가
+  - `JobApplicationRepository` 관리자 조회 쿼리와 to-one `@EntityGraph` 추가
+  - `JobApplicationService` 관리자 조회, status 파싱, page/size 검증 추가
+  - 리뷰 반영으로 `AdminApplicationSearchCondition`을 `dto.condition`으로 이동
+  - status 필터를 `trim + uppercase` 기준으로 정규화
+  - `JobApplicationServiceTest`, `AdminApplicationControllerTest` 보강
+- 주요 클래스:
+  - `AdminApplicationController`
+  - `AdminApplicationSearchCondition`
+  - `AdminApplicationSummaryResponse`
+  - `AdminApplicationDetailResponse`
+  - `JobApplicationRepository`
+  - `JobApplicationService`
+  - `AdminApplicationControllerTest`
+- API:
+  - `GET /admin/applications`
+  - `GET /admin/applications/{applicationId}`
+  - `GET /admin/job-postings/{jobPostingId}/applications`
+- 테스트 결과:
+  - `JobApplicationServiceTest` 성공
+  - `AdminApplicationControllerTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - 실제 관리자 권한 검증은 SecurityConfig에 추가하지 않았다. 운영 전 `/admin/applications/**`는 `ROLE_ADMIN` 또는 채용담당자 권한으로 보호해야 한다.
+  - 관리자 응답은 Application 루트 정보만 포함하며 상세 섹션/StageResult는 아직 없다.
+- 다음 작업:
+  - 관리자 목록 추가 필터 또는 Application 상세 섹션 구현 범위를 결정한다.
+
+## Phase 03a-3 - Application API
+
+- 작업일: 2026-05-15
+- 목적: Phase 03a-1/03a-2에서 구현한 지원자 Application 생성/조회/수정/제출/철회 Service 흐름을 HTTP API로 연결했다.
+- 핵심 구현:
+  - `ApplicationController` 추가
+  - `CurrentApplicantService` 추가
+  - `ApplicantRepository.findByLoginId` 추가
+  - `CustomUserDetails` userType 상수 추가 및 `getUsername() == loginId` 테스트 고정
+  - 지원자 Application 생성, 상세 조회, DRAFT 수정, 제출, 철회 API 추가
+  - 공고별 내 지원서 조회 API 추가
+  - `ApplicationControllerTest`로 path, method, `ApiResponse` 포맷, validation/error 응답, 타인 command 차단 고정
+- 주요 클래스:
+  - `ApplicationController`
+  - `CurrentApplicantService`
+  - `ApplicantRepository`
+  - `CustomUserDetails`
+  - `ApplicationControllerTest`
+  - `CustomUserDetailsTest`
+- API:
+  - `POST /applications`
+  - `GET /applications/{applicationId}`
+  - `POST /applications/{applicationId}`
+  - `POST /applications/{applicationId}/submit`
+  - `POST /applications/{applicationId}/withdraw`
+  - `GET /job-postings/{jobPostingId}/application`
+- 테스트 결과:
+  - `ApplicationControllerTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - `CustomUserDetails`에 `applicantId`가 없어 `loginId` 조회 helper를 사용한다.
+  - 인증/인가 실패 응답의 `401/403` 정교화는 보안 정책 확정 후 보완한다.
+  - 실제 SecurityFilterChain, CSRF, 미로그인/권한 실패 통합 테스트는 별도 보안 Phase에서 보완한다.
+  - `GET /applications/me` 목록 API는 별도 Phase로 분리했다.
+- 다음 작업:
+  - 관리자 Application 목록/상세 조회 또는 Application 상세 섹션 구현 범위를 결정한다.
+
+## Phase 03a-2 - Application Commands
+
+- 작업일: 2026-05-15
+- 목적: Phase 03a-1의 `JobApplication` 루트에 임시저장 수정, 최종제출, 철회 command를 추가했다.
+- 핵심 구현:
+  - `JobApplication.updateDraft`, `submit`, `withdraw` 추가
+  - `ApplicationUpdateRequest` 추가
+  - `JobApplicationService.updateDraft`, `submit`, `withdraw` 추가
+  - `PUBLISHED` 공고와 접수기간 내 조건을 command 공통 검증으로 적용
+  - DRAFT 수정, DRAFT -> SUBMITTED, SUBMITTED -> WITHDRAWN 상태 전이 검증
+  - Service 테스트에 updateDraft/submit/withdraw 성공 및 실패 케이스 추가
+- 주요 클래스:
+  - `JobApplication`
+  - `ApplicationUpdateRequest`
+  - `JobApplicationService`
+  - `JobApplicationServiceTest`
+- API:
+  - 없음. `ApplicationController`는 Phase 03a-3으로 분리했다.
+- 테스트 결과:
+  - `JobApplicationServiceTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - Application HTTP API와 MockMvc 계약 테스트는 아직 없다.
+  - 상세 섹션 필수값 검증은 후속 Phase에서 구현한다.
+  - 동시 unique 충돌 예외 변환은 Controller/API 단계에서 재검토한다.
+- 다음 작업:
+  - Phase 03a-3에서 ApplicationController/API/Test 구현을 진행한다.
+
+## 2026-05-13 - Phase 01a JobPosting Vertical Slice
+
+- Document: `docs/codex/implementation/phase-01a-job-posting.md`
+- Scope:
+  - Added JobPosting aggregate (`JobPosting`, `JobPosition`, `ApplicationFormConfig`)
+  - Added posting lifecycle enum/status transition service flow
+  - Added admin posting CRUD-like APIs (POST-based update policy)
+  - Added service-level business validation and tests
+- Notes:
+  - Focused on Phase 01a only.
+  - Did not add Application/Stage/Interview/Message/CommonCode domains.
+
+## 2026-05-13 - Phase 01a Review Fixes
+
+- Updated JobPosting list API to follow PageResponse pattern (`page`, `size`).
+- Added `GlobalExceptionHandler` for JobPosting exceptions:
+  - `JobPostingNotFoundException` -> 404
+  - `InvalidJobPostingException` -> 400
+- Updated Phase 01a implementation document to reflect review fixes.
+
+## 2026-05-14 - Phase 01b JobPosting Public Read API
+
+- Document: `docs/codex/implementation/phase-01b-job-posting-public-read.md`
+- Scope:
+  - Resolved existing conflict markers in Phase 01a JobPosting files while keeping admin `PageResponse` list behavior.
+  - Kept admin update as `POST /admin/job-postings/{id}` and did not reintroduce PUT.
+  - Added public/applicant JobPosting list/detail read APIs.
+  - Added public DTOs separated from admin DTOs.
+  - Added `Clock` injection for testable `accepting` calculation.
+  - Added public visibility tests for `PUBLISHED`, `DRAFT`, and `CLOSED` postings.
+- Notes:
+  - Public APIs expose only `PUBLISHED` postings.
+  - `PUBLISHED` postings are shown regardless of reception period; `accepting` reports current receivable status.
+  - Did not add Application/Stage/Interview/Message/CommonCode domains.
+
+## 2026-05-14 - Phase 01b Review Fixes
+
+- Document: `docs/codex/implementation/phase-01b-job-posting-public-read.md`
+- Scope:
+  - Removed collection `@EntityGraph` from admin pageable list query.
+  - Added admin detail-only repository lookup with `@EntityGraph`.
+  - Unified admin `publish`/`close` timestamps on injected `Clock`.
+  - Added page/size validation for admin and public JobPosting list queries.
+  - Made public detail JobPosition `sortOrder` sorting null-safe.
+  - Added tests for Clock-based publish/close timestamps and invalid paging requests.
+- Notes:
+  - Did not reintroduce PUT.
+  - Did not allow status updates through the general admin update API.
+
+## 2026-05-14 - Phase 01a/01b Integration Check
+
+- Documents:
+  - `docs/codex/implementation/phase-01a-job-posting.md`
+  - `docs/codex/implementation/phase-01b-job-posting-public-read.md`
+  - `docs/codex/07-implementation-history.md`
+- Scope:
+  - Checked the current branch and confirmed local `main` matches `origin/main`.
+  - Reconciled Phase 01a documentation with the actual repository/service/controller behavior.
+  - Rewrote Phase 01a and Phase 01b class-by-class documentation into the required table format.
+  - Confirmed admin list/detail separation: pageable list has no collection fetch, detail lookups use `@EntityGraph`.
+  - Confirmed public reads expose only `PUBLISHED` postings and use the same not-found exception for hidden or nonexistent detail records.
+- Notes:
+  - No code, API, entity, or configuration changes were made for this integration check.
+  - Did not add Application/Stage/Interview/Message/CommonCode domains.
+
+## 2026-05-14 - Phase 02 Stage Design
+
+- Document: `docs/codex/design/phase-02-stage-design.md`
+- Scope: Designed Phase 02a as JobPosting child Stage management and deferred StageResult until after the Application domain.
+- Notes: Documentation-only design work; no Java code or new domain classes were added.
+
+## Phase 02a-1 - Stage Basic CRUD
+
+- 작업일: 2026-05-14
+- 목적: `JobPosting` 하위 전형단계(`Stage`)의 관리자 기본 CRUD 기반을 추가했다.
+- 핵심 구현:
+  - `Stage` Entity와 `StageType`, `StageStatus` enum 추가
+  - `StageRepository`, `StageService`, `StageController` 추가
+  - Stage 생성/목록/상세/수정 API 추가
+  - `stageOrder` 중복과 `finalStage=true` 중복을 Service 검증으로 차단
+  - `CLOSED` JobPosting의 Stage 생성/수정 차단
+  - `READY` 상태 Stage만 일반 수정 허용
+  - `@Valid` 실패 응답을 `ApiResponse.fail()` 형식으로 처리
+- 주요 클래스:
+  - `Stage`
+  - `StageRepository`
+  - `StageService`
+  - `StageController`
+  - `StageCreateRequest`
+  - `StageUpdateRequest`
+  - `StageListResponse`
+  - `StageDetailResponse`
+  - `StageNotFoundException`
+  - `InvalidStageException`
+- API:
+  - `GET /admin/job-postings/{jobPostingId}/stages`
+  - `GET /admin/job-postings/{jobPostingId}/stages/{stageId}`
+  - `POST /admin/job-postings/{jobPostingId}/stages`
+  - `POST /admin/job-postings/{jobPostingId}/stages/{stageId}`
+- 테스트 결과:
+  - `StageServiceTest` 성공
+  - `StageControllerTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - reorder/start/announce/close/delete command는 Phase 02a-2로 분리
+  - `StageResult`는 `Application` 도메인 이후로 보류
+  - `stageOrder` DB unique 제약과 동시성 제어는 reorder 정책 확정 이후 재검토
+  - `Stage.update()` 상태 방어는 현재 Service 책임으로 유지
+- 다음 작업:
+  - Phase 02a-2에서 Stage reorder와 상태 command, delete 정책 구현
+
+## Phase 02a-2 - Stage Reorder and Commands
+
+- 작업일: 2026-05-14
+- 목적: Phase 02a-1 Stage 기본 CRUD 위에 reorder, 상태 전이, 삭제 command를 추가했다.
+- 핵심 구현:
+  - Stage reorder command 추가
+  - `READY -> IN_PROGRESS -> RESULT_ANNOUNCED -> CLOSED` 상태 전이 command 추가
+  - READY Stage 물리 삭제 command 추가
+  - reorder 요청 DTO와 nested validation 추가
+  - `ConstraintViolationException`도 `ApiResponse.fail()` 형식으로 처리
+  - Service 테스트에 reorder/status/delete 정책 검증 추가
+- 주요 클래스:
+  - `Stage`
+  - `StageService`
+  - `StageController`
+  - `StageOrderRequest`
+  - `StageReorderRequest`
+  - `GlobalExceptionHandler`
+  - `StageServiceTest`
+  - `StageControllerTest`
+- API:
+  - `POST /admin/job-postings/{jobPostingId}/stages/reorder`
+  - `POST /admin/job-postings/{jobPostingId}/stages/{stageId}/start`
+  - `POST /admin/job-postings/{jobPostingId}/stages/{stageId}/announce`
+  - `POST /admin/job-postings/{jobPostingId}/stages/{stageId}/close`
+  - `POST /admin/job-postings/{jobPostingId}/stages/{stageId}/delete`
+- 테스트 결과:
+  - `StageServiceTest` 성공
+  - `StageControllerTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - DB unique 제약과 동시성 제어는 아직 보류
+  - Application/StageResult 도입 후 진행 중 Stage 수정/삭제 정책 재검토 필요
+- 다음 작업:
+  - Phase 02a-3 Controller/API 테스트 보강 또는 Application 기본 흐름 구현 결정
+
+## Phase 02a-3 - Stage Controller API Test
+
+- 작업일: 2026-05-14
+- 목적: Phase 02a Stage 관리자 API의 path, method, 응답 포맷을 Controller 테스트로 고정했다.
+- 핵심 구현:
+  - `StageControllerTest`에 CRUD API 성공 응답 검증 추가
+  - reorder/start/announce/close/delete command API 성공 응답 검증 추가
+  - validation 실패, Stage 미존재, 잘못된 상태 command 실패 응답 검증 추가
+  - PUT 및 DELETE HTTP method 미지원 정책 검증 추가
+  - Phase 02a-3 구현 문서 생성 및 Phase 02 설계/구현 문서 정합성 보완
+- 주요 클래스:
+  - `StageControllerTest`
+- API:
+  - `GET /admin/job-postings/{jobPostingId}/stages`
+  - `GET /admin/job-postings/{jobPostingId}/stages/{stageId}`
+  - `POST /admin/job-postings/{jobPostingId}/stages`
+  - `POST /admin/job-postings/{jobPostingId}/stages/{stageId}`
+  - `POST /admin/job-postings/{jobPostingId}/stages/reorder`
+  - `POST /admin/job-postings/{jobPostingId}/stages/{stageId}/start`
+  - `POST /admin/job-postings/{jobPostingId}/stages/{stageId}/announce`
+  - `POST /admin/job-postings/{jobPostingId}/stages/{stageId}/close`
+  - `POST /admin/job-postings/{jobPostingId}/stages/{stageId}/delete`
+- 테스트 결과:
+  - `StageControllerTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - Stage 공개 노출 API는 아직 구현하지 않았다.
+  - JobPosting publish 조건에 Stage 최소 1개 검증은 아직 추가하지 않았다.
+  - StageResult는 Application 도메인 이후로 보류한다.
+- 다음 작업:
+  - Application 기본 흐름 구현을 우선 검토한다.
+
+## 2026-05-14 - Phase 03 Application Design
+
+- Document: `docs/codex/design/phase-03-application-design.md`
+- Scope: Designed the applicant Application basic flow as the foundation for later StageResult implementation.
+- Key decisions: Use `JobApplication` as the recommended Java class name while keeping Application as the API/document term; split Phase 03 into applicant basic flow, admin read APIs, detail sections, and later StageResult.
+- Review update: Fixed Phase 03a-1 decisions for `applicant_id + job_posting_id` unique, `JobPositionRepository` lookup, and applicant name snapshot source.
+- Notes: Documentation-only design work; no Java code or new domain classes were added.
+
+## Phase 03a-1 - Application Basic Create/Read
+
+- 작업일: 2026-05-14
+- 목적: 지원자 Application 루트의 기본 생성/조회 기반을 추가했다.
+- 핵심 구현:
+  - `JobApplication` Entity와 `JobApplicationStatus` enum 추가
+  - `JobApplicationRepository`, `JobPositionRepository` 추가
+  - `JobApplicationService.create`, `getApplication`, `getMyApplicationByJobPosting` 추가
+  - `applicant_id + job_posting_id` DB unique 제약과 Service 중복 검증 추가
+  - PUBLISHED/접수기간/모집분야 소속/ApplicationFormConfig 존재 검증 추가
+  - 지원자명, 공고명, 모집분야명 snapshot 저장
+- 주요 클래스:
+  - `JobApplication`
+  - `JobApplicationStatus`
+  - `JobApplicationRepository`
+  - `JobPositionRepository`
+  - `ApplicationCreateRequest`
+  - `ApplicationDetailResponse`
+  - `JobApplicationService`
+  - `JobApplicationNotFoundException`
+  - `InvalidJobApplicationException`
+  - `JobApplicationServiceTest`
+- API:
+  - 없음. 이번 Phase에서는 Controller를 만들지 않았다.
+- 테스트 결과:
+  - `JobApplicationServiceTest` 성공
+  - 전체 `clean test` 성공
+- 남은 이슈:
+  - `ApplicationController`, `updateDraft`, `submit`, `withdraw`는 후속 Phase로 분리
+  - 현재 로그인 Applicant 식별 방식은 Controller 도입 전 확정 필요
+  - 철회 후 재지원 허용 시 unique 제약 재검토 필요
+  - 동시 unique 충돌 예외 변환과 Applicant not-found 응답 정책은 Controller/API 단계에서 재검토
+- 다음 작업:
+  - Phase 03a-2에서 updateDraft/submit/withdraw command 구현 여부 검토
+## 2026-05-18 - Phase 03d-2 StageResult Update Commands + Announce Pending Guard
+
+- Scope: Implemented admin StageResult result input commands and Stage announce pending guard.
+- Implemented:
+  - `StageResult.updateResult(...)`
+  - `StageResultUpdateRequest`
+  - `StageResultBulkUpdateRequest`
+  - `StageResultBulkUpdateItemRequest`
+  - `StageResultBulkUpdateResponse`
+  - `StageResultNotFoundException`
+  - `StageResultService.updateResult(...)`
+  - `StageResultService.bulkUpdateResults(...)`
+  - `StageResultController` update and bulk POST endpoints
+  - Stage announce guard in `StageService.announce(...)`
+- APIs:
+  - `POST /admin/stages/{stageId}/results/{resultId}`
+  - `POST /admin/stages/{stageId}/results/bulk`
+- Business rules:
+  - StageResult update is allowed only when Stage is `IN_PROGRESS`.
+  - `READY`, `RESULT_ANNOUNCED`, and `CLOSED` stages reject general result updates.
+  - updates operate only on existing StageResult rows.
+  - `PENDING` rollback is rejected.
+  - bulk update is all-or-nothing.
+  - duplicate bulk result ids fail.
+  - result id/stage mismatch is hidden as 404.
+  - `decidedAt` is set by the service.
+  - `decidedBy` is temporarily stored as `"SYSTEM"`.
+  - Stage announce fails if no StageResult row exists.
+  - Stage announce fails if any `PENDING` StageResult remains.
+- Tests:
+  - `StageResultServiceTest`: success
+  - `StageResultControllerTest`: success
+  - `StageServiceTest`: success
+  - `StageControllerTest`: success
+  - `JobApplicationServiceTest` + `ApplicationControllerTest`: success
+  - `./gradlew.bat clean test --no-daemon`: success
+- Documentation:
+  - `docs/codex/implementation/phase-03d-2-stage-result-update-announce-guard.md`
+  - `docs/codex/reports/phase-03d-2-stage-result-update-announce-guard.html`
+- Deferred:
+  - correction history
+  - post-announcement correction command
+  - applicant-facing result read
+  - admin application stage-result timeline
+  - actual admin identity and audit logging
+- Next recommended phase: Phase 03d-3 admin application stage-result lazy timeline API or applicant-facing result read design.
+
+## 2026-05-18 - Phase 03d-1 StageResult Initialize/List Admin API
+
+- Scope: Implemented the first StageResult vertical slice.
+- Implemented:
+  - `StageResultStatus`
+  - `StageResult`
+  - `StageResultRepository`
+  - `StageResultService`
+  - `StageResultController`
+  - `AdminStageResultResponse`
+  - `StageResultInitializeResponse`
+  - `InvalidStageResultException`
+- APIs:
+  - `GET /admin/stages/{stageId}/results`
+  - `POST /admin/stages/{stageId}/results/initialize`
+- Business rules:
+  - initialize is allowed only for `READY` and `IN_PROGRESS` stages.
+  - `RESULT_ANNOUNCED` and `CLOSED` stages reject initialize.
+  - only `SUBMITTED` applications in the Stage's JobPosting receive missing `PENDING` rows.
+  - `DRAFT` and `WITHDRAWN` applications are skipped.
+  - re-running initialize is idempotent.
+  - `StageResult` validates that Stage and JobApplication belong to the same JobPosting.
+  - no StageResult collections were added to `Stage` or `JobApplication`.
+- Tests:
+  - `StageResultServiceTest`: success
+  - `StageResultControllerTest`: success
+  - `StageServiceTest` + `StageControllerTest`: success
+  - `JobApplicationServiceTest` + `ApplicationControllerTest`: success
+  - `./gradlew.bat clean test --no-daemon`: success
+- Documentation:
+  - `docs/codex/implementation/phase-03d-1-stage-result-initialize-list.md`
+  - `docs/codex/reports/phase-03d-1-stage-result-initialize-list.html`
+- Deferred:
+  - result update/bulk update
+  - correction history
+  - applicant-facing result read
+  - admin application stage-result timeline
+  - Stage announce pending-result guard
+  - security, authorization, audit logging
+- Next recommended phase: Phase 03d-2 StageResult update commands and announcement integration policy.
+
+## 권한 관리 슬라이스 (2026-08-13, 통합 화면 슬라이스 — recruit/api-contract.md "관리자 권한 관리" 섹션 기준)
+
+- Scope: 관리자 권한 관리 API + 사용자별 role 매핑 + 면접관 권한(ROLE_INTERVIEWER) 부여 경로 신설.
+- New classes:
+  - `security.auth.RoleNames` (role 문자열 단일 출처, 부여 가능 5종 + 라벨)
+  - `domain.entity.UserRoleMapping` + `domain.repository.UserRoleMappingRepository`
+  - `service.RoleMappingService`, `controller.AdminRoleMappingController`
+  - `dto.request.DeptRoleMappingSaveRequest`/`UserRoleMappingSaveRequest`
+  - `dto.response.AssignableRoleResponse`/`DeptRoleMappingResponse`/`UserRoleMappingResponse`/`RoleMappingIdResponse`
+  - `exception.InvalidRoleMappingException`(400)/`RoleMappingNotFoundException`(404)
+- Modified classes:
+  - `CustomLdapUserDetailsMapper` — 최종 권한 = 부서 매핑 ∪ 개인 매핑(loginId 완전일치, 합집합만)
+  - `AuthenticationConfig`(매퍼 빈에 UserRoleMappingRepository 주입), `DeptRoleMapping`(+create/update),
+    `DeptRoleMappingRepository`/`UserRepository`(조회 메서드 추가), `GlobalExceptionHandler`
+  - role 리터럴 상수 치환: `SecurityConfig`, `CustomUserDetailsService`, `AdminAuditController`, `AdminClientEventLogController`
+- APIs: `GET /admin/role-mappings/roles`, dept/user 각 `GET`·`POST`·`POST /{id}`·`POST /{id}/delete` (전부 broad `/api/admin/**` 매처 — SecurityConfig 무변경)
+- Business rules: roleName은 RoleNames 부여 가능 5종만, (deptName|loginId, roleName) 중복 거부(서비스 검증), deptName trim 후 2자 이상(부분일치 오매칭 방어), loginId는 FK 없는 문자열(JIT 생성 전 사전 부여 허용).
+- **수동 DDL 필요**: `docs/codex/ops/role-mapping-user-role-mapping-ddl.sql` (`user_role_mapping` 테이블 + login_id 인덱스)
+- Tests: `RoleMappingServiceTest`, `CustomLdapUserDetailsMapperTest`, `SecurityConfigTest`(권한관리 인가 6건 추가)
+- Documentation: 통합 슬라이스라 recruit/CLAUDE.md §7에 따라 api-contract.md 갱신으로 갈음(HTML 리포트 생략).

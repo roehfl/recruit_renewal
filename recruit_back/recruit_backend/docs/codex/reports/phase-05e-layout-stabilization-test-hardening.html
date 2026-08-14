@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Phase 05e - Layout Stabilization / Test Hardening</title>
+  <style>
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #1f2937; background: #f4f7fb; line-height: 1.55; }
+    header { background: #0f766e; color: #fff; padding: 28px 36px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 48px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin-top: 34px; padding-bottom: 8px; border-bottom: 2px solid #dbeafe; color: #0f172a; }
+    h3 { margin-top: 22px; color: #134e4a; }
+    .meta { color: #d9f99d; font-size: 14px; }
+    .badge { display: inline-block; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; margin-right: 6px; }
+    .completed { background: #dcfce7; color: #166534; }
+    .pending { background: #fef3c7; color: #92400e; }
+    .out { background: #fee2e2; color: #991b1b; }
+    .info { background: #dbeafe; color: #1e40af; }
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 16px; }
+    .card { background: #fff; border: 1px solid #dbe3ef; border-radius: 8px; padding: 18px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+    .summary { background: #fff; border-left: 5px solid #0f766e; border-radius: 8px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; background: #fff; border-radius: 8px; overflow: hidden; }
+    th, td { border: 1px solid #dbe3ef; padding: 10px 12px; text-align: left; vertical-align: top; }
+    th { background: #e0f2fe; color: #0f172a; }
+    code { background: #e5e7eb; padding: 2px 5px; border-radius: 4px; font-size: 13px; }
+    pre { background: #0f172a; color: #e5e7eb; padding: 16px; border-radius: 8px; overflow: auto; }
+    ul { padding-left: 20px; }
+    .stats { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px; }
+    .stat-card { background: #fff; border: 1px solid #dbe3ef; border-radius: 8px; padding: 16px 20px; text-align: center; min-width: 140px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+    .stat-card .number { font-size: 28px; font-weight: 700; color: #0f766e; }
+    .stat-card .label { font-size: 13px; color: #475569; margin-top: 4px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Recruit Backend - Phase 05e</h1>
+  <div>Layout Stabilization / Test Hardening</div>
+  <div class="meta"><span class="badge completed">Completed</span>Generated/Updated: 2026-05-27</div>
+</header>
+<main>
+  <section class="summary">
+    <h2>Executive Summary</h2>
+    <p>Phase 05e hardened the layout test coverage by adding 27 new tests and strengthening 2 existing tests across 4 test classes. No production code was changed.</p>
+    <p>The validation matrix is now fully covered: null checks, boundary values (pageNo=0, negative sortOrder, title/description max length), data loss prevention (verify never delete on validation failure), policy regression (question/attachment enabled-but-not-required), and <code>validateLayoutForPublish()</code> unit tests are all in place.</p>
+    <p>Phase 05 (Application Form Page Layout) is now complete. All 5 slices (05a-05e) are implemented and tested.</p>
+    <p><span class="badge completed">Phase 05 complete</span> 99 targeted tests passed, 0 failures.</p>
+  </section>
+
+  <section>
+    <h2>Quick Stats</h2>
+    <div class="stats">
+      <div class="stat-card">
+        <div class="number">+27</div>
+        <div class="label">New Tests</div>
+      </div>
+      <div class="stat-card">
+        <div class="number">72</div>
+        <div class="label">Layout Tests Total</div>
+      </div>
+      <div class="stat-card">
+        <div class="number">99</div>
+        <div class="label">All Targeted Tests</div>
+      </div>
+      <div class="stat-card">
+        <div class="number">0</div>
+        <div class="label">Production Changes</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Test Additions By Class</h2>
+    <table>
+      <tr><th>Test Class</th><th>Before</th><th>After</th><th>Added</th><th>Focus</th></tr>
+      <tr>
+        <td><code>ApplicationFormLayoutValidatorTest</code></td>
+        <td>10</td><td>22</td><td>+12</td>
+        <td>Null checks, boundary values, negative numbers, max lengths, enum filtering</td>
+      </tr>
+      <tr>
+        <td><code>ApplicationFormLayoutServiceTest</code></td>
+        <td>18</td><td>26</td><td>+8 (+2 strengthened)</td>
+        <td><code>validateLayoutForPublish()</code> unit tests, policy regression, save data loss prevention, placed verification</td>
+      </tr>
+      <tr>
+        <td><code>ApplicationFormLayoutDefaultFactoryTest</code></td>
+        <td>3</td><td>7</td><td>+4</td>
+        <td>Null/empty guards, sparse section page numbering</td>
+      </tr>
+      <tr>
+        <td><code>ApplicationFormLayoutSectionPolicyTest</code></td>
+        <td>3</td><td>6</td><td>+3</td>
+        <td>Null config + externals, minimal config, enabled/required separation</td>
+      </tr>
+      <tr>
+        <td><code>AdminApplicationFormLayoutControllerTest</code></td>
+        <td>11</td><td>11</td><td>-</td>
+        <td>No changes needed</td>
+      </tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Validation Matrix Coverage</h2>
+    <table>
+      <tr><th>#</th><th>Rule</th><th>Status</th></tr>
+      <tr><td>1</td><td>At least one page</td><td><span class="badge completed">Tested</span></td></tr>
+      <tr><td>2</td><td>Each page has at least one item</td><td><span class="badge completed">Tested</span></td></tr>
+      <tr><td>3a</td><td>pageNo not null</td><td><span class="badge completed">New in 05e</span></td></tr>
+      <tr><td>3b</td><td>pageNo not duplicated</td><td><span class="badge completed">Tested</span></td></tr>
+      <tr><td>4</td><td>pageNo &gt; 0</td><td><span class="badge completed">New in 05e</span></td></tr>
+      <tr><td>5a</td><td>page sortOrder not null</td><td><span class="badge completed">New in 05e</span></td></tr>
+      <tr><td>5b</td><td>page sortOrder not duplicated</td><td><span class="badge completed">Tested</span></td></tr>
+      <tr><td>6</td><td>page sortOrder &gt;= 0</td><td><span class="badge completed">New in 05e</span></td></tr>
+      <tr><td>7</td><td>page title nonblank</td><td><span class="badge completed">New in 05e</span></td></tr>
+      <tr><td>8</td><td>page title max 100</td><td><span class="badge completed">New in 05e</span></td></tr>
+      <tr><td>9</td><td>page description max 500</td><td><span class="badge completed">New in 05e</span></td></tr>
+      <tr><td>10a</td><td>item sectionType not null</td><td><span class="badge completed">New in 05e</span></td></tr>
+      <tr><td>10b</td><td>item sectionType in layout subset</td><td><span class="badge completed">Tested + ETC</span></td></tr>
+      <tr><td>11a</td><td>item sortOrder not null</td><td><span class="badge completed">New in 05e</span></td></tr>
+      <tr><td>11b</td><td>item sortOrder &gt;= 0</td><td><span class="badge completed">New in 05e</span></td></tr>
+      <tr><td>14</td><td>item sortOrder unique within page</td><td><span class="badge completed">Tested</span></td></tr>
+      <tr><td>15</td><td>section type unique across layout</td><td><span class="badge completed">Tested</span></td></tr>
+      <tr><td>16</td><td>disabled section not placed</td><td><span class="badge completed">Tested + extra</span></td></tr>
+      <tr><td>17</td><td>enabled section must be placed</td><td><span class="badge completed">Tested</span></td></tr>
+      <tr><td>18</td><td>required section must be placed</td><td><span class="badge completed">Tested</span></td></tr>
+      <tr><td>19</td><td>BASIC_INFO in enabled</td><td><span class="badge completed">Tested</span></td></tr>
+      <tr><td>20</td><td>BASIC_INFO in required</td><td><span class="badge completed">Tested</span></td></tr>
+      <tr><td>21</td><td>required subset of enabled</td><td><span class="badge completed">Tested</span></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Policy Regression Coverage</h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3><span class="badge completed">Question Policy</span></h3>
+        <ul>
+          <li>Question enabled + required: placed and marked required</li>
+          <li>Question enabled + not required: placed but not required</li>
+          <li>Question active, layout missing: publish blocked</li>
+          <li>No active questions: QUESTION_ANSWER not in enabled set</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge completed">Attachment Policy</span></h3>
+        <ul>
+          <li>Attachment enabled + required: placed and marked required</li>
+          <li>Attachment enabled + not required: placed but not required</li>
+          <li>Attachment requirements exist, layout missing: publish blocked</li>
+          <li>No attachment requirements: ATTACHMENT not in enabled set</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Test Results</h2>
+    <pre>$env:AES_SECRET_KEY='22791194512954214612461221261067'
+.\gradlew.bat test --tests "*ApplicationFormLayout*" --tests "*JobPostingServiceTest" --no-daemon
+
+# Result: BUILD SUCCESSFUL
+# ApplicationFormLayoutValidatorTest: 22 tests, 0 failures
+# ApplicationFormLayoutServiceTest: 26 tests, 0 failures
+# ApplicationFormLayoutDefaultFactoryTest: 7 tests, 0 failures
+# ApplicationFormLayoutSectionPolicyTest: 6 tests, 0 failures
+# AdminApplicationFormLayoutControllerTest: 11 tests, 0 failures
+# JobPostingServiceTest: 27 tests, 0 failures
+# Total: 99 tests, 0 failures</pre>
+  </section>
+
+  <section>
+    <h2>Phase 05 Completion Summary</h2>
+    <table>
+      <tr><th>Slice</th><th>Purpose</th><th>Status</th></tr>
+      <tr><td>05a</td><td>Domain (entities, repos, validator, factory)</td><td><span class="badge completed">Complete</span></td></tr>
+      <tr><td>05b</td><td>Applicant Layout Read</td><td><span class="badge completed">Complete</span></td></tr>
+      <tr><td>05c</td><td>Admin Layout Management</td><td><span class="badge completed">Complete</span></td></tr>
+      <tr><td>05d</td><td>Publish/Layout Guard Integration</td><td><span class="badge completed">Complete</span></td></tr>
+      <tr><td>05e</td><td>Layout Stabilization / Test Hardening</td><td><span class="badge completed">Complete</span></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Next Phase Recommendation</h2>
+    <div class="summary">
+      <p><strong>Phase 05 is complete.</strong> All slices implemented and tested.</p>
+      <p>Recommended next: Phase 06 - Interview Evaluation (interviewer evaluation write/save/submit, admin evaluation read, StageResult reflection).</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

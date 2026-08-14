@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03e-4 Security Exception JSON Response</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Segoe UI", sans-serif; color: #1f2937; background: #f6f8fb; line-height: 1.55; }
+    header { background: #102a43; color: #fff; padding: 32px 40px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 52px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 32px 0 14px; font-size: 21px; border-bottom: 1px solid #dbe3ef; padding-bottom: 8px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    code { font-family: Consolas, "Courier New", monospace; background: #eef2f7; padding: 2px 5px; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #dbe3ef; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e5edf5; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #eef3f8; color: #334155; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    ul { margin: 10px 0 0; padding-left: 20px; }
+    li { margin: 5px 0; }
+    .meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; color: #d9e2ec; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .completed { background: #dcfce7; color: #166534; }
+    .pending { background: #fef3c7; color: #92400e; }
+    .out { background: #fee2e2; color: #991b1b; }
+    .warn { background: #fde68a; color: #78350f; }
+    .muted { background: #e2e8f0; color: #475569; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .summary { background: #fff; border: 1px solid #dbe3ef; border-left: 5px solid #1d4ed8; border-radius: 8px; padding: 18px; margin-top: 18px; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .card { background: #fff; border: 1px solid #dbe3ef; border-radius: 8px; padding: 16px; }
+    @media (max-width: 860px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 36px; }
+      .grid, .two { grid-template-columns: 1fr; }
+      table { display: block; overflow-x: auto; white-space: nowrap; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>Shinyoung Recruit Backend</div>
+  <h1>Phase 03e-4 Security Exception JSON Response</h1>
+  <div class="meta">
+    <span class="badge completed">Completed</span>
+    <span>Generated: 2026-05-19</span>
+  </div>
+</header>
+<main>
+  <section class="summary">
+    <h2>Executive Summary</h2>
+    <p>Phase 03e-4 adds Spring Security handlers for authentication and authorization failures.</p>
+    <p>Unauthenticated protected requests now return <code>401</code> with JSON <code>ApiResponse.fail("Authentication is required.")</code>.</p>
+    <p>Authenticated users without authority now return <code>403</code> with JSON <code>ApiResponse.fail("Access is denied.")</code>.</p>
+    <p>URL authorization rules, business exception handling, StageResult actor propagation, DTOs, and schema were not changed.</p>
+  </section>
+
+  <section>
+    <h2>Scope Cards</h2>
+    <div class="grid">
+      <div class="card">
+        <h3><span class="badge completed">Completed</span> Implemented</h3>
+        <ul>
+          <li><code>CustomAuthenticationEntryPoint</code> for 401 JSON.</li>
+          <li><code>CustomAccessDeniedHandler</code> for 403 JSON.</li>
+          <li><code>SecurityConfig.exceptionHandling(...)</code> registration.</li>
+          <li>JSON content type and UTF-8 encoding.</li>
+          <li>Controller security failure tests.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge out">Not Implemented</span> Excluded</h3>
+        <ul>
+          <li>No URL authorization rule changes.</li>
+          <li>No <code>ApiResponse</code> structure changes.</li>
+          <li>No business exception handler redesign.</li>
+          <li>No DB schema or LDAP setting changes.</li>
+          <li>No StageResult actor logic changes.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge pending">Deferred</span> Remaining</h3>
+        <ul>
+          <li>Fallback API classification.</li>
+          <li>Profile-gating dev tooling endpoints.</li>
+          <li>Centralized security error code/message policy.</li>
+          <li>Fine-grained admin roles by API family.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Changed Files</h2>
+    <table>
+      <tr><th>Path</th><th>Status</th><th>Purpose</th></tr>
+      <tr><td><code>src/main/java/com/shinyoung/recruit/security/auth/CustomAuthenticationEntryPoint.java</code></td><td><span class="badge completed">New</span></td><td>401 JSON security failure handler</td></tr>
+      <tr><td><code>src/main/java/com/shinyoung/recruit/security/auth/CustomAccessDeniedHandler.java</code></td><td><span class="badge completed">New</span></td><td>403 JSON security failure handler</td></tr>
+      <tr><td><code>src/main/java/com/shinyoung/recruit/config/SecurityConfig.java</code></td><td><span class="badge completed">Modified</span></td><td>Registers security exception handlers</td></tr>
+      <tr><td><code>ApplicationStageResultControllerTest</code></td><td><span class="badge completed">Modified</span></td><td>Applicant API 401/403 JSON assertions</td></tr>
+      <tr><td><code>StageResultControllerTest</code></td><td><span class="badge completed">Modified</span></td><td>Admin StageResult 401/403 JSON assertions</td></tr>
+      <tr><td><code>StageControllerTest</code></td><td><span class="badge completed">Modified</span></td><td>Admin Stage 401/403 JSON assertions</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Architecture and Domain</h2>
+    <div class="two">
+      <div class="card">
+        <h3>Security Handler Structure</h3>
+        <ul>
+          <li>Handlers run before controller invocation.</li>
+          <li>Responses are serialized with <code>ObjectMapper.writeValue(...)</code>.</li>
+          <li><code>ObjectProvider&lt;ObjectMapper&gt;</code> reuses a mapper when available and avoids forcing a global mapper bean.</li>
+          <li>Messages are fixed strings for this phase.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Domain Impact</h3>
+        <ul>
+          <li>No entity relationship changed.</li>
+          <li>No DTO shape changed.</li>
+          <li>No service business logic changed.</li>
+          <li>Applicant result responses still hide actor and evaluation internals.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>API List</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Failure Case</th><th>HTTP</th><th>Response</th></tr>
+      <tr><td>Any</td><td><code>/admin/**</code></td><td>Anonymous</td><td>401</td><td><code>ApiResponse.fail("Authentication is required.")</code></td></tr>
+      <tr><td>Any</td><td><code>/admin/**</code></td><td>No admin/recruit authority</td><td>403</td><td><code>ApiResponse.fail("Access is denied.")</code></td></tr>
+      <tr><td>Any</td><td><code>/applications/**</code></td><td>Anonymous</td><td>401</td><td><code>ApiResponse.fail("Authentication is required.")</code></td></tr>
+      <tr><td>Any</td><td><code>/applications/**</code></td><td>Non-applicant principal</td><td>403</td><td><code>ApiResponse.fail("Access is denied.")</code></td></tr>
+      <tr><td>GET</td><td><code>/job-postings/{jobPostingId}/application</code></td><td>Anonymous or non-applicant</td><td>401/403</td><td>Same security JSON policy</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Validation and Business Rules</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Authentication</h3>
+        <ul>
+          <li>Missing authentication returns 401.</li>
+          <li>Handled by <code>AuthenticationEntryPoint</code>.</li>
+          <li>Response body uses <code>success=false</code>.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Authorization</h3>
+        <ul>
+          <li>Insufficient authority returns 403.</li>
+          <li>Handled by <code>AccessDeniedHandler</code>.</li>
+          <li>Response body uses <code>success=false</code>.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Business Errors</h3>
+        <ul>
+          <li>Validation failures remain 400.</li>
+          <li>Not-found failures remain 404.</li>
+          <li><code>GlobalExceptionHandler</code> remains responsible.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Test Results</h2>
+    <table>
+      <tr><th>Command</th><th>Result</th><th>Notes</th></tr>
+      <tr>
+        <td><code>$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests com.shinyoung.recruit.controller.ApplicationStageResultControllerTest --tests com.shinyoung.recruit.controller.StageResultControllerTest --tests com.shinyoung.recruit.controller.StageControllerTest</code></td>
+        <td><span class="badge completed">Success</span></td>
+        <td>37 targeted controller tests completed after handler adjustment.</td>
+      </tr>
+      <tr>
+        <td><code>$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests com.shinyoung.recruit.service.StageResultServiceTest --tests com.shinyoung.recruit.service.StageResultCorrectionServiceTest</code></td>
+        <td><span class="badge completed">Success</span></td>
+        <td>StageResult actor propagation and correction service regression passed.</td>
+      </tr>
+      <tr>
+        <td>Initial sandbox attempt</td>
+        <td><span class="badge warn">Blocked</span></td>
+        <td>Gradle wrapper distribution download needed network access.</td>
+      </tr>
+      <tr>
+        <td>First approved retry</td>
+        <td><span class="badge warn">Failed</span></td>
+        <td>No global <code>ObjectMapper</code> bean existed; fixed with <code>ObjectProvider&lt;ObjectMapper&gt;</code>.</td>
+      </tr>
+      <tr>
+        <td><code>.\gradlew.bat clean test --no-daemon</code></td>
+        <td><span class="badge warn">Timeout</span></td>
+        <td>Attempted twice with 5-minute and 10-minute limits. No XML failures/errors were found in generated partial results, but the full suite did not complete.</td>
+      </tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Remaining Issues</h2>
+    <ul>
+      <li><span class="badge pending">Pending</span> Classify remaining API families before replacing <code>anyRequest().permitAll()</code>.</li>
+      <li><span class="badge pending">Pending</span> Decide production exposure policy for Swagger/OpenAPI and H2 console.</li>
+      <li><span class="badge pending">Pending</span> Decide whether security messages need error codes or localization.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Next Phase Recommendation</h2>
+    <p>Proceed with remaining API classification and fallback authorization hardening. Keep applicant ownership checks in services and only tighten fallback authorization after public endpoints are explicitly listed.</p>
+  </section>
+</main>
+</body>
+</html>

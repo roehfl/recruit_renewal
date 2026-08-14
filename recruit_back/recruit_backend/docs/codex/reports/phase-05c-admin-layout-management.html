@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Phase 05c - Admin Layout Management</title>
+  <style>
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #1f2937; background: #f4f7fb; line-height: 1.55; }
+    header { background: #0f766e; color: #fff; padding: 28px 36px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 48px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin-top: 34px; padding-bottom: 8px; border-bottom: 2px solid #dbeafe; color: #0f172a; }
+    h3 { margin-top: 22px; color: #134e4a; }
+    .meta { color: #d9f99d; font-size: 14px; }
+    .badge { display: inline-block; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; margin-right: 6px; }
+    .completed { background: #dcfce7; color: #166534; }
+    .pending { background: #fef3c7; color: #92400e; }
+    .out { background: #fee2e2; color: #991b1b; }
+    .info { background: #dbeafe; color: #1e40af; }
+    .warning { background: #fef3c7; color: #92400e; }
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 16px; }
+    .card { background: #fff; border: 1px solid #dbe3ef; border-radius: 8px; padding: 18px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+    .summary { background: #fff; border-left: 5px solid #0f766e; border-radius: 8px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; background: #fff; border-radius: 8px; overflow: hidden; }
+    th, td { border: 1px solid #dbe3ef; padding: 10px 12px; text-align: left; vertical-align: top; }
+    th { background: #e0f2fe; color: #0f172a; }
+    code { background: #e5e7eb; padding: 2px 5px; border-radius: 4px; font-size: 13px; }
+    pre { background: #0f172a; color: #e5e7eb; padding: 16px; border-radius: 8px; overflow: auto; }
+    ul { padding-left: 20px; }
+    .small { font-size: 13px; color: #475569; }
+    .stats { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px; }
+    .stat-card { background: #fff; border: 1px solid #dbe3ef; border-radius: 8px; padding: 16px 20px; text-align: center; min-width: 140px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+    .stat-card .number { font-size: 28px; font-weight: 700; color: #0f766e; }
+    .stat-card .label { font-size: 13px; color: #475569; margin-top: 4px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Recruit Backend - Phase 05c</h1>
+  <div>Admin Layout Management</div>
+  <div class="meta"><span class="badge completed">Completed</span>Generated/Updated: 2026-05-27</div>
+</header>
+<main>
+  <section class="summary">
+    <h2>Executive Summary</h2>
+    <p>Phase 05c implemented admin-facing layout management APIs for configuring the page arrangement of applicant application forms.</p>
+    <p>Three endpoints were added: layout read (with available sections metadata), layout save (replace-all semantics), and applicant-facing preview projection.</p>
+    <p>The service reuses Phase 05a layout domain entities, validators, and helpers. No existing source files were modified.</p>
+    <p>All endpoints are protected by the existing <code>/admin/**</code> security policy requiring <code>ROLE_ADMIN</code> or <code>ROLE_RECRUIT_ADMIN</code>.</p>
+    <p><span class="badge completed">Can move forward</span> 13 service tests and 11 controller tests passed.</p>
+  </section>
+
+  <section>
+    <h2>Quick Stats</h2>
+    <div class="stats">
+      <div class="stat-card">
+        <div class="number">3</div>
+        <div class="label">API Endpoints</div>
+      </div>
+      <div class="stat-card">
+        <div class="number">7</div>
+        <div class="label">New Files</div>
+      </div>
+      <div class="stat-card">
+        <div class="number">0</div>
+        <div class="label">Modified Files</div>
+      </div>
+      <div class="stat-card">
+        <div class="number">24</div>
+        <div class="label">Tests Passed</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Scope Cards</h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3><span class="badge completed">Implemented</span></h3>
+        <ul>
+          <li><code>GET /admin/.../application-form-layout</code> - admin layout read</li>
+          <li><code>POST /admin/.../application-form-layout</code> - layout save (replace-all)</li>
+          <li><code>GET /admin/.../application-form-layout/preview</code> - preview</li>
+          <li><code>AdminApplicationFormLayoutResponse</code> with nested records</li>
+          <li><code>ApplicationFormLayoutPreviewResponse</code> with nested records</li>
+          <li><code>ApplicationFormLayoutSaveRequest</code> with Bean Validation</li>
+          <li><code>ApplicationFormLayoutService</code> orchestration</li>
+          <li><code>AdminApplicationFormLayoutController</code></li>
+          <li>13 service unit tests + 11 controller integration tests</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge out">Not Implemented</span></h3>
+        <ul>
+          <li>Frontend, Vue, Pinia, or static resources</li>
+          <li>DB schema or migration changes</li>
+          <li>Application create/update/submit/withdraw changes</li>
+          <li>Per-field error mapping for save validation</li>
+          <li>Layout versioning or change audit trail</li>
+          <li>Per-posting ownership verification for admin</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge pending">Deferred</span></h3>
+        <ul>
+          <li>Publish/layout guard integration (Phase 05d)</li>
+          <li>Layout history and versioning</li>
+          <li>Admin role-based posting ownership</li>
+          <li>Swagger/OpenAPI annotation</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Architecture / Domain</h2>
+    <div class="card">
+      <pre>JobPosting 1 --- 1 ApplicationFormConfig
+JobPosting 1 --- N ApplicationFormPage
+ApplicationFormPage 1 --- N ApplicationFormPageItem
+JobPosting 1 --- N JobPostingQuestion
+JobPosting 1 --- N JobPostingAttachmentRequirement</pre>
+      <p class="small">Phase 05c reuses Phase 05a entities. No new entities were added.</p>
+    </div>
+
+    <table>
+      <thead>
+      <tr><th>Class</th><th>Type</th><th>Responsibility</th></tr>
+      </thead>
+      <tbody>
+      <tr><td><code>ApplicationFormLayoutService</code></td><td>Service</td><td>Admin layout read/save/preview orchestration. Uses Clock for testable time checks.</td></tr>
+      <tr><td><code>AdminApplicationFormLayoutController</code></td><td>Controller</td><td>REST endpoints under <code>/admin/job-postings/{id}/application-form-layout</code>.</td></tr>
+      <tr><td><code>ApplicationFormLayoutSaveRequest</code></td><td>Request DTO</td><td>Replace-all layout payload with nested PageRequest and ItemRequest records.</td></tr>
+      <tr><td><code>AdminApplicationFormLayoutResponse</code></td><td>Response DTO</td><td>Admin layout with pages, items, available sections, editable/stored flags.</td></tr>
+      <tr><td><code>ApplicationFormLayoutPreviewResponse</code></td><td>Response DTO</td><td>Applicant-facing preview with enabled sections only, no admin metadata.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>API List</h2>
+    <table>
+      <thead>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/admin/job-postings/{jobPostingId}/application-form-layout</code></td>
+        <td>Admin layout read with available sections metadata.</td>
+        <td>Path: <code>jobPostingId</code></td>
+        <td><code>ApiResponse&lt;AdminApplicationFormLayoutResponse&gt;</code></td>
+      </tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/admin/job-postings/{jobPostingId}/application-form-layout</code></td>
+        <td>Replace full layout (replace-all semantics).</td>
+        <td>Path: <code>jobPostingId</code>, Body: <code>ApplicationFormLayoutSaveRequest</code></td>
+        <td><code>ApiResponse&lt;AdminApplicationFormLayoutResponse&gt;</code></td>
+      </tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/admin/job-postings/{jobPostingId}/application-form-layout/preview</code></td>
+        <td>Applicant-facing preview projection.</td>
+        <td>Path: <code>jobPostingId</code></td>
+        <td><code>ApiResponse&lt;ApplicationFormLayoutPreviewResponse&gt;</code></td>
+      </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>New Files</h2>
+    <table>
+      <thead>
+      <tr><th>File</th><th>Type</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+      <tr><td><code>ApplicationFormLayoutSaveRequest.java</code></td><td>Request DTO</td><td>Replace-all layout save payload with nested records and Bean Validation.</td></tr>
+      <tr><td><code>AdminApplicationFormLayoutResponse.java</code></td><td>Response DTO</td><td>Admin layout with pages, items, available sections, editable/stored flags.</td></tr>
+      <tr><td><code>ApplicationFormLayoutPreviewResponse.java</code></td><td>Response DTO</td><td>Applicant-facing preview with enabled sections only.</td></tr>
+      <tr><td><code>ApplicationFormLayoutService.java</code></td><td>Service</td><td>Admin layout read/save/preview orchestration.</td></tr>
+      <tr><td><code>AdminApplicationFormLayoutController.java</code></td><td>Controller</td><td>Admin layout REST endpoints.</td></tr>
+      <tr><td><code>ApplicationFormLayoutServiceTest.java</code></td><td>Test</td><td>13 service unit tests with Mockito mocks.</td></tr>
+      <tr><td><code>AdminApplicationFormLayoutControllerTest.java</code></td><td>Test</td><td>11 controller integration tests with SpringBootTest.</td></tr>
+      </tbody>
+    </table>
+    <p class="small">No existing source files were modified. <code>GlobalExceptionHandler</code> already handled <code>InvalidApplicationFormLayoutException</code> from Phase 05a.</p>
+  </section>
+
+  <section>
+    <h2>Validation / Policy</h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3><span class="badge info">Editable Guard</span></h3>
+        <ul>
+          <li><code>editable=true</code> only when posting is not <code>CLOSED</code> and <code>now &lt; receptionStartDateTime</code>.</li>
+          <li>Save rejects CLOSED postings with <code>"...&#47924;&#44048;&#46108;..."</code> message (400).</li>
+          <li>Save rejects started reception with <code>"...&#51217;&#49688;&#44032; &#49884;&#51089;&#46108;..."</code> message (400).</li>
+          <li>Read shows stale layouts as-is (no validation on read).</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge info">Layout Validation</span></h3>
+        <ul>
+          <li>Disabled sections cannot be placed.</li>
+          <li>Required sections must be placed.</li>
+          <li><code>BASIC_INFO</code> must always be placed.</li>
+          <li><code>ApplicationFormConfig</code> must exist for save.</li>
+          <li>Bean Validation: pages not empty, items not empty, valid types, valid sort orders.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge info">Section Sources</span></h3>
+        <ul>
+          <li><code>BASIC_INFO</code>: <code>ALWAYS</code></li>
+          <li><code>EDUCATION</code> to <code>GAP_PERIOD</code>: <code>APPLICATION_FORM_CONFIG</code></li>
+          <li><code>QUESTION_ANSWER</code>: <code>QUESTION</code> (active questions exist)</li>
+          <li><code>ATTACHMENT</code>: <code>ATTACHMENT_REQUIREMENT</code> (requirement rows exist)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge info">Available Sections</span></h3>
+        <ul>
+          <li>All 10 layout section types always appear in <code>availableSections</code>.</li>
+          <li>Each shows: <code>enabled</code>, <code>required</code>, <code>placed</code>, <code>source</code>.</li>
+          <li>Frontend uses this to show drag-and-drop section palette.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Error Responses</h2>
+    <table>
+      <thead>
+      <tr><th>Condition</th><th>HTTP Status</th><th>Response</th></tr>
+      </thead>
+      <tbody>
+      <tr><td>Posting not found</td><td>404</td><td><code>ApiResponse.fail(...)</code></td></tr>
+      <tr><td>Posting CLOSED (save)</td><td>400</td><td><code>ApiResponse.fail(...)</code></td></tr>
+      <tr><td>Reception started (save)</td><td>400</td><td><code>ApiResponse.fail(...)</code></td></tr>
+      <tr><td>Missing ApplicationFormConfig (save)</td><td>400</td><td><code>ApiResponse.fail(...)</code></td></tr>
+      <tr><td>Layout validation failure (save)</td><td>400</td><td><code>ApiResponse.fail(...)</code></td></tr>
+      <tr><td>Bean Validation failure (save)</td><td>400</td><td><code>ApiResponse.fail(...)</code></td></tr>
+      <tr><td>Unsupported HTTP method</td><td>405</td><td>Method Not Allowed</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Test Results</h2>
+    <table>
+      <thead>
+      <tr><th>Test Class</th><th>Tests</th><th>Result</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td><code>ApplicationFormLayoutServiceTest</code></td>
+        <td>13</td>
+        <td><span class="badge completed">ALL PASSED</span></td>
+        <td>Default/stored layout read, available sections, editable flags, save success/rejection, preview filtering.</td>
+      </tr>
+      <tr>
+        <td><code>AdminApplicationFormLayoutControllerTest</code></td>
+        <td>11</td>
+        <td><span class="badge completed">ALL PASSED</span></td>
+        <td>GET/POST success, round-trip, error cases (400/404/405), preview structure.</td>
+      </tr>
+      </tbody>
+    </table>
+
+    <h3>Test Command</h3>
+    <table>
+      <thead>
+      <tr><th>Command</th><th>Result</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td><code>$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*ApplicationFormLayout*" --no-daemon</code></td>
+        <td><span class="badge completed">BUILD SUCCESSFUL</span></td>
+        <td>24 tests executed, all passed.</td>
+      </tr>
+      <tr>
+        <td><code>.\gradlew.bat clean test --no-daemon</code></td>
+        <td><span class="badge pending">Not run</span></td>
+        <td>Intentionally skipped per Phase 05 targeted-test instruction (local timeout concerns).</td>
+      </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Remaining Issues</h2>
+    <ul>
+      <li><span class="badge warning">Limitation</span> Admin endpoints do not provide per-field error mapping. The first validation error message is returned.</li>
+      <li><span class="badge warning">Limitation</span> No audit trail for layout changes beyond <code>BaseEntity</code> <code>createdBy</code>/<code>updatedBy</code> fields.</li>
+      <li><span class="badge warning">Limitation</span> Layout versioning and change history are not implemented.</li>
+      <li><span class="badge warning">Limitation</span> Admin security uses path-based <code>/admin/**</code> policy. Per-posting ownership is not verified.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Next Phase</h2>
+    <div class="card">
+      <p><strong>Phase 05d - Publish/Layout Guard Integration</strong></p>
+      <p>The admin can now read, save, and preview layouts. The next step is to integrate layout validation into the publish workflow so that a posting cannot be published without a valid complete layout.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

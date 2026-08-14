@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03i-2 Attachment File Upload</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #667085;
+      --border: #d8dee8;
+      --green: #0f7a4f;
+      --green-bg: #e8f6ef;
+      --blue: #1456b8;
+      --blue-bg: #e9f1ff;
+      --amber: #a65f00;
+      --amber-bg: #fff4df;
+      --red: #b42318;
+      --red-bg: #fdecec;
+      --gray: #475467;
+      --gray-bg: #eef2f6;
+      --code: #f2f4f7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.55;
+    }
+    header {
+      background: #111827;
+      color: #fff;
+      padding: 32px 40px;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 24px 48px;
+    }
+    h1, h2, h3 { margin: 0; }
+    h1 { font-size: 30px; line-height: 1.2; }
+    h2 {
+      margin-top: 30px;
+      margin-bottom: 12px;
+      font-size: 22px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    h3 { margin-top: 18px; margin-bottom: 8px; font-size: 17px; }
+    p { margin: 8px 0; }
+    code {
+      background: var(--code);
+      border-radius: 4px;
+      padding: 2px 5px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.94em;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+      align-items: center;
+    }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge.blue { color: var(--blue); background: var(--blue-bg); }
+    .badge.green { color: var(--green); background: var(--green-bg); }
+    .badge.amber { color: var(--amber); background: var(--amber-bg); }
+    .badge.red { color: var(--red); background: var(--red-bg); }
+    .badge.gray { color: var(--gray); background: var(--gray-bg); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      margin: 12px 0 18px;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+      padding: 9px 10px;
+      font-size: 14px;
+    }
+    th { background: #eef2f6; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 4px 0; }
+    .muted { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="muted">Shinyoung Recruit Backend</div>
+    <h1>Phase 03i-2 Attachment File Upload</h1>
+    <div class="meta">
+      <span class="badge green">Implemented</span>
+      <span class="badge blue">Applicant Upload</span>
+      <span>Updated: 2026-05-20</span>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>Executive Summary</h2>
+      <p>Implemented applicant-owned single physical file upload on top of the existing attachment metadata slice.</p>
+      <p>The existing JSON metadata APIs remain, but metadata replace now manages only <code>METADATA_ONLY</code> rows and preserves <code>STORED</code> file-backed rows.</p>
+      <p>Storage internals and download availability remain hidden from applicant/admin metadata responses.</p>
+    </section>
+
+    <section>
+      <h2>Scope</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Completed</h3>
+          <ul>
+            <li><code>POST /applications/{applicationId}/attachments/files</code></li>
+            <li><code>PhysicalFileStatus</code> enum and entity field</li>
+            <li>Local filesystem storage abstraction</li>
+            <li>Filename, extension, content type, size, count, and total-size validation</li>
+            <li>Rollback cleanup for just-stored files</li>
+            <li>Metadata replace hardening</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Not Implemented</h3>
+          <ul>
+            <li>Applicant/admin download</li>
+            <li>Admin upload</li>
+            <li>Delete endpoint</li>
+            <li>Orphan cleanup scheduler</li>
+            <li>S3/NAS/object storage</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Deferred</h3>
+          <ul>
+            <li><code>downloadAvailable</code> field</li>
+            <li>Dashboard readiness</li>
+            <li>Submit validator changes</li>
+            <li>Attachment required policy</li>
+            <li>Virus scan/DLP integration</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Architecture And Domain</h2>
+      <table>
+        <thead>
+          <tr><th>Component</th><th>Status</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>ApplicationAttachment.physicalFileStatus</code></td><td><span class="badge green">Added</span></td><td><code>@Enumerated(EnumType.STRING)</code>, non-null, default <code>METADATA_ONLY</code></td></tr>
+          <tr><td><code>AttachmentProperties</code></td><td><span class="badge green">Added</span></td><td>Binds <code>recruit.attachment</code> storage root, file size, count, total size, and allowlists with startup validation</td></tr>
+          <tr><td><code>AttachmentStorageService</code></td><td><span class="badge green">Added</span></td><td>Abstraction for store/delete/exists; first implementation is local filesystem</td></tr>
+          <tr><td><code>ApplicationAttachmentFileService</code></td><td><span class="badge green">Added</span></td><td>Owns upload orchestration, validation, storage, DB save, and cleanup</td></tr>
+          <tr><td><code>AttachmentResponse</code></td><td><span class="badge blue">Reused</span></td><td>Still excludes <code>storedFileName</code>, <code>storagePath</code>, <code>physicalFileStatus</code>, and <code>downloadAvailable</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>API List</h2>
+      <table>
+        <thead>
+          <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>POST</code></td><td><code>/applications/{applicationId}/attachments/files</code></td><td>Applicant uploads one physical file</td><td><code>multipart/form-data</code>: <code>file</code>, <code>attachmentType</code>, <code>sectionType</code>, optional <code>sectionRecordId</code></td><td><code>ApiResponse&lt;AttachmentResponse&gt;</code></td></tr>
+          <tr><td><code>GET</code></td><td><code>/applications/{applicationId}/attachments</code></td><td>Existing metadata read</td><td>Unchanged</td><td>Unchanged</td></tr>
+          <tr><td><code>POST</code></td><td><code>/applications/{applicationId}/attachments</code></td><td>Existing metadata replace</td><td>JSON metadata only; storage fields rejected</td><td>Unchanged response shape</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Validation Rules</h2>
+      <table>
+        <thead>
+          <tr><th>Rule</th><th>Policy</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Ownership/state</td><td>Current applicant only; application must be <code>DRAFT</code>, posting <code>PUBLISHED</code>, and reception period open</td></tr>
+          <tr><td>Forbidden upload parts</td><td><code>sortOrder</code>, <code>displayName</code>, <code>originalFileName</code>, <code>storedFileName</code>, and <code>storagePath</code> return 400</td></tr>
+          <tr><td>Sort order</td><td>Server assigns append-only order from max application attachment sort order</td></tr>
+          <tr><td>Count/total</td><td>Only <code>physicalFileStatus=STORED</code> rows count toward file count and total size</td></tr>
+          <tr><td>File policy</td><td>Reject missing/empty/oversized files, invalid extension/content type, path separators, control chars, reserved names, and long names</td></tr>
+          <tr><td>Metadata replace</td><td>Deletes/replaces only <code>METADATA_ONLY</code>; preserves <code>STORED</code>; rejects client storage fields; rejects metadata <code>sortOrder</code> conflicts with existing <code>STORED</code> rows</td></tr>
+          <tr><td>Configuration</td><td>Validates non-null storage root, positive size/count limits, and non-empty extension/content-type allowlists at startup</td></tr>
+          <tr><td>Storage</td><td>Generated UUID filename and relative key under normalized storage root</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <table>
+        <thead>
+          <tr><th>Area</th><th>Files</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Domain/repository</td><td><code>PhysicalFileStatus.java</code>, <code>ApplicationAttachment.java</code>, <code>ApplicationAttachmentRepository.java</code></td></tr>
+          <tr><td>Upload services</td><td><code>AttachmentProperties.java</code>, <code>AttachmentFilePolicy.java</code>, <code>AttachmentStorageService.java</code>, <code>LocalAttachmentStorageService.java</code>, <code>StoredAttachmentFile.java</code>, <code>ApplicationAttachmentFileService.java</code></td></tr>
+          <tr><td>API/error/config</td><td><code>ApplicationAttachmentController.java</code>, <code>GlobalExceptionHandler.java</code>, <code>application.yaml</code></td></tr>
+          <tr><td>Tests</td><td><code>ApplicationAttachmentServiceTest.java</code>, <code>ApplicationAttachmentFileServiceTest.java</code>, <code>ApplicationAttachmentControllerTest.java</code></td></tr>
+          <tr><td>Docs</td><td><code>phase-03i-2-attachment-file-upload.md</code>, this HTML report, related design/history docs</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Test Results</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Result</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>.\gradlew.bat test --tests ...ApplicationAttachmentServiceTest --tests ...ApplicationAttachmentFileServiceTest --tests ...ApplicationAttachmentControllerTest --no-daemon</code></td><td><span class="badge green">Passed</span></td><td>Verified targeted service/controller coverage</td></tr>
+          <tr><td>Initial sandbox run</td><td><span class="badge amber">Blocked</span></td><td>Gradle distribution download was denied by sandbox network restriction</td></tr>
+          <tr><td>Second run</td><td><span class="badge amber">Interrupted</span></td><td>Timeout left Gradle test result files locked; fixed with <code>.\gradlew.bat --stop</code></td></tr>
+          <tr><td><code>.\gradlew.bat clean test --no-daemon</code></td><td><span class="badge green">Passed</span></td><td>Passed after review fix rerun with a longer timeout</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Remaining Issues</h2>
+      <ul>
+        <li>Download semantics and missing physical file behavior are deferred to Phase 03i-3.</li>
+        <li><code>MISSING</code> exists but is not assigned in this phase.</li>
+        <li>Local filesystem storage needs shared storage or object storage before multi-node production deployment.</li>
+        <li>Delete, admin upload, orphan cleanup, malware scanning, and required attachment policy remain deferred.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Next Phase</h2>
+      <p>Recommended next phase: Phase 03i-3 applicant/admin download for <code>physicalFileStatus=STORED</code> rows, with streaming response headers, safe filenames, and explicit missing-file handling.</p>
+    </section>
+  </main>
+</body>
+</html>

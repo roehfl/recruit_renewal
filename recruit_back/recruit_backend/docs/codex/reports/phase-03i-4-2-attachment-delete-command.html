@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03i-4-2 Attachment Soft Delete Command</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --text: #17202a;
+      --muted: #5c6978;
+      --line: #dce3ec;
+      --green: #147d4f;
+      --blue: #1f66cc;
+      --amber: #a86100;
+      --red: #b42318;
+      --gray: #667085;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.55;
+    }
+    header {
+      padding: 28px 36px;
+      background: #10233f;
+      color: #fff;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+    h1, h2, h3 {
+      margin: 0 0 12px;
+      line-height: 1.25;
+    }
+    h1 {
+      font-size: 28px;
+    }
+    h2 {
+      font-size: 20px;
+      margin-top: 28px;
+    }
+    h3 {
+      font-size: 16px;
+      margin-top: 18px;
+    }
+    p {
+      margin: 0 0 12px;
+    }
+    code {
+      background: #eef3f8;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 90%;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      margin: 12px 0 20px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }
+    th {
+      background: #eef3f8;
+      font-weight: 700;
+    }
+    ul {
+      margin: 8px 0 18px;
+      padding-left: 22px;
+    }
+    .meta {
+      color: #d9e6f7;
+      margin-top: 8px;
+    }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+    }
+    .completed { background: var(--green); }
+    .pending { background: var(--gray); }
+    .warning { background: var(--amber); }
+    .out { background: var(--red); }
+    .info { background: var(--blue); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 16px 0 24px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+    @media (max-width: 820px) {
+      header { padding: 22px; }
+      main { padding: 18px; }
+      .grid, .summary { grid-template-columns: 1fr; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Recruit Backend - Phase 03i-4-2 Attachment Soft Delete Command</h1>
+    <div><span class="badge completed">Completed</span></div>
+    <p class="meta">Generated: 2026-05-20 KST</p>
+  </header>
+  <main>
+    <section class="summary">
+      <div class="card">
+        <h2>Executive Summary</h2>
+        <p>Phase 03i-4-2 implemented applicant and admin attachment delete commands using a soft lifecycle state.</p>
+        <p>Deleted attachment rows are retained as <code>PhysicalFileStatus.DELETED</code>, hidden from normal metadata lists, and remain non-downloadable.</p>
+        <p>Previously stored physical files are deleted after the DB transaction commits; physical delete failure is logged and does not roll back the soft delete.</p>
+      </div>
+      <div class="card">
+        <h2>Status</h2>
+        <p><span class="badge completed">Implementation complete</span></p>
+        <p><span class="badge completed">Targeted tests passed</span></p>
+        <p><span class="badge completed">Full clean test passed</span></p>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h2>Implemented</h2>
+        <ul>
+          <li>Applicant delete command</li>
+          <li>Admin delete command with reason</li>
+          <li><code>DELETED</code> lifecycle state</li>
+          <li>Minimal delete fields on attachment row</li>
+          <li>After-commit physical delete</li>
+          <li>Deleted-row list filtering</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>Not Implemented</h2>
+        <ul>
+          <li>HTTP DELETE endpoints</li>
+          <li>Separate deletion history table</li>
+          <li>Include-deleted metadata read</li>
+          <li>Download API redesign</li>
+          <li>Upload API redesign</li>
+          <li><code>downloadAvailable</code> field</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>Deferred</h2>
+        <ul>
+          <li>Orphan scan dry-run</li>
+          <li>Orphan cleanup execution</li>
+          <li>Admin repair / mark-missing</li>
+          <li>Required attachment policy</li>
+          <li>Dashboard and submit integration</li>
+          <li>S3/NAS/object storage migration</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>API List</h2>
+      <table>
+        <thead>
+          <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>POST</code></td>
+            <td><code>/applications/{applicationId}/attachments/{attachmentId}/delete</code></td>
+            <td>Applicant deletes an owned editable attachment</td>
+            <td>Empty body</td>
+            <td><code>ApiResponse&lt;AttachmentDeleteResponse&gt;</code></td>
+          </tr>
+          <tr>
+            <td><code>POST</code></td>
+            <td><code>/admin/applications/{applicationId}/attachments/{attachmentId}/delete</code></td>
+            <td>Admin or recruit-admin deletes an attachment with a persisted reason</td>
+            <td><code>{ "reason": "..." }</code></td>
+            <td><code>ApiResponse&lt;AttachmentDeleteResponse&gt;</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Architecture And Domain</h2>
+      <table>
+        <thead>
+          <tr><th>Area</th><th>Classes</th><th>Summary</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Lifecycle</td><td><code>PhysicalFileStatus</code>, <code>AttachmentDeleteActorType</code></td><td>Added <code>DELETED</code> plus delete actor type.</td></tr>
+          <tr><td>Entity</td><td><code>ApplicationAttachment</code></td><td>Stores <code>deletedAt</code>, <code>deletedBy</code>, <code>deletedByType</code>, and <code>deletionReason</code>.</td></tr>
+          <tr><td>Service</td><td><code>ApplicationAttachmentDeleteService</code></td><td>Owns validation, soft delete, and after-commit physical delete registration.</td></tr>
+          <tr><td>Controller</td><td><code>ApplicationAttachmentController</code>, <code>AdminApplicationAttachmentController</code></td><td>Expose POST command endpoints while preserving existing security paths.</td></tr>
+          <tr><td>Repository</td><td><code>ApplicationAttachmentRepository</code></td><td>Adds active-row list and active scoped lookup excluding <code>DELETED</code>.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Validation Policy</h2>
+      <table>
+        <thead>
+          <tr><th>Rule</th><th>Status</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Applicant ownership</td><td><span class="badge completed">Completed</span></td><td>Other applicant access is hidden 404.</td></tr>
+          <tr><td>Applicant state/window</td><td><span class="badge completed">Completed</span></td><td>Only <code>DRAFT</code>, published posting, accepting period.</td></tr>
+          <tr><td>Admin reason</td><td><span class="badge completed">Completed</span></td><td><code>@NotBlank</code>, <code>@Size(max=1000)</code>, trimmed before persistence.</td></tr>
+          <tr><td>Already deleted row</td><td><span class="badge completed">Completed</span></td><td>Delete lookup excludes <code>DELETED</code>, so repeated delete returns 404.</td></tr>
+          <tr><td>Metadata visibility</td><td><span class="badge completed">Completed</span></td><td>Applicant and admin normal lists exclude deleted rows.</td></tr>
+          <tr><td>Download</td><td><span class="badge completed">Completed</span></td><td>Download still requires <code>STORED</code>; deleted rows remain 404.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Transaction And Physical Delete</h2>
+      <ul>
+        <li>DB state changes to <code>DELETED</code> first.</li>
+        <li>For previously <code>STORED</code> rows, physical delete is registered with transaction <code>afterCommit</code>.</li>
+        <li><code>METADATA_ONLY</code> rows do not request physical delete.</li>
+        <li>Missing physical files are treated idempotently.</li>
+        <li>Physical delete failure is logged only and does not roll back the DB soft delete.</li>
+        <li>Logs avoid full storage key and absolute path exposure.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Response Exposure</h2>
+      <table>
+        <thead>
+          <tr><th>Response Field</th><th>Exposed</th><th>Reason</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>applicationId</code></td><td>Yes</td><td>Business identifier</td></tr>
+          <tr><td><code>attachmentId</code></td><td>Yes</td><td>Business identifier</td></tr>
+          <tr><td><code>deleted</code></td><td>Yes</td><td>Command result</td></tr>
+          <tr><td><code>physicalDeleteRequested</code></td><td>Yes</td><td>Truthful before after-commit completion</td></tr>
+          <tr><td><code>message</code></td><td>Yes</td><td>User-safe fixed text</td></tr>
+          <tr><td><code>storedFileName</code>, <code>storagePath</code>, <code>storageRoot</code>, absolute path</td><td>No</td><td>Storage internals</td></tr>
+          <tr><td><code>physicalFileStatus</code>, <code>downloadAvailable</code></td><td>No</td><td>Not part of delete response contract</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Changed Files</h2>
+      <table>
+        <thead>
+          <tr><th>Path</th><th>Change</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>src/main/java/com/shinyoung/recruit/enumeration/PhysicalFileStatus.java</code></td><td>Added <code>DELETED</code></td></tr>
+          <tr><td><code>src/main/java/com/shinyoung/recruit/enumeration/AttachmentDeleteActorType.java</code></td><td>New enum</td></tr>
+          <tr><td><code>src/main/java/com/shinyoung/recruit/domain/entity/ApplicationAttachment.java</code></td><td>Delete lifecycle fields and method</td></tr>
+          <tr><td><code>src/main/java/com/shinyoung/recruit/service/ApplicationAttachmentDeleteService.java</code></td><td>New delete command service</td></tr>
+          <tr><td><code>src/main/java/com/shinyoung/recruit/controller/ApplicationAttachmentController.java</code></td><td>Applicant delete endpoint</td></tr>
+          <tr><td><code>src/main/java/com/shinyoung/recruit/controller/AdminApplicationAttachmentController.java</code></td><td>Admin delete endpoint</td></tr>
+          <tr><td><code>src/test/java/com/shinyoung/recruit/service/ApplicationAttachmentDeleteServiceTest.java</code></td><td>Delete policy tests</td></tr>
+          <tr><td><code>src/test/java/com/shinyoung/recruit/controller/ApplicationAttachmentDownloadControllerTest.java</code></td><td>Delete API/security tests</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Tests</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Result</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>test --tests "*ApplicationAttachmentDelete*" --no-daemon</code></td><td><span class="badge completed">Success</span></td><td>Delete service and policy tests passed.</td></tr>
+          <tr><td><code>test --tests "*ApplicationAttachment*" --no-daemon</code></td><td><span class="badge completed">Success</span></td><td>Attachment regression tests passed.</td></tr>
+          <tr><td><code>test --tests "*AdminApplicationSection*" --no-daemon</code></td><td><span class="badge completed">Success</span></td><td>Sandbox network block on first run; approved rerun passed.</td></tr>
+          <tr><td><code>clean test --no-daemon</code></td><td><span class="badge completed">Success</span></td><td>Full regression passed.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Remaining Issues</h2>
+      <ul>
+        <li><span class="badge pending">Pending</span> Include-deleted audit read is not implemented.</li>
+        <li><span class="badge pending">Pending</span> Separate deletion history table is deferred.</li>
+        <li><span class="badge pending">Pending</span> Physical delete completion/failure is not persisted to DB.</li>
+        <li><span class="badge warning">Open</span> Orphan scan and cleanup still need a dry-run-first phase.</li>
+        <li><span class="badge warning">Open</span> Required attachment/dashboard/submit integration remains a later policy phase.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Next Phase Recommendation</h2>
+      <p>Proceed with Phase 03i-4-3 orphan storage scan dry-run. The scan should report orphan physical files, <code>STORED</code> rows with missing files, and <code>DELETED</code> rows whose physical files still exist, without deleting anything.</p>
+    </section>
+  </main>
+</body>
+</html>

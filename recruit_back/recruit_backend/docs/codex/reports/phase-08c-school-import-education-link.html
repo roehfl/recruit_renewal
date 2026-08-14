@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 08c - School import + Education link</title>
+<style>
+  :root { --blue:#1d4ed8; --green:#15803d; --amber:#b45309; --red:#b91c1c;
+    --muted:#6b7280; --bg:#f8fafc; --card:#fff; --border:#e2e8f0; --ink:#0f172a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.6; }
+  .wrap { max-width:1080px; margin:0 auto; padding:32px 20px 64px; }
+  header.page { background:linear-gradient(135deg,#3730a3,#6d28d9); color:#fff; border-radius:16px; padding:28px 32px; margin-bottom:28px; }
+  header.page h1 { margin:0 0 6px; font-size:24px; }
+  header.page .sub { opacity:.9; font-size:14px; }
+  .badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+  .badge.done { background:#dcfce7; color:var(--green); }
+  .badge.oos { background:#fee2e2; color:var(--red); }
+  .badge.warn { background:#fef3c7; color:var(--amber); }
+  .badge.white { background:rgba(255,255,255,.18); color:#fff; }
+  section { margin-bottom:26px; }
+  h2 { font-size:18px; border-left:4px solid #6d28d9; padding-left:10px; margin:0 0 14px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px 18px; }
+  .card h3 { margin:0 0 8px; font-size:14px; }
+  .card ul { margin:6px 0 0; padding-left:18px; font-size:13px; }
+  .card.kpi { text-align:center; }
+  .card.kpi .num { font-size:30px; font-weight:700; color:#6d28d9; }
+  .card.kpi .lbl { font-size:12px; color:var(--muted); }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--border); border-radius:12px; overflow:hidden; font-size:13px; }
+  th,td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { background:#f1f5f9; font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  code { background:#f1f5f9; padding:1px 6px; border-radius:5px; font-size:12px; }
+  .summary { background:var(--card); border:1px solid var(--border); border-left:4px solid var(--green); border-radius:10px; padding:16px 20px; font-size:14px; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  .note { font-size:12px; color:var(--muted); }
+  .ok { color:var(--green); font-weight:600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Phase 08c · School import + Education link <span class="badge white">완료 · Phase 08 종료</span></h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · xlsx upsert + ApplicationEducation.schoolId · 생성일 2026-06-02</div>
+</header>
+
+<section>
+  <h2>요약</h2>
+  <div class="summary">
+    (A) <code>ApplicationEducation</code> 에 optional <code>schoolId</code>(application-level 참조, 강한 FK 없음)를 추가해
+    자동완성 선택 학력을 School master 와 연결한다(미선택=null). (B) <code>POST /api/admin/schools/import</code> 로
+    xlsx 일괄 <strong>upsert</strong>(schoolCode 우선 + (name,type,region) fallback, insert/update/skip). 기존 education 쓰기·조회 계약은
+    오버로드/back-compat 생성자로 비파괴 유지. 테스트 <span class="ok">BUILD SUCCESSFUL</span>.
+  </div>
+</section>
+
+<section>
+  <h2>지표</h2>
+  <div class="cards">
+    <div class="card kpi"><div class="num">1</div><div class="lbl">신규 API</div></div>
+    <div class="card kpi"><div class="num">5</div><div class="lbl">신규 클래스(main)</div></div>
+    <div class="card kpi"><div class="num">15</div><div class="lbl">신규 테스트</div></div>
+    <div class="card kpi"><div class="num">0</div><div class="lbl">신규 테이블</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>범위</h2>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="badge done">완료</span> Implemented</h3>
+      <ul>
+        <li>ApplicationEducation.schoolId(optional, app-level)</li>
+        <li>EducationRequest/Response 에 schoolId</li>
+        <li>School xlsx import(upsert)</li>
+        <li>insert/update/skip 카운트 + skip 사유</li>
+        <li>비파괴(오버로드/back-compat 생성자)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="badge oos">제외</span> Out of scope</h3>
+      <ul>
+        <li>schoolId 존재/active 검증(app-level 참조)</li>
+        <li>import preview/STALE(단일 commit)</li>
+        <li>SCHOOL funnel 통계(07c 보류)</li>
+        <li>free-text 소급 매칭</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>API / upsert</h2>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>접근</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>POST</td><td class="mono">/api/admin/schools/import</td><td>admin</td><td>xlsx 일괄 upsert(행 단위 skip)</td></tr>
+    </tbody>
+  </table>
+  <table style="margin-top:12px;">
+    <thead><tr><th>항목</th><th>규칙</th></tr></thead>
+    <tbody>
+      <tr><td>upsert 키</td><td>schoolCode(있으면) 우선 → 없으면 (schoolName, schoolType, region) fallback. 기존=update(active 보존), 신규=insert.</td></tr>
+      <tr><td>파일 방어</td><td>.xlsx만, 크기/행수(UploadProperties 재사용), header signature, formula 셀 skip, blank 행 skip. 파일 레벨 오류는 400.</td></tr>
+      <tr><td>행 정책</td><td>전체 거부 아님 — blank schoolName/formula 셀 행만 skip + 사유(rowNumber/reason).</td></tr>
+      <tr><td>education link</td><td>schoolId nullable, 자동완성 선택 시에만. 존재 검증 안 함(ADR 0004). schoolName free-text 유지.</td></tr>
+    </tbody>
+  </table>
+  <p class="note">라우팅: <code>/admin/schools/import</code>(literal) 이 <code>/admin/schools/{id}</code>(template) 보다 우선.</p>
+</section>
+
+<section>
+  <h2>테스트</h2>
+  <div class="summary" style="border-left-color:var(--green);">
+    <div><strong>명령</strong>: <span class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*School*" --tests "*ApplicationEducation*" --tests "*AdminApplicationSection*" --no-daemon</span></div>
+    <div><strong>결과</strong>: <span class="ok">BUILD SUCCESSFUL</span> — School import 9 + parser unit 5 + School 12 + ApplicationEducation(신규 schoolId) + AdminApplicationSection 회귀 통과.</div>
+  </div>
+  <p class="note">import: schoolCode insert+update, natural key fallback(중복 insert 안 함), blank/길이초과/formula/모호 skip+사유, 비-xlsx/wrong header/maxRows/maxFileSize 거부, 인가. education: 선택 schoolId 저장/응답·직접입력 null. 회귀: education 응답 schoolId 추가 비파괴.</p>
+</section>
+
+<section>
+  <h2>리뷰 반영 (instruction.md · 5건)</h2>
+  <table>
+    <thead><tr><th>등급</th><th>지적</th><th>반영</th></tr></thead>
+    <tbody>
+      <tr><td>Blocking</td><td>import 행 길이 미검증 → DB 예외로 전체 rollback 가능</td><td><code>validateRow</code>(필수+컬럼 길이) 로 초과 행만 skip+사유.</td></tr>
+      <tr><td>Blocking</td><td>natural key 중복 시 임의 첫 행 update(master 오염)</td><td>fallback 매칭 2건 이상이면 <code>ExistingMatch.ambiguous</code> 로 해당 행 skip.</td></tr>
+      <tr><td>Medium</td><td>import 방어 테스트 부족(formula/maxRows/maxFileSize/길이/모호)</td><td>controller 3건 + parser unit 5건 회귀 추가.</td></tr>
+      <tr><td>Medium</td><td>ApplicationEducation.schoolId 인덱스 없음</td><td><code>idx_application_education_school</code> 추가(SCHOOL 통계 기반).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>남은 이슈 / 다음 단계</h2>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="badge warn">open</span> 후속</h3>
+      <ul><li>schoolId 존재 검증(선택), import max-rows 상향(전국 데이터셋), preview 분리(수요 시).</li></ul>
+    </div>
+    <div class="card">
+      <h3><span class="badge done">Phase 08 종료</span></h3>
+      <ul><li>다음: SCHOOL/CERTIFICATE funnel 통계(schoolId 기반), 메시지 발송, 개인정보 파기/감사.</li></ul>
+    </div>
+  </div>
+</section>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03k Application Form Required Policy Design</title>
+  <style>
+    :root {
+      --blue: #1d4ed8;
+      --green: #047857;
+      --amber: #b45309;
+      --red: #b91c1c;
+      --slate: #334155;
+      --line: #d7dee8;
+      --bg: #f6f8fb;
+      --card: #ffffff;
+    }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: #172033;
+    }
+    header {
+      padding: 30px 36px;
+      background: #17324d;
+      color: #fff;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 26px 20px 48px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+    h2 {
+      margin: 30px 0 12px;
+      font-size: 20px;
+      color: #17324d;
+    }
+    h3 {
+      margin: 0 0 10px;
+      font-size: 16px;
+      color: #223046;
+    }
+    p {
+      line-height: 1.55;
+    }
+    code {
+      background: #edf2f7;
+      border-radius: 4px;
+      padding: 2px 5px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+    th, td {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eaf1f8;
+      color: #1f344d;
+    }
+    ul {
+      margin: 8px 0 0 18px;
+      padding: 0;
+    }
+    li {
+      margin: 6px 0;
+    }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .completed { background: #d1fae5; color: var(--green); }
+    .pending { background: #fef3c7; color: var(--amber); }
+    .out { background: #fee2e2; color: var(--red); }
+    .info { background: #dbeafe; color: var(--blue); }
+    .muted { color: #5e6b7c; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .two {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 880px) {
+      header { padding: 24px 18px; }
+      main { padding: 20px 14px 36px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Recruit Backend - Phase 03k</h1>
+  <div>ApplicationFormConfig Use/Required Policy Split Design</div>
+  <p><span class="badge completed">Design Complete</span> <span class="muted" style="color:#dbeafe;">Generated: 2026-05-22</span></p>
+</header>
+<main>
+  <section class="summary">
+    <div class="card">
+      <h2>Executive Summary</h2>
+      <p>This phase defines how application form section usage and final-submit requiredness should be separated.</p>
+      <p>The recommendation is to keep existing <code>useXxx</code> fields for visibility and section API access, and add explicit <code>requireXxx</code> fields for submit-blocking and dashboard required-readiness policy.</p>
+      <p>Review update: <code>requireXxx</code> must not be exposed in request or response payloads before submit and dashboard policies also use it. The recommended Phase 03k-1 is now an end-to-end policy change.</p>
+      <p>Implementation note: the completed Phase 03k-1 was later narrowed by <code>instruction.md</code> to a public read-only compatibility slice. It adds <code>applicationFormRequiredPolicy</code> to public job posting responses, but it does not implement the target <code>requireXxx</code> fields, schema migration, submit validator conversion, or dashboard completion conversion described by this design.</p>
+      <p>No Java source, test source, DB migration, runtime API behavior, security configuration, SMS/email, or LDAP behavior is changed in this design phase.</p>
+    </div>
+    <div class="card">
+      <h2>Status</h2>
+      <p><span class="badge completed">Markdown Created</span></p>
+      <p><span class="badge completed">HTML Created</span></p>
+      <p><span class="badge pending">Implementation Deferred</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Current Problem</h2>
+    <div class="card">
+      <p><code>ApplicationFormConfig</code> currently has only seven <code>useXxx</code> flags. Those flags decide section visibility and section API access, but some of them also decide final-submit requiredness and dashboard required readiness.</p>
+      <p>This makes optional-but-visible sections difficult to support. For example, education may need to be shown and editable without blocking final submit.</p>
+    </div>
+    <table>
+      <thead><tr><th>Area</th><th>Current Behavior</th><th>Issue</th></tr></thead>
+      <tbody>
+      <tr><td>Education</td><td><code>useEducation=true</code> requires at least one row at submit.</td><td>Cannot show optional education.</td></tr>
+      <tr><td>Career</td><td><code>useCareer=true</code> requires profile/type and row policy.</td><td>Cannot show optional career.</td></tr>
+      <tr><td>Military</td><td><code>useMilitary=true</code> requires row/type-specific data.</td><td>Cannot show optional military.</td></tr>
+      <tr><td>Certificate/Language/Award/Gap</td><td>Enabled sections are optional guidance only.</td><td>Cannot make them submit-required.</td></tr>
+      <tr><td>Dashboard</td><td>Mirrors current submit validator assumptions.</td><td>Required and optional groups are coupled to use flags.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Scope Cards</h2>
+    <div class="grid">
+      <div class="card">
+        <h3><span class="badge completed">Designed</span></h3>
+        <ul>
+          <li><code>useXxx</code> / <code>requireXxx</code> responsibility split</li>
+          <li>Required field names and defaults</li>
+          <li>Admin/public response impact</li>
+          <li>Submit and dashboard conversion policy</li>
+          <li>Migration/backfill strategy</li>
+          <li>Safe end-to-end implementation phase split</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge out">Not Implemented</span></h3>
+        <ul>
+          <li>Java source changes</li>
+          <li>Test source changes</li>
+          <li>DB migration files</li>
+          <li>Runtime API behavior changes</li>
+          <li>New endpoints</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge pending">Deferred</span></h3>
+        <ul>
+          <li>Attachment required policy</li>
+          <li>Education grade requiredness</li>
+          <li>Language score/grade requiredness</li>
+          <li>Shared readiness abstraction</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Proposed Policy</h2>
+    <div class="two">
+      <div class="card">
+        <h3><code>useXxx</code></h3>
+        <ul>
+          <li>Controls applicant screen visibility.</li>
+          <li>Controls applicant section save/read API access.</li>
+          <li>Controls whether a section can appear in admin/public form config.</li>
+          <li>Does not by itself mean submit-required after the required-policy implementation.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><code>requireXxx</code></h3>
+        <ul>
+          <li>Controls submit-blocking validation.</li>
+          <li>Controls dashboard required-missing groups.</li>
+          <li>Controls required completion counts and submit-blocking issue count.</li>
+          <li>Requires the matching <code>useXxx=true</code>.</li>
+        </ul>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Recommended Field</th><th>Default / Backfill</th><th>Notes</th></tr></thead>
+      <tbody>
+      <tr><td><code>requireEducation</code></td><td><code>useEducation</code></td><td>Preserves current submit behavior.</td></tr>
+      <tr><td><code>requireCareer</code></td><td><code>useCareer</code></td><td>Preserves current submit behavior.</td></tr>
+      <tr><td><code>requireCertificate</code></td><td><code>false</code></td><td>Currently optional.</td></tr>
+      <tr><td><code>requireLanguage</code></td><td><code>false</code></td><td>Currently optional.</td></tr>
+      <tr><td><code>requireMilitary</code></td><td><code>useMilitary</code></td><td>Preserves current submit behavior.</td></tr>
+      <tr><td><code>requireAward</code></td><td><code>false</code></td><td>Currently optional.</td></tr>
+      <tr><td><code>requireGapPeriod</code></td><td><code>false</code></td><td>Operationally risky if enabled without a no-gap declaration.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>API Impact</h2>
+    <table>
+      <thead><tr><th>Method</th><th>Path</th><th>Impact</th></tr></thead>
+      <tbody>
+      <tr><td>POST</td><td><code>/admin/job-postings</code></td><td><code>applicationFormConfig</code> accepts optional nullable <code>requireXxx</code> fields.</td></tr>
+      <tr><td>POST</td><td><code>/admin/job-postings/{id}</code></td><td>Same config request expansion and validation.</td></tr>
+      <tr><td>GET</td><td><code>/admin/job-postings/{id}</code></td><td>Admin detail config includes use and require fields.</td></tr>
+      <tr><td>GET</td><td><code>/job-postings/{id}</code></td><td>Public detail config includes use and require fields.</td></tr>
+      <tr><td>GET</td><td><code>/applications/{applicationId:[0-9]+}/dashboard</code></td><td>Readiness must calculate using <code>requireXxx</code> in the same phase that exposes required fields.</td></tr>
+      <tr><td>POST</td><td><code>/applications/{applicationId}/submit</code></td><td>Submit blocking checks must use <code>requireXxx</code> in the same phase that exposes required fields.</td></tr>
+      </tbody>
+    </table>
+    <div class="card" style="margin-top:16px;">
+      <p>Public list remains unchanged and must not include <code>applicationFormConfig</code>.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Review Fixes</h2>
+    <div class="card">
+      <p><span class="badge completed">Contract Safety Updated</span></p>
+      <p>Do not ship a phase where public/admin responses say <code>requireEducation=false</code> while final submit still blocks because <code>useEducation=true</code>. The implementation slice that exposes <code>requireXxx</code> must also convert submit validation and dashboard readiness.</p>
+    </div>
+    <table>
+      <thead><tr><th>Area</th><th>Updated Rule</th></tr></thead>
+      <tbody>
+      <tr><td>Preferred 03k-1</td><td>Add fields, expose request/response, validate, convert submit validator, convert dashboard checker, keep section access on <code>useXxx</code>.</td></tr>
+      <tr><td>Safe smaller split</td><td>If split is required, 03k-1 may add internal fields/backfill only, with no request/response exposure. Exposure and submit/dashboard conversion must happen together later.</td></tr>
+      <tr><td>Create nulls</td><td>Omitted <code>requireXxx</code> values use backward-compatible defaults.</td></tr>
+      <tr><td>Update nulls</td><td>Omitted <code>requireXxx</code> values preserve existing stored values. Changing <code>useXxx=false</code> clears matching <code>requireXxx</code>; explicit <code>use=false, require=true</code> is rejected.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Submit / Dashboard Impact</h2>
+    <table>
+      <thead><tr><th>Config State</th><th>Submit Validator</th><th>Dashboard Readiness</th><th>Section Save API</th></tr></thead>
+      <tbody>
+      <tr><td><code>use=false</code></td><td>Excluded.</td><td>Excluded.</td><td>Blocked for applicant section APIs.</td></tr>
+      <tr><td><code>use=true, require=false</code></td><td>Not submit-blocking.</td><td>Optional incomplete if empty.</td><td>Allowed while application is writable.</td></tr>
+      <tr><td><code>use=true, require=true</code></td><td>Section-specific blocking validation runs.</td><td>Required missing if incomplete.</td><td>Allowed while application is writable.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Validation</h2>
+    <div class="card">
+      <p>Requests with <code>requireXxx=true</code> and matching <code>useXxx=false</code> should be rejected with a 400-equivalent validation failure. Silent coercion is not recommended because it hides admin configuration mistakes.</p>
+    </div>
+    <table>
+      <thead><tr><th>Invariant</th><th>Recommended Owner</th></tr></thead>
+      <tbody>
+      <tr><td><code>requireEducation=true -> useEducation=true</code></td><td>Service validation plus entity factory/update invariant.</td></tr>
+      <tr><td><code>requireCareer=true -> useCareer=true</code></td><td>Service validation plus entity factory/update invariant.</td></tr>
+      <tr><td><code>requireCertificate=true -> useCertificate=true</code></td><td>Service validation plus entity factory/update invariant.</td></tr>
+      <tr><td><code>requireLanguage=true -> useLanguage=true</code></td><td>Service validation plus entity factory/update invariant.</td></tr>
+      <tr><td><code>requireMilitary=true -> useMilitary=true</code></td><td>Service validation plus entity factory/update invariant.</td></tr>
+      <tr><td><code>requireAward=true -> useAward=true</code></td><td>Service validation plus entity factory/update invariant.</td></tr>
+      <tr><td><code>requireGapPeriod=true -> useGapPeriod=true</code></td><td>Service validation plus entity factory/update invariant.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Migration / Compatibility</h2>
+    <div class="card">
+      <p>Add non-null boolean columns for the seven required flags. Backfill education, career, and military from their current use flags. Backfill certificate, language, award, and gap period as false.</p>
+    </div>
+    <table>
+      <thead><tr><th>Column</th><th>Backfill</th></tr></thead>
+      <tbody>
+      <tr><td><code>require_education</code></td><td><code>use_education</code></td></tr>
+      <tr><td><code>require_career</code></td><td><code>use_career</code></td></tr>
+      <tr><td><code>require_certificate</code></td><td><code>false</code></td></tr>
+      <tr><td><code>require_language</code></td><td><code>false</code></td></tr>
+      <tr><td><code>require_military</code></td><td><code>use_military</code></td></tr>
+      <tr><td><code>require_award</code></td><td><code>false</code></td></tr>
+      <tr><td><code>require_gap_period</code></td><td><code>false</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Attachment Decision</h2>
+    <div class="card">
+      <p><span class="badge pending">Deferred</span></p>
+      <p>Attachment requiredness is excluded from Phase 03k. A later phase should design a dedicated policy such as <code>JobPostingAttachmentRequirement</code> with attachment type, section type, required flag, min count, and max count.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Phase Split</h2>
+    <table>
+      <thead><tr><th>Phase</th><th>Scope</th><th>Deferred</th></tr></thead>
+      <tbody>
+      <tr><td>03k-1</td><td>End-to-end required policy: add fields, create defaults, update preserve semantics, request/response expansion, validation, submit conversion, dashboard conversion.</td><td>Attachment required policy and broad section access redesign.</td></tr>
+      <tr><td>03k-2</td><td>Policy hardening only if needed: shared helper extraction, edge-case regression, optional dashboard wording, deployment migration follow-up.</td><td>Must not be the first phase that aligns submit/dashboard with already exposed <code>requireXxx</code>.</td></tr>
+      <tr><td>03k-3 candidate</td><td>Attachment required policy design/implementation if required.</td><td>Messaging, LDAP, interview, Excel/PDF/statistics.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Test Plan</h2>
+    <table>
+      <thead><tr><th>Phase</th><th>Coverage</th></tr></thead>
+      <tbody>
+      <tr><td>03k-1</td><td>Defaults, update preserve semantics, disabled-section clearing, invalid <code>require->use</code> combinations, admin/public detail response fields, public list exclusion, submit validator required/optional behavior, dashboard required/optional grouping, section access regression.</td></tr>
+      <tr><td>03k-2</td><td>Additional hardening tests only if a follow-up phase is created.</td></tr>
+      </tbody>
+    </table>
+    <div class="card" style="margin-top:16px;">
+      <p><span class="badge pending">Not Run</span> Tests were not executed because this is a documentation-only design phase.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Deferred Items</h2>
+    <div class="card">
+      <ul>
+        <li>MariaDB migration mechanism and exact deployment sequence.</li>
+        <li>Gap period "no gap" declaration model.</li>
+        <li>Education grade and language score requiredness.</li>
+        <li>Attachment required policy.</li>
+        <li>Shared readiness abstraction after behavior stabilizes.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+</body>
+</html>

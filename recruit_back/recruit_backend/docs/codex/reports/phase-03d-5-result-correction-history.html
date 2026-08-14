@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03d-5 Result Correction History</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; color: #18202a; background: #f6f8fb; line-height: 1.55; }
+    header { background: #12324a; color: #fff; padding: 34px 40px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 52px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e1ea; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e6ecf2; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #25364a; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef2f6; padding: 2px 5px; border-radius: 4px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .completed { background: #d9f3e5; color: #146137; }
+    .pending { background: #f3e7cc; color: #7a4b00; }
+    .out { background: #f4d7da; color: #842029; }
+    .warn { background: #fff0c2; color: #765300; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e1ea; border-radius: 8px; padding: 16px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .mono { font-family: Consolas, monospace; font-size: 13px; }
+    .section { margin-top: 24px; }
+    @media (max-width: 820px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 36px; }
+      .grid, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>Shinyoung Recruit Backend</div>
+  <h1>Phase 03d-5 Result Correction History</h1>
+  <span class="badge completed">Completed</span>
+  <span class="badge muted">Generated: 2026-05-19</span>
+</header>
+<main>
+  <section class="summary">
+    <div class="card">
+      <h2>Executive Summary</h2>
+      <p>Phase 03d-5 adds a separate post-announcement correction command for StageResult.</p>
+      <p>The latest StageResult row is updated, and every correction stores an append-only snapshot history with a mandatory reason.</p>
+      <p>Correction history is admin-only. Applicant-facing result APIs remain unchanged and show only the latest corrected result.</p>
+    </div>
+    <div class="card">
+      <h2>Status</h2>
+      <p><span class="badge completed">Implementation Complete</span></p>
+      <p><span class="badge completed">Targeted Tests Passed</span></p>
+      <p><span class="badge completed">Full Regression Passed</span></p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Scope Cards</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Implemented</h3>
+        <ul class="list">
+          <li><code>StageResultCorrectionHistory</code> entity</li>
+          <li>Correction repository, service, request DTO, response DTO</li>
+          <li><code>POST /admin/stages/{stageId}/results/{resultId}/correct</code></li>
+          <li><code>GET /admin/stages/{stageId}/results/{resultId}/histories</code></li>
+          <li>Service and controller tests</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Not Implemented</h3>
+        <ul class="list">
+          <li>Applicant correction history exposure</li>
+          <li>Duplicate StageResult rows</li>
+          <li>PUT/PATCH/DELETE correction APIs</li>
+          <li>Stage announce policy changes</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Deferred</h3>
+        <ul class="list">
+          <li>Real admin identity for <code>correctedBy</code></li>
+          <li>Correction notification</li>
+          <li>Fine-grained authorization</li>
+          <li>Audit logging and migration scripts</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Changed Files</h2>
+    <table>
+      <tr><th>Path</th><th>Type</th><th>Notes</th></tr>
+      <tr><td><code>src/main/java/com/shinyoung/recruit/domain/entity/StageResultCorrectionHistory.java</code></td><td>New</td><td>Append-only correction history entity</td></tr>
+      <tr><td><code>src/main/java/com/shinyoung/recruit/domain/repository/StageResultCorrectionHistoryRepository.java</code></td><td>New</td><td>History lookup by result id</td></tr>
+      <tr><td><code>src/main/java/com/shinyoung/recruit/dto/request/StageResultCorrectionRequest.java</code></td><td>New</td><td>Correction command request</td></tr>
+      <tr><td><code>src/main/java/com/shinyoung/recruit/dto/response/StageResultCorrectionHistoryResponse.java</code></td><td>New</td><td>Admin-only history response</td></tr>
+      <tr><td><code>src/main/java/com/shinyoung/recruit/service/StageResultCorrectionService.java</code></td><td>New</td><td>Correction policy and history persistence</td></tr>
+      <tr><td><code>src/main/java/com/shinyoung/recruit/controller/StageResultController.java</code></td><td>Modified</td><td>Correction and histories endpoints</td></tr>
+      <tr><td><code>src/test/java/com/shinyoung/recruit/service/StageResultCorrectionServiceTest.java</code></td><td>New</td><td>Correction service tests</td></tr>
+      <tr><td><code>src/test/java/com/shinyoung/recruit/controller/StageResultControllerTest.java</code></td><td>Modified</td><td>Correction API tests</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Architecture And Domain</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Entity Structure</h3>
+        <p class="mono">StageResultCorrectionHistory N : 1 StageResult</p>
+        <p class="mono">StageResult N : 1 Stage</p>
+        <p class="mono">StageResult N : 1 JobApplication</p>
+      </div>
+      <div class="card">
+        <h3>Ownership Rules</h3>
+        <ul class="list">
+          <li>History belongs to one StageResult.</li>
+          <li>StageResult has no history collection.</li>
+          <li>No cascade or orphanRemoval is configured.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Snapshot Fields</h3>
+        <ul class="list">
+          <li>Status, score, comment, decidedAt before correction</li>
+          <li>Status, score, comment, decidedAt after correction</li>
+          <li>correctedAt, correctedBy, reason</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>API List</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/admin/stages/{stageId}/results/{resultId}/correct</code></td>
+        <td>Correct announced or closed StageResult</td>
+        <td><code>StageResultCorrectionRequest</code></td>
+        <td><code>ApiResponse&lt;AdminStageResultResponse&gt;</code></td>
+      </tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/admin/stages/{stageId}/results/{resultId}/histories</code></td>
+        <td>Read correction histories</td>
+        <td>None</td>
+        <td><code>ApiResponse&lt;List&lt;StageResultCorrectionHistoryResponse&gt;&gt;</code></td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Validation And Policy</h2>
+    <table>
+      <tr><th>Rule</th><th>Status</th><th>Detail</th></tr>
+      <tr><td>Correction status guard</td><td><span class="badge completed">Implemented</span></td><td>Allowed only in <code>RESULT_ANNOUNCED</code> or <code>CLOSED</code>.</td></tr>
+      <tr><td>READY/IN_PROGRESS correction</td><td><span class="badge out">Rejected</span></td><td>Admins must use the existing general update API before announcement.</td></tr>
+      <tr><td>Reason required</td><td><span class="badge completed">Implemented</span></td><td><code>reason</code> is not blank and max 1000 characters.</td></tr>
+      <tr><td>Latest result update</td><td><span class="badge completed">Implemented</span></td><td>The existing StageResult row is mutated; no duplicate row is created.</td></tr>
+      <tr><td>Applicant exposure</td><td><span class="badge out">Blocked</span></td><td>Correction history is not exposed in applicant APIs.</td></tr>
+      <tr><td>Admin identity</td><td><span class="badge warn">Deferred</span></td><td><code>SYSTEM</code> remains the placeholder for <code>correctedBy</code> and <code>decidedBy</code>.</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Test Results</h2>
+    <table>
+      <tr><th>Command</th><th>Result</th><th>Notes</th></tr>
+      <tr>
+        <td><code>.\gradlew.bat test --tests com.shinyoung.recruit.service.StageResultCorrectionServiceTest --tests com.shinyoung.recruit.controller.StageResultControllerTest</code></td>
+        <td><span class="badge completed">Success</span></td>
+        <td>Correction service and controller contract passed.</td>
+      </tr>
+      <tr>
+        <td><code>.\gradlew.bat test --tests com.shinyoung.recruit.service.ApplicationStageResultServiceTest --tests com.shinyoung.recruit.controller.ApplicationStageResultControllerTest</code></td>
+        <td><span class="badge completed">Success</span></td>
+        <td>Applicant result regression passed.</td>
+      </tr>
+      <tr>
+        <td><code>.\gradlew.bat test --tests com.shinyoung.recruit.service.StageResultServiceTest --tests com.shinyoung.recruit.service.StageServiceTest</code></td>
+        <td><span class="badge completed">Success</span></td>
+        <td>StageResult and Stage lifecycle regression passed.</td>
+      </tr>
+      <tr>
+        <td><code>.\gradlew.bat clean test --no-daemon</code></td>
+        <td><span class="badge completed">Success</span></td>
+        <td>Full regression passed.</td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Remaining Issues</h2>
+    <div class="card">
+      <ul class="list">
+        <li>Replace <code>SYSTEM</code> with real authenticated admin identity.</li>
+        <li>Define whether corrections should trigger applicant notification.</li>
+        <li>Add migration scripts when generated schema is no longer sufficient.</li>
+        <li>Add fine-grained authorization and audit logging in a security phase.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Next Phase Recommendation</h2>
+    <div class="card">
+      <p>Next work should connect real admin identity and notification/audit policy. The core correction command and history storage are now ready for follow-up security and operations decisions.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

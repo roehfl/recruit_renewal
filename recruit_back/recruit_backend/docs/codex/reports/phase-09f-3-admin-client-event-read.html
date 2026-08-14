@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 09f-3 — Admin Client Event Read API 구현 리포트</title>
+<style>
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
+    color:#1e293b;background:#eef2f7;line-height:1.55;font-size:14px}
+  header{background:linear-gradient(135deg,#0f172a,#1e40af);color:#fff;padding:28px 32px}
+  header h1{margin:0 0 6px;font-size:21px}
+  header .sub{color:#bfdbfe;font-size:13px}
+  .wrap{max-width:1060px;margin:0 auto;padding:24px 20px 60px}
+  section{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px 22px;margin:18px 0;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+  h2{font-size:16px;margin:0 0 14px;padding-bottom:8px;border-bottom:2px solid #e2e8f0}
+  h3{font-size:13.5px;margin:14px 0 7px;color:#334155}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;vertical-align:middle}
+  .b-green{background:#dcfce7;color:#15803d}
+  .b-blue{background:#dbeafe;color:#1d4ed8}
+  .b-amber{background:#fef3c7;color:#b45309}
+  .b-gray{background:#e2e8f0;color:#475569}
+  .b-red{background:#fee2e2;color:#b91c1c}
+  .b-orange{background:#ffedd5;color:#c2410c}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:8px 0}
+  .card{border:1px solid #e2e8f0;border-radius:10px;padding:14px;background:#f8fafc}
+  .card h4{margin:0 0 8px;font-size:13px}
+  .card ul{margin:6px 0 0;padding-left:18px}
+  .card li{margin:3px 0;font-size:13px}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12.5px}
+  th,td{border:1px solid #e2e8f0;padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:#f1f5f9;font-weight:700}
+  code{background:#f1f5f9;padding:1px 5px;border-radius:5px;font-size:12px;color:#7c3aed}
+  pre{background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:8px;overflow-x:auto;white-space:pre-wrap;font-size:12px;margin:8px 0}
+  .ok{background:#f0fdf4;border-left:4px solid #16a34a;padding:10px 14px;border-radius:0 8px 8px 0;margin:10px 0;font-size:13px}
+  .note{background:#fffbeb;border-left:4px solid #d97706;padding:10px 14px;border-radius:0 8px 8px 0;margin:10px 0;font-size:13px}
+  .warn{background:#fff7ed;border-left:4px solid #ea580c;padding:10px 14px;border-radius:0 8px 8px 0;margin:10px 0;font-size:13px}
+  .muted{color:#64748b;font-size:12.5px}
+  .class-block{border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;margin:10px 0;background:#fafafa}
+  .class-block h4{margin:0 0 6px;font-size:13.5px;color:#0f172a}
+  .class-block .meta{font-size:11.5px;color:#64748b;margin-bottom:8px}
+  .row-even{background:#f8fafc}
+  .pipeline{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:#1e293b;color:#e2e8f0;padding:12px 14px;border-radius:8px;overflow-x:auto;white-space:pre;margin:8px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Phase 09f-3 — Admin Client Event Read API</h1>
+  <div class="sub">
+    신영증권 채용 Renewal 백엔드 · 구현 리포트 ·
+    <span class="badge b-green">구현 완료</span>
+    <span class="badge b-green">테스트 통과 (19)</span>
+    · 2026-06-10
+  </div>
+</header>
+<div class="wrap">
+
+  <!-- 1. 요약 -->
+  <section>
+    <h2>1. 요약</h2>
+    <p>Phase 09f(지원자 화면 진단 로그)의 세 번째 슬라이스. <b>관리자 조회 파이프라인</b>을 구현했다 —
+      <code>GET /api/admin/client-events</code>(검색 11파라미터) +
+      <code>GET /api/admin/client-events/{id}</code>(단건 조회).
+      권한별 민감 필드 projection(마스킹/원문)과 조회 가드(page size / 날짜 범위 / default 범위)를 포함한다.</p>
+    <div class="ok">
+      <b>이 슬라이스로 09f 수집 → 조회 파이프라인이 완성됨.</b>
+      retention cleanup(bulk delete + 스케줄러)은 <b>09f-4</b>로 이월.
+      프론트엔드 연동은 별도 FE 프로젝트(09f-2).
+    </div>
+    <div class="note">
+      <b>민감 필드 원문</b>은 <code>ROLE_PRIVACY_ADMIN</code> 보유 시에만 반환.
+      <code>ROLE_RECRUIT_ADMIN</code>은 4개 필드(<code>ipAddress</code>/<code>userAgent</code>/<code>principalHash</code>/<code>stackSummary</code>)가 <code>***</code>으로 마스킹됨.
+      <code>ROLE_ADMIN</code> 단독 사용자는 의도적으로 403(감사 read 선례와 동일한 privacy-tightening).
+    </div>
+    <table>
+      <tr><th>총 커밋</th><td>3 (43cce7f, a2418f5, fe8dbfc)</td></tr>
+      <tr><th>신규 클래스</th><td>5종</td></tr>
+      <tr><th>수정 클래스</th><td>3종 (GlobalExceptionHandler, ClientEventLogRepository, SecurityConfig)</td></tr>
+      <tr><th>테스트</th><td>3 클래스, 19건 통과</td></tr>
+    </table>
+  </section>
+
+  <!-- 2. 범위 -->
+  <section>
+    <h2>2. 구현 범위</h2>
+    <div class="cards">
+      <div class="card">
+        <h4><span class="badge b-green">구현 완료</span></h4>
+        <ul>
+          <li>예외 2종 — <code>ClientEventLogNotFoundException</code>(404), <code>InvalidClientEventQueryException</code>(400)</li>
+          <li>GlobalExceptionHandler 핸들러 2건 추가</li>
+          <li><code>ClientEventLogRepository.search</code> — 9필터 JPQL, receivedAt DESC/id DESC</li>
+          <li>Repository 테스트 5건(09f-1 4건 + 09f-3 1건)</li>
+          <li><code>ClientEventLogResponse</code> — 34필드 record, 마스킹/원문 projection</li>
+          <li><code>ClientEventLogReadService</code> — 가드(size 100/범위 90일/default 7일)</li>
+          <li><code>AdminClientEventLogController</code> — 검색 + 단건 조회</li>
+          <li>SecurityConfig narrow matcher — <code>GET /api/admin/client-events/**</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4><span class="badge b-orange">Pending — 09f-4</span></h4>
+        <ul>
+          <li>Retention bulk delete (<code>@Modifying @Query</code>)</li>
+          <li><code>ClientEventLogCleanupService</code></li>
+          <li>스케줄러(<code>@Scheduled</code> + <code>cleanup-cron</code>)</li>
+          <li>관리자 수동 cleanup 트리거 API</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4><span class="badge b-red">Out of scope</span></h4>
+        <ul>
+          <li>프론트엔드 연동 (09f-2 별도 FE 프로젝트)</li>
+          <li>조회 UI 화면 구현</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. API 목록 -->
+  <section>
+    <h2>3. API 목록</h2>
+
+    <h3>GET /api/admin/client-events — 검색</h3>
+    <table>
+      <tr><th>항목</th><th>내용</th></tr>
+      <tr><td>Method</td><td>GET</td></tr>
+      <tr class="row-even"><td>Path</td><td><code>/api/admin/client-events</code></td></tr>
+      <tr><td>Base Prefix</td><td><code>/api</code> (<code>WebMvcConfig</code>가 controller 패키지에 일괄 부여)</td></tr>
+      <tr class="row-even"><td>인증/인가</td><td><code>ROLE_RECRUIT_ADMIN</code> 또는 <code>ROLE_PRIVACY_ADMIN</code></td></tr>
+      <tr><td>민감 필드 원문</td><td><code>ROLE_PRIVACY_ADMIN</code> 보유 시만. 나머지는 <code>***</code></td></tr>
+    </table>
+
+    <h3>검색 파라미터</h3>
+    <table>
+      <tr><th>파라미터</th><th>타입</th><th>필수</th><th>설명</th></tr>
+      <tr><td><code>eventType</code></td><td>enum</td><td>선택</td><td>이벤트 유형 필터</td></tr>
+      <tr class="row-even"><td><code>severity</code></td><td>enum</td><td>선택</td><td>심각도 필터</td></tr>
+      <tr><td><code>source</code></td><td>enum</td><td>선택</td><td>발생 채널 필터</td></tr>
+      <tr class="row-even"><td><code>applicationId</code></td><td>Long</td><td>선택</td><td>지원서 ID 필터</td></tr>
+      <tr><td><code>jobPostingId</code></td><td>Long</td><td>선택</td><td>공고 ID 필터</td></tr>
+      <tr class="row-even"><td><code>clientSessionId</code></td><td>String</td><td>선택</td><td>세션 ID 정확일치(normalize 적용)</td></tr>
+      <tr><td><code>relatedCorrelationId</code></td><td>String</td><td>선택</td><td>상관 correlation ID(normalize 적용)</td></tr>
+      <tr class="row-even"><td><code>from</code></td><td>ISO DateTime</td><td>선택</td><td>receivedAt 범위 시작. null → <code>to - 7일</code></td></tr>
+      <tr><td><code>to</code></td><td>ISO DateTime</td><td>선택</td><td>receivedAt 범위 끝. null → 현재 시각</td></tr>
+      <tr class="row-even"><td><code>page</code></td><td>int</td><td>선택</td><td>페이지 번호(default 0)</td></tr>
+      <tr><td><code>size</code></td><td>int</td><td>선택</td><td>페이지 크기(default 20, 최대 100)</td></tr>
+    </table>
+
+    <h3>GET /api/admin/client-events/{id} — 단건 조회</h3>
+    <table>
+      <tr><th>항목</th><th>내용</th></tr>
+      <tr><td>Method</td><td>GET</td></tr>
+      <tr class="row-even"><td>Path</td><td><code>/api/admin/client-events/{id}</code></td></tr>
+      <tr><td>인증/인가</td><td><code>ROLE_RECRUIT_ADMIN</code> 또는 <code>ROLE_PRIVACY_ADMIN</code></td></tr>
+      <tr class="row-even"><td>민감 필드 원문</td><td><code>ROLE_PRIVACY_ADMIN</code> 보유 시만</td></tr>
+    </table>
+
+    <h3>오류 조건</h3>
+    <table>
+      <tr><th>조건</th><th>HTTP</th></tr>
+      <tr><td>미인증</td><td>401</td></tr>
+      <tr class="row-even"><td><code>ROLE_ADMIN</code> 단독 / <code>ROLE_APPLICANT</code> 등 권한 미보유</td><td>403</td></tr>
+      <tr><td><code>id</code> 존재하지 않음 (단건 조회)</td><td>404</td></tr>
+      <tr class="row-even"><td><code>page &lt; 0</code></td><td>400</td></tr>
+      <tr><td><code>size &lt; 1</code> 또는 <code>size &gt; 100</code></td><td>400</td></tr>
+      <tr class="row-even"><td><code>from &gt; to</code></td><td>400</td></tr>
+      <tr><td><code>to - from &gt; 90일</code></td><td>400</td></tr>
+    </table>
+  </section>
+
+  <!-- 4. 변경 파일 -->
+  <section>
+    <h2>4. 변경 파일</h2>
+    <h3>커밋 43cce7f — 조회 예외 2종 + 핸들러 + repository search</h3>
+    <table>
+      <tr><th>파일</th><th>변경</th></tr>
+      <tr><td><code>exception/ClientEventLogNotFoundException.java</code></td><td>신규 — 404</td></tr>
+      <tr class="row-even"><td><code>exception/InvalidClientEventQueryException.java</code></td><td>신규 — 400</td></tr>
+      <tr><td><code>exception/GlobalExceptionHandler.java</code></td><td>수정 — 핸들러 2건 추가</td></tr>
+      <tr class="row-even"><td><code>domain/repository/ClientEventLogRepository.java</code></td><td>수정 — <code>search</code> @Query 추가</td></tr>
+      <tr><td><code>test/.../ClientEventLogRepositoryTest.java</code></td><td>수정 — search 테스트 1건 추가(총 5건)</td></tr>
+    </table>
+    <h3>커밋 a2418f5 — ClientEventLogResponse + ReadService</h3>
+    <table>
+      <tr><th>파일</th><th>변경</th></tr>
+      <tr><td><code>dto/response/ClientEventLogResponse.java</code></td><td>신규 — 34필드 record, 마스킹 projection</td></tr>
+      <tr class="row-even"><td><code>service/ClientEventLogReadService.java</code></td><td>신규 — 가드/normalize/조회</td></tr>
+      <tr><td><code>test/.../ClientEventLogReadServiceTest.java</code></td><td>신규 — 6건</td></tr>
+    </table>
+    <h3>커밋 fe8dbfc — AdminController + SecurityConfig matcher</h3>
+    <table>
+      <tr><th>파일</th><th>변경</th></tr>
+      <tr><td><code>controller/AdminClientEventLogController.java</code></td><td>신규 — GET 2종</td></tr>
+      <tr class="row-even"><td><code>config/SecurityConfig.java</code></td><td>수정 — narrow matcher 삽입</td></tr>
+      <tr><td><code>test/.../AdminClientEventLogControllerTest.java</code></td><td>신규 — 8건</td></tr>
+    </table>
+  </section>
+
+  <!-- 5. 마스킹 정책 -->
+  <section>
+    <h2>5. 민감 필드 마스킹 정책</h2>
+    <table>
+      <tr><th>필드</th><th>RECRUIT_ADMIN</th><th>PRIVACY_ADMIN</th><th>마스킹 근거</th></tr>
+      <tr><td><code>ipAddress</code></td><td><span class="badge b-amber">***</span></td><td><span class="badge b-green">원문</span></td><td>서버 추출 IP — 개인 식별 가능</td></tr>
+      <tr class="row-even"><td><code>userAgent</code></td><td><span class="badge b-amber">***</span></td><td><span class="badge b-green">원문</span></td><td>서버 추출 UA — 기기 식별 가능</td></tr>
+      <tr><td><code>principalHash</code></td><td><span class="badge b-amber">***</span></td><td><span class="badge b-green">원문</span></td><td>HMAC hash — 사용자 연결 가능</td></tr>
+      <tr class="row-even"><td><code>stackSummary</code></td><td><span class="badge b-amber">***</span></td><td><span class="badge b-green">원문</span></td><td>자유 문자열 — PII 혼입 가능(리뷰 Blocker 3)</td></tr>
+      <tr><td><code>message</code></td><td><span class="badge b-blue">노출</span></td><td><span class="badge b-blue">노출</span></td><td>safe code 패턴 강제 — PII 혼입 불가</td></tr>
+      <tr class="row-even"><td><code>metadataJson</code></td><td><span class="badge b-blue">노출</span></td><td><span class="badge b-blue">노출</span></td><td>exact allowlist 통과 — PII key 수집 차단</td></tr>
+      <tr><td><code>stackHash</code></td><td><span class="badge b-blue">노출</span></td><td><span class="badge b-blue">노출</span></td><td>스택 해시값 — 원문 미포함</td></tr>
+    </table>
+    <div class="note">
+      <b>null 원문 보존</b>: <code>mask()</code> 헬퍼가 <code>value == null</code>이면 <code>includeSensitive</code>와 무관하게 null 반환.
+      null 원문 필드는 RECRUIT_ADMIN에게도 null(not <code>***</code>).
+    </div>
+  </section>
+
+  <!-- 6. 도메인/클래스 구조 -->
+  <section>
+    <h2>6. 도메인 / 클래스 구조</h2>
+
+    <div class="class-block">
+      <h4>ClientEventLogNotFoundException</h4>
+      <div class="meta">exception · 신규 · HTTP 404</div>
+      <p>단건 조회(<code>getEvent</code>) 시 id 부재. <code>RuntimeException</code> 단순 상속. <code>GlobalExceptionHandler</code>에서 404 매핑.</p>
+    </div>
+
+    <div class="class-block">
+      <h4>InvalidClientEventQueryException</h4>
+      <div class="meta">exception · 신규 · HTTP 400</div>
+      <p>조회 파라미터 검증 실패. page 음수 / size 범위 초과 / 날짜 범위 역전 / 90일 초과. <code>RuntimeException</code> 단순 상속.</p>
+    </div>
+
+    <div class="class-block">
+      <h4>ClientEventLogRepository (수정)</h4>
+      <div class="meta">domain.repository · Repository 마커 · 09f-1 기존 + search 추가</div>
+      <p><code>search(@Query)</code> 추가. 9 필터 파라미터 + <code>Pageable</code>. null 필터는 <code>IS NULL OR</code> 패턴으로 생략. <code>ORDER BY c.receivedAt DESC, c.id DESC</code> 고정.</p>
+    </div>
+
+    <div class="class-block">
+      <h4>ClientEventLogResponse</h4>
+      <div class="meta">dto.response · Response DTO · Java record · 신규</div>
+      <p>34필드 record. <code>from(log, includeSensitive)</code> 정적 팩토리. <code>includeSensitive=false</code> 시 4필드 → <code>***</code>. 단일 <code>private static String mask(String, boolean)</code> 헬퍼.</p>
+    </div>
+
+    <div class="class-block">
+      <h4>ClientEventLogReadService</h4>
+      <div class="meta">service · @Service · @Transactional(readOnly=true) · 신규</div>
+      <p>가드(<code>validatePaging</code>/<code>validateRange</code>) + <code>normalize</code> + repository 호출 + projection 위임.
+        <code>MAX_PAGE_SIZE=100</code>, <code>MAX_RANGE_DAYS=90</code>, <code>DEFAULT_RANGE_DAYS=7</code>.
+        Duration 비교로 90일 체크(<code>toDays()</code> 소수 버림 없음).</p>
+    </div>
+
+    <div class="class-block">
+      <h4>AdminClientEventLogController</h4>
+      <div class="meta">controller · @RestController · 신규</div>
+      <p><code>GET /admin/client-events</code> + <code>GET /admin/client-events/{id}</code>.
+        <code>includeSensitive(userDetails)</code> — authorities에 <code>ROLE_PRIVACY_ADMIN</code> 포함 시 true.
+        <code>AdminAuditController</code> 선례 패턴.</p>
+    </div>
+
+    <div class="class-block">
+      <h4>SecurityConfig (수정)</h4>
+      <div class="meta">config · 수정 · narrow matcher 삽입</div>
+      <p><code>GET /api/admin/client-events/**</code> → <code>ROLE_RECRUIT_ADMIN/ROLE_PRIVACY_ADMIN</code>.
+        broad <code>/api/admin/**</code> 앞에 위치. <code>ROLE_ADMIN</code> 단독 → 403(의도적).</p>
+    </div>
+  </section>
+
+  <!-- 7. 조회 가드 -->
+  <section>
+    <h2>7. 조회 가드</h2>
+    <table>
+      <tr><th>가드</th><th>값</th><th>근거</th></tr>
+      <tr><td>page size 상한</td><td>100</td><td>대량 조회 부하 방지</td></tr>
+      <tr class="row-even"><td>날짜 범위 상한</td><td>90일</td><td>설계 §8.2. Duration 비교로 소수 버림 없음(09b 선례)</td></tr>
+      <tr><td>default 범위</td><td>최근 7일</td><td>진단 로그 단기 운영 용도. 감사(30일)보다 짧음</td></tr>
+      <tr class="row-even"><td>normalize</td><td>trim + blank→null</td><td>공백 문자열 → 의도치 않은 전체 조회 방지</td></tr>
+    </table>
+    <div class="pipeline">validatePaging(page, size)
+  page &lt; 0               → 400
+  size &lt; 1 || size &gt; 100  → 400
+
+effectiveTo   = to   != null ? to   : now(clock)
+effectiveFrom = from != null ? from : effectiveTo.minusDays(7)
+
+validateRange(from, to)
+  from.isAfter(to)                                   → 400
+  Duration.between(from, to) &gt; Duration.ofDays(90)  → 400
+
+normalize(value) → trim → blank = null</div>
+  </section>
+
+  <!-- 8. 테스트 결과 -->
+  <section>
+    <h2>8. 테스트 결과</h2>
+    <div class="ok"><b>전체 19건 통과</b> (scoped 실행)</div>
+
+    <h3>ClientEventLogRepositoryTest (5건, 09f-1 4건 + 09f-3 1건) — @DataJpaTest</h3>
+    <table>
+      <tr><th>테스트명</th><th>검증 내용</th><th>슬라이스</th></tr>
+      <tr><td>저장_조회_enum_매핑</td><td>save→findById, enum 저장/복원, count</td><td>09f-1</td></tr>
+      <tr class="row-even"><td>같은_session_event_쌍은_unique_제약으로_거부된다</td><td>saveAndFlush 중복 → DataIntegrityViolationException</td><td>09f-1</td></tr>
+      <tr><td>existsBy로_중복을_선확인한다</td><td>existsByClientSessionIdAndClientEventId true/false</td><td>09f-1</td></tr>
+      <tr class="row-even"><td>필수값_누락이면_엔티티_생성이_거부된다</td><td>clientEventId 누락 → InvalidClientEventLogException</td><td>09f-1</td></tr>
+      <tr><td><b>search는_필터와_최신순_정렬을_지원한다</b></td><td>applicationId 필터, eventType 필터, receivedAt DESC 정렬 검증</td><td><span class="badge b-blue">09f-3 신규</span></td></tr>
+    </table>
+
+    <h3>ClientEventLogReadServiceTest (6건) — @SpringBootTest</h3>
+    <table>
+      <tr><th>테스트명</th><th>검증 내용</th></tr>
+      <tr><td>범위_미지정이면_최근_7일만_조회된다</td><td>now-1d 조회, now-10d 미조회(default 7일)</td></tr>
+      <tr class="row-even"><td>includeSensitive가_false면_민감_필드가_마스킹된다</td><td>ipAddress/userAgent/principalHash/stackSummary → <code>***</code></td></tr>
+      <tr><td>includeSensitive가_true면_원문을_본다</td><td>4필드 원문 검증</td></tr>
+      <tr class="row-even"><td>범위가_90일을_넘으면_거부된다</td><td>from=now-120d → InvalidClientEventQueryException</td></tr>
+      <tr><td>size가_100을_넘으면_거부된다</td><td>size=101 → InvalidClientEventQueryException</td></tr>
+      <tr class="row-even"><td>없는_id_단건_조회는_NotFound_예외다</td><td>getEvent(999999L) → ClientEventLogNotFoundException</td></tr>
+    </table>
+
+    <h3>AdminClientEventLogControllerTest (8건) — @SpringBootTest</h3>
+    <table>
+      <tr><th>테스트명</th><th>검증 내용</th></tr>
+      <tr><td>RECRUIT_ADMIN은_민감_필드가_마스킹된다</td><td>4필드 <code>***</code>, clientSessionId 노출</td></tr>
+      <tr class="row-even"><td>PRIVACY_ADMIN은_원문을_본다</td><td>ipAddress/stackSummary 원문</td></tr>
+      <tr><td>단건_조회와_404를_지원한다</td><td>존재 id → 200, 미존재 id → 404</td></tr>
+      <tr class="row-even"><td>applicationId_필터가_동작한다</td><td>applicationId=999 → totalElements=0</td></tr>
+      <tr><td><b>최신순으로_정렬된다</b></td><td>receivedAt now-1h가 content[0], now-1d가 content[1]</td></tr>
+      <tr class="row-even"><td>size_초과는_400이다</td><td>size=101 → 400</td></tr>
+      <tr><td>APPLICANT_권한은_403이다</td><td>ROLE_APPLICANT → 403</td></tr>
+      <tr class="row-even"><td>미인증은_401이다</td><td>미인증 → 401</td></tr>
+    </table>
+
+    <h3>실행 명령</h3>
+    <pre>$env:AES_SECRET_KEY="22791194512954214612461221261067"
+./gradlew test `
+  "--tests=com.shinyoung.recruit.domain.repository.ClientEventLogRepositoryTest" `
+  "--tests=com.shinyoung.recruit.service.ClientEventLogReadServiceTest" `
+  "--tests=com.shinyoung.recruit.controller.AdminClientEventLogControllerTest"</pre>
+  </section>
+
+  <!-- 9. 남은 이슈 -->
+  <section>
+    <h2>9. 남은 이슈</h2>
+
+    <div class="warn">
+      <b>PRIVACY_ADMIN 컨트롤러 테스트 부분 커버리지</b><br>
+      <code>AdminClientEventLogControllerTest.PRIVACY_ADMIN은_원문을_본다</code>는 <code>ipAddress</code>/<code>stackSummary</code> 2필드만 검증.
+      <code>userAgent</code>/<code>principalHash</code> 원문은 서비스 레벨 테스트에서 검증됨.
+      <code>mask()</code>가 단일 헬퍼라 런타임 위험 낮음. 향후 컨트롤러 테스트 보강 권장.
+    </div>
+
+    <div class="note">
+      <b>ROLE_ADMIN 403 전용 테스트 미포함</b><br>
+      narrow matcher에서 <code>ROLE_ADMIN</code> 단독 사용자가 403을 받는지 전용 테스트 없음.
+      SecurityConfig 주석에 의도 명시. <code>APPLICANT_권한은_403이다</code>로 구조 검증됨.
+    </div>
+  </section>
+
+  <!-- 10. 다음 단계 -->
+  <section>
+    <h2>10. 다음 단계</h2>
+    <table>
+      <tr><th>슬라이스</th><th>내용</th><th>상태</th></tr>
+      <tr>
+        <td><b>09f-4</b></td>
+        <td>
+          <ul style="margin:0;padding-left:16px">
+            <li>Retention bulk delete (<code>@Modifying @Query receivedAt &lt; cutoff</code>)</li>
+            <li><code>ClientEventLogCleanupService</code></li>
+            <li><code>SchedulingConfig</code> + <code>CleanupScheduler</code> (<code>@Scheduled</code> + <code>cleanup-cron</code>)</li>
+            <li>관리자 수동 트리거 <code>POST /api/admin/client-events/cleanup</code></li>
+            <li>SecurityConfig narrow matcher (cleanup endpoint)</li>
+          </ul>
+        </td>
+        <td><span class="badge b-orange">Pending</span></td>
+      </tr>
+    </table>
+    <div class="ok">09f-4 완료로 <b>Phase 09f 전 슬라이스 종료</b>.</div>
+  </section>
+
+</div>
+</body>
+</html>

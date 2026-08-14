@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03i-5 Attachment Required Policy Design</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #64748b;
+      --line: #d9e2ec;
+      --green: #15803d;
+      --blue: #1d4ed8;
+      --amber: #b45309;
+      --red: #b91c1c;
+      --gray: #475569;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.55;
+    }
+    header {
+      background: #0f172a;
+      color: #fff;
+      padding: 28px 20px;
+    }
+    header .inner, main {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 0 0 14px;
+      font-size: 21px;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 18px 0 10px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+    p { margin: 0 0 12px; }
+    main { padding: 22px 18px 36px; }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fbfdff;
+    }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      margin: 0 6px 6px 0;
+      white-space: nowrap;
+    }
+    .done { background: var(--green); }
+    .info { background: var(--blue); }
+    .pending { background: var(--gray); }
+    .warn { background: var(--amber); }
+    .out { background: var(--red); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef3f8;
+      color: #253041;
+    }
+    code, pre {
+      font-family: Consolas, "Courier New", monospace;
+    }
+    pre {
+      overflow-x: auto;
+      background: #111827;
+      color: #e5e7eb;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 13px;
+    }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    .muted { color: var(--muted); }
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+      h1 { font-size: 24px; }
+      section { padding: 14px; }
+      table { font-size: 13px; }
+      th, td { padding: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="inner">
+      <h1>Phase 03i-5 Attachment Required Policy Design</h1>
+      <p>Documentation-only design for per-posting attachment requirements, dashboard readiness, and submit validation.</p>
+      <span class="badge done">Design Complete</span>
+      <span class="badge pending">Implementation Pending</span>
+      <span class="badge out">No Runtime Change</span>
+    </div>
+  </header>
+  <main>
+    <section>
+      <h2>Summary</h2>
+      <div class="grid">
+        <div class="card">
+          <strong>Required Unit</strong>
+          <p><code>jobPosting + attachmentType + sectionType</code></p>
+        </div>
+        <div class="card">
+          <strong>Recommended Model</strong>
+          <p><code>JobPostingAttachmentRequirement</code></p>
+        </div>
+        <div class="card">
+          <strong>Matching Evidence</strong>
+          <p>Only active <code>STORED</code> attachment rows for the same application.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Completed Scope</h2>
+      <span class="badge done">Completed</span>
+      <ul>
+        <li>Decided the first required unit.</li>
+        <li>Defined the dedicated requirement model and deferred fields.</li>
+        <li>Defined admin replace-all API candidates.</li>
+        <li>Defined public policy, dashboard readiness, and submit validator impact.</li>
+        <li>Defined lifecycle interactions with upload, delete, missing, and orphan scan.</li>
+        <li>Defined implementation test plan and recommended next phase.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Not Implemented Scope</h2>
+      <span class="badge out">Out of Scope</span>
+      <ul>
+        <li>No Java, test, config, security, entity, repository, service, controller, enum, or migration file changes.</li>
+        <li>No runtime API behavior changes.</li>
+        <li>No <code>useAttachment</code> or <code>requireAttachment</code> fields in <code>ApplicationFormConfig</code>.</li>
+        <li>No conditional, per-row, per-position, per-applicant-type, or template-linked requirements.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Current State</h2>
+      <table>
+        <thead><tr><th>Area</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Upload</td><td><code>POST /applications/{applicationId}/attachments/files</code> creates <code>STORED</code> rows.</td></tr>
+          <tr><td>Download</td><td>Applicant/admin download accepts only <code>STORED</code> rows.</td></tr>
+          <tr><td>Delete</td><td>Soft delete moves rows to <code>DELETED</code> and normal lists hide them.</td></tr>
+          <tr><td>Storage scan</td><td>Admin dry-run scan reports mismatches without mutation.</td></tr>
+          <tr><td>Required policy</td><td>Attachment remains deferred in public policy, dashboard, and submit validation.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Policy Decision</h2>
+      <table>
+        <thead><tr><th>Candidate</th><th>Decision</th><th>Reason</th></tr></thead>
+        <tbody>
+          <tr><td>Global <code>requireAttachment</code></td><td><span class="badge out">Rejected</span></td><td>Cannot express which file is required.</td></tr>
+          <tr><td><code>attachmentType</code> only</td><td><span class="badge out">Rejected</span></td><td>Cannot distinguish the same type across sections.</td></tr>
+          <tr><td><code>sectionType</code> only</td><td><span class="badge out">Rejected</span></td><td>Cannot express multiple files in one section.</td></tr>
+          <tr><td><code>attachmentType + sectionType</code></td><td><span class="badge done">Recommended</span></td><td>Matches current upload metadata and avoids row-id dependency.</td></tr>
+          <tr><td>Add <code>sectionRecordId</code></td><td><span class="badge pending">Deferred</span></td><td>Needs row-level evidence semantics and applicant row ids.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Domain Structure</h2>
+      <pre>JobPosting 1 --- N JobPostingAttachmentRequirement
+JobApplication 1 --- N ApplicationAttachment
+
+Requirement is policy.
+Attachment is applicant evidence.</pre>
+      <table>
+        <thead><tr><th>Field</th><th>Rule</th></tr></thead>
+        <tbody>
+          <tr><td><code>jobPosting</code></td><td>Required owner posting.</td></tr>
+          <tr><td><code>attachmentType</code></td><td>Required <code>AttachmentType</code>.</td></tr>
+          <tr><td><code>sectionType</code></td><td>Required <code>ApplicationSectionType</code>.</td></tr>
+          <tr><td><code>required</code></td><td>Submit-blocking when true.</td></tr>
+          <tr><td><code>minCount</code></td><td>Required rules need at least one matching stored file by default.</td></tr>
+          <tr><td><code>displayName</code>, <code>description</code></td><td>Safe user-facing policy text.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Matching Rule</h2>
+      <span class="badge info">Source of Truth</span>
+      <pre>attachment.jobApplication.id == application.id
+attachment.attachmentType == requirement.attachmentType
+attachment.sectionType == requirement.sectionType
+attachment.physicalFileStatus == STORED
+attachment.deletedAt == null</pre>
+      <p>Rows in <code>METADATA_ONLY</code>, <code>MISSING</code>, or <code>DELETED</code> do not satisfy a required attachment. Orphan physical files also do not satisfy readiness because they have no active DB row.</p>
+    </section>
+
+    <section>
+      <h2>API List</h2>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>GET</td><td><code>/admin/job-postings/{jobPostingId}/attachment-requirements</code></td><td>Read requirements</td><td><span class="badge pending">Next Phase</span></td></tr>
+          <tr><td>POST</td><td><code>/admin/job-postings/{jobPostingId}/attachment-requirements</code></td><td>Replace all requirements</td><td><span class="badge pending">Next Phase</span></td></tr>
+        </tbody>
+      </table>
+      <p>Replace-all is recommended first. Individual row CRUD is deferred until stable per-row editing or audit history is needed.</p>
+    </section>
+
+    <section>
+      <h2>Public And Applicant Impact</h2>
+      <table>
+        <thead><tr><th>Surface</th><th>Decision</th></tr></thead>
+        <tbody>
+          <tr><td>Public policy aggregate</td><td><code>attachmentRequired=true</code> when at least one required attachment rule exists.</td></tr>
+          <tr><td>Public detail</td><td>Expose a separate safe <code>attachmentRequirements</code> list.</td></tr>
+          <tr><td>Public list</td><td>Keep only aggregate policy unless frontend needs detail there.</td></tr>
+          <tr><td>Dashboard</td><td>Add <code>ATTACHMENT</code> readiness group and <code>REQUIRED_ATTACHMENT_MISSING</code> issues.</td></tr>
+          <tr><td>Submit</td><td>Block when matching stored count is less than <code>minCount</code>.</td></tr>
+        </tbody>
+      </table>
+      <p><span class="badge warn">Review Update</span> Public detail <code>attachmentRequirements</code>, public aggregate policy, dashboard readiness, and submit validation must be released in the same externally visible implementation slice.</p>
+    </section>
+
+    <section>
+      <h2>Optional Rule Semantics</h2>
+      <table>
+        <thead><tr><th>Rule</th><th>Dashboard Result When Missing</th><th>Submit Result</th></tr></thead>
+        <tbody>
+          <tr><td><code>required=false, minCount=0</code></td><td>Guidance only; no optional incomplete issue.</td><td>Does not block.</td></tr>
+          <tr><td><code>required=false, minCount&gt;0</code></td><td>Optional incomplete issue.</td><td>Does not block.</td></tr>
+          <tr><td><code>required=true, minCount&gt;=1</code></td><td>Required missing issue.</td><td>Blocks submit.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Validation Rules</h2>
+      <table>
+        <thead><tr><th>Rule</th><th>Expected Result</th></tr></thead>
+        <tbody>
+          <tr><td>Missing type or section</td><td>400</td></tr>
+          <tr><td><code>required=true</code> and <code>minCount &lt; 1</code></td><td>400</td></tr>
+          <tr><td>Duplicate type/section in one posting</td><td>400</td></tr>
+          <tr><td>Blank display name</td><td>400</td></tr>
+          <tr><td>Published posting replace</td><td>400 in first implementation</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Security And Exposure</h2>
+      <span class="badge warn">Warning</span>
+      <p>Policy responses must not expose storage internals or applicant evidence internals.</p>
+      <ul>
+        <li>Do not expose <code>storedFileName</code>, <code>storagePath</code>, storage root, absolute paths, physical status, delete actor, or deletion reason.</li>
+        <li>Admin APIs reuse existing <code>/admin/**</code> security.</li>
+        <li>Public endpoints expose only requirement policy, not applicant upload state.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Test Results</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Result</th><th>Reason</th></tr></thead>
+        <tbody>
+          <tr><td>Gradle tests</td><td><span class="badge pending">Not Run</span></td><td>Documentation-only design phase; no Java/test/config/schema changes.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Remaining Issues</h2>
+      <ul>
+        <li>Manual MariaDB DDL remains needed for persistent database deployment.</li>
+        <li><code>STORED</code> rows with missing physical files are an operational risk; Phase 03i-5-2 may use DB status only, but storage health scan/repair should correct broken rows before production enforcement.</li>
+        <li>Published posting mutation and effective-date behavior are deferred.</li>
+        <li>Per-rule active/versioning, max count, conditional rules, row-level requirements, and template linkage are deferred.</li>
+        <li>Submitted application status impact after admin deletion remains a product/audit decision.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Next Phase</h2>
+      <span class="badge info">Phase 03i-5-2</span>
+      <p>Implement <code>JobPostingAttachmentRequirement</code>, admin replace-all configuration for DRAFT postings, public safe policy exposure, dashboard readiness integration, and submit validation against active <code>STORED</code> attachment rows.</p>
+      <p>External public policy exposure must be bundled with dashboard and submit behavior so applicants do not see a contract that the validator does not enforce.</p>
+    </section>
+  </main>
+</body>
+</html>

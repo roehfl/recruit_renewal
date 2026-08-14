@@ -1,0 +1,16 @@
+# Gradle
+.gradle/
+build/
+
+# Logs
+logs/
+*.log
+
+# IDE/editor
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

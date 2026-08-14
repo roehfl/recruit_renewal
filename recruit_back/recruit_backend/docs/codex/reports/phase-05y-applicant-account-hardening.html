@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 05y — Applicant Account Hardening 구현 리포트</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; margin: 0; background: #f4f6f9; color: #1f2937; line-height: 1.6; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 60px; }
+  header.page { background: linear-gradient(135deg, #1e3a5f, #2c5282); color: #fff; border-radius: 12px; padding: 28px 32px; margin-bottom: 24px; }
+  header.page h1 { margin: 0 0 6px; font-size: 1.5rem; }
+  header.page .sub { opacity: .85; font-size: .95rem; }
+  .badge { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: .78rem; font-weight: 700; vertical-align: middle; }
+  .b-blue { background: #dbeafe; color: #1d4ed8; }
+  .b-green { background: #dcfce7; color: #15803d; }
+  .b-gray { background: #e5e7eb; color: #4b5563; }
+  .b-red { background: #fee2e2; color: #b91c1c; }
+  .b-amber { background: #fef3c7; color: #b45309; }
+  .b-navy { background: #e0e7ff; color: #3730a3; }
+  header.page .badge { margin-right: 8px; }
+  section { background: #fff; border-radius: 12px; padding: 24px 28px; margin-bottom: 22px; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+  section h2 { margin: 0 0 14px; font-size: 1.15rem; color: #1e3a5f; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; }
+  section h3 { margin: 18px 0 8px; font-size: 1rem; color: #2c5282; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: .9rem; }
+  th { background: #f1f5f9; text-align: left; padding: 8px 10px; border: 1px solid #e2e8f0; white-space: nowrap; }
+  td { padding: 8px 10px; border: 1px solid #e2e8f0; vertical-align: top; }
+  code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: .85em; font-family: Consolas, 'Courier New', monospace; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: .85rem; }
+  pre code { background: none; padding: 0; color: inherit; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 10px; }
+  .card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; background: #fafbfc; }
+  .card h4 { margin: 0 0 8px; font-size: .95rem; }
+  .card ul { margin: 0; padding-left: 18px; font-size: .88rem; }
+  .card li { margin-bottom: 4px; }
+  .summary-box { background: #eff6ff; border-left: 4px solid #2563eb; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  .warn-box { background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  .danger-box { background: #fef2f2; border-left: 4px solid #ef4444; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  .mono { font-family: Consolas, 'Courier New', monospace; }
+  footer { text-align: center; color: #94a3b8; font-size: .8rem; margin-top: 30px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Phase 05y — Applicant Account Hardening</h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · 결정-독립 슬라이스 구현 · 2026-06-05</div>
+  <div style="margin-top:12px">
+    <span class="badge b-green">구현 완료</span>
+    <span class="badge b-green">40 tests passed</span>
+    <span class="badge b-navy">Phase 09b 선행</span>
+  </div>
+</header>
+
+<section>
+  <h2>1. Executive Summary</h2>
+  <div class="summary-box">
+    지원자 loginId 정책(이메일 = loginId vs 별도 ID)이 <strong>미결정</strong>인 상태에서, 어느 안이 채택되어도 유효한
+    계정 기능을 구현했다. ① 현재 코드에 실재하던 <strong>loginId 무결성 결함 수정</strong>(User 레벨 중복체크 + DB unique 제약 +
+    LDAP JIT race 복구), ② 가입 화면용 <strong>이메일 중복체크 API</strong>, ③ 지원자 <strong>비밀번호/전화번호 변경 API</strong>,
+    ④ <strong>DB 제약 위반 409 응답 정비</strong>. 설계 문서의 리뷰 2차 반영본(LDAP 재인증 제거, 복구 범위 한정)을 그대로 구현했다.
+    audit 파이프라인 비접촉 — Phase 09b 진행에 영향 없다.
+    <br><br>
+    <strong>2026-06-05 구현 리뷰(3차) 반영:</strong> <code>ApplicantAccountControllerTest</code>에 <code>springSecurity()</code>
+    filter chain 적용 — 미인증 401/임직원 403이 실제 <code>/api/applicant/**</code> SecurityConfig matcher를 통과해 검증되도록 전환.
+    07-history stale 문구 정정. <code>Employee.deptName</code> unique 제약은 별도 Fix phase 권고로 기록.
+  </div>
+  <table>
+    <tr><th>설계 문서</th><td><code>docs/codex/design/phase-05y-applicant-account-hardening-design.md</code></td></tr>
+    <tr><th>구현 문서</th><td><code>docs/codex/implementation/phase-05y-applicant-account-hardening.md</code></td></tr>
+    <tr><th>테스트</th><td><span class="badge b-green">BUILD SUCCESSFUL</span> scoped 40 tests / 0 failures (전체 회귀는 프로젝트 규칙상 미실행)</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>2. 완료 범위 (Scope Cards)</h2>
+  <div class="cards">
+    <div class="card">
+      <h4><span class="badge b-green">Scope A</span> loginId 무결성</h4>
+      <ul>
+        <li><code>User.loginId</code>에 <code>unique = true</code> (JOINED 부모 테이블 제약 — H2 테스트로 동작 실증)</li>
+        <li><code>UserRepository.existsByLoginId</code> 신설 · signUp 중복체크 User 레벨 전환</li>
+        <li><code>ApplicantRepository.existsByLoginId</code> 제거</li>
+        <li>JIT race 복구: save 충돌 시 재조회 → <strong>LDAP 재인증 없이</strong> <code>buildEmployeeAuthentication</code> 토큰 생성</li>
+        <li>정규화는 trim only(대소문자 semantics 후속 결정)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-green">Scope B</span> check-email API</h4>
+      <ul>
+        <li><code>GET /auth/applicants/check-email</code> (permitAll 명시)</li>
+        <li>컨트롤러 <code>@Validated</code> + <code>@NotBlank @Email @Size(255)</code></li>
+        <li>signUp과 동일 trim 정규화 후 <code>existsByEmail</code> 판정</li>
+        <li>응답은 <code>{available}</code>만 — advisory 전용</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-green">Scope C/D</span> 계정 변경 API</h4>
+      <ul>
+        <li><code>POST /applicant/account/password</code> — currentPassword 확인 + 동일 새 비밀번호 거부 + BCrypt 저장</li>
+        <li><code>POST /applicant/account/phone-number</code> — <strong>currentPassword 재확인</strong> + trim 저장</li>
+        <li>기존 <code>/api/applicant/**</code> 보호 네임스페이스 하위 — SecurityConfig 변경 불요</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-green">Scope E</span> 횡단 보강</h4>
+      <ul>
+        <li><code>DataIntegrityViolationException</code> → 409 generic + 원인 warn 로그</li>
+        <li><code>InvalidApplicantAccountException</code> → 400</li>
+        <li><code>Applicant.changePassword / changePhoneNumber</code> 의미 메서드</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>3. 미구현 범위 (Out of Scope)</h2>
+  <table>
+    <thead><tr><th>항목</th><th>상태</th><th>사유</th></tr></thead>
+    <tbody>
+      <tr><td>check-login-id API · 이메일 변경 API · 가입 email 필수화 · 아이디 찾기</td><td><span class="badge b-red">범위 외</span></td><td>loginId 정책 결정-의존</td></tr>
+      <tr><td>NICE 본인인증 · rate limiting · CAPTCHA</td><td><span class="badge b-red">범위 외</span></td><td>05x 한계 승계</td></tr>
+      <tr><td>ActivityLog 계측(비밀번호/연락처 변경 감사)</td><td><span class="badge b-gray">보류</span></td><td>9b 이후 계측 스윕에서 일괄</td></tr>
+      <tr><td><code>User.loginId</code> <code>nullable=false</code> · email/loginId 대소문자 정규화</td><td><span class="badge b-gray">보류</span></td><td>픽스처 영향 / collation 의존 제거 후속 결정</td></tr>
+      <tr><td>운영(MariaDB) DDL 적용</td><td><span class="badge b-amber">수동 작업</span></td><td>설계 문서 §4 사전 점검 4종 + <code>uk_users_login_id</code> 적용 필요</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>4. API</h2>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>목적</th><th>Auth</th><th>상태</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td><code>/auth/applicants/check-email?email=...</code></td><td>이메일 가용성 advisory(입력값 있을 때만 호출)</td><td>permitAll</td><td><span class="badge b-green">완료</span></td></tr>
+      <tr><td>POST</td><td><code>/applicant/account/password</code></td><td>비밀번호 변경</td><td>ROLE_APPLICANT</td><td><span class="badge b-green">완료</span></td></tr>
+      <tr><td>POST</td><td><code>/applicant/account/phone-number</code></td><td>전화번호 변경(currentPassword 재확인)</td><td>ROLE_APPLICANT</td><td><span class="badge b-green">완료</span></td></tr>
+    </tbody>
+  </table>
+  <h3>응답 예시</h3>
+  <pre><code>GET /api/auth/applicants/check-email?email=free@example.com
+→ 200 { "success": true, "data": { "available": true }, "message": "정상 처리되었습니다." }
+
+POST /api/applicant/account/password  { "currentPassword": "...", "newPassword": "..." }
+→ 200 { "success": true, "data": null, "message": "정상 처리되었습니다." }
+→ 400 { "success": false, "data": null, "message": "현재 비밀번호가 일치하지 않습니다." }
+→ 400 { "success": false, "data": null, "message": "새 비밀번호가 현재 비밀번호와 달라야 합니다." }
+
+DB 제약 위반(race 등) → 409 { "success": false, "data": null, "message": "이미 처리되었거나 중복된 데이터입니다." }</code></pre>
+</section>
+
+<section>
+  <h2>5. 변경 파일</h2>
+  <h3>신규</h3>
+  <table>
+    <thead><tr><th>파일</th><th>유형</th></tr></thead>
+    <tbody>
+      <tr><td><code>controller/ApplicantAccountController.java</code></td><td>Controller</td></tr>
+      <tr><td><code>service/ApplicantAccountService.java</code></td><td>Service</td></tr>
+      <tr><td><code>dto/request/ApplicantPasswordChangeRequest.java</code> · <code>ApplicantPhoneNumberChangeRequest.java</code></td><td>Request DTO (record)</td></tr>
+      <tr><td><code>dto/response/ApplicantEmailAvailabilityResponse.java</code></td><td>Response DTO (record)</td></tr>
+      <tr><td><code>exception/InvalidApplicantAccountException.java</code></td><td>Exception (→400)</td></tr>
+      <tr><td><code>test .../ApplicantAccountServiceTest</code>(7) · <code>ApplicantAccountControllerTest</code>(7) · <code>RoutingAuthenticationProviderTest</code>(4)</td><td>Test</td></tr>
+    </tbody>
+  </table>
+  <h3>수정</h3>
+  <table>
+    <thead><tr><th>파일</th><th>변경</th></tr></thead>
+    <tbody>
+      <tr><td><code>domain/entity/User.java</code></td><td><code>loginId</code>에 <code>@Column(unique = true)</code></td></tr>
+      <tr><td><code>domain/entity/Applicant.java</code></td><td><code>changePassword</code>/<code>changePhoneNumber</code> 의미 메서드</td></tr>
+      <tr><td><code>domain/repository/UserRepository.java</code> · <code>ApplicantRepository.java</code></td><td><code>existsByLoginId</code> User로 이동(추가/제거)</td></tr>
+      <tr><td><code>service/ApplicantSignUpService.java</code></td><td>loginId 체크 User 레벨 전환 + <code>checkEmailAvailability</code></td></tr>
+      <tr><td><code>controller/ApplicantSignUpController.java</code></td><td><code>@Validated</code> + <code>GET /check-email</code></td></tr>
+      <tr><td><code>security/auth/RoutingAuthenticationProvider.java</code></td><td>JIT save 충돌 catch → 재조회 → <code>buildEmployeeAuthentication</code> 복구(LDAP 재인증 없음)</td></tr>
+      <tr><td><code>exception/GlobalExceptionHandler.java</code></td><td>400(account) / 409(integrity, warn 로그) 핸들러</td></tr>
+      <tr><td><code>config/SecurityConfig.java</code></td><td>check-email permitAll 명시</td></tr>
+      <tr><td><code>test .../ApplicantSignUpServiceTest</code>(10) · <code>ApplicantSignUpControllerTest</code>(8) · <code>UserRepositoryTest</code>(4)</td><td>보강</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>6. 도메인 구조 / JIT race 복구</h2>
+  <p style="font-size:.92rem"><code>User</code>(abstract, JOINED 상속) ← <code>Applicant</code>/<code>Employee</code> 구조 불변. <code>users.login_id</code>에 unique 제약이 추가되어 동시 가입·동시 JIT race의 backstop이 된다.</p>
+  <div class="summary-box">
+    <strong>JIT race 복구 흐름:</strong> LDAP 인증 성공 → Employee save에서 <code>DataIntegrityViolationException</code> →
+    <code>findUserByLoginId</code> 재조회 → <strong>Employee면</strong> 이미 인증된 <code>ldapUser</code>로 토큰만 생성(LDAP 인증 총 1회) →
+    양쪽 요청 모두 로그인 성공. <strong>Employee가 아니거나 부재면</strong>(deptName unique 등 loginId race 외 제약 위반 / 지원자 가입 선점)
+    원본 예외를 전파해 인증 실패 처리.
+  </div>
+</section>
+
+<section>
+  <h2>7. Validation / 비즈니스 규칙</h2>
+  <table>
+    <thead><tr><th>#</th><th>규칙</th><th>실패 응답</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>loginId 중복체크는 users 테이블 전체(임직원 포함)</td><td>400 "이미 사용 중인 아이디입니다."</td></tr>
+      <tr><td>2</td><td><code>User.loginId</code> DB unique — race backstop, null은 비충돌</td><td>409 (race 시)</td></tr>
+      <tr><td>3</td><td>check-email은 signUp과 동일 trim 정규화 후 판정, <code>available</code>만 응답</td><td>400 (형식/blank)</td></tr>
+      <tr><td>4</td><td>비밀번호 변경: currentPassword 일치 → 8~100자 → 현재와 동일 거부 → BCrypt 저장</td><td>400</td></tr>
+      <tr><td>5</td><td>전화번호 변경: currentPassword 일치 + NotBlank/max 30 + trim 저장</td><td>400</td></tr>
+      <tr><td>6</td><td>DB 제약 위반 409 generic(내부 정보 비노출, 원인 warn 로그) — 전 엔드포인트 적용</td><td>409 "이미 처리되었거나 중복된 데이터입니다."</td></tr>
+      <tr><td>7</td><td>JIT loginId race만 복구(LDAP 인증 1회), 그 외 제약 위반은 예외 전파</td><td>—</td></tr>
+      <tr><td>8</td><td>name/ci는 변경 API로 열지 않음(본인인증 산출물)</td><td>—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>8. 테스트 결과</h2>
+  <p><span class="badge b-green">BUILD SUCCESSFUL</span> — scoped 실행, <strong>40 tests / 0 failures</strong></p>
+  <table>
+    <thead><tr><th>테스트 클래스</th><th>건수</th><th>주요 케이스</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr><td><code>ApplicantSignUpServiceTest</code></td><td>10</td><td>UserRepository 전환 · 임직원 점유 loginId 실패 · checkEmailAvailability 가용/점유/trim</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>ApplicantSignUpControllerTest</code></td><td>8</td><td>check-email 200 true/false · 400 형식/blank</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>ApplicantAccountServiceTest</code></td><td>7</td><td>비밀번호 변경 성공/불일치/동일 거부 · 전화번호 성공/trim/불일치</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>ApplicantAccountControllerTest</code></td><td>7</td><td><strong>springSecurity() filter chain 적용</strong> — 미인증 401(EntryPoint) · 임직원 403(matcher 실검증) · 변경 200(+실저장 검증) · validation 400</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>RoutingAuthenticationProviderTest</code></td><td>4</td><td>JIT 성공 · race 복구(<strong>authenticate 1회 검증</strong>) · 부재/비-Employee 전파 (LDAP mock)</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>UserRepositoryTest</code></td><td>4</td><td>동일 loginId unique 충돌(교차 서브타입) · null 2건 허용 · existsByLoginId 전체 범위</td><td><span class="badge b-green">passed</span></td></tr>
+    </tbody>
+  </table>
+  <pre><code>$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*ApplicantSignUp*" --tests "*ApplicantAccount*" --tests "*RoutingAuthenticationProvider*" --tests "*UserRepositoryTest*" --no-daemon</code></pre>
+  <p style="font-size:.9rem">전체 회귀는 프로젝트 규칙상 명시 요청 시에만 실행. 설계 시점에 unique 제약 영향 위험 테스트 27건 통과를 사전 실증했고, <code>setLoginId</code> 전수조사 결과 영속 중복 픽스처 없음.</p>
+</section>
+
+<section>
+  <h2>9. 한계 / 후속 과제</h2>
+  <table>
+    <thead><tr><th>구분</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge b-amber">보안</span></td><td>check-email enumeration 벡터(rate limiting/CAPTCHA 미적용) · currentPassword 시도 횟수 제한 없음 · 전화번호 변경 SMS 재인증/알림 없음 · CSRF 재검토 시 비밀번호 변경 우선</td></tr>
+      <tr><td><span class="badge b-amber">운영</span></td><td>MariaDB <code>uk_users_login_id</code> 수동 DDL 적용 필요(중복/null·blank/collation 사전 점검 — 설계 §4)</td></tr>
+      <tr><td><span class="badge b-green">해소됨</span></td><td><code>Employee.deptName</code> <code>unique</code> 제약(동일 부서 JIT 차단 리스크) — <strong>2026-06-05 별도 Fix phase로 제거 완료</strong>(<code>fix-employee-dept-name-unique-removal.html</code> 참조)</td></tr>
+      <tr><td><span class="badge b-gray">후속</span></td><td>loginId 대소문자 semantics(collation 의존 제거) · <code>nullable=false</code> · 타 세션 무효화 · ActivityLog 계측(9b 이후)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>10. 다음 단계</h2>
+  <ul style="font-size:.93rem">
+    <li><strong>Phase 09b 진행</strong> — 본 슬라이스는 audit 파이프라인 비접촉, 영향 없음.</li>
+    <li><code>Employee.deptName</code> unique 제거 Fix phase — <strong>처리 완료</strong>(<code>fix-employee-dept-name-unique-removal.html</code>).</li>
+    <li>loginId 정책 결정 후 추가 비용: 안 1 = signUp <code>loginId=email</code> + email 필수화 / 안 2 = check-login-id API 1개.</li>
+    <li>운영 배포 시 MariaDB 수동 DDL 적용.</li>
+  </ul>
+</section>
+
+<footer>Phase 05y — Applicant Account Hardening 구현 리포트 · 2026-06-05</footer>
+</div>
+</body>
+</html>

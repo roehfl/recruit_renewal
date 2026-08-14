@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03j-1 Job Posting Domain Expansion Status</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #667085;
+      --line: #d9e2ec;
+      --green: #0f766e;
+      --green-bg: #dff7f3;
+      --blue: #1d4ed8;
+      --blue-bg: #e1ecff;
+      --amber: #a15c07;
+      --amber-bg: #fff3d6;
+      --red: #b42318;
+      --red-bg: #fee4e2;
+      --gray: #475467;
+      --gray-bg: #eef2f6;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, "Malgun Gothic", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.55;
+    }
+    header {
+      background: #12344d;
+      color: #fff;
+      padding: 32px 40px;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 24px 48px;
+    }
+    h1, h2, h3 { margin: 0; }
+    h1 { font-size: 28px; }
+    h2 {
+      font-size: 20px;
+      margin: 28px 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+    }
+    h3 { font-size: 16px; margin-bottom: 8px; }
+    p { margin: 0 0 10px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }
+    th {
+      background: #eef4f8;
+      color: #344054;
+      font-weight: 700;
+    }
+    tr:last-child td { border-bottom: 0; }
+    code {
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      background: #eef2f6;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+    .header-meta {
+      margin-top: 10px;
+      color: #d7e5ee;
+      font-size: 14px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .completed { color: var(--green); background: var(--green-bg); }
+    .pending { color: var(--gray); background: var(--gray-bg); }
+    .warning { color: var(--amber); background: var(--amber-bg); }
+    .out { color: var(--red); background: var(--red-bg); }
+    .info { color: var(--blue); background: var(--blue-bg); }
+    .summary {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      min-height: 120px;
+    }
+    .card ul, .summary ul {
+      margin: 8px 0 0 18px;
+      padding: 0;
+    }
+    .card li, .summary li { margin: 5px 0; }
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 840px) {
+      header { padding: 24px; }
+      main { padding: 20px 16px 40px; }
+      .grid, .two-col { grid-template-columns: 1fr; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>신영증권 채용 Renewal Backend</h1>
+    <div class="header-meta">Phase 03j-1 - Job Posting Domain Expansion Status <span class="badge completed">Completed</span></div>
+    <div class="header-meta">Generated: 2026-05-22</div>
+  </header>
+
+  <main>
+    <section class="summary" style="border-left: 4px solid #b54708; background: #fff7ed;">
+      <h2>갱신 노트 (2026-05-28)</h2>
+      <p><code>JobPosition.headcount</code> 필드는 불필요하다고 판단되어 이후 제거되었다. 이 문서의 <code>headcount</code> 검증/필드 언급은 역사적 기록이며 현재 코드와 일치하지 않는다. 현재 상태는 <code>docs/codex/07-implementation-history.md</code>의 "JobPosition headcount 필드 제거" 항목을 참조한다.</p>
+    </section>
+    <section class="summary">
+      <h2>Executive Summary</h2>
+      <p>Phase 03j-1 extended the internal admin job posting domain without adding new endpoint paths.</p>
+      <p><code>JobPosting</code> now stores posting type, summary, display policy, visibility, pinning, and display order. <code>JobPosition</code> now stores application type, job group, job title, work location, and employment type.</p>
+      <p>New application creation now requires a published, accepting, visible posting inside its display period. Existing application update, submit, and withdraw commands keep their previous status and reception-period guard.</p>
+      <p>Review fixes added direct Service validation for DTO constraints and replaced admin list lazy collection counting with a grouped position-count query.</p>
+      <p>The targeted phase regression suite passed, so the phase can move to public exposure design and implementation.</p>
+    </section>
+
+    <h2>Scope</h2>
+    <section class="grid">
+      <div class="card">
+        <h3><span class="badge completed">Completed</span> Implemented</h3>
+        <ul>
+          <li>Posting and position domain fields</li>
+          <li>Admin create/update/list/detail DTO expansion</li>
+          <li>Reception status and accepting calculation</li>
+          <li>Summary, display period, and duplicate sort-order validation</li>
+          <li>Service direct-call validation for extended request fields</li>
+          <li>Grouped position count query for admin list responses</li>
+          <li>New application create visibility/display guard</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge out">Out of scope</span> Not Implemented</h3>
+        <ul>
+          <li>Public applicant-facing posting API changes</li>
+          <li>Public filter/sort changes</li>
+          <li>Admin UI or static frontend resources</li>
+          <li>Authorization changes</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge pending">Deferred</span> Next Work</h3>
+        <ul>
+          <li>Public visible/display-period filtering</li>
+          <li>Pinned and display-order sorting policy</li>
+          <li>Public response field subset</li>
+          <li>Persistent DB migration scripts</li>
+        </ul>
+      </div>
+    </section>
+
+    <h2>Architecture / Domain</h2>
+    <section class="two-col">
+      <div class="card">
+        <h3>Entity Structure</h3>
+        <ul>
+          <li><code>JobPosting</code> owns many <code>JobPosition</code> rows.</li>
+          <li><code>JobPosting</code> owns one <code>ApplicationFormConfig</code> row.</li>
+          <li><code>JobApplication</code> keeps existing references to posting, position, and applicant.</li>
+          <li><code>ApplicationFormConfig</code> updates in place to avoid one-to-one unique key conflicts.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Main Classes</h3>
+        <ul>
+          <li><code>JobPostingService</code>: admin commands, validation, defaults, response mapping.</li>
+          <li><code>JobPositionRepository</code>: grouped count query for page-level <code>positionCount</code>.</li>
+          <li><code>JobApplicationService</code>: applicant command guards.</li>
+          <li><code>ReceptionStatus</code>: time-based reception state calculation.</li>
+          <li><code>JobPostingListResponse</code> and <code>JobPostingDetailResponse</code>: admin response expansion.</li>
+        </ul>
+      </div>
+    </section>
+
+    <h2>Changed Files</h2>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Status</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>JobPostingType.java</code></td><td><span class="badge completed">New</span></td><td>Posting type enum</td></tr>
+        <tr><td><code>JobPositionApplicationType.java</code></td><td><span class="badge completed">New</span></td><td>Position application type enum</td></tr>
+        <tr><td><code>ReceptionStatus.java</code></td><td><span class="badge completed">New</span></td><td>Computed reception state enum</td></tr>
+        <tr><td><code>JobPosting.java</code></td><td><span class="badge info">Modified</span></td><td>Posting display and classification fields</td></tr>
+        <tr><td><code>JobPosition.java</code></td><td><span class="badge info">Modified</span></td><td>Position metadata fields</td></tr>
+        <tr><td><code>ApplicationFormConfig.java</code></td><td><span class="badge info">Modified</span></td><td>One-to-one config in-place update</td></tr>
+        <tr><td><code>JobPositionCountProjection.java</code></td><td><span class="badge completed">New</span></td><td>Projection for grouped position counts</td></tr>
+        <tr><td><code>JobPositionRepository.java</code></td><td><span class="badge info">Modified</span></td><td>Grouped count query by posting ids</td></tr>
+        <tr><td><code>JobPostingCreateRequest.java</code>, <code>JobPostingUpdateRequest.java</code>, <code>JobPositionRequest.java</code></td><td><span class="badge info">Modified</span></td><td>Admin request DTO expansion</td></tr>
+        <tr><td><code>JobPostingListResponse.java</code>, <code>JobPostingDetailResponse.java</code>, <code>JobPositionResponse.java</code></td><td><span class="badge info">Modified</span></td><td>Admin response DTO expansion</td></tr>
+        <tr><td><code>JobPostingService.java</code>, <code>JobApplicationService.java</code></td><td><span class="badge info">Modified</span></td><td>Validation, defaults, and application creation guard</td></tr>
+        <tr><td>Phase tests</td><td><span class="badge info">Modified</span></td><td>Service and controller regression coverage</td></tr>
+      </tbody>
+    </table>
+
+    <h2>API List</h2>
+    <table>
+      <thead>
+        <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>GET</td><td><code>/admin/job-postings</code></td><td>Admin posting list</td><td><code>page</code>, <code>size</code></td><td><code>ApiResponse&lt;PageResponse&lt;JobPostingListResponse&gt;&gt;</code></td></tr>
+        <tr><td>GET</td><td><code>/admin/job-postings/{id}</code></td><td>Admin posting detail</td><td>Path id</td><td><code>ApiResponse&lt;JobPostingDetailResponse&gt;</code></td></tr>
+        <tr><td>POST</td><td><code>/admin/job-postings</code></td><td>Create posting</td><td><code>JobPostingCreateRequest</code></td><td><code>ApiResponse&lt;Long&gt;</code></td></tr>
+        <tr><td>POST</td><td><code>/admin/job-postings/{id}</code></td><td>Update posting</td><td><code>JobPostingUpdateRequest</code></td><td><code>ApiResponse&lt;Long&gt;</code></td></tr>
+        <tr><td>POST</td><td><code>/admin/job-postings/{id}/publish</code></td><td>Publish posting</td><td>Path id</td><td><code>ApiResponse&lt;Long&gt;</code></td></tr>
+        <tr><td>POST</td><td><code>/admin/job-postings/{id}/close</code></td><td>Close posting</td><td>Path id</td><td><code>ApiResponse&lt;Long&gt;</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2>Validation / Policy</h2>
+    <section class="grid">
+      <div class="card">
+        <h3>Validation Rules</h3>
+        <ul>
+          <li><code>title</code> and <code>contentHtml</code> are required.</li>
+          <li>Reception end must be after reception start.</li>
+          <li><code>summary</code> must not contain HTML tags and must be 500 characters or less.</li>
+          <li>Display end must be equal to or after display start when both are present.</li>
+          <li><code>displayOrder</code> must be 0 or greater when provided.</li>
+          <li>Position name, headcount, sort order, and 100-character metadata limits are validated in Service as well as Controller.</li>
+          <li>Position <code>sortOrder</code> values must be unique.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Default Rules</h3>
+        <ul>
+          <li><code>postingType</code>: <code>PUBLIC_RECRUITMENT</code></li>
+          <li><code>visible</code>: <code>true</code></li>
+          <li><code>pinned</code>: <code>false</code></li>
+          <li><code>displayOrder</code>: <code>0</code></li>
+          <li><code>applicationType</code>: <code>NEW_GRADUATE_OR_EXPERIENCED</code></li>
+          <li><code>employmentType</code>: <code>FULL_TIME</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Application Guard</h3>
+        <ul>
+          <li>New create: published, accepting, visible, and inside display period.</li>
+          <li>Draft update: published and accepting.</li>
+          <li>Submit: published and accepting.</li>
+          <li>Withdraw: published and accepting.</li>
+        </ul>
+      </div>
+    </section>
+
+    <h2>Test Results</h2>
+    <table>
+      <thead>
+        <tr><th>Command</th><th>Result</th><th>Coverage</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>$env:AES_SECRET_KEY='&lt;test-value&gt;'; .\gradlew.bat test --tests com.shinyoung.recruit.service.JobPostingServiceTest --tests com.shinyoung.recruit.controller.JobPostingControllerTest --tests com.shinyoung.recruit.service.JobApplicationServiceTest --no-daemon</code></td>
+          <td><span class="badge completed">Success</span></td>
+          <td>Phase service/controller regression suite</td>
+        </tr>
+        <tr>
+          <td><code>$env:AES_SECRET_KEY='&lt;test-value&gt;'; .\gradlew.bat clean test --no-daemon</code></td>
+          <td><span class="badge completed">Success</span></td>
+          <td>Full project regression suite</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Remaining Issues</h2>
+    <section class="card">
+      <ul>
+        <li><span class="badge warning">Open</span> Public job posting exposure still needs visible/display-period filtering.</li>
+        <li><span class="badge warning">Open</span> Public list sorting by pinned and display order is deferred.</li>
+        <li><span class="badge warning">Open</span> Persistent DB migration scripts are not included in this phase.</li>
+      </ul>
+    </section>
+
+    <h2>Next Phase Recommendation</h2>
+    <section class="summary">
+      <p>Proceed with Phase 03j-2 public job posting exposure. The next phase should define and implement public list/detail visibility filtering, display-period filtering, pinned/display-order sorting, and the applicant-facing response field subset.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03d-2 StageResult Update Commands</title>
+  <style>
+    :root { --bg:#f6f8fb; --panel:#fff; --ink:#17202a; --muted:#5f6b7a; --line:#d9e0ea; --ok:#136f46; --warn:#9a5b00; --bad:#a23b3b; --hold:#5a4bb7; --chip:#eef3f8; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Arial, "Noto Sans KR", sans-serif; background:var(--bg); color:var(--ink); line-height:1.55; }
+    header { padding:32px 36px; background:#1d3557; color:#fff; }
+    header p { max-width:980px; margin:8px 0 0; color:#dbe7f5; }
+    main { max-width:1180px; margin:0 auto; padding:28px; }
+    section { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:22px; margin-bottom:18px; box-shadow:0 8px 24px rgba(23,32,42,.05); }
+    h1,h2,h3 { margin:0 0 12px; line-height:1.2; }
+    h1 { font-size:28px; } h2 { font-size:20px; } h3 { font-size:16px; color:var(--muted); }
+    .grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); }
+    .card { border:1px solid var(--line); border-radius:8px; padding:14px; background:#fbfcfe; }
+    .badge { display:inline-block; padding:3px 8px; border-radius:999px; font-size:12px; font-weight:700; background:var(--chip); color:var(--ink); margin-right:6px; }
+    .done { color:var(--ok); background:#e8f6ef; }
+    .deferred { color:var(--hold); background:#efedff; }
+    .warn { color:var(--warn); background:#fff5df; }
+    .blocked { color:var(--bad); background:#ffecec; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    th,td { border:1px solid var(--line); padding:10px; vertical-align:top; text-align:left; }
+    th { background:#eef3f8; }
+    code { background:#eef3f8; border:1px solid #dce5ef; padding:1px 5px; border-radius:4px; font-family:Consolas, monospace; }
+    pre { background:#17202a; color:#f4f7fb; padding:14px; border-radius:8px; overflow:auto; }
+    ul { padding-left:20px; }
+    .note { color:var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Phase 03d-2 StageResult Update Commands + Announce Pending Guard</h1>
+    <p>관리자 전형 결과 입력을 위한 단건/벌크 수정 API와 Stage 발표 전 PENDING 결과 방어 검증을 구현했다.</p>
+  </header>
+  <main>
+    <section>
+      <h2>Phase Summary</h2>
+      <div class="grid">
+        <div class="card"><span class="badge done">Implemented</span><strong>Single update</strong><br><code>POST /admin/stages/{stageId}/results/{resultId}</code></div>
+        <div class="card"><span class="badge done">Implemented</span><strong>Bulk update</strong><br><code>POST /admin/stages/{stageId}/results/bulk</code></div>
+        <div class="card"><span class="badge done">Implemented</span><strong>Announce guard</strong><br>결과 row 없음 또는 PENDING 잔존 시 발표 차단.</div>
+        <div class="card"><span class="badge deferred">Deferred</span><strong>Correction and audit</strong><br>발표 후 정정, 변경 이력, 관리자 식별은 후속 Phase.</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Update Policy</h2>
+      <table>
+        <tr><th>Rule</th><th>Decision</th></tr>
+        <tr><td>Editable Stage status</td><td><code>IN_PROGRESS</code> only</td></tr>
+        <tr><td>READY</td><td>initialize only, result decision update rejected</td></tr>
+        <tr><td>RESULT_ANNOUNCED / CLOSED</td><td>general update rejected</td></tr>
+        <tr><td>Allowed result statuses</td><td><code>PASSED</code>, <code>FAILED</code>, <code>ABSENT</code>, <code>WITHDRAWN</code>, <code>HOLD</code></td></tr>
+        <tr><td>PENDING rollback</td><td><span class="badge blocked">Rejected</span></td></tr>
+        <tr><td>score</td><td>nullable, precision/scale deferred</td></tr>
+        <tr><td>comment</td><td>nullable, max 2000 characters</td></tr>
+        <tr><td>decidedBy</td><td><code>SYSTEM</code> temporary value</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>Bulk Policy</h2>
+      <ul>
+        <li>Bulk list must be present and non-empty.</li>
+        <li>Duplicate <code>stageResultId</code> fails.</li>
+        <li>All result ids must belong to the requested stage.</li>
+        <li>Any invalid item fails the whole transaction.</li>
+        <li>No partial success is allowed.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Announce Guard</h2>
+      <table>
+        <tr><th>StageResult state</th><th>Announce result</th></tr>
+        <tr><td>No rows</td><td><span class="badge blocked">Fail</span></td></tr>
+        <tr><td>Any <code>PENDING</code></td><td><span class="badge blocked">Fail</span></td></tr>
+        <tr><td>All decided statuses</td><td><span class="badge done">Allowed</span></td></tr>
+      </table>
+      <p class="note">Decided statuses are PASSED, FAILED, ABSENT, WITHDRAWN, and HOLD.</p>
+    </section>
+
+    <section>
+      <h2>API List</h2>
+      <table>
+        <tr><th>Method</th><th>Path</th><th>Status</th><th>Response</th></tr>
+        <tr><td>GET</td><td><code>/admin/stages/{stageId}/results</code></td><td><span class="badge done">Existing</span></td><td><code>ApiResponse&lt;List&lt;AdminStageResultResponse&gt;&gt;</code></td></tr>
+        <tr><td>POST</td><td><code>/admin/stages/{stageId}/results/initialize</code></td><td><span class="badge done">Existing</span></td><td><code>ApiResponse&lt;StageResultInitializeResponse&gt;</code></td></tr>
+        <tr><td>POST</td><td><code>/admin/stages/{stageId}/results/{resultId}</code></td><td><span class="badge done">New</span></td><td><code>ApiResponse&lt;AdminStageResultResponse&gt;</code></td></tr>
+        <tr><td>POST</td><td><code>/admin/stages/{stageId}/results/bulk</code></td><td><span class="badge done">New</span></td><td><code>ApiResponse&lt;StageResultBulkUpdateResponse&gt;</code></td></tr>
+        <tr><td>PUT/DELETE/PATCH</td><td>all result paths</td><td><span class="badge blocked">Not supported</span></td><td>none</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>Test Results</h2>
+      <pre>$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.service.StageResultServiceTest
+$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.controller.StageResultControllerTest
+$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.service.StageServiceTest
+$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.controller.StageControllerTest
+$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.service.JobApplicationServiceTest --tests com.shinyoung.recruit.controller.ApplicationControllerTest
+$env:AES_SECRET_KEY='***'; .\gradlew.bat clean test --no-daemon</pre>
+      <p><span class="badge done">Success</span> Core Phase 03d-2 service/controller tests passed.</p>
+      <p><span class="badge done">Success</span> JobApplication/Application regression passed.</p>
+      <p><span class="badge done">Success</span> Full clean test passed.</p>
+    </section>
+
+    <section>
+      <h2>Deferred Items</h2>
+      <ul>
+        <li>Correction history and correction command.</li>
+        <li>Applicant-facing result read.</li>
+        <li>Admin application stage-result timeline.</li>
+        <li>Actual admin identity in <code>decidedBy</code>.</li>
+        <li>Security, authorization, audit logging.</li>
+        <li>Interview/evaluation score aggregation.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>Phase 03e-3 URL Authorization Hardening</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #64748b;
+      --line: #dbe3ef;
+      --green: #15803d;
+      --green-bg: #dcfce7;
+      --blue: #1d4ed8;
+      --blue-bg: #dbeafe;
+      --amber: #b45309;
+      --amber-bg: #fef3c7;
+      --red: #b91c1c;
+      --red-bg: #fee2e2;
+      --gray: #475569;
+      --gray-bg: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    header {
+      background: #0f172a;
+      color: #fff;
+      padding: 32px 40px;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 24px 48px;
+    }
+    h1, h2, h3 { margin: 0; }
+    h1 { font-size: 30px; }
+    h2 {
+      margin-top: 30px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+      font-size: 21px;
+    }
+    h3 { margin-top: 16px; font-size: 16px; }
+    p { margin: 10px 0; }
+    .meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 12px;
+      color: #cbd5e1;
+    }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .completed { background: var(--green-bg); color: var(--green); }
+    .pending { background: var(--amber-bg); color: var(--amber); }
+    .deferred { background: var(--gray-bg); color: var(--gray); }
+    .out { background: var(--red-bg); color: var(--red); }
+    .info { background: var(--blue-bg); color: var(--blue); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    }
+    ul { margin: 10px 0 0; padding-left: 20px; }
+    li { margin: 5px 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }
+    th {
+      background: #eef2f7;
+      color: #334155;
+      font-weight: 700;
+    }
+    tr:last-child td { border-bottom: 0; }
+    code {
+      background: #eef2f7;
+      border-radius: 4px;
+      padding: 2px 5px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 13px;
+    }
+    .summary {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--blue);
+      border-radius: 8px;
+      padding: 18px;
+      margin-top: 18px;
+    }
+    @media (max-width: 860px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 36px; }
+      .grid, .grid.two { grid-template-columns: 1fr; }
+      table { display: block; overflow-x: auto; white-space: nowrap; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Recruit Backend - Phase 03e-3</h1>
+    <div class="meta">
+      <span>URL Authorization Hardening</span>
+      <span class="badge completed">Completed</span>
+      <span>Generated: 2026-05-19</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="summary">
+      <h2>Executive Summary</h2>
+      <p>Phase 03e-3 applies URL-level authorization to the main admin and applicant API families while preserving the existing session-based authentication structure.</p>
+      <p><code>/admin/**</code> now requires <code>ROLE_ADMIN</code> or <code>ROLE_RECRUIT_ADMIN</code>. <code>/applications/**</code> now requires <code>ROLE_APPLICANT</code>.</p>
+      <p>The phase deliberately does not add JSON 401/403 handlers. Default Spring Security failure responses remain in place until Phase 03e-4.</p>
+    </section>
+
+    <section>
+      <h2>Scope Cards</h2>
+      <div class="grid">
+        <div class="card">
+          <h3><span class="badge completed">Completed</span> Implemented</h3>
+          <ul>
+            <li>Protected <code>/admin/**</code> for admin/recruit authorities.</li>
+            <li>Protected <code>/applications/**</code> for applicants.</li>
+            <li>Protected <code>GET /job-postings/{jobPostingId}/application</code> for applicants.</li>
+            <li>Kept public job posting reads available.</li>
+            <li>Added MockMvc security coverage.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="badge out">Not Implemented</span> Excluded</h3>
+          <ul>
+            <li>No custom <code>AuthenticationEntryPoint</code>.</li>
+            <li>No custom <code>AccessDeniedHandler</code>.</li>
+            <li>No JSON <code>ApiResponse.fail</code> 401/403 body.</li>
+            <li>No StageResult actor logic changes.</li>
+            <li>No DTO, schema, or LDAP setting changes.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="badge pending">Deferred</span> Remaining</h3>
+          <ul>
+            <li>Classify remaining non-admin/non-applicant APIs.</li>
+            <li>Environment-gate Swagger and H2 console.</li>
+            <li>Add JSON security error handlers.</li>
+            <li>Design narrower admin roles per API if needed.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Architecture and Domain</h2>
+      <div class="grid two">
+        <div class="card">
+          <h3>Authorization Structure</h3>
+          <ul>
+            <li><code>DeptRoleMapping.roleName</code> uses full authority names such as <code>ROLE_ADMIN</code>.</li>
+            <li>LDAP mapping passes role names directly into <code>SimpleGrantedAuthority</code>.</li>
+            <li>SecurityConfig therefore uses <code>hasAnyAuthority(...)</code>.</li>
+            <li>Applicant APIs use <code>ROLE_APPLICANT</code>.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Data Ownership</h3>
+          <ul>
+            <li>URL authorization verifies caller type and authority.</li>
+            <li>Service-level ownership checks remain responsible for applicant resource ownership.</li>
+            <li>Other applicant resource access still follows hidden-resource 404 behavior.</li>
+            <li>No entity relationship changed.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>API List</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Path</th>
+            <th>Policy</th>
+            <th>Response</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>POST</td>
+            <td><code>/auth/login</code></td>
+            <td>Public</td>
+            <td>Existing auth response</td>
+          </tr>
+          <tr>
+            <td>POST</td>
+            <td><code>/auth/logout</code></td>
+            <td>Public by current policy</td>
+            <td>Existing auth response</td>
+          </tr>
+          <tr>
+            <td>GET</td>
+            <td><code>/job-postings/**</code></td>
+            <td>Public read</td>
+            <td>Existing public posting responses</td>
+          </tr>
+          <tr>
+            <td>GET</td>
+            <td><code>/job-postings/{jobPostingId}/application</code></td>
+            <td><code>ROLE_APPLICANT</code></td>
+            <td><code>ApiResponse&lt;ApplicationDetailResponse&gt;</code></td>
+          </tr>
+          <tr>
+            <td>Any</td>
+            <td><code>/admin/**</code></td>
+            <td><code>ROLE_ADMIN</code> or <code>ROLE_RECRUIT_ADMIN</code></td>
+            <td>Endpoint-specific</td>
+          </tr>
+          <tr>
+            <td>Any</td>
+            <td><code>/applications/**</code></td>
+            <td><code>ROLE_APPLICANT</code></td>
+            <td>Endpoint-specific</td>
+          </tr>
+          <tr>
+            <td>Any</td>
+            <td><code>/swagger-ui/**</code>, <code>/api-docs/**</code>, <code>/v3/api-docs/**</code>, <code>/h2-console/**</code>, <code>/menu/tree</code></td>
+            <td>Current public/dev allowlist</td>
+            <td>Existing responses</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Path</th>
+            <th>Status</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>build.gradle</code></td>
+            <td><span class="badge completed">Modified</span></td>
+            <td>Added <code>spring-security-test</code>.</td>
+          </tr>
+          <tr>
+            <td><code>src/main/java/com/shinyoung/recruit/config/SecurityConfig.java</code></td>
+            <td><span class="badge completed">Modified</span></td>
+            <td>Added admin/applicant URL rules.</td>
+          </tr>
+          <tr>
+            <td><code>StageResultControllerTest</code></td>
+            <td><span class="badge completed">Modified</span></td>
+            <td>Admin result endpoint authorization tests.</td>
+          </tr>
+          <tr>
+            <td><code>ApplicationStageResultControllerTest</code></td>
+            <td><span class="badge completed">Modified</span></td>
+            <td>Applicant result endpoint authorization tests.</td>
+          </tr>
+          <tr>
+            <td><code>StageControllerTest</code></td>
+            <td><span class="badge completed">Modified</span></td>
+            <td>Admin stage endpoint authorization tests.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Validation and Policy</h2>
+      <div class="grid two">
+        <div class="card">
+          <h3>Business Rules</h3>
+          <ul>
+            <li>Applicant users are denied from admin URLs.</li>
+            <li>Non-admin employees are denied from admin URLs.</li>
+            <li>Employee/admin users are denied from applicant URLs.</li>
+            <li>Public posting reads remain available without login.</li>
+            <li>Applicant ownership is still checked in services.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Security Handler Policy</h3>
+          <ul>
+            <li>401/403 body shape is not customized in this phase.</li>
+            <li>Tests assert HTTP class/status behavior, not JSON body.</li>
+            <li><code>ApiResponse.fail</code> security responses are Phase 03e-4 scope.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Test Results</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Result</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>StageResultControllerTest</code></td>
+            <td><span class="badge completed">Success</span></td>
+            <td>Admin, applicant, non-admin employee, anonymous policy covered.</td>
+          </tr>
+          <tr>
+            <td><code>ApplicationStageResultControllerTest</code></td>
+            <td><span class="badge completed">Success</span></td>
+            <td>Applicant, employee/admin, anonymous policy covered.</td>
+          </tr>
+          <tr>
+            <td><code>StageControllerTest</code></td>
+            <td><span class="badge completed">Success</span></td>
+            <td>Admin Stage URL policy covered.</td>
+          </tr>
+          <tr>
+            <td><code>StageResultServiceTest</code> + <code>StageResultCorrectionServiceTest</code></td>
+            <td><span class="badge completed">Success</span></td>
+            <td>Actor propagation regression unchanged.</td>
+          </tr>
+          <tr>
+            <td><code>clean test --no-daemon</code></td>
+            <td><span class="badge completed">Success</span></td>
+            <td>Full suite passed.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Remaining Issues</h2>
+      <ul>
+        <li><span class="badge pending">Pending</span> 401/403 JSON <code>ApiResponse.fail</code> response body.</li>
+        <li><span class="badge pending">Pending</span> Full classification of fallback APIs before replacing <code>anyRequest().permitAll()</code>.</li>
+        <li><span class="badge pending">Pending</span> Environment-specific exposure policy for Swagger/OpenAPI and H2 console.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Next Phase Recommendation</h2>
+      <p>Proceed with Phase 03e-4 security exception response hardening: add JSON 401/403 handlers, keep business exceptions in <code>GlobalExceptionHandler</code>, and add response-body tests for unauthenticated and unauthorized requests.</p>
+    </section>
+  </main>
+</body>
+</html>

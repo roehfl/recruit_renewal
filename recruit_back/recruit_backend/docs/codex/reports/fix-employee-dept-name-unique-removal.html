@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fix — Employee.deptName unique 제약 제거 리포트</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; margin: 0; background: #f4f6f9; color: #1f2937; line-height: 1.6; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 60px; }
+  header.page { background: linear-gradient(135deg, #1e3a5f, #2c5282); color: #fff; border-radius: 12px; padding: 28px 32px; margin-bottom: 24px; }
+  header.page h1 { margin: 0 0 6px; font-size: 1.5rem; }
+  header.page .sub { opacity: .85; font-size: .95rem; }
+  .badge { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: .78rem; font-weight: 700; vertical-align: middle; }
+  .b-blue { background: #dbeafe; color: #1d4ed8; }
+  .b-green { background: #dcfce7; color: #15803d; }
+  .b-gray { background: #e5e7eb; color: #4b5563; }
+  .b-red { background: #fee2e2; color: #b91c1c; }
+  .b-amber { background: #fef3c7; color: #b45309; }
+  .b-navy { background: #e0e7ff; color: #3730a3; }
+  header.page .badge { margin-right: 8px; }
+  section { background: #fff; border-radius: 12px; padding: 24px 28px; margin-bottom: 22px; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+  section h2 { margin: 0 0 14px; font-size: 1.15rem; color: #1e3a5f; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: .9rem; }
+  th { background: #f1f5f9; text-align: left; padding: 8px 10px; border: 1px solid #e2e8f0; white-space: nowrap; }
+  td { padding: 8px 10px; border: 1px solid #e2e8f0; vertical-align: top; }
+  code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: .85em; font-family: Consolas, 'Courier New', monospace; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: .85rem; }
+  pre code { background: none; padding: 0; color: inherit; }
+  .summary-box { background: #eff6ff; border-left: 4px solid #2563eb; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  .danger-box { background: #fef2f2; border-left: 4px solid #ef4444; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  .warn-box { background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: .93rem; }
+  footer { text-align: center; color: #94a3b8; font-size: .8rem; margin-top: 30px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Fix — Employee.deptName unique 제약 제거</h1>
+  <div class="sub">신영증권 채용 Renewal 백엔드 · 인증 안정성 Fix · 2026-06-05</div>
+  <div style="margin-top:12px">
+    <span class="badge b-green">구현 완료</span>
+    <span class="badge b-green">10 tests passed</span>
+    <span class="badge b-navy">05y 리뷰 3차 후속</span>
+  </div>
+</header>
+
+<section>
+  <h2>1. 문제 / 해결</h2>
+  <div class="danger-box">
+    <strong>문제.</strong> <code>Employee.deptName</code>에 <code>@Column(unique = true)</code>가 걸려 있었다.
+    같은 부서 임직원은 여러 명일 수 있고 JIT는 LDAP <code>deptName</code>을 그대로 저장하므로,
+    <strong>같은 부서의 두 번째 임직원이 최초 로그인하면 unique 충돌로 JIT 저장이 실패 → 로그인 실패</strong>가 된다.
+    (05y race 복구는 이 경우를 정확히 "복구 대상 아님"으로 전파 — 결함은 제약 자체)
+  </div>
+  <div class="summary-box">
+    <strong>해결.</strong> <code>deptName</code>을 일반 컬럼으로 완화. JIT/인증 로직과 race 복구 semantics(loginId race만 복구,
+    그 외 제약 위반은 전파)는 변경 없음. 동일 deptName 임직원 2명 저장을 리포지토리 테스트로 실증.
+  </div>
+</section>
+
+<section>
+  <h2>2. 변경 파일</h2>
+  <table>
+    <thead><tr><th>파일</th><th>변경</th></tr></thead>
+    <tbody>
+      <tr><td><code>domain/entity/Employee.java</code></td><td><code>@Column(unique = true)</code> 제거(일반 컬럼화)</td></tr>
+      <tr><td><code>security/auth/RoutingAuthenticationProvider.java</code></td><td>주석에서 deptName unique 예시 제거(로직 불변)</td></tr>
+      <tr><td><code>test .../EmployeeRepositoryTest.java</code></td><td><code>동일_deptName_임직원_2명을_저장할_수_있다</code> 추가</td></tr>
+      <tr><td><code>test .../RoutingAuthenticationProviderTest.java</code></td><td>주석 정리(테스트 불변)</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:.92rem">API/Entity 관계 변경 없음. <code>DeptRoleMapping</code> 등 unique 의존 코드 없음(전체 검색 확인).</p>
+</section>
+
+<section>
+  <h2>3. 테스트 결과</h2>
+  <p><span class="badge b-green">BUILD SUCCESSFUL</span> — scoped 실행, <strong>10 tests / 0 failures</strong></p>
+  <table>
+    <thead><tr><th>테스트 클래스</th><th>건수</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr><td><code>EmployeeRepositoryTest</code> (동일 deptName 2명 저장 신규 포함)</td><td>2</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>RoutingAuthenticationProviderTest</code></td><td>4</td><td><span class="badge b-green">passed</span></td></tr>
+      <tr><td><code>UserRepositoryTest</code></td><td>4</td><td><span class="badge b-green">passed</span></td></tr>
+    </tbody>
+  </table>
+  <pre><code>$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests "*EmployeeRepositoryTest*" --tests "*RoutingAuthenticationProvider*" --tests "*UserRepositoryTest*" --no-daemon</code></pre>
+</section>
+
+<section>
+  <h2>4. 운영 DDL / 남은 이슈</h2>
+  <div class="warn-box">
+    운영 MariaDB에 기존 unique 인덱스가 있다면 수동 제거 필요. <strong>05y의 <code>uk_users_login_id</code> 추가와 같은 DDL 작업 묶음으로 처리 권장.</strong>
+  </div>
+  <pre><code>-- 1) unique 제약/인덱스명 확인
+SELECT CONSTRAINT_NAME
+FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = 'employee'
+  AND CONSTRAINT_TYPE = 'UNIQUE';
+-- 또는: SHOW INDEX FROM employee;
+
+-- 2) 확인된 이름으로 제거
+ALTER TABLE employee DROP INDEX &lt;확인된_인덱스명&gt;;</code></pre>
+  <p style="font-size:.92rem">다음 단계: Phase 09b 진행(영향 없음).</p>
+</section>
+
+<footer>Fix — Employee.deptName unique 제약 제거 리포트 · 2026-06-05</footer>
+</div>
+</body>
+</html>

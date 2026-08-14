@@ -1,0 +1,455 @@
+﻿<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 02a-2 - Stage Reorder and Commands</title>
+  <style>
+:root {
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --paper: #ffffff;
+  --ink: #20242c;
+  --muted: #667085;
+  --line: #d9dee7;
+  --soft: #edf1f6;
+  --brand: #1f6f8b;
+  --brand-dark: #17526a;
+  --ok: #13795b;
+  --warn: #a15c00;
+  --bad: #b42318;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Arial, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  line-height: 1.6;
+}
+.page { max-width: 1180px; margin: 0 auto; padding: 32px 22px 56px; }
+.report-header {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 28px 30px;
+  margin-bottom: 18px;
+}
+.eyebrow { margin: 0 0 8px; color: var(--brand-dark); font-weight: 700; font-size: 13px; letter-spacing: 0; text-transform: uppercase; }
+h1 { margin: 0 0 14px; font-size: 30px; line-height: 1.25; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 5px 10px; background: #fff; color: var(--muted); font-size: 12px; font-weight: 700;
+}
+.badge.done { color: var(--ok); border-color: #9ed8c6; background: #eefaf6; }
+.badge.plan { color: var(--warn); border-color: #f0c27b; background: #fff8e8; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
+.card, .section {
+  background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 20px;
+}
+.card h2, .section h2 { margin-top: 0; font-size: 18px; }
+.section { margin-top: 14px; }
+h2 { margin: 28px 0 12px; font-size: 22px; line-height: 1.3; border-bottom: 1px solid var(--line); padding-bottom: 7px; }
+h3 { margin: 22px 0 10px; font-size: 18px; }
+h4 { margin: 18px 0 8px; font-size: 16px; }
+p { margin: 8px 0 12px; }
+ul { margin: 8px 0 14px 20px; padding: 0; }
+li { margin: 4px 0; }
+code { background: var(--soft); padding: 2px 5px; border-radius: 4px; font-family: Consolas, "Courier New", monospace; font-size: 0.94em; }
+pre { position: relative; overflow: auto; background: #111827; color: #eef2ff; border-radius: 8px; padding: 16px; border: 1px solid #0f172a; }
+pre code { background: transparent; color: inherit; padding: 0; }
+.table-wrap { overflow-x: auto; margin: 12px 0 18px; border: 1px solid var(--line); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; background: #fff; }
+th, td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { background: #eef3f8; font-weight: 700; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+.notice { border-left: 4px solid var(--brand); background: #eef7fb; padding: 12px 14px; border-radius: 6px; color: #25465a; }
+.source-note { color: var(--muted); font-size: 13px; }
+.full-source { margin-top: 22px; }
+@media (max-width: 820px) {
+  .page { padding: 20px 14px 40px; }
+  .grid { grid-template-columns: 1fr; }
+  h1 { font-size: 24px; }
+}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="report-header">
+      <p class="eyebrow">Implementation Phase Report</p>
+      <h1>Phase 02a-2 - Stage Reorder and Commands</h1>
+      <p class="notice">이 HTML은 원본 Markdown을 사람이 보기 좋은 보고서 형태로 재구성한 문서입니다. 테스트 결과와 완료 상태는 원본 문서 기준으로만 표시하며, 원문에 없는 성공 결과는 추가하지 않았습니다.</p>
+      <div class="meta">
+        <span class="badge done">Document 기준</span>
+        <span class="badge">Source: docs/codex/implementation/phase-02a-2-stage-command.md</span>
+        <span class="badge">Generated: 2026-05-18 10:15:43 +09:00</span>
+      </div>
+    </header>
+
+    <section class="grid">
+      <article class="card">
+        <h2>Scope Summary</h2>
+<h3>구현 목적</h3>
+<p>Phase 02a-1에서 추가한 <code>JobPosting</code> 하위 <code>Stage</code> 기본 CRUD를 유지하면서, 관리자 전형단계 운영에 필요한 순서 변경, 상태 전이, 삭제 command를 추가한다.</p>
+
+      </article>
+      <article class="card">
+        <h2>Tests / Verification</h2>
+<h4>테스트</h4>
+<ul>
+<li><code>src/test/java/com/shinyoung/recruit/service/StageServiceTest.java</code></li>
+<li><code>src/test/java/com/shinyoung/recruit/controller/StageControllerTest.java</code></li>
+</ul>
+
+      </article>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>Out Of Scope / Limitations</h2>
+<p class="source-note">원본 문서에서 별도 미구현/제외 섹션을 자동 식별하지 못했습니다. 전체 원문 섹션을 확인하세요.</p>
+      </article>
+      <article class="card">
+        <h2>Remaining Issues / Next Phase</h2>
+<h3>남은 이슈</h3>
+<ul>
+<li>DB unique 제약은 아직 없다.</li>
+<li>동시 reorder/create 요청의 최종 중복 방지는 운영 안정성 단계에서 DB 제약 또는 락 정책으로 보완해야 한다.</li>
+<li>Application/StageResult 도입 전이므로 진행 중 Stage reorder/delete 제한은 보수적으로 잡았다.</li>
+</ul>
+
+      </article>
+    </section>
+
+    <section class="section full-source">
+      <h2>Full Source Content</h2>
+      <p class="source-note">아래 내용은 원본 Markdown을 HTML로 변환한 전체 내용입니다. 민감한 환경변수 값은 보고서에서 마스킹했습니다.</p>
+<h2>Phase 02a-2 - Stage Reorder and Commands</h2>
+<h3>Phase 이름</h3>
+<p>Phase 02a-2: Stage reorder / status command / delete command</p>
+<h3>구현 목적</h3>
+<p>Phase 02a-1에서 추가한 <code>JobPosting</code> 하위 <code>Stage</code> 기본 CRUD를 유지하면서, 관리자 전형단계 운영에 필요한 순서 변경, 상태 전이, 삭제 command를 추가한다.</p>
+<h3>구현 범위</h3>
+<ul>
+<li>Stage reorder command</li>
+<li>Stage start/announce/close status command</li>
+<li>Stage delete command</li>
+<li>reorder 요청 DTO 추가</li>
+<li>command API 추가</li>
+<li><code>@Valid</code> 실패 응답의 <code>ApiResponse.fail()</code> 통일 보완</li>
+<li>Stage command Service 테스트 추가</li>
+</ul>
+<h3>구현하지 않은 범위</h3>
+<ul>
+<li><code>Application</code></li>
+<li><code>StageResult</code></li>
+<li><code>Interview</code></li>
+<li><code>Message</code></li>
+<li><code>CommonCode</code></li>
+<li>JobPosting publish 시 Stage 최소 1개 검증</li>
+<li>JobPosting 생성 시 기본 Stage 자동 생성</li>
+<li>실제 발표 시각 필드 저장</li>
+<li>DB unique 제약 추가</li>
+<li>Stage 공개 조회 API 노출</li>
+</ul>
+<h3>변경 파일 목록</h3>
+<h4>코드</h4>
+<ul>
+<li><code>src/main/java/com/shinyoung/recruit/domain/entity/Stage.java</code></li>
+<li><code>src/main/java/com/shinyoung/recruit/dto/request/StageOrderRequest.java</code></li>
+<li><code>src/main/java/com/shinyoung/recruit/dto/request/StageReorderRequest.java</code></li>
+<li><code>src/main/java/com/shinyoung/recruit/service/StageService.java</code></li>
+<li><code>src/main/java/com/shinyoung/recruit/controller/StageController.java</code></li>
+<li><code>src/main/java/com/shinyoung/recruit/exception/GlobalExceptionHandler.java</code></li>
+</ul>
+<h4>테스트</h4>
+<ul>
+<li><code>src/test/java/com/shinyoung/recruit/service/StageServiceTest.java</code></li>
+<li><code>src/test/java/com/shinyoung/recruit/controller/StageControllerTest.java</code></li>
+</ul>
+<h4>문서</h4>
+<ul>
+<li><code>docs/codex/implementation/phase-02a-2-stage-command.md</code></li>
+<li><code>docs/codex/implementation/phase-02a-1-stage-basic-crud.md</code></li>
+<li><code>docs/codex/design/phase-02-stage-design.md</code></li>
+<li><code>docs/codex/07-implementation-history.md</code></li>
+</ul>
+<h3>신규 클래스 목록</h3>
+<ul>
+<li><code>StageOrderRequest</code></li>
+<li><code>StageReorderRequest</code></li>
+</ul>
+<h3>수정 클래스 목록</h3>
+<ul>
+<li><code>Stage</code></li>
+<li><code>StageService</code></li>
+<li><code>StageController</code></li>
+<li><code>GlobalExceptionHandler</code></li>
+<li><code>StageServiceTest</code></li>
+<li><code>StageControllerTest</code></li>
+</ul>
+<h3>클래스별 설명</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>구분</th>
+<th>패키지</th>
+<th>클래스</th>
+<th>역할</th>
+<th>주요 필드/메서드</th>
+<th>연관 클래스</th>
+<th>비고</th>
+</tr></thead><tbody>
+<tr>
+<td>Entity</td>
+<td><code>domain.entity</code></td>
+<td><code>Stage</code></td>
+<td>Stage 순서/상태 변경</td>
+<td><code>reorder</code>, <code>start</code>, <code>announce</code>, <code>close</code></td>
+<td><code>StageStatus</code></td>
+<td>상태 검증은 Service에서 수행</td>
+</tr>
+<tr>
+<td>Request DTO</td>
+<td><code>dto.request</code></td>
+<td><code>StageOrderRequest</code></td>
+<td>reorder 개별 item</td>
+<td><code>stageId</code>, <code>stageOrder</code></td>
+<td><code>StageReorderRequest</code></td>
+<td><code>stageId</code> 필수, <code>stageOrder</code> 0 이상</td>
+</tr>
+<tr>
+<td>Request DTO</td>
+<td><code>dto.request</code></td>
+<td><code>StageReorderRequest</code></td>
+<td>reorder 요청</td>
+<td><code>items</code></td>
+<td><code>StageOrderRequest</code></td>
+<td>null/empty 불가, nested validation 적용</td>
+</tr>
+<tr>
+<td>Service</td>
+<td><code>service</code></td>
+<td><code>StageService</code></td>
+<td>Stage command 정책 처리</td>
+<td><code>reorder</code>, <code>start</code>, <code>announce</code>, <code>close</code>, <code>delete</code></td>
+<td><code>StageRepository</code>, <code>JobPostingRepository</code></td>
+<td>command 검증은 Controller가 아닌 Service에서 수행</td>
+</tr>
+<tr>
+<td>Controller</td>
+<td><code>controller</code></td>
+<td><code>StageController</code></td>
+<td>Stage command API</td>
+<td><code>POST /reorder</code>, <code>POST /start</code>, <code>POST /announce</code>, <code>POST /close</code>, <code>POST /delete</code></td>
+<td><code>StageService</code>, <code>ApiResponse</code></td>
+<td>PUT/DELETE HTTP method 없음</td>
+</tr>
+<tr>
+<td>Exception/Handler</td>
+<td><code>exception</code></td>
+<td><code>GlobalExceptionHandler</code></td>
+<td>validation 실패 응답 통일</td>
+<td><code>handleMethodArgumentNotValid</code>, <code>handleConstraintViolation</code></td>
+<td><code>ApiResponse</code></td>
+<td>400 + <code>ApiResponse.fail()</code></td>
+</tr>
+<tr>
+<td>Test</td>
+<td><code>service</code></td>
+<td><code>StageServiceTest</code></td>
+<td>command 정책 검증</td>
+<td>reorder/status/delete 테스트</td>
+<td><code>StageService</code>, <code>JobPostingService</code></td>
+<td>실 LDAP 의존 없음</td>
+</tr>
+<tr>
+<td>Test</td>
+<td><code>controller</code></td>
+<td><code>StageControllerTest</code></td>
+<td>validation 응답 검증</td>
+<td>invalid reorder request 테스트</td>
+<td><code>StageController</code></td>
+<td><code>ApiResponse</code> 형식 확인</td>
+</tr>
+</tbody></table></div>
+
+<h3>API 목록</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Method</th>
+<th>Path</th>
+<th>목적</th>
+<th>요청</th>
+<th>응답</th>
+</tr></thead><tbody>
+<tr>
+<td>POST</td>
+<td><code>/admin/job-postings/{jobPostingId}/stages/reorder</code></td>
+<td>Stage 순서 일괄 변경</td>
+<td><code>StageReorderRequest</code></td>
+<td><code>ApiResponse&lt;List&lt;StageListResponse&gt;&gt;</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/job-postings/{jobPostingId}/stages/{stageId}/start</code></td>
+<td>Stage 시작</td>
+<td>없음</td>
+<td><code>ApiResponse&lt;Long&gt;</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/job-postings/{jobPostingId}/stages/{stageId}/announce</code></td>
+<td>Stage 결과 발표 상태 전환</td>
+<td>없음</td>
+<td><code>ApiResponse&lt;Long&gt;</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/job-postings/{jobPostingId}/stages/{stageId}/close</code></td>
+<td>Stage 마감</td>
+<td>없음</td>
+<td><code>ApiResponse&lt;Long&gt;</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/job-postings/{jobPostingId}/stages/{stageId}/delete</code></td>
+<td>Stage 삭제 command</td>
+<td>없음</td>
+<td><code>ApiResponse&lt;Long&gt;</code></td>
+</tr>
+</tbody></table></div>
+
+<h3>Entity 관계 요약</h3>
+<ul>
+<li><code>Stage</code> N : 1 <code>JobPosting</code></li>
+<li><code>Stage -&gt; JobPosting</code> 단방향 관계 유지</li>
+<li><code>JobPosting</code>에 <code>List&lt;Stage&gt;</code>를 추가하지 않음</li>
+<li>cascade/orphanRemoval 없음</li>
+</ul>
+<h3>주요 비즈니스 규칙</h3>
+<ul>
+<li>command API는 모두 POST를 사용한다.</li>
+<li>PUT과 DELETE HTTP method는 사용하지 않는다.</li>
+<li><code>Application</code>, <code>StageResult</code>와의 연결 검증은 아직 구현하지 않는다.</li>
+<li><code>resultAnnouncementDateTime</code>은 계속 결과 발표 예정일시로만 사용한다.</li>
+<li>announce command는 실제 발표 시각을 저장하지 않는다.</li>
+</ul>
+<h3>상태 전이 규칙</h3>
+<pre data-lang="text"><code>
+READY -&gt; IN_PROGRESS -&gt; RESULT_ANNOUNCED -&gt; CLOSED
+</code></pre>
+<ul>
+<li>start는 <code>READY</code> Stage에서만 가능하다.</li>
+<li>announce는 <code>IN_PROGRESS</code> Stage에서만 가능하다.</li>
+<li>close는 <code>RESULT_ANNOUNCED</code> Stage에서만 가능하다.</li>
+<li><code>CLOSED</code> Stage는 되돌릴 수 없다.</li>
+<li>역전이는 허용하지 않는다.</li>
+<li>start/announce/close command는 <code>PUBLISHED</code> JobPosting에서만 가능하다.</li>
+<li><code>DRAFT</code>, <code>CLOSED</code> JobPosting에서는 start/announce/close가 불가능하다.</li>
+</ul>
+<h3>reorder 정책</h3>
+<ul>
+<li>요청은 해당 JobPosting의 모든 Stage를 포함해야 한다.</li>
+<li>누락 Stage가 있으면 실패한다.</li>
+<li>존재하지 않는 Stage id가 있으면 실패한다.</li>
+<li>다른 JobPosting 소속 Stage id가 있으면 실패한다.</li>
+<li>중복 Stage id가 있으면 실패한다.</li>
+<li>중복 <code>stageOrder</code>가 있으면 실패한다.</li>
+<li><code>stageOrder</code>는 null일 수 없고 0 이상이어야 한다.</li>
+<li><code>CLOSED</code> JobPosting에서는 reorder가 불가능하다.</li>
+<li><code>DRAFT</code>, <code>PUBLISHED</code> JobPosting에서는 reorder가 가능하다.</li>
+<li>Phase 02a-2에서는 <code>READY</code>가 아닌 Stage가 포함되면 reorder를 차단한다.</li>
+<li>DB unique 제약은 아직 추가하지 않고 Service 검증으로 처리한다.</li>
+</ul>
+<h3>delete 정책</h3>
+<ul>
+<li>삭제는 <code>POST /delete</code> command API로 처리한다.</li>
+<li><code>READY</code> Stage만 삭제 가능하다.</li>
+<li><code>IN_PROGRESS</code>, <code>RESULT_ANNOUNCED</code>, <code>CLOSED</code> Stage는 삭제 불가능하다.</li>
+<li><code>CLOSED</code> JobPosting에서는 삭제 불가능하다.</li>
+<li><code>DRAFT</code>, <code>PUBLISHED</code> JobPosting에서는 <code>READY</code> Stage 삭제가 가능하다.</li>
+<li>현재는 물리 삭제로 시작한다.</li>
+<li>Application/StageResult 도입 후 연결 데이터가 있는 Stage 삭제 차단 또는 soft delete를 재검토한다.</li>
+</ul>
+<h3>테스트 목록</h3>
+<h4>reorder</h4>
+<ul>
+<li>reorder 성공</li>
+<li>reorder 후 Stage 목록이 <code>stageOrder ASC</code>, <code>id ASC</code>로 정렬되는지 확인</li>
+<li>reorder 요청에 누락된 Stage가 있으면 실패</li>
+<li>reorder 요청에 중복 Stage id가 있으면 실패</li>
+<li>reorder 요청에 중복 stageOrder가 있으면 실패</li>
+<li>reorder 요청에 다른 JobPosting 소속 Stage가 있으면 실패</li>
+<li>reorder 요청에 존재하지 않는 Stage id가 있으면 실패</li>
+<li>CLOSED JobPosting의 reorder 실패</li>
+<li>READY가 아닌 Stage가 포함된 reorder 실패</li>
+</ul>
+<h4>status command</h4>
+<ul>
+<li>PUBLISHED JobPosting에서 <code>READY -&gt; IN_PROGRESS</code> start 성공</li>
+<li>DRAFT JobPosting에서 start 실패</li>
+<li>CLOSED JobPosting에서 start 실패</li>
+<li>READY가 아닌 Stage start 실패</li>
+<li>PUBLISHED JobPosting에서 <code>IN_PROGRESS -&gt; RESULT_ANNOUNCED</code> announce 성공</li>
+<li>IN_PROGRESS가 아닌 Stage announce 실패</li>
+<li>announce 시 실제 발표 시각 필드가 새로 생기지 않고 <code>resultAnnouncementDateTime</code> 유지</li>
+<li>PUBLISHED JobPosting에서 <code>RESULT_ANNOUNCED -&gt; CLOSED</code> close 성공</li>
+<li>RESULT_ANNOUNCED가 아닌 Stage close 실패</li>
+<li>CLOSED Stage 재전이 실패</li>
+</ul>
+<h4>delete</h4>
+<ul>
+<li>DRAFT JobPosting에서 READY Stage 삭제 성공</li>
+<li>PUBLISHED JobPosting에서 READY Stage 삭제 성공</li>
+<li>CLOSED JobPosting에서 삭제 실패</li>
+<li>IN_PROGRESS Stage 삭제 실패</li>
+<li>RESULT_ANNOUNCED Stage 삭제 실패</li>
+<li>CLOSED Stage 삭제 실패</li>
+<li>존재하지 않는 Stage 삭제 실패</li>
+<li>다른 JobPosting 소속 Stage 삭제 실패</li>
+</ul>
+<h4>validation</h4>
+<ul>
+<li>Stage 생성 요청 validation 실패 시 <code>ApiResponse</code> 형식으로 400 응답</li>
+<li>Stage reorder 요청 validation 실패 시 <code>ApiResponse</code> 형식으로 400 응답</li>
+</ul>
+<h3>실행한 테스트 명령</h3>
+<pre data-lang="bash"><code>
+$env:``AES_SECRET_KEY=***; .\gradlew.bat test --tests com.shinyoung.recruit.service.StageServiceTest --tests com.shinyoung.recruit.controller.StageControllerTest
+</code></pre>
+<pre data-lang="bash"><code>
+$env:``AES_SECRET_KEY=***; .\gradlew.bat clean test
+</code></pre>
+<h3>테스트 결과</h3>
+<ul>
+<li>StageServiceTest: 성공</li>
+<li>StageControllerTest: 성공</li>
+<li>전체 테스트: 성공</li>
+</ul>
+<h3>남은 이슈</h3>
+<ul>
+<li>DB unique 제약은 아직 없다.</li>
+<li>동시 reorder/create 요청의 최종 중복 방지는 운영 안정성 단계에서 DB 제약 또는 락 정책으로 보완해야 한다.</li>
+<li>Application/StageResult 도입 전이므로 진행 중 Stage reorder/delete 제한은 보수적으로 잡았다.</li>
+</ul>
+<h3>다음 Phase 전 확인 사항</h3>
+<ul>
+<li>Phase 02a-3에서 Controller/API 통합 테스트 범위를 확정한다.</li>
+<li>Stage 공개 노출 여부를 결정한다.</li>
+<li>Application 기본 흐름을 먼저 구현할지, Stage Controller 테스트 보강을 먼저 할지 결정한다.</li>
+<li>Stage 최소 1개를 JobPosting publish 조건으로 추가할지 별도 보완 Phase에서 검토한다.</li>
+</ul>
+<h3>Phase 02a-3 연계 메모</h3>
+<ul>
+<li>Phase 02a-3에서 <code>StageControllerTest</code>를 보강해 Phase 02a-2 command API의 path, method, 성공 응답, 실패 응답 포맷을 검증했다.</li>
+<li>command API는 모두 POST로 유지되며, DELETE HTTP method는 사용하지 않는다.</li>
+<li><code>POST /admin/job-postings/{jobPostingId}/stages/{stageId}/delete</code> delete command 정책은 유지된다.</li>
+<li>Stage 공개 노출 API, JobPosting publish Stage 최소 1개 검증, StageResult 구현은 이번 범위에 포함하지 않았다.</li>
+</ul>
+
+    </section>
+  </main>
+</body>
+</html>

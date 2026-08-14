@@ -1,0 +1,104 @@
+server:
+  port: 8000
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui
+    operations-sorter: method
+    tags-sorter: alpha
+spring:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  application:
+    name: recruit
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: ${RECRUIT_ATTACHMENT_MULTIPART_MAX_FILE_SIZE:25MB}
+      max-request-size: ${RECRUIT_ATTACHMENT_MULTIPART_MAX_REQUEST_SIZE:105MB}
+  Jackson:
+    deserialization:
+      fail-on-unknown-properties: false
+  jpa:
+    hibernate:
+      # 스키마는 Hibernate ddl-auto 로 생성/갱신한다(별도 migration 프레임워크 없음).
+      # 신규 테이블(예: common_code)은 수동 DDL 없이 자동 생성된다. 운영(MariaDB)에서는
+      # validate/none + 관리형 DDL 로 전환하는 것을 권장한다.
+      ddl-auto: ${SPRING_JPA_DDL_AUTO:update}
+#  datasource:
+#    username: ENC()
+#    password: ENC()
+#    url: ENC()
+#    driver-class-name: org.mariadb.jdbc.Driver
+  datasource:
+    url: jdbc:h2:file:/home/jnks/spring/data/recruit
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+crypto:
+  aes:
+    key: ${AES_SECRET_KEY}
+audit:
+  # 감사 연결용 HMAC pepper(Phase 09a). 누락 시 기본적으로 기동 실패(fail-safe, profile 이름과 무관).
+  hmac-secret: ${AUDIT_HMAC_SECRET:}
+  # secret 미설정 시 fallback secret 허용 여부(9a 리뷰 보완). local 개발에서만 명시적으로 true 로 켠다.
+  # (예: AUDIT_ALLOW_FALLBACK_SECRET=true) prod profile 에서는 true 여도 fallback 이 거부된다.
+  allow-fallback-secret: ${AUDIT_ALLOW_FALLBACK_SECRET:false}
+recruit:
+  ldap:
+    # LDAP(AD) 접속·검색 설정. 실제 값은 저장소에 두지 않고 환경변수로 주입한다(CLAUDE.md 3장).
+    # - 자격증명(manager-dn, manager-password): 유출 시 교체 대상. 기본값 없음.
+    # - 환경/조직 정보(url, base, *-search-base): 내부망 주소와 조직 구조라 실제 값을 커밋하지 않는다.
+    # user-search-filter만 AD 표준 관용구라 기본값을 둔다.
+    url: ${LDAP_URL:ldap://}
+    base: ${LDAP_BASE_DN:}
+    manager-dn: ${LDAP_MANAGER_DN:}
+    manager-password: ${LDAP_MANAGER_PASSWORD:}
+    user-search-base: ${LDAP_USER_SEARCH_BASE:}
+    user-search-filter: ${LDAP_USER_SEARCH_FILTER:(sAMAccountName={0})}
+    group-search-base: ${LDAP_GROUP_SEARCH_BASE:}
+  export:
+    max-rows: ${RECRUIT_EXPORT_MAX_ROWS:50000}
+  upload:
+    max-rows: ${RECRUIT_UPLOAD_MAX_ROWS:10000}
+    max-file-size: ${RECRUIT_UPLOAD_MAX_FILE_SIZE:5MB}
+  pdf:
+    font-classpath: ${RECRUIT_PDF_FONT_CLASSPATH:fonts/NanumGothic-Regular.ttf}
+  juso:
+    # 정부 도로명주소 OpenAPI(juso.go.kr) 프록시 설정. 승인키는 서버 보관(프론트 미노출).
+    base-url: ${JUSO_API_BASE_URL:https://business.juso.go.kr/addrlink/addrLinkApi.do}
+    # 승인키 미설정(로컬/테스트) 시 실제 호출은 502로 실패한다. 운영은 환경변수 JUSO_CONFM_KEY 주입.
+    confm-key: ${JUSO_CONFM_KEY:}
+    connect-timeout-ms: ${JUSO_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${JUSO_READ_TIMEOUT_MS:5000}
+    max-count-per-page: ${JUSO_MAX_COUNT_PER_PAGE:100}
+    # juso 조회 허용 범위(currentPage*countPerPage). 초과 요청은 juso가 E0015로 거절하므로 호출 전에 400으로 막는다.
+    # 9000은 실측 경계값(9000 정상 / 9010 E0015). totalCount와 무관한 상한이다.
+    max-search-range: ${JUSO_MAX_SEARCH_RANGE:9000}
+  attachment:
+    storage-root: ${RECRUIT_ATTACHMENT_STORAGE_ROOT:attachments}
+    max-file-size: ${RECRUIT_ATTACHMENT_MAX_FILE_SIZE:20MB}
+    max-files-per-application: ${RECRUIT_ATTACHMENT_MAX_FILES_PER_APPLICATION:20}
+    max-total-size-per-application: ${RECRUIT_ATTACHMENT_MAX_TOTAL_SIZE_PER_APPLICATION:100MB}
+    allowed-extensions: ${RECRUIT_ATTACHMENT_ALLOWED_EXTENSIONS:pdf,jpg,jpeg,png,doc,docx,xls,xlsx,hwp,hwpx}
+    allowed-content-types: ${RECRUIT_ATTACHMENT_ALLOWED_CONTENT_TYPES:application/pdf,image/jpeg,image/png,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/x-hwp,application/haansofthwp,application/vnd.hancom.hwpx}
+  posting-image:
+    storage-root: ${RECRUIT_POSTING_IMAGE_STORAGE_ROOT:posting-images}
+    max-file-size: ${RECRUIT_POSTING_IMAGE_MAX_FILE_SIZE:10MB}
+    max-images-per-posting: ${RECRUIT_POSTING_IMAGE_MAX_IMAGES_PER_POSTING:10}
+    allowed-extensions: ${RECRUIT_POSTING_IMAGE_ALLOWED_EXTENSIONS:jpg,jpeg,png,webp}
+    allowed-content-types: ${RECRUIT_POSTING_IMAGE_ALLOWED_CONTENT_TYPES:image/jpeg,image/png,image/webp}
+client-event-log:
+  # 지원자 화면 진단 로그(Phase 09f). 감사 로그(activity_log)와 분리된 단기 운영 데이터.
+  enabled: ${CLIENT_EVENT_LOG_ENABLED:true}
+  retention-days: ${CLIENT_EVENT_LOG_RETENTION_DAYS:90}
+  max-metadata-json-length: ${CLIENT_EVENT_LOG_MAX_METADATA_JSON_LENGTH:4000}
+  cleanup-cron: ${CLIENT_EVENT_LOG_CLEANUP_CRON:0 0 4 * * *}
+  rate-limit:
+    # 1차 ip 글로벌(sessionId 변조 우회 차단) / 2차 ip+session / 3차 인증 principal
+    per-minute-ip: ${CLIENT_EVENT_LOG_RATE_LIMIT_PER_MINUTE_IP:300}
+    per-minute-session: ${CLIENT_EVENT_LOG_RATE_LIMIT_PER_MINUTE_SESSION:60}
+    per-minute-principal: ${CLIENT_EVENT_LOG_RATE_LIMIT_PER_MINUTE_PRINCIPAL:120}

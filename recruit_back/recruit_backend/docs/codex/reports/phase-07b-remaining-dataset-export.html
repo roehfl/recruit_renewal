@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Phase 07b - 나머지 Dataset Export</title>
+<style>
+  :root {
+    --blue: #1d4ed8; --blue-bg: #eff6ff; --green: #047857; --green-bg: #ecfdf5;
+    --amber: #b45309; --amber-bg: #fffbeb; --red: #b91c1c; --red-bg: #fef2f2;
+    --gray: #475569; --gray-bg: #f1f5f9; --ink: #0f172a; --line: #e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+    color: var(--ink); margin: 0; background: #f8fafc; line-height: 1.6; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 32px 24px 64px; }
+  header { background: linear-gradient(135deg, #0f766e, #0891b2); color: #fff;
+    border-radius: 14px; padding: 28px 32px; box-shadow: 0 8px 24px rgba(15,118,110,.25); }
+  header h1 { margin: 0 0 6px; font-size: 23px; }
+  header .sub { opacity: .92; font-size: 14px; }
+  header .meta { margin-top: 14px; font-size: 13px; opacity: .9; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; vertical-align: middle; }
+  .b-done { background: var(--green-bg); color: var(--green); border: 1px solid #a7f3d0; }
+  .b-blue { background: var(--blue-bg); color: var(--blue); border: 1px solid #bfdbfe; }
+  .b-warn { background: var(--amber-bg); color: var(--amber); border: 1px solid #fde68a; }
+  .b-muted { background: var(--gray-bg); color: var(--gray); border: 1px solid #cbd5e1; }
+  .b-red { background: var(--red-bg); color: var(--red); border: 1px solid #fecaca; }
+  section { background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    padding: 22px 26px; margin-top: 20px; }
+  h2 { font-size: 18px; margin: 0 0 14px; padding-bottom: 8px; border-bottom: 2px solid var(--line); }
+  h3 { font-size: 15px; margin: 18px 0 8px; }
+  p { margin: 8px 0; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; background: #fff; }
+  .card.done { border-left: 4px solid var(--green); }
+  .card.skip { border-left: 4px solid var(--gray); }
+  .card.warn { border-left: 4px solid var(--amber); }
+  .card h4 { margin: 0 0 8px; font-size: 14px; }
+  .card ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--gray-bg); font-weight: 600; }
+  code { background: var(--gray-bg); padding: 1px 6px; border-radius: 5px;
+    font-family: "SFMono-Regular", Consolas, monospace; font-size: 12.5px; }
+  .mono { font-family: "SFMono-Regular", Consolas, monospace; }
+  .note { background: var(--amber-bg); border: 1px solid #fde68a; border-radius: 10px;
+    padding: 12px 16px; font-size: 13px; color: #78350f; }
+  .ok { color: var(--green); font-weight: 600; }
+  ul.tight { margin: 6px 0; }
+  .pii { color: var(--red); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Phase 07b · 나머지 Dataset Export</h1>
+    <div class="sub">Stage Results / Interviews / Interview Evaluations · list-parity xlsx (read-only)</div>
+    <div class="meta">
+      Status: <span class="badge b-done">완료</span>
+      &nbsp;·&nbsp; Generated: 2026-06-01
+      &nbsp;·&nbsp; Slice: 07b (07a 인프라 재사용)
+    </div>
+  </header>
+
+  <section>
+    <h2>Executive Summary</h2>
+    <p>
+      Phase 07a의 export 인프라(<code>ExcelExportWriter</code>, 컬럼 spec, row cap, audit, 응답 factory)를
+      재사용해 나머지 3개 dataset의 list-parity xlsx download를 추가했다:
+      <strong>stage results / interviews / interview evaluations</strong>.
+    </p>
+    <p>
+      각 export는 <strong>대응 admin list 엔드포인트의 기존 쿼리/서비스를 그대로 재사용</strong>해 필터·정렬·
+      파생값(면접 인원 카운트)을 동일하게 맞춘다(list-parity). materialize된 parity list에 공용
+      <code>ExcelExportService</code>가 row cap + writer를 적용한다. 모두 read-only, 새 entity/table/migration 없음.
+      <span class="pii">ci/ciHash/password 미포함</span>, 평가 export는 읽기 전용(Phase 06 경계 유지).
+    </p>
+    <p><span class="ok">진행 가능:</span> 다음은 07c funnel statistics.</p>
+  </section>
+
+  <section>
+    <h2>Review 반영 (instruction.md · 7 findings)</h2>
+    <table>
+      <thead><tr><th>등급</th><th>항목</th><th>반영</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge b-warn">Medium</span></td><td>eval xlsx 생성이 read-only tx 안</td><td>조회/매핑만 <code>TransactionTemplate</code>(readOnly), <code>generate</code>는 tx 밖</td></tr>
+        <tr><td><span class="badge b-warn">Medium</span></td><td>row cap의 memory bound 표현</td><td>xlsx 메모리만 bound·조회 list는 미bound로 정정 + 07f 전환 기준 문서화</td></tr>
+        <tr><td><span class="badge b-warn">Medium</span></td><td>설계-코드 응답 타입 불일치</td><td>설계 §7.4/Decision #24를 <code>StreamingResponseBody</code>로 정정</td></tr>
+        <tr><td><span class="badge b-warn">Medium</span></td><td>interviews 필터 테스트 부족</td><td>stageId·from/to 필터, from&gt;to → 400 테스트 추가</td></tr>
+        <tr><td><span class="badge b-warn">Medium</span></td><td>interviews export N+1</td><td>list-parity상 상속, 07f count projection 전환 대상으로 문서화</td></tr>
+        <tr><td><span class="badge b-muted">Low</span></td><td>header 검증 약함</td><td>interviews/evaluations 테스트에 nosniff/no-store/content-type 단언 추가</td></tr>
+        <tr><td><span class="badge b-muted">Low</span></td><td>07b formula escaping 회귀 없음</td><td>interviews <code>groupName="+inject"</code> → apostrophe escape 검증 추가</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Scope</h2>
+    <div class="cards">
+      <div class="card done">
+        <h4><span class="badge b-done">구현</span></h4>
+        <ul>
+          <li>stage results export</li>
+          <li>interviews export(필터 stageId/status/from/to)</li>
+          <li>interview evaluations export(읽기)</li>
+          <li>공용 <code>ExcelExportService</code> + <code>ExportRowSource.ofList</code></li>
+          <li>dataset 공통 audit(<code>logExport</code>)</li>
+        </ul>
+      </div>
+      <div class="card skip">
+        <h4><span class="badge b-muted">범위 밖</span></h4>
+        <ul>
+          <li>Statistics funnel (07c)</li>
+          <li>Excel upload (07d) · Application PDF (07e)</li>
+          <li>평가 Excel upload(쓰기) — Phase 06 경계 영구 제외</li>
+          <li>연락처(applications export 전용)</li>
+        </ul>
+      </div>
+      <div class="card warn">
+        <h4><span class="badge b-warn">유의</span></h4>
+        <ul>
+          <li>materialize 후 row cap → xlsx 메모리만 bound(조회 list 미bound). 07a global은 count+page-fetch</li>
+          <li>interviews export는 list-parity상 N+1 상속(07f 전환 대상)</li>
+          <li>audit는 SLF4J 로그만(영속 ActivityLog backlog)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Design · list-parity via 기존 쿼리 재사용</h2>
+    <p>
+      07a applications는 unbounded global이라 count 선검증 + page-fetch projection을 썼다. 07b 3개 dataset은
+      stage/posting-scoped이고 대응 admin list가 이미 전체 materialize하므로, 기존 list 쿼리/서비스를 재사용해
+      parity를 보장하고 materialize된 list를 공용 헬퍼에 넘긴다(size &gt; max면 writer 미호출).
+    </p>
+    <table>
+      <thead><tr><th>Dataset</th><th>재사용 소스</th><th>필터</th><th>정렬(parity)</th></tr></thead>
+      <tbody>
+        <tr><td>stage results</td><td class="mono">StageResultService.getResults</td><td>stageId</td><td>submittedAt desc, id desc</td></tr>
+        <tr><td>interviews</td><td class="mono">InterviewService.getAdminInterviews</td><td>jobPostingId, stageId, status, from, to</td><td>startDateTime asc, id asc + 참가자 카운트</td></tr>
+        <tr><td>interview evaluations</td><td class="mono">findByStageIdForAdmin + stage 검증</td><td>stageId</td><td>interview→candidate→interviewer 다중키</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>API</h2>
+    <p>모든 경로는 <code>WebMvcConfig</code>로 <code>/api</code> prefix 적용. 권한 <code>/api/admin/**</code>.</p>
+    <table>
+      <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>필터</th></tr></thead>
+      <tbody>
+        <tr><td>GET</td><td class="mono">/api/admin/stages/{stageId}/results/export</td><td>전형 결과 목록 xlsx</td><td>—</td></tr>
+        <tr><td>GET</td><td class="mono">/api/admin/job-postings/{jobPostingId}/interviews/export</td><td>면접 일정 목록 xlsx</td><td>stageId?, status?, from?, to?</td></tr>
+        <tr><td>GET</td><td class="mono">/api/admin/stages/{stageId}/interview-evaluations/export</td><td>면접 평가 목록 xlsx(읽기)</td><td>—</td></tr>
+      </tbody>
+    </table>
+    <h3>컬럼</h3>
+    <ul class="tight">
+      <li><strong>stage-results</strong>: stageResultId, stageId, applicationId, applicantName, jobPositionId, jobPositionName, applicationStatus, resultStatus, score, comment, submittedAt, decidedAt</li>
+      <li><strong>interviews</strong>: interviewId, jobPostingTitle, stageName, stageType, groupName, startDateTime, endDateTime, method, locationName, roomName, onlineMeetingUrl, status, candidateCount, interviewerCount</li>
+      <li><strong>interview-evaluations</strong>: interviewId, groupName, applicantName, positionName, interviewerName, status, grade, recommendation, comment, submittedAt</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Changed Files</h2>
+    <table>
+      <thead><tr><th>구분</th><th>파일</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">service/ExcelExportService.java</td><td>materialize list → row cap + writer</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">service/AdminDatasetExportService.java</td><td>3개 dataset export + 컬럼 spec</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">dto/response/InterviewEvaluationExportRow.java</td><td>평가 평탄 row</td></tr>
+        <tr><td><span class="badge b-blue">Mod</span></td><td class="mono">service/ExportRowSource.java</td><td>ofList(List) 정적 팩토리</td></tr>
+        <tr><td><span class="badge b-blue">Mod</span></td><td class="mono">service/ExportAuditLogger.java</td><td>공통 logExport(datasetType, …)</td></tr>
+        <tr><td><span class="badge b-blue">Mod</span></td><td class="mono">controller/AdminExportController.java</td><td>export 엔드포인트 3개 + audit</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">test/.../AdminDatasetExportControllerTest · ExcelExportServiceTest</td><td>10 tests</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Validation &amp; Policy</h2>
+    <table>
+      <thead><tr><th>규칙</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td>list-parity</td><td>각 export = 대응 admin list와 동일 필터·정렬·파생값(기존 쿼리/서비스 재사용)</td></tr>
+        <tr><td>Row cap</td><td>materialize list size &gt; maxRows(50,000) → <code>400 EXPORT_ROW_LIMIT_EXCEEDED</code>, workbook 미생성</td></tr>
+        <tr><td>검증/404</td><td>stage results=stage 존재, interviews=posting 존재 + search range, evaluations=stage 존재</td></tr>
+        <tr><td>PII</td><td>3개 dataset 연락처 미포함, <span class="pii">ci/ciHash/password 금지</span>, 평가 export 읽기 전용(Phase 06)</td></tr>
+        <tr><td>Formula injection</td><td>07a writer 상속(전 셀 string cell + 위험 prefix escape)</td></tr>
+        <tr><td>tx 경계</td><td>evaluations는 조회/매핑만 <code>TransactionTemplate</code>(readOnly), xlsx 생성은 tx 밖</td></tr>
+        <tr><td>temp 삭제</td><td>controller <code>StreamingResponseBody</code> 전송 후 finally 삭제, writer finally dispose/close</td></tr>
+        <tr><td>Audit</td><td>dataset별 SLF4J <code>logExport</code>(필터 allowlist + filtersHash), PII 값 미기록</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Test</h2>
+    <h3>명령</h3>
+    <p class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*DatasetExport*" --tests "ExcelExportServiceTest"</p>
+    <h3>신규 테스트</h3>
+    <p>
+      <span class="badge b-done">14 passed</span>
+      <code>AdminDatasetExportControllerTest</code>(12) + <code>ExcelExportServiceTest</code>(2)
+    </p>
+    <ul class="tight">
+      <li>각 dataset xlsx 헤더(content-type/nosniff/no-store) + POI read-back header parity</li>
+      <li>stage results 민감컬럼 부재 + 행수</li>
+      <li>interviews 참가자 카운트 컬럼(1 candidate / 2 interviewers)</li>
+      <li>interviews 필터: status · <strong>stageId · from/to 기간 · from&gt;to → 400</strong></li>
+      <li>interviews <strong>formula escape</strong>(groupName <span class="mono">+inject → '+inject</span>)</li>
+      <li>evaluations 평탄 행(1 candidate × 2 interviewers) + 면접관 식별 + status</li>
+      <li>각 dataset 404(unknown stage/posting) + applicant 403 / anonymous 401</li>
+      <li>row cap 초과 시 writer never-called 단위 검증(workbook 미생성)</li>
+    </ul>
+    <h3>전체 회귀</h3>
+    <p>
+      <span class="badge b-blue">872 tests</span>
+      <span class="badge b-done">864 passed</span>
+      <span class="badge b-warn">8 failed</span>
+      &nbsp; <span class="mono">./gradlew.bat test</span> · 14m 29s
+    </p>
+    <p>
+      07b 신규 14개(<code>AdminDatasetExportControllerTest</code> 12 + <code>ExcelExportServiceTest</code> 2,
+      리뷰 반영 필터/header/formula 포함) 전부 통과 — 직전 858 → 872(<strong>+14, 신규 회귀 0건</strong>).
+      실패 8건은 변동 없이 동일한 클럭 의존 사전-실패(<code>StageControllerTest</code> 2 +
+      <code>StageServiceTest</code> 6, 접수기간 검증)로 본 슬라이스와 무관하다.
+    </p>
+    <div class="note">
+      기존 8건의 <span class="mono">접수기간</span> 사전-실패는 시스템 날짜(2026-06-01)가 fixture 접수기간을
+      지나 발생하는 클럭 의존 실패로 본 슬라이스와 무관하다. export 테스트는 엔티티를 repository로 직접
+      영속화(`start()`=2026-06-01)해 클럭 의존성을 피했다.
+    </div>
+  </section>
+
+  <section>
+    <h2>Remaining Issues</h2>
+    <ul class="tight">
+      <li><strong>07f 전환 기준</strong>: 07b는 list-parity 우선으로 materialize 후 row cap을 적용한다. row 수가 커질
+        가능성이 확인되면 count 선검증 + projection page-fetch로 전환한다(특히 <strong>stage results</strong>가 지원자 수와 직결되어 1순위).</li>
+      <li>interviews export N+1(참가자 카운트)을 count projection(group by)/bulk map으로 분리(07f/성능 보강).</li>
+      <li>export audit를 영속 <code>ActivityLog</code>로 이관(backlog).</li>
+      <li>stage results/interviews 연락처 확장은 운영 수요 확인 시 후속.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Next Phase</h2>
+    <ul class="tight">
+      <li><strong>07c</strong>: 공고 단위 전형 funnel statistics(P 코호트, 7-bucket 분포, 두 비율, dimension).</li>
+    </ul>
+  </section>
+</div>
+</body>
+</html>

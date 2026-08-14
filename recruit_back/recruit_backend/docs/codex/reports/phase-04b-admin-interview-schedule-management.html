@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 04b - Admin Interview Schedule Management</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; background: #f5f7fb; color: #17212f; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 22px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d8e1eb; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e7edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #edf2f7; padding: 2px 5px; border-radius: 4px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .pending { background: #f3e7cc; color: #7a4b00; }
+    .out { background: #f4d7da; color: #842029; }
+    .warn { background: #fff0c2; color: #765300; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d8e1eb; border-radius: 8px; padding: 16px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .section { margin-top: 24px; }
+    @media (max-width: 860px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>Shinyoung Recruit Backend</div>
+  <h1>Phase 04b - Admin Interview Schedule Management</h1>
+  <span class="badge done">Completed</span>
+  <span class="badge muted">Generated: 2026-05-26</span>
+</header>
+
+<main>
+  <section class="summary">
+    <div class="card">
+      <h2>Executive Summary</h2>
+      <p>Phase 04b implements administrator interview schedule management on top of the Phase 04a interview domain.</p>
+      <p>Administrators can list/detail schedules, create and update DRAFT schedules, replace DRAFT participants, confirm eligible schedules, and cancel confirmed schedules.</p>
+      <p>The implementation reads <code>StageResult</code> only for previous-stage eligibility and does not create, update, announce, correct, or publish stage results.</p>
+      <p>The phase can move forward to applicant-owned interview schedule reads in Phase 04c.</p>
+    </div>
+    <div class="card">
+      <h2>Status</h2>
+      <p><span class="badge done">Service/API complete</span></p>
+      <p><span class="badge done">Targeted tests passed</span></p>
+      <p><span class="badge done">Docs updated</span></p>
+      <p><span class="badge out">Frontend out of scope</span></p>
+      <p><span class="badge out">Migration out of scope</span></p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Scope</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Completed Scope</h3>
+        <ul class="list">
+          <li>Admin list and detail APIs.</li>
+          <li>DRAFT schedule create and update.</li>
+          <li>DRAFT participant replace-all command.</li>
+          <li>Confirm command with stage, participant, eligibility, and collision guards.</li>
+          <li>Cancel command for confirmed schedules.</li>
+          <li>DTOs, exceptions, repository queries, service tests, controller tests, and repository tests.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Not Implemented</h3>
+        <ul class="list">
+          <li>Applicant interview read API.</li>
+          <li>Interviewer interview read API.</li>
+          <li><code>InterviewEvaluation</code>.</li>
+          <li>Interview scoring and result processing.</li>
+          <li>Message, Excel, PDF, calendar, frontend, and static resources.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Deferred</h3>
+        <ul class="list">
+          <li>Confirm/cancel memo or reason storage after an audit/history model exists.</li>
+          <li>Partial participant cancellation.</li>
+          <li>Production DDL or migration framework.</li>
+          <li>Advanced stage branching/skip policies.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Architecture And Domain</h2>
+    <div class="two">
+      <div class="card">
+        <h3>Entity Relationship</h3>
+        <ul class="list">
+          <li><code>Interview</code> belongs to one <code>JobPosting</code>.</li>
+          <li><code>Interview</code> belongs to one <code>Stage</code>.</li>
+          <li><code>InterviewParticipant</code> belongs to one <code>Interview</code>.</li>
+          <li>Candidate rows point to <code>JobApplication</code>.</li>
+          <li>Interviewer rows point to <code>Employee</code>.</li>
+          <li><code>StageResult</code> is read-only for confirmation eligibility.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Main Classes</h3>
+        <ul class="list">
+          <li><code>InterviewService</code>: admin scheduling workflow and validation.</li>
+          <li><code>InterviewAdminController</code>: admin HTTP API.</li>
+          <li><code>AdminInterviewSummaryResponse</code>: list response.</li>
+          <li><code>AdminInterviewDetailResponse</code>: detail response.</li>
+          <li><code>AdminInterviewParticipantResponse</code>: candidate/interviewer participant response.</li>
+          <li><code>InvalidInterviewException</code>, <code>InterviewNotFoundException</code>: API error mapping.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>API List</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/job-postings/{jobPostingId}/interviews?stageId=&status=&from=&to=</code></td><td>Admin interview list</td><td>Query params</td><td><code>ApiResponse&lt;List&lt;AdminInterviewSummaryResponse&gt;&gt;</code></td></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/interviews/{interviewId}</code></td><td>Admin interview detail</td><td>Path variable</td><td><code>ApiResponse&lt;AdminInterviewDetailResponse&gt;</code></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/job-postings/{jobPostingId}/interviews</code></td><td>Create DRAFT interview</td><td><code>InterviewCreateRequest</code></td><td><code>ApiResponse&lt;Long&gt;</code></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/interviews/{interviewId}</code></td><td>Update DRAFT interview</td><td><code>InterviewUpdateRequest</code></td><td><code>ApiResponse&lt;Long&gt;</code></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/interviews/{interviewId}/participants</code></td><td>Replace DRAFT participants</td><td><code>InterviewParticipantReplaceRequest</code></td><td><code>ApiResponse&lt;Long&gt;</code></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/interviews/{interviewId}/confirm</code></td><td>Confirm DRAFT interview</td><td>none</td><td><code>ApiResponse&lt;Long&gt;</code></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/interviews/{interviewId}/cancel</code></td><td>Cancel CONFIRMED interview</td><td>none</td><td><code>ApiResponse&lt;Long&gt;</code></td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Validation And Policy</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Stage Rules</h3>
+        <ul class="list">
+          <li>Allowed stage types: <code>FIRST_INTERVIEW</code>, <code>SECOND_INTERVIEW</code>, <code>FINAL_INTERVIEW</code>.</li>
+          <li>Create/update/replace/confirm require <code>READY</code> or <code>IN_PROGRESS</code>.</li>
+          <li><code>RESULT_ANNOUNCED</code> and <code>CLOSED</code> reject mutable commands.</li>
+          <li>Cancel is allowed only when the stage is <code>READY</code> or <code>IN_PROGRESS</code>.</li>
+          <li><code>RESULT_ANNOUNCED</code> and <code>CLOSED</code> reject cancel.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Participant Rules</h3>
+        <ul class="list">
+          <li>Replace request lists cannot be null.</li>
+          <li>DRAFT can have empty participant lists.</li>
+          <li>Confirm requires at least one candidate and one interviewer.</li>
+          <li>Duplicate IDs and duplicate non-null sort orders are rejected per role.</li>
+          <li>Candidate application must be same posting and <code>SUBMITTED</code>.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Eligibility And Collision</h3>
+        <ul class="list">
+          <li>Previous stage must be <code>RESULT_ANNOUNCED</code> or <code>CLOSED</code>.</li>
+          <li>Previous-stage result must exist and be <code>PASSED</code>.</li>
+          <li>Confirmed schedule collisions are checked by same candidate application or same employee.</li>
+          <li>Cancelled schedules are ignored by collision checks.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Changed Files</h2>
+    <table>
+      <tr><th>Group</th><th>Files</th></tr>
+      <tr><td>Domain/repository</td><td><code>Interview.java</code>, <code>InterviewRepository.java</code>, <code>InterviewParticipantRepository.java</code>, <code>StageResultRepository.java</code></td></tr>
+      <tr><td>Service/controller</td><td><code>InterviewService.java</code>, <code>InterviewAdminController.java</code></td></tr>
+      <tr><td>Request DTOs</td><td><code>InterviewCreateRequest</code>, <code>InterviewUpdateRequest</code>, <code>InterviewParticipantReplaceRequest</code>, <code>InterviewCandidateParticipantRequest</code>, <code>InterviewInterviewerParticipantRequest</code></td></tr>
+      <tr><td>Response DTOs</td><td><code>AdminInterviewSummaryResponse</code>, <code>AdminInterviewDetailResponse</code>, <code>AdminInterviewParticipantResponse</code></td></tr>
+      <tr><td>Exceptions</td><td><code>InterviewNotFoundException</code>, <code>InvalidInterviewException</code>, <code>GlobalExceptionHandler</code></td></tr>
+      <tr><td>Tests</td><td><code>InterviewServiceTest</code>, <code>InterviewAdminControllerTest</code>, <code>InterviewRepositoryTest</code>, <code>InterviewParticipantRepositoryTest</code></td></tr>
+      <tr><td>Docs</td><td><code>phase-04b-admin-interview-schedule-management.md</code>, this HTML report, roadmap, history, current status report</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Test Results</h2>
+    <table>
+      <tr><th>Command</th><th>Result</th><th>Purpose</th></tr>
+      <tr>
+        <td><code>$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests com.shinyoung.recruit.service.InterviewServiceTest --no-daemon</code></td>
+        <td><span class="badge done">BUILD SUCCESSFUL</span></td>
+        <td>Service validation and command behavior.</td>
+      </tr>
+      <tr>
+        <td><code>$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests com.shinyoung.recruit.controller.InterviewAdminControllerTest --no-daemon</code></td>
+        <td><span class="badge done">BUILD SUCCESSFUL</span></td>
+        <td>Admin API response shape and command routes.</td>
+      </tr>
+      <tr>
+        <td><code>$env:AES_SECRET_KEY='22791194512954214612461221261067'; .\gradlew.bat test --tests com.shinyoung.recruit.domain.repository.InterviewRepositoryTest --tests com.shinyoung.recruit.domain.repository.InterviewParticipantRepositoryTest --no-daemon</code></td>
+        <td><span class="badge done">BUILD SUCCESSFUL</span></td>
+        <td>Admin search and confirmed collision queries.</td>
+      </tr>
+    </table>
+    <div class="card" style="margin-top:14px;">
+      <p><span class="badge warn">Not run</span> Full <code>test</code> and <code>clean test</code> were not executed because <code>instruction.md</code> limited this work to targeted tests.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Remaining Issues</h2>
+    <div class="card">
+      <ul class="list">
+        <li>Applicant and interviewer schedule reads remain for Phase 04c and 04d.</li>
+        <li>Confirm/cancel memo or reason is not accepted until an audit/history model exists.</li>
+        <li>First-stage interview confirmation fails closed when there is no previous visible passed result.</li>
+        <li>Production DDL/migration files are not included in this phase.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Next Phase Recommendation</h2>
+    <div class="card">
+      <p><span class="badge info">Phase 04c</span> Implement applicant-owned interview schedule read.</p>
+      <ul class="list">
+        <li><code>GET /applicant/applications/{applicationId}/interviews</code></li>
+        <li>Validate applicant ownership.</li>
+        <li>Hide <code>DRAFT</code> schedules.</li>
+        <li>Return only assigned <code>CONFIRMED</code> and <code>CANCELLED</code> schedules.</li>
+        <li>Hide other candidates, interviewer lists, and admin memo.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+</body>
+</html>

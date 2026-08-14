@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03c-9-1 QuestionTemplate + JobPostingQuestion Admin API</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #1f2933; background: #f5f7fa; line-height: 1.55; }
+    header { background: #16324f; color: #fff; padding: 32px 40px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1, h2, h3 { margin: 0 0 12px; }
+    h1 { font-size: 30px; }
+    h2 { font-size: 21px; color: #16324f; margin-top: 30px; }
+    h3 { font-size: 16px; color: #294866; margin-top: 18px; }
+    p { margin: 8px 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+    .card { background: #fff; border: 1px solid #d8e0e8; border-radius: 8px; padding: 18px; box-shadow: 0 1px 2px rgba(20, 36, 56, 0.05); }
+    .badge { display: inline-block; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; margin: 2px 4px 2px 0; }
+    .done { background: #dff5e7; color: #17633a; }
+    .hold { background: #fff3d6; color: #7a4d00; }
+    .warn { background: #fde2e1; color: #8a1f17; }
+    .info { background: #e4efff; color: #174a83; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d8e0e8; border-radius: 8px; overflow: hidden; }
+    th, td { border-bottom: 1px solid #e6edf3; padding: 10px 12px; text-align: left; vertical-align: top; }
+    th { background: #eef4f8; color: #16324f; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { background: #edf2f7; border-radius: 4px; padding: 2px 5px; font-family: Consolas, monospace; font-size: 0.95em; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    .section { margin-top: 22px; }
+    .callout { border-left: 4px solid #2f6f9f; background: #fff; padding: 14px 16px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Phase 03c-9-1 QuestionTemplate + JobPostingQuestion Admin API</h1>
+  <p>전역 질문 템플릿과 공고별 질문 구성 관리자 API 구현 보고서</p>
+  <span class="badge done">구현 완료</span>
+  <span class="badge hold">지원자 답변 보류</span>
+  <span class="badge warn">PUT/DELETE 미추가</span>
+</header>
+<main>
+  <section class="grid">
+    <div class="card">
+      <h2>목적</h2>
+      <p>자기소개서/질문답변 도메인의 첫 구현 단계로 전역 질문 은행과 공고별 질문 snapshot 구성을 제공한다.</p>
+    </div>
+    <div class="card">
+      <h2>핵심 결정</h2>
+      <p><code>QuestionTemplate</code>은 원천 템플릿, <code>JobPostingQuestion</code>은 공고별 실제 질문 record로 분리했다.</p>
+    </div>
+    <div class="card">
+      <h2>검증 결과</h2>
+      <p><code>.\gradlew.bat clean test</code> 성공. 신규 서비스/컨트롤러 테스트와 지정 회귀 테스트가 통과했다.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>구현 범위</h2>
+    <div class="card">
+      <span class="badge done">Enum</span>
+      <span class="badge done">Entity</span>
+      <span class="badge done">Repository</span>
+      <span class="badge done">Service</span>
+      <span class="badge done">Controller</span>
+      <span class="badge done">DTO</span>
+      <span class="badge done">Test</span>
+      <p>질문 템플릿 생성/조회/수정/비활성화와 공고별 질문 생성/조회/수정/정렬/비활성화를 구현했다.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>미구현 범위</h2>
+    <div class="card">
+      <span class="badge hold">ApplicationAnswer</span>
+      <span class="badge hold">지원자 답변 API</span>
+      <span class="badge hold">Submit Validator 연동</span>
+      <span class="badge hold">관리자 답변 조회</span>
+      <span class="badge hold">QuestionSet</span>
+      <span class="badge hold">선택형/파일형 답변</span>
+      <span class="badge hold">Attachment 연동</span>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>API 목록</h2>
+    <table>
+      <thead><tr><th>Method</th><th>Path</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td>GET</td><td><code>/admin/question-templates</code></td><td>템플릿 목록, <code>active</code> 필터 지원</td></tr>
+        <tr><td>GET</td><td><code>/admin/question-templates/{templateId}</code></td><td>템플릿 상세</td></tr>
+        <tr><td>POST</td><td><code>/admin/question-templates</code></td><td>템플릿 생성</td></tr>
+        <tr><td>POST</td><td><code>/admin/question-templates/{templateId}</code></td><td>템플릿 수정</td></tr>
+        <tr><td>POST</td><td><code>/admin/question-templates/{templateId}/deactivate</code></td><td>템플릿 비활성화</td></tr>
+        <tr><td>GET</td><td><code>/admin/job-postings/{jobPostingId}/questions</code></td><td>공고 질문 목록</td></tr>
+        <tr><td>POST</td><td><code>/admin/job-postings/{jobPostingId}/questions</code></td><td>직접 작성 또는 템플릿 기반 질문 생성</td></tr>
+        <tr><td>POST</td><td><code>/admin/job-postings/{jobPostingId}/questions/{questionId}</code></td><td>질문 snapshot 수정</td></tr>
+        <tr><td>POST</td><td><code>/admin/job-postings/{jobPostingId}/questions/reorder</code></td><td>active 질문 정렬 변경</td></tr>
+        <tr><td>POST</td><td><code>/admin/job-postings/{jobPostingId}/questions/{questionId}/delete</code></td><td>질문 soft delete</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>DTO 정책</h2>
+    <table>
+      <thead><tr><th>DTO</th><th>주요 필드</th></tr></thead>
+      <tbody>
+        <tr><td><code>QuestionTemplateCreateRequest</code></td><td>title, questionText, helperText, category, answerType, defaultRequired, defaultMaxLength</td></tr>
+        <tr><td><code>QuestionTemplateResponse</code></td><td>templateId, title, questionText, helperText, category, answerType, defaultRequired, defaultMaxLength, active, createdAt, updatedAt</td></tr>
+        <tr><td><code>JobPostingQuestionCreateRequest</code></td><td>questionTemplateId, questionText, helperText, category, answerType, required, minLength, maxLength, sortOrder</td></tr>
+        <tr><td><code>JobPostingQuestionResponse</code></td><td>questionId, questionTemplateId, questionText, helperText, category, answerType, required, minLength, maxLength, sortOrder, active, createdAt, updatedAt</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>중요 정책</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Template Snapshot</h3>
+        <p>템플릿 기반 생성은 템플릿 값을 복사한 뒤 요청 override를 반영한다. 이후 템플릿 수정은 기존 공고 질문에 영향을 주지 않는다.</p>
+      </div>
+      <div class="card">
+        <h3>DRAFT Only</h3>
+        <p>공고 질문 생성, 수정, 정렬, 비활성화는 <code>JobPosting.status=DRAFT</code>에서만 가능하다.</p>
+      </div>
+      <div class="card">
+        <h3>Soft Delete</h3>
+        <p>삭제 command는 물리 삭제가 아니라 <code>active=false</code> 처리다. HTTP DELETE는 추가하지 않았다.</p>
+      </div>
+      <div class="card">
+        <h3>Length Limit</h3>
+        <p><code>SHORT_TEXT <= 500</code>, <code>LONG_TEXT <= 5000</code>. <code>minLength</code>는 선택이고 <code>maxLength</code>보다 클 수 없다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>테스트 결과</h2>
+    <table>
+      <thead><tr><th>명령</th><th>결과</th></tr></thead>
+      <tbody>
+        <tr><td><code>$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.service.QuestionTemplateServiceTest</code></td><td>성공</td></tr>
+        <tr><td><code>$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.controller.QuestionTemplateControllerTest</code></td><td>성공</td></tr>
+        <tr><td><code>$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.service.JobPostingQuestionServiceTest</code></td><td>성공</td></tr>
+        <tr><td><code>$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.controller.JobPostingQuestionControllerTest</code></td><td>성공</td></tr>
+        <tr><td><code>$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.service.JobPostingServiceTest</code></td><td>성공</td></tr>
+        <tr><td><code>$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.controller.JobPostingControllerTest</code></td><td>성공</td></tr>
+        <tr><td><code>$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.service.ApplicationSubmitValidatorTest</code></td><td>성공</td></tr>
+        <tr><td><code>$env:AES_SECRET_KEY='***'; .\gradlew.bat test --tests com.shinyoung.recruit.controller.AdminApplicationSectionControllerTest</code></td><td>성공</td></tr>
+        <tr><td><code>$env:AES_SECRET_KEY='***'; .\gradlew.bat clean test</code></td><td>성공</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>다음 Phase</h2>
+    <div class="callout">
+      <p>추천: Phase 03c-9-2에서 <code>ApplicationAnswer</code>와 지원자 질문 목록/답변 replace 저장 API를 구현한다. 이후 submit validator 답변 검증과 관리자 답변 lazy 조회를 순차적으로 연결한다.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

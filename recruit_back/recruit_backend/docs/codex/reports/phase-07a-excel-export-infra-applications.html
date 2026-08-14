@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Phase 07a - Excel Export 인프라 + Applications Download</title>
+<style>
+  :root {
+    --blue: #1d4ed8; --blue-bg: #eff6ff; --green: #047857; --green-bg: #ecfdf5;
+    --amber: #b45309; --amber-bg: #fffbeb; --red: #b91c1c; --red-bg: #fef2f2;
+    --gray: #475569; --gray-bg: #f1f5f9; --ink: #0f172a; --line: #e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+    color: var(--ink); margin: 0; background: #f8fafc; line-height: 1.6; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 32px 24px 64px; }
+  header { background: linear-gradient(135deg, #065f46, #0d9488); color: #fff;
+    border-radius: 14px; padding: 28px 32px; box-shadow: 0 8px 24px rgba(6,95,70,.25); }
+  header h1 { margin: 0 0 6px; font-size: 23px; }
+  header .sub { opacity: .92; font-size: 14px; }
+  header .meta { margin-top: 14px; font-size: 13px; opacity: .9; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; vertical-align: middle; }
+  .b-done { background: var(--green-bg); color: var(--green); border: 1px solid #a7f3d0; }
+  .b-blue { background: var(--blue-bg); color: var(--blue); border: 1px solid #bfdbfe; }
+  .b-warn { background: var(--amber-bg); color: var(--amber); border: 1px solid #fde68a; }
+  .b-muted { background: var(--gray-bg); color: var(--gray); border: 1px solid #cbd5e1; }
+  .b-red { background: var(--red-bg); color: var(--red); border: 1px solid #fecaca; }
+  section { background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    padding: 22px 26px; margin-top: 20px; }
+  h2 { font-size: 18px; margin: 0 0 14px; padding-bottom: 8px; border-bottom: 2px solid var(--line); }
+  h3 { font-size: 15px; margin: 18px 0 8px; }
+  p { margin: 8px 0; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; background: #fff; }
+  .card.done { border-left: 4px solid var(--green); }
+  .card.skip { border-left: 4px solid var(--gray); }
+  .card.warn { border-left: 4px solid var(--amber); }
+  .card h4 { margin: 0 0 8px; font-size: 14px; }
+  .card ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--gray-bg); font-weight: 600; }
+  code { background: var(--gray-bg); padding: 1px 6px; border-radius: 5px;
+    font-family: "SFMono-Regular", Consolas, monospace; font-size: 12.5px; }
+  .mono { font-family: "SFMono-Regular", Consolas, monospace; }
+  .note { background: var(--amber-bg); border: 1px solid #fde68a; border-radius: 10px;
+    padding: 12px 16px; font-size: 13px; color: #78350f; }
+  .ok { color: var(--green); font-weight: 600; }
+  ul.tight { margin: 6px 0; }
+  .pii { color: var(--red); font-weight: 600; }
+  .add { color: var(--green); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Phase 07a · Excel Export 인프라 + Applications Download</h1>
+    <div class="sub">신영증권 채용 Renewal 백엔드 · Reporting 계층 첫 슬라이스(read-only)</div>
+    <div class="meta">
+      Status: <span class="badge b-done">완료</span>
+      &nbsp;·&nbsp; Generated: 2026-06-01
+      &nbsp;·&nbsp; Slice: 07a (07b~07f 후속)
+    </div>
+  </header>
+
+  <section>
+    <h2>Executive Summary</h2>
+    <p>
+      Apache POI SXSSF 기반 Excel export 공통 인프라(<code>ExcelExportWriter</code>, 컬럼 spec 추상화,
+      row cap, export audit)를 구축하고, 그 위에 <strong>applications 목록 xlsx download</strong>
+      (연락처 컬럼 포함, global / per-posting 2개 엔드포인트)를 구현했다.
+    </p>
+    <p>
+      read-only이며 새 entity/table/migration이 없다. projection DTO를 <code>Stream</code>으로 읽어
+      SXSSF temp 파일을 만들고, controller가 스트리밍 후 temp 파일을 삭제한다. 모든 셀은 string cell로
+      쓰고 formula injection 위험 prefix를 escape한다. <span class="pii">ci/ciHash/password는 절대 미포함</span>.
+    </p>
+    <p><span class="ok">진행 가능:</span> 07b가 동일 인프라에 dataset spec만 추가하면 된다.</p>
+  </section>
+
+  <section>
+    <h2>Review 반영 (instruction.md · 8 findings)</h2>
+    <table>
+      <thead><tr><th>등급</th><th>항목</th><th>반영</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge b-red">Major</span></td><td>SXSSF temp file 누수</td><td><code>dispose()</code>/<code>close()</code>를 <code>finally</code>로 이동(예외 경로 누수 방지)</td></tr>
+        <tr><td><span class="badge b-red">Major</span></td><td>JPA Stream 메모리/connection</td><td><code>Stream</code> → <code>ExportRowSource</code> page fetch(1,000)로 DB 메모리·connection bound</td></tr>
+        <tr><td><span class="badge b-red">Major</span></td><td>정렬 parity</td><td>export 정렬을 admin list와 동일 <code>createdAt desc, id desc</code></td></tr>
+        <tr><td><span class="badge b-warn">Medium</span></td><td>audit schema 축소</td><td><code>ExportAuditContext</code> + timestamp/authority/clientIp/userAgent/requestId/filtersHash 추가</td></tr>
+        <tr><td><span class="badge b-warn">Medium</span></td><td>예외 wrapping</td><td>writer try에서 <code>RuntimeException</code>도 <code>ExportGenerationException</code>으로(검증 예외는 try 밖)</td></tr>
+        <tr><td><span class="badge b-warn">Medium</span></td><td>row cap 단위 검증</td><td><code>ApplicationExportServiceTest</code>로 writer never-called 검증</td></tr>
+        <tr><td><span class="badge b-warn">Medium</span></td><td>jobPositionId 필터 테스트</td><td>Backend/Frontend 분리 export 검증 추가</td></tr>
+        <tr><td><span class="badge b-muted">Low</span></td><td>파일명 sanitize / actor 문구</td><td>Content-Disposition <code>"</code>→<code>_</code>, 공유 actor 오류 문구 일반화</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Scope</h2>
+    <div class="cards">
+      <div class="card done">
+        <h4><span class="badge b-done">구현</span></h4>
+        <ul>
+          <li>POI SXSSF export writer + 컬럼 spec 추상화</li>
+          <li>Row cap(생성 전 count, 초과 시 400)</li>
+          <li>temp file 스트리밍 + 전송 후 삭제</li>
+          <li>applications export(연락처 포함) 2개 엔드포인트</li>
+          <li>formula injection 방어 + export audit</li>
+        </ul>
+      </div>
+      <div class="card skip">
+        <h4><span class="badge b-muted">범위 밖</span></h4>
+        <ul>
+          <li>stage results / interviews / evaluations export (07b)</li>
+          <li>Statistics funnel (07c)</li>
+          <li>Excel upload (07d) · Application PDF (07e)</li>
+          <li>비동기 export, 영속 audit, 파일명 timestamp</li>
+        </ul>
+      </div>
+      <div class="card warn">
+        <h4><span class="badge b-warn">유의</span></h4>
+        <ul>
+          <li>날짜/숫자도 string cell(locale 비의존)</li>
+          <li>audit는 SLF4J 로그만(영속 ActivityLog backlog)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Architecture</h2>
+    <h3>흐름</h3>
+    <p class="mono">
+      Controller → ApplicationExportService(@Transactional readOnly)
+      → countExportApplications (row cap 선검증)
+      → ExcelExportWriter ← ExportRowSource(findExportApplications, page 1,000)
+      → SXSSF temp file (finally dispose/close)
+      → ExcelExportResponseFactory (StreamingResponseBody, 전송 후 temp 삭제)
+    </p>
+    <h3>데이터 소유</h3>
+    <p>
+      새 entity/table 없음. 전부 read-only. <code>JobApplication</code> + <code>Applicant</code> 연락처를
+      평탄 projection(<code>ApplicationExportRow</code>)으로 직접 조회하며, JPA entity/lazy를 writer에 넘기지 않는다.
+    </p>
+  </section>
+
+  <section>
+    <h2>API</h2>
+    <p>모든 경로는 <code>WebMvcConfig</code>로 <code>/api</code> prefix 적용. 권한 <code>/api/admin/**</code>.</p>
+    <table>
+      <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>필터</th><th>Response</th></tr></thead>
+      <tbody>
+        <tr><td>GET</td><td class="mono">/api/admin/applications/export</td><td>전체 지원서 목록 xlsx</td><td>jobPostingId?, jobPositionId?, status?</td><td>xlsx (stream)</td></tr>
+        <tr><td>GET</td><td class="mono">/api/admin/job-postings/{jobPostingId}/applications/export</td><td>공고별 지원서 목록 xlsx</td><td>jobPositionId?, status?</td><td>xlsx (stream)</td></tr>
+      </tbody>
+    </table>
+    <h3>Export 컬럼 (시트 <span class="mono">applications</span>)</h3>
+    <p class="mono">
+      applicationId · applicantName · <span class="add">phoneNumber</span> · <span class="add">email</span>
+      · jobPostingTitle · jobPositionName · status · submittedAt · withdrawnAt · createdAt · updatedAt
+    </p>
+    <p class="pii">ci / ciHash / password 컬럼 없음 (전 dataset 영구 금지)</p>
+  </section>
+
+  <section>
+    <h2>Changed Files</h2>
+    <table>
+      <thead><tr><th>구분</th><th>파일</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">config/ExportProperties.java</td><td>row cap 설정(max-rows 기본 50,000)</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">exception/ExportRowLimitExceededException · ExportGenerationException</td><td>400 / 500</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">dto/response/ApplicationExportRow.java</td><td>export projection</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">service/ExportColumn · ExcelExportSpec · ExcelExportFile · ExportRowSource</td><td>컬럼 spec / 파일 핸들 / page 소스 값 객체</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">service/ExcelExportWriter.java</td><td>SXSSF writer + page fetch + formula escape + finally dispose</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">service/ExportAuditContext · ExportAuditLogger</td><td>SLF4J export audit + 요청/주체 메타</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">service/ApplicationExportService.java</td><td>필터/row cap/page fetch/writer</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">controller/ExcelExportResponseFactory.java</td><td>스트리밍 + 전송 후 삭제</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">controller/AdminExportController.java</td><td>export 엔드포인트 2개 + audit context</td></tr>
+        <tr><td><span class="badge b-blue">Mod</span></td><td class="mono">build.gradle</td><td>poi-ooxml:5.3.0</td></tr>
+        <tr><td><span class="badge b-blue">Mod</span></td><td class="mono">application.yaml</td><td>recruit.export.max-rows</td></tr>
+        <tr><td><span class="badge b-blue">Mod</span></td><td class="mono">JobApplicationRepository.java</td><td>countExportApplications, findExportApplications(Pageable, 정렬 parity)</td></tr>
+        <tr><td><span class="badge b-blue">Mod</span></td><td class="mono">GlobalExceptionHandler.java</td><td>export 예외 2개 핸들러</td></tr>
+        <tr><td><span class="badge b-blue">Mod</span></td><td class="mono">CurrentEmployeeService.java</td><td>공유 actor 오류 문구 일반화</td></tr>
+        <tr><td><span class="badge b-done">New</span></td><td class="mono">test/.../AdminExportControllerTest · AdminExportRowCapTest · ApplicationExportServiceTest</td><td>10 tests</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Validation &amp; Policy</h2>
+    <table>
+      <thead><tr><th>규칙</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td>필터 재사용</td><td>list와 동일 필터, page/size 무시(전체 행)</td></tr>
+        <tr><td>Row cap</td><td>생성 전 count, <code>&gt; maxRows</code>(50,000) → <code>400 EXPORT_ROW_LIMIT_EXCEEDED</code>, workbook 미생성</td></tr>
+        <tr><td>PII</td><td>applicantName/phoneNumber/email 포함, <span class="pii">ci/ciHash/password 금지</span></td></tr>
+        <tr><td>Formula injection</td><td>전 셀 string cell, <code>= + - @</code>·tab·CR/LF prefix → apostrophe escape</td></tr>
+        <tr><td>정렬 parity</td><td>export 정렬 = admin list와 동일 <code>createdAt desc, id desc</code></td></tr>
+        <tr><td>tx 경계</td><td>read-only tx에서 projection을 page(1,000) fetch → temp 파일. entity/lazy 미전달</td></tr>
+        <tr><td>temp 삭제</td><td>controller 스트리밍 후 finally 삭제(service 미삭제). writer는 finally <code>dispose()/close()</code></td></tr>
+        <tr><td>Audit</td><td>SLF4J 구조적(timestamp/actor/authority/clientIp/userAgent/requestId/dataset/필터 allowlist/filtersHash/rowCount/fileName), PII 값 미기록</td></tr>
+        <tr><td>404</td><td>존재하지 않는 jobPostingId</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Test</h2>
+    <h3>명령</h3>
+    <p class="mono">$env:AES_SECRET_KEY='...'; .\gradlew.bat test --tests "*AdminExport*"</p>
+    <h3>신규 테스트</h3>
+    <p>
+      <span class="badge b-done">10 passed</span>
+      <code>AdminExportControllerTest</code>(7) + <code>AdminExportRowCapTest</code>(1) + <code>ApplicationExportServiceTest</code>(2)
+    </p>
+    <ul class="tight">
+      <li>xlsx 헤더(content-type/disposition/nosniff/no-store) + POI read-back header 일치</li>
+      <li>ci/ciHash/password 컬럼 부재 + 연락처 값 존재</li>
+      <li>status 필터 / <strong>jobPositionId 필터</strong> / per-posting 분리 / 존재하지 않는 posting 404</li>
+      <li>formula injection escape(<span class="mono">'=cmd...</span>)</li>
+      <li>applicant 403 / anonymous 401</li>
+      <li>row cap 초과 → 400 <span class="mono">EXPORT_ROW_LIMIT_EXCEEDED</span>(통합) + <strong>writer never-called 단위 검증</strong></li>
+    </ul>
+    <h3>전체 회귀</h3>
+    <p>
+      <span class="badge b-blue">858 tests</span>
+      <span class="badge b-done">850 passed</span>
+      <span class="badge b-warn">8 failed</span>
+      &nbsp; <span class="mono">./gradlew.bat test</span> · 16m 33s
+    </p>
+    <p>
+      07a 구현 + 리뷰 반영으로 export 관련 <strong>10 tests 전부 통과</strong>(직전 848 → 858, +10 신규,
+      <strong>신규 회귀 0건</strong>). 실패 8건은 변동 없이 동일한 클럭 의존 사전-실패
+      (<code>StageControllerTest</code> 2 + <code>StageServiceTest</code> 6, 접수기간 검증)로 본 슬라이스와 무관하다.
+    </p>
+    <div class="note">
+      기존 8건의 <span class="mono">접수기간</span> 사전-실패는 시스템 날짜(2026-06-01)가 fixture 접수기간을
+      지나 발생하는 클럭 의존 실패로 본 슬라이스와 무관하다. export 테스트는 <code>JobApplication</code>을
+      repository로 직접 영속화해 클럭 의존성을 피했다.
+    </div>
+  </section>
+
+  <section>
+    <h2>Remaining Issues</h2>
+    <ul class="tight">
+      <li>export audit를 영속 <code>ActivityLog</code>로 이관(backlog).</li>
+      <li>비동기 대량 export 미도입(row cap이 동기 시간 bound).</li>
+      <li>파일명 timestamp 미포함(결정성 우선).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Next Phase</h2>
+    <ul class="tight">
+      <li><strong>07b</strong>: stage results / interviews / interview evaluations export(컬럼 spec만 추가).</li>
+      <li><strong>07c</strong>: funnel statistics.</li>
+    </ul>
+  </section>
+</div>
+</body>
+</html>

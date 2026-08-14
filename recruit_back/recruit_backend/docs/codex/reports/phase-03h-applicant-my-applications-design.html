@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 03h-1 Applicant My Applications Design</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; color: #1c2733; background: #f5f7fa; line-height: 1.55; }
+    header { background: #17324d; color: #fff; padding: 34px 40px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 52px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e1ea; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e6ecf2; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #25364a; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef2f6; padding: 2px 5px; border-radius: 4px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; margin-right: 6px; }
+    .completed { background: #d9f3e5; color: #146137; }
+    .pending { background: #f3e7cc; color: #7a4b00; }
+    .out { background: #f4d7da; color: #842029; }
+    .warn { background: #fff0c2; color: #765300; }
+    .muted { background: #e8edf2; color: #536171; }
+    .blue { background: #dbeafe; color: #1d4f91; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e1ea; border-radius: 8px; padding: 16px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .section { margin-top: 24px; }
+    @media (max-width: 820px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 36px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>Shinyoung Recruit Backend</div>
+  <h1>Phase 03h-1 Applicant My Applications Design</h1>
+  <span class="badge completed">Design Complete</span>
+  <span class="badge muted">Generated: 2026-05-19</span>
+</header>
+<main>
+  <section class="summary">
+    <div class="card">
+      <h2>Executive Summary</h2>
+      <p>This phase designs <code>GET /applications/me</code>, an applicant-only API for reading the current applicant's application list.</p>
+      <p>The recommended response is <code>ApiResponse&lt;PageResponse&lt;MyApplicationResponse&gt;&gt;</code> with fixed sorting by <code>createdAt DESC, id DESC</code>.</p>
+      <p>The list includes draft, submitted, and withdrawn applications, keeps closed postings visible, and includes only a compact announced-result summary.</p>
+      <p>No code, tests, security config, build config, YAML, schema, or runtime API was changed.</p>
+    </div>
+    <div class="card">
+      <h2>Status</h2>
+      <p><span class="badge completed">Documentation Only</span></p>
+      <p><span class="badge out">No Code Changes</span></p>
+      <p><span class="badge pending">Tests Not Run</span></p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Scope Cards</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Completed Scope</h3>
+        <ul class="list">
+          <li><code>GET /applications/me</code> API design</li>
+          <li>Pagination and default sorting policy</li>
+          <li>Response field selection</li>
+          <li>Announced result summary policy</li>
+          <li>Repository/service/controller candidates</li>
+          <li>Phase 03h-2 test strategy</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Not Implemented</h3>
+        <ul class="list">
+          <li>Java DTO, Repository, Service, Controller</li>
+          <li><code>GET /applications/me</code> runtime endpoint</li>
+          <li><code>SecurityConfig</code> changes</li>
+          <li>StageResult query changes</li>
+          <li>MockMvc or service tests</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Deferred</h3>
+        <ul class="list">
+          <li>Applicant dashboard summary</li>
+          <li>Completion rate and missing-section guidance</li>
+          <li>Status filters</li>
+          <li>Scheduled release guard by announcement date</li>
+          <li>Result display wording/templates</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Changed Files</h2>
+    <table>
+      <tr><th>Path</th><th>Type</th><th>Notes</th></tr>
+      <tr><td><code>docs/codex/design/phase-03h-applicant-my-applications-design.md</code></td><td>New</td><td>Codex reference design</td></tr>
+      <tr><td><code>docs/codex/reports/phase-03h-applicant-my-applications-design.html</code></td><td>New</td><td>Human-readable report</td></tr>
+      <tr><td><code>docs/codex/design/phase-03-application-design.md</code></td><td>Modified</td><td>Phase 03h-1 design note</td></tr>
+      <tr><td><code>docs/codex/07-implementation-history.md</code></td><td>Modified</td><td>Design history entry</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>API List</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th><th>Status</th></tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/applications/me</code></td>
+        <td>Logged-in applicant reads their own application list</td>
+        <td><code>page</code>, <code>size</code></td>
+        <td><code>ApiResponse&lt;PageResponse&lt;MyApplicationResponse&gt;&gt;</code></td>
+        <td><span class="badge pending">Phase 03h-2 Candidate</span></td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Access Policy</h2>
+    <table>
+      <tr><th>Caller</th><th>Behavior</th></tr>
+      <tr><td>Anonymous</td><td><code>401 + ApiResponse.fail(...)</code></td></tr>
+      <tr><td>Applicant</td><td>Allowed; returns only the current applicant's applications</td></tr>
+      <tr><td>Applicant with no applications</td><td>Allowed; returns empty <code>PageResponse</code></td></tr>
+      <tr><td>Employee/Admin</td><td><code>403 + ApiResponse.fail(...)</code>; admin APIs must be used instead</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Response Fields</h2>
+    <table>
+      <tr><th>Field</th><th>Source</th><th>Notes</th></tr>
+      <tr><td><code>applicationId</code></td><td><code>JobApplication.id</code></td><td>Navigation key</td></tr>
+      <tr><td><code>jobPostingId</code></td><td><code>JobPosting.id</code></td><td>Posting key</td></tr>
+      <tr><td><code>jobPostingTitle</code></td><td>Application snapshot preferred</td><td>Stable history display</td></tr>
+      <tr><td><code>jobPostingStatus</code></td><td><code>JobPosting.status</code></td><td>Closed postings remain visible</td></tr>
+      <tr><td><code>jobPositionId</code></td><td><code>JobPosition.id</code></td><td>Position key</td></tr>
+      <tr><td><code>jobPositionName</code></td><td>Application snapshot preferred</td><td>Stable history display</td></tr>
+      <tr><td><code>applicationStatus</code></td><td><code>JobApplication.status</code></td><td><code>DRAFT</code>, <code>SUBMITTED</code>, <code>WITHDRAWN</code></td></tr>
+      <tr><td><code>createdAt</code></td><td><code>BaseEntity.createdAt</code></td><td>Default sort key</td></tr>
+      <tr><td><code>submittedAt</code></td><td><code>JobApplication.submittedAt</code></td><td>Nullable</td></tr>
+      <tr><td><code>withdrawnAt</code></td><td><code>JobApplication.withdrawnAt</code></td><td>Nullable</td></tr>
+      <tr><td><code>receptionStartDateTime</code></td><td><code>JobPosting.receptionStartDateTime</code></td><td>Display and accepting input</td></tr>
+      <tr><td><code>receptionEndDateTime</code></td><td><code>JobPosting.receptionEndDateTime</code></td><td>Display and accepting input</td></tr>
+      <tr><td><code>accepting</code></td><td>Service calculation</td><td><code>PUBLISHED</code> and now within reception period</td></tr>
+      <tr><td><code>announcedResultCount</code></td><td>Visible StageResult summary</td><td>Only announced or closed stages</td></tr>
+      <tr><td><code>latestAnnouncedStageName</code></td><td>Visible StageResult summary</td><td>Nullable</td></tr>
+      <tr><td><code>latestResultStatus</code></td><td>Visible StageResult summary</td><td>Nullable</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Not Exposed</h2>
+    <div class="grid">
+      <div class="card">
+        <h3><span class="badge out">Personal Data</span></h3>
+        <ul class="list">
+          <li>Applicant id in response</li>
+          <li>Name, email, phone, CI, address</li>
+          <li>Encrypted personal data originals</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge out">Internal Result Data</span></h3>
+        <ul class="list">
+          <li><code>stageResultId</code></li>
+          <li><code>score</code></li>
+          <li><code>comment</code></li>
+          <li><code>decidedBy</code>, <code>correctedBy</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge out">Correction History</span></h3>
+        <ul class="list">
+          <li>Correction reason</li>
+          <li>Correction history rows</li>
+          <li>Previous score/comment/status snapshots</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Domain / Entity Structure</h2>
+    <table>
+      <tr><th>Domain</th><th>Role in API</th><th>Ownership Rule</th></tr>
+      <tr><td><code>JobApplication</code></td><td>Primary list row source</td><td>Query by current applicant id only</td></tr>
+      <tr><td><code>JobPosting</code></td><td>Posting status, reception period, title fallback</td><td>Existing closed postings remain visible</td></tr>
+      <tr><td><code>JobPosition</code></td><td>Position id/name fallback</td><td>Read through owned application</td></tr>
+      <tr><td><code>Stage</code></td><td>Announcement visibility and latest stage name</td><td>Only <code>RESULT_ANNOUNCED</code> or <code>CLOSED</code></td></tr>
+      <tr><td><code>StageResult</code></td><td>Count and latest result summary only</td><td>Batch loaded for current page application ids</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Validation And Policy</h2>
+    <div class="two">
+      <div class="card">
+        <h3>List Rules</h3>
+        <ul class="list">
+          <li>Include <code>DRAFT</code>, <code>SUBMITTED</code>, and <code>WITHDRAWN</code>.</li>
+          <li>Closed postings remain visible.</li>
+          <li>Default sort is <code>createdAt DESC, id DESC</code>.</li>
+          <li><code>accepting</code> is display data, not command authorization.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Result Summary Rules</h3>
+        <ul class="list">
+          <li>Detailed results stay under <code>/applications/{applicationId}/stage-results</code>.</li>
+          <li>Summary includes count plus latest visible stage/result.</li>
+          <li>Visible means <code>Stage.status == RESULT_ANNOUNCED || CLOSED</code>.</li>
+          <li><code>READY</code> and <code>IN_PROGRESS</code> rows are excluded.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Implementation Candidates</h2>
+    <table>
+      <tr><th>Layer</th><th>Candidate</th><th>Responsibility</th></tr>
+      <tr><td>DTO</td><td><code>MyApplicationResponse</code></td><td>One application list row with result summary fields</td></tr>
+      <tr><td>Repository</td><td><code>JobApplicationRepository</code></td><td>Page current applicant applications with job posting and position loaded</td></tr>
+      <tr><td>Repository</td><td><code>StageResultRepository</code></td><td>Batch visible result rows for current page application ids</td></tr>
+      <tr><td>Service</td><td><code>JobApplicationService.getMyApplications</code></td><td>Validate paging, load data, calculate accepting, map response</td></tr>
+      <tr><td>Controller</td><td><code>ApplicationController</code></td><td>Add <code>GET /applications/me</code> and use <code>CurrentApplicantService</code></td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Test Results</h2>
+    <table>
+      <tr><th>Command</th><th>Result</th><th>Reason</th></tr>
+      <tr><td>Not executed</td><td><span class="badge pending">Skipped</span></td><td>Documentation-only phase; no Java/test/runtime files changed</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Phase 03h-2 Test Plan</h2>
+    <table>
+      <tr><th>Test Area</th><th>Coverage</th></tr>
+      <tr><td>Service</td><td>Own application list succeeds and excludes other applicants</td></tr>
+      <tr><td>Service</td><td><code>DRAFT</code>, <code>SUBMITTED</code>, <code>WITHDRAWN</code> are included</td></tr>
+      <tr><td>Service</td><td>Default sorting by <code>createdAt DESC, id DESC</code></td></tr>
+      <tr><td>Service</td><td><code>accepting</code> calculation for published/open and closed/out-of-period postings</td></tr>
+      <tr><td>Service</td><td>Announced result count and latest result summary include only visible stages</td></tr>
+      <tr><td>Controller</td><td>Applicant succeeds; anonymous gets 401; employee/admin gets 403</td></tr>
+      <tr><td>Controller</td><td>Response does not serialize score/comment/actor/correction history fields</td></tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Remaining Issues</h2>
+    <div class="grid">
+      <div class="card">
+        <h3><span class="badge warn">Open Decision</span></h3>
+        <p>Align default and maximum <code>size</code> with existing page validation in Phase 03h-2.</p>
+      </div>
+      <div class="card">
+        <h3><span class="badge warn">Open Decision</span></h3>
+        <p>Confirm snapshot versus live title/name display. This design recommends snapshots for applicant history.</p>
+      </div>
+      <div class="card">
+        <h3><span class="badge pending">Deferred</span></h3>
+        <p>Dashboard summary, completion rate, missing sections, and result wording are later-phase concerns.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Next Phase Recommendation</h2>
+    <table>
+      <tr><th>Step</th><th>Phase 03h-2 Scope</th></tr>
+      <tr><td>1</td><td>Add <code>MyApplicationResponse</code></td></tr>
+      <tr><td>2</td><td>Add applicant-owned pageable list query</td></tr>
+      <tr><td>3</td><td>Add batch visible result summary query</td></tr>
+      <tr><td>4</td><td>Extend <code>JobApplicationService</code></td></tr>
+      <tr><td>5</td><td>Add <code>GET /applications/me</code> to <code>ApplicationController</code></td></tr>
+      <tr><td>6</td><td>Add service/controller tests and implementation docs</td></tr>
+    </table>
+  </section>
+</main>
+</body>
+</html>

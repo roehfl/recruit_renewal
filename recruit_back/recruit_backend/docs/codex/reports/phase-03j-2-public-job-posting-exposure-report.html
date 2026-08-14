@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Phase 03j-2 Public Job Posting Exposure Report</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; color: #1f2933; background: #f5f7fa; }
+    header { background: #123c69; color: #fff; padding: 28px 36px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 48px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin: 28px 0 12px; font-size: 20px; color: #123c69; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { line-height: 1.55; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d8dee9; }
+    th, td { padding: 10px 12px; border: 1px solid #d8dee9; text-align: left; vertical-align: top; }
+    th { background: #e8eef6; color: #102a43; }
+    code { background: #eef2f7; padding: 2px 5px; border-radius: 4px; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .completed { background: #d1fae5; color: #065f46; }
+    .pending { background: #fef3c7; color: #92400e; }
+    .out { background: #fee2e2; color: #991b1b; }
+    .info { background: #dbeafe; color: #1e40af; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .card { background: #fff; border: 1px solid #d8dee9; border-radius: 8px; padding: 16px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+    ul { margin: 8px 0 0 18px; padding: 0; }
+    li { margin: 6px 0; }
+    .muted { color: #52606d; }
+    @media (max-width: 860px) {
+      .grid, .summary { grid-template-columns: 1fr; }
+      main { padding: 20px 14px 36px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Recruit Backend - Phase 03j-2</h1>
+  <div>Public Job Posting Exposure, Filter, Sort, and Response Contract</div>
+  <p><span class="badge completed">Completed</span> <span class="muted" style="color:#dbeafe;">Generated: 2026-05-22</span></p>
+</header>
+<main>
+  <section class="summary">
+    <div class="card">
+      <h2>Executive Summary</h2>
+      <p>Phase 03j-2 updates the existing public job posting APIs so applicant-facing list and detail reads use the new public exposure policy.</p>
+      <p>Only published, visible, displayable postings are public. Reception period is not an exposure filter, so closed reception postings may still appear with <code>receptionStatus=CLOSED</code> and <code>accepting=false</code>.</p>
+      <p>The public list now uses database ordering and loads positions for the current page in one batch query. Review follow-up tightened sort tie-break tests and removed the obsolete status-only public repository method.</p>
+    </div>
+    <div class="card">
+      <h2>Status</h2>
+      <p><span class="badge completed">Implementation Complete</span></p>
+      <p><span class="badge completed">Target Tests Passed</span></p>
+      <p><span class="badge completed">Full Suite Passed</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Scope Cards</h2>
+    <div class="grid">
+      <div class="card">
+        <h3><span class="badge completed">Completed</span></h3>
+        <ul>
+          <li>Public list/detail exposure filters</li>
+          <li>Public list DB sort policy</li>
+          <li>Expanded public response fields</li>
+          <li>Public internal field exclusion</li>
+          <li>Batch position lookup for list pages</li>
+          <li>Service and controller tests</li>
+          <li>Review fix: isolated reception-end and id-desc sort tests</li>
+          <li>Review fix: unused legacy repository method cleanup</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge out">Not Implemented</span></h3>
+        <ul>
+          <li>New public endpoint paths</li>
+          <li>Admin API changes</li>
+          <li>Application command changes</li>
+          <li>Frontend/static resources</li>
+          <li>Persistent DB migration scripts</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge pending">Deferred</span></h3>
+        <ul>
+          <li>Application form required-policy split</li>
+          <li>Public UI handling of nullable position metadata</li>
+          <li>Production schema migration</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Architecture / Domain</h2>
+    <div class="card">
+      <p><code>JobPostingRepository.findPublicList</code> applies public filters and sorting before pagination. <code>JobPostingPublicService</code> then loads all positions for the page posting ids through <code>JobPositionRepository.findByJobPostingIdInOrderByJobPostingIdAscSortOrderAsc</code>.</p>
+      <p>The earlier unused <code>findAllByStatusOrderByCreatedAtDesc</code> public status-only query method was removed because the public service now uses the exposure-aware query.</p>
+      <p>Detail reads use an entity graph for <code>jobPositions</code> and <code>applicationFormConfig</code> while applying the same public exposure conditions.</p>
+    </div>
+    <table>
+      <thead><tr><th>Class</th><th>Type</th><th>Responsibility</th></tr></thead>
+      <tbody>
+      <tr><td><code>JobPostingPublicListProjection</code></td><td>Projection</td><td>Public list scalar fields without admin-only display policy fields.</td></tr>
+      <tr><td><code>JobPostingRepository</code></td><td>Repository</td><td>JPQL public list/detail exposure filters and list ordering.</td></tr>
+      <tr><td><code>JobPositionRepository</code></td><td>Repository</td><td>Batch fetch public positions by page posting ids.</td></tr>
+      <tr><td><code>JobPostingPublicListResponse</code></td><td>Response DTO</td><td>Applicant-facing list response contract.</td></tr>
+      <tr><td><code>JobPostingPublicDetailResponse</code></td><td>Response DTO</td><td>Applicant-facing detail response contract.</td></tr>
+      <tr><td><code>JobPositionPublicResponse</code></td><td>Response DTO</td><td>Applicant-facing position metadata response.</td></tr>
+      <tr><td><code>JobPostingPublicService</code></td><td>Service</td><td>Public page validation, query orchestration, position grouping, response mapping.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>API List</h2>
+    <table>
+      <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr></thead>
+      <tbody>
+      <tr><td>GET</td><td><code>/job-postings</code></td><td>Public job posting list</td><td><code>page</code>, <code>size</code></td><td><code>ApiResponse&lt;PageResponse&lt;JobPostingPublicListResponse&gt;&gt;</code></td></tr>
+      <tr><td>GET</td><td><code>/job-postings/{id}</code></td><td>Public job posting detail</td><td>path id</td><td><code>ApiResponse&lt;JobPostingPublicDetailResponse&gt;</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Response Fields</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Public List Included</h3>
+        <p><code>id</code>, <code>title</code>, <code>postingType</code>, <code>summary</code>, <code>receptionStartDateTime</code>, <code>receptionEndDateTime</code>, <code>receptionStatus</code>, <code>accepting</code>, <code>pinned</code>, <code>positions</code></p>
+      </div>
+      <div class="card">
+        <h3>Public Detail Included</h3>
+        <p><code>id</code>, <code>title</code>, <code>postingType</code>, <code>summary</code>, <code>contentHtml</code>, <code>receptionStartDateTime</code>, <code>receptionEndDateTime</code>, <code>receptionStatus</code>, <code>accepting</code>, <code>pinned</code>, <code>jobPositions</code>, <code>applicationFormConfig</code></p>
+      </div>
+      <div class="card">
+        <h3>Public Position Included</h3>
+        <p><code>id</code>, <code>positionName</code>, <code>applicationType</code>, <code>jobGroup</code>, <code>jobTitle</code>, <code>workLocation</code>, <code>employmentType</code>, <code>sortOrder</code></p>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <h3>Excluded Internal Fields</h3>
+      <p>Public responses do not expose <code>status</code>, <code>visible</code>, <code>displayStartDateTime</code>, <code>displayEndDateTime</code>, <code>displayOrder</code>, <code>createdAt</code>, <code>updatedAt</code>, or <code>closedAt</code>. Public list also excludes <code>contentHtml</code> and <code>applicationFormConfig</code>.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Validation / Policy</h2>
+    <table>
+      <thead><tr><th>Policy</th><th>Rule</th><th>Status</th></tr></thead>
+      <tbody>
+      <tr><td>Exposure</td><td><code>PUBLISHED</code>, <code>visible=true</code>, and current time inside optional display period.</td><td><span class="badge completed">Completed</span></td></tr>
+      <tr><td>Reception</td><td>Reception period does not hide a posting. It only drives <code>ReceptionStatus</code> and <code>accepting</code>.</td><td><span class="badge completed">Completed</span></td></tr>
+      <tr><td>Sorting</td><td><code>pinned desc</code>, status priority, <code>displayOrder asc</code>, reception end asc, published desc, id desc.</td><td><span class="badge completed">Completed</span></td></tr>
+      <tr><td>Page Validation</td><td><code>page >= 0</code> and <code>1 <= size <= 100</code>.</td><td><span class="badge completed">Completed</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Changed Files</h2>
+    <table>
+      <thead><tr><th>File</th><th>Change</th></tr></thead>
+      <tbody>
+      <tr><td><code>JobPostingPublicListProjection.java</code></td><td>Expanded list projection fields.</td></tr>
+      <tr><td><code>JobPostingRepository.java</code></td><td>Added public list/detail JPQL queries and removed the unused status-only public list method.</td></tr>
+      <tr><td><code>JobPositionRepository.java</code></td><td>Added page-id position batch query.</td></tr>
+      <tr><td><code>JobPostingPublicListResponse.java</code></td><td>Expanded public list response.</td></tr>
+      <tr><td><code>JobPostingPublicDetailResponse.java</code></td><td>Expanded public detail response.</td></tr>
+      <tr><td><code>JobPositionPublicResponse.java</code></td><td>Expanded public position response.</td></tr>
+      <tr><td><code>JobPostingPublicService.java</code></td><td>Applied public query and position grouping.</td></tr>
+      <tr><td><code>JobPostingPublicServiceTest.java</code></td><td>Added public exposure/sort/field tests, including isolated <code>receptionEndDateTime asc</code> and final <code>id desc</code> tie-break tests.</td></tr>
+      <tr><td><code>JobPostingPublicControllerTest.java</code></td><td>Added JSON include/exclude and 404 tests.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Test Results</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Result</th><th>Notes</th></tr></thead>
+      <tbody>
+      <tr><td><code>$env:AES_SECRET_KEY='&lt;test-value&gt;'; .\gradlew.bat cleanTest test --tests com.shinyoung.recruit.service.JobPostingPublicServiceTest --tests com.shinyoung.recruit.controller.JobPostingPublicControllerTest --no-daemon</code></td><td><span class="badge completed">Success</span></td><td>Public API target tests passed.</td></tr>
+      <tr><td><code>$env:AES_SECRET_KEY='&lt;test-value&gt;'; .\gradlew.bat clean test --no-daemon</code></td><td><span class="badge completed">Success</span></td><td>572 tests, 0 failures, 0 ignored, 100% successful. The command exited normally.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Remaining Issues</h2>
+    <div class="card">
+      <ul>
+        <li>Production database migration is still required before shared DB deployment.</li>
+        <li>Application form section usage and required policy remain coupled.</li>
+        <li>Frontend rendering behavior for nullable position metadata is outside this backend phase.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Next Phase Recommendation</h2>
+    <div class="card">
+      <p>Proceed to Phase 03k: split <code>ApplicationFormConfig</code> usage and required policy so public detail and application submission can distinguish visible sections from required sections.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

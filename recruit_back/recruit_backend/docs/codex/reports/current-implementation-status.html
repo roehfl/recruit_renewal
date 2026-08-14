@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recruit Backend Current Implementation Status</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f4f7fb; line-height: 1.55; }
+    header { background: #142f47; color: #fff; padding: 34px 42px; }
+    main { max-width: 1220px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 22px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d8e1eb; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e7edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #edf2f7; padding: 2px 5px; border-radius: 4px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .partial { background: #fff0c2; color: #765300; }
+    .pending { background: #f3e7cc; color: #7a4b00; }
+    .blocked { background: #f4d7da; color: #842029; }
+    .muted { background: #e8edf2; color: #536171; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d8e1eb; border-radius: 8px; padding: 16px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .section { margin-top: 24px; }
+    .small { font-size: 13px; color: #526173; }
+    @media (max-width: 860px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>Shinyoung Recruit Backend</div>
+  <h1>Current Implementation Status</h1>
+  <span class="badge done">Status Snapshot</span>
+  <span class="badge muted">Generated: 2026-05-27</span>
+</header>
+
+<main>
+  <section class="summary">
+    <div class="card">
+      <h2>Summary</h2>
+      <p>The backend has moved beyond scaffold work. Job postings, stages, applications, detailed application sections, questions/answers, stage results, attachments, and required attachment policy are implemented and documented.</p>
+      <p>Phase 04 Interview Scheduling is complete through stabilization. Phase 05 Application Form Page Layout is complete through all 5 slices (05a~05e).</p>
+      <p>Phase 06 Interview Evaluation design is complete. Phase 06a (InterviewEvaluation domain: entity, enums, repository, 27 tests) is implemented. The next step is Phase 06b (admin initialize + interviewer evaluation write).</p>
+    </div>
+    <div class="card">
+      <h2>Overall State</h2>
+      <p><span class="badge done">JobPosting complete</span></p>
+      <p><span class="badge done">Application core complete</span></p>
+      <p><span class="badge done">StageResult complete</span></p>
+      <p><span class="badge done">Attachment lifecycle complete</span></p>
+      <p><span class="badge done">Phase 04a domain complete</span></p>
+      <p><span class="badge done">Phase 04b admin API complete</span></p>
+      <p><span class="badge done">Phase 04c applicant read complete</span></p>
+      <p><span class="badge done">Phase 04d interviewer read complete</span></p>
+      <p><span class="badge done">Phase 04e stabilization complete</span></p>
+      <p><span class="badge done">Phase 05 layout complete (all slices)</span></p>
+      <p><span class="badge done">Phase 06 evaluation design complete</span></p>
+      <p><span class="badge partial">Auth/authorization partially hardened</span></p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Completed Implementation Scope</h2>
+    <table>
+      <tr><th>Area</th><th>Status</th><th>Current implementation</th><th>Primary docs/API</th></tr>
+      <tr>
+        <td>Common foundation</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Common response, exception handling, JPA auditing, crypto/hash baseline, H2 test baseline.</td>
+        <td><code>ApiResponse</code>, <code>PageResponse</code>, <code>GlobalExceptionHandler</code></td>
+      </tr>
+      <tr>
+        <td>Auth baseline</td>
+        <td><span class="badge partial">Partial</span></td>
+        <td>Session login/logout/me, applicant DB auth, employee LDAP/JIT structure.</td>
+        <td><code>/auth/login</code>, <code>/auth/me</code></td>
+      </tr>
+      <tr>
+        <td>Menu and notice</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Menu tree/detail/breadcrumb, admin menu create/update, notice list/detail/create.</td>
+        <td><code>/menu/**</code>, <code>/board/notices</code></td>
+      </tr>
+      <tr>
+        <td>Job posting</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Admin CRUD, publish/close, job positions, display policy, public list/detail filtering and sorting.</td>
+        <td><code>/admin/job-postings</code>, <code>/job-postings</code></td>
+      </tr>
+      <tr>
+        <td>Application form policy</td>
+        <td><span class="badge done">Complete</span></td>
+        <td><code>ApplicationFormConfig.useXxx</code> and <code>requireXxx</code> split, public required policy, submit/dashboard integration.</td>
+        <td><code>phase-03k-2</code></td>
+      </tr>
+      <tr>
+        <td>Stage and StageResult</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Stage CRUD/reorder/status commands, StageResult initialize/list/update/bulk/correction, applicant result read.</td>
+        <td><code>/admin/job-postings/{id}/stages</code>, <code>/admin/stages/{id}/results</code></td>
+      </tr>
+      <tr>
+        <td>Application flow</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Create, read, my list, dashboard, draft update, final submit, withdraw, admin application read.</td>
+        <td><code>/applications</code>, <code>/applications/me</code>, <code>/applications/{id}/dashboard</code></td>
+      </tr>
+      <tr>
+        <td>Application detail sections</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Education, career, certificate, language, military, award, gap period, admin lazy section read.</td>
+        <td><code>/applications/{id}/educations</code> and related section APIs</td>
+      </tr>
+      <tr>
+        <td>Question and answer</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Question templates, posting questions, answer save/read, submit validation, admin answer read.</td>
+        <td><code>/admin/question-templates</code>, <code>/applications/{id}/answers</code></td>
+      </tr>
+      <tr>
+        <td>Attachment lifecycle</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Metadata, physical upload, applicant/admin download, applicant/admin soft delete, storage health dry-run.</td>
+        <td><code>/applications/{id}/attachments</code>, <code>/admin/attachments/storage-health/scan</code></td>
+      </tr>
+      <tr>
+        <td>Attachment required policy</td>
+        <td><span class="badge done">Complete</span></td>
+        <td>Per-posting attachment requirements, DRAFT-only replace-all, public safe exposure, dashboard/submit integration.</td>
+        <td><code>/admin/job-postings/{id}/attachment-requirements</code>, <code>phase-03i-5-2</code></td>
+      </tr>
+      <tr>
+        <td>Application form page layout domain</td>
+        <td><span class="badge done">05a complete</span></td>
+        <td><code>ApplicationFormPage</code>, <code>ApplicationFormPageItem</code>, layout section enum values, repositories, validator, section policy helper, and default factory.</td>
+        <td><code>phase-05a-application-form-layout-domain</code></td>
+      </tr>
+      <tr>
+        <td>Interview scheduling domain</td>
+        <td><span class="badge done">04a complete</span></td>
+        <td><code>Interview</code>, <code>InterviewParticipant</code>, four enums, repositories, entity/repository tests.</td>
+        <td><code>phase-04a-interview-scheduling-domain</code></td>
+      </tr>
+      <tr>
+        <td>Interview schedule admin management</td>
+        <td><span class="badge done">04b complete</span></td>
+        <td>Admin list/detail, DRAFT create/update, participant replacement, confirm/cancel commands, eligibility and collision guards.</td>
+        <td><code>phase-04b-admin-interview-schedule-management</code></td>
+      </tr>
+      <tr>
+        <td>Applicant interview schedule read</td>
+        <td><span class="badge done">04c complete</span></td>
+        <td>Applicant-owned list/detail, DRAFT hiding, CONFIRMED/CANCELLED exposure, candidate assignment and ownership guards, applicant-safe response.</td>
+        <td><code>phase-04c-applicant-interview-read</code></td>
+      </tr>
+      <tr>
+        <td>Interviewer interview schedule read</td>
+        <td><span class="badge done">04d complete</span></td>
+        <td>Interviewer-owned list/detail, DRAFT hiding, CONFIRMED/CANCELLED exposure, assignment guard, assigned candidate detail list, interviewer-safe response.</td>
+        <td><code>phase-04d-interviewer-interview-read</code></td>
+      </tr>
+      <tr>
+        <td>Interview scheduling stabilization</td>
+        <td><span class="badge done">04e complete</span></td>
+        <td>Cross-slice cancellation regression, participant lifecycle hardening, StageResult non-mutation regression, authorization matrix review.</td>
+        <td><code>phase-04e-interview-scheduling-stabilization</code></td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Phase 04 Status</h2>
+    <div class="two">
+      <div class="card">
+        <h3>Completed</h3>
+        <p><span class="badge done">Phase 04 design</span></p>
+        <ul class="list">
+          <li>Interview schedule/group design.</li>
+          <li>Candidate and interviewer participant assignment model.</li>
+          <li>Admin, applicant, and interviewer API draft.</li>
+          <li>Visibility, eligibility, stage status, collision, and <code>StageResult</code> non-mutation policies.</li>
+        </ul>
+        <p><span class="badge done">Phase 04a implementation</span></p>
+        <ul class="list">
+          <li><code>Interview</code> and <code>InterviewParticipant</code> entities.</li>
+          <li>Interview method/status and participant role/status enums.</li>
+          <li>Repositories and targeted tests.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Completed Slices</h3>
+        <p><span class="badge done">Phase 04b - Admin Interview Schedule Management</span></p>
+        <ul class="list">
+          <li>Admin create/update/read service and API.</li>
+          <li>DRAFT participant replacement.</li>
+          <li>Confirm/cancel commands.</li>
+          <li><code>StageType</code> allowlist and <code>StageStatus</code> guards.</li>
+          <li>Candidate eligibility checks.</li>
+          <li>Duplicate assignment and confirmed-schedule collision checks.</li>
+          <li><code>StageResult</code> non-mutation regression.</li>
+        </ul>
+        <p><span class="badge done">Phase 04c - Applicant Interview Read</span></p>
+        <ul class="list">
+          <li>Applicant-owned schedule read API.</li>
+          <li>Hide <code>DRAFT</code> schedules.</li>
+          <li>Return only assigned <code>CONFIRMED</code> or <code>CANCELLED</code> schedules.</li>
+          <li>Hide other candidates, interviewer lists, and admin memo.</li>
+        </ul>
+        <p><span class="badge done">Phase 04d - Interviewer Interview Read</span></p>
+        <ul class="list">
+          <li>Interviewer-owned assigned schedule read API.</li>
+          <li>Hide <code>DRAFT</code> schedules.</li>
+          <li>Return only assigned <code>CONFIRMED</code> or <code>CANCELLED</code> schedules.</li>
+          <li>Hide admin memo and <code>StageResult</code> internals.</li>
+          <li>Expose assigned candidate list in detail only.</li>
+        </ul>
+        <p><span class="badge done">Phase 04e - Interview Scheduling Stabilization</span></p>
+        <ul class="list">
+          <li>Cross-slice API and response consistency.</li>
+          <li>Cancelled schedule and participant lifecycle edge-case tests.</li>
+          <li>Admin/applicant/employee/interviewer authorization matrix review.</li>
+          <li>Clean handoff to <code>Phase 05 - Application Form Page Layout</code>.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Partial and Operational Areas</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Security/Auth</h3>
+        <p><span class="badge partial">Partial</span></p>
+        <ul class="list">
+          <li>URL authorization and JSON 401/403 exist.</li>
+          <li>Operating role matrix and interviewer-specific roles remain.</li>
+          <li>LDAP/role mapping production validation remains.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>DB Operations</h3>
+        <p><span class="badge partial">Manual schema needed</span></p>
+        <ul class="list">
+          <li>H2 generated schema and tests are available.</li>
+          <li>No migration framework is active.</li>
+          <li>Persistent MariaDB changes require manual DDL through the deployment process.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Attachment Lifecycle</h3>
+        <p><span class="badge partial">Partial</span></p>
+        <ul class="list">
+          <li>Upload/download/delete/scan are implemented.</li>
+          <li>Repair/cleanup commit command remains.</li>
+          <li>Separate deletion history table remains undecided.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Remaining Major Work</h2>
+    <table>
+      <tr><th>Priority</th><th>Area</th><th>Remaining work</th><th>Recommended phase</th></tr>
+      <tr>
+        <td>1</td>
+        <td>Interview evaluation</td>
+        <td>06a domain complete (<code>InterviewEvaluation</code> entity, enums, repository, 27 tests). Remaining: interviewer save/submit, admin initialize/read/reopen, StageResult non-mutation guarantee (06b~06e).</td>
+        <td>Phase 06b</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Export/PDF/statistics</td>
+        <td>Application and result export, application PDF, recruitment statistics.</td>
+        <td>Phase 07</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>CommonCode and school master</td>
+        <td>Common code management, school master import/search, application-level validation.</td>
+        <td>Phase 08</td>
+      </tr>
+      <tr>
+        <td>Backlog</td>
+        <td>Messaging and privacy/audit/retention</td>
+        <td><code>MessageBatch</code>, <code>MessageSendLog</code>, provider adapter boundary, retention policy, purge history, access/change audit.</td>
+        <td>Unnumbered backlog</td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Recent Verification</h2>
+    <div class="card">
+      <p>Latest known full verification from implementation records:</p>
+      <p><code>AES_SECRET_KEY=&lt;test-example-key&gt; .\gradlew.bat clean test --no-daemon</code> - <span class="badge done">BUILD SUCCESSFUL</span> on 2026-05-22.</p>
+      <p>Phase 04a verification used targeted tests only. Full <code>test</code> and <code>clean test</code> were intentionally not run because <code>instruction.md</code> forbids full suite execution for that slice.</p>
+      <p>Phase 04a targeted entity, repository, and minimal related regression tests all passed on 2026-05-26.</p>
+      <p>Phase 04b targeted service, controller, and repository tests passed on 2026-05-26. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> limited this slice to targeted verification.</p>
+      <p>Phase 04c targeted service, controller, repository, and admin scheduling regression tests passed on 2026-05-26. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> limited this slice to targeted verification.</p>
+      <p>Phase 04d targeted service, controller, repository, applicant-read regression, admin scheduling regression, and current employee resolver tests passed on 2026-05-26. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> limited this slice to targeted verification.</p>
+      <p>Phase 04e targeted stabilization, admin authorization matrix, applicant/interviewer regression, repository, scheduling service, and current employee resolver tests passed on 2026-05-26. Initial sandbox execution failed because Gradle wrapper network download was blocked; the same targeted command passed after approved escalation. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> limited Phase 04 work to targeted verification.</p>
+      <p>Phase 05a targeted entity, repository, validator, section policy, and default factory tests passed on 2026-05-26. Initial sandbox execution failed because Gradle wrapper network download was blocked, and one retry was blocked by a stale Gradle test output lock from the timeout; the final targeted command passed after clearing the daemon. Full <code>test</code> and <code>clean test</code> were not run because <code>instruction.md</code> forbids full-suite execution for Phase 05a.</p>
+      <p>Phase 05b~05e targeted tests passed on 2026-05-27. Phase 05 (Application Form Page Layout) is now complete through all 5 slices. Layout tests: 72 total. JobPostingServiceTest publish guard tests added.</p>
+      <p>Phase 06 Interview Evaluation design completed on 2026-05-27. Documentation only; no Gradle tests required.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 04 Interview Scheduling Design</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>Shinyoung Recruit Backend</div>
+  <h1>Phase 04 - Interview Scheduling Design</h1>
+  <span class="badge done">Design Completed</span>
+  <span class="badge muted">Generated: 2026-05-26</span>
+</header>
+
+<main>
+  <section class="summary">
+    <div class="card">
+      <h2>Executive Summary</h2>
+      <p>Phase 04 is defined as Interview Scheduling, not a DB-operations baseline phase.</p>
+      <p>The design introduces <code>Interview</code> and <code>InterviewParticipant</code> as the schedule and assignment model for candidates and interviewers.</p>
+      <p>The responsibility is limited to who attends which interview, when, where, and in which group. Interview Scheduling must not become an alternative result announcement channel.</p>
+      <p>Interview scoring, result publication, messaging, Excel, PDF, and frontend work are excluded. Admin confirmation may read <code>StageResult</code> only to verify candidate eligibility; applicant schedule reads do not expose or mutate <code>StageResult</code>.</p>
+      <p>The next implementation can start with a domain slice while keeping <code>StageResult</code> unchanged.</p>
+    </div>
+    <div class="card">
+      <h2>Status</h2>
+      <p><span class="badge done">Markdown Added</span></p>
+      <p><span class="badge done">HTML Report Added</span></p>
+      <p><span class="badge info">Documentation Only</span></p>
+      <p><span class="badge pending">Java Pending</span></p>
+      <p><span class="badge out">Evaluation Out Of Scope</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Scope Cards</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Completed Scope</h3>
+        <p><span class="badge done">Completed</span></p>
+        <ul class="list">
+          <li>Interview schedule/group domain design.</li>
+          <li>Candidate and interviewer participant assignment design.</li>
+          <li>Admin, applicant, and interviewer API drafts.</li>
+          <li>Visibility, status, candidate eligibility, stage guard, participant lifecycle, and confirmation validation policies.</li>
+          <li>Roadmap/status alignment for Phase 04.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Not Implemented</h3>
+        <p><span class="badge pending">Pending</span></p>
+        <ul class="list">
+          <li>No Java entity, repository, service, controller, DTO, or test code.</li>
+          <li>No database migration or DDL file.</li>
+          <li>No runtime API behavior changed.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Out Of Scope</h3>
+        <p><span class="badge out">Excluded</span></p>
+        <ul class="list">
+          <li>Interview evaluation and scoring.</li>
+          <li><code>StageResult</code> mutation or announcement.</li>
+          <li>Messages, Excel, PDF, calendar integration, frontend/static assets.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Changed Files</h2>
+    <table>
+      <tr><th>File</th><th>Change</th></tr>
+      <tr><td><code>docs/codex/design/phase-04-interview-scheduling-design.md</code></td><td>New Codex reference design document.</td></tr>
+      <tr><td><code>docs/codex/reports/phase-04-interview-scheduling-design.html</code></td><td>New self-contained human-readable report.</td></tr>
+      <tr><td><code>docs/codex/06-implementation-roadmap.md</code></td><td>Phase 04 aligned to Interview Scheduling and later phases reordered.</td></tr>
+      <tr><td><code>docs/codex/07-implementation-history.md</code></td><td>Phase 04 design entry added and DB-operations phase recommendation removed.</td></tr>
+      <tr><td><code>docs/codex/01-project-context.md</code></td><td>Remaining large-scope list adjusted to remove the DB-operations phase entry.</td></tr>
+      <tr><td><code>docs/codex/reports/current-implementation-status.html</code></td><td>Current status report updated to show Phase 04 as Interview Scheduling.</td></tr>
+      <tr><td><code>docs/codex/implementation/phase-03i-5-2-attachment-required-policy.md</code></td><td>Old next-phase DB-operations recommendation removed while keeping manual DDL facts.</td></tr>
+      <tr><td><code>docs/codex/implementation/phase-03k-2-application-form-required-policy.md</code></td><td>Old next-phase DB-operations recommendation removed while keeping manual DDL facts.</td></tr>
+      <tr><td><code>docs/codex/reports/phase-03i-5-2-attachment-required-policy.html</code></td><td>Human report next-phase recommendation aligned.</td></tr>
+      <tr><td><code>docs/codex/reports/phase-03k-2-application-form-required-policy.html</code></td><td>Human report next-phase recommendation aligned.</td></tr>
+      <tr><td><code>docs/codex/reports/phase-03i-5-attachment-required-policy-design.html</code></td><td>Manual DDL note kept factual without DB-operations phase recommendation.</td></tr>
+      <tr><td><code>instruction.md</code></td><td>Review source read and reflected into Phase 04 design.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Architecture Domain</h2>
+    <div class="two">
+      <div class="card">
+        <h3>Interview</h3>
+        <p><span class="badge info">Entity Candidate</span></p>
+        <p>Owns schedule, group, time range, method, place, online meeting URL, admin memo, and lifecycle status.</p>
+        <ul class="list">
+          <li>Connected to <code>JobPosting</code> and <code>Stage</code>.</li>
+          <li>Allowed stage types: <code>FIRST_INTERVIEW</code>, <code>SECOND_INTERVIEW</code>, <code>FINAL_INTERVIEW</code>.</li>
+          <li>Allowed stage statuses for creation/confirmation: <code>READY</code>, <code>IN_PROGRESS</code>.</li>
+          <li>Status: <code>DRAFT</code>, <code>CONFIRMED</code>, <code>CANCELLED</code>.</li>
+          <li><code>groupName</code> is required; single-group interviews can use a default such as <code>1조</code>.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>InterviewParticipant</h3>
+        <p><span class="badge info">Entity Candidate</span></p>
+        <p>Owns assignment rows for both candidates and interviewers.</p>
+        <ul class="list">
+          <li><code>CANDIDATE</code>: requires <code>jobApplication</code>, no <code>employee</code>.</li>
+          <li><code>INTERVIEWER</code>: requires <code>employee</code>, no <code>jobApplication</code>.</li>
+          <li>First implementation uses <code>ASSIGNED</code>; <code>CANCELLED</code> is reserved for later partial participant cancellation/amendment.</li>
+          <li>DRAFT replacement may delete and recreate participant rows.</li>
+          <li>Schedule cancellation keeps existing participants <code>ASSIGNED</code>.</li>
+        </ul>
+      </div>
+    </div>
+    <pre>JobPosting
+  └─ Stage
+      └─ Interview
+          ├─ InterviewParticipant(CANDIDATE) -> JobApplication -> Applicant
+          └─ InterviewParticipant(INTERVIEWER) -> Employee
+
+StageResult remains separate and is not mutated by Interview Scheduling.</pre>
+  </section>
+
+  <section>
+    <h2>Domain Fields</h2>
+    <table>
+      <tr><th>Class</th><th>Key Fields</th><th>Notes</th></tr>
+      <tr>
+        <td><code>Interview</code></td>
+        <td><code>jobPosting</code>, <code>stage</code>, <code>groupName</code>, <code>startDateTime</code>, <code>endDateTime</code>, <code>method</code>, <code>locationName</code>, <code>roomName</code>, <code>onlineMeetingUrl</code>, <code>memo</code>, <code>status</code></td>
+        <td>Schedule and group root. <code>groupName</code> is required. <code>DRAFT</code> is admin-only.</td>
+      </tr>
+      <tr>
+        <td><code>InterviewParticipant</code></td>
+        <td><code>interview</code>, <code>role</code>, <code>jobApplication</code>, <code>employee</code>, <code>participantStatus</code>, <code>sortOrder</code></td>
+        <td>One table for candidate and interviewer assignments with mutually exclusive references. <code>CANCELLED</code> participant status is reserved for a later phase.</td>
+      </tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>API List</h2>
+    <h3>Admin</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Request</th><th>Response</th></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/job-postings/{jobPostingId}/interviews?stageId=&amp;status=&amp;from=&amp;to=</code></td><td>List schedules for one posting.</td><td>Query parameters</td><td>Admin summary list</td></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/interviews/{interviewId}</code></td><td>Read schedule detail.</td><td>None</td><td>Admin detail with participants</td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/job-postings/{jobPostingId}/interviews</code></td><td>Create DRAFT schedule.</td><td><code>InterviewCreateRequest</code></td><td>Created id/detail</td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/interviews/{interviewId}</code></td><td>Update DRAFT schedule.</td><td><code>InterviewUpdateRequest</code></td><td>Updated detail</td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/interviews/{interviewId}/participants</code></td><td>Replace assignment set.</td><td><code>InterviewParticipantReplaceRequest</code></td><td>Updated participants</td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/interviews/{interviewId}/confirm</code></td><td>Confirm after validation.</td><td>Optional memo</td><td>Confirmed detail</td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/interviews/{interviewId}/cancel</code></td><td>Cancel schedule.</td><td>Optional reason</td><td>Cancelled detail</td></tr>
+    </table>
+
+    <h3>Applicant And Interviewer</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Visibility</th></tr>
+      <tr><td><code>GET</code></td><td><code>/applicant/applications/{applicationId}/interviews</code></td><td>Applicant own application interview schedules.</td><td>Assigned <code>CONFIRMED</code>/<code>CANCELLED</code> only; no other candidates, interviewer list, admin memo, or <code>StageResult</code> internals.</td></tr>
+      <tr><td><code>GET</code></td><td><code>/interviewer/interviews?from=&amp;to=&amp;jobPostingId=&amp;stageId=</code></td><td>Current employee assigned interview list.</td><td>Assigned <code>CONFIRMED</code>/<code>CANCELLED</code> only.</td></tr>
+      <tr><td><code>GET</code></td><td><code>/interviewer/interviews/{interviewId}</code></td><td>Current employee assigned interview detail.</td><td>May include candidate list; no admin memo.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Validation Rules</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Confirmation Guards</h3>
+        <ul class="list">
+          <li>At least one assigned candidate.</li>
+          <li>At least one assigned interviewer.</li>
+          <li>Valid time range.</li>
+          <li>Same job posting and stage ownership.</li>
+          <li>Candidate eligibility before admin confirmation.</li>
+          <li>No duplicate assignment or confirmed schedule collision.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Stage Guards</h3>
+        <ul class="list">
+          <li>Stage type must be <code>FIRST_INTERVIEW</code>, <code>SECOND_INTERVIEW</code>, or <code>FINAL_INTERVIEW</code>.</li>
+          <li>Creation and confirmation require stage status <code>READY</code> or <code>IN_PROGRESS</code>.</li>
+          <li><code>RESULT_ANNOUNCED</code> and <code>CLOSED</code> reject creation, participant replacement, and confirmation.</li>
+          <li>Cancellation is allowed until the stage becomes <code>CLOSED</code>.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Candidate Eligibility</h3>
+        <ul class="list">
+          <li>Application must belong to the same posting.</li>
+          <li>Application status must be <code>SUBMITTED</code>.</li>
+          <li>If there is a previous stage, the candidate must have passed it.</li>
+          <li>Applicant-visible schedules require confirmed/cancelled status, owned candidate assignment, and no <code>StageResult</code> field exposure.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="grid" style="margin-top:14px;">
+      <div class="card">
+        <h3>Collision Check</h3>
+        <ul class="list">
+          <li>Target <code>Interview.status = CONFIRMED</code>.</li>
+          <li>Target <code>participantStatus = ASSIGNED</code>.</li>
+          <li>Same candidate application or same interviewer employee.</li>
+          <li>Exclude the current interview itself.</li>
+          <li>Overlap: existing start &lt; requested end and requested start &lt; existing end.</li>
+          <li>Ignore <code>CANCELLED</code> schedules.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Participant Lifecycle</h3>
+        <ul class="list">
+          <li>DRAFT replacement may delete and recreate rows.</li>
+          <li>Confirmed schedule cancellation changes only <code>Interview.status</code>.</li>
+          <li>Existing participant rows remain <code>ASSIGNED</code>.</li>
+          <li><code>InterviewParticipantStatus.CANCELLED</code> is reserved for a later partial cancellation/amendment phase.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Status Rules</h3>
+        <ul class="list">
+          <li><code>DRAFT</code> can update and replace participants.</li>
+          <li><code>DRAFT</code> can become <code>CONFIRMED</code>.</li>
+          <li><code>CONFIRMED</code> can become <code>CANCELLED</code>.</li>
+          <li><code>CONFIRMED</code> participant replacement is rejected.</li>
+          <li><code>CANCELLED</code> is terminal for the first slice.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px;">
+      <h3>Method Rules</h3>
+      <p><code>IN_PERSON</code> requires location. <code>ONLINE</code> requires online meeting URL. <code>HYBRID</code> requires both. <code>OTHER</code> allows a free-form policy.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Database Candidates</h2>
+    <table>
+      <tr><th>Table</th><th>Candidate</th><th>Purpose</th></tr>
+      <tr><td><code>interview</code></td><td><code>index(job_posting_id, stage_id, status)</code></td><td>Admin list and status filtering.</td></tr>
+      <tr><td><code>interview</code></td><td><code>index(start_date_time, end_date_time)</code></td><td>Time-range and collision queries.</td></tr>
+      <tr><td><code>interview_participant</code></td><td><code>unique(interview_id, role, job_application_id)</code></td><td>Candidate duplicate prevention where nullable FK semantics allow it.</td></tr>
+      <tr><td><code>interview_participant</code></td><td><code>unique(interview_id, role, employee_id)</code></td><td>Interviewer duplicate prevention where nullable FK semantics allow it.</td></tr>
+      <tr><td><code>interview_participant</code></td><td><code>index(job_application_id)</code>, <code>index(employee_id)</code></td><td>Assignment lookup and collision checks.</td></tr>
+    </table>
+    <p class="small">Role-specific nullable foreign keys can make DB uniqueness imperfect, so final duplicate protection remains a service responsibility.</p>
+  </section>
+
+  <section>
+    <h2>Test Results</h2>
+    <table>
+      <tr><th>Item</th><th>Result</th></tr>
+      <tr><td>Gradle tests</td><td><span class="badge pending">Not run</span> Documentation-only phase; no Java, test, schema, config, or runtime API changes.</td></tr>
+      <tr><td>Documentation validation</td><td><span class="badge done">Planned</span> Check that Phase 04 is Interview Scheduling and DB operations baseline is not a recommended phase.</td></tr>
+      <tr><td>Future target tests</td><td>Admin service/controller tests, stage status guards, candidate eligibility against visible/passed <code>StageResult</code>, applicant ownership tests, interviewer assignment-only tests, collision validation, participant lifecycle tests, and <code>StageResult</code> non-mutation regression.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Remaining Issues</h2>
+    <div class="card">
+      <p><span class="badge warn">Open Issues</span></p>
+      <ul class="list">
+        <li>Final admin/interviewer role names must align with existing <code>DeptRoleMapping</code>.</li>
+        <li>Before implementation, verify the actual <code>StageType</code> enum again and align with existing Stage tests. As of 2026-05-26, source contains <code>FIRST_INTERVIEW</code>, <code>SECOND_INTERVIEW</code>, and <code>FINAL_INTERVIEW</code>.</li>
+        <li>Confirmed schedule amendment is deferred; first implementation should reject confirmed updates and use cancel/recreate.</li>
+        <li>Message phase must later decide how confirmed/cancelled schedules create message records.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Next Phase</h2>
+    <div class="card">
+      <p><span class="badge info">Recommendation</span></p>
+      <p>Proceed with <code>Phase 04a - Interview Scheduling Domain</code>: add enums, <code>Interview</code>, <code>InterviewParticipant</code>, repositories, and service validation tests for ownership, stage type allowlist, stage status guards, candidate eligibility, applicant visibility, participant role exclusivity, collision checks, and time validity. Keep <code>StageResult</code> unchanged.</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>
