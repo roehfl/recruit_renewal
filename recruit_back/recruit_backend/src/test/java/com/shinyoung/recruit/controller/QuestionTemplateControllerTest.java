@@ -108,6 +108,17 @@ class QuestionTemplateControllerTest {
     }
 
     @Test
+    void activate_question_template_success() throws Exception {
+        QuestionTemplateResponse template = createTemplate();
+        questionTemplateService.deactivateTemplate(template.templateId());
+
+        mockMvc.perform(post("/api/admin/question-templates/{templateId}/activate", template.templateId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.active").value(true));
+    }
+
+    @Test
     void validation_failure_returns_api_response() throws Exception {
         mockMvc.perform(post("/api/admin/question-templates")
                         .contentType(MediaType.APPLICATION_JSON)

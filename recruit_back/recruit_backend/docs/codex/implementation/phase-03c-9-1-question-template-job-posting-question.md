@@ -12,7 +12,7 @@ This phase intentionally stops before applicant answers. `ApplicationAnswer`, ap
 - `QuestionAnswerType` enum
 - `QuestionTemplate` entity and repository
 - `JobPostingQuestion` entity and repository
-- Question template create/read/update/deactivate service and controller
+- Question template create/read/update/deactivate/activate service and controller
 - Job posting question create/read/update/reorder/deactivate service and controller
 - Template-based question creation with snapshot copy and request override
 - Direct job posting question creation
@@ -72,18 +72,18 @@ This phase intentionally stops before applicant answers. `ApplicationAnswer`, ap
 |---|---|---|---|---|---|
 | `enumeration` | `QuestionCategory` | Enum | Categorizes question intent | `SELF_INTRODUCTION`, `GENERAL`, `JOB_SPECIFIC`, `ETC` | Display labels remain outside enum |
 | `enumeration` | `QuestionAnswerType` | Enum | Defines initial answer input type | `SHORT_TEXT`, `LONG_TEXT` | Choice/file types deferred |
-| `domain.entity` | `QuestionTemplate` | Entity | Global question bank | `create`, `update`, `deactivate` | No reverse collection |
+| `domain.entity` | `QuestionTemplate` | Entity | Global question bank | `create`, `update`, `deactivate`, `activate` | No reverse collection |
 | `domain.entity` | `JobPostingQuestion` | Entity | JobPosting-specific question snapshot | `createFromTemplate`, `createDirect`, `update`, `changeOrder`, `deactivate` | No `JobPosting` collection |
 | `domain.repository` | `QuestionTemplateRepository` | Repository | Template persistence | `findByActive`, `existsByIdAndActiveTrue` | Page-based list |
 | `domain.repository` | `JobPostingQuestionRepository` | Repository | JobPosting question persistence | sorted finders, sortOrder exists checks | Active duplicate sort order enforced in service |
 | `dto.request` | `QuestionTemplateCreateRequest` | Request DTO | Template create input | validation annotations | `active` not accepted |
-| `dto.request` | `QuestionTemplateUpdateRequest` | Request DTO | Template update input | validation annotations | Deactivate is separate command |
+| `dto.request` | `QuestionTemplateUpdateRequest` | Request DTO | Template update input | validation annotations | Deactivate and activate are separate commands |
 | `dto.response` | `QuestionTemplateResponse` | Response DTO | Template response | `from(QuestionTemplate)` | Includes active and audit dates |
 | `dto.request` | `JobPostingQuestionCreateRequest` | Request DTO | JobPosting question create input | nullable template/override fields | Branch validation is in service |
 | `dto.request` | `JobPostingQuestionUpdateRequest` | Request DTO | Snapshot update input | required snapshot fields | Template reference is not changed |
 | `dto.request` | `JobPostingQuestionReorderRequest` | Request DTO | Reorder command input | `questions` | Requires non-empty list |
 | `dto.response` | `JobPostingQuestionResponse` | Response DTO | JobPosting question response | `from(JobPostingQuestion)` | Exposes `questionTemplateId`, not template body |
-| `service` | `QuestionTemplateService` | Service | Template policy and CRUD | `getTemplates`, `createTemplate`, `updateTemplate`, `deactivateTemplate` | `SHORT_TEXT <= 500`, `LONG_TEXT <= 5000` |
+| `service` | `QuestionTemplateService` | Service | Template policy and CRUD | `getTemplates`, `createTemplate`, `updateTemplate`, `deactivateTemplate`, `activateTemplate` | `SHORT_TEXT <= 500`, `LONG_TEXT <= 5000` |
 | `service` | `JobPostingQuestionService` | Service | JobPosting question policy | create/update/reorder/deactivate | DRAFT-only mutation |
 | `controller` | `QuestionTemplateController` | Controller | Template admin API | GET/POST mappings | No PUT/DELETE |
 | `controller` | `JobPostingQuestionController` | Controller | JobPosting question admin API | GET/POST mappings | Delete command is soft delete |
@@ -108,7 +108,9 @@ This phase intentionally stops before applicant answers. `ApplicationAnswer`, ap
 - `helperText` is nullable.
 - `active` defaults to true.
 - Deactivate uses `active=false`.
-- Update does not reactivate or deactivate. Deactivation is a separate command.
+- Activate uses `active=true` and only applies to an inactive template. Calling it on an active template is rejected with `InvalidQuestionTemplateException` (400).
+- Deactivate stays idempotent; only activate validates the current state.
+- Update does not reactivate or deactivate. Activation and deactivation are separate commands.
 - Inactive template detail lookup is allowed, but inactive templates cannot be used to create new job posting questions.
 
 ## JobPostingQuestion Policy
@@ -174,6 +176,7 @@ This phase intentionally stops before applicant answers. `ApplicationAnswer`, ap
 | POST | `/admin/question-templates` | Create template |
 | POST | `/admin/question-templates/{templateId}` | Update template |
 | POST | `/admin/question-templates/{templateId}/deactivate` | Deactivate template |
+| POST | `/admin/question-templates/{templateId}/activate` | Activate inactive template (400 when already active) |
 | GET | `/admin/job-postings/{jobPostingId}/questions` | JobPosting question list |
 | POST | `/admin/job-postings/{jobPostingId}/questions` | Create direct or template-based question |
 | POST | `/admin/job-postings/{jobPostingId}/questions/{questionId}` | Update question snapshot |
@@ -196,6 +199,7 @@ This phase intentionally stops before applicant answers. `ApplicationAnswer`, ap
 ## Test Coverage
 
 - Template create/list/filter/detail/update/deactivate
+- Template activate success, already-active rejection, and not-found rejection
 - Template page validation
 - Service direct-call null request validation
 - Template required field and max length policy
@@ -225,11 +229,30 @@ This phase intentionally stops before applicant answers. `ApplicationAnswer`, ap
 
 Commands were run with `AES_SECRET_KEY` set in the local PowerShell environment.
 
+## Follow-up Change 2026-08-19: Template Activate Command
+
+The phase originally shipped without a way to restore an inactive template. `POST /admin/question-templates/{templateId}/activate` closes that gap and keeps the existing command-style endpoint convention (`publish`, `close`, `reopen`, `deactivate`) instead of merging both transitions into one toggle endpoint.
+
+| Path | Type | Notes |
+|---|---|---|
+| `src/main/java/com/shinyoung/recruit/domain/entity/QuestionTemplate.java` | Modified | `activate()` sets `active=true` |
+| `src/main/java/com/shinyoung/recruit/service/QuestionTemplateService.java` | Modified | `activateTemplate` + `validateTemplateInactive` |
+| `src/main/java/com/shinyoung/recruit/controller/QuestionTemplateController.java` | Modified | `POST /{templateId}/activate` |
+| `src/test/java/com/shinyoung/recruit/service/QuestionTemplateServiceTest.java` | Modified | Activate success/already-active/not-found tests |
+| `src/test/java/com/shinyoung/recruit/controller/QuestionTemplateControllerTest.java` | Modified | Activate API success test |
+| `../../api-contract.md` | Modified | Question template screen contract section |
+
+| Command | Result |
+|---|---|
+| `.\gradlew.bat test --tests com.shinyoung.recruit.service.QuestionTemplateServiceTest --tests com.shinyoung.recruit.controller.QuestionTemplateControllerTest --tests com.shinyoung.recruit.service.JobPostingQuestionServiceTest --no-daemon` | Success (41 tests, 0 failures) |
+
+`JobPostingQuestion` deliberately gets no activate command in this change. A deactivated question keeps its `sortOrder`, and the duplicate check only covers active rows (`existsByJobPostingIdAndActiveTrueAndSortOrder`), so reactivation can collide with a live question. That needs a sortOrder resolution policy first.
+
 ## Known Limitations
 
 - No DB unique constraint for active `sortOrder`; service validation enforces it.
 - No title search API for templates.
-- No reactivation command for inactive templates.
+- No reactivation command for inactive job posting questions; blocked on the `sortOrder` collision policy above.
 - No revision/reopen policy for published job posting question changes.
 - No answer storage or submit answer validation yet.
 

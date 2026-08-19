@@ -99,6 +99,21 @@ public class QuestionTemplateService {
         return QuestionTemplateResponse.from(template);
     }
 
+    @Transactional
+    public QuestionTemplateResponse activateTemplate(Long templateId) {
+        QuestionTemplate template = findTemplate(templateId);
+        validateTemplateInactive(template);
+
+        template.activate();
+        return QuestionTemplateResponse.from(template);
+    }
+
+    private void validateTemplateInactive(QuestionTemplate template) {
+        if (Boolean.TRUE.equals(template.getActive())) {
+            throw new InvalidQuestionTemplateException("Active template cannot be activated again.");
+        }
+    }
+
     private QuestionTemplate findTemplate(Long templateId) {
         return questionTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new QuestionTemplateNotFoundException("QuestionTemplate not found. id=" + templateId));

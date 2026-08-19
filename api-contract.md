@@ -454,3 +454,42 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
   - 수험번호는 `applicationId`로 대체. 파생 필드는 페이지 단위 배치 조회 4회로 채움(N+1 없음)
 - 오류: 400(page/size 범위 위반, enum 값 오류), 404(`jobPostingId` 미존재)
 - 제외 확정: 성별(도메인 없음), 연락처(암호화 컬럼 검색 불가), 채용구분 연도
+
+### 화면: 관리자 질문 템플릿 (전역 질문 은행)
+
+- 프론트: (미구현) 질문 템플릿 관리 화면 + `src/api/questionTemplateApi.ts`
+- 백엔드: `com.shinyoung.recruit.controller.QuestionTemplateController`, `service.QuestionTemplateService`
+- 공통: 모든 경로는 `/api` prefix(`WebMvcConfig.addPathPrefix`) 적용. 삭제는 없고 `active` 플래그 soft disable만 존재(DB row 유지).
+
+#### GET `/api/admin/question-templates`  🔴 백엔드 구현됨 / 프론트 미반영
+
+- 요청(query): `page`(기본 0), `size`(기본 20, 1~100), `active`(optional — 미지정 시 활성·비활성 전체)
+- 응답(200): `ApiResponse<PageResponse<QuestionTemplateResponse>>`
+- `QuestionTemplateResponse`: `{ templateId, title, questionText, helperText, category, answerType, defaultRequired, defaultMaxLength, active, createdAt, updatedAt }`
+
+#### GET `/api/admin/question-templates/{templateId}`  🔴 백엔드 구현됨 / 프론트 미반영
+
+- 응답(200): `ApiResponse<QuestionTemplateResponse>`. 비활성 템플릿도 단건 조회는 허용
+- 오류: 404(미존재)
+
+#### POST `/api/admin/question-templates`, POST `/api/admin/question-templates/{templateId}`  🔴 백엔드 구현됨 / 프론트 미반영
+
+- 생성/수정. 요청: `{ title, questionText, helperText?, category, answerType, defaultRequired, defaultMaxLength }`
+- 요청에 `active` 없음. 활성 상태는 수정 API로 바꿀 수 없고 별도 command로만 전이한다
+- 오류: 400(검증 실패), 404(수정 시 미존재)
+
+#### POST `/api/admin/question-templates/{templateId}/deactivate`  🔴 백엔드 구현됨 / 프론트 미반영
+
+- 비활성화(soft disable). `active=false`로 UPDATE, row 삭제 아님
+- 비활성 템플릿은 신규 공고 질문 생성에 사용할 수 없다(기존 공고 질문 snapshot에는 영향 없음)
+- 응답(200): `ApiResponse<QuestionTemplateResponse>` (`active=false`)
+- 오류: 404(미존재). 이미 비활성인 템플릿 재호출은 통과(멱등)
+
+#### POST `/api/admin/question-templates/{templateId}/activate`  🟡 백엔드 구현·검증 완료(2026-08-19) / 프론트 미반영
+
+- 비활성 템플릿 재활성화. `active=true`로 UPDATE
+- 이미 활성인 템플릿에 호출하면 400(`Active template cannot be activated again.`) — 예외 방식 확정
+- 응답(200): `ApiResponse<QuestionTemplateResponse>` (`active=true`)
+- 오류: 400(이미 활성), 404(미존재)
+- 매핑: front (미구현) ↔ back `QuestionTemplateController.activateTemplate()`
+- 참고: 공고별 질문(`JobPostingQuestion`)에는 activate 명령이 없다. 비활성 시 `sortOrder`가 남아 있고 중복 검사는 active 행만 대상이라, 재활성 시 sortOrder 충돌 해소 정책이 먼저 필요하다

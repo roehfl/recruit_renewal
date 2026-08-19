@@ -100,6 +100,30 @@ class QuestionTemplateServiceTest {
     }
 
     @Test
+    void activate_template_success() {
+        QuestionTemplateResponse created = questionTemplateService.createTemplate(createRequest());
+        questionTemplateService.deactivateTemplate(created.templateId());
+
+        QuestionTemplateResponse activated = questionTemplateService.activateTemplate(created.templateId());
+
+        assertThat(activated.active()).isTrue();
+    }
+
+    @Test
+    void activate_template_fails_when_already_active() {
+        QuestionTemplateResponse created = questionTemplateService.createTemplate(createRequest());
+
+        assertThatThrownBy(() -> questionTemplateService.activateTemplate(created.templateId()))
+                .isInstanceOf(InvalidQuestionTemplateException.class);
+    }
+
+    @Test
+    void activate_template_fails_when_not_found() {
+        assertThatThrownBy(() -> questionTemplateService.activateTemplate(99999L))
+                .isInstanceOf(QuestionTemplateNotFoundException.class);
+    }
+
+    @Test
     void get_template_fails_when_not_found() {
         assertThatThrownBy(() -> questionTemplateService.getTemplate(99999L))
                 .isInstanceOf(QuestionTemplateNotFoundException.class);

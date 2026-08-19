@@ -57,4 +57,9 @@ public class QuestionTemplateController {
     public ResponseEntity<ApiResponse<QuestionTemplateResponse>> deactivateTemplate(@PathVariable Long templateId) {
         return ResponseEntity.ok(ApiResponse.success(questionTemplateService.deactivateTemplate(templateId)));
     }
+
+    @PostMapping("/{templateId}/activate")
+    public ResponseEntity<ApiResponse<QuestionTemplateResponse>> activateTemplate(@PathVariable Long templateId) {
+        return ResponseEntity.ok(ApiResponse.success(questionTemplateService.activateTemplate(templateId)));
+    }
 }

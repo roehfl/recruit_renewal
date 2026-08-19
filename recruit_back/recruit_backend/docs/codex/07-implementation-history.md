@@ -4436,3 +4436,16 @@
 - **수동 DDL 필요**: `docs/codex/ops/role-mapping-user-role-mapping-ddl.sql` (`user_role_mapping` 테이블 + login_id 인덱스)
 - Tests: `RoleMappingServiceTest`, `CustomLdapUserDetailsMapperTest`, `SecurityConfigTest`(권한관리 인가 6건 추가)
 - Documentation: 통합 슬라이스라 recruit/CLAUDE.md §7에 따라 api-contract.md 갱신으로 갈음(HTML 리포트 생략).
+
+## 질문 템플릿 activate 명령 추가 (2026-08-19, Phase 03c-9-1 후속 슬라이스)
+
+- Scope: 비활성 질문 템플릿을 되살리는 `POST /admin/question-templates/{templateId}/activate` 신설. Phase 03c-9-1 Known Limitations의 "No reactivation command for inactive templates." 해소.
+- Modified classes:
+  - `domain.entity.QuestionTemplate` — `activate()` 추가(`active=true`)
+  - `service.QuestionTemplateService` — `activateTemplate` + `validateTemplateInactive`
+  - `controller.QuestionTemplateController` — `POST /{templateId}/activate`
+- Business rules: 이미 활성인 템플릿에 호출하면 `InvalidQuestionTemplateException`(400, `Active template cannot be activated again.`). 미존재는 404. `deactivate`는 기존대로 멱등 유지(비대칭 의도적).
+- 설계 판단: 기존 command 스타일 엔드포인트 관례(`publish`/`close`/`reopen`/`deactivate`) 유지. 활성/비활성을 단일 토글 엔드포인트로 통합하지 않음.
+- `JobPostingQuestion`은 activate 미추가. 비활성 시 `sortOrder`가 남고 중복 검사는 active 행만 대상이라 재활성 시 충돌 가능 — sortOrder 해소 정책 선행 필요.
+- Tests: `QuestionTemplateServiceTest`(activate 성공/이미 활성/미존재 3건), `QuestionTemplateControllerTest`(activate API 1건). `QuestionTemplateServiceTest` + `QuestionTemplateControllerTest` + `JobPostingQuestionServiceTest` 41건 전체 성공.
+- Documentation: `docs/codex/implementation/phase-03c-9-1-question-template-job-posting-question.md`(Follow-up Change 절 추가), `docs/codex/reports/phase-03c-9-1-question-template-job-posting-question.html`, `recruit/api-contract.md`(관리자 질문 템플릿 섹션 신설).
