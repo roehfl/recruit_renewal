@@ -203,7 +203,7 @@ const dutyList = ref<DutyItem[]>([
 }
 
 .page-inner {
-  max-width: 1080px;
+  max-width: var(--app-frame-width);
   margin: 0 auto;
   padding: 42px 20px 42px;
 }
@@ -289,7 +289,7 @@ const dutyList = ref<DutyItem[]>([
 
 .quick-link-grid {
   display: grid;
-  max-width: 1080px;
+  max-width: none;
   min-height: 150px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;

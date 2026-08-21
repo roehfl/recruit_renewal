@@ -328,7 +328,7 @@ onMounted(() => {
 }
 
 .page-inner {
-  max-width: 1080px;
+  max-width: var(--app-frame-width);
   margin: 0 auto;
   padding: 98px 20px 88px;
   /* padding: 42px 20px 88px; */
@@ -336,7 +336,7 @@ onMounted(() => {
 
 .page-inner-top {
   width: 100%;
-  max-width: 1040px;
+  max-width: none;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -374,7 +374,7 @@ onMounted(() => {
 
 .profile-card {
   width: 100%;
-  max-width: 1040px;
+  max-width: none;
   max-height: 150px;
 
   display: flex;

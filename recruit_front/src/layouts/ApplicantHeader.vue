@@ -243,7 +243,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
 
 .header-inner {
   width: 100%;
-  max-width: 1180px;
+  max-width: var(--app-frame-width);
   margin: 0 auto;
   padding: 0 24px;
 }

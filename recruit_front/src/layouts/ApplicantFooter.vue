@@ -53,15 +53,15 @@ const footerMenus: FooterMenuGroup[] = [
     items: [
       {
         title: '보상 및 평가',
-        url: '/applicant/hrRule',
+        url: '/applicant/benefits?tab=reward',
       },
       {
         title: '교육제도',
-        url: '/applicant/training',
+        url: '/applicant/benefits?tab=training',
       },
       {
         title: '복리후생',
-        url: '/applicant/benefits',
+        url: '/applicant/benefits?tab=benefit',
       },
     ],
   },
@@ -115,7 +115,7 @@ const footerMenus: FooterMenuGroup[] = [
 }
 
 .footer-inner {
-  max-width: 1180px;
+  max-width: var(--app-frame-width);
   margin: 0 auto;
   padding: 36px 24px 22px;
 }

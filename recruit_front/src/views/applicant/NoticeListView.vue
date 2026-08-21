@@ -176,13 +176,13 @@ onMounted(() => {
   padding: 0;
 }
 .board-container {
-  max-width: 1080px;
+  max-width: var(--app-frame-width);
   margin: 0 auto;
   padding: 0px 24px 60px 0px;
 }
 
 .page-inner {
-  max-width: 1080px;
+  max-width: var(--app-frame-width);
   margin: 0 auto;
   padding: 42px 20px 42px;
 }

@@ -250,14 +250,14 @@ const clickToEmailCertificationButton = async () => {
 }
 
 .page-inner {
-  max-width: 1080px;
+  max-width: var(--app-frame-width);
   margin: 0 auto;
   padding: 98px 20px 88px;
 }
 
 .page-card {
   width: 100%;
-  max-width: 1040px;
+  max-width: none;
   min-width: 680px;
   min-height: 200;
 

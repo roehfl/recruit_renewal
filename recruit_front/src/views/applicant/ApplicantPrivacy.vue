@@ -220,7 +220,7 @@ const PolicyList = ref<PrivacyPolicy[]>([
 }
 
 .page-inner {
-  max-width: 1080px;
+  max-width: var(--app-frame-width);
   margin: 0 auto;
   padding: 98px 20px 88px;
   /* padding: 42px 20px 88px; */

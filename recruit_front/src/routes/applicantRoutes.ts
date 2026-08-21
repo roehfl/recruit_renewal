@@ -15,7 +15,7 @@ export const applicantRoutes: RouteRecordRaw[] = [
       },
       {
         path: 'benefits',
-        name: 'ApplicantBenefits',
+        name: 'ApplicantBenefits',   // 인사제도 (보상 및 평가 · 교육제도 · 복리후생 통합)
         component: () => import('@/views/applicant/ApplicantBenefits.vue'),
         meta: {
           public: true,
@@ -48,19 +48,13 @@ export const applicantRoutes: RouteRecordRaw[] = [
       //   },
       {
         path: 'hrRule',
-        name: 'ApplicantHrRule',          // 회사 소개 > 보상 및 평가
-        component: () => import('@/views/applicant/ApplicantHrRule.vue'),
-        meta: {
-          public: true,
-        },
+        name: 'ApplicantHrRule',          // 인사제도 > 보상 및 평가 (benefits 화면으로 통합)
+        redirect: { path: '/applicant/benefits', query: { tab: 'reward' } },
       },
       {
         path: 'training',
-        name: 'ApplicantTraining',          // 회사 소개 > 교육제도
-        component: () => import('@/views/applicant/ApplicantTraining.vue'),
-        meta: {
-          public: true,
-        },
+        name: 'ApplicantTraining',          // 인사제도 > 교육제도 (benefits 화면으로 통합)
+        redirect: { path: '/applicant/benefits', query: { tab: 'training' } },
       },
       {
         path: 'recruitProcedure',

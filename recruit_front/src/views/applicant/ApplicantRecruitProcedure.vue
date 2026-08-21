@@ -69,7 +69,7 @@ import ApplicantBreadcrumb from '@/views/applicant/ApplicantBreadcrumb.vue'
 }
 
 .page-inner {
-  max-width: 1080px;
+  max-width: var(--app-frame-width);
   margin: 0 auto;
   padding: 42px 20px 88px;
 }
@@ -84,7 +84,7 @@ import ApplicantBreadcrumb from '@/views/applicant/ApplicantBreadcrumb.vue'
 }
 
 .sample-page {
-  max-width: 1180px;
+  max-width: var(--app-frame-width);
   margin: 0 auto;
   padding: 32px 24px 60px;
 }

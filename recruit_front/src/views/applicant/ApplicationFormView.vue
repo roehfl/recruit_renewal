@@ -717,7 +717,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 .page-inner {
-  max-width: 1180px;
+  max-width: var(--app-frame-width);
   margin: 0 auto;
   padding: 32px 24px 72px;
 }

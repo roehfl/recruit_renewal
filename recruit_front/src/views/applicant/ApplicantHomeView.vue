@@ -8,9 +8,7 @@
       </div>
 
       <div class="right-area">
-        <ApplicantNoticeList :max-count="4" />
         <ApplicantQuickLinkCards />
-        <!-- <ApplicantNoticeList /> -->
       </div>
     </section>
   </main>
@@ -20,12 +18,11 @@
 import MainBannerSwitcher from '@/views/applicant/banners/MainBannerSwitcher.vue'
 import ApplicantRecruitList from '@/views/applicant/ApplicantRecruitList.vue'
 import ApplicantQuickLinkCards from '@/views/applicant/ApplicantQuickLinkCards.vue'
-import ApplicantNoticeList from '@/views/applicant/ApplicantNoticeList.vue'
 </script>
 
 <style scoped>
 .applicant-main {
-  max-width: 1180px;
+  max-width: var(--app-frame-width);
   margin: 0 auto;
   padding: 32px 24px 60px;
 }

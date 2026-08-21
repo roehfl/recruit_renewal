@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import ApplicantBreadcrumb from '@/views/applicant/ApplicantBreadcrumb.vue'
 import type { CardItem, PanelTab } from '@/views/applicant/infoTabPanel'
 
@@ -74,15 +74,20 @@ const props = defineProps<{
   subtitle?: string
   largeTitle?: boolean
   tabs: PanelTab[]
+  /** 진입 시 열어둘 탭(없거나 없는 키면 첫 탭) */
+  initialTabKey?: string
 }>()
 
-const activeTabKey = ref<string>(props.tabs[0]?.key ?? '')
+const resolveTabKey = (key?: string): string =>
+  props.tabs.find((t) => t.key === key)?.key ?? props.tabs[0]?.key ?? ''
+
+const activeTabKey = ref<string>(resolveTabKey(props.initialTabKey))
 
 const activeTab = computed<PanelTab>(
   () => (props.tabs.find((t) => t.key === activeTabKey.value) ?? props.tabs[0])!,
 )
 
-const activeChipKey = ref<string>(props.tabs[0]?.chips[0]?.key ?? '')
+const activeChipKey = ref<string>(activeTab.value?.chips[0]?.key ?? '')
 
 const activeChip = computed(
   () =>
@@ -100,6 +105,14 @@ const selectTab = (key: string): void => {
 const selectChip = (key: string): void => {
   activeChipKey.value = key
 }
+
+// 같은 화면에서 쿼리만 바뀌는 경우(푸터 링크 등)에도 탭을 맞춘다.
+watch(
+  () => props.initialTabKey,
+  (key) => {
+    selectTab(resolveTabKey(key))
+  },
+)
 </script>
 
 <style scoped>
@@ -110,7 +123,7 @@ const selectChip = (key: string): void => {
 }
 
 .page-inner {
-  max-width: 1080px;
+  max-width: var(--app-frame-width);
   margin: 0 auto;
   padding: 42px 20px 80px;
 }
