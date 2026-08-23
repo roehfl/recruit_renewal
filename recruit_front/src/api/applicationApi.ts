@@ -13,7 +13,7 @@ export const applicationApi = {
   },
 
   signup(request: SignupUser) {
-    return apiClient.post<ApiResponse<SignupUser>>('/auth/applicants/signup', request)
+    return apiClient.post<ApiResponse<SignupUser>>('/auth/applicants/sign-up', request)
   },
   
   checkEmail(email: string) {
