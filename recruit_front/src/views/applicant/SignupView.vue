@@ -300,7 +300,7 @@ async function clickToSignupButton() {
 .signup-page-inner {
   max-width: var(--app-frame-width);
   margin: 0 auto;
-  padding: 42px 20px 20px;
+  padding: 42px var(--app-frame-padding-x) 20px;
 }
 
 .signup-form {

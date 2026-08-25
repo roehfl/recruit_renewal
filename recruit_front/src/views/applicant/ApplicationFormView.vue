@@ -719,7 +719,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 .page-inner {
   max-width: var(--app-frame-width);
   margin: 0 auto;
-  padding: 32px 24px 72px;
+  padding: 32px var(--app-frame-padding-x) 72px;
 }
 
 .application-header-card,

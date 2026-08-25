@@ -205,7 +205,7 @@ const dutyList = ref<DutyItem[]>([
 .page-inner {
   max-width: var(--app-frame-width);
   margin: 0 auto;
-  padding: 42px 20px 42px;
+  padding: 42px var(--app-frame-padding-x) 42px;
 }
 
 .page-title {

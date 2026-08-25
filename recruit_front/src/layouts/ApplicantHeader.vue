@@ -21,6 +21,24 @@ const authStore = useAuthStore()
 const menuStore = useMenuStore()
 
 const menuOpen = ref(false)
+
+/*
+ * 헤더 로고 이미지: public/images/header-logo.{png,svg,jpg,webp} 중 하나를 추가하면
+ * 별도 코드 수정 없이 적용된다. 파일이 없으면 기존 로고+텍스트로 폴백한다.
+ */
+const brandLogoCandidates = [
+  '/images/header-logo.png',
+  '/images/header-logo.svg',
+  '/images/header-logo.jpg',
+  '/images/header-logo.webp',
+]
+const brandLogoIndex = ref(0)
+
+const brandLogoSrc = computed<string>(() => brandLogoCandidates[brandLogoIndex.value] ?? '')
+
+const onBrandLogoError = (): void => {
+  brandLogoIndex.value += 1
+}
 const hasUnreadNotice = ref(false)
 
 const mainMenus = computed<MenuItem[]>(() => {
@@ -110,12 +128,28 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
         <CloseOutlined v-if="menuOpen" />
         <MenuOutlined v-else />
         </button>
-        <RouterLink to="/applicant" class="brand-logo logo-stack" @click="closeMenu">
-          <img :src="logoImage" alt="신영증권 로고" class="logo-img" />
-          <span class="brand-logo-text">
-            <span class="brand-logo-main">신영증권</span>
-            <span class="brand-logo-sub">Recruit</span>
-          </span>
+        <RouterLink
+          to="/applicant"
+          class="brand-logo"
+          :class="{ 'logo-stack': !brandLogoSrc }"
+          @click="closeMenu"
+        >
+          <img
+            v-if="brandLogoSrc"
+            :src="brandLogoSrc"
+            alt="신영증권 채용"
+            class="brand-logo-img"
+            @error="onBrandLogoError"
+          />
+
+          <!-- public/images/header-logo.* 가 없을 때의 폴백 -->
+          <template v-else>
+            <img :src="logoImage" alt="신영증권 로고" class="logo-img" />
+            <span class="brand-logo-text">
+              <span class="brand-logo-main">신영증권</span>
+              <span class="brand-logo-sub">Recruit</span>
+            </span>
+          </template>
         </RouterLink>
       </div>
       
@@ -245,7 +279,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
   width: 100%;
   max-width: var(--app-frame-width);
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 var(--app-frame-padding-x);
 }
 
 .header-main {
@@ -272,6 +306,13 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
   gap: 8px;
   line-height: 1;
   flex: 0 0 auto;
+}
+
+.brand-logo-img {
+  display: block;
+  height: 40px;
+  width: auto;
+  object-fit: contain;
 }
 
 .logo-img {
@@ -671,6 +712,10 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
 
   .header-main {
     min-height: 64px;
+  }
+
+  .brand-logo-img {
+    height: 32px;
   }
 
   .logo-img {

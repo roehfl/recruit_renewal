@@ -71,7 +71,7 @@ import ApplicantBreadcrumb from '@/views/applicant/ApplicantBreadcrumb.vue'
 .page-inner {
   max-width: var(--app-frame-width);
   margin: 0 auto;
-  padding: 42px 20px 88px;
+  padding: 42px var(--app-frame-padding-x) 88px;
 }
 
 .page-title {
@@ -86,7 +86,7 @@ import ApplicantBreadcrumb from '@/views/applicant/ApplicantBreadcrumb.vue'
 .sample-page {
   max-width: var(--app-frame-width);
   margin: 0 auto;
-  padding: 32px 24px 60px;
+  padding: 32px var(--app-frame-padding-x) 60px;
 }
 
 .procedure-steps {

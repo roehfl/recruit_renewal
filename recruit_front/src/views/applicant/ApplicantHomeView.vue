@@ -24,7 +24,7 @@ import ApplicantQuickLinkCards from '@/views/applicant/ApplicantQuickLinkCards.v
 .applicant-main {
   max-width: var(--app-frame-width);
   margin: 0 auto;
-  padding: 32px 24px 60px;
+  padding: 32px var(--app-frame-padding-x) 60px;
 }
 
 .main-visual {
