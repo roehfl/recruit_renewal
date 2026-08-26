@@ -198,6 +198,12 @@
           <td><code>--app-bg-page</code> (#f5f7fa)</td>
           <td>프레임이 시각적으로 분리된다</td>
         </tr>
+        <tr>
+          <td>프레임 안쪽 콘텐츠 폭</td>
+          <td>각 화면이 <code>max-width: var(--app-frame-width)</code>로 다시 85% 적용 (실효 72.2%)</td>
+          <td><code>.applicant-content</code>에서 토큰을 100%로 덮음</td>
+          <td>프레임이 이미 85%를 담당하므로 이중 적용을 제거</td>
+        </tr>
       </tbody>
     </table>
     <p class="small">좌측 공고 카드 높이는 글자 기반으로 고정이고, 우측 카드 높이는 행 균등 분할로 좌측 높이를 따라간다. 그 결과 화면 폭과 무관하게 좌·우 하단이 일치한다. 다만 카드가 정사각형은 아니며, 폭이 넓어질수록 가로로 길어진다.</p>
@@ -320,6 +326,7 @@
         <tr><td>프레임 / 푸터 좌우 경계</td><td>양쪽 모두 left 134px, right 1656px</td><td>완전 일치</td></tr>
         <tr><td>프레임 세로</td><td>top 0 ~ bottom 1270px, 세로 스크롤 없음</td><td>뷰포트 높이와 일치</td></tr>
         <tr><td>바깥 배경</td><td><code>rgb(245, 247, 250)</code></td><td>#f5f7fa</td></tr>
+        <tr><td>본문 / 헤더 / 푸터 내부 폭</td><td>세 곳 모두 1520px, left 135 ~ right 1655</td><td>완전 일치 (이중 85% 제거 후)</td></tr>
       </tbody>
     </table>
     <p class="small">측정 당시 백엔드가 기동되어 있지 않아 채용공고 목록이 빈 상태였다. 그래서 좌측 카드 높이가 384px로 짧게 잡혔고, 우측 카드도 그에 맞춰 축소되었다. 공고가 채워지면 양쪽이 함께 커진다.</p>
@@ -411,6 +418,11 @@
           <td>12</td>
           <td>본문 높이를 <code>calc(100vh - 72px - ...)</code>에서 flex로 전환</td>
           <td>헤더 실제 높이가 border 포함 73px이라 계산식이 2px 어긋나 스크롤이 생겼다. flex 컬럼으로 바꿔 매직넘버를 제거했다</td>
+        </tr>
+        <tr>
+          <td>13</td>
+          <td>이중 85% 문제를 15개 화면 수정이 아니라 CSS 변수 재선언으로 해결</td>
+          <td>지원자 화면 15곳이 <code>max-width: var(--app-frame-width)</code>를 쓴다. <code>.applicant-content</code>에서 토큰을 100%로 재선언하면 상속으로 전부 해결되고, 프레임과 푸터는 바깥 스코프의 85%를 그대로 쓴다</td>
         </tr>
       </tbody>
     </table>

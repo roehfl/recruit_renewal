@@ -41,7 +41,14 @@ import ApplicantFooter from './ApplicantFooter.vue'
   background: var(--app-content-bg-color);
 }
 
+/*
+ * 프레임(.applicant-frame)이 이미 --app-frame-width(85%)를 적용하므로,
+ * 그 안쪽 화면들이 같은 토큰으로 한 번 더 85%를 먹지 않도록 100%로 덮는다.
+ * (지원자 화면들은 공통적으로 max-width: var(--app-frame-width)를 쓴다)
+ */
 .applicant-content {
+  --app-frame-width: 100%;
+
   flex: 1 1 auto;
 }
 </style>
