@@ -62,7 +62,7 @@
     <div class="card">
       <h2>요약</h2>
       <p>지원자 홈 화면을 확정 시안에 맞춰 재구성했다. 지원자 영역의 프레임 폭을 전체의 85%로 좁히고, 헤더·본문·푸터를 같은 폭으로 정렬했다.</p>
-      <p>본문은 좌측 <strong>진행중인 채용공고(1/2)</strong> + 우측 <strong>퀵링크 카드 6장(3×2, 1/2)</strong>의 2컬럼 구조이며, 우측 카드 블록이 좌측 카드 높이를 채워 어느 화면 폭에서든 하단 라인이 맞는다.</p>
+      <p>본문은 좌측 <strong>진행중인 채용공고(5fr)</strong> + 우측 <strong>퀵링크 카드 6장(3×2, 6fr)</strong>의 2컬럼 구조이며, 우측 카드 블록이 좌측 카드 높이를 채워 어느 화면 폭에서든 하단 라인이 맞는다.</p>
       <p>푸터는 높이 56px 고정으로 프레임 맨 아래에 배치했다(항상 떠 있는 <code>position: fixed</code>는 최종적으로 제외). 홈 채용공고 노출은 상위 4건으로 제한했다.</p>
       <p>본문 폰트를 Pretendard에서 <strong>Noto Sans CJK KR</strong>로 교체하고 자체 호스팅했으며, 헤더 로고를 <strong>CI 이미지 + '신영증권' 텍스트</strong> 조합으로 변경했다.</p>
       <p>프레임 바깥은 회색(<code>--app-bg-page</code>)으로 깔고, 헤더+본문+푸터를 아우르는 <strong>1px 윤곽선</strong>을 넣어 프레임 경계를 드러냈다. 푸터는 앱 테마인 <strong>다크그린</strong>으로 채웠다.</p>
@@ -153,8 +153,8 @@
         <tr>
           <td>홈 2컬럼</td>
           <td><code>380px 1fr</code>, <code>align-items: start</code></td>
-          <td><code>1fr 1fr</code>, <code>align-items: stretch</code></td>
-          <td>공고가 화면 절반 차지</td>
+          <td><code>5fr 6fr</code>, <code>align-items: stretch</code></td>
+          <td>공고가 콘텐츠 폭의 약 44%. 고정 px이 아닌 비율이라 화면이 넓어져도 유지된다</td>
         </tr>
         <tr>
           <td>퀵링크 그리드</td>
@@ -323,7 +323,7 @@
         <tr><td>헤더 폭 / 좌측 시작</td><td>1522px / 134px</td><td>뷰포트의 85%, 중앙 정렬</td></tr>
         <tr><td>본문 폭</td><td>1522px</td><td>헤더와 동일</td></tr>
         <tr><td>푸터</td><td><code>position: fixed</code>, 높이 56px, bottom 1270px</td><td>화면 바닥 고정</td></tr>
-        <tr><td>본문 그리드</td><td><code>694.75px 694.75px</code></td><td>1fr : 1fr</td></tr>
+        <tr><td>본문 그리드</td><td><code>630.67px 756.83px</code> (공고 44.4%)</td><td>5fr : 6fr</td></tr>
         <tr><td>퀵링크 카드 수</td><td>6장</td><td>6장 (3×2)</td></tr>
         <tr><td>좌 / 우 컬럼 높이</td><td>384px / 384px</td><td>일치</td></tr>
         <tr><td>본문 폰트</td><td><code>"Noto Sans KR", "Noto Sans CJK KR", ...</code></td><td>Pretendard 미참조</td></tr>

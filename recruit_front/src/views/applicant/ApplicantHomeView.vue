@@ -33,7 +33,7 @@ import ApplicantQuickLinkCards from '@/views/applicant/ApplicantQuickLinkCards.v
 
 .main-content {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 5fr 6fr;
   gap: 32px;
   align-items: stretch;
 }
