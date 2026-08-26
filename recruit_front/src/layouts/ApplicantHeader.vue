@@ -23,21 +23,25 @@ const menuStore = useMenuStore()
 const menuOpen = ref(false)
 
 /*
- * 헤더 로고 이미지: public/images/header-logo.{png,svg,jpg,webp} 중 하나를 추가하면
- * 별도 코드 수정 없이 적용된다. 파일이 없으면 기존 로고+텍스트로 폴백한다.
+ * 헤더 로고는 CI 이미지 + '신영증권' 텍스트로 구성한다.
+ * CI는 public/images/ci.{svg,png,jpg,webp} 중 하나를 추가하면 별도 코드 수정 없이 적용되고,
+ * 없으면 번들에 포함된 logo.png로 폴백한다. 원본 CI 비율(99 x 102)은 CSS에서 유지한다.
  */
-const brandLogoCandidates = [
-  '/images/header-logo.png',
-  '/images/header-logo.svg',
-  '/images/header-logo.jpg',
-  '/images/header-logo.webp',
+const ciLogoCandidates = [
+  '/images/ci.svg',
+  '/images/ci.png',
+  '/images/ci.jpg',
+  '/images/ci.webp',
+  logoImage,
 ]
-const brandLogoIndex = ref(0)
+const ciLogoIndex = ref(0)
 
-const brandLogoSrc = computed<string>(() => brandLogoCandidates[brandLogoIndex.value] ?? '')
+const ciLogoSrc = computed<string>(() => ciLogoCandidates[ciLogoIndex.value] ?? logoImage)
 
-const onBrandLogoError = (): void => {
-  brandLogoIndex.value += 1
+const onCiLogoError = (): void => {
+  if (ciLogoIndex.value < ciLogoCandidates.length - 1) {
+    ciLogoIndex.value += 1
+  }
 }
 const hasUnreadNotice = ref(false)
 
@@ -128,28 +132,9 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
         <CloseOutlined v-if="menuOpen" />
         <MenuOutlined v-else />
         </button>
-        <RouterLink
-          to="/applicant"
-          class="brand-logo"
-          :class="{ 'logo-stack': !brandLogoSrc }"
-          @click="closeMenu"
-        >
-          <img
-            v-if="brandLogoSrc"
-            :src="brandLogoSrc"
-            alt="신영증권 채용"
-            class="brand-logo-img"
-            @error="onBrandLogoError"
-          />
-
-          <!-- public/images/header-logo.* 가 없을 때의 폴백 -->
-          <template v-else>
-            <img :src="logoImage" alt="신영증권 로고" class="logo-img" />
-            <span class="brand-logo-text">
-              <span class="brand-logo-main">신영증권</span>
-              <span class="brand-logo-sub">Recruit</span>
-            </span>
-          </template>
+        <RouterLink to="/applicant" class="brand-logo" @click="closeMenu">
+          <img :src="ciLogoSrc" alt="신영증권 CI" class="brand-ci" @error="onCiLogoError" />
+          <span class="brand-logo-main">신영증권</span>
         </RouterLink>
       </div>
       
@@ -277,8 +262,6 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
 
 .header-inner {
   width: 100%;
-  max-width: var(--app-frame-width);
-  margin: 0 auto;
   padding: 0 var(--app-frame-padding-x);
 }
 
@@ -295,55 +278,30 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
 }
 
 .brand-logo {
-  text-decoration: none;
-  white-space: nowrap;
-  font-family: 'Pretendard', sans-serif;
-}
-
-.logo-stack {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  line-height: 1;
+  gap: 10px;
   flex: 0 0 auto;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
-.brand-logo-img {
+/* CI 원본 비율(99 x 102)을 유지한다. */
+.brand-ci {
   display: block;
   height: 40px;
   width: auto;
+  aspect-ratio: 99 / 102;
   object-fit: contain;
 }
 
-.logo-img {
-  width: 30px;
-  height: auto;
-  object-fit: contain;
-  display: block;
-}
-
-.brand-logo-text {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0;
-  line-height: 1;
-}
-
-.logo-stack .brand-logo-main {
+.brand-logo-main {
+  color: var(--app-text-primary);
   font-size: 26px;
   font-weight: 700;
-  color: var(--app-text-primary);
   line-height: 1;
   letter-spacing: -0.045em;
-}
-
-.logo-stack .brand-logo-sub {
-  color: var(--app-primary-color);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  line-height: 1;
 }
 
 .hamburger-button {
@@ -714,20 +672,12 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
     min-height: 64px;
   }
 
-  .brand-logo-img {
+  .brand-ci {
     height: 32px;
   }
 
-  .logo-img {
-    width: 34px;
-  }
-
-  .logo-stack .brand-logo-main {
+  .brand-logo-main {
     font-size: 20px;
-  }
-
-  .logo-stack .brand-logo-sub {
-    font-size: 10px;
   }
 
   .top-actions {

@@ -38,21 +38,41 @@ interface QuickLinkItem {
 
 const router = useRouter()
 
+/*
+ * TODO(route): '/applicant/company'(신영증권 소개), '/applicant/faq'(채용 FAQ),
+ * '/apply'(지원서 작성/수정), '/my/result'(지원결과 조회) 는 아직 라우트가 없어
+ * 클릭 시 NotFound로 빠진다. 화면이 준비되면 applicantRoutes.ts에 추가한다.
+ */
 const quickLinks = ref<QuickLinkItem[]>([
   {
-    title: '입사지원/수정',
+    title: '신영증권 소개',
+    description: '회사와 인재상을 먼저 만나보세요.',
+    url: '/applicant/company',
+  },
+  {
+    title: '직무 소개',
+    description: '어떤 업무를 원하시나요?<br> 다양한 직무를 확인하실 수 있습니다.',
+    url: '/applicant/dutyIntroduction',
+  },
+  {
+    title: '인사제도 소개',
+    description: '보상·평가, 교육제도, 복리후생을 확인하실 수 있습니다.',
+    url: '/applicant/benefits',
+  },
+  {
+    title: '지원서 작성/수정',
     description: '현재 진행중인 채용에 대한 입사지원 및 수정을 하실 수 있습니다.',
     url: '/apply',
   },
   {
-    title: '합격자 조회',
+    title: '지원결과 조회',
     description: '지원에 대한 결과를 확인하실 수 있습니다.',
     url: '/my/result',
   },
   {
-    title: '직무소개',
-    description: '어떤 업무를 원하시나요?<br> 다양한 직무를 확인하실 수 있습니다.',
-    url: '/applicant/dutyIntroduction',
+    title: '채용 FAQ',
+    description: '지원 전 자주 묻는 질문을 모았습니다.',
+    url: '/applicant/faq',
   },
 ])
 
@@ -64,11 +84,15 @@ const goPage = async (url: string): Promise<void> => {
 <style scoped>
 .quick-link-section {
   width: 100%;
+  height: 100%;
 }
 
+/* 3×2. 행을 균등 분할해 좌측 채용공고 카드와 하단 라인을 맞춘다. */
 .quick-link-grid {
   display: grid;
+  height: 100%;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -112,7 +136,7 @@ const goPage = async (url: string): Promise<void> => {
   position: relative;
   z-index: 2;
   display: flex;
-  min-height: 142px;
+  height: 100%;
   flex-direction: column;
   justify-content: space-between;
 }
@@ -120,16 +144,16 @@ const goPage = async (url: string): Promise<void> => {
 .card-title {
   margin: 0;
   color: inherit;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1.35;
 }
 
 .card-desc {
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   color: inherit;
   opacity: 0.82;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.55;
   word-break: keep-all;
 }
@@ -139,7 +163,7 @@ const goPage = async (url: string): Promise<void> => {
   align-items: center;
   gap: 6px;
   color: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -149,7 +173,9 @@ const goPage = async (url: string): Promise<void> => {
 
 @media (max-width: 1100px) {
   .quick-link-grid {
+    height: auto;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
   }
 }
 
@@ -163,11 +189,8 @@ const goPage = async (url: string): Promise<void> => {
   }
 
   .card-content {
+    height: auto;
     min-height: 112px;
-  }
-
-  .card-title {
-    font-size: 18px;
   }
 }
 </style>

@@ -64,7 +64,7 @@ const emit = defineEmits<{ (e: 'close'): void }>()
 
 <style scoped>
 .dm-modal {
-  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Noto Sans KR', 'Noto Sans CJK KR', 'Apple SD Gothic Neo', sans-serif;
   color: #1f2937;
 }
 

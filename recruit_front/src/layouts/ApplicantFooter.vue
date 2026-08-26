@@ -9,8 +9,18 @@
 </template>
 
 <style scoped>
+/* 화면 하단에 항상 떠 있는 고정 높이 푸터 */
 .app-footer {
-  margin-top: 56px;
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 90;
+
+  width: var(--app-frame-width);
+  height: var(--app-footer-height);
+  margin: 0 auto;
+  border: 1px solid var(--app-border-color);
   border-top: 1px solid #e3e7ea;
   background: #f7f8f8;
 }
@@ -21,9 +31,9 @@
   justify-content: space-between;
   gap: 14px;
 
-  max-width: var(--app-frame-width);
-  margin: 0 auto;
-  padding: 14px var(--app-frame-padding-x);
+  width: 100%;
+  height: 100%;
+  padding: 0 var(--app-frame-padding-x);
 }
 
 .copyright {
@@ -48,15 +58,12 @@
 }
 
 @media (max-width: 560px) {
-  .app-footer {
-    margin-top: 40px;
-  }
-
   .footer-inner {
     align-items: flex-start;
+    justify-content: center;
     flex-direction: column;
-    gap: 6px;
-    padding: 12px 20px;
+    gap: 4px;
+    padding: 0 20px;
   }
 }
 </style>

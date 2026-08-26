@@ -1,36 +1,10 @@
 @use './variables.scss';
 
-@font-face {
-  font-family: 'Pretendard';
-  src: url('@/assets/fonts/Pretendard-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Pretendard';
-  src: url('@/assets/fonts/Pretendard-Medium.woff2') format('woff2');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Pretendard';
-  src: url('@/assets/fonts/Pretendard-SemiBold.woff2') format('woff2');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Pretendard';
-  src: url('@/assets/fonts/Pretendard-Bold.woff2') format('woff2');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
+/*
+ * 본문 폰트는 Noto Sans CJK KR을 사용한다.
+ * @font-face 정의는 자체 호스팅한 public/fonts/noto-sans-kr.css 에 있고
+ * index.html에서 로드한다. (Pretendard woff2 파일은 assets/fonts에 보존)
+ */
 
 * {
   box-sizing: border-box;
@@ -40,7 +14,7 @@ html,
 body,
 #app {
   min-height: 100%;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'Noto Sans KR', 'Noto Sans CJK KR', 'Apple SD Gothic Neo', sans-serif;
 }
 
 body {

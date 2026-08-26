@@ -26,7 +26,7 @@ import { RouterView } from 'vue-router'
         colorSuccess: '#2f855a',
         colorWarning: '#d97706',
         colorError: '#ff4d4f',
-        fontFamily: 'Pretendard',
+        fontFamily: 'Noto Sans KR, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif',
       },
     }"
   >

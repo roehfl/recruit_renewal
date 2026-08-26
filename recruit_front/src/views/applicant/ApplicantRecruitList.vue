@@ -115,8 +115,13 @@ const getDDay = (endDateTime: string) => {
   return `D-${diffDay}`;
 }
 
+// 홈 화면에서는 상위 4건만 노출한다(전체는 '바로가기'로 이동).
+const HOME_RECRUIT_LIMIT = 4
+
 const filteredRecruitList = computed<JobPostingListItem[]>(() => {
-  return jobPostings.value.filter((item) => item.postingType === activeTab.value)
+  return jobPostings.value
+    .filter((item) => item.postingType === activeTab.value)
+    .slice(0, HOME_RECRUIT_LIMIT)
 })
 
 const goRecruitDetail = async (recruitId: number): Promise<void> => {

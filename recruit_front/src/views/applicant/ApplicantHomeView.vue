@@ -33,9 +33,9 @@ import ApplicantQuickLinkCards from '@/views/applicant/ApplicantQuickLinkCards.v
 
 .main-content {
   display: grid;
-  grid-template-columns: 380px 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 32px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .left-area {
