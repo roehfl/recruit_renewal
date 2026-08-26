@@ -122,18 +122,11 @@ const columns: TableColumnsType<JobPostingListItem> = [
       h('span', { class: `status-tag ${text}` }, recruitStatusTypeMap[text]),
   },
   {
-    title: '모집시작일',
-    dataIndex: 'receptionStartDateTime',
-    key: 'startDate',
-    customRender: ({ text }: { text: string }) => formatDate(text, 'YYYY-MM-DD HH:mm'),
-    width: 160,
-  },
-  {
-    title: '모집종료일',
-    dataIndex: 'receptionEndDateTime',
-    key: 'endDate',
-    customRender: ({ text }: { text: string }) => formatDate(text, 'YYYY-MM-DD HH:mm'),
-    width: 160,
+    title: '접수기간',
+    key: 'receptionPeriod',
+    customRender: ({ record }) =>
+      `${formatDate(record.receptionStartDateTime, 'YYYY-MM-DD HH:mm')} ~ ${formatDate(record.receptionEndDateTime, 'YYYY-MM-DD HH:mm')}`,
+    width: 280,
   },
 ]
 

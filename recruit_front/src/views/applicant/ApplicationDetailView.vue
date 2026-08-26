@@ -12,6 +12,7 @@ import type { MyJobPostingListItem, MyJobPostingDetailListItem } from '@/types/j
 import { boardApi } from '@/api/boardApi'
 import HtmlView from '@/views/common/htmlView.vue'
 import JobPostingImageStack from '@/components/jobPosting/JobPostingImageStack.vue'
+import { LinkOutlined } from '@ant-design/icons-vue'
 import type { JobPostingImage } from '@/types/jobPosting'
 
 
@@ -73,6 +74,30 @@ const positionOptions = computed(() => {
   }))
 })
 
+
+// 공고 URL 클립보드 복사
+async function copyPostingUrl(): Promise<void> {
+  const url = window.location.href
+
+  try {
+    // clipboard API 는 보안 컨텍스트(https/localhost)에서만 제공되므로 없으면 execCommand 로 대체한다.
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(url)
+    } else {
+      const textarea = document.createElement('textarea')
+      textarea.value = url
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+    message.success('공고 URL이 복사되었습니다.')
+  } catch {
+    message.warning('클립보드 복사에 실패했습니다. 주소창의 URL을 직접 복사하세요.')
+  }
+}
 
 // 목록 페이지로 이동 
 function goRecruitPage(): void {
@@ -239,6 +264,9 @@ onMounted(async () => {
             <a-form-item>
               <a-space>
                 <a-button v-if="jobPostDetail?.receptionStatus === 'ACCEPTING'" type="primary" @click="confirmSubmit()">지원하기</a-button>
+                <a-button @click="copyPostingUrl">
+                  <LinkOutlined /> URL 복사
+                </a-button>
                 <a-button @click="goRecruitPage">목록</a-button>
               </a-space>
             </a-form-item>
@@ -256,8 +284,9 @@ onMounted(async () => {
               {{ recruitStatusTypeMap[jobPostDetail?.receptionStatus]?.text }}
             </a-tag> -->
           </a-descriptions-item>
-          <a-descriptions-item label="모집시작일">{{ formatDate(jobPostDetail?.receptionStartDateTime, 'YYYY-MM-DD HH:mm') }}</a-descriptions-item>
-          <a-descriptions-item label="모집종료일">{{ formatDate(jobPostDetail?.receptionEndDateTime, 'YYYY-MM-DD HH:mm') }}</a-descriptions-item>
+          <a-descriptions-item label="접수기간" span="2">
+            {{ formatDate(jobPostDetail?.receptionStartDateTime, 'YYYY-MM-DD HH:mm') }} ~ {{ formatDate(jobPostDetail?.receptionEndDateTime, 'YYYY-MM-DD HH:mm') }}
+          </a-descriptions-item>
           </a-descriptions>
         </div>
       </a-card>
@@ -266,6 +295,11 @@ onMounted(async () => {
         <template v-if="jobPostImages.length > 0">
           <a-card class="form-content-card" :bordered="false">
             <JobPostingImageStack :images="jobPostImages" :fetch-image="fetchPostingImage" />
+
+            <div class="posting-bottom-actions">
+              <a-button v-if="jobPostDetail?.receptionStatus === 'ACCEPTING'" type="primary" size="large" @click="confirmSubmit()">지원하기</a-button>
+              <a-button size="large" @click="goRecruitPage">목록</a-button>
+            </div>
           </a-card>
         </template>
 
@@ -300,6 +334,13 @@ onMounted(async () => {
   // border: 1px solid var(--app-border-default);
   border-radius: 10px;
   // box-shadow: var(--app-shadow-soft);
+}
+
+.posting-bottom-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 32px;
 }
 
 .application-header {
