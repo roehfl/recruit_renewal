@@ -78,3 +78,20 @@ export const formatDate = (
     return tokens[token as DateFormatToken]
   })
 }
+
+// 접수 마감까지 남은 일수. 지난 공고는 '마감', 당일은 'D-DAY'.
+export const getDDay = (endDateTime: DateInput): string => {
+  const endDate = toDate(endDateTime)
+
+  if (!endDate) {
+    return ''
+  }
+
+  const diffTime = endDate.getTime() - new Date().getTime()
+  if (diffTime < 0) return '마감'
+
+  const diffDay = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+  if (diffDay === 0) return 'D-DAY'
+
+  return `D-${diffDay}`
+}

@@ -56,7 +56,7 @@ import { useRouter } from 'vue-router'
 import { RightOutlined } from '@ant-design/icons-vue'
 import { boardApi } from '@/api/boardApi'
 import type { JobPostingListItem } from '@/types/jobPosting'
-import { formatDate } from '@/common/dateUtil'
+import { formatDate, getDDay } from '@/common/dateUtil'
 
 type RecruitType = 'PUBLIC_RECRUITMENT' | 'ROLLING_RECRUITMENT'
 
@@ -100,19 +100,6 @@ async function loadJobPostings() {
   } finally {
     loading.value = false
   }
-}
-
-const getDDay = (endDateTime: string) => {
-  const now = new Date();
-  const endDate = new Date(endDateTime)
-
-  const diffTime = endDate.getTime() - now.getTime();
-  if (diffTime < 0) return '마감'
-
-  const diffDay = Math.floor( diffTime / ( 1000 * 60 * 60 * 24 ) );
-  if (diffDay === 0) return 'D-DAY'
-  
-  return `D-${diffDay}`;
 }
 
 // 홈 화면에서는 상위 4건만 노출한다(전체는 '바로가기'로 이동).

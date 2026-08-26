@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
-import { formatDate } from '@/common/dateUtil'
+import { formatDate, getDDay } from '@/common/dateUtil'
 
 
 import { apiClient } from '@/api/client'
@@ -286,6 +286,7 @@ onMounted(async () => {
           </a-descriptions-item>
           <a-descriptions-item label="접수기간" span="2">
             {{ formatDate(jobPostDetail?.receptionStartDateTime, 'YYYY-MM-DD HH:mm') }} ~ {{ formatDate(jobPostDetail?.receptionEndDateTime, 'YYYY-MM-DD HH:mm') }}
+            <span v-if="jobPostDetail?.receptionEndDateTime" class="dday">{{ getDDay(jobPostDetail.receptionEndDateTime) }}</span>
           </a-descriptions-item>
           </a-descriptions>
         </div>
@@ -334,6 +335,13 @@ onMounted(async () => {
   // border: 1px solid var(--app-border-default);
   border-radius: 10px;
   // box-shadow: var(--app-shadow-soft);
+}
+
+.dday {
+  margin-left: 8px;
+  color: var(--app-color-warning);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .posting-bottom-actions {
