@@ -63,9 +63,9 @@
       <h2>요약</h2>
       <p>지원자 홈 화면을 확정 시안에 맞춰 재구성했다. 지원자 영역의 프레임 폭을 전체의 85%로 좁히고, 헤더·본문·푸터를 같은 폭으로 정렬했다.</p>
       <p>본문은 좌측 <strong>진행중인 채용공고(1/2)</strong> + 우측 <strong>퀵링크 카드 6장(3×2, 1/2)</strong>의 2컬럼 구조이며, 우측 카드 블록이 좌측 카드 높이를 채워 어느 화면 폭에서든 하단 라인이 맞는다.</p>
-      <p>푸터는 높이 56px로 고정하고 화면 하단에 항상 떠 있도록(<code>position: fixed</code>) 변경했다. 홈 채용공고 노출은 상위 4건으로 제한했다.</p>
+      <p>푸터는 높이 56px 고정으로 프레임 맨 아래에 배치했다(항상 떠 있는 <code>position: fixed</code>는 최종적으로 제외). 홈 채용공고 노출은 상위 4건으로 제한했다.</p>
       <p>본문 폰트를 Pretendard에서 <strong>Noto Sans CJK KR</strong>로 교체하고 자체 호스팅했으며, 헤더 로고를 <strong>CI 이미지 + '신영증권' 텍스트</strong> 조합으로 변경했다.</p>
-      <p>프레임 바깥은 회색(<code>--app-bg-page</code>)으로 깔고, 헤더+본문+푸터를 아우르는 <strong>1px 윤곽선</strong>을 넣어 프레임 경계를 드러냈다.</p>
+      <p>프레임 바깥은 회색(<code>--app-bg-page</code>)으로 깔고, 헤더+본문+푸터를 아우르는 <strong>1px 윤곽선</strong>을 넣어 프레임 경계를 드러냈다. 푸터는 앱 테마인 <strong>다크그린</strong>으로 채웠다.</p>
       <p>백엔드 API 요청/응답은 건드리지 않았으므로 <code>api-contract.md</code> 영향은 없다.</p>
     </div>
     <div class="card">
@@ -91,7 +91,7 @@
         <ul class="list">
           <li>지원자 프레임 폭 100% → 85% (<code>--app-frame-width</code>)</li>
           <li>헤더 바 자체를 프레임 폭으로 정렬</li>
-          <li>푸터 고정 높이 56px + 화면 하단 고정</li>
+          <li>푸터 고정 높이 56px, 프레임 하단 배치 (다크그린)</li>
           <li>홈 2컬럼 비율 <code>380px 1fr</code> → <code>1fr 1fr</code></li>
           <li>퀵링크 카드 3장 → 6장 (3×2)</li>
           <li>좌·우 컬럼 하단 정렬 (<code>align-items: stretch</code> + 행 균등 분할)</li>
@@ -145,10 +145,10 @@
           <td><code>.applicant-header</code>에 <code>width</code>/<code>margin</code> 부여</td>
         </tr>
         <tr>
-          <td>푸터</td>
+          <td>푸터 배치</td>
           <td>본문 흐름 뒤, 높이 가변, <code>margin-top: 56px</code></td>
-          <td><code>position: fixed</code>, 높이 56px 고정, 프레임 폭</td>
-          <td><code>--app-footer-height</code> 토큰 신설</td>
+          <td>프레임 내부 맨 아래, 높이 56px 고정 (<code>position: static</code>)</td>
+          <td><code>--app-footer-height</code> 토큰 신설. 본문이 짧으면 프레임 <code>min-height: 100vh</code> + flex로 바닥에 붙고, 길면 콘텐츠 뒤로 밀린다</td>
         </tr>
         <tr>
           <td>홈 2컬럼</td>
@@ -190,13 +190,19 @@
           <td>프레임 경계</td>
           <td>없음 (헤더 아래선·푸터 위선만 존재)</td>
           <td><code>.applicant-frame</code>에 1px 윤곽선</td>
-          <td>하단 테두리는 고정 푸터의 <code>border-top</code>이 이어받는다</td>
+          <td>헤더·본문·푸터를 모두 프레임 안에 넣어 사방을 두른다</td>
         </tr>
         <tr>
           <td>프레임 바깥 배경</td>
           <td>흰색 (안쪽과 동일)</td>
           <td><code>--app-bg-page</code> (#f5f7fa)</td>
           <td>프레임이 시각적으로 분리된다</td>
+        </tr>
+        <tr>
+          <td>푸터 색</td>
+          <td>연회색 바 (#f7f8f8), 본문 #2c3a43, 링크 #6c9b20</td>
+          <td>다크그린 바 (<code>--app-color-primary</code> #0f4726), 본문 흰색 72%, 링크 흰색</td>
+          <td>앱 테마와 통일. 링크 hover는 <code>--tap-accent-bar</code>(#cfe0c8)</td>
         </tr>
         <tr>
           <td>프레임 안쪽 콘텐츠 폭</td>
@@ -327,6 +333,8 @@
         <tr><td>프레임 세로</td><td>top 0 ~ bottom 1270px, 세로 스크롤 없음</td><td>뷰포트 높이와 일치</td></tr>
         <tr><td>바깥 배경</td><td><code>rgb(245, 247, 250)</code></td><td>#f5f7fa</td></tr>
         <tr><td>본문 / 헤더 / 푸터 내부 폭</td><td>세 곳 모두 1520px, left 135 ~ right 1655</td><td>완전 일치 (이중 85% 제거 후)</td></tr>
+        <tr><td>푸터 대비비</td><td>흰색 72% 본문 약 6.4:1, 흰색 링크 10.8:1 (배경 #0f4726)</td><td>WCAG AA(4.5:1) 충족</td></tr>
+        <tr><td>푸터 배치</td><td><code>position: static</code>, 프레임의 세 번째 자식(HEADER / MAIN / FOOTER)</td><td>고정 해제, 윤곽선 안쪽</td></tr>
       </tbody>
     </table>
     <p class="small">측정 당시 백엔드가 기동되어 있지 않아 채용공고 목록이 빈 상태였다. 그래서 좌측 카드 높이가 384px로 짧게 잡혔고, 우측 카드도 그에 맞춰 축소되었다. 공고가 채워지면 양쪽이 함께 커진다.</p>
@@ -381,8 +389,8 @@
         </tr>
         <tr>
           <td>5</td>
-          <td>푸터를 sticky가 아니라 <code>position: fixed</code>로</td>
-          <td>"항상 떠 있어야 한다"는 요구에 맞춰 스크롤과 무관하게 화면 하단에 고정했다</td>
+          <td>푸터 항상 고정(<code>position: fixed</code>)은 최종적으로 제외</td>
+          <td>검토 후 요구가 철회되었다. 프레임 안쪽 흐름에 두어 윤곽선이 푸터까지 감싸도록 했고, 짧은 본문에서는 flex 배치로 여전히 바닥에 붙는다</td>
         </tr>
         <tr>
           <td>6</td>

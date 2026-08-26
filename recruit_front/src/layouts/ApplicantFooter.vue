@@ -9,20 +9,16 @@
 </template>
 
 <style scoped>
-/* 화면 하단에 항상 떠 있는 고정 높이 푸터 */
+/*
+ * 프레임 안쪽 맨 아래에 놓이는 고정 높이 푸터. 앱 테마인 다크그린으로 채운다.
+ * 본문이 짧으면 프레임의 min-height와 flex 배치 덕분에 화면 바닥에 붙고,
+ * 길면 콘텐츠 뒤로 밀린다.
+ */
 .app-footer {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 90;
-
-  width: var(--app-frame-width);
+  flex: 0 0 auto;
+  width: 100%;
   height: var(--app-footer-height);
-  margin: 0 auto;
-  border: 1px solid var(--app-border-color);
-  border-top: 1px solid #e3e7ea;
-  background: #f7f8f8;
+  background: var(--app-color-primary);
 }
 
 .footer-inner {
@@ -38,21 +34,21 @@
 
 .copyright {
   margin: 0;
-  color: #2c3a43;
+  color: rgb(255 255 255 / 72%);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.01em;
 }
 
 .privacy-link {
-  color: #6c9b20;
+  color: #ffffff;
   font-size: 12px;
   font-weight: 800;
   text-decoration: none;
 }
 
 .privacy-link:hover {
-  color: #2f6f55;
+  color: var(--tap-accent-bar);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
