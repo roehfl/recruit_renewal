@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>지원자 홈 리디자인 - 구현 보고서</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal — 프론트엔드</div>
+  <h1>지원자 홈(/applicant) 리디자인 구현</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge info">프론트 단독 · API 무변경</span>
+  <span class="badge info">폰트 · 로고 교체 포함</span>
+  <span class="badge muted">작성일: 2026-08-26</span>
+</header>
+
+<main>
+
+  <!-- 1. 요약 + 현황 -->
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>지원자 홈 화면을 확정 시안에 맞춰 재구성했다. 지원자 영역의 프레임 폭을 전체의 85%로 좁히고, 헤더·본문·푸터를 같은 폭으로 정렬했다.</p>
+      <p>본문은 좌측 <strong>진행중인 채용공고(1/2)</strong> + 우측 <strong>퀵링크 카드 6장(3×2, 1/2)</strong>의 2컬럼 구조이며, 우측 카드 블록이 좌측 카드 높이를 채워 어느 화면 폭에서든 하단 라인이 맞는다.</p>
+      <p>푸터는 높이 56px로 고정하고 화면 하단에 항상 떠 있도록(<code>position: fixed</code>) 변경했다. 홈 채용공고 노출은 상위 4건으로 제한했다.</p>
+      <p>본문 폰트를 Pretendard에서 <strong>Noto Sans CJK KR</strong>로 교체하고 자체 호스팅했으며, 헤더 로고를 <strong>CI 이미지 + '신영증권' 텍스트</strong> 조합으로 변경했다.</p>
+      <p>프레임 바깥은 회색(<code>--app-bg-page</code>)으로 깔고, 헤더+본문+푸터를 아우르는 <strong>1px 윤곽선</strong>을 넣어 프레임 경계를 드러냈다.</p>
+      <p>백엔드 API 요청/응답은 건드리지 않았으므로 <code>api-contract.md</code> 영향은 없다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">시안 확정 반영 완료</span></p>
+      <p><span class="badge done">type-check 통과</span></p>
+      <p><span class="badge info">API 계약 영향 없음</span></p>
+      <p><span class="badge done">폰트 self-host 적용</span></p>
+      <p><span class="badge pending">라우트 4건 미존재</span></p>
+      <p><span class="badge done">프레임 윤곽선 적용</span></p>
+      <p><span class="badge pending">CI 이미지 미제공</span></p>
+      <p><span class="badge pending">카드 문구 확정 대기</span></p>
+      <p><span class="badge out">로그인 상태 분기 제외</span></p>
+    </div>
+  </section>
+
+  <!-- 2. 범위 -->
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <ul class="list">
+          <li>지원자 프레임 폭 100% → 85% (<code>--app-frame-width</code>)</li>
+          <li>헤더 바 자체를 프레임 폭으로 정렬</li>
+          <li>푸터 고정 높이 56px + 화면 하단 고정</li>
+          <li>홈 2컬럼 비율 <code>380px 1fr</code> → <code>1fr 1fr</code></li>
+          <li>퀵링크 카드 3장 → 6장 (3×2)</li>
+          <li>좌·우 컬럼 하단 정렬 (<code>align-items: stretch</code> + 행 균등 분할)</li>
+          <li>홈 채용공고 상위 4건 제한</li>
+          <li>본문 폰트 Pretendard → Noto Sans CJK KR (self-host)</li>
+          <li>헤더 로고를 CI + '신영증권' 텍스트로 교체</li>
+          <li>프레임 윤곽선 추가 + 바깥 배경 회색 처리</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현</h3>
+        <ul class="list">
+          <li>신영증권 소개 화면 및 라우트</li>
+          <li>채용 FAQ 화면 및 라우트</li>
+          <li>지원서 작성/수정(<code>/apply</code>) 라우트</li>
+          <li>지원결과 조회(<code>/my/result</code>) 라우트</li>
+          <li>카드 설명 문구 최종안</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <ul class="list">
+          <li>로그인 여부에 따른 홈 화면 분기</li>
+          <li>내 지원 현황 진행바 및 <code>/applications/me</code> 응답 확장</li>
+          <li>홈 하단 공지사항 섹션 (요구에 따라 제외)</li>
+          <li>백엔드 변경 일체</li>
+          <li>지원자 홈 외 다른 화면의 레이아웃 조정</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. 레이아웃 규격 -->
+  <section>
+    <h2>레이아웃 규격</h2>
+    <table>
+      <thead>
+        <tr><th>항목</th><th>변경 전</th><th>변경 후</th><th>비고</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>지원자 프레임 폭</td>
+          <td><code>--app-frame-width: 100%</code></td>
+          <td><code>--app-frame-width: 85%</code></td>
+          <td>토큰 한 곳 변경으로 지원자 전 화면에 적용</td>
+        </tr>
+        <tr>
+          <td>헤더 바</td>
+          <td>배경 100%, 내부만 프레임 폭</td>
+          <td>바 전체가 프레임 폭 + 중앙 정렬</td>
+          <td><code>.applicant-header</code>에 <code>width</code>/<code>margin</code> 부여</td>
+        </tr>
+        <tr>
+          <td>푸터</td>
+          <td>본문 흐름 뒤, 높이 가변, <code>margin-top: 56px</code></td>
+          <td><code>position: fixed</code>, 높이 56px 고정, 프레임 폭</td>
+          <td><code>--app-footer-height</code> 토큰 신설</td>
+        </tr>
+        <tr>
+          <td>홈 2컬럼</td>
+          <td><code>380px 1fr</code>, <code>align-items: start</code></td>
+          <td><code>1fr 1fr</code>, <code>align-items: stretch</code></td>
+          <td>공고가 화면 절반 차지</td>
+        </tr>
+        <tr>
+          <td>퀵링크 그리드</td>
+          <td>3열 × 1행, 카드 3장</td>
+          <td>3열 × 2행 균등 분할, 카드 6장</td>
+          <td><code>grid-template-rows: repeat(2, minmax(0, 1fr))</code></td>
+        </tr>
+        <tr>
+          <td>카드 타이포</td>
+          <td>제목 20px / 설명 14px / 링크 14px</td>
+          <td>제목 18px / 설명 13px / 링크 13px</td>
+          <td>카드가 작아진 만큼 축소</td>
+        </tr>
+        <tr>
+          <td>홈 공고 노출 수</td>
+          <td>제한 없음</td>
+          <td>상위 4건</td>
+          <td><code>HOME_RECRUIT_LIMIT = 4</code></td>
+        </tr>
+        <tr>
+          <td>본문 폰트</td>
+          <td><code>'Pretendard', 'Noto Sans KR', ...</code></td>
+          <td><code>'Noto Sans KR', 'Noto Sans CJK KR', ...</code></td>
+          <td>가변 woff2 서브셋 124개 self-host</td>
+        </tr>
+        <tr>
+          <td>헤더 로고</td>
+          <td><code>header-logo.png</code> 단일 이미지</td>
+          <td>CI 이미지 + '신영증권' 텍스트</td>
+          <td>CI는 <code>aspect-ratio: 99 / 102</code>로 비율 고정, 높이 40px</td>
+        </tr>
+        <tr>
+          <td>프레임 경계</td>
+          <td>없음 (헤더 아래선·푸터 위선만 존재)</td>
+          <td><code>.applicant-frame</code>에 1px 윤곽선</td>
+          <td>하단 테두리는 고정 푸터의 <code>border-top</code>이 이어받는다</td>
+        </tr>
+        <tr>
+          <td>프레임 바깥 배경</td>
+          <td>흰색 (안쪽과 동일)</td>
+          <td><code>--app-bg-page</code> (#f5f7fa)</td>
+          <td>프레임이 시각적으로 분리된다</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="small">좌측 공고 카드 높이는 글자 기반으로 고정이고, 우측 카드 높이는 행 균등 분할로 좌측 높이를 따라간다. 그 결과 화면 폭과 무관하게 좌·우 하단이 일치한다. 다만 카드가 정사각형은 아니며, 폭이 넓어질수록 가로로 길어진다.</p>
+  </section>
+
+  <!-- 4. 퀵링크 카드 -->
+  <section>
+    <h2>퀵링크 카드 구성</h2>
+    <table>
+      <thead>
+        <tr><th>순서</th><th>카드명</th><th>연결 경로</th><th>라우트 상태</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td>신영증권 소개</td><td><code>/applicant/company</code></td><td><span class="badge pending">라우트 없음</span></td></tr>
+        <tr><td>2</td><td>직무 소개</td><td><code>/applicant/dutyIntroduction</code></td><td><span class="badge done">정상</span></td></tr>
+        <tr><td>3</td><td>인사제도 소개</td><td><code>/applicant/benefits</code></td><td><span class="badge done">정상</span></td></tr>
+        <tr><td>4</td><td>지원서 작성/수정</td><td><code>/apply</code></td><td><span class="badge pending">라우트 없음 (기존 값 유지)</span></td></tr>
+        <tr><td>5</td><td>지원결과 조회</td><td><code>/my/result</code></td><td><span class="badge pending">라우트 없음 (기존 값 유지)</span></td></tr>
+        <tr><td>6</td><td>채용 FAQ</td><td><code>/applicant/faq</code></td><td><span class="badge pending">라우트 없음</span></td></tr>
+      </tbody>
+    </table>
+    <p class="small">라우트가 없는 4건은 클릭 시 <code>NotFound</code>로 빠진다. <code>/apply</code>와 <code>/my/result</code>는 이번 변경 이전부터 동일한 상태였고, 기존 동작을 보존하기 위해 경로를 그대로 두었다. <code>ApplicantQuickLinkCards.vue</code>에 TODO 주석으로 명시했다.</p>
+  </section>
+
+  <!-- 5. 변경 파일 -->
+  <section>
+    <h2>변경 파일</h2>
+    <table>
+      <thead>
+        <tr><th>파일</th><th>변경 내용</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>src/styles/variables.scss</code></td>
+          <td><code>--app-frame-width</code> 85%로 변경, <code>--app-footer-height: 56px</code> 추가</td>
+        </tr>
+        <tr>
+          <td><code>src/layouts/ApplicantHeader.vue</code></td>
+          <td><code>.applicant-header</code>를 프레임 폭 + 중앙 정렬로, <code>.header-inner</code>는 패딩만 담당</td>
+        </tr>
+        <tr>
+          <td><code>src/layouts/ApplicantFooter.vue</code></td>
+          <td>하단 고정 + 고정 높이로 전환, 모바일 미디어 쿼리 정리</td>
+        </tr>
+        <tr>
+          <td><code>src/layouts/ApplicantLayout.vue</code></td>
+          <td><code>.applicant-frame</code> 래퍼 추가(윤곽선·flex 컬럼), 바깥 배경 회색, 고정 푸터 공간 확보</td>
+        </tr>
+        <tr>
+          <td><code>src/views/applicant/ApplicantHomeView.vue</code></td>
+          <td>본문 그리드 <code>1fr 1fr</code>, <code>align-items: stretch</code></td>
+        </tr>
+        <tr>
+          <td><code>src/views/applicant/ApplicantQuickLinkCards.vue</code></td>
+          <td>카드 6장 구성, 3×2 균등 그리드, 타이포·여백 축소, 반응형 보정</td>
+        </tr>
+        <tr>
+          <td><code>src/views/applicant/ApplicantRecruitList.vue</code></td>
+          <td>홈 노출 공고를 상위 4건으로 제한</td>
+        </tr>
+        <tr>
+          <td><code>index.html</code></td>
+          <td>자체 호스팅 폰트 스타일시트 <code>/fonts/noto-sans-kr.css</code> 로드</td>
+        </tr>
+        <tr>
+          <td><code>public/fonts/noto-sans-kr.css</code> (신규)</td>
+          <td>Noto Sans KR 가변 폰트 <code>@font-face</code> 124개, 로컬 경로로 재작성</td>
+        </tr>
+        <tr>
+          <td><code>public/fonts/noto-sans-kr/*.woff2</code> (신규)</td>
+          <td>woff2 서브셋 124개, 총 3.36MB</td>
+        </tr>
+        <tr>
+          <td><code>src/App.vue</code></td>
+          <td>ant-design-vue 테마 토큰 <code>fontFamily</code> 교체</td>
+        </tr>
+        <tr>
+          <td><code>src/views/applicant/DutyIntroModalBody.vue</code></td>
+          <td>모달 <code>font-family</code> 교체</td>
+        </tr>
+        <tr>
+          <td><code>public/images/header-logo.png</code> (삭제)</td>
+          <td>CI + 텍스트 구성으로 바뀌어 미사용. <code>public/images/README.md</code>의 드롭인 표도 <code>ci.svg</code>로 갱신</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="small">시안 파일은 <code>docs/design/지원자 홈 시안 2안.html</code>(확정안)과 <code>docs/design/지원자 홈 시안 1안.html</code>(폐기, 비교용)에 보관되어 있다.</p>
+  </section>
+
+  <!-- 6. 검증 결과 -->
+  <section>
+    <h2>검증 결과</h2>
+    <table>
+      <thead>
+        <tr><th>항목</th><th>명령/방법</th><th>결과</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>타입 체크</td><td><code>npm run type-check</code></td><td><span class="badge done">통과 (오류 없음)</span></td></tr>
+        <tr><td>렌더링 실측</td><td>dev 서버 <code>/applicant</code>, 1790 × 1270</td><td><span class="badge done">규격 일치</span></td></tr>
+        <tr><td>전체 빌드</td><td><code>npm run build</code></td><td><span class="badge muted">미실행 (요청 시 수행)</span></td></tr>
+        <tr><td>단위 테스트</td><td><code>npm run test:unit</code></td><td><span class="badge muted">미실행 (변경 범위에 해당 테스트 없음)</span></td></tr>
+      </tbody>
+    </table>
+
+    <h3>실측값</h3>
+    <table>
+      <thead>
+        <tr><th>요소</th><th>측정값</th><th>기대값</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>헤더 폭 / 좌측 시작</td><td>1522px / 134px</td><td>뷰포트의 85%, 중앙 정렬</td></tr>
+        <tr><td>본문 폭</td><td>1522px</td><td>헤더와 동일</td></tr>
+        <tr><td>푸터</td><td><code>position: fixed</code>, 높이 56px, bottom 1270px</td><td>화면 바닥 고정</td></tr>
+        <tr><td>본문 그리드</td><td><code>694.75px 694.75px</code></td><td>1fr : 1fr</td></tr>
+        <tr><td>퀵링크 카드 수</td><td>6장</td><td>6장 (3×2)</td></tr>
+        <tr><td>좌 / 우 컬럼 높이</td><td>384px / 384px</td><td>일치</td></tr>
+        <tr><td>본문 폰트</td><td><code>"Noto Sans KR", "Noto Sans CJK KR", ...</code></td><td>Pretendard 미참조</td></tr>
+        <tr><td>폰트 로딩</td><td><code>@font-face</code> 124개 등록, 사용 구간 9개만 로드, 전부 <code>localhost</code> 200</td><td>외부 CDN 요청 0건</td></tr>
+        <tr><td>헤더 CI</td><td>38.8 × 40px, 비율 0.97</td><td>99 / 102 = 0.971</td></tr>
+        <tr><td>프레임 / 푸터 좌우 경계</td><td>양쪽 모두 left 134px, right 1656px</td><td>완전 일치</td></tr>
+        <tr><td>프레임 세로</td><td>top 0 ~ bottom 1270px, 세로 스크롤 없음</td><td>뷰포트 높이와 일치</td></tr>
+        <tr><td>바깥 배경</td><td><code>rgb(245, 247, 250)</code></td><td>#f5f7fa</td></tr>
+      </tbody>
+    </table>
+    <p class="small">측정 당시 백엔드가 기동되어 있지 않아 채용공고 목록이 빈 상태였다. 그래서 좌측 카드 높이가 384px로 짧게 잡혔고, 우측 카드도 그에 맞춰 축소되었다. 공고가 채워지면 양쪽이 함께 커진다.</p>
+
+    <h3>기존 콘솔 오류 (이번 변경과 무관)</h3>
+    <table>
+      <thead>
+        <tr><th>오류</th><th>원인</th><th>판단</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>메뉴 정보를 불러오지 못했습니다.</code></td>
+          <td>메뉴 트리 API 404</td>
+          <td><span class="badge muted">백엔드 미기동, 변경 전부터 동일</span></td>
+        </tr>
+        <tr>
+          <td><code>Cannot read properties of undefined (reading 'content')</code></td>
+          <td>공고 목록 API 404 응답을 <code>result.data.data.content</code>로 접근</td>
+          <td><span class="badge warn">백엔드 미기동이 직접 원인이나, 실패 응답 방어 코드가 없음</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 7. 결정 로그 -->
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <thead>
+        <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>프레임 폭을 각 화면이 아니라 <code>--app-frame-width</code> 토큰에서 변경</td>
+          <td>지원자 화면 15곳이 이미 이 토큰을 참조하고 있어 한 곳 수정으로 전체가 일관되게 적용된다</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>헤더 배경 바까지 85%로 제한</td>
+          <td>원래는 배경만 풀블리드였으나, 본문과 시각적으로 어긋난다는 지적에 따라 바 전체를 프레임에 맞췄다</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>카드 정사각형(<code>aspect-ratio: 1/1</code>) 포기</td>
+          <td>좌측 높이는 고정이고 정사각 카드 높이는 폭에 비례하므로 특정 폭에서만 하단이 맞는다. 하단 정렬을 우선했다</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>홈 공고 노출을 4건으로 제한</td>
+          <td>6건이면 좌측이 과도하게 길어져 우측 카드가 세로로 늘어진다. 전체 목록은 '바로가기'로 이동 가능하다</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>푸터를 sticky가 아니라 <code>position: fixed</code>로</td>
+          <td>"항상 떠 있어야 한다"는 요구에 맞춰 스크롤과 무관하게 화면 하단에 고정했다</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>라우트 없는 카드도 의도한 경로를 그대로 기재</td>
+          <td>경로를 비워두면 화면 준비 시 다시 찾아야 한다. TODO 주석으로 미존재 사실을 명시했다</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td>Noto Sans KR을 CDN이 아닌 self-host로</td>
+          <td>기존 Pretendard도 self-host였고, 사내망에서 외부 CDN 차단 시 폰트가 깨지지 않도록 했다</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td>정적 weight 4종(496 서브셋)이 아니라 가변 폰트(124 서브셋)로</td>
+          <td>파일 수가 1/4로 줄고 100~900 전 굵기를 커버한다. 총 3.36MB</td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td>CI를 드롭인 슬롯(<code>public/images/ci.*</code>)으로 구현</td>
+          <td><code>header-logo</code>·<code>main-banner</code>와 동일한 기존 패턴이다. 파일만 넣으면 코드 수정 없이 적용된다</td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td>Pretendard woff2 파일은 삭제하지 않고 보존</td>
+          <td>자산 삭제는 되돌리기 어렵다. <code>@font-face</code> 정의만 제거해 실제 로드는 발생하지 않는다</td>
+        </tr>
+        <tr>
+          <td>11</td>
+          <td>윤곽선을 레이아웃 전체가 아니라 <code>.applicant-frame</code> 래퍼에 부여</td>
+          <td>바깥 회색 영역과 안쪽 흰 프레임을 분리해야 한다. 고정 푸터는 프레임 밖으로 빠지므로 좌우 테두리를 따로 줘 선을 이었다</td>
+        </tr>
+        <tr>
+          <td>12</td>
+          <td>본문 높이를 <code>calc(100vh - 72px - ...)</code>에서 flex로 전환</td>
+          <td>헤더 실제 높이가 border 포함 73px이라 계산식이 2px 어긋나 스크롤이 생겼다. flex 컬럼으로 바꿔 매직넘버를 제거했다</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 8. 미결 사항 -->
+  <section>
+    <h2>미결 사항</h2>
+    <table>
+      <thead>
+        <tr><th>#</th><th>질문</th><th>현재 입장</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>신영증권 소개 / 채용 FAQ 화면을 새로 만들 것인가, 외부 링크로 연결할 것인가?</td>
+          <td>미정. 결정 후 <code>applicantRoutes.ts</code>에 추가하거나 카드 <code>url</code>을 외부 URL로 교체한다</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><code>/apply</code>, <code>/my/result</code> 라우트를 이번 기회에 정리할 것인가?</td>
+          <td>기존 값을 보존했다. 별도 승인 시 정리한다</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>카드 설명 문구를 확정 문안으로 교체할 것인가?</td>
+          <td>현재 문구는 임시안이다. 특히 '신영증권 소개', '채용 FAQ' 두 건은 새로 작성한 문구다</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>공고 목록 API 실패 시 방어 코드를 추가할 것인가?</td>
+          <td>기존 결함이며 이번 범위 밖으로 두었다. 별도 작업으로 처리 권장</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>1440px 이하 좁은 화면에서 카드 비율이 세로로 길어지는 것을 허용할 것인가?</td>
+          <td>하단 정렬을 우선한 결과다. 문제가 되면 폭 구간별로 카드 배치(3×2 → 2×3)를 바꾸는 방안이 있다</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>99 × 102 규격의 실제 CI 파일은 언제 반영하는가?</td>
+          <td>미제공 상태다. 현재는 <code>src/assets/images/logo.png</code>(485 × 576)가 폴백으로 표시되며, 99 : 102 박스에 <code>object-fit: contain</code>으로 들어가 좌우에 약간의 여백이 생긴다</td>
+        </tr>
+
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 9. 다음 단계 권장 -->
+  <section>
+    <h2>다음 단계 권장</h2>
+    <div class="two">
+      <div class="card">
+        <h3>바로 이어서</h3>
+        <ul class="list">
+          <li>신영증권 소개 / 채용 FAQ 화면 정의 및 라우트 추가</li>
+          <li>카드 설명 문구 확정</li>
+          <li>백엔드 기동 상태에서 공고가 채워진 홈 재확인</li>
+          <li>99 × 102 CI 파일을 <code>public/images/ci.svg</code>(또는 png)로 반영</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>후속 후보</h3>
+        <ul class="list">
+          <li>로그인 상태 홈 분기 (내 지원 현황 진행바) — <code>/applications/me</code> 응답에 전형 단계 배열 추가 필요</li>
+          <li>공고 목록 API 실패 응답 방어 처리</li>
+          <li>85% 프레임 적용 후 지원자 타 화면(지원서 작성, 공고 상세 등) 레이아웃 점검</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+</body>
+</html>
