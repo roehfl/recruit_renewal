@@ -4,7 +4,7 @@
       <ApplicantBreadcrumb />
 
       <h1 class="page-title">자주 묻는 질문</h1>
-      <p class="page-desc">채용 절차와 지원서 작성에 대해 자주 문의하시는 내용을 정리했습니다.</p>
+      <p class="page-desc">채용 관련해 자주 문의하시는 내용을 정리했습니다. 그 외 문의사항은 <strong class="desc-email">hr@shinyoung.com</strong> 으로 연락 바랍니다.</p>
 
       <p v-if="!loading && categories.length === 0" class="empty-message">
         등록된 FAQ가 없습니다.
@@ -146,6 +146,11 @@ onMounted(async () => {
   margin: 0 0 38px;
   font-size: 15px;
   color: var(--app-text-secondary);
+}
+
+.desc-email {
+  color: var(--app-text-primary);
+  font-weight: 700;
 }
 
 .empty-message {
