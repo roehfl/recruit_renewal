@@ -70,6 +70,7 @@ public class ApplicationEducationService {
         }
 
         Set<Integer> sortOrders = new HashSet<>();
+        int highSchoolCount = 0;
         for (EducationRequest education : request.educations()) {
             validateEducationRequiredFields(education);
             validateOverallGrades(education);
@@ -77,8 +78,14 @@ public class ApplicationEducationService {
                 throw new InvalidJobApplicationException("Education sort order must be unique.");
             }
             List<SemesterGradeRequest> semesterGrades = semesterGradeRequests(education);
-            if (education.educationLevel() == EducationLevel.HIGH_SCHOOL && !semesterGrades.isEmpty()) {
-                throw new InvalidJobApplicationException("High school education cannot include semester grades.");
+            if (education.educationLevel() == EducationLevel.HIGH_SCHOOL) {
+                if (!semesterGrades.isEmpty()) {
+                    throw new InvalidJobApplicationException("High school education cannot include semester grades.");
+                }
+                // 최종 고등학교 1개만 입력받는다.
+                if (++highSchoolCount > 1) {
+                    throw new InvalidJobApplicationException("High school education must not be more than one.");
+                }
             }
             semesterGrades.forEach(this::validateSemesterGrade);
         }

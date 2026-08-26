@@ -446,6 +446,18 @@ class ApplicationEducationServiceTest {
     }
 
     @Test
+    void replace_fails_when_more_than_one_high_school() {
+        Applicant applicant = createApplicant("education-hs-dup", "Education HS Dup");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
+
+        assertThatThrownBy(() -> applicationEducationService.replaceEducations(
+                applicant.getId(),
+                applicationId,
+                new EducationReplaceRequest(List.of(highSchoolEducation(0), highSchoolEducation(1)))
+        )).isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
     void save_education_with_additional_major_and_thesis_roundtrip() {
         Applicant applicant = createApplicant("education-major", "Education Major");
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));

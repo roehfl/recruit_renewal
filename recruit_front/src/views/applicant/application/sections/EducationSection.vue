@@ -26,7 +26,7 @@
                 <!-- 학교 구분 -->
                 <td>
                   <a-select
-                    v-model:value="item.educationLevel" :options="educationLevelType"
+                    v-model:value="item.educationLevel" :options="educationLevelOptions(item)"
                     placeholder="선택" style="width: 113px"
                   />
                 </td>
@@ -359,14 +359,23 @@ function removeItem(index: number) {
   items.splice(index, 1)
 }
 
-// 학교 구분
-const educationLevelType: { value: educationLevelType; label: string }[] = [
-  { value: 'HIGH_SCHOOL', label: '고등학교' },
-  { value: 'COLLEGE', label: '전문대학교' },
-  { value: 'UNIVERSITY', label: '대학교' },
-  { value: 'MASTER', label: '대학원(석사)' },
-  { value: 'DOCTOR', label: '대학원(박사)' },
+// 학교 구분. searchType 은 학교 검색 API 가 쓰는 DB 코드 문자열이라 표시 라벨과 분리한다.
+const educationLevelType: { value: educationLevelType; label: string; searchType: string }[] = [
+  { value: 'HIGH_SCHOOL', label: '최종 고등학교', searchType: '고등학교' },
+  { value: 'COLLEGE', label: '전문대학교', searchType: '전문대학교' },
+  { value: 'UNIVERSITY', label: '대학교', searchType: '대학교' },
+  { value: 'MASTER', label: '대학원(석사)', searchType: '대학원(석사)' },
+  { value: 'DOCTOR', label: '대학원(박사)', searchType: '대학원(박사)' },
 ]
+
+// 최종 고등학교는 1개만 입력 가능하므로, 다른 학력이 이미 선택했으면 옵션을 막는다.
+function educationLevelOptions(current: EducationItem) {
+  const highSchoolTaken = items.some(item => item !== current && item.educationLevel === 'HIGH_SCHOOL')
+  return educationLevelType.map(option => ({
+    ...option,
+    disabled: option.value === 'HIGH_SCHOOL' && highSchoolTaken,
+  }))
+}
 
 // 졸업 구분
 const graduationStatus: { value: graduationStatus; label: string }[] = [
@@ -438,7 +447,7 @@ const handleSchoolConfirm = ( ) => {
 // 학교 검색 클릭 시
 // GET schools
 async function schoolSearchClick () {
-  const schoolType = educationLevelType.find(item => item.value === selecedEducation.value?.educationLevel)?.label
+  const schoolType = educationLevelType.find(item => item.value === selecedEducation.value?.educationLevel)?.searchType
   loading.value = true
   try {
     const result = await educationApi.getSchools({
@@ -591,6 +600,10 @@ const validateBeforeSubmit = () => {
 const vaildation = () => {
     if (items.length === 0) {
       if (props.section.required) throw new Error("학력을 추가하세요.")
+    }
+
+    if (items.filter(item => item?.educationLevel === 'HIGH_SCHOOL').length > 1) {
+      throw new Error('최종 고등학교는 1개만 입력할 수 있습니다.')
     }
 
     for (let i = 0; i < items.length; i++) {
