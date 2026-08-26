@@ -493,3 +493,94 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 오류: 400(이미 활성), 404(미존재)
 - 매핑: front (미구현) ↔ back `QuestionTemplateController.activateTemplate()`
 - 참고: 공고별 질문(`JobPostingQuestion`)에는 activate 명령이 없다. 비활성 시 `sortOrder`가 남아 있고 중복 검사는 active 행만 대상이라, 재활성 시 sortOrder 충돌 해소 정책이 먼저 필요하다
+
+### 화면: FAQ (지원자 FaqView / 관리자 AdminFaqManageView)
+
+- 프론트: `src/views/applicant/FaqView.vue`, `src/views/admin/faq/AdminFaqManageView.vue`, `src/api/faqApi.ts`, `src/api/adminFaqApi.ts`
+- 백엔드: `com.shinyoung.recruit.controller.FaqController`(공개), `com.shinyoung.recruit.controller.AdminFaqController`(관리자)
+- 도메인: `FaqCategory`(카테고리) 1 : N `Faq`(질문/답변). 카테고리·FAQ 각각 `sortOrder`(정렬)와 `active`(노출) 보유
+- 페이징 없음. 지원자 화면은 전체를 한 번에 받아 스크롤로 노출한다
+- 답변(`answer`)은 **평문**이다. HTML을 저장/렌더링하지 않으며 줄바꿈만 그대로 노출한다(`white-space: pre-wrap`)
+- CORS가 GET/POST만 허용하므로 삭제도 POST를 쓴다(`/delete`). 삭제는 `active=false` soft delete다
+
+#### GET `/api/faqs`  🟢 확정(2026-08-26)
+
+- 설명: 지원자 화면용 공개 조회. 인증 불필요
+- 요청: 없음
+- 응답(200): `ApiResponse<[{ id, name, faqs: [{ id, question, answer }] }]>`
+- 노출 규칙
+  - `active=true` 카테고리만, 그 안의 `active=true` FAQ만 반환
+  - 정렬은 카테고리·FAQ 모두 `sortOrder ASC, id ASC`
+  - 노출 가능한 FAQ가 0건인 카테고리는 응답에서 제외한다(빈 카테고리 클릭 방지)
+- 매핑: front `faqApi.fetchFaqs()` ↔ back `FaqController.getFaqs()`
+
+#### GET `/api/admin/faq-categories`  🟢 확정(2026-08-26)
+
+- 설명: 관리자 카테고리 목록. 비활성 포함 전체를 `sortOrder ASC, id ASC`로 반환
+- 응답(200): `ApiResponse<[{ id, name, sortOrder, active, faqCount }]>`
+- `faqCount`는 해당 카테고리의 **활성 FAQ 수**다
+- 권한: `ROLE_ADMIN` 또는 `ROLE_RECRUIT_ADMIN`
+- 매핑: front `adminFaqApi.fetchCategories()` ↔ back `AdminFaqController.getCategories()`
+
+#### POST `/api/admin/faq-categories`  🟢 확정(2026-08-26)
+
+- 설명: 카테고리 생성. `sortOrder`는 서버가 `현재 최대값 + 1`로 부여한다(요청에 없음)
+- 요청: `{ name, active }`
+- 응답(200): `ApiResponse<{ id, name, sortOrder, active, faqCount }>`
+- 오류: 400(`name` 공백), 400(이름 중복)
+
+#### POST `/api/admin/faq-categories/{categoryId}`  🟢 확정(2026-08-26)
+
+- 설명: 카테고리 수정. `sortOrder`는 이 API로 바꾸지 않는다(reorder 전용)
+- 요청: `{ name, active }`
+- 응답(200): `ApiResponse<{ id, name, sortOrder, active, faqCount }>`
+- 오류: 400(검증 실패·이름 중복), 404(미존재)
+
+#### POST `/api/admin/faq-categories/{categoryId}/delete`  🟢 확정(2026-08-26)
+
+- 설명: 카테고리 soft delete(`active=false`). row 삭제 아님. 이미 비활성이면 멱등 통과
+- 하위 FAQ의 `active`는 건드리지 않는다. 카테고리가 비활성이면 공개 조회에서 통째로 빠진다
+- 응답(200): `ApiResponse<Void>`
+- 오류: 404(미존재)
+
+#### POST `/api/admin/faq-categories/reorder`  🟢 확정(2026-08-26)
+
+- 설명: 카테고리 정렬 일괄 반영. 배열 순서대로 `sortOrder`를 `0..n-1`로 정규화한다
+- 요청: `{ ids: [3, 1, 2] }`
+- `ids`는 전체 카테고리 id 집합과 정확히 일치해야 한다(누락·중복·미존재 id는 400)
+- 응답(200): `ApiResponse<Void>`
+
+#### GET `/api/admin/faqs`  🟢 확정(2026-08-26)
+
+- 설명: 관리자 FAQ 목록. 비활성 포함 전체를 `sortOrder ASC, id ASC`로 반환
+- 요청(query): `categoryId`(필수)
+- 응답(200): `ApiResponse<[{ id, categoryId, question, answer, sortOrder, active }]>`
+- 오류: 404(카테고리 미존재)
+
+#### POST `/api/admin/faqs`  🟢 확정(2026-08-26)
+
+- 설명: FAQ 생성. `sortOrder`는 서버가 해당 카테고리 내 `최대값 + 1`로 부여한다
+- 요청: `{ categoryId, question, answer, active }`
+- 응답(200): `ApiResponse<{ id, categoryId, question, answer, sortOrder, active }>`
+- 오류: 400(`question`/`answer` 공백, `question` 500자 초과), 404(카테고리 미존재)
+
+#### POST `/api/admin/faqs/{faqId}`  🟢 확정(2026-08-26)
+
+- 설명: FAQ 수정. `categoryId`를 바꾸면 다른 카테고리로 이동하며, 이동 시 `sortOrder`는 대상 카테고리의 `최대값 + 1`로 재부여한다
+- 요청: `{ categoryId, question, answer, active }`
+- 응답(200): `ApiResponse<{ id, categoryId, question, answer, sortOrder, active }>`
+- 오류: 400(검증 실패), 404(FAQ·카테고리 미존재)
+
+#### POST `/api/admin/faqs/{faqId}/delete`  🟢 확정(2026-08-26)
+
+- 설명: FAQ soft delete(`active=false`). 이미 비활성이면 멱등 통과
+- 응답(200): `ApiResponse<Void>`
+- 오류: 404(미존재)
+
+#### POST `/api/admin/faqs/reorder`  🟢 확정(2026-08-26)
+
+- 설명: 한 카테고리 안의 FAQ 정렬 일괄 반영. 배열 순서대로 `sortOrder`를 `0..n-1`로 정규화한다
+- 요청: `{ categoryId, ids: [7, 5, 6] }`
+- `ids`는 해당 카테고리의 전체 FAQ id 집합과 정확히 일치해야 한다(누락·중복·타 카테고리 id는 400)
+- 응답(200): `ApiResponse<Void>`
+- 오류: 400(id 집합 불일치), 404(카테고리 미존재)

@@ -57,6 +57,14 @@ export const applicantRoutes: RouteRecordRaw[] = [
         redirect: { path: '/applicant/benefits', query: { tab: 'training' } },
       },
       {
+        path: 'faq',
+        name: 'ApplicantFaq',   // 채용안내 > 자주 묻는 질문
+        component: () => import('@/views/applicant/FaqView.vue'),
+        meta: {
+          public: true,
+        },
+      },
+      {
         path: 'recruitProcedure',
         name: 'ApplicantRecruitProcedure',   // 채용안내 > 채용절차
         component: () => import('@/views/applicant/ApplicantRecruitProcedure.vue'),

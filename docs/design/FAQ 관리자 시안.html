@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>신영증권 채용 FAQ 관리자 시안</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap">
+<style>
+  body {
+    margin: 0;
+    background: #f5f7fa;
+    color: #1f2937;
+    font-family: 'Noto Sans KR', 'Noto Sans CJK KR', 'Apple SD Gothic Neo', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  * { box-sizing: border-box; }
+  .icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border: 1px solid #e5e7eb; border-radius: 4px;
+    background: #ffffff; color: #6b7280; cursor: pointer;
+  }
+  .icon-btn:hover { border-color: #0f4726; color: #0f4726; }
+  .text-btn {
+    height: 26px; padding: 0 9px; border: 1px solid #e5e7eb; border-radius: 4px;
+    background: #ffffff; color: #4b5563; font-size: 12px; cursor: pointer;
+    font-family: inherit;
+  }
+  .text-btn:hover { border-color: #0f4726; color: #0f4726; }
+  .text-btn.danger:hover { border-color: #ff4d4f; color: #ff4d4f; }
+  .primary-btn {
+    height: 32px; padding: 0 14px; border: none; border-radius: 4px;
+    background: #0f4726; color: #ffffff; font-size: 13px; font-weight: 500;
+    cursor: pointer; font-family: inherit;
+  }
+</style>
+</head>
+<body>
+
+<div style="display: flex; min-height: 100vh;">
+
+  <!-- 사이드바 -->
+  <aside style="width: 240px; flex: none; display: flex; flex-direction: column; background: linear-gradient(180deg, #0f4726 0%, #0a3a1e 100%); color: #ffffff;">
+    <div style="height: 56px; display: flex; align-items: center; gap: 10px; padding: 0 18px; border-bottom: 1px solid rgba(255,255,255,0.12);">
+      <span style="display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 6px; background: rgba(255,255,255,0.14); font-size: 13px; font-weight: 700;">신</span>
+      <span style="display: flex; flex-direction: column; line-height: 1.25;">
+        <span style="font-size: 13px; font-weight: 700;">신영증권</span>
+        <span style="font-size: 10px; letter-spacing: 0.6px; color: rgba(255,255,255,0.6);">RECRUIT ADMIN</span>
+      </span>
+    </div>
+
+    <nav style="flex: 1 1 auto; padding: 16px 10px;">
+      <p style="margin: 0 0 8px 8px; font-size: 11px; letter-spacing: 0.5px; color: rgba(255,255,255,0.45);">채용 관리</p>
+      <div style="padding: 9px 10px; border-radius: 6px; font-size: 13px; color: rgba(255,255,255,0.82);">채용공고 관리</div>
+      <div style="padding: 9px 10px; border-radius: 6px; font-size: 13px; color: rgba(255,255,255,0.82);">지원서 관리</div>
+
+      <p style="margin: 18px 0 8px 8px; font-size: 11px; letter-spacing: 0.5px; color: rgba(255,255,255,0.45);">사이트 관리</p>
+      <div style="padding: 9px 10px; border-radius: 6px; font-size: 13px; color: rgba(255,255,255,0.82);">메뉴 관리</div>
+      <div style="padding: 9px 10px; border-radius: 6px; background: rgba(255,255,255,0.16); font-size: 13px; font-weight: 600;">FAQ 관리</div>
+      <div style="padding: 9px 10px; border-radius: 6px; font-size: 13px; color: rgba(255,255,255,0.82);">권한 매핑</div>
+    </nav>
+  </aside>
+
+  <!-- 본문 -->
+  <main style="flex: 1 1 auto; min-width: 0; padding: 22px 24px;">
+
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;">
+      <div>
+        <h1 style="margin: 0 0 4px; font-size: 22px; font-weight: 700;">FAQ 관리</h1>
+        <p style="margin: 0; font-size: 13px; color: #6b7280;">카테고리와 질문/답변을 등록하고 노출 순서를 조정합니다.</p>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 320px 1fr; gap: 16px; align-items: start;">
+
+      <!-- 좌: 카테고리 패널 -->
+      <section style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.04);">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+          <span style="font-size: 15px; font-weight: 600;">카테고리</span>
+          <button class="primary-btn" style="height: 28px; padding: 0 10px; font-size: 12px;">+ 추가</button>
+        </div>
+
+        <ul style="list-style: none; margin: 0; padding: 6px;">
+
+          <li style="display: flex; align-items: center; gap: 6px; padding: 10px 10px; border-radius: 6px; background: #f4f8f0;">
+            <span style="flex: 1 1 auto; font-size: 14px; font-weight: 600; color: #0f4726;">지원서 관련</span>
+            <span style="flex: 0 0 auto; font-size: 11px; color: #6b7280;">4건</span>
+            <button class="icon-btn" title="위로" style="opacity: 0.35;">&uarr;</button>
+            <button class="icon-btn" title="아래로">&darr;</button>
+            <button class="text-btn">수정</button>
+            <button class="text-btn danger">삭제</button>
+          </li>
+
+          <li style="display: flex; align-items: center; gap: 6px; padding: 10px 10px; border-radius: 6px;">
+            <span style="flex: 1 1 auto; font-size: 14px; color: #1f2937;">채용 절차</span>
+            <span style="flex: 0 0 auto; font-size: 11px; color: #9ca3af;">6건</span>
+            <button class="icon-btn" title="위로">&uarr;</button>
+            <button class="icon-btn" title="아래로">&darr;</button>
+            <button class="text-btn">수정</button>
+            <button class="text-btn danger">삭제</button>
+          </li>
+
+          <li style="display: flex; align-items: center; gap: 6px; padding: 10px 10px; border-radius: 6px;">
+            <span style="flex: 1 1 auto; font-size: 14px; color: #1f2937;">면접 전형</span>
+            <span style="flex: 0 0 auto; font-size: 11px; color: #9ca3af;">5건</span>
+            <button class="icon-btn" title="위로">&uarr;</button>
+            <button class="icon-btn" title="아래로">&darr;</button>
+            <button class="text-btn">수정</button>
+            <button class="text-btn danger">삭제</button>
+          </li>
+
+          <li style="display: flex; align-items: center; gap: 6px; padding: 10px 10px; border-radius: 6px;">
+            <span style="flex: 1 1 auto; font-size: 14px; color: #9ca3af; text-decoration: line-through;">인사제도 &middot; 복리후생</span>
+            <span style="flex: 0 0 auto; padding: 1px 6px; border-radius: 3px; background: #f1f1f1; font-size: 10px; color: #6b7280;">비노출</span>
+            <button class="icon-btn" title="위로">&uarr;</button>
+            <button class="icon-btn" title="아래로" style="opacity: 0.35;">&darr;</button>
+            <button class="text-btn">수정</button>
+            <button class="text-btn danger">삭제</button>
+          </li>
+
+        </ul>
+      </section>
+
+      <!-- 우: FAQ 목록 -->
+      <section style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.04);">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+          <span style="font-size: 15px; font-weight: 600;">지원서 관련 <span style="font-weight: 400; color: #9ca3af;">&mdash; 질문/답변 4건</span></span>
+          <button class="primary-btn">+ FAQ 추가</button>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+          <colgroup>
+            <col style="width: 56px;"><col><col style="width: 78px;"><col style="width: 210px;">
+          </colgroup>
+          <thead>
+            <tr style="background: #f9fafb; color: #6b7280; font-size: 12px;">
+              <th style="padding: 10px 12px; text-align: center; font-weight: 500; border-bottom: 1px solid #e5e7eb;">순서</th>
+              <th style="padding: 10px 12px; text-align: left; font-weight: 500; border-bottom: 1px solid #e5e7eb;">질문</th>
+              <th style="padding: 10px 12px; text-align: center; font-weight: 500; border-bottom: 1px solid #e5e7eb;">노출</th>
+              <th style="padding: 10px 12px; text-align: center; font-weight: 500; border-bottom: 1px solid #e5e7eb;">관리</th>
+            </tr>
+          </thead>
+          <tbody style="font-size: 13px;">
+
+            <tr>
+              <td style="padding: 12px; text-align: center; color: #9ca3af; border-bottom: 1px solid #f1f1f1;">1</td>
+              <td style="padding: 12px; border-bottom: 1px solid #f1f1f1;">
+                <div style="font-weight: 500; margin-bottom: 3px;">지원서는 어떻게 작성하나요?</div>
+                <div style="font-size: 12px; color: #9ca3af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">채용공고 상세 페이지의 [지원하기] 버튼을 통해 온라인으로만 접수합니다.</div>
+              </td>
+              <td style="padding: 12px; text-align: center; border-bottom: 1px solid #f1f1f1;">
+                <span style="padding: 2px 7px; border-radius: 3px; background: #eaf3de; color: #3b6d11; font-size: 11px;">노출</span>
+              </td>
+              <td style="padding: 12px; text-align: center; border-bottom: 1px solid #f1f1f1; white-space: nowrap;">
+                <button class="icon-btn" title="위로" style="opacity: 0.35;">&uarr;</button>
+                <button class="icon-btn" title="아래로">&darr;</button>
+                <button class="text-btn">수정</button>
+                <button class="text-btn danger">삭제</button>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 12px; text-align: center; color: #9ca3af; border-bottom: 1px solid #f1f1f1;">2</td>
+              <td style="padding: 12px; border-bottom: 1px solid #f1f1f1;">
+                <div style="font-weight: 500; margin-bottom: 3px;">지원서를 최종제출한 뒤에도 수정할 수 있나요?</div>
+                <div style="font-size: 12px; color: #9ca3af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">최종제출 이후에는 수정이 불가능합니다. 제출 전 반드시 확인해 주세요.</div>
+              </td>
+              <td style="padding: 12px; text-align: center; border-bottom: 1px solid #f1f1f1;">
+                <span style="padding: 2px 7px; border-radius: 3px; background: #eaf3de; color: #3b6d11; font-size: 11px;">노출</span>
+              </td>
+              <td style="padding: 12px; text-align: center; border-bottom: 1px solid #f1f1f1; white-space: nowrap;">
+                <button class="icon-btn" title="위로">&uarr;</button>
+                <button class="icon-btn" title="아래로">&darr;</button>
+                <button class="text-btn">수정</button>
+                <button class="text-btn danger">삭제</button>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 12px; text-align: center; color: #9ca3af; border-bottom: 1px solid #f1f1f1;">3</td>
+              <td style="padding: 12px; border-bottom: 1px solid #f1f1f1;">
+                <div style="font-weight: 500; margin-bottom: 3px;">첨부파일은 어떤 형식으로 올려야 하나요?</div>
+                <div style="font-size: 12px; color: #9ca3af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">PDF, JPG, PNG 형식만 지원하며 파일당 10MB를 초과할 수 없습니다.</div>
+              </td>
+              <td style="padding: 12px; text-align: center; border-bottom: 1px solid #f1f1f1;">
+                <span style="padding: 2px 7px; border-radius: 3px; background: #eaf3de; color: #3b6d11; font-size: 11px;">노출</span>
+              </td>
+              <td style="padding: 12px; text-align: center; border-bottom: 1px solid #f1f1f1; white-space: nowrap;">
+                <button class="icon-btn" title="위로">&uarr;</button>
+                <button class="icon-btn" title="아래로">&darr;</button>
+                <button class="text-btn">수정</button>
+                <button class="text-btn danger">삭제</button>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 12px; text-align: center; color: #9ca3af;">4</td>
+              <td style="padding: 12px;">
+                <div style="font-weight: 500; margin-bottom: 3px; color: #9ca3af;">여러 공고에 동시에 지원할 수 있나요?</div>
+                <div style="font-size: 12px; color: #c2c7cd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">중복 지원은 가능하나 전형 일정이 겹칠 수 있습니다.</div>
+              </td>
+              <td style="padding: 12px; text-align: center;">
+                <span style="padding: 2px 7px; border-radius: 3px; background: #f1f1f1; color: #6b7280; font-size: 11px;">비노출</span>
+              </td>
+              <td style="padding: 12px; text-align: center; white-space: nowrap;">
+                <button class="icon-btn" title="위로">&uarr;</button>
+                <button class="icon-btn" title="아래로" style="opacity: 0.35;">&darr;</button>
+                <button class="text-btn">수정</button>
+                <button class="text-btn danger">삭제</button>
+              </td>
+            </tr>
+
+          </tbody>
+        </table>
+      </section>
+
+    </div>
+
+    <!-- 등록/수정 모달 -->
+    <p style="margin: 34px 0 10px; font-size: 12px; color: #9ca3af;">[FAQ 추가 / 수정] 클릭 시 모달</p>
+
+    <div style="display: flex; align-items: center; justify-content: center; padding: 30px; border-radius: 8px; background: rgba(31,41,55,0.35);">
+      <div style="width: 560px; background: #ffffff; border-radius: 8px; box-shadow: 0 8px 24px rgba(31,41,55,0.18); overflow: hidden;">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; border-bottom: 1px solid #e5e7eb;">
+          <span style="font-size: 15px; font-weight: 600;">FAQ 수정</span>
+          <span style="color: #9ca3af; cursor: pointer;">&times;</span>
+        </div>
+
+        <div style="padding: 20px;">
+          <label style="display: block; margin-bottom: 6px; font-size: 13px; color: #4b5563;">카테고리</label>
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 11px; margin-bottom: 16px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 13px;">
+            <span>지원서 관련</span><span style="color: #9ca3af; font-size: 11px;">&#9660;</span>
+          </div>
+
+          <label style="display: block; margin-bottom: 6px; font-size: 13px; color: #4b5563;">질문 (Q)</label>
+          <div style="height: 36px; padding: 8px 11px; margin-bottom: 16px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 13px;">지원서는 어떻게 작성하나요?</div>
+
+          <label style="display: block; margin-bottom: 6px; font-size: 13px; color: #4b5563;">답변 (A)</label>
+          <div style="min-height: 130px; padding: 10px 11px; margin-bottom: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 13px; line-height: 1.75; color: #374151; white-space: pre-wrap;">채용공고 상세 페이지의 [지원하기] 버튼을 통해 온라인으로만 접수합니다.
+
+임시저장 기능을 제공하므로 한 번에 작성하지 않아도 됩니다.</div>
+          <p style="margin: 0 0 16px; font-size: 11px; color: #9ca3af;">평문으로 저장되며 줄바꿈은 그대로 노출됩니다. HTML 태그는 사용할 수 없습니다.</p>
+
+          <div style="display: flex; align-items: center; gap: 9px;">
+            <span style="display: inline-flex; align-items: center; width: 38px; height: 20px; padding: 2px; border-radius: 10px; background: #0f4726;">
+              <span style="width: 16px; height: 16px; margin-left: auto; border-radius: 50%; background: #ffffff;"></span>
+            </span>
+            <span style="font-size: 13px; color: #4b5563;">지원자 화면에 노출</span>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; padding: 13px 20px; border-top: 1px solid #e5e7eb; background: #f9fafb;">
+          <button class="text-btn" style="height: 32px; padding: 0 16px; font-size: 13px;">취소</button>
+          <button class="primary-btn">저장</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+</body>
+</html>

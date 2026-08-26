@@ -303,6 +303,18 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler(FaqNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFaqNotFound(FaqNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidFaqException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidFaq(InvalidFaqException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(SchoolNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleSchoolNotFound(SchoolNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

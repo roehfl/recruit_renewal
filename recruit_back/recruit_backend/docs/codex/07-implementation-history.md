@@ -4449,3 +4449,29 @@
 - `JobPostingQuestion`은 activate 미추가. 비활성 시 `sortOrder`가 남고 중복 검사는 active 행만 대상이라 재활성 시 충돌 가능 — sortOrder 해소 정책 선행 필요.
 - Tests: `QuestionTemplateServiceTest`(activate 성공/이미 활성/미존재 3건), `QuestionTemplateControllerTest`(activate API 1건). `QuestionTemplateServiceTest` + `QuestionTemplateControllerTest` + `JobPostingQuestionServiceTest` 41건 전체 성공.
 - Documentation: `docs/codex/implementation/phase-03c-9-1-question-template-job-posting-question.md`(Follow-up Change 절 추가), `docs/codex/reports/phase-03c-9-1-question-template-job-posting-question.html`, `recruit/api-contract.md`(관리자 질문 템플릿 섹션 신설).
+
+## FAQ 화면 (2026-08-26, front-back 통합 슬라이스)
+
+- Scope: 지원자 FAQ 조회 화면 + 관리자 FAQ 관리 화면. 카테고리 1:N 질문/답변, 카테고리·FAQ 각각 정렬(sortOrder)과 노출(active) 관리. 페이징 없음(전체 스크롤).
+- New classes:
+  - `domain.entity.FaqCategory`(카테고리, name unique + sortOrder + active), `domain.entity.Faq`(question 500자 + answer LONGTEXT 평문 + sortOrder + active, `@ManyToOne(LAZY)` FaqCategory)
+  - `domain.repository.FaqCategoryRepository`, `domain.repository.FaqRepository`(`findVisibleFaqs()` — 활성 카테고리×활성 FAQ fetch join 단일 조회로 N+1 차단)
+  - `service.FaqService`(공개 조회 + 카테고리/FAQ CRUD + reorder)
+  - `controller.FaqController`(공개 `GET /faqs`), `controller.AdminFaqController`(관리자 CRUD)
+  - `dto.request.FaqCategorySaveRequest`/`FaqSaveRequest`/`FaqCategoryReorderRequest`/`FaqReorderRequest`
+  - `dto.response.FaqCategoryResponse`/`FaqResponse`/`PublicFaqCategoryResponse`/`PublicFaqResponse`
+  - `exception.InvalidFaqException`(400)/`FaqNotFoundException`(404)
+- Modified classes: `GlobalExceptionHandler`(FAQ 예외 2종 매핑 추가)
+- APIs: 공개 `GET /faqs`. 관리자 `GET·POST /admin/faq-categories`, `POST /admin/faq-categories/{id}`, `POST /admin/faq-categories/{id}/delete`, `POST /admin/faq-categories/reorder`, `GET·POST /admin/faqs`, `POST /admin/faqs/{id}`, `POST /admin/faqs/{id}/delete`, `POST /admin/faqs/reorder`. 전부 broad `/api/admin/**` 매처로 커버되어 SecurityConfig 무변경.
+- Business rules:
+  - 답변은 **평문**이다. HTML 저장/렌더링 없음(줄바꿈만 `white-space: pre-wrap`으로 보존) — XSS 표면을 만들지 않으려는 의도적 선택.
+  - `sortOrder`는 요청으로 받지 않는다. 생성 시 스코프(전역/카테고리 내) 최대값+1 자동 부여, 변경은 reorder 전용.
+  - reorder 요청의 id 집합은 대상 전체와 정확히 일치해야 한다(부분 정렬 400). 부분 정렬을 허용하면 남은 항목의 sortOrder가 어긋나 화면 순서가 깨진다.
+  - FAQ 수정으로 카테고리를 옮기면 대상 카테고리 최대값+1로 sortOrder 재부여.
+  - 삭제는 `active=false` soft delete(멱등). 카테고리 삭제는 하위 FAQ의 active를 건드리지 않으며, 카테고리가 비활성이면 공개 조회에서 통째로 빠진다.
+  - 공개 조회는 노출 가능한 FAQ가 0건인 카테고리를 제외한다(빈 카테고리 클릭 방지).
+  - CORS 허용 메서드가 GET/POST뿐이라 수정·삭제·정렬도 전부 POST.
+- Frontend: `types/faq.ts`, `api/faqApi.ts`, `api/adminFaqApi.ts`, `views/applicant/FaqView.vue`(좌 카테고리 / 우 Q 아코디언, 다중 펼침), `views/admin/faq/AdminFaqManageView.vue`(좌 카테고리 패널 + 우 FAQ 테이블, ↑↓ 즉시 reorder), 라우트 `/applicant/faq`(public)·`/admin/faqs`.
+- Tests: `FaqControllerTest` 14건 + `FaqRepositoryTest` 3건 전부 성공. 프론트 `npm run type-check`, `npm run build` 성공. 로컬 부팅 후 `GET /api/faqs` 200, 비인증 관리자 API 401 확인.
+- **메뉴 미등록**: `Menu`는 DB 기반이라 지원자 헤더/관리자 사이드바에 FAQ가 뜨려면 메뉴 관리 화면에서 `/applicant/faq`·`/admin/faqs`를 등록해야 한다. 코드로 시드하지 않았다.
+- Documentation: 통합 슬라이스라 recruit/CLAUDE.md §7에 따라 `recruit/api-contract.md` 갱신으로 갈음(HTML 리포트 생략). 시안: `docs/design/FAQ 지원자 시안.html`, `docs/design/FAQ 관리자 시안.html`.
