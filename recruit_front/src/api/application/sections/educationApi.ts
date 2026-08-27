@@ -16,7 +16,7 @@ export const educationApi = {
     return apiClient.get<ApiResponse<schoolItem[]>>(`schools`, {
       params: {
         q: params.q,
-        schoolType: params.schoolType,
+        educationLevel: params.educationLevel,
       }
     })
   },

@@ -27,7 +27,7 @@
                 <td>
                   <a-select
                     v-model:value="item.educationLevel" :options="educationLevelOptions(item)"
-                    placeholder="선택" style="width: 113px"
+                    placeholder="선택" style="width: 145px"
                   />
                 </td>
 
@@ -121,12 +121,12 @@
             <tbody>
               <tr
                 v-for="school in searchSchoolList"
-                :key="school.id"
-                :class="{ selected: schoolForm.schoolId === school.id}"
+                :key="school.schoolCode"
+                :class="{ selected: schoolForm.schoolCode === school.schoolCode}"
                 @click="selectSchool(school)"
                 @cancel="cancelSchoolModal"
               >
-                <td>{{ school.schoolName }}({{ school.region }})</td>
+                <td>{{ school.schoolName }}<template v-if="school.region">({{ school.region }})</template></td>
               </tr>
             </tbody>
           </table>
@@ -140,7 +140,7 @@
           <tbody>
             <tr>
               <td colspan="4">
-                <a-input v-model:value="schoolForm.schoolName" placeholder="직접 입력" />
+                <a-input v-model:value="schoolForm.schoolName" @input="clearSelectedSchool" placeholder="직접 입력" />
               </td>
             </tr>
             <tr  v-if="schoolForm.schoolName">
@@ -279,7 +279,7 @@ import { educationApi } from '@/api/application/sections/educationApi'
 import { logClientEvent } from '@/common/clientEventLogger'
 import { getApiErrorMessage } from '@/api/apiError'
 import type {  CommonCodeItems } from '@/types/commonCode'
-import type { schoolItem, educationLevelType, graduationStatus, dayNightType, campusType, semesterGradeItem } from '@/types/application/sections/education'
+import type { schoolItem, schoolSource, educationLevelType, graduationStatus, dayNightType, campusType, semesterGradeItem } from '@/types/application/sections/education'
 import type { SectionComponentProps } from '@/types/application'
 import type {
   EducationItem,
@@ -313,7 +313,8 @@ function createEmptyItem(): EducationItem {
     transfer: false,
     countryCode: '',
     semesterGrades: [],
-    schoolId: null,
+    schoolCode: null,
+    schoolSource: null,
     overallGradePoint: null,
     overallMaxGradePoint: null,
     overallMajorGradePoint: null,
@@ -342,7 +343,8 @@ function setItems(list: EducationResponse[]) {
       transfer: row.transfer,
       countryCode: row.countryCode,
       semesterGrades: row.semesterGrades ?? [],
-      schoolId: row.schoolId,
+      schoolCode: row.schoolCode,
+      schoolSource: row.schoolSource,
       overallGradePoint: row.overallGradePoint,
       overallMaxGradePoint: row.overallMaxGradePoint,
       overallMajorGradePoint: row.overallMajorGradePoint,
@@ -359,13 +361,13 @@ function removeItem(index: number) {
   items.splice(index, 1)
 }
 
-// 학교 구분. searchType 은 학교 검색 API 가 쓰는 DB 코드 문자열이라 표시 라벨과 분리한다.
-const educationLevelType: { value: educationLevelType; label: string; searchType: string }[] = [
-  { value: 'HIGH_SCHOOL', label: '최종 고등학교', searchType: '고등학교' },
-  { value: 'COLLEGE', label: '전문대학교', searchType: '전문대학교' },
-  { value: 'UNIVERSITY', label: '대학교', searchType: '대학교' },
-  { value: 'MASTER', label: '대학원(석사)', searchType: '대학원(석사)' },
-  { value: 'DOCTOR', label: '대학원(박사)', searchType: '대학원(박사)' },
+// 학교 구분
+const educationLevelType: { value: educationLevelType; label: string }[] = [
+  { value: 'HIGH_SCHOOL', label: '최종 고등학교' },
+  { value: 'COLLEGE', label: '전문대학교' },
+  { value: 'UNIVERSITY', label: '대학교' },
+  { value: 'MASTER', label: '대학원(석사)' },
+  { value: 'DOCTOR', label: '대학원(박사)' },
 ]
 
 // 최종 고등학교는 1개만 입력 가능하므로, 다른 학력이 이미 선택했으면 옵션을 막는다.
@@ -413,7 +415,8 @@ const openSchoolModal = ( education : EducationItem) => {
 
     Object.assign(schoolForm, {
         schoolName: education.schoolName,
-        schoolId: education.schoolId,
+        schoolCode: education.schoolCode,
+        schoolSource: education.schoolSource,
         dayNightType: education.dayNightType ?? 'UNKNOWN',
         campusType: education.campusType ??'UNKNOWN',
 
@@ -424,12 +427,20 @@ const openSchoolModal = ( education : EducationItem) => {
     schoolModalOpen.value = true;
 }
 const schoolModalOpen = ref(false)
-const schoolForm: {search: string|undefined, schoolName: string|undefined, dayNightType: dayNightType, campusType: campusType, schoolId: number | null} = reactive({
+const schoolForm: {
+  search: string | undefined,
+  schoolName: string | undefined,
+  dayNightType: dayNightType,
+  campusType: campusType,
+  schoolCode: string | null,
+  schoolSource: schoolSource | null,
+} = reactive({
   search: undefined,
   schoolName: undefined,
   dayNightType: 'UNKNOWN',
   campusType: 'UNKNOWN',
-  schoolId: null,
+  schoolCode: null,
+  schoolSource: null,
 })
 
 const handleSchoolConfirm = ( ) => {
@@ -437,7 +448,8 @@ const handleSchoolConfirm = ( ) => {
     if (!schoolForm.schoolName) return message.warn('학교명을 선택하거나 입력하세요.');
 
     selecedEducation.value.schoolName = schoolForm.schoolName
-    selecedEducation.value.schoolId = schoolForm.schoolId
+    selecedEducation.value.schoolCode = schoolForm.schoolCode
+    selecedEducation.value.schoolSource = schoolForm.schoolSource
     selecedEducation.value.dayNightType = schoolForm.dayNightType
     selecedEducation.value.campusType = schoolForm.campusType
 
@@ -447,29 +459,44 @@ const handleSchoolConfirm = ( ) => {
 // 학교 검색 클릭 시
 // GET schools
 async function schoolSearchClick () {
-  const schoolType = educationLevelType.find(item => item.value === selecedEducation.value?.educationLevel)?.searchType
+  const educationLevel = selecedEducation.value?.educationLevel
+  if (!educationLevel) return message.warn('학교 구분을 먼저 선택하세요.')
+
   loading.value = true
   try {
     const result = await educationApi.getSchools({
       q: schoolForm.search || '',
-      schoolType: schoolType || '',
+      educationLevel,
     })
 
     searchSchoolList.value = result.data.data
+    if (searchSchoolList.value.length === 0) message.info('검색 결과가 없습니다. 아래에 직접 입력하세요.')
+  } catch {
+    // 외부 학교 검색 API 장애·지연으로 막히면 직접 입력으로 진행할 수 있게 안내한다.
+    searchSchoolList.value = []
+    message.warning('학교 검색에 실패했습니다. 아래에 직접 입력하세요.')
   } finally {
     loading.value = false
   }
 }
 
-// 학교 직접 입력 후 선택시
+// 검색 결과에서 학교 선택 시
 const selectSchool = (school: schoolItem) => {
   schoolForm.schoolName = school.schoolName
-  schoolForm.schoolId = school.id
+  schoolForm.schoolCode = school.schoolCode
+  schoolForm.schoolSource = school.schoolSource
+}
+
+// 직접 입력하면 검색으로 고른 학교코드를 버린다(코드와 학교명 불일치 방지)
+const clearSelectedSchool = () => {
+  schoolForm.schoolCode = null
+  schoolForm.schoolSource = null
 }
 
 const cancelSchoolModal = () => {
   schoolForm.schoolName = undefined
-  schoolForm.schoolId = null
+  schoolForm.schoolCode = null
+  schoolForm.schoolSource = null
 }
 
 // 전공 입력 모달
@@ -646,7 +673,8 @@ function buildPayload(): EducationReplaceRequest {
       transfer: item.transfer,
       countryCode: item.countryCode || undefined,
       semesterGrades: item.semesterGrades || [],
-      schoolId: item.schoolId || null,
+      schoolCode: item.schoolCode || null,
+      schoolSource: item.schoolSource || null,
       sortOrder: index,
       overallGradePoint: item.overallGradePoint || null,
       overallMaxGradePoint: item.overallMaxGradePoint || null,

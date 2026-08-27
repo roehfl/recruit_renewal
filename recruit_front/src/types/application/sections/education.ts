@@ -14,6 +14,11 @@ export type graduationStatus =
   | "DROPPED_OUT"
   | "COMPLETED"
 
+export type schoolSource =
+  | "NEIS"
+  | "UNIV_INFO"
+  | "UNIV_DEPT"
+
 export type dayNightType = 
   | "DAY"
   | "NIGHT"
@@ -51,7 +56,8 @@ export interface EducationItem {
   campusType?: campusType
   transfer?: boolean
   countryCode?: string
-  schoolId?: number | null
+  schoolCode?: string | null
+  schoolSource?: schoolSource | null
   semesterGrades?: semesterGradeItem[]
   overallGradePoint?: number | null
   overallMaxGradePoint?: number | null
@@ -76,7 +82,8 @@ export interface EducationRequestItem {
   countryCode?: string
   sortOrder: number
   semesterGrades?: semesterGradeItem[]
-  schoolId?: number | null
+  schoolCode?: string | null
+  schoolSource?: schoolSource | null
   overallGradePoint?: number | null
   overallMaxGradePoint?: number | null
   overallMajorGradePoint?: number | null
@@ -104,7 +111,8 @@ export interface EducationResponse {
   campusType: campusType
   transfer: boolean
   countryCode: string
-  schoolId: number
+  schoolCode: string | null
+  schoolSource: schoolSource | null
   sortOrder: number
   semesterGrades: semesterGradeItem[]
   overallGradePoint: number
@@ -115,14 +123,14 @@ export interface EducationResponse {
 
 export interface shcoolSerachParams { 
   q: string
-  schoolType: string
+  educationLevel: educationLevelType
 }
 
 export interface schoolItem {
-  id: number
+  schoolCode: string
   schoolName: string
-  schoolType: string
-  region: string
+  schoolSource: schoolSource
+  region: string | null
 }
 
 export interface schoolResponse {

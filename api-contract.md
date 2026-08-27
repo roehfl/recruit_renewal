@@ -67,23 +67,39 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 변경(2026-06-25): 요청·응답에서 `degreeName` 제거. `additionalMajorType`(복수/부/세부전공 구분), `additionalMajorName`(해당 전공 명칭), `thesisTitle`(논문명) 추가.
 - 변경(2026-06-30, 🟢 확정): 학력 단위 전체 평점 요약 4필드 추가 — `overallGradePoint`(전체 평점), `overallMaxGradePoint`(전체 만점기준), `overallMajorGradePoint`(전공 전체 평점), `overallMajorMaxGradePoint`(전공 전체 만점기준). 모두 `BigDecimal`. 전체 쌍은 `HIGH_SCHOOL`이 아니면 필수, `HIGH_SCHOOL`이면 선택. 전공 전체 쌍은 모든 레벨에서 선택. 자동 평균계산 없음(수동 입력).
 - 변경(2026-08-26, 🟢 확정): `HIGH_SCHOOL`(화면 라벨 "최종 고등학교")은 지원서당 **1건만** 허용. 2건 이상이면 400. 스키마 변경 없음(검증 규칙만 추가).
-- 요청: `{ educations: [{ educationLevel, schoolName, majorName, additionalMajorType, additionalMajorName, thesisTitle, admissionDate, graduationDate, graduationStatus, dayNightType, campusType, transfer, countryCode, sortOrder, semesterGrades, schoolId, overallGradePoint, overallMaxGradePoint, overallMajorGradePoint, overallMajorMaxGradePoint }] }`
+- 요청: `{ educations: [{ educationLevel, schoolName, majorName, additionalMajorType, additionalMajorName, thesisTitle, admissionDate, graduationDate, graduationStatus, dayNightType, campusType, transfer, countryCode, sortOrder, semesterGrades, schoolCode, schoolSource, overallGradePoint, overallMaxGradePoint, overallMajorGradePoint, overallMajorMaxGradePoint }] }`
 - 응답(200): `ApiResponse<{ educations: [...] }>` (degreeName 없음, 3필드 + 전체평점 4필드 포함, educationId 포함)
 - `additionalMajorType`는 코드 문자열(프론트가 CommonCode 그룹 `MAJOR_TYPE`로 렌더, 백엔드 validation 미결합). `additionalMajorName`/`thesisTitle`는 선택 자유텍스트.
 - 전체 평점 쌍/전공 전체 쌍은 함께 입력해야 한다(평점만 있고 만점이 없으면 검증 실패). 평점 ≤ 만점, 만점 > 0.
 - 관리자 조회 `GET /api/admin/applications/{id}/educations` 응답도 동일하게 4필드 추가.
 
-### 화면: 관리자 학교 마스터 (School)
+### 화면: 학교 검색 (외부 OpenAPI)
 
-- 프론트: (후속) 학교 검색/관리 화면, `src/api`의 school 관련
-- 백엔드: `SchoolController`(공개 검색), `AdminSchoolController`(CRUD/xlsx import)
+- 프론트: `src/views/applicant/application/sections/EducationSection.vue` 학교찾기 모달, `src/api/application/sections/educationApi.ts`
+- 백엔드: `com.shinyoung.recruit.controller.SchoolSearchController`
 
-#### School 생성·수정·검색·import  🔴 백엔드 구현됨 / 프론트 미반영
+#### GET `/api/schools`  🟢 확정 (2026-08-27, 프론트 반영 완료)
 
-- 변경(2026-06-23): `schoolCode` 제거, `schoolCategory` 추가.
-- 생성/수정 요청·응답: `schoolCode` 없음, `schoolCategory` 포함. `schoolType`/`schoolCategory`는 코드 문자열(프론트가 CommonCode 그룹 `SCHOOL_TYPE`/`SCHOOL_CATEGORY`로 렌더, 백엔드 validation 미결합).
-- xlsx import 헤더(7열): `schoolName, schoolType, schoolCategory, educationMode, region, address, countryCode`
-- 중복제거: `(schoolName, schoolType, region)` fallback
+- 변경(2026-08-27): School 마스터 DB 검색을 **외부 OpenAPI 프록시**로 교체한다. `school` 테이블·관리자 학교 관리(xlsx import 포함)는 폐기한다.
+- 요청: `q`(검색어, 공백이면 빈 목록), `educationLevel`(`EducationLevel` enum). 기존 `schoolType`(한글 라벨) 파라미터는 제거.
+- 응답(200): `ApiResponse<[{ schoolCode, schoolName, schoolSource, region }]>` — 활성/비활성 개념 없음, 상위 20건.
+  - `schoolCode` — 외부 학교코드 문자열. NEIS는 `SD_SCHUL_CODE`, 대학은 학교코드(없으면 학교명으로 대체).
+  - `schoolSource` — `NEIS` | `UNIV_INFO` | `UNIV_DEPT`. 코드 네임스페이스 구분용. 학교 검색이 실제로 쓰는 값은 `NEIS`·`UNIV_INFO` 둘뿐이다.
+- 라우팅: `HIGH_SCHOOL` → NEIS 학교기본정보, `COLLEGE`/`UNIVERSITY`/`MASTER`/`DOCTOR` → 전국대학및전문대학정보표준데이터. 대학원은 별도 학교 목록이 없어 대학교와 같은 학교구분 값을 쓴다.
+- 인증키는 서버 설정에만 두고 프론트에 노출하지 않는다(juso 선례). 키 미설정·외부 장애·파싱 실패는 502.
+- 외부 API 는 직접 호출하지 않고 **DMZ 웹서버를 경유**한다: NEIS `https://juso.go.kr/neis/...`(→ `open.neis.go.kr`), 공공데이터 `https://juso.go.kr/gov/...`(→ `api.data.go.kr`). 프리픽스 뒤 경로는 원본과 동일하다.
+- 대학 API 확정(2026-08-27): 전국대학및전문대학정보(`/openapi/tn_pubr_public_univ_info_api`, 행 1건 = 학교 1곳). 공공데이터포털 표준데이터 규격 — `serviceKey/pageNo/numOfRows/type=json`, 응답 `response.header.resultCode` + `response.body.items`.
+- 학과 단위 데이터셋(`tn_pubr_public_univ_major_api`) 호출 코드는 제거하지 않고 남겨뒀다. 전공명 자동완성 후속 검토용이며 학교 검색 경로에서는 호출하지 않는다.
+- 🔴 미확정: 대학 표준데이터 행의 필드명(`schoolNm`/`schoolGbnNm`/`schoolCd`/`ctprvnNm` 추정)과 학교구분 실제 값(전문대학/대학교). 이 데이터셋은 학교 식별 코드를 제공하지 않을 가능성이 크고, 그 경우 `schoolCode`는 학교명이 된다. 서비스키 발급 후 실측으로 확정한다.
+
+#### 지원서 학력의 학교 식별자  🟢 확정 (2026-08-27, 프론트 반영 완료)
+
+- `ApplicationEducation.schoolId`(School PK, Long) → `schoolCode`(String, 50자) + `schoolSource`(`SchoolSource` enum)로 교체 완료(S2·S3).
+- 지원자가 학교명을 직접 입력하면 `schoolCode`·`schoolSource`는 null 이다(프론트가 검색 선택값을 비운다).
+- 학력 요청/응답에서 `schoolId` 제거, `schoolCode`·`schoolSource` 추가. 관리자 학력 조회 응답도 동일.
+- 학교별 퍼널 통계는 `schoolCode` 기준 그룹핑으로 바뀌었고, 표시명은 지원서 학력 행의 `schoolName`을 쓴다.
+  학교 그룹의 `groupId`는 항상 null 이다(학교코드가 Long PK 가 아님, CERTIFICATE dimension 과 동일).
+- 기존 `school_id` 컬럼/값은 폐기한다. `ddl-auto: update` 라 컬럼은 자동 삭제되지 않으므로 운영에서는 수동 DROP 이 필요하다.
 
 ### 화면: 지원자 어학 (ApplicationLanguage)
 

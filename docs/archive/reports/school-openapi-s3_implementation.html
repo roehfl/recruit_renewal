@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>학교 검색 OpenAPI 전환 S3 - 구현 보고서</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal</div>
+  <h1>학교 검색 OpenAPI 전환 - S3 프론트 연동</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge info">계약 🟢 확정</span>
+  <span class="badge pending">인증키 대기</span>
+  <span class="badge muted">작성일: 2026-08-27</span>
+</header>
+
+<main>
+
+  <!-- ===== 요약 + 현황 ===== -->
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>지원자 학력 입력 화면을 S1·S2 로 바뀐 계약에 맞췄다. 학교 검색은 한글 라벨 대신 <code>educationLevel</code> enum 을 보내고, 결과는 <code>schoolCode</code>·<code>schoolSource</code> 로 받는다.</p>
+      <p>학력 저장 payload 의 <code>schoolId</code> 도 <code>schoolCode</code>·<code>schoolSource</code> 로 교체했다. 이로써 S1 이후 끊겨 있던 학교 검색이 다시 동작한다.</p>
+      <p>외부 API 는 장애·지연이 있을 수 있어, 검색 실패와 결과 없음을 각각 안내하고 직접 입력으로 진행할 수 있게 했다.</p>
+      <p>직접 입력으로 학교명을 고치면 앞서 고른 학교코드를 버린다. 코드와 학교명이 어긋난 채 저장되면 통계 그룹이 잘못 묶이기 때문이다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">검색 파라미터 정렬됨</span></p>
+      <p><span class="badge done">저장 payload 정렬됨</span></p>
+      <p><span class="badge done">type-check 통과</span></p>
+      <p><span class="badge info">계약 🟢 확정</span></p>
+      <p><span class="badge pending">브라우저 실동작 미검증</span></p>
+      <p><span class="badge out">School 마스터 제거는 S4</span></p>
+    </div>
+  </section>
+
+  <!-- ===== 범위 ===== -->
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>학교 검색 요청 파라미터 <code>schoolType</code> → <code>educationLevel</code></li>
+          <li>검색 결과 타입 및 목록 렌더링을 학교코드 기준으로 교체</li>
+          <li>학력 항목·저장 payload 의 <code>schoolId</code> → <code>schoolCode</code>·<code>schoolSource</code></li>
+          <li>검색 실패·결과 없음 안내 및 직접 입력 유도</li>
+          <li>직접 입력 시 선택된 학교코드 해제</li>
+          <li><code>api-contract.md</code> 🟢 확정</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>브라우저 실동작 확인(인증키 발급 후 실제 검색 결과 렌더링)</li>
+          <li>검색 결과에 학교 구분·주소 등 추가 표시(현재 학교명·지역만)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>관리자 화면(학교 관리 UI 는 프론트에 존재하지 않음)</li>
+          <li>통계 화면(<code>groupId</code> null 처리는 기존 코드가 이미 수행)</li>
+          <li>백엔드 변경(S1·S2 에서 완료)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 화면 동작 ===== -->
+  <section>
+    <h2>학교 찾기 모달 동작</h2>
+    <div class="transition">
+      <span class="state">학교 구분 선택</span>
+      <span class="arrow">→</span>
+      <span class="state">학교명 검색</span>
+      <span class="action">GET /api/schools</span>
+      <span class="arrow">→</span>
+      <span class="state">목록에서 선택</span>
+      <span class="action">코드·출처 보관</span>
+      <span class="arrow">→</span>
+      <span class="state">확인</span>
+      <span class="action">학력 행에 반영</span>
+    </div>
+    <div class="transition">
+      <span class="state">검색 실패 / 결과 없음</span>
+      <span class="arrow">→</span>
+      <span class="state">직접 입력</span>
+      <span class="action">코드·출처 = null</span>
+      <span class="arrow">→</span>
+      <span class="state">확인</span>
+    </div>
+    <p class="small">학교 구분을 고르지 않고 검색하면 경고만 띄우고 외부 호출을 하지 않는다. 검색으로 학교를 고른 뒤 직접 입력란을 수정하면 코드가 해제되어 직접 입력과 같은 상태가 된다.</p>
+  </section>
+
+  <!-- ===== 변경 파일 ===== -->
+  <section>
+    <h2>변경 파일</h2>
+    <table>
+      <tr><th>파일</th><th>변경 내용</th></tr>
+      <tr><td><code>src/types/application/sections/education.ts</code></td><td><code>schoolSource</code> 타입 추가, <code>schoolItem</code>·검색 파라미터·학력 항목/요청/응답의 학교 식별자 필드 교체</td></tr>
+      <tr><td><code>src/api/application/sections/educationApi.ts</code></td><td><code>getSchools</code> 쿼리 파라미터를 <code>educationLevel</code> 로 교체</td></tr>
+      <tr><td><code>src/views/applicant/application/sections/EducationSection.vue</code></td><td>학교 구분 옵션에서 검색용 라벨 제거, 검색 호출·결과 렌더링·선택 상태·저장 payload 교체, 실패/빈 결과 안내, 직접 입력 시 코드 해제</td></tr>
+      <tr><td><code>api-contract.md</code></td><td>학교 검색·학력 학교 식별자 섹션 🟢 확정</td></tr>
+    </table>
+  </section>
+
+  <!-- ===== 결정 로그 ===== -->
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>학교 구분 옵션의 검색용 라벨(<code>searchType</code>)을 제거</td><td>백엔드가 enum 을 받으므로 표시 라벨과 검색 값을 분리할 이유가 사라졌다. 라벨은 화면 표기만 담당한다</td></tr>
+      <tr><td>2</td><td>검색 실패를 경고로 처리하고 직접 입력을 유도</td><td>외부 API 장애가 지원서 작성 자체를 막으면 안 된다. 학교명은 직접 입력으로도 저장할 수 있다</td></tr>
+      <tr><td>3</td><td>직접 입력 시 학교코드를 해제</td><td>코드는 통계 그룹 키다. 코드는 A 학교인데 이름만 B 로 바꾼 데이터가 저장되면 집계가 틀어진다</td></tr>
+      <tr><td>4</td><td>지역이 없으면 괄호를 표시하지 않음</td><td>외부 API 는 지역이 비어 올 수 있다. 기존 렌더링은 빈 괄호가 남는다</td></tr>
+    </table>
+  </section>
+
+  <!-- ===== 테스트 결과 ===== -->
+  <section>
+    <h2>테스트 결과</h2>
+    <div class="card">
+      <p><span class="badge done">성공</span> 실행 명령: <code>npm run type-check</code> (vue-tsc)</p>
+      <p><span class="badge pending">미실행</span> 브라우저 실동작 확인 — 외부 API 인증키가 없어 실제 검색 결과를 띄울 수 없다.</p>
+      <p class="small">프론트 단위 테스트는 이 화면을 다루지 않아 실행하지 않았다.</p>
+    </div>
+  </section>
+
+  <!-- ===== 다음 단계 ===== -->
+  <section>
+    <h2>다음 Slice 권장</h2>
+    <table>
+      <tr><th>Slice</th><th>범위</th><th>상태</th></tr>
+      <tr><td><strong>S4</strong><br>레거시 제거</td><td><code>School</code> 엔티티·<code>SchoolRepository</code>·<code>SchoolService</code>·<code>AdminSchoolController</code>·xlsx import·관련 DTO 8종·테스트 3종 삭제, <code>school_id</code> 컬럼 DROP DDL 안내</td><td><span class="badge pending">대기</span></td></tr>
+    </table>
+    <p>S4 는 순수 삭제 슬라이스라 인증키와 무관하게 진행할 수 있다. 다만 인증키 발급 후 실제 검색이 동작하는지 확인한 뒤 지우는 편이 안전하다. 되돌릴 일이 생기면 삭제 전 상태가 남아 있는 쪽이 낫기 때문이다.</p>
+  </section>
+
+</main>
+</body>
+</html>
