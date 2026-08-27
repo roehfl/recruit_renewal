@@ -10,7 +10,6 @@ import com.shinyoung.recruit.domain.entity.ApplicationEducation;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
-import com.shinyoung.recruit.domain.entity.School;
 import com.shinyoung.recruit.domain.entity.Stage;
 import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
@@ -18,7 +17,6 @@ import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
-import com.shinyoung.recruit.domain.repository.SchoolRepository;
 import com.shinyoung.recruit.domain.repository.StageRepository;
 import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.dto.response.ApplicationDailyPointResponse;
@@ -28,6 +26,7 @@ import com.shinyoung.recruit.dto.response.FunnelResponse;
 import com.shinyoung.recruit.dto.response.StageFunnelResponse;
 import com.shinyoung.recruit.enumeration.EducationLevel;
 import com.shinyoung.recruit.enumeration.GraduationStatus;
+import com.shinyoung.recruit.enumeration.SchoolSource;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
@@ -84,9 +83,6 @@ class AdminStatisticsControllerTest {
 
     @Autowired
     private ApplicationEducationRepository educationRepository;
-
-    @Autowired
-    private SchoolRepository schoolRepository;
 
     @Autowired
     private ApplicationCertificateRepository certificateRepository;
@@ -355,23 +351,25 @@ class AdminStatisticsControllerTest {
         assertThat(group(funnel, "기타").population().p()).isEqualTo(1);   // app1
     }
 
+    private static final String ALPHA_CODE = "U-ALPHA";
+    private static final String ALPHA_NAME = "Alpha University";
+    private static final String BETA_CODE = "U-BETA";
+    private static final String BETA_NAME = "Beta University";
+
     @Test
     void school_dimension_groups_by_final_school_with_other_bucket() throws Exception {
         JobPosting jobPosting = saveJobPosting("Backend");
         JobPosition backend = position(jobPosting, "Backend");
         Stage stage1 = saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
-        School alpha = saveSchool("Alpha University");
-        School beta = saveSchool("Beta University");
-
         JobApplication app1 = submittedApplication(jobPosting, backend, "A1");
-        education(app1, EducationLevel.HIGH_SCHOOL, null, 0);   // 최종학력 아님
-        education(app1, EducationLevel.UNIVERSITY, alpha.getId(), 1); // 최종학력 = Alpha
+        education(app1, EducationLevel.HIGH_SCHOOL, null, null, 0);   // 최종학력 아님
+        education(app1, EducationLevel.UNIVERSITY, ALPHA_CODE, ALPHA_NAME, 1); // 최종학력 = Alpha
         JobApplication app2 = submittedApplication(jobPosting, backend, "A2");
-        education(app2, EducationLevel.UNIVERSITY, alpha.getId(), 0);
+        education(app2, EducationLevel.UNIVERSITY, ALPHA_CODE, ALPHA_NAME, 0);
         JobApplication app3 = submittedApplication(jobPosting, backend, "A3");
-        education(app3, EducationLevel.UNIVERSITY, beta.getId(), 0);
+        education(app3, EducationLevel.UNIVERSITY, BETA_CODE, BETA_NAME, 0);
         JobApplication app4 = submittedApplication(jobPosting, backend, "A4");
-        education(app4, EducationLevel.UNIVERSITY, null, 0);    // 직접입력 → 미매칭
+        education(app4, EducationLevel.UNIVERSITY, null, null, 0);    // 직접입력 → 미매칭
         submittedApplication(jobPosting, backend, "A5");        // 학력 없음 → 미매칭
 
         result(stage1, app1, StageResultStatus.PASSED);
@@ -384,7 +382,7 @@ class AdminStatisticsControllerTest {
         assertThat(funnel.population().p()).isEqualTo(5);
 
         DimensionFunnelResponse alphaGroup = group(funnel, "Alpha University");
-        assertThat(alphaGroup.groupId()).isEqualTo(alpha.getId());
+        assertThat(alphaGroup.groupId()).isNull(); // 학교코드는 Long PK 가 아니므로 groupId 미사용
         assertThat(alphaGroup.population().p()).isEqualTo(2);
         assertThat(alphaGroup.stages().get(0).funnelPassedCount()).isEqualTo(1); // app1 PASSED, app2 FAILED
 
@@ -401,12 +399,9 @@ class AdminStatisticsControllerTest {
         JobPosting jobPosting = saveJobPosting("Backend");
         JobPosition backend = position(jobPosting, "Backend");
         saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
-        School alpha = saveSchool("Alpha University");
-        School beta = saveSchool("Beta University");
-
-        education(submittedApplication(jobPosting, backend, "A1"), EducationLevel.UNIVERSITY, alpha.getId(), 0);
-        education(submittedApplication(jobPosting, backend, "A2"), EducationLevel.UNIVERSITY, alpha.getId(), 0);
-        education(submittedApplication(jobPosting, backend, "A3"), EducationLevel.UNIVERSITY, beta.getId(), 0);
+        education(submittedApplication(jobPosting, backend, "A1"), EducationLevel.UNIVERSITY, ALPHA_CODE, ALPHA_NAME, 0);
+        education(submittedApplication(jobPosting, backend, "A2"), EducationLevel.UNIVERSITY, ALPHA_CODE, ALPHA_NAME, 0);
+        education(submittedApplication(jobPosting, backend, "A3"), EducationLevel.UNIVERSITY, BETA_CODE, BETA_NAME, 0);
         submittedApplication(jobPosting, backend, "A4"); // 미매칭
 
         FunnelResponse funnel = getFunnel(jobPosting.getId(), "SCHOOL", 1); // topN=1 → Alpha만 개별
@@ -422,11 +417,10 @@ class AdminStatisticsControllerTest {
         JobPosting jobPosting = saveJobPosting("Backend");
         JobPosition backend = position(jobPosting, "Backend");
         saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
-        School alpha = saveSchool("Alpha University");
 
         JobApplication app = submittedApplication(jobPosting, backend, "A1");
-        education(app, EducationLevel.UNIVERSITY, null, 0);          // 같은 레벨, schoolId 없음
-        education(app, EducationLevel.UNIVERSITY, alpha.getId(), 1); // 같은 레벨, schoolId=Alpha → 우선
+        education(app, EducationLevel.UNIVERSITY, null, null, 0);   // 같은 레벨, 학교코드 없음
+        education(app, EducationLevel.UNIVERSITY, ALPHA_CODE, ALPHA_NAME, 1); // 같은 레벨, 코드 있음 → 우선
 
         FunnelResponse funnel = getFunnel(jobPosting.getId(), "SCHOOL", null);
 
@@ -439,11 +433,8 @@ class AdminStatisticsControllerTest {
         JobPosting jobPosting = saveJobPosting("Backend");
         JobPosition backend = position(jobPosting, "Backend");
         saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
-        School alpha = saveSchool("Alpha University");
-        School beta = saveSchool("Beta University");
-
-        education(submittedApplication(jobPosting, backend, "A1"), EducationLevel.UNIVERSITY, alpha.getId(), 0);
-        education(submittedApplication(jobPosting, backend, "A2"), EducationLevel.UNIVERSITY, beta.getId(), 0);
+        education(submittedApplication(jobPosting, backend, "A1"), EducationLevel.UNIVERSITY, ALPHA_CODE, ALPHA_NAME, 0);
+        education(submittedApplication(jobPosting, backend, "A2"), EducationLevel.UNIVERSITY, BETA_CODE, BETA_NAME, 0);
 
         // topN=0 → limit(0)이 아니라 기본 10으로 clamp → 두 학교 모두 개별 노출, '기타' 없음.
         FunnelResponse funnel = getFunnel(jobPosting.getId(), "SCHOOL", 0);
@@ -451,23 +442,6 @@ class AdminStatisticsControllerTest {
         assertThat(funnel.dimensions()).hasSize(2);
         assertThat(group(funnel, "Alpha University").population().p()).isEqualTo(1);
         assertThat(group(funnel, "Beta University").population().p()).isEqualTo(1);
-    }
-
-    @Test
-    void school_dimension_dangling_school_id_folds_into_other() throws Exception {
-        JobPosting jobPosting = saveJobPosting("Backend");
-        JobPosition backend = position(jobPosting, "Backend");
-        saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
-
-        // School 테이블에 없는 schoolId(dangling) → 개별 그룹이 아니라 '기타'로 합산되어야 한다.
-        education(submittedApplication(jobPosting, backend, "A1"), EducationLevel.UNIVERSITY, 999999L, 0);
-
-        FunnelResponse funnel = getFunnel(jobPosting.getId(), "SCHOOL", null);
-
-        assertThat(funnel.dimensions()).hasSize(1);
-        assertThat(group(funnel, "기타").population().p()).isEqualTo(1);
-        assertThat(funnel.dimensions()).allSatisfy(g -> assertThat(g.groupName()).isNotNull());
-        assertThat(funnel.dimensions()).noneSatisfy(g -> assertThat(g.groupId()).isEqualTo(999999L));
     }
 
     @Test
@@ -499,11 +473,10 @@ class AdminStatisticsControllerTest {
         JobPosition backend = position(jobPosting, "Backend");
         JobPosition frontend = position(jobPosting, "Frontend");
         Stage stage1 = saveStage(jobPosting, "Document", StageType.DOCUMENT, 1);
-        School school = saveSchool("Shinyoung University");
 
         JobApplication app1 = submittedApplication(jobPosting, backend, "App1");
         JobApplication app2 = submittedApplication(jobPosting, frontend, "App2");
-        education(app1, EducationLevel.UNIVERSITY, school.getId(), 1);
+        education(app1, EducationLevel.UNIVERSITY, "U-SY", "Shinyoung University", 1);
         certificate(app1, "정보처리기사");
         result(stage1, app1, StageResultStatus.PASSED);
         result(stage1, app2, StageResultStatus.FAILED);
@@ -766,15 +739,14 @@ class AdminStatisticsControllerTest {
                 .findFirst().orElseThrow();
     }
 
-    private School saveSchool(String name) {
-        return schoolRepository.saveAndFlush(
-                School.create(name, "UNIVERSITY", null, null, "Seoul", null, "KR", true));
-    }
-
-    private void education(JobApplication application, EducationLevel level, Long schoolId, int sortOrder) {
+    /** schoolCode 가 null 이면 직접입력(미매칭) 학력이다. 그룹 표시명은 학력 행의 학교명을 쓴다. */
+    private void education(JobApplication application, EducationLevel level,
+                           String schoolCode, String schoolName, int sortOrder) {
         educationRepository.saveAndFlush(ApplicationEducation.create(
-                application, level, "School-" + sortOrder, null, null, null, null, null, null,
-                GraduationStatus.GRADUATED, null, null, false, "KR", schoolId, sortOrder));
+                application, level, schoolName == null ? "School-" + sortOrder : schoolName,
+                null, null, null, null, null, null,
+                GraduationStatus.GRADUATED, null, null, false, "KR",
+                schoolCode, schoolCode == null ? null : SchoolSource.UNIV_DEPT, sortOrder));
     }
 
     private void certificate(JobApplication application, String certificateName) {

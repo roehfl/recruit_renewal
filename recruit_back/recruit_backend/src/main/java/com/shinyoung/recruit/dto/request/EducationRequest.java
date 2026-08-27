@@ -4,6 +4,7 @@ import com.shinyoung.recruit.enumeration.CampusType;
 import com.shinyoung.recruit.enumeration.DayNightType;
 import com.shinyoung.recruit.enumeration.EducationLevel;
 import com.shinyoung.recruit.enumeration.GraduationStatus;
+import com.shinyoung.recruit.enumeration.SchoolSource;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -52,8 +53,11 @@ public record EducationRequest(
 
         List<@Valid SemesterGradeRequest> semesterGrades,
 
-        /** 선택적 School master 참조(Phase 08c). 자동완성 선택 시에만 값, 직접입력이면 null. */
-        Long schoolId,
+        /** 외부 학교 검색이 준 학교코드. 자동완성 선택 시에만 값, 직접입력이면 null. */
+        String schoolCode,
+
+        /** {@code schoolCode} 의 출처. 코드와 함께 채워진다. */
+        SchoolSource schoolSource,
 
         @DecimalMin(value = "0.0", message = "Overall grade point must be greater than or equal to 0.")
         BigDecimal overallGradePoint,
@@ -68,7 +72,7 @@ public record EducationRequest(
         BigDecimal overallMajorMaxGradePoint
 ) {
 
-    /** schoolId·overall 없이 호출하던 기존 코드 호환용(Phase 08c 이전). */
+    /** 학교코드·overall 없이 호출하던 기존 코드 호환용(Phase 08c 이전). */
     public EducationRequest(
             EducationLevel educationLevel,
             String schoolName,
@@ -88,10 +92,10 @@ public record EducationRequest(
     ) {
         this(educationLevel, schoolName, majorName, additionalMajorType, additionalMajorName, thesisTitle,
                 admissionDate, graduationDate, graduationStatus, dayNightType, campusType, transfer, countryCode,
-                sortOrder, semesterGrades, null);
+                sortOrder, semesterGrades, null, null);
     }
 
-    /** schoolId 포함, overall 없이 호출하던 기존 코드 호환용. */
+    /** 학교코드 포함, overall 없이 호출하던 기존 코드 호환용. */
     public EducationRequest(
             EducationLevel educationLevel,
             String schoolName,
@@ -108,10 +112,11 @@ public record EducationRequest(
             String countryCode,
             Integer sortOrder,
             List<SemesterGradeRequest> semesterGrades,
-            Long schoolId
+            String schoolCode,
+            SchoolSource schoolSource
     ) {
         this(educationLevel, schoolName, majorName, additionalMajorType, additionalMajorName, thesisTitle,
                 admissionDate, graduationDate, graduationStatus, dayNightType, campusType, transfer, countryCode,
-                sortOrder, semesterGrades, schoolId, null, null, null, null);
+                sortOrder, semesterGrades, schoolCode, schoolSource, null, null, null, null);
     }
 }

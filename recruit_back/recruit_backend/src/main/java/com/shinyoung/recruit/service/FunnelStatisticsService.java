@@ -1,13 +1,11 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.JobPosting;
-import com.shinyoung.recruit.domain.entity.School;
 import com.shinyoung.recruit.domain.entity.Stage;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
-import com.shinyoung.recruit.domain.repository.SchoolRepository;
 import com.shinyoung.recruit.domain.repository.StageRepository;
 import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.dto.response.DimensionFunnelResponse;
@@ -68,7 +66,6 @@ public class FunnelStatisticsService {
     private final JobApplicationRepository jobApplicationRepository;
     private final StageResultRepository stageResultRepository;
     private final ApplicationEducationRepository educationRepository;
-    private final SchoolRepository schoolRepository;
     private final ApplicationCertificateRepository certificateRepository;
 
     public FunnelResponse getFunnel(Long jobPostingId, String dimensionParam, Integer topN) {
@@ -153,10 +150,12 @@ public class FunnelStatisticsService {
     }
 
     /**
-     * 학교별 dimension: 지원자별 "최종학력(가장 높은 EducationLevel) 1교"의 {@code schoolId}로 코호트를 분할한다.
-     * 미매칭(최종학력에 schoolId 없음/학력 없음) 및 dangling schoolId(School 테이블에 없음)는 '기타'로 모으고,
-     * 학교 그룹은 인원 desc·schoolId asc로 정렬해 topN(기본 10)만 개별 노출하며, 초과 학교 + 미매칭은 '기타' 한
-     * 그룹으로 합산한다(application 단위 distinct). 개별 그룹은 항상 실재 학교라 groupName 이 null 이 되지 않는다.
+     * 학교별 dimension: 지원자별 "최종학력(가장 높은 EducationLevel) 1교"의 {@code schoolCode}로 코호트를 분할한다.
+     * 미매칭(최종학력에 학교코드 없음 = 직접입력/학력 없음)은 '기타'로 모으고, 학교 그룹은 인원 desc·학교코드 asc로
+     * 정렬해 topN(기본 10)만 개별 노출하며, 초과 학교 + 미매칭은 '기타' 한 그룹으로 합산한다(application 단위 distinct).
+     * 표시명은 지원서 학력 행의 {@code schoolName} 이므로 groupName 이 null 이 되지 않는다.
+     *
+     * <p>{@code groupId} 는 학교코드가 Long PK 가 아니므로 항상 null 이다(CERTIFICATE dimension 과 동일).
      */
     private List<DimensionFunnelResponse> computeSchoolDimension(
             List<Stage> stages,
@@ -165,44 +164,39 @@ public class FunnelStatisticsService {
             Long jobPostingId,
             Integer topN
     ) {
-        Map<Long, Long> schoolByApplication = finalSchoolByApplication(jobPostingId);
+        Map<Long, FunnelSchoolEducationRow> finalEducationByApplication = finalEducationByApplication(jobPostingId);
 
-        // 실재 School 만 그룹 키로 사용한다. dangling schoolId(삭제/오타 등 School 미존재)는 '기타'로 합산한다.
-        Set<Long> candidateSchoolIds = schoolByApplication.values().stream()
-                .filter(java.util.Objects::nonNull)
-                .collect(Collectors.toSet());
-        Map<Long, String> nameById = candidateSchoolIds.isEmpty()
-                ? Map.of()
-                : schoolRepository.findAllById(candidateSchoolIds).stream()
-                        .collect(Collectors.toMap(School::getId, School::getSchoolName));
-
-        Map<Long, List<FunnelCohortRow>> bySchool = new LinkedHashMap<>();
+        // 학교코드가 있는 학력만 그룹 키로 사용한다. 직접입력(코드 없음)은 '기타'로 합산한다.
+        Map<String, String> nameByCode = new HashMap<>();
+        Map<String, List<FunnelCohortRow>> bySchool = new LinkedHashMap<>();
         List<FunnelCohortRow> unmatched = new ArrayList<>();
         for (FunnelCohortRow row : cohort) {
-            Long schoolId = schoolByApplication.get(row.applicationId());
-            if (schoolId == null || !nameById.containsKey(schoolId)) {
-                unmatched.add(row); // 미매칭 또는 dangling → 기타
+            FunnelSchoolEducationRow education = finalEducationByApplication.get(row.applicationId());
+            String schoolCode = education == null ? null : education.schoolCode();
+            if (schoolCode == null) {
+                unmatched.add(row); // 학력 없음 또는 직접입력 → 기타
             } else {
-                bySchool.computeIfAbsent(schoolId, key -> new ArrayList<>()).add(row);
+                nameByCode.putIfAbsent(schoolCode, education.schoolName());
+                bySchool.computeIfAbsent(schoolCode, key -> new ArrayList<>()).add(row);
             }
         }
 
-        List<Map.Entry<Long, List<FunnelCohortRow>>> ranked = bySchool.entrySet().stream()
+        List<Map.Entry<String, List<FunnelCohortRow>>> ranked = bySchool.entrySet().stream()
                 .sorted(Comparator
-                        .<Map.Entry<Long, List<FunnelCohortRow>>>comparingInt(entry -> entry.getValue().size())
+                        .<Map.Entry<String, List<FunnelCohortRow>>>comparingInt(entry -> entry.getValue().size())
                         .reversed()
                         .thenComparing(Map.Entry::getKey))
                 .toList();
 
         int limit = (topN == null || topN <= 0) ? DEFAULT_DIMENSION_TOP_N : Math.min(topN, MAX_DIMENSION_TOP_N);
-        List<Map.Entry<Long, List<FunnelCohortRow>>> top = ranked.stream().limit(limit).toList();
-        List<Map.Entry<Long, List<FunnelCohortRow>>> overflow = ranked.stream().skip(limit).toList();
+        List<Map.Entry<String, List<FunnelCohortRow>>> top = ranked.stream().limit(limit).toList();
+        List<Map.Entry<String, List<FunnelCohortRow>>> overflow = ranked.stream().skip(limit).toList();
 
         List<DimensionFunnelResponse> dimensions = new ArrayList<>();
-        for (Map.Entry<Long, List<FunnelCohortRow>> entry : top) {
+        for (Map.Entry<String, List<FunnelCohortRow>> entry : top) {
             CohortFunnel funnel = computeCohort(stages, entry.getValue(), resultsByStage);
             dimensions.add(new DimensionFunnelResponse(
-                    entry.getKey(), nameById.get(entry.getKey()), funnel.population(), funnel.stages()));
+                    null, nameByCode.get(entry.getKey()), funnel.population(), funnel.stages()));
         }
 
         List<FunnelCohortRow> other = new ArrayList<>(unmatched);
@@ -283,25 +277,23 @@ public class FunnelStatisticsService {
         return normalized.isEmpty() ? null : normalized;
     }
 
-    /** 지원자별 최종학력 1교의 schoolId. 학력 없음/최종학력에 schoolId 없음이면 매핑 없음(미매칭). */
-    private Map<Long, Long> finalSchoolByApplication(Long jobPostingId) {
+    /** 지원자별 최종학력 1건. 학력이 없으면 매핑 없음(미매칭). */
+    private Map<Long, FunnelSchoolEducationRow> finalEducationByApplication(Long jobPostingId) {
         Map<Long, FunnelSchoolEducationRow> best = new HashMap<>();
         for (FunnelSchoolEducationRow row : educationRepository.findFunnelSchoolEducations(jobPostingId)) {
             best.merge(row.applicationId(), row, this::pickFinalEducation);
         }
-        Map<Long, Long> schoolByApplication = new HashMap<>();
-        best.forEach((applicationId, row) -> schoolByApplication.put(applicationId, row.schoolId()));
-        return schoolByApplication;
+        return best;
     }
 
-    /** 최종학력 선택: 더 높은 educationLevel 우선, 동률이면 schoolId 있는 쪽 우선. */
+    /** 최종학력 선택: 더 높은 educationLevel 우선, 동률이면 학교코드 있는 쪽 우선. */
     private FunnelSchoolEducationRow pickFinalEducation(FunnelSchoolEducationRow a, FunnelSchoolEducationRow b) {
         int levelCompare = Integer.compare(levelRank(a), levelRank(b));
         if (levelCompare != 0) {
             return levelCompare > 0 ? a : b;
         }
-        boolean aHasSchool = a.schoolId() != null;
-        boolean bHasSchool = b.schoolId() != null;
+        boolean aHasSchool = a.schoolCode() != null;
+        boolean bHasSchool = b.schoolCode() != null;
         if (aHasSchool != bHasSchool) {
             return aHasSchool ? a : b;
         }

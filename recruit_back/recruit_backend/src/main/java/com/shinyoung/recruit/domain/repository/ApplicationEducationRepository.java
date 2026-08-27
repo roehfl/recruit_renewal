@@ -22,12 +22,13 @@ public interface ApplicationEducationRepository extends JpaRepository<Applicatio
     void deleteByJobApplicationId(Long applicationId);
 
     /**
-     * SCHOOL funnel dimension 입력: 공고의 제출 이력(submittedAt != null) 코호트 학력들(applicationId/level/schoolId).
+     * SCHOOL funnel dimension 입력: 공고의 제출 이력(submittedAt != null) 코호트 학력들
+     * (applicationId/level/schoolCode/schoolName).
      * 지원자별 최종학력 1교 산출은 service 가 in-memory 로 수행한다.
      */
     @Query("""
             select new com.shinyoung.recruit.dto.response.FunnelSchoolEducationRow(
-                e.jobApplication.id, e.educationLevel, e.schoolId)
+                e.jobApplication.id, e.educationLevel, e.schoolCode, e.schoolName)
             from ApplicationEducation e
             where e.jobApplication.jobPosting.id = :jobPostingId
               and e.jobApplication.submittedAt is not null

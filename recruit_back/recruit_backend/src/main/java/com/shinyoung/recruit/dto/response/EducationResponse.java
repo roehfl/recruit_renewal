@@ -6,6 +6,7 @@ import com.shinyoung.recruit.enumeration.CampusType;
 import com.shinyoung.recruit.enumeration.DayNightType;
 import com.shinyoung.recruit.enumeration.EducationLevel;
 import com.shinyoung.recruit.enumeration.GraduationStatus;
+import com.shinyoung.recruit.enumeration.SchoolSource;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,7 +27,8 @@ public record EducationResponse(
         CampusType campusType,
         Boolean transfer,
         String countryCode,
-        Long schoolId,
+        String schoolCode,
+        SchoolSource schoolSource,
         Integer sortOrder,
         BigDecimal overallGradePoint,
         BigDecimal overallMaxGradePoint,
@@ -54,7 +56,8 @@ public record EducationResponse(
                 education.getCampusType(),
                 education.getTransfer(),
                 education.getCountryCode(),
-                education.getSchoolId(),
+                education.getSchoolCode(),
+                education.getSchoolSource(),
                 education.getSortOrder(),
                 education.getOverallGradePoint(),
                 education.getOverallMaxGradePoint(),

@@ -24,6 +24,7 @@ import com.shinyoung.recruit.enumeration.CampusType;
 import com.shinyoung.recruit.enumeration.DayNightType;
 import com.shinyoung.recruit.enumeration.EducationLevel;
 import com.shinyoung.recruit.enumeration.GraduationStatus;
+import com.shinyoung.recruit.enumeration.SchoolSource;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
@@ -110,15 +111,15 @@ class ApplicationEducationServiceTest {
     }
 
     @Test
-    void education_persists_optional_school_id_when_selected_and_null_when_freetext() {
-        Applicant applicant = createApplicant("education-schoolid", "Education SchoolId");
+    void education_persists_optional_school_code_when_selected_and_null_when_freetext() {
+        Applicant applicant = createApplicant("education-schoolcode", "Education SchoolCode");
         Long jobPostingId = createPublishedJobPosting(true);
         Long applicationId = createApplication(applicant, jobPostingId);
 
         EducationRequest linkedToMaster = new EducationRequest(
                 EducationLevel.UNIVERSITY, "Linked University", null, null, null, null,
                 LocalDate.of(2020, 3, 1), LocalDate.of(2024, 2, 1), GraduationStatus.GRADUATED,
-                DayNightType.DAY, CampusType.MAIN, false, "KR", 1, List.of(), 777L,
+                DayNightType.DAY, CampusType.MAIN, false, "KR", 1, List.of(), "U-777", SchoolSource.UNIV_DEPT,
                 new BigDecimal("3.9"), new BigDecimal("4.5"), null, null);
         EducationRequest freeText = new EducationRequest(
                 EducationLevel.HIGH_SCHOOL, "Free Text High", null, null, null, null,
@@ -130,8 +131,10 @@ class ApplicationEducationServiceTest {
 
         EducationResponse linked = responses.stream().filter(r -> r.sortOrder() == 1).findFirst().orElseThrow();
         EducationResponse free = responses.stream().filter(r -> r.sortOrder() == 0).findFirst().orElseThrow();
-        assertThat(linked.schoolId()).isEqualTo(777L);
-        assertThat(free.schoolId()).isNull();
+        assertThat(linked.schoolCode()).isEqualTo("U-777");
+        assertThat(linked.schoolSource()).isEqualTo(SchoolSource.UNIV_DEPT);
+        assertThat(free.schoolCode()).isNull();
+        assertThat(free.schoolSource()).isNull();
     }
 
     @Test
@@ -163,6 +166,7 @@ class ApplicationEducationServiceTest {
                                 grade(1, 2),
                                 grade(1, 1)
                         ),
+                        null,
                         null,
                         new BigDecimal("3.5"),
                         new BigDecimal("4.5"),
@@ -521,7 +525,7 @@ class ApplicationEducationServiceTest {
                 new EducationReplaceRequest(List.of(new EducationRequest(
                         EducationLevel.UNIVERSITY, "University", null, null, null, null,
                         null, null, GraduationStatus.GRADUATED, null, null, false, "KR",
-                        0, List.of(), null, null, null, null, null)))
+                        0, List.of(), null, null, null, null, null, null)))
         )).isInstanceOf(InvalidJobApplicationException.class);
     }
 
@@ -537,7 +541,7 @@ class ApplicationEducationServiceTest {
                 new EducationReplaceRequest(List.of(new EducationRequest(
                         EducationLevel.UNIVERSITY, "University", null, null, null, null,
                         null, null, GraduationStatus.GRADUATED, null, null, false, "KR",
-                        0, List.of(), null,
+                        0, List.of(), null, null,
                         new BigDecimal("4.6"), new BigDecimal("4.5"), null, null)))
         )).isInstanceOf(InvalidJobApplicationException.class);
 
@@ -548,7 +552,7 @@ class ApplicationEducationServiceTest {
                 new EducationReplaceRequest(List.of(new EducationRequest(
                         EducationLevel.UNIVERSITY, "University", null, null, null, null,
                         null, null, GraduationStatus.GRADUATED, null, null, false, "KR",
-                        0, List.of(), null,
+                        0, List.of(), null, null,
                         new BigDecimal("3.8"), new BigDecimal("4.5"),
                         new BigDecimal("3.7"), null)))
         )).isInstanceOf(InvalidJobApplicationException.class);
@@ -560,7 +564,7 @@ class ApplicationEducationServiceTest {
                 new EducationReplaceRequest(List.of(new EducationRequest(
                         EducationLevel.UNIVERSITY, "University", null, null, null, null,
                         null, null, GraduationStatus.GRADUATED, null, null, false, "KR",
-                        0, List.of(), null,
+                        0, List.of(), null, null,
                         new BigDecimal("3.8"), new BigDecimal("4.5"),
                         null, new BigDecimal("4.5"))))
         )).isInstanceOf(InvalidJobApplicationException.class);
@@ -646,6 +650,7 @@ class ApplicationEducationServiceTest {
                 "KR",
                 sortOrder,
                 List.of(grade(2, 1), grade(1, 1)),
+                null,
                 null,
                 new BigDecimal("3.8"),
                 new BigDecimal("4.5"),

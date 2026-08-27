@@ -4,6 +4,7 @@ import com.shinyoung.recruit.enumeration.CampusType;
 import com.shinyoung.recruit.enumeration.DayNightType;
 import com.shinyoung.recruit.enumeration.EducationLevel;
 import com.shinyoung.recruit.enumeration.GraduationStatus;
+import com.shinyoung.recruit.enumeration.SchoolSource;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -29,7 +30,7 @@ import java.time.LocalDate;
         indexes = {
                 @Index(name = "idx_application_education_application", columnList = "job_application_id"),
                 @Index(name = "idx_application_education_sort", columnList = "job_application_id,sort_order"),
-                @Index(name = "idx_application_education_school", columnList = "school_id")
+                @Index(name = "idx_application_education_school", columnList = "school_code")
         }
 )
 @Getter
@@ -82,11 +83,16 @@ public class ApplicationEducation extends BaseEntity {
     private String countryCode;
 
     /**
-     * 선택적 {@link School} master 참조(Phase 08c). 지원자가 자동완성에서 학교를 고른 경우에만 채워지고,
-     * 직접입력(미매칭)이면 null 이다. 강한 FK 가 아니라 application-level 참조다(ADR 0004).
+     * 외부 학교 검색 OpenAPI 가 준 학교코드. 지원자가 자동완성에서 학교를 고른 경우에만 채워지고,
+     * 직접입력(미매칭)이면 null 이다. 학교별 통계 grouping 키로 쓴다.
      */
-    @Column(name = "school_id")
-    private Long schoolId;
+    @Column(name = "school_code", length = 50)
+    private String schoolCode;
+
+    /** {@link #schoolCode} 의 출처. 코드 체계가 출처마다 달라 코드 단독으로는 해석할 수 없다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "school_source", length = 20)
+    private SchoolSource schoolSource;
 
     // 학력 단위 전체(평균) 평점·만점기준. HIGH_SCHOOL이 아니면 서비스 검증에서 필수, HIGH_SCHOOL은 선택. DB는 nullable.
     private BigDecimal overallGradePoint;
@@ -116,7 +122,8 @@ public class ApplicationEducation extends BaseEntity {
             CampusType campusType,
             Boolean transfer,
             String countryCode,
-            Long schoolId,
+            String schoolCode,
+            SchoolSource schoolSource,
             BigDecimal overallGradePoint,
             BigDecimal overallMaxGradePoint,
             BigDecimal overallMajorGradePoint,
@@ -137,7 +144,8 @@ public class ApplicationEducation extends BaseEntity {
         this.campusType = campusType;
         this.transfer = transfer;
         this.countryCode = countryCode;
-        this.schoolId = schoolId;
+        this.schoolCode = schoolCode;
+        this.schoolSource = schoolSource;
         this.overallGradePoint = overallGradePoint;
         this.overallMaxGradePoint = overallMaxGradePoint;
         this.overallMajorGradePoint = overallMajorGradePoint;
@@ -166,7 +174,7 @@ public class ApplicationEducation extends BaseEntity {
                 jobApplication, educationLevel, schoolName, majorName,
                 additionalMajorType, additionalMajorName, thesisTitle,
                 admissionDate, graduationDate, graduationStatus, dayNightType, campusType,
-                transfer, countryCode, null, sortOrder);
+                transfer, countryCode, null, null, sortOrder);
     }
 
     public static ApplicationEducation create(
@@ -184,14 +192,15 @@ public class ApplicationEducation extends BaseEntity {
             CampusType campusType,
             Boolean transfer,
             String countryCode,
-            Long schoolId,
+            String schoolCode,
+            SchoolSource schoolSource,
             Integer sortOrder
     ) {
         return create(
                 jobApplication, educationLevel, schoolName, majorName,
                 additionalMajorType, additionalMajorName, thesisTitle,
                 admissionDate, graduationDate, graduationStatus, dayNightType, campusType,
-                transfer, countryCode, schoolId, null, null, null, null, sortOrder);
+                transfer, countryCode, schoolCode, schoolSource, null, null, null, null, sortOrder);
     }
 
     public static ApplicationEducation create(
@@ -209,7 +218,8 @@ public class ApplicationEducation extends BaseEntity {
             CampusType campusType,
             Boolean transfer,
             String countryCode,
-            Long schoolId,
+            String schoolCode,
+            SchoolSource schoolSource,
             BigDecimal overallGradePoint,
             BigDecimal overallMaxGradePoint,
             BigDecimal overallMajorGradePoint,
@@ -231,7 +241,8 @@ public class ApplicationEducation extends BaseEntity {
                 campusType,
                 transfer,
                 countryCode,
-                schoolId,
+                schoolCode,
+                schoolSource,
                 overallGradePoint,
                 overallMaxGradePoint,
                 overallMajorGradePoint,
