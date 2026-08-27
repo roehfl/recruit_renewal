@@ -14,6 +14,9 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -76,19 +79,10 @@ public class UnivDeptSchoolClient {
             throw new SchoolSearchException("학교 검색 서비스가 설정되지 않았습니다.");
         }
 
-        // 포털의 Encoding/Decoding 표기를 모두 허용한다(이중 인코딩 방지).
-        String normalizedKey = PublicDataServiceKey.normalize(serviceKey);
-
         String body;
         try {
             body = univDeptRestClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .queryParam("serviceKey", normalizedKey)
-                            .queryParam("pageNo", 1)
-                            .queryParam("numOfRows", properties.getPageSize())
-                            .queryParam("type", "json")
-                            .queryParam(FIELD_SCHOOL_NAME, keyword)
-                            .build())
+                    .uri(requestUri(serviceKey, keyword))
                     .retrieve()
                     .body(String.class);
         } catch (RestClientException e) {
@@ -97,6 +91,19 @@ public class UnivDeptSchoolClient {
         }
 
         return parse(body, keyword, schoolKind);
+    }
+
+    /**
+     * 요청 URI 를 직접 조립한다. Spring URI 빌더에 서비스키를 넘기면 {@code +} 를 그대로 두어
+     * 쿼리스트링에서 공백으로 해석되므로(상위 API 403), 인코딩을 직접 통제한다.
+     */
+    private URI requestUri(String serviceKey, String keyword) {
+        return URI.create("%s?serviceKey=%s&pageNo=1&numOfRows=%d&type=json&%s=%s".formatted(
+                properties.getBaseUrl(),
+                PublicDataServiceKey.toQueryValue(serviceKey),
+                properties.getPageSize(),
+                FIELD_SCHOOL_NAME,
+                URLEncoder.encode(keyword, StandardCharsets.UTF_8)));
     }
 
     private List<SchoolSearchResponse> parse(String body, String keyword, String schoolKind) {
