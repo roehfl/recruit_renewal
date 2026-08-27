@@ -163,7 +163,7 @@
       <tr><td><code>educationLevel</code> 누락</td><td><span class="badge warn">400</span></td><td>기존 파라미터 누락 핸들러가 처리</td></tr>
       <tr><td>NEIS 결과 없음(<code>INFO-200</code>)</td><td><span class="badge info">200 빈 목록</span></td><td>오류가 아니라 빈 결과로 취급</td></tr>
       <tr><td>인증키·baseUrl 미설정</td><td><span class="badge out">502</span></td><td>설정 누락은 서버 문제. 상세는 로깅만</td></tr>
-      <tr><td>DMZ 프록시 경유</td><td><span class="badge info">경로 규칙</span></td><td>외부 직접 호출 없이 DMZ 웹서버를 통한다. <code>/neis</code> → NEIS, <code>/gov</code> → 공공데이터포털. 프리픽스 뒤 경로는 원본과 동일</td></tr>
+      <tr><td>DMZ 프록시 경유</td><td><span class="badge info">경로 규칙</span></td><td>외부 직접 호출 없이 DMZ 웹서버를 통한다(<b>HTTP 80</b>). <code>/neis</code> → NEIS, <code>/gov</code> → 공공데이터포털, <code>/juso</code> → 도로명주소. 프리픽스 뒤 경로는 원본과 동일</td></tr>
       <tr><td>네트워크·타임아웃·파싱 실패</td><td><span class="badge out">502</span></td><td>연결 3초 / 읽기 5초</td></tr>
       <tr><td>그 밖의 외부 오류코드</td><td><span class="badge out">502</span></td><td>인증키 관련 메시지를 클라이언트에 노출하지 않는다</td></tr>
     </table>

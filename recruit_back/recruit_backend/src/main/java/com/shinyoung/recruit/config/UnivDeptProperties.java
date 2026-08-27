@@ -23,7 +23,7 @@ public class UnivDeptProperties {
      * 전국대학별학과정보 표준데이터 조회 엔드포인트(GET). DMZ 웹서버를 경유한다
      * ({@code /gov} → {@code api.data.go.kr}).
      */
-    private String baseUrl = "https://juso.go.kr/gov/openapi/tn_pubr_public_univ_major_api";
+    private String baseUrl = "http://juso.go.kr/gov/openapi/tn_pubr_public_univ_major_api";
 
     /** 공공데이터포털에서 발급받은 서비스키(디코딩 키). 서버 보관(프론트 미노출). 미설정 시 호출 단계에서 502로 실패한다. */
     private String serviceKey = "";

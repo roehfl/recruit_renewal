@@ -26,7 +26,7 @@ public class UnivInfoProperties {
      * ({@code /gov} → {@code api.data.go.kr}).
      */
     @NotBlank
-    private String baseUrl = "https://juso.go.kr/gov/openapi/tn_pubr_public_univ_info_api";
+    private String baseUrl = "http://juso.go.kr/gov/openapi/tn_pubr_public_univ_info_api";
 
     /** 공공데이터포털에서 발급받은 서비스키(디코딩 키). 서버 보관(프론트 미노출). 미설정 시 호출 단계에서 502로 실패한다. */
     private String serviceKey = "";

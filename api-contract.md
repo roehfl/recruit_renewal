@@ -87,7 +87,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
   - `schoolSource` — `NEIS` | `UNIV_INFO` | `UNIV_DEPT`. 코드 네임스페이스 구분용. 학교 검색이 실제로 쓰는 값은 `NEIS`·`UNIV_INFO` 둘뿐이다.
 - 라우팅: `HIGH_SCHOOL` → NEIS 학교기본정보, `COLLEGE`/`UNIVERSITY`/`MASTER`/`DOCTOR` → 전국대학및전문대학정보표준데이터. 대학원은 별도 학교 목록이 없어 대학교와 같은 학교구분 값을 쓴다.
 - 인증키는 서버 설정에만 두고 프론트에 노출하지 않는다(juso 선례). 키 미설정·외부 장애·파싱 실패는 502.
-- 외부 API 는 직접 호출하지 않고 **DMZ 웹서버를 경유**한다: NEIS `https://juso.go.kr/neis/...`(→ `open.neis.go.kr`), 공공데이터 `https://juso.go.kr/gov/...`(→ `api.data.go.kr`). 프리픽스 뒤 경로는 원본과 동일하다.
+- 외부 API 는 직접 호출하지 않고 **DMZ 웹서버를 경유**한다(HTTP 80): NEIS `http://juso.go.kr/neis/...`(→ `open.neis.go.kr`), 공공데이터 `http://juso.go.kr/gov/...`(→ `api.data.go.kr`), 주소 `http://juso.go.kr/juso/...`(→ `business.juso.go.kr`). 프리픽스 뒤 경로는 원본과 동일하다.
 - 대학 API 확정(2026-08-27): 전국대학및전문대학정보(`/openapi/tn_pubr_public_univ_info_api`, 행 1건 = 학교 1곳). 공공데이터포털 표준데이터 규격 — `serviceKey/pageNo/numOfRows/type=json`, 응답 `response.header.resultCode` + `response.body.items`.
 - 학과 단위 데이터셋(`tn_pubr_public_univ_major_api`) 호출 코드는 제거하지 않고 남겨뒀다. 전공명 자동완성 후속 검토용이며 학교 검색 경로에서는 호출하지 않는다.
 - 🔴 미확정: 대학 표준데이터 행의 필드명(`schoolNm`/`schoolGbnNm`/`schoolCd`/`ctprvnNm` 추정)과 학교구분 실제 값(전문대학/대학교). 이 데이터셋은 학교 식별 코드를 제공하지 않을 가능성이 크고, 그 경우 `schoolCode`는 학교명이 된다. 서비스키 발급 후 실측으로 확정한다.

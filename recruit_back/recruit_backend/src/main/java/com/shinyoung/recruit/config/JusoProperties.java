@@ -23,7 +23,7 @@ public class JusoProperties {
      * ({@code /juso} → {@code business.juso.go.kr}).
      */
     @NotBlank
-    private String baseUrl = "https://juso.go.kr/juso/addrlink/addrLinkApi.do";
+    private String baseUrl = "http://juso.go.kr/juso/addrlink/addrLinkApi.do";
 
     /** juso에서 발급받은 승인키. 서버 보관(프론트 미노출). 미설정 시 호출 단계에서 502로 실패한다. */
     private String confmKey = "";

@@ -23,7 +23,7 @@ public class NeisProperties {
      * ({@code /neis} → {@code open.neis.go.kr}).
      */
     @NotBlank
-    private String baseUrl = "https://juso.go.kr/neis/hub/schoolInfo";
+    private String baseUrl = "http://juso.go.kr/neis/hub/schoolInfo";
 
     /** NEIS에서 발급받은 인증키. 서버 보관(프론트 미노출). 미설정 시 호출 단계에서 502로 실패한다. */
     private String apiKey = "";
