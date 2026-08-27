@@ -6,7 +6,6 @@ import com.shinyoung.recruit.dto.request.SchoolCreateRequest;
 import com.shinyoung.recruit.dto.request.SchoolUpdateRequest;
 import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.dto.response.SchoolResponse;
-import com.shinyoung.recruit.dto.response.SchoolSearchResponse;
 import com.shinyoung.recruit.exception.SchoolNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -15,34 +14,21 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 
 /**
- * School 관리(Phase 08b). public 자동완성(활성 top-N) + admin CRUD(비활성 포함 페이지 목록).
+ * School 관리(Phase 08b). admin CRUD(비활성 포함 페이지 목록).
+ *
+ * <p>public 자동완성은 외부 OpenAPI 프록시({@link SchoolSearchService})로 이관했다.
  */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class SchoolService {
 
-    /** public 자동완성 결과 상한(cardinality/성능). */
-    private static final int SEARCH_LIMIT = 20;
     /** admin 목록 페이지 크기 상한(과대 size 요청 방어). */
     private static final int MAX_ADMIN_PAGE_SIZE = 200;
 
     private final SchoolRepository schoolRepository;
-
-    /** public: 활성 학교 이름 검색(prefix 우선 + contains), top-N. q 가 비면 빈 목록. */
-    public List<SchoolSearchResponse> search(String q, String schoolType) {
-        String query = blankToNull(q);
-        if (query == null) {
-            return List.of();
-        }
-        return schoolRepository.search(escapeLike(query), blankToNull(schoolType), PageRequest.of(0, SEARCH_LIMIT))
-                .stream()
-                .map(SchoolSearchResponse::from)
-                .toList();
-    }
 
     /** admin: 비활성 포함 페이지 목록(q/schoolType 옵션). */
     public PageResponse<SchoolResponse> getAdminSchools(String q, String schoolType, int page, int size) {

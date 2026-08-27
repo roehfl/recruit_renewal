@@ -69,7 +69,8 @@ recruit:
     font-classpath: ${RECRUIT_PDF_FONT_CLASSPATH:fonts/NanumGothic-Regular.ttf}
   juso:
     # 정부 도로명주소 OpenAPI(juso.go.kr) 프록시 설정. 승인키는 서버 보관(프론트 미노출).
-    base-url: ${JUSO_API_BASE_URL:https://business.juso.go.kr/addrlink/addrLinkApi.do}
+    # 외부 직접 호출이 아니라 DMZ 웹서버를 경유한다(/juso -> business.juso.go.kr).
+    base-url: ${JUSO_API_BASE_URL:https://juso.go.kr/juso/addrlink/addrLinkApi.do}
     # 승인키 미설정(로컬/테스트) 시 실제 호출은 502로 실패한다. 운영은 환경변수 JUSO_CONFM_KEY 주입.
     confm-key: ${JUSO_CONFM_KEY:}
     connect-timeout-ms: ${JUSO_CONNECT_TIMEOUT_MS:3000}
@@ -78,6 +79,35 @@ recruit:
     # juso 조회 허용 범위(currentPage*countPerPage). 초과 요청은 juso가 E0015로 거절하므로 호출 전에 400으로 막는다.
     # 9000은 실측 경계값(9000 정상 / 9010 E0015). totalCount와 무관한 상한이다.
     max-search-range: ${JUSO_MAX_SEARCH_RANGE:9000}
+  neis:
+    # NEIS(교육행정정보시스템) 학교기본정보 OpenAPI. 고등학교 검색용. 인증키는 서버 보관(프론트 미노출).
+    # 외부 직접 호출이 아니라 DMZ 웹서버를 경유한다(/neis -> open.neis.go.kr).
+    base-url: ${NEIS_API_BASE_URL:https://juso.go.kr/neis/hub/schoolInfo}
+    # 인증키 미설정(로컬/테스트) 시 실제 호출은 502로 실패한다. 운영은 환경변수 NEIS_API_KEY 주입.
+    api-key: ${NEIS_API_KEY:}
+    connect-timeout-ms: ${NEIS_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${NEIS_READ_TIMEOUT_MS:5000}
+    page-size: ${NEIS_PAGE_SIZE:20}
+  univ-info:
+    # 공공데이터포털 전국대학및전문대학정보표준데이터. 전문대학·대학교·대학원 학교 검색용(행 1건 = 학교 1곳).
+    # DMZ 웹서버 경유(/gov -> api.data.go.kr).
+    base-url: ${UNIV_INFO_API_BASE_URL:https://juso.go.kr/gov/openapi/tn_pubr_public_univ_info_api}
+    # 포털의 '디코딩' 서비스키를 넣는다(인코딩 키를 넣으면 재인코딩되어 인증이 깨진다).
+    # 미설정(로컬/테스트) 시 실제 호출은 502로 실패한다.
+    service-key: ${UNIV_INFO_API_SERVICE_KEY:}
+    connect-timeout-ms: ${UNIV_INFO_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${UNIV_INFO_READ_TIMEOUT_MS:5000}
+    page-size: ${UNIV_INFO_PAGE_SIZE:50}
+  univ-dept:
+    # 공공데이터포털 전국대학별학과정보표준데이터(학과 단위). 현재 학교 검색에는 쓰지 않는다(전공 자동완성 후속 대비).
+    base-url: ${UNIV_DEPT_API_BASE_URL:https://juso.go.kr/gov/openapi/tn_pubr_public_univ_major_api}
+    # 포털의 '디코딩' 서비스키를 넣는다(인코딩 키를 넣으면 재인코딩되어 인증이 깨진다).
+    # 미설정(로컬/테스트) 시 실제 호출은 502로 실패한다.
+    service-key: ${UNIV_DEPT_API_SERVICE_KEY:}
+    connect-timeout-ms: ${UNIV_DEPT_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${UNIV_DEPT_READ_TIMEOUT_MS:5000}
+    # 학과 단위 데이터라 같은 학교가 여러 행으로 온다. 중복 제거 후에도 결과가 남도록 크게 잡는다.
+    page-size: ${UNIV_DEPT_PAGE_SIZE:100}
   attachment:
     storage-root: ${RECRUIT_ATTACHMENT_STORAGE_ROOT:attachments}
     max-file-size: ${RECRUIT_ATTACHMENT_MAX_FILE_SIZE:20MB}

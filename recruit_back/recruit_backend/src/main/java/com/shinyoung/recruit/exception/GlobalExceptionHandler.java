@@ -361,6 +361,16 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
+    /**
+     * 외부 학교 검색 OpenAPI(NEIS / 대학 표준데이터) 실패. 상위 의존 장애이므로 502로 매핑한다.
+     * 메시지는 클라이언트-안전하게 가공된 값이며, 인증키/오류코드 등 내부 상세는 로깅만 한다.
+     */
+    @ExceptionHandler(SchoolSearchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleSchoolSearch(SchoolSearchException e) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(InvalidStageResultUploadException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidStageResultUpload(InvalidStageResultUploadException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)

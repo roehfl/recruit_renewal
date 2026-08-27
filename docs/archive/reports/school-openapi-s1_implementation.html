@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>학교 검색 OpenAPI 전환 S1 - 구현 보고서</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal</div>
+  <h1>학교 검색 OpenAPI 전환 - S1 백엔드 골격</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge pending">인증키 대기</span>
+  <span class="badge muted">작성일: 2026-08-27 (엔드포인트 확정 반영)</span>
+</header>
+
+<main>
+
+  <!-- ===== 요약 + 현황 ===== -->
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>지원자 학력 입력의 학교 자동완성을 자체 <code>School</code> 마스터 DB 검색에서 <strong>외부 OpenAPI 프록시</strong>로 교체했다. 고등학교는 NEIS 학교기본정보를, 전문대학·대학교·대학원은 공공데이터포털 전국대학및전문대학정보표준데이터를 호출한다.</p>
+      <p>구조는 기존 juso.go.kr 주소 검색 연동(<code>JusoProperties</code>/<code>JusoClientConfig</code>/<code>JusoAddressClient</code>)을 그대로 따랐다. 인증키는 서버 설정에만 두고 프론트에 노출하지 않으며, 키 미설정·외부 장애·파싱 실패는 모두 502로 감춘다.</p>
+      <p>인증키 발급 전이라 실제 응답 검증은 하지 못했다. 외부 호출 없이 검증 가능한 라우팅·중복제거·오류 매핑만 테스트로 고정했다.</p>
+      <p>전체 전환은 S1~S4로 나눈다. 이번은 S1(검색 백엔드)까지이며, 학력 스키마 전환(S2)·프론트 연동(S3)·레거시 제거(S4)는 후속이다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">검색 백엔드 교체됨</span></p>
+      <p><span class="badge done">테스트 통과</span></p>
+      <p><span class="badge info">계약 문서 🟡 초안</span></p>
+      <p><span class="badge pending">인증키 미발급</span></p>
+      <p><span class="badge pending">대학 API 실측 미완</span></p>
+      <p><span class="badge out">School 마스터 제거는 S4</span></p>
+    </div>
+  </section>
+
+  <!-- ===== 범위 ===== -->
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>NEIS·대학 표준데이터 설정 클래스 및 <code>RestClient</code> 빈</li>
+          <li>외부 API 호출 클라이언트 2종(호출·파싱·오류코드 분류)</li>
+          <li>학교 구분별 API 라우팅 + 학교 단위 중복제거</li>
+          <li><code>GET /api/schools</code> 파라미터·응답 스키마 교체</li>
+          <li><code>SchoolSearchException</code> → 502 매핑</li>
+          <li><code>api-contract.md</code> 학교 검색 섹션 🟡 초안</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>대학 표준데이터 행 필드명·학교구분 값 확정(서비스키 발급 후 실측)</li>
+          <li><code>ApplicationEducation</code>의 <code>schoolId</code> → <code>schoolCode</code> 전환(S2)</li>
+          <li>학교별 퍼널 통계 그룹핑 키 교체(S2)</li>
+          <li>프론트 학교찾기 모달 연동(S3)</li>
+          <li>결과 캐싱(외부 호출 쿼터 대응)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li><code>School</code> 엔티티·Repository 삭제(S4)</li>
+          <li>관리자 학교 관리·xlsx import 제거(S4)</li>
+          <li>기존 <code>school_id</code> 데이터 마이그레이션(폐기 확정)</li>
+          <li>해외 학교 검색(두 API 모두 국내만 제공, 직접입력 유지)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== API ===== -->
+  <section>
+    <h2>API</h2>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>상태</th></tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/api/schools</code></td>
+        <td>학교 자동완성 검색. 파라미터 <code>q</code>(검색어), <code>educationLevel</code>(필수)</td>
+        <td><span class="badge done">교체됨</span></td>
+      </tr>
+    </table>
+
+    <div class="card">
+      <h3>응답 필드</h3>
+      <table>
+        <tr><th>필드</th><th>타입</th><th>설명</th></tr>
+        <tr><td><code>schoolCode</code></td><td>String</td><td>외부 학교코드. NEIS는 <code>SD_SCHUL_CODE</code>, 대학은 학교코드(없으면 학교명으로 대체)</td></tr>
+        <tr><td><code>schoolName</code></td><td>String</td><td>학교명</td></tr>
+        <tr><td><code>schoolSource</code></td><td>SchoolSource</td><td><code>NEIS</code> | <code>UNIV_INFO</code> | <code>UNIV_DEPT</code>. 코드 체계가 달라 네임스페이스 구분에 쓴다. 학교 검색이 실제로 내보내는 값은 앞의 둘</td></tr>
+        <tr><td><code>region</code></td><td>String</td><td>소재지</td></tr>
+      </table>
+      <p class="small">기존 응답의 <code>id</code>(School PK, Long)와 <code>schoolType</code>은 제거됐다. 요청 파라미터도 한글 라벨 <code>schoolType</code>에서 enum <code>educationLevel</code>로 바뀌었다.</p>
+    </div>
+
+    <div class="card">
+      <h3>학교 구분별 라우팅</h3>
+      <table>
+        <tr><th>educationLevel</th><th>호출 대상</th><th>필터 값</th></tr>
+        <tr><td><code>HIGH_SCHOOL</code></td><td>NEIS 학교기본정보</td><td><code>SCHUL_KND_SC_NM</code> = 고등학교</td></tr>
+        <tr><td><code>COLLEGE</code></td><td>전국대학및전문대학정보</td><td>학교구분 = 전문대학</td></tr>
+        <tr><td><code>UNIVERSITY</code></td><td>전국대학및전문대학정보</td><td>학교구분 = 대학교</td></tr>
+        <tr><td><code>MASTER</code> / <code>DOCTOR</code></td><td>전국대학및전문대학정보</td><td>학교구분 = 대학교(대학원 전용 학교 목록이 없다)</td></tr>
+      </table>
+      <p class="small">2026-08-27 데이터셋 교체: 처음 잡았던 <b>전국대학별학과정보</b>는 학과 단위라 학교 목록으로는 맞지 않았다(학교 식별 코드도 제공 항목에 없다). 행 1건이 학교 1곳인 <b>전국대학및전문대학정보</b>로 바꿨다. 학과 데이터셋 호출 코드(<code>UnivDeptSchoolClient</code>)는 전공명 자동완성 후속 검토용으로 남겨뒀고, 학교 검색 경로에서는 호출하지 않는다. 학교구분 실제 값은 서비스키 발급 후 확정해야 한다.</p>
+    </div>
+  </section>
+
+  <!-- ===== 오류 처리 ===== -->
+  <section>
+    <h2>오류 처리</h2>
+    <table>
+      <tr><th>상황</th><th>응답</th><th>비고</th></tr>
+      <tr><td>검색어 공백</td><td><span class="badge info">200 빈 목록</span></td><td>외부 호출 없이 즉시 반환(기존 동작 유지)</td></tr>
+      <tr><td><code>educationLevel</code> 누락</td><td><span class="badge warn">400</span></td><td>기존 파라미터 누락 핸들러가 처리</td></tr>
+      <tr><td>NEIS 결과 없음(<code>INFO-200</code>)</td><td><span class="badge info">200 빈 목록</span></td><td>오류가 아니라 빈 결과로 취급</td></tr>
+      <tr><td>인증키·baseUrl 미설정</td><td><span class="badge out">502</span></td><td>설정 누락은 서버 문제. 상세는 로깅만</td></tr>
+      <tr><td>DMZ 프록시 경유</td><td><span class="badge info">경로 규칙</span></td><td>외부 직접 호출 없이 DMZ 웹서버를 통한다. <code>/neis</code> → NEIS, <code>/gov</code> → 공공데이터포털. 프리픽스 뒤 경로는 원본과 동일</td></tr>
+      <tr><td>네트워크·타임아웃·파싱 실패</td><td><span class="badge out">502</span></td><td>연결 3초 / 읽기 5초</td></tr>
+      <tr><td>그 밖의 외부 오류코드</td><td><span class="badge out">502</span></td><td>인증키 관련 메시지를 클라이언트에 노출하지 않는다</td></tr>
+    </table>
+  </section>
+
+  <!-- ===== 변경 파일 ===== -->
+  <section>
+    <h2>변경 파일</h2>
+    <h3>신규</h3>
+    <table>
+      <tr><th>파일</th><th>유형</th><th>역할</th></tr>
+      <tr><td><code>config/NeisProperties.java</code></td><td>설정</td><td>NEIS baseUrl·인증키·타임아웃·페이지 크기</td></tr>
+      <tr><td><code>config/UnivInfoProperties.java</code></td><td>설정</td><td>전국대학및전문대학정보 baseUrl(확정)·서비스키·타임아웃·페이지 크기</td></tr>
+      <tr><td><code>config/UnivDeptProperties.java</code></td><td>설정</td><td>전국대학별학과정보 설정. 학교 검색 경로에서는 사용하지 않는다</td></tr>
+      <tr><td><code>config/SchoolOpenApiClientConfig.java</code></td><td>설정</td><td><code>neisRestClient</code>, <code>univDeptRestClient</code> 빈</td></tr>
+      <tr><td><code>service/NeisSchoolClient.java</code></td><td>Component</td><td>NEIS 호출·<code>JsonNode</code> 파싱·<code>RESULT</code> 코드 분류</td></tr>
+      <tr><td><code>service/UnivInfoSchoolClient.java</code></td><td>Component</td><td>전국대학및전문대학정보 호출·행 파싱·학교구분 필터(학교 검색 경로)</td></tr>
+      <tr><td><code>service/UnivDeptSchoolClient.java</code></td><td>Component</td><td>전국대학별학과정보 호출. 보존만 하고 호출하지 않는다</td></tr>
+      <tr><td><code>service/SchoolSearchService.java</code></td><td>Service</td><td>구분별 라우팅, 학교코드 기준 중복제거, 상위 20건</td></tr>
+      <tr><td><code>enumeration/SchoolSource.java</code></td><td>Enum</td><td><code>NEIS</code>, <code>UNIV_DEPT</code></td></tr>
+      <tr><td><code>exception/SchoolSearchException.java</code></td><td>Exception</td><td>외부 학교 검색 실패(502 매핑)</td></tr>
+      <tr><td><code>service/SchoolSearchServiceTest.java</code></td><td>Test</td><td>라우팅·중복제거 단위 테스트(mock)</td></tr>
+      <tr><td><code>controller/SchoolSearchControllerTest.java</code></td><td>Test</td><td>계약·오류 매핑 테스트</td></tr>
+    </table>
+
+    <h3>수정</h3>
+    <table>
+      <tr><th>파일</th><th>내용</th></tr>
+      <tr><td><code>controller/SchoolSearchController.java</code></td><td>파라미터를 <code>schoolType</code>(String) → <code>educationLevel</code>(enum)로 교체, <code>SchoolSearchService</code> 위임</td></tr>
+      <tr><td><code>dto/response/SchoolSearchResponse.java</code></td><td>필드 전면 교체, <code>from(School)</code> 제거</td></tr>
+      <tr><td><code>service/SchoolService.java</code></td><td>public 자동완성 <code>search()</code> 제거(admin CRUD만 남김)</td></tr>
+      <tr><td><code>exception/GlobalExceptionHandler.java</code></td><td><code>SchoolSearchException</code> → 502 핸들러 추가</td></tr>
+      <tr><td><code>resources/application.yaml</code></td><td><code>recruit.neis</code>, <code>recruit.univ-dept</code> 설정 블록 추가(값은 환경변수 주입)</td></tr>
+      <tr><td><code>controller/SchoolControllerTest.java</code></td><td>DB 기반 public 검색 테스트 4건 제거, 비활성 검색 단언 정리</td></tr>
+      <tr><td><code>api-contract.md</code></td><td>학교 마스터 섹션을 학교 검색(OpenAPI) 섹션으로 재작성(🟡 초안)</td></tr>
+    </table>
+  </section>
+
+  <!-- ===== 결정 로그 ===== -->
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>juso 연동 구조를 그대로 복제</td><td>외부 OpenAPI 프록시 선례가 이미 있고, 타임아웃·키 은닉·오류 분류 규칙이 검증돼 있다</td></tr>
+      <tr><td>2</td><td>고정 스키마 record 대신 <code>JsonNode</code> 순회로 파싱</td><td>NEIS는 정상/오류 응답의 최상위 구조가 다르고, 대학 표준데이터는 행 필드명이 확정 전이라 스키마를 고정하기 이르다</td></tr>
+      <tr><td>3</td><td>학교 검색 데이터셋을 <code>tn_pubr_public_univ_info_api</code>(전국대학및전문대학정보)로 확정</td><td>먼저 잡았던 학과 데이터셋은 행이 학과라 학교 목록으로 부적합하고 학교 식별 코드도 없다. 학교 데이터셋은 행 1건이 학교 1곳이라 중복제거도 필요 없다</td></tr>
+      <tr><td>7</td><td>대학원도 대학교 목록을 그대로 사용</td><td>대학원 전용 학교 목록이 없다. 지원자는 "○○대학교"로 입력하므로 실사용에 문제가 없다</td></tr>
+      <tr><td>8</td><td>학과 데이터셋 호출 코드를 남겨둠</td><td>사용자 지시. 학력 입력의 <code>majorName</code> 은 현재 자유 입력이라 전공명 자동완성에 재활용할 여지가 있다</td></tr>
+      <tr><td>4</td><td>대학 API의 <code>page-size</code>를 100으로(자동완성 상한 20보다 크게)</td><td>학과 단위 데이터라 같은 학교가 여러 행으로 온다. 중복제거 후에도 결과가 남아야 한다</td></tr>
+      <tr><td>5</td><td>NEIS <code>INFO-200</code>은 오류가 아닌 빈 결과</td><td>검색 결과 없음은 정상 흐름이다. 502로 올리면 사용자가 장애로 오인한다</td></tr>
+      <tr><td>6</td><td>파라미터를 <code>educationLevel</code> enum으로 교체</td><td>기존에는 프론트가 한글 라벨을 그대로 보내 DB 값과 문자열 일치에 의존했다. enum이면 오타·라벨 변경에 깨지지 않는다</td></tr>
+    </table>
+  </section>
+
+  <!-- ===== 미결 사항 ===== -->
+  <section>
+    <h2>미결 사항</h2>
+    <table>
+      <tr><th>#</th><th>질문</th><th>현재 입장</th></tr>
+      <tr><td>1</td><td>학교명 검색 파라미터(<code>schoolNm</code>)를 상위 API 가 실제로 필터로 받는가</td><td>무시될 수 있어 응답에서 학교명 포함 여부를 한 번 더 거른다. 필터가 먹지 않으면 첫 페이지만 조회되므로 실측 후 조정한다</td></tr>
+      <tr><td>2</td><td>행 필드명(<code>schoolNm</code>/<code>schoolGbn</code>/<code>schoolCd</code>/<code>ctprvnNm</code>)이 실제와 일치하는가</td><td>클라이언트 상수로 모아뒀다. 다르면 상수만 고치면 된다</td></tr>
+      <tr><td>3</td><td>대학원·전문대학이 같은 데이터셋에 포함되는가</td><td>포함 전제로 라우팅했다. 별도 데이터셋이면 클라이언트를 하나 더 둔다</td></tr>
+      <tr><td>4</td><td>학교 식별 코드가 응답에 있는가</td><td>포털의 제공 항목 목록에는 없다. 없으면 학교명이 코드가 되어 학교별 통계 그룹 키가 학교명 문자열이 된다</td></tr>
+      <tr><td>5</td><td>일일 호출 쿼터 대응이 필요한가</td><td>현재 캐싱 없음. 실사용 호출량 확인 후 결정한다</td></tr>
+      <tr><td>6</td><td>서비스키를 인코딩/디코딩 중 무엇으로 넣는가</td><td><b>디코딩 키</b>를 넣는다. 인코딩 키를 넣으면 URI 빌더가 다시 인코딩해 인증이 깨진다</td></tr>
+      <tr><td>7</td><td>DMZ 프록시가 프리픽스 뒤 경로를 그대로 전달하는가</td><td>그대로 전달한다고 보고 <code>/neis/hub/schoolInfo</code>, <code>/gov/openapi/tn_pubr_public_univ_info_api</code> 로 구성했다. 프록시가 경로를 다르게 매핑하면 환경변수로 덮어쓴다</td></tr>
+    </table>
+  </section>
+
+  <!-- ===== 테스트 결과 ===== -->
+  <section>
+    <h2>테스트 결과</h2>
+    <div class="card">
+      <p><span class="badge done">성공</span> 실행 대상: <code>SchoolSearchServiceTest</code>, <code>SchoolSearchControllerTest</code>, <code>SchoolControllerTest</code></p>
+      <table>
+        <tr><th>테스트</th><th>검증 내용</th></tr>
+        <tr><td>검색어가 비면 외부호출 없이 빈 목록</td><td>공백 입력 시 두 클라이언트 모두 호출되지 않는다</td></tr>
+        <tr><td>고등학교는 NEIS로 라우팅</td><td><code>HIGH_SCHOOL</code>이면 NEIS만 호출하고 <code>schoolSource</code>가 <code>NEIS</code></td></tr>
+        <tr><td>대학·대학원은 학교구분값으로 라우팅</td><td>전문대학/대학교/대학원 값이 각각 전달되고, 석사·박사는 같은 값을 쓴다</td></tr>
+        <tr><td>같은 학교코드는 한 번만 남는다</td><td>학과 단위 중복 행이 학교 단위로 접힌다</td></tr>
+        <tr><td>학교구분 누락은 400</td><td>필수 파라미터 검증</td></tr>
+        <tr><td>인증키 미설정이면 502</td><td>설정 누락이 상위 의존 장애로 매핑된다</td></tr>
+      </table>
+      <p class="small">전체 리그레션은 실행하지 않았다(변경 범위만 검증하는 프로젝트 정책). 실제 외부 API 응답 파싱은 인증키가 없어 검증하지 못했다.</p>
+    </div>
+  </section>
+
+  <!-- ===== 다음 단계 ===== -->
+  <section>
+    <h2>다음 Slice 권장</h2>
+    <table>
+      <tr><th>Slice</th><th>범위</th><th>상태</th></tr>
+      <tr><td><strong>S2</strong><br>학력 스키마·통계 전환</td><td><code>ApplicationEducation</code>의 <code>schoolId</code> → <code>schoolCode</code>+<code>schoolSource</code>, 관련 DTO, 학교별 퍼널 통계 그룹핑, 수동 DDL</td><td><span class="badge pending">대기</span></td></tr>
+      <tr><td><strong>S3</strong><br>프론트 연동</td><td>학교찾기 모달의 파라미터·결과 처리, <code>educationApi</code>·타입 수정, 외부 지연·실패 시 직접입력 유도</td><td><span class="badge pending">대기</span></td></tr>
+      <tr><td><strong>S4</strong><br>레거시 제거</td><td><code>School</code> 엔티티·Repository·admin CRUD·xlsx import·관련 DTO·테스트 삭제, 계약 🟢 확정</td><td><span class="badge pending">대기</span></td></tr>
+    </table>
+    <p>S2 착수 전에 인증키를 발급받아 미결 사항 1~4를 실측으로 닫는 것을 권한다. 특히 학교코드 존재 여부(미결 4)는 S2의 저장 키 설계를 좌우한다.</p>
+  </section>
+
+</main>
+</body>
+</html>

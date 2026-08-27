@@ -1,23 +1,17 @@
 package com.shinyoung.recruit.dto.response;
 
-import com.shinyoung.recruit.domain.entity.School;
+import com.shinyoung.recruit.enumeration.SchoolSource;
 
 /**
- * public 자동완성 응답(경량). 지원자가 학교를 고를 때 필요한 식별·표시 필드만 노출한다(비민감).
+ * 학교 자동완성 응답(경량). 지원자가 학교를 고를 때 필요한 식별·표시 필드만 노출한다(비민감).
+ *
+ * <p>{@code schoolCode}는 외부 OpenAPI가 주는 학교 식별자이며, 체계가 출처마다 다르므로
+ * {@code schoolSource}와 함께 해석한다.
  */
 public record SchoolSearchResponse(
-        Long id,
+        String schoolCode,
         String schoolName,
-        String schoolType,
+        SchoolSource schoolSource,
         String region
 ) {
-
-    public static SchoolSearchResponse from(School school) {
-        return new SchoolSearchResponse(
-                school.getId(),
-                school.getSchoolName(),
-                school.getSchoolType(),
-                school.getRegion()
-        );
-    }
 }
