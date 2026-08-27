@@ -74,11 +74,14 @@ public class UnivInfoSchoolClient {
             throw new SchoolSearchException("학교 검색 서비스가 설정되지 않았습니다.");
         }
 
+        // 포털의 Encoding/Decoding 표기를 모두 허용한다(이중 인코딩 방지).
+        String normalizedKey = PublicDataServiceKey.normalize(serviceKey);
+
         String body;
         try {
             body = univInfoRestClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .queryParam("serviceKey", serviceKey)
+                            .queryParam("serviceKey", normalizedKey)
                             .queryParam("pageNo", 1)
                             .queryParam("numOfRows", properties.getPageSize())
                             .queryParam("type", "json")
