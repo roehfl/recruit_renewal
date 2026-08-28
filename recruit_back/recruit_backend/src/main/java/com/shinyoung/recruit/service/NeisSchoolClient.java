@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -75,6 +76,11 @@ public class NeisSchoolClient {
                             .build())
                     .retrieve()
                     .body(String.class);
+        } catch (RestClientResponseException e) {
+            // 상위 API 는 실패 사유를 본문에 담아준다(예: SERVICE_KEY_IS_NOT_REGISTERED_ERROR).
+            log.warn("NEIS 학교 검색 호출 실패(keyword 길이={}): 상태={} 본문={}",
+                    keyword.length(), e.getStatusCode(), snippet(e.getResponseBodyAsString()));
+            throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.", e);
         } catch (RestClientException e) {
             log.warn("NEIS 학교 검색 호출 실패(keyword 길이={}): {}", keyword.length(), e.getMessage());
             throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.", e);
@@ -92,7 +98,7 @@ public class NeisSchoolClient {
         try {
             root = objectMapper.readTree(body);
         } catch (Exception e) {
-            log.warn("NEIS 응답 파싱 실패: {}", e.getMessage());
+            log.warn("NEIS 응답 파싱 실패: {}, 본문={}", e.getMessage(), snippet(body));
             throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.", e);
         }
 
@@ -105,7 +111,7 @@ public class NeisSchoolClient {
 
         JsonNode schoolInfo = root.path("schoolInfo");
         if (!schoolInfo.isArray()) {
-            log.warn("NEIS 응답에 schoolInfo 배열이 없습니다.");
+            log.warn("NEIS 응답에 schoolInfo 배열이 없습니다. 본문={}", snippet(body));
             throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.");
         }
 
@@ -142,6 +148,15 @@ public class NeisSchoolClient {
         // 인증키 오류 등 상세는 로깅만 — 클라이언트에 원인/키 관련 메시지를 노출하지 않는다.
         log.warn("NEIS 오류코드={}, message={}", code, result.path("MESSAGE").asText(""));
         throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    }
+
+    /** 로그용 응답 본문 앞부분. 본문에는 인증키가 들어가지 않는다. */
+    private static String snippet(String body) {
+        if (body == null || body.isBlank()) {
+            return "(빈 본문)";
+        }
+        String trimmed = body.strip();
+        return trimmed.length() <= 500 ? trimmed : trimmed.substring(0, 500) + "...(생략)";
     }
 
     private static String text(JsonNode node, String field) {

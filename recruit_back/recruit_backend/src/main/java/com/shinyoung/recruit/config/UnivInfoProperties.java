@@ -39,9 +39,9 @@ public class UnivInfoProperties {
     @Min(0)
     private int readTimeoutMs = 5000;
 
-    /** 한 번에 요청할 행 수(numOfRows). 행 하나가 학교 하나라 자동완성 상한보다 조금만 크게 잡는다. */
+    /** 한 번에 요청할 행 수(numOfRows). 상위 API 상한은 1000 이다. 학교명으로 좁혀 조회하므로 크게 잡지 않는다. */
     @Min(1)
-    private int pageSize = 50;
+    private int pageSize = 100;
 
     public String getBaseUrl() {
         return baseUrl;

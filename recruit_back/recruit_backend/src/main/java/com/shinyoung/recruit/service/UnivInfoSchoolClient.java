@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -26,14 +27,14 @@ import java.util.List;
  *
  * <p>행 하나가 학교 하나이므로 학과 단위인 {@link UnivDeptSchoolClient} 와 달리 중복 제거가 필요 없다.
  *
+ * <p>요청/응답 항목명은 포털 API 명세 기준이다(대문자 스네이크). 학교명 검색은 {@code SCHL_NM} 파라미터로
+ * 상위 API 에 맡기고, 응답에서 한 번 더 학교명 포함 여부를 확인한다.
+ *
  * <p>표준데이터 규격({@code serviceKey/pageNo/numOfRows/type=json} 요청,
  * {@code response.header.resultCode} + {@code response.body.items} 응답)을 따른다.
  *
- * <p>이 데이터셋은 학교 식별 코드를 제공하지 않을 가능성이 크다. 코드가 없으면 학교명을 코드로 쓴다
- * (학교별 통계 grouping 키가 학교명 문자열이 된다).
- *
- * <p>아래 필드명 상수와 학교구분 값은 서비스키 발급 후 실제 응답으로 확정해야 한다. 필드명이 어긋나
- * 결과가 통째로 사라지는 일을 막기 위해, 학교구분 필터는 해당 필드가 <b>있을 때만</b> 적용한다.
+ * <p>이 데이터셋에는 학교 식별 코드가 없다(제공 항목은 제공기관코드뿐). 따라서 {@code schoolCode} 는
+ * 학교명을 그대로 쓴다 — 학교별 통계 grouping 키가 학교명 문자열이 된다.
  */
 @Component
 public class UnivInfoSchoolClient {
@@ -43,14 +44,12 @@ public class UnivInfoSchoolClient {
     /** 정상 응답 코드. */
     private static final String SUCCESS_CODE = "00";
 
-    /** 표준데이터 행의 학교명 필드. */
-    private static final String FIELD_SCHOOL_NAME = "schoolNm";
-    /** 표준데이터 행의 학교구분명 필드(대학교/전문대학 등). */
-    private static final String FIELD_SCHOOL_KIND = "schoolGbnNm";
-    /** 표준데이터 행의 학교 식별 코드 필드. 없으면 학교명을 코드로 대체한다. */
-    private static final String FIELD_SCHOOL_CODE = "schoolCd";
-    /** 표준데이터 행의 시도명 필드. */
-    private static final String FIELD_REGION = "ctprvnNm";
+    /** 학교명. 요청 파라미터이자 응답 항목이다. */
+    private static final String FIELD_SCHOOL_NAME = "SCHL_NM";
+    /** 대학구분명(대학 / 대학원 / 전문대학). 학력 구분 필터에 쓴다. */
+    private static final String FIELD_UNIV_KIND = "UNIV_SE_NM";
+    /** 시도명. */
+    private static final String FIELD_REGION = "CTPV_NM";
 
     private final RestClient univInfoRestClient;
     private final UnivInfoProperties properties;
@@ -64,11 +63,11 @@ public class UnivInfoSchoolClient {
     /**
      * 학교명으로 검색한다. 호출자는 공백이 아닌 keyword 를 넘긴다.
      *
-     * @param keyword    학교명(부분일치)
-     * @param schoolKind 학교구분명. null 이면 구분 필터 없이 조회한다.
+     * @param keyword  학교명(부분일치)
+     * @param univKind 대학구분명({@code UNIV_SE_NM}). null 이면 구분 필터 없이 조회한다.
      * @throws SchoolSearchException 서비스키 미설정, 네트워크/타임아웃, 파싱 실패, 상위 API 오류코드
      */
-    public List<SchoolSearchResponse> search(String keyword, String schoolKind) {
+    public List<SchoolSearchResponse> search(String keyword, String univKind) {
         String serviceKey = properties.getServiceKey();
         if (!StringUtils.hasText(serviceKey)) {
             // 설정 누락은 서버 문제 — 상세는 로깅만, 클라이언트에는 일반 메시지.
@@ -80,31 +79,43 @@ public class UnivInfoSchoolClient {
         String body;
         try {
             body = univInfoRestClient.get()
-                    .uri(requestUri(serviceKey, keyword))
+                    .uri(requestUri(serviceKey, keyword, univKind))
                     .retrieve()
                     .body(String.class);
+        } catch (RestClientResponseException e) {
+            // 상위 API 는 실패 사유를 본문에 담아준다(예: SERVICE_KEY_IS_NOT_REGISTERED_ERROR).
+            log.warn("대학 학교정보 검색 호출 실패(keyword 길이={}): 상태={} 본문={}",
+                    keyword.length(), e.getStatusCode(), snippet(e.getResponseBodyAsString()));
+            throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.", e);
         } catch (RestClientException e) {
             log.warn("대학 학교정보 검색 호출 실패(keyword 길이={}): {}", keyword.length(), e.getMessage());
             throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.", e);
         }
 
-        return parse(body, keyword, schoolKind);
+        return parse(body, keyword, univKind);
     }
 
     /**
      * 요청 URI 를 직접 조립한다. Spring URI 빌더에 서비스키를 넘기면 {@code +} 를 그대로 두어
      * 쿼리스트링에서 공백으로 해석되므로(상위 API 403), 인코딩을 직접 통제한다.
+     *
+     * <p>파라미터명은 명세상 대문자 스네이크다. 잘못된 이름을 보내면
+     * {@code INVALID_REQUEST_PARAMETER_ERROR}(코드 10)로 거절된다.
      */
-    private URI requestUri(String serviceKey, String keyword) {
-        return URI.create("%s?serviceKey=%s&pageNo=1&numOfRows=%d&type=json&%s=%s".formatted(
+    private URI requestUri(String serviceKey, String keyword, String univKind) {
+        String uri = "%s?serviceKey=%s&pageNo=1&numOfRows=%d&type=json&%s=%s".formatted(
                 properties.getBaseUrl(),
                 PublicDataServiceKey.toQueryValue(serviceKey),
                 properties.getPageSize(),
                 FIELD_SCHOOL_NAME,
-                URLEncoder.encode(keyword, StandardCharsets.UTF_8)));
+                URLEncoder.encode(keyword, StandardCharsets.UTF_8));
+        if (univKind != null) {
+            uri += "&%s=%s".formatted(FIELD_UNIV_KIND, URLEncoder.encode(univKind, StandardCharsets.UTF_8));
+        }
+        return URI.create(uri);
     }
 
-    private List<SchoolSearchResponse> parse(String body, String keyword, String schoolKind) {
+    private List<SchoolSearchResponse> parse(String body, String keyword, String univKind) {
         if (!StringUtils.hasText(body)) {
             throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.");
         }
@@ -113,7 +124,7 @@ public class UnivInfoSchoolClient {
         try {
             root = objectMapper.readTree(body);
         } catch (Exception e) {
-            log.warn("대학 학교정보 응답 파싱 실패: {}", e.getMessage());
+            log.warn("대학 학교정보 응답 파싱 실패: {}, 본문={}", e.getMessage(), snippet(body));
             throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.", e);
         }
 
@@ -121,37 +132,46 @@ public class UnivInfoSchoolClient {
         String resultCode = response.path("header").path("resultCode").asText("");
         if (!SUCCESS_CODE.equals(resultCode)) {
             // 서비스키 오류 등 상세는 로깅만 — 클라이언트에 원인/키 관련 메시지를 노출하지 않는다.
-            log.warn("대학 학교정보 오류코드={}, message={}",
-                    resultCode, response.path("header").path("resultMsg").asText(""));
+            log.warn("대학 학교정보 오류코드={}, message={}, 본문={}",
+                    resultCode, response.path("header").path("resultMsg").asText(""), snippet(body));
             throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.");
         }
 
         JsonNode items = response.path("body").path("items");
         if (!items.isArray()) {
-            log.warn("대학 학교정보 응답에 items 배열이 없습니다.");
+            log.warn("대학 학교정보 응답에 items 배열이 없습니다. 본문={}", snippet(body));
             throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.");
         }
 
         List<SchoolSearchResponse> schools = new ArrayList<>();
         for (JsonNode row : items) {
-            // 검색 파라미터를 상위 API 가 무시할 수 있어 학교명 포함 여부를 한 번 더 거른다.
+            // 상위 API 가 검색 조건을 어떻게 해석하든 결과가 어긋나지 않도록 응답에서 한 번 더 거른다.
             String schoolName = text(row, FIELD_SCHOOL_NAME);
             if (schoolName == null || !schoolName.contains(keyword)) {
                 continue;
             }
-            String kind = text(row, FIELD_SCHOOL_KIND);
-            if (schoolKind != null && kind != null && !schoolKind.equals(kind)) {
+            String kind = text(row, FIELD_UNIV_KIND);
+            if (univKind != null && kind != null && !univKind.equals(kind)) {
                 continue;
             }
-            String schoolCode = text(row, FIELD_SCHOOL_CODE);
+            // 이 데이터셋에는 학교 식별 코드가 없어 학교명을 코드로 쓴다.
             schools.add(new SchoolSearchResponse(
-                    schoolCode == null ? schoolName : schoolCode,
+                    schoolName,
                     schoolName,
                     SchoolSource.UNIV_INFO,
                     text(row, FIELD_REGION)
             ));
         }
         return schools;
+    }
+
+    /** 로그용 응답 본문 앞부분. 본문에는 인증키가 들어가지 않는다. */
+    private static String snippet(String body) {
+        if (body == null || body.isBlank()) {
+            return "(빈 본문)";
+        }
+        String trimmed = body.strip();
+        return trimmed.length() <= 500 ? trimmed : trimmed.substring(0, 500) + "...(생략)";
     }
 
     private static String text(JsonNode node, String field) {

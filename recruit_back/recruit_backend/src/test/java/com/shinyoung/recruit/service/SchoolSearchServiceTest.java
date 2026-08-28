@@ -55,8 +55,9 @@ class SchoolSearchServiceTest {
         schoolSearchService.search("한국", EducationLevel.DOCTOR);
 
         verify(univInfoSchoolClient).search("한국", "전문대학");
-        // 대학원은 학교 목록이 따로 없어 대학교와 같은 값을 쓴다(학사·석사·박사 3회 호출).
-        verify(univInfoSchoolClient, org.mockito.Mockito.times(3)).search("한국", "대학교");
+        verify(univInfoSchoolClient).search("한국", "대학");
+        // 대학원도 별도 행으로 제공되므로 석사·박사는 같은 값을 쓴다(2회 호출).
+        verify(univInfoSchoolClient, org.mockito.Mockito.times(2)).search("한국", "대학원");
         verify(neisSchoolClient, never()).search(any(), any());
     }
 

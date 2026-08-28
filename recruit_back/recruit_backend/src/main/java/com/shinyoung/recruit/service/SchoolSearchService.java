@@ -14,7 +14,7 @@ import java.util.Set;
  * 학교 자동완성 검색. 학교 구분에 따라 외부 OpenAPI 를 골라 호출하고, 중복 제거 후 상위 N 건만 돌려준다.
  *
  * <p>고등학교는 NEIS 학교기본정보, 그 외(전문대학·대학교·대학원)는 전국대학및전문대학정보 표준데이터를 쓴다.
- * 대학원은 별도 학교 목록이 없어 대학 목록을 그대로 쓴다(지원자는 "○○대학교"로 입력한다).
+ * 대학원은 대학구분명이 "대학원"인 행으로 따로 제공된다.
  */
 @Service
 public class SchoolSearchService {
@@ -53,13 +53,14 @@ public class SchoolSearchService {
     }
 
     /**
-     * 대학 표준데이터의 학교구분 값. 실제 값은 서비스키 발급 후 응답으로 확정한다.
-     * 대학원은 학교 목록이 따로 없으므로 대학교와 같은 값을 쓴다.
+     * 대학 표준데이터의 대학구분명({@code UNIV_SE_NM}) 값. 대학원도 별도 행으로 제공되므로
+     * 석사·박사는 대학원 목록에서 찾는다(예: "○○대학교 대학원", "○○대학교 교육대학원").
      */
     private static String univSchoolKind(EducationLevel educationLevel) {
         return switch (educationLevel) {
             case COLLEGE -> "전문대학";
-            case UNIVERSITY, MASTER, DOCTOR -> "대학교";
+            case UNIVERSITY -> "대학";
+            case MASTER, DOCTOR -> "대학원";
             case HIGH_SCHOOL -> null;
         };
     }
