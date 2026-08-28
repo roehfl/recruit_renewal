@@ -1114,6 +1114,33 @@ class JobApplicationServiceTest {
     }
 
     @Test
+    void admin_search_filters_by_phone_number() {
+        Applicant hyphenApplicant = createApplicant("search-phone-hyphen", "Phone Hyphen");
+        hyphenApplicant.setPhoneNumber("010-1234-5678");
+        applicantRepository.save(hyphenApplicant);
+        Applicant plainApplicant = createApplicant("search-phone-plain", "Phone Plain");
+        plainApplicant.setPhoneNumber("01099998888");
+        applicantRepository.save(plainApplicant);
+
+        Long jobPostingId = createPublishedJobPosting("Search Phone Posting");
+        Long hyphenApplicationId = createApplication(hyphenApplicant, jobPostingId);
+        Long plainApplicationId = createApplication(plainApplicant, jobPostingId);
+
+        // 하이픈으로 저장된 번호를 숫자만으로 검색
+        assertThat(searchApplicationIds(jobPostingId, search().phoneNumber("01012345678").build()))
+                .containsExactly(hyphenApplicationId);
+        // 검색어에 하이픈이 있어도 같은 결과
+        assertThat(searchApplicationIds(jobPostingId, search().phoneNumber("010-1234-5678").build()))
+                .containsExactly(hyphenApplicationId);
+        // 뒷자리 부분일치(전화 문의 시 뒤 4자리만 아는 경우)
+        assertThat(searchApplicationIds(jobPostingId, search().phoneNumber("9888").build()))
+                .containsExactly(plainApplicationId);
+        // 숫자가 없는 검색어는 조건 미적용
+        assertThat(searchApplicationIds(jobPostingId, search().phoneNumber("---").build()))
+                .containsExactlyInAnyOrder(hyphenApplicationId, plainApplicationId);
+    }
+
+    @Test
     void admin_search_filters_by_final_education() {
         Applicant multiApplicant = createApplicant("search-edu-multi", "Edu Multi");
         Applicant singleApplicant = createApplicant("search-edu-single", "Edu Single");
@@ -1305,6 +1332,7 @@ class JobApplicationServiceTest {
         private String jobGroup;
         private String workLocation;
         private String name;
+        private String phoneNumber;
         private LocalDate birthDateFrom;
         private LocalDate birthDateTo;
         private String finalEducationLevel;
@@ -1320,6 +1348,7 @@ class JobApplicationServiceTest {
         SearchRequestBuilder jobPositionId(Long value) { this.jobPositionId = value; return this; }
         SearchRequestBuilder status(String value) { this.status = value; return this; }
         SearchRequestBuilder name(String value) { this.name = value; return this; }
+        SearchRequestBuilder phoneNumber(String value) { this.phoneNumber = value; return this; }
         SearchRequestBuilder birthDateFrom(LocalDate value) { this.birthDateFrom = value; return this; }
         SearchRequestBuilder birthDateTo(LocalDate value) { this.birthDateTo = value; return this; }
         SearchRequestBuilder finalEducationLevel(String value) { this.finalEducationLevel = value; return this; }
@@ -1334,7 +1363,7 @@ class JobApplicationServiceTest {
 
         AdminApplicationSearchRequest build() {
             return new AdminApplicationSearchRequest(
-                    jobPositionId, status, applicationType, jobGroup, workLocation, name,
+                    jobPositionId, status, applicationType, jobGroup, workLocation, name, phoneNumber,
                     birthDateFrom, birthDateTo, finalEducationLevel, schoolName, graduationStatus,
                     finalSchoolCondition, certificateName, languageName, languageLevel,
                     stageType, stageResultStatus);

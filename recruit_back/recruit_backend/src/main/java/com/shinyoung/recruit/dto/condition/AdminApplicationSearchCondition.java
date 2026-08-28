@@ -18,6 +18,8 @@ public record AdminApplicationSearchCondition(
         String jobGroup,
         String workLocation,
         String name,
+        /** 숫자만 남긴 휴대폰 검색어. 저장값도 같은 방식으로 정규화해 비교한다. */
+        String phoneNumber,
         LocalDate birthDateFrom,
         LocalDate birthDateTo,
         EducationLevel finalEducationLevel,

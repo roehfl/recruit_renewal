@@ -207,6 +207,7 @@ public class JobApplicationService {
                 condition.jobGroup(),
                 condition.workLocation(),
                 condition.name(),
+                condition.phoneNumber(),
                 condition.birthDateFrom(),
                 condition.birthDateTo(),
                 condition.finalEducationRank(),
@@ -315,6 +316,7 @@ public class JobApplicationService {
                 normalizeSearchText(request.jobGroup()),
                 normalizeSearchText(request.workLocation()),
                 normalizeSearchText(request.name()),
+                normalizePhoneNumber(request.phoneNumber()),
                 request.birthDateFrom(),
                 request.birthDateTo(),
                 parseSearchEnum(EducationLevel.class, request.finalEducationLevel(), "최종학력"),
@@ -338,6 +340,18 @@ public class JobApplicationService {
         } catch (IllegalArgumentException e) {
             throw new InvalidJobApplicationException(label + " 값이 올바르지 않습니다. value=" + value);
         }
+    }
+
+    /**
+     * 휴대폰 검색어에서 숫자만 남긴다. 저장값의 하이픈/공백 유무가 제각각이라 양쪽을 같은 방식으로
+     * 정규화해야 {@code 010-1234-5678} 저장분을 {@code 01012345678} 로도 찾을 수 있다.
+     */
+    private String normalizePhoneNumber(String value) {
+        if (value == null) {
+            return null;
+        }
+        String digits = value.replaceAll("[^0-9]", "");
+        return digits.isEmpty() ? null : digits;
     }
 
     private String normalizeSearchText(String value) {

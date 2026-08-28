@@ -81,6 +81,8 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
     /**
      * 관리자 지원현황 조회 통합 검색. 모든 조건은 null 이면 미적용(null-guard) — 공고 지정/비지정 목록이 이 쿼리 하나를 공유한다.
      *
+     * <p>{@code phoneNumber} 는 숫자만 남긴 값으로 들어오며, 저장값도 하이픈/공백을 제거해 비교한다.
+     *
      * <p>최종학력 판정은 지원서 학력 행들의 최고 레벨 기준이며, CASE rank(HIGH_SCHOOL=0…DOCTOR=4)는
      * {@code EducationLevel} 선언 순서(= {@code AdminApplicationSearchCondition.finalEducationRank()})와 일치해야 한다.
      * 졸업여부/최종학교조건도 같은 최종학력 행 기준으로 판정한다. {@code finalSchoolCondition} 은 enum 5분기 비교를 위해
@@ -97,6 +99,9 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
               and (:jobGroup is null or application.jobPosition.jobGroup = :jobGroup)
               and (:workLocation is null or application.jobPosition.workLocation = :workLocation)
               and (:name is null or application.applicantNameSnapshot like concat('%', :name, '%'))
+              and (:phoneNumber is null
+                   or replace(replace(application.applicant.phoneNumber, '-', ''), ' ', '')
+                      like concat('%', :phoneNumber, '%'))
               and ((:birthDateFrom is null and :birthDateTo is null) or exists (
                     select 1 from ApplicationBasicInfo basicInfo
                     where basicInfo.jobApplication = application
@@ -166,6 +171,7 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
             @Param("jobGroup") String jobGroup,
             @Param("workLocation") String workLocation,
             @Param("name") String name,
+            @Param("phoneNumber") String phoneNumber,
             @Param("birthDateFrom") LocalDate birthDateFrom,
             @Param("birthDateTo") LocalDate birthDateTo,
             @Param("finalEducationRank") Integer finalEducationRank,

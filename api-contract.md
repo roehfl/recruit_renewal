@@ -83,14 +83,20 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 변경(2026-08-27): School 마스터 DB 검색을 **외부 OpenAPI 프록시**로 교체한다. `school` 테이블·관리자 학교 관리(xlsx import 포함)는 폐기한다.
 - 요청: `q`(검색어, 공백이면 빈 목록), `educationLevel`(`EducationLevel` enum). 기존 `schoolType`(한글 라벨) 파라미터는 제거.
 - 응답(200): `ApiResponse<[{ schoolCode, schoolName, schoolSource, region }]>` — 활성/비활성 개념 없음, 상위 20건.
-  - `schoolCode` — 외부 학교코드 문자열. NEIS는 `SD_SCHUL_CODE`, 대학은 학교코드(없으면 학교명으로 대체).
+  - `schoolCode` — 외부 학교 식별자 문자열. NEIS는 `SD_SCHUL_CODE`, 대학은 **학교명**(해당 데이터셋에 학교코드가 없다).
   - `schoolSource` — `NEIS` | `UNIV_INFO` | `UNIV_DEPT`. 코드 네임스페이스 구분용. 학교 검색이 실제로 쓰는 값은 `NEIS`·`UNIV_INFO` 둘뿐이다.
-- 라우팅: `HIGH_SCHOOL` → NEIS 학교기본정보, `COLLEGE`/`UNIVERSITY`/`MASTER`/`DOCTOR` → 전국대학및전문대학정보표준데이터. 대학원은 별도 학교 목록이 없어 대학교와 같은 학교구분 값을 쓴다.
+- 라우팅: `HIGH_SCHOOL` → NEIS 학교기본정보, `COLLEGE`/`UNIVERSITY`/`MASTER`/`DOCTOR` → 전국대학및전문대학정보표준데이터.
 - 인증키는 서버 설정에만 두고 프론트에 노출하지 않는다(juso 선례). 키 미설정·외부 장애·파싱 실패는 502.
 - 외부 API 는 직접 호출하지 않고 **DMZ 웹서버를 경유**한다(HTTP 80): NEIS `http://juso.go.kr/neis/...`(→ `open.neis.go.kr`), 공공데이터 `http://juso.go.kr/gov/...`(→ `api.data.go.kr`), 주소 `http://juso.go.kr/juso/...`(→ `business.juso.go.kr`). 프리픽스 뒤 경로는 원본과 동일하다.
 - 대학 API 확정(2026-08-27): 전국대학및전문대학정보(`/openapi/tn_pubr_public_univ_info_api`, 행 1건 = 학교 1곳). 공공데이터포털 표준데이터 규격 — `serviceKey/pageNo/numOfRows/type=json`, 응답 `response.header.resultCode` + `response.body.items`.
 - 학과 단위 데이터셋(`tn_pubr_public_univ_major_api`) 호출 코드는 제거하지 않고 남겨뒀다. 전공명 자동완성 후속 검토용이며 학교 검색 경로에서는 호출하지 않는다.
-- 🔴 미확정: 대학 표준데이터 행의 필드명(`schoolNm`/`schoolGbnNm`/`schoolCd`/`ctprvnNm` 추정)과 학교구분 실제 값(전문대학/대학교). 이 데이터셋은 학교 식별 코드를 제공하지 않을 가능성이 크고, 그 경우 `schoolCode`는 학교명이 된다. 서비스키 발급 후 실측으로 확정한다.
+- 대학 API 명세 확정(2026-08-28, 포털 명세 확인):
+  - 요청 파라미터는 대문자 스네이크다 — `SCHL_NM`(학교명), `UNIV_SE_NM`(대학구분명), `pageNo`, `numOfRows`(최대 1000), `type=json`. 이름이 틀리면 `INVALID_REQUEST_PARAMETER_ERROR`(코드 10).
+  - 응답 항목도 동일 표기 — `SCHL_NM`, `UNIV_SE_NM`, `SCHL_SE_NM`, `CTPV_NM` 등.
+  - **학교 식별 코드가 없다**(제공 항목은 제공기관코드 `instt_code` 뿐). 따라서 대학 계열의 `schoolCode`는 **학교명 문자열**이다. 학교별 통계 그룹 키도 학교명이 된다.
+  - 대학원은 별도 행으로 제공된다(`UNIV_SE_NM`=대학원, `SCHL_SE_NM`=일반대학원/특수대학원/전문대학원). 예: "충남대학교 대학원", "충남대학교 교육대학원".
+- 학교 구분 매핑: `COLLEGE`→`UNIV_SE_NM`=전문대학, `UNIVERSITY`→대학, `MASTER`/`DOCTOR`→대학원.
+- NEIS 명세 확인(2026-08-28): 신청주소 `hub/schoolInfo`, 기본인자 `KEY`/`Type`/`pIndex`/`pSize`, 신청인자 `SCHUL_NM`/`SCHUL_KND_SC_NM`, 출력값 `SD_SCHUL_CODE`/`SCHUL_NM`/`LCTN_SC_NM`. 고등학교는 학교코드가 있다.
 
 #### 지원서 학력의 학교 식별자  🟢 확정 (2026-08-27, 프론트 반영 완료)
 
@@ -456,6 +462,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
   - `schoolName` — 학교명 부분일치(학력 행 아무거나)
   - `graduationStatus` — 졸업여부. `GraduationStatus`. **최종학력 행** 기준
   - `finalSchoolCondition` — 최종학교조건. DOMESTIC(countryCode 없음) | OVERSEAS(countryCode 있음) | TRANSFER(편입) | BRANCH(분교) | NIGHT(야간). **최종학력 행** 기준
+  - `phoneNumber` — 휴대폰번호 부분일치(2026-08-28 추가). 전화 문의 지원자 F/U 용. 하이픈·공백을 무시하고 숫자만으로 비교한다(`010-1234-5678` 저장분을 `01012345678`로 검색해도 매칭). `Applicant.phoneNumber` 기준
   - `certificateName` — 자격증명 부분일치
   - `languageName` — 외국어구사. `ApplicationLanguage.languageName` 완전일치
   - `languageLevel` — 외국어수준. `conversationalAbility` 완전일치 (값 체계는 CommonCode 그룹 `LANGUAGE_LEVEL`(상/중/하)로 관리자 등록 — 별도 백엔드 코드 없음)

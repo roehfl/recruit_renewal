@@ -15,6 +15,7 @@ public record AdminApplicationSearchRequest(
         String jobGroup,
         String workLocation,
         String name,
+        String phoneNumber,
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
         LocalDate birthDateFrom,
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
