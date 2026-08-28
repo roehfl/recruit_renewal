@@ -612,3 +612,30 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - `ids`는 해당 카테고리의 전체 FAQ id 집합과 정확히 일치해야 한다(누락·중복·타 카테고리 id는 400)
 - 응답(200): `ApiResponse<Void>`
 - 오류: 400(id 집합 불일치), 404(카테고리 미존재)
+
+### 화면: 관리자 공통코드 관리 (AdminCommonCodeManageView)  🟢 확정(2026-08-28)
+
+- 백엔드는 Phase 08a 기구현분을 그대로 사용하며 이번 화면 작업으로 변경되지 않았다
+- 그룹 목록을 담는 테이블이 없어 그룹 자체를 `groupCode=CODE_GROUP` 의 코드 행으로 관리한다(self-host). 이 행의 `description`이 그룹의 사용 화면 메모다
+- 삭제 API는 없다. 삭제는 `active=false` soft delete로만 처리한다
+- `groupCode`/`code`는 생성 후 불변이라 수정 요청에 포함하지 않는다
+
+#### GET `/api/admin/codes`  🟢 확정(2026-08-28)
+
+- 설명: 비활성 포함 코드 조회. `groupCode` 생략 시 전체를 `groupCode` → `sortOrder` → `id` 순으로 반환한다. 화면은 그룹 목록도 이 응답에서 파생하므로 항상 생략 형태로 호출한다
+- 요청: `?groupCode=NATIONALITY` (선택)
+- 응답(200): `ApiResponse<[{ id, groupCode, code, displayName, sortOrder, active, description }]>`
+
+#### POST `/api/admin/codes`  🟢 확정(2026-08-28)
+
+- 설명: 코드 생성. `sortOrder` 미지정 시 0, `active` 미지정 시 true. 화면은 그룹 내 `최대값 + 10`을 기본값으로 채워 보낸다
+- 요청: `{ groupCode, code, displayName, sortOrder, active, description }`
+- 응답(200): `ApiResponse<{ id, groupCode, code, displayName, sortOrder, active, description }>`
+- 오류: 400(필수값 공백, 길이 초과, `groupCode`+`code` 중복)
+
+#### POST `/api/admin/codes/{id}`  🟢 확정(2026-08-28)
+
+- 설명: 코드 수정. `active=false`가 soft delete다. `groupCode`/`code`는 불변이라 요청에 없다
+- 요청: `{ displayName, sortOrder, active, description }`
+- 응답(200): `ApiResponse<{ id, groupCode, code, displayName, sortOrder, active, description }>`
+- 오류: 400(필수값 공백, 길이 초과), 404(미존재)
