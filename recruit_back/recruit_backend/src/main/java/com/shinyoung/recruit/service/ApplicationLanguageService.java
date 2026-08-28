@@ -66,8 +66,14 @@ public class ApplicationLanguageService {
         if (language == null) {
             throw new InvalidJobApplicationException("Language item is required.");
         }
+        if (language.languageCode() == null || language.languageCode().isBlank()) {
+            throw new InvalidJobApplicationException("Language code is required.");
+        }
         if (language.languageName() == null || language.languageName().isBlank()) {
             throw new InvalidJobApplicationException("Language name is required.");
+        }
+        if (language.testCode() == null || language.testCode().isBlank()) {
+            throw new InvalidJobApplicationException("Test code is required.");
         }
         if (language.testName() == null || language.testName().isBlank()) {
             throw new InvalidJobApplicationException("Test name is required.");
@@ -86,7 +92,9 @@ public class ApplicationLanguageService {
     private ApplicationLanguage toLanguage(JobApplication application, LanguageRequest request) {
         return ApplicationLanguage.create(
                 application,
+                request.languageCode(),
                 request.languageName(),
+                request.testCode(),
                 request.testName(),
                 request.scoreOrGrade(),
                 request.conversationalAbility(),

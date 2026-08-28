@@ -115,10 +115,14 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 #### GET·POST `/api/applications/{applicationId}/languages`  🟢 (프론트 반영 완료)
 
 - 변경(2026-06-23): 요청·응답에서 `score`,`grade` 제거. `scoreOrGrade`(선택), `conversationalAbility`(선택) 추가.
-- 요청: `{ languages: [{ languageName, testName, scoreOrGrade, conversationalAbility, examDate, expiredDate, issuingOrganization, sortOrder }] }`
-- 응답(200): `ApiResponse<[{ languageId, languageName, testName, scoreOrGrade, conversationalAbility, examDate, expiredDate, issuingOrganization, sortOrder }]>`
+- 변경(2026-08-28): 언어·시험명을 공통코드 선택으로 전환. `languageCode`,`testCode` 추가(필수). `languageName`,`testName`은 표시명 스냅샷으로 유지(필수).
+- 요청: `{ languages: [{ languageCode, languageName, testCode, testName, scoreOrGrade, conversationalAbility, examDate, expiredDate, issuingOrganization, sortOrder }] }`
+- 응답(200): `ApiResponse<[{ languageId, languageCode, languageName, testCode, testName, scoreOrGrade, conversationalAbility, examDate, expiredDate, issuingOrganization, sortOrder }]>`
 - `conversationalAbility`는 공통코드 그룹 `LANGUAGE_CONVERSATION` 코드 문자열(프론트가 CommonCode로 렌더, 백엔드 validation 미결합, 코드 시드 안 함).
-- 관리자 조회 `GET /api/admin/applications/{id}/languages` 응답도 동일하게 `scoreOrGrade`/`conversationalAbility` 반영.
+- `languageCode`는 공통코드 그룹 `LANGUAGE_TYPE`, `testCode`는 언어별 그룹 `LANGUAGE_TEST_{languageCode}`(예 `LANGUAGE_TEST_ENGLISH`) 코드 문자열이다. 백엔드 validation 미결합(공백만 검사), 코드 시드 안 함 — 관리자 CommonCode API로 등록한다.
+- 직접입력: 코드가 `ETC`면 프론트가 자유입력을 받아 `languageName`/`testName`에 넣는다. 그 외엔 선택한 코드의 `displayName`을 그대로 스냅샷한다. `ETC` 옵션은 프론트가 목록 끝에 항상 붙인다(관리자 등록 불필요).
+- 표시·PDF·관리자 검색은 `languageName`/`testName`(표시명)을 쓴다. 집계는 `languageCode`/`testCode` 기준이다.
+- 관리자 조회 `GET /api/admin/applications/{id}/languages` 응답도 동일하게 `scoreOrGrade`/`conversationalAbility`/`languageCode`/`testCode` 반영.
 
 ### 화면: 지원자 수상 (ApplicationAward)
 

@@ -116,7 +116,9 @@ class ApplicationLanguageControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").exists())
-                .andExpect(jsonPath("$.data[0].languageName").value("English"));
+                .andExpect(jsonPath("$.data[0].languageName").value("English"))
+                .andExpect(jsonPath("$.data[0].languageCode").value("ENGLISH"))
+                .andExpect(jsonPath("$.data[0].testCode").value("TOEIC"));
     }
 
     @Test
@@ -256,7 +258,9 @@ class ApplicationLanguageControllerTest {
                 {
                   "languages": [
                     {
+                      "languageCode": "ENGLISH",
                       "languageName": "English",
+                      "testCode": "TOEIC",
                       "testName": "TOEIC",
                       "scoreOrGrade": "900",
                       "conversationalAbility": "상",

@@ -24,9 +24,36 @@
             <tbody>
               <tr>
                 <th>언어<em> *</em></th>
-                <td><a-input v-model:value="item.languageName" placeholder="예) 영어" /></td>
+                <td>
+                  <a-select
+                    v-model:value="item.languageCode"
+                    :options="languageTypeOptions"
+                    placeholder="선택"
+                    @change="onLanguageChange(item)"
+                  />
+                  <a-input
+                    v-if="item.languageCode === ETC_CODE"
+                    v-model:value="item.languageName"
+                    class="etc-input"
+                    placeholder="언어 직접입력"
+                  />
+                </td>
                 <th>시험명<em> *</em></th>
-                <td><a-input v-model:value="item.testName" placeholder="예) TOEIC" /></td>
+                <td>
+                  <a-select
+                    v-model:value="item.testCode"
+                    :options="testOptions(item)"
+                    :disabled="!item.languageCode"
+                    placeholder="선택"
+                    @change="onTestChange(item)"
+                  />
+                  <a-input
+                    v-if="item.testCode === ETC_CODE"
+                    v-model:value="item.testName"
+                    class="etc-input"
+                    placeholder="시험명 직접입력"
+                  />
+                </td>
               </tr>
               <tr>
                 <th>점수/등급</th>
@@ -93,9 +120,53 @@ const conversationOptions = computed(() =>
   conversationList.value.map((code) => ({ value: code.code, label: code.displayName })),
 )
 
+// 직접입력. 관리자가 그룹에 등록하지 않아도 항상 마지막 선택지로 붙인다.
+const ETC_CODE = 'ETC'
+const languageTypeList = ref<CommonCodeItems[]>([])
+// key: LANGUAGE_TEST_{languageCode}
+const testListMap = ref<Record<string, CommonCodeItems[]>>({})
+
+function toOptions(list: CommonCodeItems[]) {
+  const options = list
+    .filter((code) => code.code !== ETC_CODE)
+    .map((code) => ({ value: code.code, label: code.displayName }))
+  options.push({ value: ETC_CODE, label: '기타(직접입력)' })
+  return options
+}
+
+const languageTypeOptions = computed(() => toOptions(languageTypeList.value))
+
+function testGroupCode(languageCode: string) {
+  return `LANGUAGE_TEST_${languageCode}`
+}
+
+function testOptions(item: LanguageItem) {
+  if (!item.languageCode || item.languageCode === ETC_CODE) return toOptions([])
+  return toOptions(testListMap.value[testGroupCode(item.languageCode)] ?? [])
+}
+
+function displayNameOf(list: CommonCodeItems[], code?: string) {
+  return list.find((item) => item.code === code)?.displayName ?? ''
+}
+
+function onLanguageChange(item: LanguageItem) {
+  item.languageName =
+    item.languageCode === ETC_CODE ? '' : displayNameOf(languageTypeList.value, item.languageCode)
+  item.testCode = undefined
+  item.testName = ''
+  if (item.languageCode) loadTestCodes(item.languageCode)
+}
+
+function onTestChange(item: LanguageItem) {
+  const list = item.languageCode ? (testListMap.value[testGroupCode(item.languageCode)] ?? []) : []
+  item.testName = item.testCode === ETC_CODE ? '' : displayNameOf(list, item.testCode)
+}
+
 function createEmptyItem(): LanguageItem {
   return {
+    languageCode: undefined,
     languageName: '',
+    testCode: undefined,
     testName: '',
     scoreOrGrade: '',
     conversationalAbility: undefined,
@@ -111,7 +182,9 @@ function setItems(list: LanguageResponse[]) {
     items.length,
     ...list.map((row) => ({
       languageId: row.languageId,
+      languageCode: row.languageCode ?? undefined,
       languageName: row.languageName,
+      testCode: row.testCode ?? undefined,
       testName: row.testName,
       scoreOrGrade: row.scoreOrGrade ?? '',
       conversationalAbility: row.conversationalAbility ?? undefined,
@@ -134,7 +207,9 @@ function buildPayload(): LanguageReplaceRequest {
   if (notApplicable.value) return { languages: [] }
   return {
     languages: items.map((item, index) => ({
+      languageCode: item.languageCode ?? '',
       languageName: item.languageName,
+      testCode: item.testCode ?? '',
       testName: item.testName,
       scoreOrGrade: item.scoreOrGrade || undefined,
       conversationalAbility: item.conversationalAbility || undefined,
@@ -158,7 +233,13 @@ function validate(): boolean {
   for (let i = 0; i < items.length; i++) {
     const item = items[i]
     if (!item) continue
-    if (!item.languageName || !item.testName || !item.examDate) {
+    if (
+      !item.languageCode ||
+      !item.languageName ||
+      !item.testCode ||
+      !item.testName ||
+      !item.examDate
+    ) {
       message.warning(`어학 ${i + 1}: 언어, 시험명, 응시일자는 필수입니다.`)
       return false
     }
@@ -171,9 +252,32 @@ async function loadLanguages() {
   try {
     const result = await languageApi.getApplicationsLanguages(props.applicationId)
     setItems(result.data.data ?? [])
+    await loadLoadedItemTestCodes()
   } finally {
     loading.value = false
   }
+}
+
+async function loadTestCodes(languageCode: string) {
+  if (!languageCode || languageCode === ETC_CODE) return
+  const groupCode = testGroupCode(languageCode)
+  if (testListMap.value[groupCode]) return
+  const result = await commonCodeApi.getCommonCodes(groupCode)
+  testListMap.value[groupCode] = result.data.data ?? []
+}
+
+// 저장된 항목의 시험명 라벨을 표시하려면 해당 언어 그룹을 미리 받아둬야 한다.
+async function loadLoadedItemTestCodes() {
+  const codes: string[] = []
+  items.forEach((item) => {
+    if (item.languageCode && !codes.includes(item.languageCode)) codes.push(item.languageCode)
+  })
+  await Promise.all(codes.map((code) => loadTestCodes(code)))
+}
+
+async function loadLanguageTypeCodes() {
+  const result = await commonCodeApi.getCommonCodes('LANGUAGE_TYPE')
+  languageTypeList.value = result.data.data ?? []
 }
 
 async function loadConversationCodes() {
@@ -209,6 +313,7 @@ function validateBeforeSubmit(): boolean {
 
 onMounted(() => {
   loadLanguages()
+  loadLanguageTypeCodes()
   loadConversationCodes()
 })
 
@@ -354,5 +459,8 @@ em {
 :deep(.ant-picker),
 :deep(.ant-select) {
   width: 100%;
+}
+.etc-input {
+  margin-top: 6px;
 }
 </style>

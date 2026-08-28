@@ -1185,7 +1185,7 @@ class JobApplicationServiceTest {
                 certApplication, "정보처리기사", "한국산업인력공단",
                 LocalDate.of(2024, 3, 1), "12345", null, null, 0));
         languageRepository.save(ApplicationLanguage.create(
-                certApplication, "영어", "OPIc", "IH", "HIGH",
+                certApplication, "ENGLISH", "영어", "OPIC", "OPIc", "IH", "HIGH",
                 LocalDate.of(2025, 1, 1), null, "ACTFL", 0));
 
         assertThat(searchApplicationIds(jobPostingId, search().certificateName("정보처리").build()))

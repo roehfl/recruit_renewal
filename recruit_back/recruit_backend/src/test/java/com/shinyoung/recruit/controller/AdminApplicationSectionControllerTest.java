@@ -400,7 +400,9 @@ class AdminApplicationSectionControllerTest {
         ));
         languageRepository.save(ApplicationLanguage.create(
                 application,
+                "ENGLISH",
                 "English",
+                "TOEIC",
                 "TOEIC",
                 "900",
                 "A",

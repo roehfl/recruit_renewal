@@ -36,8 +36,14 @@ public class ApplicationLanguage extends BaseEntity {
     @JoinColumn(name = "job_application_id", nullable = false)
     private JobApplication jobApplication;
 
+    // 공통코드 LANGUAGE_TYPE 코드값(직접입력은 ETC). 파기 대상이라 nullable — 입력 필수는 request 검증이 보장한다.
+    private String languageCode;
+
     @Column(nullable = false)
     private String languageName;
+
+    // 공통코드 LANGUAGE_TEST_{languageCode} 코드값(직접입력은 ETC). nullable 사유는 languageCode 와 동일하다.
+    private String testCode;
 
     @Column(nullable = false)
     private String testName;
@@ -58,7 +64,9 @@ public class ApplicationLanguage extends BaseEntity {
 
     private ApplicationLanguage(
             JobApplication jobApplication,
+            String languageCode,
             String languageName,
+            String testCode,
             String testName,
             String scoreOrGrade,
             String conversationalAbility,
@@ -68,7 +76,9 @@ public class ApplicationLanguage extends BaseEntity {
             Integer sortOrder
     ) {
         this.jobApplication = jobApplication;
+        this.languageCode = languageCode;
         this.languageName = languageName;
+        this.testCode = testCode;
         this.testName = testName;
         this.scoreOrGrade = scoreOrGrade;
         this.conversationalAbility = conversationalAbility;
@@ -80,7 +90,9 @@ public class ApplicationLanguage extends BaseEntity {
 
     public static ApplicationLanguage create(
             JobApplication jobApplication,
+            String languageCode,
             String languageName,
+            String testCode,
             String testName,
             String scoreOrGrade,
             String conversationalAbility,
@@ -91,7 +103,9 @@ public class ApplicationLanguage extends BaseEntity {
     ) {
         return new ApplicationLanguage(
                 jobApplication,
+                languageCode,
                 languageName,
+                testCode,
                 testName,
                 scoreOrGrade,
                 conversationalAbility,

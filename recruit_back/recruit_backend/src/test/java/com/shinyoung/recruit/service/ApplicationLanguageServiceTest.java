@@ -105,7 +105,7 @@ class ApplicationLanguageServiceTest {
                 applicant.getId(),
                 applicationId,
                 new LanguageReplaceRequest(List.of(new LanguageRequest(
-                        "English", "TOEIC", "950", "BUSINESS",
+                        "ENGLISH", "English", "TOEIC", "TOEIC", "950", "BUSINESS",
                         LocalDate.of(2024, 1, 1), LocalDate.of(2026, 1, 1), "ETS", 0))));
 
         assertThat(responses).hasSize(1);
@@ -242,6 +242,59 @@ class ApplicationLanguageServiceTest {
                 applicant.getId(),
                 applicationId,
                 new LanguageReplaceRequest(List.of(new LanguageRequest(
+                        "ENGLISH",
+                        "",
+                        "TOEIC",
+                        "TOEIC",
+                        "900",
+                        null,
+                        LocalDate.of(2024, 1, 1),
+                        null,
+                        null,
+                        0
+                )))
+        )).isInstanceOf(InvalidJobApplicationException.class);
+
+        assertThatThrownBy(() -> applicationLanguageService.replaceLanguages(
+                applicant.getId(),
+                applicationId,
+                new LanguageReplaceRequest(List.of(new LanguageRequest(
+                        "ENGLISH",
+                        "English",
+                        "TOEIC",
+                        "",
+                        "900",
+                        null,
+                        LocalDate.of(2024, 1, 1),
+                        null,
+                        null,
+                        0
+                )))
+        )).isInstanceOf(InvalidJobApplicationException.class);
+
+        assertThatThrownBy(() -> applicationLanguageService.replaceLanguages(
+                applicant.getId(),
+                applicationId,
+                new LanguageReplaceRequest(List.of(new LanguageRequest(
+                        "",
+                        "English",
+                        "TOEIC",
+                        "TOEIC",
+                        "900",
+                        null,
+                        LocalDate.of(2024, 1, 1),
+                        null,
+                        null,
+                        0
+                )))
+        )).isInstanceOf(InvalidJobApplicationException.class);
+
+        assertThatThrownBy(() -> applicationLanguageService.replaceLanguages(
+                applicant.getId(),
+                applicationId,
+                new LanguageReplaceRequest(List.of(new LanguageRequest(
+                        "ENGLISH",
+                        "English",
                         "",
                         "TOEIC",
                         "900",
@@ -257,22 +310,9 @@ class ApplicationLanguageServiceTest {
                 applicant.getId(),
                 applicationId,
                 new LanguageReplaceRequest(List.of(new LanguageRequest(
+                        "ENGLISH",
                         "English",
-                        "",
-                        "900",
-                        null,
-                        LocalDate.of(2024, 1, 1),
-                        null,
-                        null,
-                        0
-                )))
-        )).isInstanceOf(InvalidJobApplicationException.class);
-
-        assertThatThrownBy(() -> applicationLanguageService.replaceLanguages(
-                applicant.getId(),
-                applicationId,
-                new LanguageReplaceRequest(List.of(new LanguageRequest(
-                        "English",
+                        "TOEIC",
                         "TOEIC",
                         "900",
                         null,
@@ -287,7 +327,9 @@ class ApplicationLanguageServiceTest {
                 applicant.getId(),
                 applicationId,
                 new LanguageReplaceRequest(List.of(new LanguageRequest(
+                        "ENGLISH",
                         "English",
+                        "TOEIC",
                         "TOEIC",
                         "900",
                         null,
@@ -350,7 +392,9 @@ class ApplicationLanguageServiceTest {
 
     private LanguageRequest language(String languageName, String testName, Integer sortOrder) {
         return new LanguageRequest(
+                languageName.toUpperCase(),
                 languageName,
+                testName.toUpperCase(),
                 testName,
                 "900",
                 null,

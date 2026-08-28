@@ -6,7 +6,9 @@ import java.time.LocalDate;
 
 public record AdminLanguageResponse(
         Long languageId,
+        String languageCode,
         String languageName,
+        String testCode,
         String testName,
         String scoreOrGrade,
         String conversationalAbility,
@@ -19,7 +21,9 @@ public record AdminLanguageResponse(
     public static AdminLanguageResponse from(ApplicationLanguage language) {
         return new AdminLanguageResponse(
                 language.getId(),
+                language.getLanguageCode(),
                 language.getLanguageName(),
+                language.getTestCode(),
                 language.getTestName(),
                 language.getScoreOrGrade(),
                 language.getConversationalAbility(),

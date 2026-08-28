@@ -6,7 +6,9 @@ import java.time.LocalDate;
 
 public record LanguageResponse(
         Long languageId,
+        String languageCode,
         String languageName,
+        String testCode,
         String testName,
         String scoreOrGrade,
         String conversationalAbility,
@@ -19,7 +21,9 @@ public record LanguageResponse(
     public static LanguageResponse from(ApplicationLanguage language) {
         return new LanguageResponse(
                 language.getId(),
+                language.getLanguageCode(),
                 language.getLanguageName(),
+                language.getTestCode(),
                 language.getTestName(),
                 language.getScoreOrGrade(),
                 language.getConversationalAbility(),

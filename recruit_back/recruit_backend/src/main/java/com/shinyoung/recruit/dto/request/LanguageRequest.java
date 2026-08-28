@@ -7,8 +7,14 @@ import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 
 public record LanguageRequest(
+        @NotBlank(message = "Language code is required.")
+        String languageCode,
+
         @NotBlank(message = "Language name is required.")
         String languageName,
+
+        @NotBlank(message = "Test code is required.")
+        String testCode,
 
         @NotBlank(message = "Test name is required.")
         String testName,

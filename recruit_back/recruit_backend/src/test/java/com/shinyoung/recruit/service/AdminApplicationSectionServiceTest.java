@@ -582,7 +582,9 @@ class AdminApplicationSectionServiceTest {
     private ApplicationLanguage language(JobApplication application, String languageName, Integer sortOrder) {
         return ApplicationLanguage.create(
                 application,
+                languageName.toUpperCase(),
                 languageName,
+                "TEST",
                 "Test",
                 "900",
                 "A",

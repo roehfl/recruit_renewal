@@ -120,6 +120,7 @@ public interface ApplicationPiiPurgeRepository extends Repository<JobApplication
     @Query("""
             update ApplicationLanguage l
             set l.languageName = '__PURGED__', l.testName = '__PURGED__', l.examDate = null,
+                l.languageCode = null, l.testCode = null,
                 l.scoreOrGrade = null, l.conversationalAbility = null,
                 l.expiredDate = null, l.issuingOrganization = null,
                 l.createdBy = null, l.updatedBy = null
