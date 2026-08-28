@@ -43,6 +43,8 @@ public class UnivInfoSchoolClient {
 
     /** 정상 응답 코드. */
     private static final String SUCCESS_CODE = "00";
+    /** 조건에 맞는 데이터 없음. 오류가 아니라 빈 결과로 취급한다. */
+    private static final String NO_DATA_CODE = "03";
 
     /** 학교명. 요청 파라미터이자 응답 항목이다. */
     private static final String FIELD_SCHOOL_NAME = "SCHL_NM";
@@ -128,19 +130,23 @@ public class UnivInfoSchoolClient {
             throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.", e);
         }
 
-        JsonNode response = root.path("response");
-        String resultCode = response.path("header").path("resultCode").asText("");
+        String resultCode = root.path("header").path("resultCode").asText("");
+        if (NO_DATA_CODE.equals(resultCode)) {
+            // 검색 결과 없음은 정상 흐름이다(body 도 null 로 온다).
+            return List.of();
+        }
         if (!SUCCESS_CODE.equals(resultCode)) {
             // 서비스키 오류 등 상세는 로깅만 — 클라이언트에 원인/키 관련 메시지를 노출하지 않는다.
             log.warn("대학 학교정보 오류코드={}, message={}, 본문={}",
-                    resultCode, response.path("header").path("resultMsg").asText(""), snippet(body));
+                    resultCode, root.path("header").path("resultMsg").asText(""), snippet(body));
             throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.");
         }
 
-        JsonNode items = response.path("body").path("items");
+        JsonNode items = root.path("body").path("items");
         if (!items.isArray()) {
+            // 정상 코드인데 목록이 없으면 응답 구조가 바뀐 것이다. 검색을 막지는 않고 로그로 드러낸다.
             log.warn("대학 학교정보 응답에 items 배열이 없습니다. 본문={}", snippet(body));
-            throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+            return List.of();
         }
 
         List<SchoolSearchResponse> schools = new ArrayList<>();

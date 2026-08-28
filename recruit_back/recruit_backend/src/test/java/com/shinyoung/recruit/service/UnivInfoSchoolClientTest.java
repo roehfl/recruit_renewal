@@ -20,8 +20,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class UnivInfoSchoolClientTest {
 
     private static final String BASE_URL = "http://juso.go.kr/gov/openapi/tn_pubr_public_univ_info_api";
+    /** 실제 응답은 최상위에 바로 header/body 가 온다(response 래퍼 없음). */
     private static final String EMPTY_BODY =
-            "{\"response\":{\"header\":{\"resultCode\":\"00\"},\"body\":{\"items\":[]}}}";
+            "{\"header\":{\"resultCode\":\"00\"},\"body\":{\"items\":[]}}";
+    /** 검색 결과 없음. body 가 null 로 온다. */
+    private static final String NO_DATA_BODY =
+            "{\"header\":{\"resultCode\":\"03\",\"resultMsg\":\"NODATA_ERROR\"},\"body\":null}";
 
     @Test
     void 명세대로_대문자_스네이크_파라미터를_전송한다() {
@@ -43,6 +47,22 @@ class UnivInfoSchoolClientTest {
         assertThat(requestUriOf("abc+def/ghi==", null))
                 .contains("serviceKey=abc%2Bdef%2Fghi%3D%3D")
                 .doesNotContain("serviceKey=abc+def/ghi");
+    }
+
+    @Test
+    void 데이터_없음_응답은_빈_목록으로_처리한다() {
+        // resultCode=03(NODATA_ERROR)은 오류가 아니라 검색 결과 없음이다. 502로 올리면 안 된다.
+        UnivInfoProperties properties = new UnivInfoProperties();
+        properties.setBaseUrl(BASE_URL);
+        properties.setServiceKey("dummyKey");
+
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        UnivInfoSchoolClient client = new UnivInfoSchoolClient(builder.build(), properties);
+        server.expect(request -> { })
+                .andRespond(MockRestResponseCreators.withSuccess(NO_DATA_BODY, MediaType.APPLICATION_JSON));
+
+        assertThat(client.search("없는학교", "대학")).isEmpty();
     }
 
     private String requestUriOf(String serviceKey, String univKind) {
