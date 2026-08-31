@@ -46,12 +46,17 @@ public class UnivInfoSchoolClient {
     /** 조건에 맞는 데이터 없음. 오류가 아니라 빈 결과로 취급한다. */
     private static final String NO_DATA_CODE = "03";
 
-    /** 학교명. 요청 파라미터이자 응답 항목이다. */
-    private static final String FIELD_SCHOOL_NAME = "SCHL_NM";
+    /** 학교명 요청 파라미터. 명세상 대문자 스네이크다. */
+    private static final String PARAM_SCHOOL_NAME = "SCHL_NM";
+    /** 대학구분명 요청 파라미터. */
+    private static final String PARAM_UNIV_KIND = "UNIV_SE_NM";
+
+    /** 학교명 응답 항목. 응답은 요청 파라미터와 달리 lowerCamel 이다. */
+    private static final String FIELD_SCHOOL_NAME = "schlNm";
     /** 대학구분명(대학 / 대학원 / 전문대학). 학력 구분 필터에 쓴다. */
-    private static final String FIELD_UNIV_KIND = "UNIV_SE_NM";
+    private static final String FIELD_UNIV_KIND = "univSeNm";
     /** 시도명. */
-    private static final String FIELD_REGION = "CTPV_NM";
+    private static final String FIELD_REGION = "ctpvNm";
 
     private final RestClient univInfoRestClient;
     private final UnivInfoProperties properties;
@@ -109,10 +114,10 @@ public class UnivInfoSchoolClient {
                 properties.getBaseUrl(),
                 PublicDataServiceKey.toQueryValue(serviceKey),
                 properties.getPageSize(),
-                FIELD_SCHOOL_NAME,
+                PARAM_SCHOOL_NAME,
                 URLEncoder.encode(keyword, StandardCharsets.UTF_8));
         if (univKind != null) {
-            uri += "&%s=%s".formatted(FIELD_UNIV_KIND, URLEncoder.encode(univKind, StandardCharsets.UTF_8));
+            uri += "&%s=%s".formatted(PARAM_UNIV_KIND, URLEncoder.encode(univKind, StandardCharsets.UTF_8));
         }
         return URI.create(uri);
     }
@@ -142,15 +147,21 @@ public class UnivInfoSchoolClient {
             throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.");
         }
 
-        JsonNode items = root.path("body").path("items");
-        if (!items.isArray()) {
+        // 목록은 body.items.item 에 한 단계 더 들어가 있다. 행이 하나뿐이면 배열이 아니라 객체로 온다.
+        JsonNode item = root.path("body").path("items").path("item");
+        List<JsonNode> rows = new ArrayList<>();
+        if (item.isArray()) {
+            item.forEach(rows::add);
+        } else if (item.isObject()) {
+            rows.add(item);
+        } else {
             // 정상 코드인데 목록이 없으면 응답 구조가 바뀐 것이다. 검색을 막지는 않고 로그로 드러낸다.
-            log.warn("대학 학교정보 응답에 items 배열이 없습니다. 본문={}", snippet(body));
+            log.warn("대학 학교정보 응답에 body.items.item 이 없습니다. 본문={}", snippet(body));
             return List.of();
         }
 
         List<SchoolSearchResponse> schools = new ArrayList<>();
-        for (JsonNode row : items) {
+        for (JsonNode row : rows) {
             // 상위 API 가 검색 조건을 어떻게 해석하든 결과가 어긋나지 않도록 응답에서 한 번 더 거른다.
             String schoolName = text(row, FIELD_SCHOOL_NAME);
             if (schoolName == null || !schoolName.contains(keyword)) {
@@ -167,6 +178,11 @@ public class UnivInfoSchoolClient {
                     SchoolSource.UNIV_INFO,
                     text(row, FIELD_REGION)
             ));
+        }
+        if (schools.isEmpty() && !rows.isEmpty()) {
+            // 행은 왔는데 전부 걸러졌다면 항목명/구분값이 어긋난 것이다. 조용히 빈 결과가 되지 않게 남긴다.
+            log.warn("대학 학교정보 {}건이 모두 필터링됐습니다(univKind={}). 첫 행={}",
+                    rows.size(), univKind, snippet(rows.get(0).toString()));
         }
         return schools;
     }

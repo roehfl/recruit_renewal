@@ -88,13 +88,17 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 라우팅: `HIGH_SCHOOL` → NEIS 학교기본정보, `COLLEGE`/`UNIVERSITY`/`MASTER`/`DOCTOR` → 전국대학및전문대학정보표준데이터.
 - 인증키는 서버 설정에만 두고 프론트에 노출하지 않는다(juso 선례). 키 미설정·외부 장애·파싱 실패는 502.
 - 외부 API 는 직접 호출하지 않고 **DMZ 웹서버를 경유**한다(HTTP 80): NEIS `http://juso.go.kr/neis/...`(→ `open.neis.go.kr`), 공공데이터 `http://juso.go.kr/gov/...`(→ `api.data.go.kr`), 주소 `http://juso.go.kr/juso/...`(→ `business.juso.go.kr`). 프리픽스 뒤 경로는 원본과 동일하다.
-- 대학 API 확정(2026-08-27): 전국대학및전문대학정보(`/openapi/tn_pubr_public_univ_info_api`, 행 1건 = 학교 1곳). 공공데이터포털 표준데이터 규격 — `serviceKey/pageNo/numOfRows/type=json`, 응답 `response.header.resultCode` + `response.body.items`.
+- 대학 API 확정(2026-08-27): 전국대학및전문대학정보(`/openapi/tn_pubr_public_univ_info_api`, 행 1건 = 학교 1곳). 공공데이터포털 표준데이터 규격 — `serviceKey/pageNo/numOfRows/type=json`.
 - 학과 단위 데이터셋(`tn_pubr_public_univ_major_api`) 호출 코드는 제거하지 않고 남겨뒀다. 전공명 자동완성 후속 검토용이며 학교 검색 경로에서는 호출하지 않는다.
-- 대학 API 명세 확정(2026-08-28, 포털 명세 확인):
-  - 요청 파라미터는 대문자 스네이크다 — `SCHL_NM`(학교명), `UNIV_SE_NM`(대학구분명), `pageNo`, `numOfRows`(최대 1000), `type=json`. 이름이 틀리면 `INVALID_REQUEST_PARAMETER_ERROR`(코드 10).
-  - 응답 항목도 동일 표기 — `SCHL_NM`, `UNIV_SE_NM`, `SCHL_SE_NM`, `CTPV_NM` 등.
+- 대학 API 명세 확정(2026-08-31, 운영 환경 실호출로 검증):
+  - 요청 파라미터는 대문자 스네이크다 — `SCHL_NM`(학교명), `UNIV_SE_NM`(대학구분명), `pageNo`, `numOfRows`(최대 1000), `type=json`.
+  - **`SCHL_NM`은 완전일치다.** `SCHL_NM=평택`은 `resultCode=03`(NODATA), `SCHL_NM=서울대학교`는 정상 반환. `평택%`·`%평택%` 와일드카드도 NODATA다. 즉 상위 API로 부분검색이 불가능하다.
+    - 대응(2026-08-31): 부분검색을 서버에서 구현하지 않고, 학교찾기 모달에 "대학은 학교명을 전체 입력해야 검색됩니다" 안내를 노출한다. 전량 조회(`totalCount` 약 2000건) 후 로컬 필터링은 후속 과제로 남긴다.
+  - 응답 구조는 요청과 다르다 — 최상위에 바로 `header`/`body`(`response` 래퍼 없음), 목록은 **`body.items.item`** 이고 행이 1건이면 배열이 아니라 객체로 온다. `numOfRows`/`pageNo`/`totalCount`는 최상위에 있다.
+  - 응답 항목명은 **lowerCamel** 이다 — `schlNm`, `univSeNm`, `schlSeNm`, `ctpvNm`, `insttNm` 등. 요청의 대문자 스네이크와 표기가 다르다.
   - **학교 식별 코드가 없다**(제공 항목은 제공기관코드 `instt_code` 뿐). 따라서 대학 계열의 `schoolCode`는 **학교명 문자열**이다. 학교별 통계 그룹 키도 학교명이 된다.
-  - 대학원은 별도 행으로 제공된다(`UNIV_SE_NM`=대학원, `SCHL_SE_NM`=일반대학원/특수대학원/전문대학원). 예: "충남대학교 대학원", "충남대학교 교육대학원".
+  - 대학원은 별도 행으로 제공된다(`univSeNm`=대학원, `schlSeNm`=일반대학원/특수대학원/전문대학원). 예: "평택대학교 물류·정보·경영대학원".
+- DMZ 프록시 주의(2026-08-31): Apache `/gov` Location 이 `api.data.go.kr` 백엔드 연결을 재사용하는데 상위가 유휴 연결을 끊어 **간헐적으로 60초 무응답 후 실패**한다(동일 요청 3회 중 1회 재현). 앱은 readTimeout 5초라 이때 502가 되고 프론트에는 "학교 검색에 실패했습니다"가 뜬다. 조치는 인프라 쪽 `ProxyPass ... disablereuse=On connectiontimeout=5 timeout=15`.
 - 학교 구분 매핑: `COLLEGE`→`UNIV_SE_NM`=전문대학, `UNIVERSITY`→대학, `MASTER`/`DOCTOR`→대학원.
 - NEIS 명세 확인(2026-08-28): 신청주소 `hub/schoolInfo`, 기본인자 `KEY`/`Type`/`pIndex`/`pSize`, 신청인자 `SCHUL_NM`/`SCHUL_KND_SC_NM`, 출력값 `SD_SCHUL_CODE`/`SCHUL_NM`/`LCTN_SC_NM`. 고등학교는 학교코드가 있다.
 

@@ -112,6 +112,8 @@
         
         <div class="modal-span">
           <span> ※ 아래 학교명을 클릭하세요.</span>
+          <!-- 대학 학교정보 OpenAPI는 학교명 완전일치만 지원한다. 부분검색이 안 되는 점을 미리 알린다. -->
+          <span v-if="isUniversitySearch"> ※ 대학은 학교명을 전체 입력해야 검색됩니다. (예: 서울대학교)</span>
           <span> ※ 해외 소재 학교인 경우, 공식 명칭을 검색해주세요.</span>
           <span> ※ 검색결과에 없는 경우, 아래에 직접 입력하세요.</span>
         </div>
@@ -293,8 +295,13 @@ const items = reactive<EducationItem[]>([])
 const props = defineProps<SectionComponentProps>()
 const searchSchoolList = ref<schoolItem[]>([])
 
-// 수정중인 학력 저장 
+// 수정중인 학력 저장
 const selecedEducation = ref<EducationItem | null>(null);
+
+/* 고교는 NEIS(부분검색 가능), 그 외는 대학 표준데이터(학교명 완전일치)라 안내 문구가 다르다. */
+const isUniversitySearch = computed(
+  () => !!selecedEducation.value?.educationLevel && selecedEducation.value.educationLevel !== 'HIGH_SCHOOL',
+)
 
 function createEmptyItem(): EducationItem {
   return {
@@ -470,7 +477,13 @@ async function schoolSearchClick () {
     })
 
     searchSchoolList.value = result.data.data
-    if (searchSchoolList.value.length === 0) message.info('검색 결과가 없습니다. 아래에 직접 입력하세요.')
+    if (searchSchoolList.value.length === 0) {
+      message.info(
+        isUniversitySearch.value
+          ? '검색 결과가 없습니다. 대학은 학교명을 전체 입력해야 검색됩니다. 없으면 아래에 직접 입력하세요.'
+          : '검색 결과가 없습니다. 아래에 직접 입력하세요.',
+      )
+    }
   } catch {
     // 외부 학교 검색 API 장애·지연으로 막히면 직접 입력으로 진행할 수 있게 안내한다.
     searchSchoolList.value = []
