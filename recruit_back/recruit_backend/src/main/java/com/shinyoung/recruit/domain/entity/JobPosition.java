@@ -7,6 +7,9 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -33,8 +36,16 @@ public class JobPosition {
     @Column(length = 100)
     private String jobTitle;
 
-    @Column(length = 100)
-    private String workLocation;
+    /**
+     * 후보 근무지 목록. 개수가 곧 지원자 화면의 분기다 — 0개면 근무지 선택 없음, 1개면 고정, N개면 선택.
+     */
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "job_position_work_location",
+            joinColumns = @JoinColumn(name = "job_position_id")
+    )
+    @OrderColumn(name = "sort_order")
+    private List<JobPositionWorkLocation> workLocations = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
@@ -48,7 +59,7 @@ public class JobPosition {
             JobPositionApplicationType applicationType,
             String jobGroup,
             String jobTitle,
-            String workLocation,
+            List<JobPositionWorkLocation> workLocations,
             EmploymentType employmentType,
             Integer sortOrder
     ) {
@@ -56,7 +67,7 @@ public class JobPosition {
         this.applicationType = defaultApplicationType(applicationType);
         this.jobGroup = jobGroup;
         this.jobTitle = jobTitle;
-        this.workLocation = workLocation;
+        this.workLocations = workLocations == null ? new ArrayList<>() : new ArrayList<>(workLocations);
         this.employmentType = defaultEmploymentType(employmentType);
         this.sortOrder = sortOrder;
     }
@@ -70,7 +81,7 @@ public class JobPosition {
             JobPositionApplicationType applicationType,
             String jobGroup,
             String jobTitle,
-            String workLocation,
+            List<JobPositionWorkLocation> workLocations,
             EmploymentType employmentType,
             Integer sortOrder
     ) {
@@ -79,7 +90,7 @@ public class JobPosition {
                 applicationType,
                 jobGroup,
                 jobTitle,
-                workLocation,
+                workLocations,
                 employmentType,
                 sortOrder
         );
@@ -87,6 +98,20 @@ public class JobPosition {
 
     void assignJobPosting(JobPosting jobPosting) {
         this.jobPosting = jobPosting;
+    }
+
+    /** 후보 근무지 중 해당 코드가 있는지. 없으면 지원 시 선택할 수 없다. */
+    public boolean hasWorkLocation(String code) {
+        return workLocations.stream().anyMatch(it -> it.getCode().equals(code));
+    }
+
+    /** 후보 근무지의 표시명. 후보에 없으면 null. */
+    public String findWorkLocationName(String code) {
+        return workLocations.stream()
+                .filter(it -> it.getCode().equals(code))
+                .map(JobPositionWorkLocation::getName)
+                .findFirst()
+                .orElse(null);
     }
 
     private static JobPositionApplicationType defaultApplicationType(JobPositionApplicationType applicationType) {

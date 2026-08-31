@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
@@ -68,9 +68,23 @@ const recruitStatusTypeMap: Record<string, string> = {
 }
 // 공고 직무 
 const positionOptions = computed(() => {
-  return jobPostDetail.value?.jobPositions.map( (item: { positionName: string; id: number; workLocation: string; }) => ({
-    label: `${item.positionName} (근무지: ${item.workLocation})`,
+  return jobPostDetail.value?.jobPositions.map( (item: { positionName: string; id: number; }) => ({
+    label: item.positionName,
     value: item.id
+  }))
+})
+
+// 선택한 직무의 후보 근무지. 후보 개수가 곧 화면 분기다(0=미표시, 1=고정, N=선택).
+const workLocationOptions = computed<{ label: string; value: string }[]>(() => {
+  const positionId = selectedPosition.value?.value
+  if (!positionId) {
+    return []
+  }
+  const position = jobPostDetail.value?.jobPositions
+    ?.find((item: { id: number }) => item.id === positionId)
+  return (position?.workLocations ?? []).map((it: { code: string; name: string }) => ({
+    label: it.name,
+    value: it.code
   }))
 })
 
@@ -113,8 +127,22 @@ function goApplicationFormPage(applicationId: unknown): void {
 // 선택한 직무 
 const selectedPosition = ref< {label: string; value: number} | undefined >()
 
+// 선택한 근무지 코드
+const selectedWorkLocation = ref<string | undefined>()
+
+// 직무를 바꾸면 근무지 선택을 초기화한다. 후보가 1개뿐이면 자동 선택한다.
+watch(selectedPosition, () => {
+  const options = workLocationOptions.value
+  selectedWorkLocation.value = options.length === 1 ? options[0]!.value : undefined
+})
+
 // 직무 선택 포커스 
 const positionSelectRef = ref();
+
+// 확인 모달에 보여줄 근무지 표시명
+const selectedWorkLocationLabel = computed(() =>
+  workLocationOptions.value.find((it) => it.value === selectedWorkLocation.value)?.label ?? ''
+)
 
 // 지원하기 버튼 클릭 시 
 function confirmSubmit(): void {
@@ -130,6 +158,12 @@ function confirmSubmit(): void {
     message.warning('직무를 선택해주세요.');
     positionSelectRef.value?.focus();
 
+    return;
+  }
+
+  // 후보 근무지가 있는 직무는 근무지 선택이 필수다.
+  if (workLocationOptions.value.length > 0 && !selectedWorkLocation.value) {
+    message.warning('근무지를 선택해주세요.');
     return;
   }
 
@@ -152,7 +186,9 @@ function confirmSubmit(): void {
     else {
       Modal.confirm({
         title: '공고 지원',
-        content: `지원 직무는 '${selectedPosition.value?.label}' 입니다. 지원하시겠습니까?`,
+        content: selectedWorkLocation.value
+          ? `지원 직무는 '${selectedPosition.value?.label}', 근무지는 '${selectedWorkLocationLabel.value}' 입니다. 지원하시겠습니까?`
+          : `지원 직무는 '${selectedPosition.value?.label}' 입니다. 지원하시겠습니까?`,
         okText: '지원하기',
         cancelText: '취소',
         async onOk() {
@@ -184,6 +220,7 @@ async function submitApplication(): Promise<void> {
       {
         jobPostingId : id, 
         jobPositionId: positionId,
+        workLocationCode: selectedWorkLocation.value ?? null,
       })
 
     if (!response.data.success) {
@@ -259,6 +296,19 @@ onMounted(async () => {
                 :options="positionOptions" 
                 label-in-value
                 placeholder="직무를 선택해주세요"
+              />
+            </a-form-item>
+            <a-form-item
+              v-if="jobPostDetail?.receptionStatus === 'ACCEPTING' && workLocationOptions.length > 0"
+              label="근무지"
+              required
+            >
+              <a-select
+                v-model:value="selectedWorkLocation"
+                style="width: 200px"
+                :options="workLocationOptions"
+                :disabled="workLocationOptions.length === 1"
+                placeholder="근무지를 선택해주세요"
               />
             </a-form-item>
             <a-form-item>

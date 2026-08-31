@@ -643,3 +643,60 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 요청: `{ displayName, sortOrder, active, description }`
 - 응답(200): `ApiResponse<{ id, groupCode, code, displayName, sortOrder, active, description }>`
 - 오류: 400(필수값 공백, 길이 초과), 404(미존재)
+
+### 화면: 직무별 근무지 선택 (공고 상세 ApplicationDetailView + 관리자 공고 등록 AdminJobPostingFormView)
+
+- 프론트: `src/views/applicant/ApplicationDetailView.vue`(직무·근무지 선택), `src/views/admin/jobPosting/AdminJobPostingFormView.vue`(근무지 후보 등록), `src/views/admin/application/ApplicationStatus.vue`(근무지 검색), `src/types/jobPosting.ts`
+- 백엔드: `com.shinyoung.recruit.controller.JobPostingController` · `JobPostingPublicController` · `ApplicationController` · `AdminApplicationController`, `service.JobPostingService` · `JobApplicationService`
+- 배경: 기존에는 `JobPosition.workLocation`이 단일 자유텍스트라 "직무 동일 / 근무지만 다름"을 별도 모집분야 행으로 등록해야 했다. 근무지를 공통코드화하고 **직무 1건이 후보 근무지 N건**을 갖도록 바꾼다. 지원자는 공고 상세에서 직무를 고르면 그 직무의 후보 근무지가 드롭다운에 동적으로 채워지고, 근무지를 함께 선택해 지원을 시작한다.
+- 근무지 코드는 CommonCode 그룹 **`WORK_LOCATION`**을 쓴다. 코드 관리는 기존 공통코드 관리 화면(`/api/admin/codes`)을 그대로 사용하며 신규 코드 관리 API는 없다.
+- 후보 개수가 곧 직무별 분기다(별도 `required` 플래그 없음).
+  - 0개 → 근무지 선택 개념 없음. 지원자 화면에 드롭다운 미표시, 지원서에 근무지 저장 안 함(null)
+  - 1개 → 근무지 고정(예: IT=본사). 프론트가 자동 선택 + readonly 표시
+  - N개 → 지원자가 선택
+- 마이그레이션: **신규 공고부터 적용**. 기존 `job_position.work_location` 컬럼은 코드에서 참조하지 않게 되며(`ddl-auto: update`는 컬럼을 지우지 않음) 정리는 수동 DDL로 한다.
+
+#### POST `/admin/job-postings`, POST `/admin/job-postings/{id}`  🟢 확정(2026-08-31, front-back 반영 완료) (근무지 후보 등록)
+
+- 변경: `jobPositions[]` 항목의 `workLocation`(단일 문자열) → **`workLocationCodes: string[]`**(CommonCode `WORK_LOCATION`의 `code` 목록, 순서가 곧 노출 순서)
+- 요청(변경분): `jobPositions: [{ positionName, applicationType, jobGroup, jobTitle, workLocationCodes: ["HQ","BSN"], employmentType, sortOrder }]`
+- 검증: 미지정/빈 배열 허용(후보 0개), 배열 내 중복 코드 400, `WORK_LOCATION` 그룹의 **활성 코드가 아니면** 400
+
+#### GET `/admin/job-postings/{id}`  🟢 확정(2026-08-31)
+
+- 변경: `jobPositions[].workLocation` → **`workLocations: [{ code, name }]`**. `name`은 CommonCode `displayName`
+
+#### GET `/job-postings/{id}` (공개 상세)  🟢 확정(2026-08-31)
+
+- 변경: `jobPositions[].workLocation` → **`workLocations: [{ code, name }]`** (활성 코드만, 등록 순서)
+- 프론트는 이 배열로 근무지 드롭다운을 구성한다. **추가 API 호출 없음**(공고 상세 응답 한 번으로 직무별 후보를 모두 받음)
+
+#### POST `/applications`  🟢 확정(2026-08-31) (지원 시작)
+
+- 변경: 요청에 `workLocationCode` 추가 → `{ jobPostingId, jobPositionId, workLocationCode? }`
+- 검증: 선택 직무의 후보가 1건 이상인데 `workLocationCode`가 없으면 400 / 후보에 없는 코드면 400 / 후보 0건인데 값을 보내면 400
+- 저장: `JobApplication.workLocationCode` + `workLocationNameSnapshot`(선택 시점 `displayName` 스냅샷, 기존 `jobPositionNameSnapshot`과 동일 규약)
+
+#### POST `/applications/{applicationId}`  🟢 확정(2026-08-31) (임시저장 지원분야 수정)
+
+- 변경: 요청에 `workLocationCode` 추가 → `{ jobPositionId, workLocationCode? }`. 검증 규칙은 생성과 동일(변경된 직무의 후보 기준)
+
+#### GET `/applications/{applicationId}/form-page`  🟢 확정(2026-08-31) (표시용 확장)
+
+- 변경: 응답에 `workLocationName` 추가(스냅샷 우선, 없으면 null). 지원서 작성 화면 헤더에 "모집분야 / 근무지" 읽기전용 표시용. **여기서 근무지를 고르지 않는다**
+
+#### GET `/admin/applications`, GET `/admin/job-postings/{jobPostingId}/applications`  🟢 확정(2026-08-31) (근무지 조건 의미 변경)
+
+- 변경: 검색 파라미터 `workLocation`이 `JobPosition.workLocation` 자유텍스트 완전일치 → **`JobApplication.workLocationCode` 완전일치**. 프론트 검색폼은 텍스트 입력 → `WORK_LOCATION` 공통코드 select로 교체
+- 변경: 응답 `AdminApplicationSummaryResponse.workLocation`이 지원자가 선택한 근무지의 **표시명**(`workLocationNameSnapshot`)을 담는다. 미선택이면 null
+- 제출 시 재검증: 공고 수정으로 후보 목록이 바뀌어 이미 선택한 근무지가 무효가 될 수 있으므로, 제출(`POST /applications/{id}/submit`) 시 `validateSelectedJobPosition`과 동일한 방식으로 근무지 유효성을 재검증하고 위반 시 400
+
+#### GET `/admin/applications/{applicationId}`  🟢 확정(2026-08-31) (지원서 상세 표시 확장)
+
+- 변경: 응답에 `workLocationNameSnapshot` 추가. 관리자 지원서 상세의 "직무/근무지" 칸은 모집분야의 후보가 아니라 **지원자가 실제로 선택한 근무지**를 보여준다. 미선택이면 null
+
+#### 구현 메모 (🟢 확정 시점 기준)
+
+- `job_position_work_location` 은 `@ElementCollection` + `@OrderColumn(sort_order)` 이며 `code` 와 **저장 시점 `displayName` 스냅샷(`name`)** 을 함께 담는다. 공고는 시점 문서라 라벨을 굳혀 두며, 공통코드 `displayName` 변경은 공고를 재저장할 때 반영된다
+- 근무지 코드 유효성(활성 코드 존재)은 공고 저장 1회당 `WORK_LOCATION` 활성 코드 1회 조회로 검증한다(N+1 없음)
+- `ApplicationCreateRequest` / `ApplicationUpdateRequest` 는 `workLocationCode` 를 생략한 축약 생성자를 유지한다(근무지 후보 0개 모집분야용)

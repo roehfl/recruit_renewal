@@ -11,13 +11,19 @@ export interface AdminJobPostingListItem {
   jobPositions : AdminJobPosition[]
 }
 
+/** 모집분야의 후보 근무지(CommonCode 그룹 WORK_LOCATION). */
+export interface WorkLocationOption {
+  code: string
+  name: string
+}
+
 export interface AdminJobPosition {
   id: number | null
   positionName: string
   applicationType: 'NEW_GRADUATE' | 'EXPERIENCED' | 'NEW_GRADUATE_OR_EXPERIENCED'
   jobGroup: string | null
   jobTitle: string | null
-  workLocation: string | null
+  workLocations: WorkLocationOption[]
   employmentType: 'FULL_TIME' | 'CONTRACT' | 'INTERN' | 'FREELANCE' | 'PART_TIME' | 'ETC'
   sortOrder: number
 }

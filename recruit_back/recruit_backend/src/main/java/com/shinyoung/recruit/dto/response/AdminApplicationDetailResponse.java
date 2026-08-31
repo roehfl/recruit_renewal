@@ -13,6 +13,8 @@ public record AdminApplicationDetailResponse(
         String jobPostingTitleSnapshot,
         Long jobPositionId,
         String jobPositionNameSnapshot,
+        /** 지원자가 선택한 근무지 표시명. 근무지 후보가 없는 모집분야면 null. */
+        String workLocationNameSnapshot,
         JobApplicationStatus status,
         LocalDateTime submittedAt,
         LocalDateTime withdrawnAt,
@@ -29,6 +31,7 @@ public record AdminApplicationDetailResponse(
                 application.getJobPostingTitleSnapshot(),
                 application.getJobPosition().getId(),
                 application.getJobPositionNameSnapshot(),
+                application.getWorkLocationNameSnapshot(),
                 application.getStatus(),
                 application.getSubmittedAt(),
                 application.getWithdrawnAt(),

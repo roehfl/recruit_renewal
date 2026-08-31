@@ -1,5 +1,7 @@
 package com.shinyoung.recruit.service;
 
+import com.shinyoung.recruit.domain.entity.CommonCode;
+import com.shinyoung.recruit.domain.repository.CommonCodeRepository;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.AttachmentRequirementReplaceRequest;
 import com.shinyoung.recruit.dto.request.AttachmentRequirementRequest;
@@ -23,6 +25,7 @@ import com.shinyoung.recruit.enumeration.QuestionCategory;
 import com.shinyoung.recruit.enumeration.ReceptionStatus;
 import com.shinyoung.recruit.exception.InvalidJobPostingException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -68,6 +71,16 @@ class JobPostingPublicServiceTest {
 
     @Autowired
     private JobPostingAttachmentRequirementService attachmentRequirementService;
+
+    @Autowired
+    private CommonCodeRepository commonCodeRepository;
+
+    /** 공통 request 헬퍼가 쓰는 근무지 코드(CommonCode 그룹 WORK_LOCATION)를 미리 등록한다. */
+    @BeforeEach
+    void 근무지코드_등록() {
+        commonCodeRepository.save(CommonCode.create("WORK_LOCATION", "SEOUL", "Seoul", 0, true, null));
+        commonCodeRepository.save(CommonCode.create("WORK_LOCATION", "BUSAN", "Busan", 1, true, null));
+    }
 
     @Test
     void public_list_returns_only_published_visible_displayable_postings() {
@@ -318,7 +331,9 @@ class JobPostingPublicServiceTest {
         assertThat(response.positions().get(0).applicationType()).isEqualTo(JobPositionApplicationType.NEW_GRADUATE);
         assertThat(response.positions().get(0).jobGroup()).isEqualTo("Research");
         assertThat(response.positions().get(0).jobTitle()).isEqualTo("Equity Analyst");
-        assertThat(response.positions().get(0).workLocation()).isEqualTo("Seoul");
+        assertThat(response.positions().get(0).workLocations())
+                .extracting("code", "name")
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("SEOUL", "Seoul"));
         assertThat(response.positions().get(0).employmentType()).isEqualTo(EmploymentType.FULL_TIME);
     }
 
@@ -832,7 +847,7 @@ class JobPostingPublicServiceTest {
                                 JobPositionApplicationType.EXPERIENCED,
                                 "IT",
                                 "Backend Developer",
-                                "Busan",
+                                List.of("BUSAN"),
                                 EmploymentType.CONTRACT,
                                 2
                         ),
@@ -841,7 +856,7 @@ class JobPostingPublicServiceTest {
                                 JobPositionApplicationType.NEW_GRADUATE,
                                 "Research",
                                 "Equity Analyst",
-                                "Seoul",
+                                List.of("SEOUL"),
                                 EmploymentType.FULL_TIME,
                                 1
                         )

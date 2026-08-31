@@ -3,12 +3,15 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { adminJobPostingApi } from '@/api/adminJobPostingApi'
+import { commonCodeApi } from '@/api/commonApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import type {
   AdminApplicationFormConfig,
   AdminJobPositionForm,
   AdminJobPostingSaveRequest,
 } from '@/types/jobPosting'
+
+const WORK_LOCATION_GROUP_CODE = 'WORK_LOCATION'
 
 const MAX_IMAGES = 10
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024
@@ -45,7 +48,7 @@ const displayOrder = ref(0)
 const contentHtmlLegacy = ref<string | null>(null) // 수정 시 기존 값 보존용(화면 미노출)
 
 const jobPositions = ref<AdminJobPositionForm[]>([
-  { positionName: '', applicationType: 'NEW_GRADUATE_OR_EXPERIENCED', jobGroup: null, jobTitle: null, workLocation: null, employmentType: 'FULL_TIME', sortOrder: 0 },
+  { positionName: '', applicationType: 'NEW_GRADUATE_OR_EXPERIENCED', jobGroup: null, jobTitle: null, workLocationCodes: [], employmentType: 'FULL_TIME', sortOrder: 0 },
 ])
 
 const formConfig = ref<AdminApplicationFormConfig>({
@@ -152,7 +155,7 @@ const addPosition = () => {
     applicationType: 'NEW_GRADUATE_OR_EXPERIENCED',
     jobGroup: null,
     jobTitle: null,
-    workLocation: null,
+    workLocationCodes: [],
     employmentType: 'FULL_TIME',
     sortOrder: jobPositions.value.length,
   })
@@ -236,6 +239,21 @@ const save = async () => {
   }
 }
 
+// 근무지 후보 선택지(활성 공통코드)
+const workLocationOptions = ref<{ label: string; value: string }[]>([])
+
+const loadWorkLocationOptions = async () => {
+  try {
+    const response = await commonCodeApi.getCommonCodes(WORK_LOCATION_GROUP_CODE)
+    workLocationOptions.value = response.data.data.map((code) => ({
+      label: code.displayName,
+      value: code.code,
+    }))
+  } catch (error) {
+    message.error(getApiErrorMessage(error, '근무지 코드를 불러오지 못했습니다.'))
+  }
+}
+
 const loadForEdit = async () => {
   if (!isEdit.value) return
   loading.value = true
@@ -253,7 +271,10 @@ const loadForEdit = async () => {
     pinned.value = detail.pinned
     displayOrder.value = detail.displayOrder
     contentHtmlLegacy.value = detail.contentHtml
-    jobPositions.value = detail.jobPositions.map(({ id: _id, ...position }) => position)
+    jobPositions.value = detail.jobPositions.map(({ id: _id, workLocations, ...position }) => ({
+      ...position,
+      workLocationCodes: workLocations.map((it) => it.code),
+    }))
     formConfig.value = detail.applicationFormConfig
     const generation = ++imageLoadGeneration
     const settled = await Promise.allSettled(detail.images.map(async (image): Promise<EditableImage> => {
@@ -284,7 +305,10 @@ const loadForEdit = async () => {
   }
 }
 
-onMounted(loadForEdit)
+onMounted(() => {
+  loadWorkLocationOptions()
+  loadForEdit()
+})
 onBeforeUnmount(() => {
   imageLoadGeneration++
   images.value.forEach((image) => URL.revokeObjectURL(image.previewUrl))
@@ -383,7 +407,13 @@ onBeforeUnmount(() => {
           <a-select v-model:value="position.employmentType" :options="employmentTypeOptions" class="position-select" />
           <a-input v-model:value="position.jobGroup" placeholder="직군" class="position-input" />
           <a-input v-model:value="position.jobTitle" placeholder="담당 직무" class="position-input" />
-          <a-input v-model:value="position.workLocation" placeholder="근무지" class="position-input" />
+          <a-select
+            v-model:value="position.workLocationCodes"
+            mode="multiple"
+            :options="workLocationOptions"
+            placeholder="근무지(다중 선택, 미선택 시 근무지 없음)"
+            class="position-input"
+          />
           <a-button danger size="small" @click="removePosition(index)">삭제</a-button>
         </div>
       </a-card>

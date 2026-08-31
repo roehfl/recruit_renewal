@@ -72,12 +72,19 @@ export interface AdminJobPostingListItem {
 
 export type AdminJobPostingStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED'
 
+/** 모집분야의 후보 근무지(CommonCode 그룹 WORK_LOCATION). 응답 전용 모양이다. */
+export interface WorkLocationOption {
+  code: string
+  name: string
+}
+
 export interface AdminJobPositionForm {
   positionName: string
   applicationType: 'NEW_GRADUATE' | 'EXPERIENCED' | 'NEW_GRADUATE_OR_EXPERIENCED'
   jobGroup: string | null
   jobTitle: string | null
-  workLocation: string | null
+  /** 후보 근무지 코드 목록. 비면 근무지 선택이 없는 모집분야다. */
+  workLocationCodes: string[]
   employmentType: 'FULL_TIME' | 'CONTRACT' | 'INTERN' | 'FREELANCE' | 'PART_TIME' | 'ETC'
   sortOrder: number
 }
@@ -137,7 +144,11 @@ export interface AdminJobPostingDetail {
   createdAt: string
   updatedAt: string
   positionCount: number
-  jobPositions: (AdminJobPositionForm & { id: number })[]
+  /** 응답은 코드 목록이 아니라 code+name 쌍으로 내려온다. */
+  jobPositions: (Omit<AdminJobPositionForm, 'workLocationCodes'> & {
+    id: number
+    workLocations: WorkLocationOption[]
+  })[]
   applicationFormConfig: AdminApplicationFormConfig
   images: JobPostingImage[]
 }

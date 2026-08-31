@@ -203,7 +203,7 @@ class JobPostingAttachmentRequirementServiceTest {
                         JobPositionApplicationType.EXPERIENCED,
                         "IT",
                         "Backend Engineer",
-                        "Seoul",
+                        List.of(),
                         EmploymentType.FULL_TIME,
                         0
                 )),

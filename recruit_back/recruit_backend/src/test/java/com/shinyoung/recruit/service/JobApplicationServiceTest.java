@@ -7,10 +7,12 @@ import com.shinyoung.recruit.domain.entity.ApplicationBasicInfo;
 import com.shinyoung.recruit.domain.entity.ApplicationCertificate;
 import com.shinyoung.recruit.domain.entity.ApplicationEducation;
 import com.shinyoung.recruit.domain.entity.ApplicationLanguage;
+import com.shinyoung.recruit.domain.entity.CommonCode;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.CommonCodeRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
@@ -114,6 +116,9 @@ class JobApplicationServiceTest {
 
     @Autowired
     private JobPositionRepository jobPositionRepository;
+
+    @Autowired
+    private CommonCodeRepository commonCodeRepository;
 
     @Autowired
     private ApplicationBasicInfoRepository basicInfoRepository;
@@ -1387,6 +1392,98 @@ class JobApplicationServiceTest {
                 LocalDateTime.of(2026, 6, 1, 9, 0),
                 LocalDateTime.of(2026, 6, 30, 18, 0)
         ));
+    }
+
+    @Test
+    void 근무지_후보가_있으면_선택값을_스냅샷과_함께_저장한다() {
+        Applicant applicant = createApplicant("applicant-work-location", "Work Location Applicant");
+        Long jobPostingId = createPublishedJobPostingWithWorkLocations("Work Location Posting");
+
+        Long applicationId = jobApplicationService.create(
+                applicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId), "BUSAN")
+        );
+
+        JobApplication application = jobApplicationRepository.findById(applicationId).orElseThrow();
+        assertThat(application.getWorkLocationCode()).isEqualTo("BUSAN");
+        assertThat(application.getWorkLocationNameSnapshot()).isEqualTo("부산");
+    }
+
+    @Test
+    void 근무지_후보가_있는데_미선택이면_생성_실패() {
+        Applicant applicant = createApplicant("applicant-work-location-missing", "Missing");
+        Long jobPostingId = createPublishedJobPostingWithWorkLocations("Work Location Missing");
+
+        assertThatThrownBy(() -> jobApplicationService.create(
+                applicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId))
+        )).isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
+    void 후보에_없는_근무지코드면_생성_실패() {
+        Applicant applicant = createApplicant("applicant-work-location-unknown", "Unknown");
+        Long jobPostingId = createPublishedJobPostingWithWorkLocations("Work Location Unknown");
+
+        assertThatThrownBy(() -> jobApplicationService.create(
+                applicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId), "DAEGU")
+        )).isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
+    void 근무지_후보가_없는_모집분야에_근무지를_보내면_생성_실패() {
+        Applicant applicant = createApplicant("applicant-work-location-none", "None");
+        Long jobPostingId = createPublishedJobPosting("Work Location None");
+
+        assertThatThrownBy(() -> jobApplicationService.create(
+                applicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, firstJobPositionId(jobPostingId), "HQ")
+        )).isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    @Test
+    void 제출시_선택한_근무지가_후보에서_사라졌으면_실패() {
+        Applicant applicant = createApplicant("applicant-work-location-stale", "Stale");
+        Long jobPostingId = createPublishedJobPostingWithWorkLocations("Work Location Stale");
+        Long jobPositionId = firstJobPositionId(jobPostingId);
+        Long applicationId = jobApplicationService.create(
+                applicant.getId(),
+                new ApplicationCreateRequest(jobPostingId, jobPositionId, "BUSAN")
+        );
+
+        // 공고 수정으로 후보 목록이 줄어든 상황을 재현한다.
+        JobPosition jobPosition = jobPositionRepository.findById(jobPositionId).orElseThrow();
+        ReflectionTestUtils.setField(jobPosition, "workLocations", new java.util.ArrayList<>(
+                List.of(jobPosition.getWorkLocations().get(0))
+        ));
+
+        assertThatThrownBy(() -> jobApplicationService.submit(applicant.getId(), applicationId))
+                .isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    private Long createPublishedJobPostingWithWorkLocations(String title) {
+        commonCodeRepository.save(CommonCode.create("WORK_LOCATION", "HQ", "본사", 0, true, null));
+        commonCodeRepository.save(CommonCode.create("WORK_LOCATION", "BUSAN", "부산", 1, true, null));
+
+        Long jobPostingId = jobPostingService.create(new JobPostingCreateRequest(
+                title,
+                "<p>content</p>",
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 30, 18, 0),
+                List.of(new JobPositionRequest(
+                        "Backend",
+                        null,
+                        null,
+                        null,
+                        List.of("HQ", "BUSAN"),
+                        null,
+                        0
+                )),
+                new ApplicationFormConfigRequest(false, false, false, false, false, false, false)
+        ));
+        jobPostingService.publish(jobPostingId);
+        return jobPostingId;
     }
 
     private Long createPublishedJobPosting() {

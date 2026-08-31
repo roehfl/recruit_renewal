@@ -606,6 +606,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
             <h1>{{ pageTitle }}</h1>
             <p class="header-desc">
               모집분야: {{ selectedPositionText }}
+              <template v-if="formPage?.workLocationName"> / 근무지: {{ formPage.workLocationName }}</template>
             </p>
           </div>
 

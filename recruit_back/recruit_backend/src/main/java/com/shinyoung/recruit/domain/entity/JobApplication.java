@@ -75,6 +75,14 @@ public class JobApplication extends BaseEntity {
     @Column(nullable = false)
     private String jobPositionNameSnapshot;
 
+    /** 지원자가 선택한 근무지(CommonCode 그룹 {@code WORK_LOCATION}). 후보가 없는 모집분야는 null. */
+    @Column(name = "work_location_code", length = 100)
+    private String workLocationCode;
+
+    /** 선택 시점의 근무지 표시명 스냅샷({@code jobPositionNameSnapshot}과 동일 규약). */
+    @Column(name = "work_location_name_snapshot", length = 200)
+    private String workLocationNameSnapshot;
+
     /**
      * 파기 marker(Phase 09c 컬럼 도입 — 쓰기는 09d-1, 09c 는 eligibility 의 ALREADY_PURGED 판정에 읽기만).
      * {@code JobApplicationStatus} 와 직교(orthogonal) — 기존 status enum 불변(설계 §7.2).
@@ -128,6 +136,12 @@ public class JobApplication extends BaseEntity {
     public void updateDraft(JobPosition jobPosition, String jobPositionNameSnapshot) {
         this.jobPosition = jobPosition;
         this.jobPositionNameSnapshot = jobPositionNameSnapshot;
+    }
+
+    /** 선택 근무지 세팅. 후보가 없는 모집분야면 {@code null, null}로 비운다. */
+    public void updateWorkLocation(String workLocationCode, String workLocationNameSnapshot) {
+        this.workLocationCode = workLocationCode;
+        this.workLocationNameSnapshot = workLocationNameSnapshot;
     }
 
     public void submit(LocalDateTime submittedAt) {

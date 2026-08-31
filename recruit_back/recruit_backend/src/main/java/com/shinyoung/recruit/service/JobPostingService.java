@@ -3,6 +3,8 @@ package com.shinyoung.recruit.service;
 import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
+import com.shinyoung.recruit.domain.entity.JobPositionWorkLocation;
+import com.shinyoung.recruit.domain.repository.CommonCodeRepository;
 import com.shinyoung.recruit.domain.repository.JobPositionCountProjection;
 import com.shinyoung.recruit.domain.repository.JobPositionRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
@@ -31,6 +33,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -45,9 +48,12 @@ public class JobPostingService {
     private static final Pattern HTML_TAG_PATTERN = Pattern.compile("<[^>]+>");
     private static final int SUMMARY_MAX_LENGTH = 500;
     private static final int JOB_POSITION_TEXT_MAX_LENGTH = 100;
+    /** 근무지 후보를 담는 CommonCode 그룹. */
+    private static final String WORK_LOCATION_GROUP_CODE = "WORK_LOCATION";
 
     private final JobPostingRepository jobPostingRepository;
     private final JobPositionRepository jobPositionRepository;
+    private final CommonCodeRepository commonCodeRepository;
     private final ApplicationFormLayoutService applicationFormLayoutService;
     private final JobPostingImageService jobPostingImageService;
     private final Clock clock;
@@ -308,7 +314,7 @@ public class JobPostingService {
         validateMaxLength(request.positionName(), JOB_POSITION_TEXT_MAX_LENGTH, "모집분야명");
         validateMaxLength(request.jobGroup(), JOB_POSITION_TEXT_MAX_LENGTH, "직군");
         validateMaxLength(request.jobTitle(), JOB_POSITION_TEXT_MAX_LENGTH, "담당 직무명");
-        validateMaxLength(request.workLocation(), JOB_POSITION_TEXT_MAX_LENGTH, "근무지");
+        validateWorkLocationCodes(request.workLocationCodes());
         if (request.sortOrder() == null || request.sortOrder() < 0) {
             throw new InvalidJobPostingException("모집분야 정렬 순서는 0 이상이어야 합니다.");
         }
@@ -317,6 +323,22 @@ public class JobPostingService {
     private void validateMaxLength(String value, int maxLength, String fieldName) {
         if (value != null && value.length() > maxLength) {
             throw new InvalidJobPostingException(fieldName + "은 " + maxLength + "자 이하이어야 합니다.");
+        }
+    }
+
+    /** 후보 근무지는 비어 있어도 되지만(근무지 선택 없는 모집분야), 있으면 중복이 없어야 한다. */
+    private void validateWorkLocationCodes(List<String> workLocationCodes) {
+        if (workLocationCodes == null) {
+            return;
+        }
+        Set<String> codes = new HashSet<>();
+        for (String code : workLocationCodes) {
+            if (code == null || code.isBlank()) {
+                throw new InvalidJobPostingException("근무지 코드는 비어 있을 수 없습니다.");
+            }
+            if (!codes.add(code)) {
+                throw new InvalidJobPostingException("근무지는 중복될 수 없습니다. code=" + code);
+            }
         }
     }
 
@@ -331,16 +353,43 @@ public class JobPostingService {
     }
 
     private List<JobPosition> toJobPositions(List<JobPositionRequest> requests) {
+        Map<String, String> workLocationNames = loadWorkLocationNames();
         return requests.stream()
                 .map(it -> JobPosition.create(
                         it.positionName(),
                         defaultApplicationType(it.applicationType()),
                         it.jobGroup(),
                         it.jobTitle(),
-                        it.workLocation(),
+                        toWorkLocations(it.workLocationCodes(), workLocationNames),
                         defaultEmploymentType(it.employmentType()),
                         it.sortOrder()
                 ))
+                .toList();
+    }
+
+    /** 활성 근무지 코드 → 표시명. 공고 저장 1회당 한 번만 조회한다. */
+    private Map<String, String> loadWorkLocationNames() {
+        Map<String, String> names = new LinkedHashMap<>();
+        commonCodeRepository.findByGroupCodeAndActiveTrueOrderBySortOrderAscIdAsc(WORK_LOCATION_GROUP_CODE)
+                .forEach(it -> names.put(it.getCode(), it.getDisplayName()));
+        return names;
+    }
+
+    private List<JobPositionWorkLocation> toWorkLocations(
+            List<String> workLocationCodes,
+            Map<String, String> workLocationNames
+    ) {
+        if (workLocationCodes == null || workLocationCodes.isEmpty()) {
+            return List.of();
+        }
+        return workLocationCodes.stream()
+                .map(code -> {
+                    String name = workLocationNames.get(code);
+                    if (name == null) {
+                        throw new InvalidJobPostingException("등록되지 않은 근무지 코드입니다. code=" + code);
+                    }
+                    return JobPositionWorkLocation.of(code, name);
+                })
                 .toList();
     }
 

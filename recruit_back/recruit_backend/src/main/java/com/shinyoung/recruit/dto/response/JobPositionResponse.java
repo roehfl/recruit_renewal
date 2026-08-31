@@ -4,13 +4,15 @@ import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.enumeration.EmploymentType;
 import com.shinyoung.recruit.enumeration.JobPositionApplicationType;
 
+import java.util.List;
+
 public record JobPositionResponse(
         Long id,
         String positionName,
         JobPositionApplicationType applicationType,
         String jobGroup,
         String jobTitle,
-        String workLocation,
+        List<WorkLocationResponse> workLocations,
         EmploymentType employmentType,
         Integer sortOrder
 ) {
@@ -21,7 +23,7 @@ public record JobPositionResponse(
                 jobPosition.getApplicationType(),
                 jobPosition.getJobGroup(),
                 jobPosition.getJobTitle(),
-                jobPosition.getWorkLocation(),
+                jobPosition.getWorkLocations().stream().map(WorkLocationResponse::from).toList(),
                 jobPosition.getEmploymentType(),
                 jobPosition.getSortOrder()
         );

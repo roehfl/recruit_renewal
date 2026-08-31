@@ -1,5 +1,7 @@
 package com.shinyoung.recruit.controller;
 
+import com.shinyoung.recruit.domain.entity.CommonCode;
+import com.shinyoung.recruit.domain.repository.CommonCodeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,11 +24,15 @@ class JobPostingControllerTest {
     @Autowired
     private WebApplicationContext context;
 
+    @Autowired
+    private CommonCodeRepository commonCodeRepository;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+        commonCodeRepository.save(CommonCode.create("WORK_LOCATION", "HQ", "본사", 0, true, null));
     }
 
     @Test
@@ -61,7 +67,8 @@ class JobPostingControllerTest {
                 .andExpect(jsonPath("$.data.jobPositions[1].applicationType").value("EXPERIENCED"))
                 .andExpect(jsonPath("$.data.jobPositions[1].jobGroup").value("IT"))
                 .andExpect(jsonPath("$.data.jobPositions[1].jobTitle").value("Backend Engineer"))
-                .andExpect(jsonPath("$.data.jobPositions[1].workLocation").value("Seoul"))
+                .andExpect(jsonPath("$.data.jobPositions[1].workLocations[0].code").value("HQ"))
+                .andExpect(jsonPath("$.data.jobPositions[1].workLocations[0].name").value("본사"))
                 .andExpect(jsonPath("$.data.jobPositions[1].employmentType").value("FULL_TIME"));
     }
 
@@ -266,7 +273,7 @@ class JobPostingControllerTest {
                       "applicationType": "EXPERIENCED",
                       "jobGroup": "IT",
                       "jobTitle": "Backend Engineer",
-                      "workLocation": "Seoul",
+                      "workLocationCodes": ["HQ"],
                       "employmentType": "FULL_TIME",
                       "sortOrder": 1
                     },
@@ -309,7 +316,7 @@ class JobPostingControllerTest {
                       "applicationType": "NEW_GRADUATE",
                       "jobGroup": "IT",
                       "jobTitle": "Backend Intern",
-                      "workLocation": "Seoul",
+                      "workLocationCodes": ["HQ"],
                       "employmentType": "INTERN",
                       "sortOrder": 0
                     }

@@ -55,6 +55,8 @@ export interface AdminApplicationDetailResponse {
   jobPostingTitleSnapshot: string
   jobPositionId: number
   jobPositionNameSnapshot: string
+  /** 지원자가 선택한 근무지 표시명. 근무지 후보가 없는 모집분야면 null. */
+  workLocationNameSnapshot: string | null
   status: 'DRAFT' | 'SUBMITTED' | 'WITHDRAWN'
   submittedAt: string
   withdrawnAt: string

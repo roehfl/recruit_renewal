@@ -119,7 +119,7 @@ const stageResultStatusOptions = computed(() =>
 )
 
 const jobPositions = ref<AdminJobPosition[]>([
-  { id: null, positionName: '', applicationType: 'NEW_GRADUATE_OR_EXPERIENCED', jobGroup: null, jobTitle: null, workLocation: null, employmentType: 'FULL_TIME', sortOrder: 0 },
+  { id: null, positionName: '', applicationType: 'NEW_GRADUATE_OR_EXPERIENCED', jobGroup: null, jobTitle: null, workLocations: [], employmentType: 'FULL_TIME', sortOrder: 0 },
 ])
 
 const jobPostings = ref<AdminJobPostingListItem[]>([])
@@ -137,9 +137,15 @@ const jobPositionOptions = computed(() => {
     label: posting.positionName,
   }))
 })
+// 근무지 검색은 공통코드 code 로 비교한다. 공고의 모집분야들이 제시한 후보를 코드 기준으로 중복 제거한다.
 const jobWorkLocationOptions = computed(() => {
-  const workLocations = new Set(jobPositions.value.map((position) => position.workLocation));
-  return [...workLocations].map((workLocation) => ({value: workLocation, label: workLocation}))
+  const workLocations = new Map<string, string>()
+  jobPositions.value.forEach((position) => {
+    position.workLocations?.forEach((workLocation) => {
+      workLocations.set(workLocation.code, workLocation.name)
+    })
+  })
+  return [...workLocations].map(([code, name]) => ({ value: code, label: name }))
 })
 
 const changeJobPosting = async (jobPostingId: number): Promise<void> => {

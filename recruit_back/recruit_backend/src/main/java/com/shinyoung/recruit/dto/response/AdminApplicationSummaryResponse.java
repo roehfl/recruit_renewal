@@ -68,7 +68,7 @@ public record AdminApplicationSummaryResponse(
                 application.getUpdatedAt(),
                 application.getJobPosition().getJobGroup(),
                 application.getJobPosition().getJobTitle(),
-                application.getJobPosition().getWorkLocation(),
+                application.getWorkLocationNameSnapshot(),
                 enrichment.birthDate(),
                 enrichment.age(),
                 enrichment.finalEducationLevel(),

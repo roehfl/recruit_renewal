@@ -83,6 +83,9 @@ public class JobApplicationService {
         validateNotDuplicated(applicantId, jobPosting.getId());
 
         JobPosition jobPosition = findJobPosition(request.jobPositionId(), jobPosting.getId());
+        String workLocationCode = normalizeWorkLocationCode(request.workLocationCode());
+        validateWorkLocationChoice(jobPosition, workLocationCode);
+
         JobApplication application = JobApplication.create(
                 applicant,
                 jobPosting,
@@ -91,6 +94,7 @@ public class JobApplicationService {
                 jobPosting.getTitle(),
                 jobPosition.getPositionName()
         );
+        application.updateWorkLocation(workLocationCode, jobPosition.findWorkLocationName(workLocationCode));
 
         return jobApplicationRepository.save(application).getId();
     }
@@ -136,7 +140,11 @@ public class JobApplicationService {
         validateDraftForUpdate(application);
 
         JobPosition jobPosition = findJobPosition(request.jobPositionId(), application.getJobPosting().getId());
+        String workLocationCode = normalizeWorkLocationCode(request.workLocationCode());
+        validateWorkLocationChoice(jobPosition, workLocationCode);
+
         application.updateDraft(jobPosition, jobPosition.getPositionName());
+        application.updateWorkLocation(workLocationCode, jobPosition.findWorkLocationName(workLocationCode));
 
         return application.getId();
     }
@@ -148,6 +156,7 @@ public class JobApplicationService {
         validateDraftForSubmit(application);
         validateApplicationFormConfig(application.getJobPosting());
         validateSelectedJobPosition(application);
+        validateWorkLocationChoice(application.getJobPosition(), application.getWorkLocationCode());
         applicationSubmitValidator.validate(application);
         application.submit(LocalDateTime.now(clock));
 
@@ -449,6 +458,33 @@ public class JobApplicationService {
         Long jobPostingId = application.getJobPosting().getId();
         if (jobPositionRepository.findByIdAndJobPostingId(jobPositionId, jobPostingId).isEmpty()) {
             throw new InvalidJobApplicationException("지원서의 모집분야가 채용공고에 속하지 않습니다.");
+        }
+    }
+
+    private String normalizeWorkLocationCode(String workLocationCode) {
+        if (workLocationCode == null || workLocationCode.isBlank()) {
+            return null;
+        }
+        return workLocationCode.trim();
+    }
+
+    /**
+     * 후보 근무지 개수가 곧 분기다 — 후보가 있으면 그 중 하나를 반드시 골라야 하고, 후보가 없으면 아예 보낼 수 없다.
+     * 공고 수정으로 후보 목록이 바뀌면 임시저장분의 선택이 무효가 될 수 있어 제출 시에도 같은 규칙으로 재검증한다.
+     */
+    private void validateWorkLocationChoice(JobPosition jobPosition, String workLocationCode) {
+        boolean hasCandidates = !jobPosition.getWorkLocations().isEmpty();
+        if (!hasCandidates) {
+            if (workLocationCode != null) {
+                throw new InvalidJobApplicationException("해당 모집분야는 근무지를 선택할 수 없습니다.");
+            }
+            return;
+        }
+        if (workLocationCode == null) {
+            throw new InvalidJobApplicationException("근무지는 필수 선택입니다.");
+        }
+        if (!jobPosition.hasWorkLocation(workLocationCode)) {
+            throw new InvalidJobApplicationException("모집분야의 근무지가 아닙니다. workLocationCode=" + workLocationCode);
         }
     }
 

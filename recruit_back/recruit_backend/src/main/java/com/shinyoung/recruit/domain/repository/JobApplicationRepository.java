@@ -97,7 +97,7 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
               and (:status is null or application.status = :status)
               and (:applicationType is null or application.jobPosition.applicationType = :applicationType)
               and (:jobGroup is null or application.jobPosition.jobGroup = :jobGroup)
-              and (:workLocation is null or application.jobPosition.workLocation = :workLocation)
+              and (:workLocation is null or application.workLocationCode = :workLocation)
               and (:name is null or application.applicantNameSnapshot like concat('%', :name, '%'))
               and (:phoneNumber is null
                    or replace(replace(application.applicant.phoneNumber, '-', ''), ' ', '')

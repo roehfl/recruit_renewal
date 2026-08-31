@@ -255,7 +255,7 @@ onBeforeUnmount(() => {
               <th>지원분야 </th>
               <td>{{ jobPositionData?.positionName }}</td>
               <th>직무/근무지 </th>
-              <td>{{ jobPositionData?.workLocation }}</td>
+              <td>{{ applicationData?.workLocationNameSnapshot }}</td>
             </tr>
           </tbody>
         </table>

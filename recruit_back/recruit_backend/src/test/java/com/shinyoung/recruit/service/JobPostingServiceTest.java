@@ -1,5 +1,7 @@
 package com.shinyoung.recruit.service;
 
+import com.shinyoung.recruit.domain.entity.CommonCode;
+import com.shinyoung.recruit.domain.repository.CommonCodeRepository;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormLayoutSaveRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
@@ -56,6 +58,14 @@ class JobPostingServiceTest {
     @Autowired
     private JobPostingImageService jobPostingImageService;
 
+    @Autowired
+    private CommonCodeRepository commonCodeRepository;
+
+    /** 근무지 후보는 CommonCode 그룹 WORK_LOCATION 의 활성 코드만 등록할 수 있다. */
+    private void 근무지코드_등록(String code, String displayName) {
+        commonCodeRepository.save(CommonCode.create("WORK_LOCATION", code, displayName, 0, true, null));
+    }
+
     @Test
     void JobPosting_생성_성공() {
         Long id = jobPostingService.create(createRequest());
@@ -67,6 +77,8 @@ class JobPostingServiceTest {
 
     @Test
     void 공고_생성시_확장필드를_저장한다() {
+        근무지코드_등록("HQ", "본사");
+
         JobPostingCreateRequest request = new JobPostingCreateRequest(
                 "2026 경력 채용",
                 JobPostingType.EXPERIENCED_RECRUITMENT,
@@ -84,7 +96,7 @@ class JobPostingServiceTest {
                         JobPositionApplicationType.EXPERIENCED,
                         "Research",
                         "Equity Analyst",
-                        "Seoul",
+                        List.of("HQ"),
                         EmploymentType.CONTRACT,
                         0
                 )),
@@ -105,7 +117,9 @@ class JobPostingServiceTest {
         assertThat(detail.jobPositions().get(0).applicationType()).isEqualTo(JobPositionApplicationType.EXPERIENCED);
         assertThat(detail.jobPositions().get(0).jobGroup()).isEqualTo("Research");
         assertThat(detail.jobPositions().get(0).jobTitle()).isEqualTo("Equity Analyst");
-        assertThat(detail.jobPositions().get(0).workLocation()).isEqualTo("Seoul");
+        assertThat(detail.jobPositions().get(0).workLocations())
+                .extracting("code", "name")
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("HQ", "본사"));
         assertThat(detail.jobPositions().get(0).employmentType()).isEqualTo(EmploymentType.CONTRACT);
     }
 
@@ -124,7 +138,7 @@ class JobPostingServiceTest {
         assertThat(detail.jobPositions().get(0).applicationType()).isEqualTo(JobPositionApplicationType.NEW_GRADUATE_OR_EXPERIENCED);
         assertThat(detail.jobPositions().get(0).jobGroup()).isNull();
         assertThat(detail.jobPositions().get(0).jobTitle()).isNull();
-        assertThat(detail.jobPositions().get(0).workLocation()).isNull();
+        assertThat(detail.jobPositions().get(0).workLocations()).isEmpty();
         assertThat(detail.jobPositions().get(0).employmentType()).isEqualTo(EmploymentType.FULL_TIME);
     }
 
@@ -275,7 +289,7 @@ class JobPostingServiceTest {
                 JobPositionApplicationType.EXPERIENCED,
                 tooLong,
                 "Backend",
-                "Seoul",
+                List.of(),
                 EmploymentType.FULL_TIME,
                 0
         )))).isInstanceOf(InvalidJobPostingException.class);
@@ -284,16 +298,32 @@ class JobPostingServiceTest {
                 JobPositionApplicationType.EXPERIENCED,
                 "IT",
                 tooLong,
-                "Seoul",
+                List.of(),
                 EmploymentType.FULL_TIME,
                 0
         )))).isInstanceOf(InvalidJobPostingException.class);
+    }
+
+    @Test
+    void 근무지_후보는_등록된_활성코드만_중복없이_허용한다() {
+        근무지코드_등록("HQ", "본사");
+
         assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest(
                 "백엔드",
                 JobPositionApplicationType.EXPERIENCED,
                 "IT",
                 "Backend",
-                tooLong,
+                List.of("HQ", "HQ"),
+                EmploymentType.FULL_TIME,
+                0
+        )))).isInstanceOf(InvalidJobPostingException.class);
+
+        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest(
+                "백엔드",
+                JobPositionApplicationType.EXPERIENCED,
+                "IT",
+                "Backend",
+                List.of("UNKNOWN"),
                 EmploymentType.FULL_TIME,
                 0
         )))).isInstanceOf(InvalidJobPostingException.class);
@@ -508,7 +538,7 @@ class JobPostingServiceTest {
                         JobPositionApplicationType.NEW_GRADUATE,
                         "IT",
                         "Backend Intern",
-                        "Seoul",
+                        List.of(),
                         EmploymentType.INTERN,
                         0
                 )),
