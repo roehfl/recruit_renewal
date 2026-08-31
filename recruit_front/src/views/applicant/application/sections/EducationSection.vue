@@ -93,76 +93,13 @@
         title="학교 찾기"
         @ok="handleSchoolConfirm"
       >
-        <table class="field-table">
-          <colgroup>
-            <col style="width: 20%" /><col style="width: 80%" />
-          </colgroup>
-          <tbody>
-            <tr>
-              <th>학교명<em> *</em></th>
-              <td>
-                <div class="div-flex">
-                  <a-input v-model:value="schoolForm.search" @pressEnter="schoolSearchClick" placeholder="학교명" />
-                  <a-button @click="schoolSearchClick" type="primary">검색</a-button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        
-        <div class="modal-span">
-          <span> ※ 아래 학교명을 클릭하세요.</span>
-          <!-- 대학 학교정보 OpenAPI는 학교명 완전일치만 지원한다. 부분검색이 안 되는 점을 미리 알린다. -->
-          <span v-if="isUniversitySearch"> ※ 대학은 학교명을 전체 입력해야 검색됩니다. (예: 서울대학교)</span>
-          <span> ※ 해외 소재 학교인 경우, 공식 명칭을 검색해주세요.</span>
-          <span> ※ 검색결과에 없는 경우, 아래에 직접 입력하세요.</span>
-        </div>
-
-        <div  class="school-result" v-if="searchSchoolList.length > 0">
-          <table class="school-table">
-            <tbody>
-              <tr
-                v-for="school in searchSchoolList"
-                :key="school.schoolCode"
-                :class="{ selected: schoolForm.schoolCode === school.schoolCode}"
-                @click="selectSchool(school)"
-                @cancel="cancelSchoolModal"
-              >
-                <td>{{ school.schoolName }}<template v-if="school.region">({{ school.region }})</template></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <table class="field-table">
-          <colgroup>
-            <col style="width: 20%" /><col style="width: 30%" />
-            <col style="width: 20%" /><col style="width: 30%" />
-          </colgroup>
-          <tbody>
-            <tr>
-              <td colspan="4">
-                <a-input v-model:value="schoolForm.schoolName" @input="clearSelectedSchool" placeholder="직접 입력" />
-              </td>
-            </tr>
-            <tr  v-if="schoolForm.schoolName">
-              <th>주간/야간</th>
-              <td>
-                <a-select
-                  v-model:value="schoolForm.dayNightType" :options="dayNightType"
-                  palceholder="선택" style="width: 100%"
-                />
-              </td>
-              <th>본교/분교</th>
-              <td>
-                <a-select
-                  v-model:value="schoolForm.campusType" :options="campusType"
-                  palceholder="선택" style="width: 100%"
-                />
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <SchoolModalBody
+          ref="schoolModalBodyRef"
+          :open="schoolModalOpen"
+          :education-level="selecedEducation?.educationLevel"
+          :initial="schoolModalInitial"
+          :show-extra-options="true"
+        />
       </a-modal>
 
       <!-- 전공명, 논문명, 학점 모달 -->
@@ -281,27 +218,23 @@ import { educationApi } from '@/api/application/sections/educationApi'
 import { logClientEvent } from '@/common/clientEventLogger'
 import { getApiErrorMessage } from '@/api/apiError'
 import type {  CommonCodeItems } from '@/types/commonCode'
-import type { schoolItem, schoolSource, educationLevelType, graduationStatus, dayNightType, campusType, semesterGradeItem } from '@/types/application/sections/education'
+import type { schoolSource, educationLevelType, graduationStatus, dayNightType, campusType, semesterGradeItem } from '@/types/application/sections/education'
 import type { SectionComponentProps } from '@/types/application'
 import type {
   EducationItem,
   EducationResponse,
   EducationReplaceRequest,
 } from '@/types/application/sections/education'
+import SchoolModalBody from '@/views/common/SchoolModalBody.vue'
 
+const schoolModalBodyRef = ref<InstanceType<typeof SchoolModalBody>>()
 const loading = ref(false)
 const notApplicable = ref(false)
 const items = reactive<EducationItem[]>([])
 const props = defineProps<SectionComponentProps>()
-const searchSchoolList = ref<schoolItem[]>([])
 
 // 수정중인 학력 저장
 const selecedEducation = ref<EducationItem | null>(null);
-
-/* 고교는 NEIS(부분검색 가능), 그 외는 대학 표준데이터(학교명 완전일치)라 안내 문구가 다르다. */
-const isUniversitySearch = computed(
-  () => !!selecedEducation.value?.educationLevel && selecedEducation.value.educationLevel !== 'HIGH_SCHOOL',
-)
 
 function createEmptyItem(): EducationItem {
   return {
@@ -416,43 +349,34 @@ const isPostingPUBLIC = () => {
 }
 
 // 학교 검색 모달
+const schoolModalOpen = ref(false)
+const schoolModalInitial = ref<{
+  schoolName: string | undefined,
+  schoolCode: string | null,
+  schoolSource: schoolSource | null,
+  dayNightType: dayNightType,
+  campusType: campusType,
+}>()
+
 const openSchoolModal = ( education : EducationItem) => {
     selecedEducation.value = education;
     if (!selecedEducation.value.educationLevel) return message.warn('학교 구분을 먼저 선택하세요.');
 
-    Object.assign(schoolForm, {
+    schoolModalInitial.value = {
         schoolName: education.schoolName,
-        schoolCode: education.schoolCode,
-        schoolSource: education.schoolSource,
+        schoolCode: education.schoolCode ?? null,
+        schoolSource: education.schoolSource ?? null,
         dayNightType: education.dayNightType ?? 'UNKNOWN',
-        campusType: education.campusType ??'UNKNOWN',
-
-    })
-    schoolForm.search = undefined;
-    searchSchoolList.value = [];
+        campusType: education.campusType ?? 'UNKNOWN',
+    }
 
     schoolModalOpen.value = true;
 }
-const schoolModalOpen = ref(false)
-const schoolForm: {
-  search: string | undefined,
-  schoolName: string | undefined,
-  dayNightType: dayNightType,
-  campusType: campusType,
-  schoolCode: string | null,
-  schoolSource: schoolSource | null,
-} = reactive({
-  search: undefined,
-  schoolName: undefined,
-  dayNightType: 'UNKNOWN',
-  campusType: 'UNKNOWN',
-  schoolCode: null,
-  schoolSource: null,
-})
 
 const handleSchoolConfirm = ( ) => {
+    const schoolForm = schoolModalBodyRef.value?.schoolForm;
     if (!selecedEducation.value) return;
-    if (!schoolForm.schoolName) return message.warn('학교명을 선택하거나 입력하세요.');
+    if (!schoolForm?.schoolName) return message.warn('학교명을 선택하거나 입력하세요.');
 
     selecedEducation.value.schoolName = schoolForm.schoolName
     selecedEducation.value.schoolCode = schoolForm.schoolCode
@@ -461,55 +385,6 @@ const handleSchoolConfirm = ( ) => {
     selecedEducation.value.campusType = schoolForm.campusType
 
     schoolModalOpen.value = false
-}
-
-// 학교 검색 클릭 시
-// GET schools
-async function schoolSearchClick () {
-  const educationLevel = selecedEducation.value?.educationLevel
-  if (!educationLevel) return message.warn('학교 구분을 먼저 선택하세요.')
-
-  loading.value = true
-  try {
-    const result = await educationApi.getSchools({
-      q: schoolForm.search || '',
-      educationLevel,
-    })
-
-    searchSchoolList.value = result.data.data
-    if (searchSchoolList.value.length === 0) {
-      message.info(
-        isUniversitySearch.value
-          ? '검색 결과가 없습니다. 대학은 학교명을 전체 입력해야 검색됩니다. 없으면 아래에 직접 입력하세요.'
-          : '검색 결과가 없습니다. 아래에 직접 입력하세요.',
-      )
-    }
-  } catch {
-    // 외부 학교 검색 API 장애·지연으로 막히면 직접 입력으로 진행할 수 있게 안내한다.
-    searchSchoolList.value = []
-    message.warning('학교 검색에 실패했습니다. 아래에 직접 입력하세요.')
-  } finally {
-    loading.value = false
-  }
-}
-
-// 검색 결과에서 학교 선택 시
-const selectSchool = (school: schoolItem) => {
-  schoolForm.schoolName = school.schoolName
-  schoolForm.schoolCode = school.schoolCode
-  schoolForm.schoolSource = school.schoolSource
-}
-
-// 직접 입력하면 검색으로 고른 학교코드를 버린다(코드와 학교명 불일치 방지)
-const clearSelectedSchool = () => {
-  schoolForm.schoolCode = null
-  schoolForm.schoolSource = null
-}
-
-const cancelSchoolModal = () => {
-  schoolForm.schoolName = undefined
-  schoolForm.schoolCode = null
-  schoolForm.schoolSource = null
 }
 
 // 전공 입력 모달

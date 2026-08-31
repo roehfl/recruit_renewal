@@ -38,6 +38,10 @@ const isActiveMenu = (menu: MenuItem): boolean => {
   return menuStore.isActiveMenu('ADMIN', menu, activeMenuPath.value)
 }
 
+const goHome = () => {
+  router.push('/admin');
+}
+
 const goMenu = (menu: MenuItem): void => {
   if (!menu.path) {
     return
@@ -64,7 +68,7 @@ const handleLogout = async (): Promise<void> => {
 
 <template>
   <aside class="admin-sidebar">
-    <div class="sidebar-brand">
+    <div class="sidebar-brand" @click="goHome">
       <span class="brand-logo">
         <img :src="logoImage" alt="신영증권 로고" />
       </span>

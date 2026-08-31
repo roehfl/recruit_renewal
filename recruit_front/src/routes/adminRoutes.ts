@@ -59,6 +59,16 @@ export const adminRoutes: RouteRecordRaw[] = [
         name: 'AdminJobPostingEdit',
         component: () => import('@/views/admin/jobPosting/AdminJobPostingFormView.vue'),
       },
+      {
+        path: 'applications',
+        name: 'AdminApplicationStatus',
+        component: () => import('@/views/admin/application/ApplicationStatus.vue'),
+      },
+      {
+        path: 'applications/:applicationId',
+        name: 'AdminApplication',
+        component: () => import('@/views/admin/application/Application.vue'),
+      },
     ],
   },
 ]

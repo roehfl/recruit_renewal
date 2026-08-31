@@ -455,10 +455,10 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 
 ### 화면: 지원현황 조회 (관리자 — 지원서 검색)
 
-- 프론트: (후속 슬라이스) 지원현황 조회 화면 + `src/api/adminApplicationApi.ts`
+- 프론트: `src/views/admin/application/ApplicationStatus.vue`(목록·검색), `src/views/admin/application/Application.vue`(지원서 상세) + `src/api/admin/adminApplicationApi.ts`
 - 백엔드: `com.shinyoung.recruit.controller.AdminApplicationController`, `service.JobApplicationService`
 
-#### GET `/admin/applications`, GET `/admin/job-postings/{jobPostingId}/applications`  🟡 검색 조건 확장 — 백엔드 구현·검증 완료(2026-08-14) / 프론트 미반영
+#### GET `/admin/applications`, GET `/admin/job-postings/{jobPostingId}/applications`  🟢 검색 조건 확장 — 백엔드 구현·검증 완료(2026-08-14) / 프론트 반영(2026-08-31, `phoneNumber` 조건만 화면 미노출)
 
 - 기존 페이징 목록 API의 **하위호환 확장**. 기존 파라미터(`jobPostingId`(전자만)·`jobPositionId`·`status`·`page`·`size`) 유지, 아래 검색 조건 추가. 모든 조건 optional, 빈 문자열은 미적용으로 간주. enum 계열 값이 정의 밖이면 400.
 - 추가 요청 파라미터(query):
@@ -470,7 +470,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
   - `schoolName` — 학교명 부분일치(학력 행 아무거나)
   - `graduationStatus` — 졸업여부. `GraduationStatus`. **최종학력 행** 기준
   - `finalSchoolCondition` — 최종학교조건. DOMESTIC(countryCode 없음) | OVERSEAS(countryCode 있음) | TRANSFER(편입) | BRANCH(분교) | NIGHT(야간). **최종학력 행** 기준
-  - `phoneNumber` — 휴대폰번호 부분일치(2026-08-28 추가). 전화 문의 지원자 F/U 용. 하이픈·공백을 무시하고 숫자만으로 비교한다(`010-1234-5678` 저장분을 `01012345678`로 검색해도 매칭). `Applicant.phoneNumber` 기준
+  - `phoneNumber` — 휴대폰번호 부분일치(2026-08-28 추가, 프론트 검색폼 미노출). 전화 문의 지원자 F/U 용. 하이픈·공백을 무시하고 숫자만으로 비교한다(`010-1234-5678` 저장분을 `01012345678`로 검색해도 매칭). `Applicant.phoneNumber` 기준
   - `certificateName` — 자격증명 부분일치
   - `languageName` — 외국어구사. `ApplicationLanguage.languageName` 완전일치
   - `languageLevel` — 외국어수준. `conversationalAbility` 완전일치 (값 체계는 CommonCode 그룹 `LANGUAGE_LEVEL`(상/중/하)로 관리자 등록 — 별도 백엔드 코드 없음)

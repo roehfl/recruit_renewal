@@ -68,8 +68,8 @@ const recruitStatusTypeMap: Record<string, string> = {
 }
 // 공고 직무 
 const positionOptions = computed(() => {
-  return jobPostDetail.value?.jobPositions.map( (item: { positionName: string; id: number }) => ({
-    label: item.positionName,
+  return jobPostDetail.value?.jobPositions.map( (item: { positionName: string; id: number; workLocation: string; }) => ({
+    label: `${item.positionName} (근무지: ${item.workLocation})`,
     value: item.id
   }))
 })
@@ -255,7 +255,7 @@ onMounted(async () => {
               <a-select
                 ref="positionSelectRef"
                 v-model:value="selectedPosition"
-                style="width: 200px"
+                style="width: 300px"
                 :options="positionOptions" 
                 label-in-value
                 placeholder="직무를 선택해주세요"
