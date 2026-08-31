@@ -21,7 +21,6 @@ export interface AdminJobPosition {
   id: number | null
   positionName: string
   applicationType: 'NEW_GRADUATE' | 'EXPERIENCED' | 'NEW_GRADUATE_OR_EXPERIENCED'
-  jobGroup: string | null
   jobTitle: string | null
   workLocations: WorkLocationOption[]
   employmentType: 'FULL_TIME' | 'CONTRACT' | 'INTERN' | 'FREELANCE' | 'PART_TIME' | 'ETC'

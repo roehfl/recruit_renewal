@@ -1334,7 +1334,6 @@ class JobApplicationServiceTest {
         private Long jobPositionId;
         private String status;
         private String applicationType;
-        private String jobGroup;
         private String workLocation;
         private String name;
         private String phoneNumber;
@@ -1368,7 +1367,7 @@ class JobApplicationServiceTest {
 
         AdminApplicationSearchRequest build() {
             return new AdminApplicationSearchRequest(
-                    jobPositionId, status, applicationType, jobGroup, workLocation, name, phoneNumber,
+                    jobPositionId, status, applicationType, workLocation, name, phoneNumber,
                     birthDateFrom, birthDateTo, finalEducationLevel, schoolName, graduationStatus,
                     finalSchoolCondition, certificateName, languageName, languageLevel,
                     stageType, stageResultStatus);
@@ -1473,7 +1472,6 @@ class JobApplicationServiceTest {
                 LocalDateTime.of(2026, 6, 30, 18, 0),
                 List.of(new JobPositionRequest(
                         "Backend",
-                        null,
                         null,
                         null,
                         List.of("HQ", "BUSAN"),

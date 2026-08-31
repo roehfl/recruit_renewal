@@ -312,7 +312,6 @@ public class JobPostingService {
             throw new InvalidJobPostingException("모집분야명은 필수입니다.");
         }
         validateMaxLength(request.positionName(), JOB_POSITION_TEXT_MAX_LENGTH, "모집분야명");
-        validateMaxLength(request.jobGroup(), JOB_POSITION_TEXT_MAX_LENGTH, "직군");
         validateMaxLength(request.jobTitle(), JOB_POSITION_TEXT_MAX_LENGTH, "담당 직무명");
         validateWorkLocationCodes(request.workLocationCodes());
         if (request.sortOrder() == null || request.sortOrder() < 0) {
@@ -358,7 +357,6 @@ public class JobPostingService {
                 .map(it -> JobPosition.create(
                         it.positionName(),
                         defaultApplicationType(it.applicationType()),
-                        it.jobGroup(),
                         it.jobTitle(),
                         toWorkLocations(it.workLocationCodes(), workLocationNames),
                         defaultEmploymentType(it.employmentType()),

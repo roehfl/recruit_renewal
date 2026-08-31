@@ -81,7 +81,6 @@ export interface WorkLocationOption {
 export interface AdminJobPositionForm {
   positionName: string
   applicationType: 'NEW_GRADUATE' | 'EXPERIENCED' | 'NEW_GRADUATE_OR_EXPERIENCED'
-  jobGroup: string | null
   jobTitle: string | null
   /** 후보 근무지 코드 목록. 비면 근무지 선택이 없는 모집분야다. */
   workLocationCodes: string[]

@@ -31,9 +31,6 @@ public class JobPosition {
     private JobPositionApplicationType applicationType;
 
     @Column(length = 100)
-    private String jobGroup;
-
-    @Column(length = 100)
     private String jobTitle;
 
     /**
@@ -57,7 +54,6 @@ public class JobPosition {
     private JobPosition(
             String positionName,
             JobPositionApplicationType applicationType,
-            String jobGroup,
             String jobTitle,
             List<JobPositionWorkLocation> workLocations,
             EmploymentType employmentType,
@@ -65,7 +61,6 @@ public class JobPosition {
     ) {
         this.positionName = positionName;
         this.applicationType = defaultApplicationType(applicationType);
-        this.jobGroup = jobGroup;
         this.jobTitle = jobTitle;
         this.workLocations = workLocations == null ? new ArrayList<>() : new ArrayList<>(workLocations);
         this.employmentType = defaultEmploymentType(employmentType);
@@ -73,13 +68,12 @@ public class JobPosition {
     }
 
     public static JobPosition create(String positionName, Integer sortOrder) {
-        return new JobPosition(positionName, null, null, null, null, null, sortOrder);
+        return new JobPosition(positionName, null, null, null, null, sortOrder);
     }
 
     public static JobPosition create(
             String positionName,
             JobPositionApplicationType applicationType,
-            String jobGroup,
             String jobTitle,
             List<JobPositionWorkLocation> workLocations,
             EmploymentType employmentType,
@@ -88,7 +82,6 @@ public class JobPosition {
         return new JobPosition(
                 positionName,
                 applicationType,
-                jobGroup,
                 jobTitle,
                 workLocations,
                 employmentType,

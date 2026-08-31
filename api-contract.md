@@ -463,7 +463,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 기존 페이징 목록 API의 **하위호환 확장**. 기존 파라미터(`jobPostingId`(전자만)·`jobPositionId`·`status`·`page`·`size`) 유지, 아래 검색 조건 추가. 모든 조건 optional, 빈 문자열은 미적용으로 간주. enum 계열 값이 정의 밖이면 400.
 - 추가 요청 파라미터(query):
   - `applicationType` — 지원구분. `JobPositionApplicationType` (NEW_GRADUATE | EXPERIENCED | NEW_GRADUATE_OR_EXPERIENCED)
-  - `jobGroup`, `workLocation` — 직무/근무지. `JobPosition` 필드 완전일치
+  - `workLocation` — 근무지. 지원서의 `workLocationCode` 완전일치 (`jobGroup` 조건은 2026-08-31 제거)
   - `name` — 이름. `applicantNameSnapshot` 부분일치(LIKE)
   - `birthDateFrom`, `birthDateTo` — 생년월일 범위(ISO date). `ApplicationBasicInfo.birthDate`
   - `finalEducationLevel` — 최종학력. `EducationLevel` (HIGH_SCHOOL~DOCTOR). 지원서 학력 중 **최고 레벨**이 일치해야 함
@@ -478,7 +478,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
   - `stageResultStatus` — 전형 결과. `StageResultStatus` (PENDING | PASSED | FAILED | ABSENT | WITHDRAWN | HOLD)
   - 전형별결과 화면 값 매핑: "서류지원" → `status=SUBMITTED`(stage 조건 없이), 그 외 → `stageType` + `stageResultStatus` 조합 (예: 서류전형합격 = DOCUMENT+PASSED, 1차면접결시 = FIRST_INTERVIEW+ABSENT)
 - 응답(200): `ApiResponse<PageResponse<AdminApplicationSummaryResponse>>` — 기존 필드 유지 + 그리드용 파생 필드 추가(2026-08-14, 백엔드 검증 완료):
-  - `jobGroup`, `jobTitle`(직무), `workLocation`(근무지) — `JobPosition` 속성
+  - `jobTitle`(직무) — `JobPosition` 속성. `workLocation`(근무지)은 지원자가 선택한 근무지 표시명 (`jobGroup`은 2026-08-31 제거)
   - `birthDate`, `age` — `ApplicationBasicInfo.birthDate` + 조회 시점(오늘, 서버 Clock) 기준 만 나이. basic info 없으면 null
   - `finalEducationLevel`(최종학력), `finalSchoolName`(최종대학교) — 최고 EducationLevel 학력 행(검색 필터와 동일 판정). 학력 없으면 null
   - `stageType`, `stageResultStatus` — 최신(stageOrder 최대) 전형 결과, 검색 조건과 동일 값 체계. 발표 여부 무관(관리자 화면). 결과 없으면 null(서류지원 상태는 `status=SUBMITTED`로 판별)
@@ -659,7 +659,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 #### POST `/admin/job-postings`, POST `/admin/job-postings/{id}`  🟢 확정(2026-08-31, front-back 반영 완료) (근무지 후보 등록)
 
 - 변경: `jobPositions[]` 항목의 `workLocation`(단일 문자열) → **`workLocationCodes: string[]`**(CommonCode `WORK_LOCATION`의 `code` 목록, 순서가 곧 노출 순서)
-- 요청(변경분): `jobPositions: [{ positionName, applicationType, jobGroup, jobTitle, workLocationCodes: ["HQ","BSN"], employmentType, sortOrder }]`
+- 요청(변경분): `jobPositions: [{ positionName, applicationType, jobTitle, workLocationCodes: ["HQ","BSN"], employmentType, sortOrder }]`
 - 검증: 미지정/빈 배열 허용(후보 0개), 배열 내 중복 코드 400, `WORK_LOCATION` 그룹의 **활성 코드가 아니면** 400
 
 #### GET `/admin/job-postings/{id}`  🟢 확정(2026-08-31)
@@ -700,3 +700,10 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - `job_position_work_location` 은 `@ElementCollection` + `@OrderColumn(sort_order)` 이며 `code` 와 **저장 시점 `displayName` 스냅샷(`name`)** 을 함께 담는다. 공고는 시점 문서라 라벨을 굳혀 두며, 공통코드 `displayName` 변경은 공고를 재저장할 때 반영된다
 - 근무지 코드 유효성(활성 코드 존재)은 공고 저장 1회당 `WORK_LOCATION` 활성 코드 1회 조회로 검증한다(N+1 없음)
 - `ApplicationCreateRequest` / `ApplicationUpdateRequest` 는 `workLocationCode` 를 생략한 축약 생성자를 유지한다(근무지 후보 0개 모집분야용)
+
+#### 직군(`jobGroup`) 제거  🟢 확정(2026-08-31)
+
+- 모집분야 입력은 **모집분야명 + 담당 직무(`jobTitle`)** 로 충분하다는 판단에 따라 `jobGroup` 을 전 구간에서 제거했다
+- 영향: `JobPosition.jobGroup` 필드, 공고 등록/수정 요청의 `jobPositions[].jobGroup`, 공고 상세(관리자·공개) 응답의 `jobGroup`, 지원현황 검색 조건 `jobGroup`, `AdminApplicationSummaryResponse.jobGroup`
+- 프론트에서 `jobGroup` 을 실제로 노출하던 곳은 관리자 공고 등록 폼의 "직군" 입력 하나뿐이었고, 검색폼·그리드 컬럼에는 없었다
+- DB 컬럼 `job_position.job_group` 은 `ddl-auto: update` 특성상 자동 삭제되지 않는다. 정리는 수동 DDL 로 한다

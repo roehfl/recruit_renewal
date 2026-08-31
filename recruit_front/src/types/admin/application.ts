@@ -15,7 +15,6 @@ export interface AdminApplicationSummaryResponse {
   withdrawnAt: string
   createdAt: string
   updatedAt: string
-  jobGroup: string
   jobTitle: string
   workLocation: string
   birthDate: string
@@ -31,7 +30,6 @@ export interface AdminApplicationSearchRequest {
   graduationStatus: string | undefined
   jobPositionId: number | undefined
   certificateName: string | undefined
-  jobGroup: string | undefined
   languageName: string | undefined
   workLocation: string | undefined
   birthDateTo: string | undefined

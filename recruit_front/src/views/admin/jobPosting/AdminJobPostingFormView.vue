@@ -48,7 +48,7 @@ const displayOrder = ref(0)
 const contentHtmlLegacy = ref<string | null>(null) // 수정 시 기존 값 보존용(화면 미노출)
 
 const jobPositions = ref<AdminJobPositionForm[]>([
-  { positionName: '', applicationType: 'NEW_GRADUATE_OR_EXPERIENCED', jobGroup: null, jobTitle: null, workLocationCodes: [], employmentType: 'FULL_TIME', sortOrder: 0 },
+  { positionName: '', applicationType: 'NEW_GRADUATE_OR_EXPERIENCED', jobTitle: null, workLocationCodes: [], employmentType: 'FULL_TIME', sortOrder: 0 },
 ])
 
 const formConfig = ref<AdminApplicationFormConfig>({
@@ -153,7 +153,6 @@ const addPosition = () => {
   jobPositions.value.push({
     positionName: '',
     applicationType: 'NEW_GRADUATE_OR_EXPERIENCED',
-    jobGroup: null,
     jobTitle: null,
     workLocationCodes: [],
     employmentType: 'FULL_TIME',
@@ -405,7 +404,6 @@ onBeforeUnmount(() => {
           <a-input v-model:value="position.positionName" placeholder="모집분야명 *" class="position-name" />
           <a-select v-model:value="position.applicationType" :options="applicationTypeOptions" class="position-select" />
           <a-select v-model:value="position.employmentType" :options="employmentTypeOptions" class="position-select" />
-          <a-input v-model:value="position.jobGroup" placeholder="직군" class="position-input" />
           <a-input v-model:value="position.jobTitle" placeholder="담당 직무" class="position-input" />
           <a-select
             v-model:value="position.workLocationCodes"

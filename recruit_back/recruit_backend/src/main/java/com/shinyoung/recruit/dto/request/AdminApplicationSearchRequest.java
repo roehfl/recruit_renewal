@@ -12,7 +12,6 @@ public record AdminApplicationSearchRequest(
         Long jobPositionId,
         String status,
         String applicationType,
-        String jobGroup,
         String workLocation,
         String name,
         String phoneNumber,

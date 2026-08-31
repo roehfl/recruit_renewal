@@ -94,7 +94,6 @@ class JobPostingServiceTest {
                 List.of(new JobPositionRequest(
                         "리서치",
                         JobPositionApplicationType.EXPERIENCED,
-                        "Research",
                         "Equity Analyst",
                         List.of("HQ"),
                         EmploymentType.CONTRACT,
@@ -115,7 +114,6 @@ class JobPostingServiceTest {
         assertThat(detail.displayOrder()).isEqualTo(7);
         assertThat(detail.positionCount()).isEqualTo(1);
         assertThat(detail.jobPositions().get(0).applicationType()).isEqualTo(JobPositionApplicationType.EXPERIENCED);
-        assertThat(detail.jobPositions().get(0).jobGroup()).isEqualTo("Research");
         assertThat(detail.jobPositions().get(0).jobTitle()).isEqualTo("Equity Analyst");
         assertThat(detail.jobPositions().get(0).workLocations())
                 .extracting("code", "name")
@@ -136,7 +134,6 @@ class JobPostingServiceTest {
         assertThat(detail.pinned()).isFalse();
         assertThat(detail.displayOrder()).isZero();
         assertThat(detail.jobPositions().get(0).applicationType()).isEqualTo(JobPositionApplicationType.NEW_GRADUATE_OR_EXPERIENCED);
-        assertThat(detail.jobPositions().get(0).jobGroup()).isNull();
         assertThat(detail.jobPositions().get(0).jobTitle()).isNull();
         assertThat(detail.jobPositions().get(0).workLocations()).isEmpty();
         assertThat(detail.jobPositions().get(0).employmentType()).isEqualTo(EmploymentType.FULL_TIME);
@@ -288,16 +285,6 @@ class JobPostingServiceTest {
                 "백엔드",
                 JobPositionApplicationType.EXPERIENCED,
                 tooLong,
-                "Backend",
-                List.of(),
-                EmploymentType.FULL_TIME,
-                0
-        )))).isInstanceOf(InvalidJobPostingException.class);
-        assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest(
-                "백엔드",
-                JobPositionApplicationType.EXPERIENCED,
-                "IT",
-                tooLong,
                 List.of(),
                 EmploymentType.FULL_TIME,
                 0
@@ -311,7 +298,6 @@ class JobPostingServiceTest {
         assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest(
                 "백엔드",
                 JobPositionApplicationType.EXPERIENCED,
-                "IT",
                 "Backend",
                 List.of("HQ", "HQ"),
                 EmploymentType.FULL_TIME,
@@ -321,7 +307,6 @@ class JobPostingServiceTest {
         assertThatThrownBy(() -> jobPostingService.create(createRequestWithPosition(new JobPositionRequest(
                 "백엔드",
                 JobPositionApplicationType.EXPERIENCED,
-                "IT",
                 "Backend",
                 List.of("UNKNOWN"),
                 EmploymentType.FULL_TIME,
@@ -536,7 +521,6 @@ class JobPostingServiceTest {
                 List.of(new JobPositionRequest(
                         "인턴",
                         JobPositionApplicationType.NEW_GRADUATE,
-                        "IT",
                         "Backend Intern",
                         List.of(),
                         EmploymentType.INTERN,

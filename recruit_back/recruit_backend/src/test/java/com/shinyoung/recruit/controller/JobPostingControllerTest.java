@@ -65,7 +65,6 @@ class JobPostingControllerTest {
                 .andExpect(jsonPath("$.data.applicationFormConfig.requireEducation").value(true))
                 .andExpect(jsonPath("$.data.applicationFormConfig.requireCertificate").value(false))
                 .andExpect(jsonPath("$.data.jobPositions[1].applicationType").value("EXPERIENCED"))
-                .andExpect(jsonPath("$.data.jobPositions[1].jobGroup").value("IT"))
                 .andExpect(jsonPath("$.data.jobPositions[1].jobTitle").value("Backend Engineer"))
                 .andExpect(jsonPath("$.data.jobPositions[1].workLocations[0].code").value("HQ"))
                 .andExpect(jsonPath("$.data.jobPositions[1].workLocations[0].name").value("본사"))
@@ -271,7 +270,6 @@ class JobPostingControllerTest {
                     {
                       "positionName": "Backend",
                       "applicationType": "EXPERIENCED",
-                      "jobGroup": "IT",
                       "jobTitle": "Backend Engineer",
                       "workLocationCodes": ["HQ"],
                       "employmentType": "FULL_TIME",
@@ -314,7 +312,6 @@ class JobPostingControllerTest {
                     {
                       "positionName": "Intern",
                       "applicationType": "NEW_GRADUATE",
-                      "jobGroup": "IT",
                       "jobTitle": "Backend Intern",
                       "workLocationCodes": ["HQ"],
                       "employmentType": "INTERN",

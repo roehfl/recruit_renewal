@@ -119,7 +119,7 @@ const stageResultStatusOptions = computed(() =>
 )
 
 const jobPositions = ref<AdminJobPosition[]>([
-  { id: null, positionName: '', applicationType: 'NEW_GRADUATE_OR_EXPERIENCED', jobGroup: null, jobTitle: null, workLocations: [], employmentType: 'FULL_TIME', sortOrder: 0 },
+  { id: null, positionName: '', applicationType: 'NEW_GRADUATE_OR_EXPERIENCED', jobTitle: null, workLocations: [], employmentType: 'FULL_TIME', sortOrder: 0 },
 ])
 
 const jobPostings = ref<AdminJobPostingListItem[]>([])
@@ -194,7 +194,6 @@ const initialSearchRequest: AdminApplicationSearchRequest = {
     graduationStatus:undefined,       // 졸업 여부
     jobPositionId:undefined,          // 지원 분야
     certificateName: undefined,       // 자격증
-    jobGroup:undefined,               // 지원 직무 이름 
     languageName: undefined,          // 언어
     workLocation: undefined,          // 근무지
     birthDateTo: undefined,           // 생년월일 TO

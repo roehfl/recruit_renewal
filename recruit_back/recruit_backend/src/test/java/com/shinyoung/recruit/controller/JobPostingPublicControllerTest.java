@@ -82,7 +82,6 @@ class JobPostingPublicControllerTest {
                 .andExpect(jsonPath("$.data.content[0].accepting").value(true))
                 .andExpect(jsonPath("$.data.content[0].pinned").value(true))
                 .andExpect(jsonPath("$.data.content[0].positions[0].applicationType").value("NEW_GRADUATE"))
-                .andExpect(jsonPath("$.data.content[0].positions[0].jobGroup").value("Research"))
                 .andExpect(jsonPath("$.data.content[0].positions[0].jobTitle").value("Analyst"))
                 .andExpect(jsonPath("$.data.content[0].positions[0].workLocations").isEmpty())
                 .andExpect(jsonPath("$.data.content[0].positions[0].employmentType").value("FULL_TIME"))
@@ -255,7 +254,6 @@ class JobPostingPublicControllerTest {
                         new JobPositionRequest(
                                 "Analyst",
                                 JobPositionApplicationType.NEW_GRADUATE,
-                                "Research",
                                 "Analyst",
                                 List.of(),
                                 EmploymentType.FULL_TIME,

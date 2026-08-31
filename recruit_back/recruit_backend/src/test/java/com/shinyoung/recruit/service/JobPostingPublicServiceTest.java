@@ -329,7 +329,6 @@ class JobPostingPublicServiceTest {
         assertThat(response.positions()).hasSize(2);
         assertThat(response.positions().get(0).positionName()).isEqualTo("Analyst");
         assertThat(response.positions().get(0).applicationType()).isEqualTo(JobPositionApplicationType.NEW_GRADUATE);
-        assertThat(response.positions().get(0).jobGroup()).isEqualTo("Research");
         assertThat(response.positions().get(0).jobTitle()).isEqualTo("Equity Analyst");
         assertThat(response.positions().get(0).workLocations())
                 .extracting("code", "name")
@@ -845,7 +844,6 @@ class JobPostingPublicServiceTest {
                         new JobPositionRequest(
                                 "Developer",
                                 JobPositionApplicationType.EXPERIENCED,
-                                "IT",
                                 "Backend Developer",
                                 List.of("BUSAN"),
                                 EmploymentType.CONTRACT,
@@ -854,7 +852,6 @@ class JobPostingPublicServiceTest {
                         new JobPositionRequest(
                                 "Analyst",
                                 JobPositionApplicationType.NEW_GRADUATE,
-                                "Research",
                                 "Equity Analyst",
                                 List.of("SEOUL"),
                                 EmploymentType.FULL_TIME,
