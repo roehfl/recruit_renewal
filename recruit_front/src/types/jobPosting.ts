@@ -1,15 +1,14 @@
 export type JobPostingStatusCode = 'OPEN' | 'CLOSED'
 
+/*
+ * 지원자 공고 목록 항목(GET /job-postings). 백엔드 JobPostingPublicListResponse 중
+ * 지원자 화면이 실제로 쓰는 필드만 선언한다.
+ */
 export interface JobPostingListItem {
   id: number
   title: string
-  type: string
-  description: string
-  status: JobPostingStatusCode
-  startDate: string
-  endDate: string
-  receptionStatus: string
   postingType: string
+  receptionStatus: string
   receptionStartDateTime: string
   receptionEndDateTime: string
 }

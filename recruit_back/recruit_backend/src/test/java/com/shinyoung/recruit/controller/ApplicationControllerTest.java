@@ -513,7 +513,10 @@ class ApplicationControllerTest {
                 .andExpect(jsonPath("$.data.withdrawable").value(true))
                 .andExpect(jsonPath("$.data.submittedAt").exists())
                 .andExpect(jsonPath("$.data.withdrawnAt").doesNotExist())
-                .andExpect(jsonPath("$.data.completionSummary.requiredSectionCount").value(0))
+                // BASIC_INFO 는 form config 와 무관하게 항상 필수 그룹이다(ApplicationCompletionReadChecker.checkBasicInfo).
+                // 여기서는 유효한 기본정보를 seed 했으므로 그룹 1개가 잡히되 미충족 이슈는 없다.
+                .andExpect(jsonPath("$.data.completionSummary.requiredSectionCount").value(1))
+                .andExpect(jsonPath("$.data.completionSummary.completedRequiredSectionCount").value(1))
                 .andExpect(jsonPath("$.data.completionSummary.submitBlockingIssueCount").value(0))
                 .andExpect(jsonPath("$.data.requiredMissingSections").isArray())
                 .andExpect(jsonPath("$.data.optionalIncompleteSections").isArray())
@@ -553,10 +556,14 @@ class ApplicationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.editable").value(true))
                 .andExpect(jsonPath("$.data.submittable").value(false))
-                .andExpect(jsonPath("$.data.completionSummary.requiredSectionCount").value(1))
-                .andExpect(jsonPath("$.data.completionSummary.submitBlockingIssueCount").value(1))
-                .andExpect(jsonPath("$.data.requiredMissingSections[0].sectionCode").value("EDUCATION"))
-                .andExpect(jsonPath("$.data.requiredMissingSections[0].reasonCode").value("MISSING_ROW"));
+                // 항상 필수인 BASIC_INFO(미입력) + form config 로 켠 EDUCATION 두 그룹이 잡힌다.
+                // 순서는 checker 의 검사 순서를 따른다(기본정보 먼저).
+                .andExpect(jsonPath("$.data.completionSummary.requiredSectionCount").value(2))
+                .andExpect(jsonPath("$.data.completionSummary.submitBlockingIssueCount").value(2))
+                .andExpect(jsonPath("$.data.requiredMissingSections[0].sectionCode").value("BASIC_INFO"))
+                .andExpect(jsonPath("$.data.requiredMissingSections[0].reasonCode").value("MISSING_ROW"))
+                .andExpect(jsonPath("$.data.requiredMissingSections[1].sectionCode").value("EDUCATION"))
+                .andExpect(jsonPath("$.data.requiredMissingSections[1].reasonCode").value("MISSING_ROW"));
     }
 
     @Test
