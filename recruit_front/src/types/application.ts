@@ -47,7 +47,9 @@ export interface ApplicationFormPageResponse {
   postingType?: postingType
   jobPositionId?: number
   jobPositionName?: string
-  /** 지원자가 선택한 근무지 표시명(읽기 전용). 근무지 후보가 없는 모집분야면 null. */
+  /** 지원자가 선택한 근무지 코드. 근무지 후보가 없는 모집분야면 null. */
+  workLocationCode?: string | null
+  /** 지원자가 선택한 근무지 표시명. 근무지 후보가 없는 모집분야면 null. */
   workLocationName?: string | null
   accepting?: boolean
   editable?: boolean
@@ -85,7 +87,7 @@ export interface MyApplicationListItem {
   receptionEndDateTime?: string
   accepting?: boolean
   announcedResultCount?: number
-  latestAnnouncedStagName?: string
+  latestAnnouncedStageName?: string
   latestResultStatus?: string
 }
 

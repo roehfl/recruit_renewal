@@ -14,6 +14,8 @@ import {
 
 import { apiClient } from '@/api/client'
 import type { ApiResponse } from '@/types/api'
+import type { JobPositionPublicOption } from '@/types/jobPosting'
+import { boardApi } from '@/api/boardApi'
 import { dashboardApi } from '@/api/application/dashboardApi'
 
 import BasicInfoSection from '@/views/applicant/application/sections/BasicInfoSection.vue'
@@ -218,6 +220,95 @@ const selectedPositionText = computed(() => {
 })
 
 const canEdit = computed(() => formPage.value?.editable === true)
+
+/*
+ * 지원분야 변경 모달. 임시저장(DRAFT) 상태에서만 열 수 있고, 저장은 POST /applications/{id} 한 번이다.
+ * 후보 목록은 공개 공고 상세를 재사용해 받아오며(모달 최초 오픈 시 1회) 별도 API를 두지 않는다.
+ */
+const positionModalOpen = ref(false)
+const positionModalLoading = ref(false)
+const positionModalSaving = ref(false)
+const postingPositions = ref<JobPositionPublicOption[]>([])
+const editingPositionId = ref<number | undefined>()
+const editingWorkLocationCode = ref<string | undefined>()
+
+const positionOptions = computed(() =>
+  postingPositions.value.map((position) => ({ label: position.positionName, value: position.id })),
+)
+
+function workLocationOptionsOf(positionId: number | undefined): { label: string; value: string }[] {
+  const position = postingPositions.value.find((item) => item.id === positionId)
+  return (position?.workLocations ?? []).map((it) => ({ label: it.name, value: it.code }))
+}
+
+const editingWorkLocationOptions = computed(() => workLocationOptionsOf(editingPositionId.value))
+
+// 모집분야를 바꾸면 근무지 선택을 초기화한다. 후보가 1개뿐이면 자동 선택한다(공고 상세와 동일 규칙).
+function handleEditingPositionChange(value: number): void {
+  editingPositionId.value = value
+  const options = workLocationOptionsOf(value)
+  editingWorkLocationCode.value = options.length === 1 ? options[0]!.value : undefined
+}
+
+async function openPositionModal(): Promise<void> {
+  const jobPostingId = formPage.value?.jobPostingId
+  if (!jobPostingId) {
+    return
+  }
+
+  positionModalOpen.value = true
+  editingPositionId.value = formPage.value?.jobPositionId
+  editingWorkLocationCode.value = formPage.value?.workLocationCode ?? undefined
+
+  if (postingPositions.value.length > 0) {
+    return
+  }
+
+  positionModalLoading.value = true
+  try {
+    const response = await boardApi.fetchJobPostingDetail(jobPostingId)
+    postingPositions.value = response.data.data.jobPositions ?? []
+  } catch (error) {
+    message.error(getErrorMessage(error, '모집분야 목록을 불러오지 못했습니다.'))
+    positionModalOpen.value = false
+  } finally {
+    positionModalLoading.value = false
+  }
+}
+
+async function savePositionChange(): Promise<void> {
+  const id = applicationId.value
+  if (!id || !editingPositionId.value) {
+    message.warning('모집분야를 선택해주세요.')
+    return
+  }
+
+  // 후보 근무지가 있는 모집분야는 근무지 선택이 필수다(백엔드와 동일 규칙).
+  if (editingWorkLocationOptions.value.length > 0 && !editingWorkLocationCode.value) {
+    message.warning('근무지를 선택해주세요.')
+    return
+  }
+
+  positionModalSaving.value = true
+  try {
+    const response = await apiClient.post<ApiResponse<unknown>>(`/applications/${id}`, {
+      jobPositionId: editingPositionId.value,
+      workLocationCode: editingWorkLocationCode.value ?? null,
+    })
+
+    if (!response.data.success) {
+      throw new Error(response.data.message || '지원분야 변경에 실패했습니다.')
+    }
+
+    message.success('지원분야를 변경했습니다.')
+    positionModalOpen.value = false
+    await fetchFormPage(id)
+  } catch (error) {
+    message.error(getErrorMessage(error, '지원분야 변경에 실패했습니다.'))
+  } finally {
+    positionModalSaving.value = false
+  }
+}
 const isFirstPage = computed(() => currentPageIndex.value <= 0)
 const isLastPage = computed(() => currentPageIndex.value >= pages.value.length - 1)
 
@@ -607,6 +698,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
             <p class="header-desc">
               모집분야: {{ selectedPositionText }}
               <template v-if="formPage?.workLocationName"> / 근무지: {{ formPage.workLocationName }}</template>
+              <a-button v-if="canEdit" type="link" size="small" @click="openPositionModal">변경</a-button>
             </p>
           </div>
 
@@ -708,10 +800,49 @@ function getErrorMessage(error: unknown, fallback: string): string {
         <a-empty v-else class="empty-box" description="지원서 구성 정보가 없습니다." />
       </a-spin>
     </div>
+
+    <a-modal
+      v-model:open="positionModalOpen"
+      title="지원분야 변경"
+      :confirm-loading="positionModalSaving"
+      ok-text="변경"
+      cancel-text="취소"
+      @ok="savePositionChange"
+    >
+      <a-spin :spinning="positionModalLoading">
+        <a-form layout="vertical">
+          <a-form-item label="모집분야" required>
+            <a-select
+              :value="editingPositionId"
+              :options="positionOptions"
+              placeholder="모집분야를 선택해주세요"
+              style="width: 100%"
+              @change="handleEditingPositionChange"
+            />
+          </a-form-item>
+          <a-form-item v-if="editingWorkLocationOptions.length > 0" label="근무지" required>
+            <a-select
+              v-model:value="editingWorkLocationCode"
+              :options="editingWorkLocationOptions"
+              :disabled="editingWorkLocationOptions.length === 1"
+              placeholder="근무지를 선택해주세요"
+              style="width: 100%"
+            />
+          </a-form-item>
+        </a-form>
+        <p class="position-modal-hint">임시저장 상태에서만 변경할 수 있습니다. 최종 제출 후에는 변경할 수 없습니다.</p>
+      </a-spin>
+    </a-modal>
   </section>
 </template>
 
 <style scoped lang="scss">
+.position-modal-hint {
+  margin: 0;
+  font-size: 13px;
+  color: #8c8c8c;
+}
+
 .application-form-page {
   width: 100%;
   background: var(--app-bg-page);

@@ -683,7 +683,8 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 
 #### GET `/applications/{applicationId}/form-page`  🟢 확정(2026-08-31) (표시용 확장)
 
-- 변경: 응답에 `workLocationName` 추가(스냅샷 우선, 없으면 null). 지원서 작성 화면 헤더에 "모집분야 / 근무지" 읽기전용 표시용. **여기서 근무지를 고르지 않는다**
+- 변경: 응답에 `workLocationCode` + `workLocationName` 추가(스냅샷 기준, 미선택이면 null). 지원서 작성 화면 헤더의 "모집분야 / 근무지" 읽기전용 표시와, 지원분야 변경 모달의 초기 선택값으로 쓴다
+- 지원분야 변경(2026-08-31): 지원서 작성 화면 헤더의 "변경" 버튼이 모달을 열고 `POST /applications/{applicationId}` 로 저장한다. 모집분야·근무지 후보 목록은 **공개 공고 상세(`GET /job-postings/{id}`)를 재사용**하며 전용 API를 두지 않는다. 임시저장(DRAFT) 상태에서만 노출한다(`editable`)
 
 #### GET `/admin/applications`, GET `/admin/job-postings/{jobPostingId}/applications`  🟢 확정(2026-08-31) (근무지 조건 의미 변경)
 

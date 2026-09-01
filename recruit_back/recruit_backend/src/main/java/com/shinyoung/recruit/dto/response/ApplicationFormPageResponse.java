@@ -19,7 +19,9 @@ public record ApplicationFormPageResponse(
         JobPostingType postingType,
         Long jobPositionId,
         String jobPositionName,
-        /** 지원자가 선택한 근무지 표시명(읽기 전용). 선택하지 않았으면 null. */
+        /** 지원자가 선택한 근무지 코드. 선택하지 않았으면 null. */
+        String workLocationCode,
+        /** 지원자가 선택한 근무지 표시명. 선택하지 않았으면 null. */
         String workLocationName,
         JobApplicationStatus applicationStatus,
         LocalDateTime receptionStartDateTime,
@@ -48,6 +50,7 @@ public record ApplicationFormPageResponse(
                 jobPosting.getPostingType(),
                 jobPosition.getId(),
                 resolveText(application.getJobPositionNameSnapshot(), jobPosition.getPositionName()),
+                application.getWorkLocationCode(),
                 application.getWorkLocationNameSnapshot(),
                 application.getStatus(),
                 jobPosting.getReceptionStartDateTime(),

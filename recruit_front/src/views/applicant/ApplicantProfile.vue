@@ -263,8 +263,7 @@ const loadMyApplications = async () => {
 const columns: TableColumnsType<MyApplicationListItem> = [
   {
     title: '공고명',
-    dataIndex: 'title',
-    key: 'title',
+    key: 'jobPostingTitle',
     customRender: ({ record }) => h('a', { onClick: () => goDetail(record.jobPostingId) }, record.jobPostingTitle),
   },
   {
@@ -277,8 +276,7 @@ const columns: TableColumnsType<MyApplicationListItem> = [
   },
   {
     title: '지원서 수정',
-    dataIndex: 'title',
-    key: 'title',
+    key: 'editApplication',
     width: 150,
     align: 'center',
     customRender: ({ record }) => h('a', { onClick: () => goForm(record) }, record?.applicationStatus !== 'DRAFT' ? '-' : '바로가기' ),

@@ -66,7 +66,7 @@ const recruitStatusTypeMap: Record<string, string> = {
   CLOSED: '마감', 
   UPCOMING: '예정', 
 }
-// 공고 직무 
+// 공고 모집분야
 const positionOptions = computed(() => {
   return jobPostDetail.value?.jobPositions.map( (item: { positionName: string; id: number; }) => ({
     label: item.positionName,
@@ -74,7 +74,7 @@ const positionOptions = computed(() => {
   }))
 })
 
-// 선택한 직무의 후보 근무지. 후보 개수가 곧 화면 분기다(0=미표시, 1=고정, N=선택).
+// 선택한 모집분야의 후보 근무지. 후보 개수가 곧 화면 분기다(0=미표시, 1=고정, N=선택).
 const workLocationOptions = computed<{ label: string; value: string }[]>(() => {
   const positionId = selectedPosition.value?.value
   if (!positionId) {
@@ -124,19 +124,19 @@ function goApplicationFormPage(applicationId: unknown): void {
   router.push(`/applicant/${applicationId}/form`);
 }
 
-// 선택한 직무 
+// 선택한 모집분야
 const selectedPosition = ref< {label: string; value: number} | undefined >()
 
 // 선택한 근무지 코드
 const selectedWorkLocation = ref<string | undefined>()
 
-// 직무를 바꾸면 근무지 선택을 초기화한다. 후보가 1개뿐이면 자동 선택한다.
+// 모집분야를 바꾸면 근무지 선택을 초기화한다. 후보가 1개뿐이면 자동 선택한다.
 watch(selectedPosition, () => {
   const options = workLocationOptions.value
   selectedWorkLocation.value = options.length === 1 ? options[0]!.value : undefined
 })
 
-// 직무 선택 포커스 
+// 모집분야 선택 포커스
 const positionSelectRef = ref();
 
 // 확인 모달에 보여줄 근무지 표시명
@@ -151,17 +151,17 @@ function confirmSubmit(): void {
     message.error('모집 예정 공고입니다.');
     return;
   }
-  // 선택 직무 : selectedPosition
-  // label : 직무 명
-  // value : 직무 Id
+  // 선택 모집분야 : selectedPosition
+  // label : 모집분야명
+  // value : 모집분야 Id
   if (!selectedPosition.value ) {
-    message.warning('직무를 선택해주세요.');
+    message.warning('모집분야를 선택해주세요.');
     positionSelectRef.value?.focus();
 
     return;
   }
 
-  // 후보 근무지가 있는 직무는 근무지 선택이 필수다.
+  // 후보 근무지가 있는 모집분야는 근무지 선택이 필수다.
   if (workLocationOptions.value.length > 0 && !selectedWorkLocation.value) {
     message.warning('근무지를 선택해주세요.');
     return;
@@ -171,11 +171,11 @@ function confirmSubmit(): void {
   isApplication().then((Response) => {
   // isApply().then((Response) => {
     if (Response) {
-      // message.error("이미 해당 채용공고에 지원서가 존재합니다.");
+      const notice = existingApplicationNotice(Response.applicationStatus)
       Modal.confirm({
-        title: '공고 지원',
-        content: `이미 지원한 공고입니다. 해당 지원서로 이동하시겠습니까?`,
-        okText: '공고 이동',
+        title: notice.title,
+        content: notice.content,
+        okText: notice.okText,
         cancelText: '취소',
         async onOk() {
           await goApplicationFormPage(Response.applicationId);
@@ -187,8 +187,8 @@ function confirmSubmit(): void {
       Modal.confirm({
         title: '공고 지원',
         content: selectedWorkLocation.value
-          ? `지원 직무는 '${selectedPosition.value?.label}', 근무지는 '${selectedWorkLocationLabel.value}' 입니다. 지원하시겠습니까?`
-          : `지원 직무는 '${selectedPosition.value?.label}' 입니다. 지원하시겠습니까?`,
+          ? `지원 모집분야는 '${selectedPosition.value?.label}', 근무지는 '${selectedWorkLocationLabel.value}' 입니다. 지원하시겠습니까?`
+          : `지원 모집분야는 '${selectedPosition.value?.label}' 입니다. 지원하시겠습니까?`,
         okText: '지원하기',
         cancelText: '취소',
         async onOk() {
@@ -248,6 +248,36 @@ async function submitApplication(): Promise<void> {
   
 // }
 
+/*
+ * 기지원 이력 안내 문구. 지원서 상태에 따라 문구가 달라진다.
+ * 철회분은 동일 공고 재지원이 백엔드에서 막히므로(중복 검사는 상태를 보지 않는다) 그 사실을 함께 알린다.
+ */
+function existingApplicationNotice(
+  applicationStatus: MyJobPostingDetailListItem['applicationStatus'],
+): { title: string; content: string; okText: string } {
+  if (applicationStatus === 'SUBMITTED') {
+    return {
+      title: '제출 완료된 공고',
+      content: '해당 공고에 제출을 완료한 지원서가 존재합니다. 제출한 지원서를 확인하시겠습니까?',
+      okText: '지원서 확인',
+    }
+  }
+
+  if (applicationStatus === 'WITHDRAWN') {
+    return {
+      title: '철회한 공고',
+      content: '해당 공고에서 철회한 지원서가 존재하여 다시 지원할 수 없습니다. 철회한 지원서를 확인하시겠습니까?',
+      okText: '지원서 확인',
+    }
+  }
+
+  return {
+    title: '지원중인 공고',
+    content: '해당 공고에 작성중인 지원서가 존재합니다. 작성중인 지원서로 이동하시겠습니까?',
+    okText: '지원서 이동',
+  }
+}
+
 async function isApplication(): Promise<MyJobPostingDetailListItem | undefined> {
   const id = jobPostDetail.value.id;
   const result = await apiClient.get<ApiResponse<MyJobPostingListItem>>(`/applications/me`);
@@ -288,14 +318,14 @@ onMounted(async () => {
           </div>
 
           <a-space wrap>
-            <a-form-item v-if="jobPostDetail?.receptionStatus === 'ACCEPTING'" label="직무" required>
+            <a-form-item v-if="jobPostDetail?.receptionStatus === 'ACCEPTING'" label="모집분야" required>
               <a-select
                 ref="positionSelectRef"
                 v-model:value="selectedPosition"
                 style="width: 300px"
                 :options="positionOptions" 
                 label-in-value
-                placeholder="직무를 선택해주세요"
+                placeholder="모집분야를 선택해주세요"
               />
             </a-form-item>
             <a-form-item

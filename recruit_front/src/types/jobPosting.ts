@@ -30,11 +30,19 @@ export interface JobPostingImage {
   fileSize: number
 }
 
+/** 공개 공고 상세의 모집분야. 지원 시작·지원분야 변경 드롭다운의 소스다. */
+export interface JobPositionPublicOption {
+  id: number
+  positionName: string
+  workLocations: WorkLocationOption[]
+}
+
 export interface JobPostingDetail {
   id: number
   title: string
   contentHtml: string
   images: JobPostingImage[]
+  jobPositions?: JobPositionPublicOption[]
 }
 
 export interface MyJobPostingListItem {
@@ -46,13 +54,10 @@ export interface MyJobPostingDetailListItem {
   applicationId: number
   jobPostingId: number
   jobPostingTitle: string
-  status: JobPostingStatusCode
+  /** 지원서 상태. 백엔드 MyApplicationResponse.applicationStatus 와 대응한다. */
+  applicationStatus: 'DRAFT' | 'SUBMITTED' | 'WITHDRAWN'
   jobPositionId: number
   jobPositionName: string
-  summary: string
-  startDate: string
-  endDate: string
-  postingType: string
 }
 /*
  * 관리자 공고 목록 항목(GET /admin/job-postings). 지원자 화면용 JobPostingListItem과 필드가 달라 분리한다.
