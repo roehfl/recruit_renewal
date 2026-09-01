@@ -985,8 +985,16 @@ function getErrorMessage(error: unknown, fallback: string): string {
   display: none;
 }
 
+/*
+ * 활성 배경이 그 단계의 칸 전체를 채우게 한다. antd 는 아이템을 flex 1 로 균등 분배하는데,
+ * 컨테이너가 inline-block(내용 너비)이라 단계 수가 적으면 넓은 칸에 작은 배경만 떠 허전해 보인다.
+ * antd 가 넣는 -16px 시작 여백도 배경이 칸을 넘지 않도록 0 으로 되돌린다.
+ */
 .steps-scroll :deep(.ant-steps-item-container) {
-  padding: 6px 12px 6px 8px;
+  display: block;
+  width: 100%;
+  margin-inline-start: 0;
+  padding: 10px 14px;
   border-radius: var(--app-border-radius);
 }
 
