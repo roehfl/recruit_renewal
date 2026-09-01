@@ -108,7 +108,7 @@
 <script setup lang="ts">
 import { onMounted, h, ref, reactive } from 'vue'
 import type { ChangePasswordRequest, MyApplicationList, MyApplicationListItem } from '@/types/application'
-import { message, type TableColumnsType } from 'ant-design-vue'
+import { Button, message, type TableColumnsType } from 'ant-design-vue'
 import { LockOutlined } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
@@ -263,8 +263,8 @@ const loadMyApplications = async () => {
 const columns: TableColumnsType<MyApplicationListItem> = [
   {
     title: '공고명',
+    dataIndex: 'jobPostingTitle',
     key: 'jobPostingTitle',
-    customRender: ({ record }) => h('a', { onClick: () => goDetail(record.jobPostingId) }, record.jobPostingTitle),
   },
   {
     title: '상태',
@@ -279,26 +279,19 @@ const columns: TableColumnsType<MyApplicationListItem> = [
     key: 'editApplication',
     width: 150,
     align: 'center',
-    customRender: ({ record }) => h('a', { onClick: () => goForm(record) }, record?.applicationStatus !== 'DRAFT' ? '-' : '바로가기' ),
+    customRender: ({ record }) =>
+      record?.applicationStatus !== 'DRAFT'
+        ? '-'
+        : h(Button, { onClick: () => goForm(record) }, () => '바로가기'),
   },
   {
     title: '전형결과 확인',
     key: 'result',
     width: 180,
     align: 'center',
-    customRender: () => h('a', { class: 'action-link' }, '확인'),
+    customRender: () => h(Button, null, () => '확인'),
   },
 ]
-
-const goDetail = async (id: number) => {
-  const selectedPosting = applicationListItems.value.find((item) => item.jobPositionId === id)
-  await router.push({
-    path: `/applicant/${id}/detail`,
-    state: {
-      data: JSON.stringify(selectedPosting),
-    },
-  })
-}
 
 const goForm = async (record: MyApplicationListItem) => {
   
