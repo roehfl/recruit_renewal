@@ -903,53 +903,50 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 .apply-target {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  margin-top: 22px;
-  padding: 20px 22px;
-  border: 1px solid var(--app-border-default);
-  border-left: 4px solid var(--app-color-primary-emerald);
-  border-radius: var(--app-border-radius);
-  background: var(--app-bg-soft);
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--app-border-subtle);
 }
 
 .apply-target-fields {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px 48px;
+  gap: 14px 40px;
   margin: 0;
 }
 
 .apply-target-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-width: 140px;
+  gap: 4px;
 }
 
 .apply-target-label {
   color: var(--app-text-muted);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 .apply-target-value {
   margin: 0;
   color: var(--app-text-primary);
-  font-size: 21px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.25;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
 }
 
 .apply-target-change {
   flex-shrink: 0;
-  height: var(--app-control-height-lg);
+  height: var(--app-control-height);
+  padding: 0 13px;
   border-color: var(--app-color-primary-emerald);
   color: var(--app-color-primary-emerald);
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -963,9 +960,9 @@ function getErrorMessage(error: unknown, fallback: string): string {
   margin-top: 18px;
 }
 
-/* 진행상황은 보조 정보라 헤더보다 낮은 밀도로 압축한다. */
+/* 진행상황은 보조 정보라 헤더보다 낮은 밀도로 둔다. */
 .steps-card :deep(.ant-card-body) {
-  padding: 10px 16px;
+  padding: 16px 20px;
 }
 
 .steps-scroll {
@@ -985,15 +982,15 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 .steps-scroll :deep(.ant-steps-item-icon) {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   margin-top: 2px;
-  font-size: 12px;
-  line-height: 24px;
+  font-size: 14px;
+  line-height: 28px;
 }
 
 .steps-card :deep(.ant-steps-item-title) {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -1176,16 +1173,11 @@ function getErrorMessage(error: unknown, fallback: string): string {
   .apply-target {
     flex-direction: column;
     align-items: stretch;
-    gap: 16px;
-    padding: 16px 18px;
+    gap: 14px;
   }
 
   .apply-target-fields {
-    gap: 14px 28px;
-  }
-
-  .apply-target-value {
-    font-size: 18px;
+    gap: 12px 28px;
   }
 
   .apply-target-change {
