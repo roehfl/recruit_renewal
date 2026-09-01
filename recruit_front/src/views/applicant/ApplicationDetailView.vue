@@ -173,6 +173,8 @@ function confirmSubmit(): void {
     if (Response) {
       const notice = existingApplicationNotice(Response.applicationStatus)
       Modal.confirm({
+        // 경고가 아닌 안내라 아이콘을 두지 않는다. 아이콘이 있으면 본문이 34px 들여써져 좌측이 비어 보인다.
+        icon: null,
         title: notice.title,
         content: notice.content,
         okText: notice.okText,
@@ -185,6 +187,7 @@ function confirmSubmit(): void {
     }
     else {
       Modal.confirm({
+        icon: null,
         title: '공고 지원',
         content: selectedWorkLocation.value
           ? `지원 모집분야는 '${selectedPosition.value?.label}', 근무지는 '${selectedWorkLocationLabel.value}' 입니다. 지원하시겠습니까?`

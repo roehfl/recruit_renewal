@@ -977,8 +977,32 @@ function getErrorMessage(error: unknown, fallback: string): string {
   min-width: 148px;
 }
 
+/*
+ * 활성 표시는 antd 기본 하단 언더라인(2px ::before) 대신 항목 배경으로 준다.
+ * 언더라인은 아래 여백 12px에 기대는 표시라, 밀도를 줄이면 글자에 붙어 답답해진다.
+ */
+.steps-scroll :deep(.ant-steps-item)::before {
+  display: none;
+}
+
 .steps-scroll :deep(.ant-steps-item-container) {
-  padding: 2px 0;
+  padding: 6px 12px 6px 8px;
+  border-radius: var(--app-border-radius);
+}
+
+.steps-scroll :deep(.ant-steps-item-active .ant-steps-item-container) {
+  background: var(--app-bg-selected);
+}
+
+/* antd 기본 팔레트(파랑) 대신 브랜드 색을 쓴다. ConfigProvider 테마가 없어 여기서 지정한다. */
+.steps-scroll :deep(.ant-steps-item-process .ant-steps-item-icon) {
+  background: var(--app-color-primary-emerald);
+  border-color: var(--app-color-primary-emerald);
+}
+
+/* antd 원본 선택자가 4단 자식 체인이라 같은 깊이로 맞춰야 이긴다. */
+.steps-card :deep(.ant-steps-item-process > .ant-steps-item-container > .ant-steps-item-content > .ant-steps-item-title) {
+  color: var(--app-color-primary-emerald);
 }
 
 .steps-scroll :deep(.ant-steps-item-icon) {
