@@ -23,24 +23,24 @@ const menuStore = useMenuStore()
 const menuOpen = ref(false)
 
 /*
- * 헤더 로고는 CI 이미지 + '신영증권' 텍스트로 구성한다.
- * CI는 public/images/ci.{svg,png,jpg,webp} 중 하나를 추가하면 별도 코드 수정 없이 적용되고,
- * 없으면 번들에 포함된 logo.png로 폴백한다. 원본 CI 비율(99 x 102)은 CSS에서 유지한다.
+ * 헤더 로고는 텍스트 없이 로고 이미지 하나로 표시한다.
+ * public/images/header-logo.{png,svg,jpg,webp} 중 하나를 추가하면 별도 코드 수정 없이 적용되고,
+ * 없으면 번들에 포함된 logo.png로 폴백한다.
  */
-const ciLogoCandidates = [
-  '/images/ci.svg',
-  '/images/ci.png',
-  '/images/ci.jpg',
-  '/images/ci.webp',
+const brandLogoCandidates = [
+  '/images/header-logo.png',
+  '/images/header-logo.svg',
+  '/images/header-logo.jpg',
+  '/images/header-logo.webp',
   logoImage,
 ]
-const ciLogoIndex = ref(0)
+const brandLogoIndex = ref(0)
 
-const ciLogoSrc = computed<string>(() => ciLogoCandidates[ciLogoIndex.value] ?? logoImage)
+const brandLogoSrc = computed<string>(() => brandLogoCandidates[brandLogoIndex.value] ?? logoImage)
 
-const onCiLogoError = (): void => {
-  if (ciLogoIndex.value < ciLogoCandidates.length - 1) {
-    ciLogoIndex.value += 1
+const onBrandLogoError = (): void => {
+  if (brandLogoIndex.value < brandLogoCandidates.length - 1) {
+    brandLogoIndex.value += 1
   }
 }
 const hasUnreadNotice = ref(false)
@@ -133,8 +133,12 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
         <MenuOutlined v-else />
         </button>
         <RouterLink to="/applicant" class="brand-logo" @click="closeMenu">
-          <img :src="ciLogoSrc" alt="신영증권 CI" class="brand-ci" @error="onCiLogoError" />
-          <span class="brand-logo-main">신영증권</span>
+          <img
+            :src="brandLogoSrc"
+            alt="신영증권 로고"
+            class="brand-logo-img"
+            @error="onBrandLogoError"
+          />
         </RouterLink>
       </div>
       
@@ -287,21 +291,12 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
   white-space: nowrap;
 }
 
-/* CI 원본 비율(99 x 102)을 유지한다. */
-.brand-ci {
+/* 로고 이미지 원본 비율을 유지한다. */
+.brand-logo-img {
   display: block;
   height: 40px;
   width: auto;
-  aspect-ratio: 99 / 102;
   object-fit: contain;
-}
-
-.brand-logo-main {
-  color: var(--app-text-primary);
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.045em;
 }
 
 .hamburger-button {
@@ -672,12 +667,8 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
     min-height: 64px;
   }
 
-  .brand-ci {
+  .brand-logo-img {
     height: 32px;
-  }
-
-  .brand-logo-main {
-    font-size: 20px;
   }
 
   .top-actions {
