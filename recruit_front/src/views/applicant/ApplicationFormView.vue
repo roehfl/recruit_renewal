@@ -969,6 +969,15 @@ function getErrorMessage(error: unknown, fallback: string): string {
   overflow-x: auto;
 }
 
+/*
+ * antd 는 navigation steps 상단에만 12px 를 주고 하단은 아이템 컨테이너의
+ * padding-bottom(언더라인 자리)으로 맞춘다. 그 padding 을 배경용으로 바꿨으니
+ * 상단 여백도 걷어내야 위아래가 같아진다.
+ */
+.steps-scroll :deep(.ant-steps-navigation) {
+  padding-top: 0;
+}
+
 .steps-scroll :deep(.ant-steps) {
   min-width: max-content;
 }
