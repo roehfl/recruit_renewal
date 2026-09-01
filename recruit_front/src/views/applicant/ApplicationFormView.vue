@@ -5,6 +5,7 @@ import type { ApplicationSectionType, ApplicationFormItem, ApplicationFormPage, 
 import { useRoute } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
+  EditOutlined,
   LeftOutlined,
   ReloadOutlined,
   RightOutlined,
@@ -695,11 +696,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
           <div>
             <p class="eyebrow">Application Form</p>
             <h1>{{ pageTitle }}</h1>
-            <p class="header-desc">
-              모집분야: {{ selectedPositionText }}
-              <template v-if="formPage?.workLocationName"> / 근무지: {{ formPage.workLocationName }}</template>
-              <a-button v-if="canEdit" type="link" size="small" @click="openPositionModal">변경</a-button>
-            </p>
           </div>
 
           <a-space wrap>
@@ -712,6 +708,24 @@ function getErrorMessage(error: unknown, fallback: string): string {
               새로고침
             </a-button>
           </a-space>
+        </div>
+
+        <!-- 지원 대상(모집분야·근무지). 지원서 전체의 전제라 헤더에서 가장 눈에 띄어야 한다. -->
+        <div class="apply-target">
+          <dl class="apply-target-fields">
+            <div class="apply-target-field">
+              <dt class="apply-target-label">모집분야</dt>
+              <dd class="apply-target-value">{{ selectedPositionText }}</dd>
+            </div>
+            <div v-if="formPage?.workLocationName" class="apply-target-field">
+              <dt class="apply-target-label">근무지</dt>
+              <dd class="apply-target-value">{{ formPage.workLocationName }}</dd>
+            </div>
+          </dl>
+          <a-button v-if="canEdit" class="apply-target-change" @click="openPositionModal">
+            <EditOutlined />
+            지원분야 변경
+          </a-button>
         </div>
       </a-card>
 
@@ -887,20 +901,75 @@ function getErrorMessage(error: unknown, fallback: string): string {
   line-height: 1.25;
 }
 
-.header-desc {
-  margin: 10px 0 0;
-  color: var(--app-text-secondary);
-  font-size: 14px;
-  line-height: 1.5;
+.apply-target {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 22px;
+  padding: 20px 22px;
+  border: 1px solid var(--app-border-default);
+  border-left: 4px solid var(--app-color-primary-emerald);
+  border-radius: var(--app-border-radius);
+  background: var(--app-bg-soft);
+}
+
+.apply-target-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 48px;
+  margin: 0;
+}
+
+.apply-target-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 140px;
+}
+
+.apply-target-label {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.apply-target-value {
+  margin: 0;
+  color: var(--app-text-primary);
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+}
+
+.apply-target-change {
+  flex-shrink: 0;
+  height: var(--app-control-height-lg);
+  border-color: var(--app-color-primary-emerald);
+  color: var(--app-color-primary-emerald);
+  font-weight: 700;
+}
+
+.apply-target-change:hover {
+  border-color: var(--app-color-primary-hover);
+  color: var(--app-color-primary-hover);
+  background: var(--app-bg-btn-hover);
 }
 
 .steps-card {
   margin-top: 18px;
 }
 
+/* 진행상황은 보조 정보라 헤더보다 낮은 밀도로 압축한다. */
+.steps-card :deep(.ant-card-body) {
+  padding: 10px 16px;
+}
+
 .steps-scroll {
   overflow-x: auto;
-  padding-bottom: 4px;
 }
 
 .steps-scroll :deep(.ant-steps) {
@@ -911,8 +980,27 @@ function getErrorMessage(error: unknown, fallback: string): string {
   min-width: 148px;
 }
 
+.steps-scroll :deep(.ant-steps-item-container) {
+  padding: 2px 0;
+}
+
+.steps-scroll :deep(.ant-steps-item-icon) {
+  width: 24px;
+  height: 24px;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 24px;
+}
+
 .steps-card :deep(.ant-steps-item-title) {
+  font-size: 13px;
   font-weight: 700;
+  line-height: 1.4;
+}
+
+.steps-card :deep(.ant-steps-item-description) {
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .form-content-card {
@@ -1083,6 +1171,25 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
   .application-header h1 {
     font-size: 25px;
+  }
+
+  .apply-target {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+    padding: 16px 18px;
+  }
+
+  .apply-target-fields {
+    gap: 14px 28px;
+  }
+
+  .apply-target-value {
+    font-size: 18px;
+  }
+
+  .apply-target-change {
+    width: 100%;
   }
 
   .placeholder-meta {
