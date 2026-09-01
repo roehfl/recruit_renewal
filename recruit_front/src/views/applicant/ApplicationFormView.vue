@@ -973,8 +973,25 @@ function getErrorMessage(error: unknown, fallback: string): string {
   min-width: max-content;
 }
 
+/*
+ * 좌우 여백은 아이템에 준다. 단계 사이 화살표(::after)는 아이템의 오른쪽 경계 정중앙에 놓이는데,
+ * 배경이 칸을 100% 채우면 화살표가 배경에 붙는다. 여백만큼 배경이 안쪽으로 물러나 양옆이 같이 벌어진다.
+ */
 .steps-scroll :deep(.ant-steps-item) {
   min-width: 148px;
+  padding-inline: 24px;
+}
+
+/* antd 가 첫 항목 이후에 넣는 16px 시작 여백을 덮어 화살표 양옆 간격을 같게 만든다. */
+.steps-scroll :deep(.ant-steps-item:not(:first-child)) {
+  padding-inline-start: 24px;
+}
+
+/* 단계 사이 화살표. antd 기본은 1px 연회색이라 배경 강조 옆에서 거의 안 보인다. */
+.steps-scroll :deep(.ant-steps-item)::after {
+  border-top-width: 2px;
+  border-inline-end-width: 2px;
+  border-color: var(--app-text-muted);
 }
 
 /*
