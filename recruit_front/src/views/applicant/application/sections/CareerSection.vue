@@ -45,8 +45,8 @@
                 <th>최종직급</th>
                 <td class="last-position" colspan="3">
                     <a-input class="last-position-box" v-model:value="item.positionTitle" placeholder="예) 대리" />
-                    <span class="last-position-text">승진일</span>
-                    <a-date-picker class="last-position-box" v-model:value="item.promotionDate" value-format="YYYY-MM-DD" />
+                    <span class="last-position-text">승진년월</span>
+                    <a-date-picker class="last-position-box" v-model:value="item.promotionDate" picker="month" value-format="YYYY-MM-DD" />
                 </td>
                 <th>연봉</th>
                 <td class="last-position">

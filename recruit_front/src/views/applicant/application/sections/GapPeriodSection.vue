@@ -30,9 +30,9 @@
                 <th>공백기간<em> *</em></th>
                 <td colspan="3">
                   <div class="period-input">
-                    <a-date-picker v-model:value="item.startDate" value-format="YYYY-MM-DD" placeholder="시작일" />
+                    <a-date-picker v-model:value="item.startDate" picker="month" value-format="YYYY-MM-DD" placeholder="시작년월" />
                     <span>~</span>
-                    <a-date-picker v-model:value="item.endDate" value-format="YYYY-MM-DD" placeholder="종료일" />
+                    <a-date-picker v-model:value="item.endDate" picker="month" value-format="YYYY-MM-DD" placeholder="종료년월" />
                   </div>
                 </td>
               </tr>

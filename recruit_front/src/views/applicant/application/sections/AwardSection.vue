@@ -25,8 +25,8 @@
               <tr>
                 <th>수상명<em> *</em></th>
                 <td><a-input v-model:value="item.awardName" placeholder="예) 전국 대학생 알고리즘 경진대회 대상" /></td>
-                <th>수상일자<em> *</em></th>
-                <td><a-date-picker v-model:value="item.awardDate" value-format="YYYY-MM-DD" /></td>
+                <th>수상년월<em> *</em></th>
+                <td><a-date-picker v-model:value="item.awardDate" picker="month" value-format="YYYY-MM-DD" /></td>
               </tr>
               <tr>
                 <th>수여기관<em> *</em></th>
