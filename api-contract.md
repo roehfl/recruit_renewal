@@ -56,6 +56,8 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 응답(200): `ApiResponse<{ careers: [...] }>` (careerType 필드 없음)
 - 경력은 선택(0개 허용). 신입/경력 타입(careerType) 개념 폐지.
 - 관리자 조회 `GET /api/admin/applications/{id}/careers` 응답도 동일하게 careerType 제거 + promotionDate 추가.
+- 변경(2026-09-01, 프론트 전용 / 백엔드 무변경): 경력 섹션에 **경력기술서 첨부란 1개**를 추가. 경력사항이 1건 이상일 때만 노출한다. 기존 첨부 엔드포인트를 그대로 쓰며 식별자는 `sectionType=CAREER` + `attachmentType=CAREER_DESCRIPTION`(`sectionRecordId`는 보내지 않음 — 섹션당 1건). 저장은 기존 파일 delete → 신규 upload 순차 호출. 경력사항을 0건으로 만들면 첨부도 함께 삭제한다.
+- 변경(2026-09-01, 프론트 전용): 안내문구 "* 최근 경력부터 순서대로 입력해 주세요." 추가. `currentSalary`(연봉)를 최종직급 셀 안이 아니라 **독립 cell header**로 분리.
 
 ### 화면: 지원자 학력 (ApplicationEducation)
 
@@ -71,6 +73,8 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 응답(200): `ApiResponse<{ educations: [...] }>` (degreeName 없음, 3필드 + 전체평점 4필드 포함, educationId 포함)
 - `additionalMajorType`는 코드 문자열(프론트가 CommonCode 그룹 `MAJOR_TYPE`로 렌더, 백엔드 validation 미결합). `additionalMajorName`/`thesisTitle`는 선택 자유텍스트.
 - 전체 평점 쌍/전공 전체 쌍은 함께 입력해야 한다(평점만 있고 만점이 없으면 검증 실패). 평점 ≤ 만점, 만점 > 0.
+- 변경(2026-09-01, 🟢 확정): 학력 1건당 `semesterGrades` **최대 16개**. 17개 이상이면 400(`ApplicationEducationService.MAX_SEMESTER_GRADES`). 스키마 변경 없음(검증 규칙만 추가).
+- 변경(2026-09-01, 프론트 전용): `HIGH_SCHOOL` 화면 라벨 "최종 고등학교" → **"고등학교"**(1건 제약은 그대로). 고등학교도 `admissionDate` 입력 가능(백엔드는 원래 레벨 제약 없음). 전공/평점 모달의 학기 입력은 학년×학기 표가 아니라 **1~8학기 기본 + '학기 추가'로 16학기까지** 늘리는 목록으로 바뀜. N학기 ↔ `(schoolYear = ceil(N/2), semester = (N-1)%2+1)` 환산이라 저장 스키마는 동일.
 - 관리자 조회 `GET /api/admin/applications/{id}/educations` 응답도 동일하게 4필드 추가.
 
 ### 화면: 학교 검색 (외부 OpenAPI)
@@ -126,7 +130,9 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - `languageCode`는 공통코드 그룹 `LANGUAGE_TYPE`, `testCode`는 언어별 그룹 `LANGUAGE_TEST_{languageCode}`(예 `LANGUAGE_TEST_ENGLISH`) 코드 문자열이다. 백엔드 validation 미결합(공백만 검사), 코드 시드 안 함 — 관리자 CommonCode API로 등록한다.
 - 직접입력: 코드가 `ETC`면 프론트가 자유입력을 받아 `languageName`/`testName`에 넣는다. 그 외엔 선택한 코드의 `displayName`을 그대로 스냅샷한다. `ETC` 옵션은 프론트가 목록 끝에 항상 붙인다(관리자 등록 불필요).
 - 표시·PDF·관리자 검색은 `languageName`/`testName`(표시명)을 쓴다. 집계는 `languageCode`/`testCode` 기준이다.
-- 관리자 조회 `GET /api/admin/applications/{id}/languages` 응답도 동일하게 `scoreOrGrade`/`conversationalAbility`/`languageCode`/`testCode` 반영.
+- 변경(2026-09-01, 🟢 확정): 요청·응답에 `registrationNumber`(등록번호, 선택) 추가. 자유 입력 String, 백엔드 검증 없음. PII 파기(`purgeLanguages`) 대상에 포함(null 처리).
+- 변경(2026-09-01, 프론트 전용): 지원서 어학 화면에서 `conversationalAbility`(회화능력) 입력을 제거하고 그 자리에 `registrationNumber`를 노출한다. **백엔드 필드·DB 컬럼·관리자 검색 필터(`languageLevel`)·PDF '회화능력' 출력은 유지**한다(프론트가 값을 보내지 않으므로 신규 저장분은 null).
+- 관리자 조회 `GET /api/admin/applications/{id}/languages` 응답도 동일하게 `scoreOrGrade`/`conversationalAbility`/`languageCode`/`testCode` 반영. `registrationNumber`는 관리자 응답에 **미포함**(필요 시 별도 슬라이스).
 
 ### 화면: 지원자 수상 (ApplicationAward)
 
@@ -151,6 +157,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 응답(200): `ApiResponse<[{ certificateId, certificateName, issuingOrganization, acquiredDate, certificateNumber, expiredDate, scoreOrGrade, sortOrder }]>`
 - 필수: `certificateName`, `issuingOrganization`, `acquiredDate`. 나머지 선택.
 - 자격증은 선택(0개 허용 = 빈 배열). 전체 교체(replace) 방식.
+- 변경(2026-09-01, 프론트 전용 / 계약 무변경): `expiredDate` 화면 라벨 "유효기간" → **"유효일자"**.
 
 ### 화면: 지원자 공백기간 (ApplicationGapPeriod)
 
@@ -164,6 +171,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 필수: `startDate`, `endDate`, `gapType`, `reason`. `description`은 선택(≤2000).
 - `gapType`은 enum `EDUCATION`/`CAREER`/`OTHER`(프론트 라벨 학업/경력/기타, 하드코딩 — 공통코드 아님).
 - 공백기간은 선택(0개 허용 = 빈 배열). 전체 교체(replace) 방식. 프론트 "해당 사항 없음" 체크박스는 영속화 부재로 주석 처리됨.
+- 변경(2026-09-01, 프론트 전용 / 계약 무변경): 화면에서 "시작일"/"종료일" 두 행을 **"공백기간" 한 행**으로 합쳐 표시(`startDate ~ endDate`). 전송 필드는 동일.
 
 ### 화면: 지원자 자기소개/질문 (ApplicationQuestionAnswer)
 
@@ -191,6 +199,8 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 변경(2026-06-23): 요청·응답에 `veteranType`(문자열, 평문, 선택) 추가.
 - 규칙: `veteranStatus=="SUBJECT"`면 `veteranType` 필수, `"NOT_SUBJECT"`면 비어 있어야 함(값 있으면 400).
 - 자유 입력 String(공통코드/암호화 아님 — 보훈은 일반 PII). 관리자 조회 응답(`AdminBasicInfoResponse`)에도 `veteranType` 포함.
+- 변경(2026-09-01, 🟢 확정): 요청·응답에 `applicationRouteCode`(지원 경로, 선택, ≤50) 추가. 공통코드 그룹 `APPLICATION_ROUTE` 코드 문자열이며 값이 있으면 **활성 코드인지 백엔드가 검증**한다(비활성/미등록이면 400). 미입력 허용. 평문 컬럼(암호화 아님, PII 파기 대상 아님). 코드 시드는 안 함 — 관리자 CommonCode API로 등록해야 드롭다운에 뜬다. 프론트는 `BasicInfoSection.vue`에서 드롭다운으로 렌더. 관리자 조회 응답(`AdminBasicInfoResponse`)은 무변경.
+- 변경(2026-09-01, 프론트 전용): 이메일 항목 라벨 `e-mail` → `이메일`.
 
 ### 화면: 지원자 병역 (ApplicationMilitary)
 
@@ -305,10 +315,17 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 매핑: front address 검색 ↔ back `AddressSearchController.searchAddresses()` → `AddressSearchService.search()` → `JusoAddressClient.search()`.
 - 범위 밖: 상세주소(동/호) 입력, 좌표(위경도) 조회(별도 API), 프론트 주소 검색 UI, 도로명 영문주소 표시 정책.
 
-### 화면: 지원자 첨부파일 (ApplicationAttachment — 독립 섹션)
+### 화면: 지원자 첨부파일 (ApplicationAttachment — 독립 섹션) ⛔ 프론트 폐지 (2026-09-01)
 
-- 프론트: `src/views/applicant/application/sections/AttachmentSection.vue`(신규), `src/api/application/sections/attachmentApi.ts`(신규), `src/types/application/sections/attachment.ts`(신규)
+- 폐지(2026-09-01, 프론트 전용 / 백엔드 무변경): 독립 첨부 섹션을 지원서 화면에서 제거했다.
+  - `AttachmentSection.vue` 삭제. `ApplicationFormView`의 `sectionComponentMap`/`sectionNameMap`/`completionSectionCodeMap`에서 `ATTACHMENT` 제거하고, `pages` 계산 시 `sectionType === 'ATTACHMENT'` 항목과 그로 인해 비게 된 페이지를 걸러낸다.
+  - 관리자 공고 등록/수정 화면에서 "첨부파일" 체크박스 제거. `AdminApplicationFormConfig.useAttachment`는 계약 유지를 위해 **항상 `false`로 전송**(신규 공고). 기존 공고를 수정 저장하면 저장돼 있던 값이 그대로 다시 전송되므로 `useAttachment=true`인 기존 공고는 백엔드 레이아웃에 ATTACHMENT 페이지가 남는다 — 프론트가 걸러내므로 화면에는 안 보인다.
+  - 백엔드 `ApplicationSectionType.ATTACHMENT`, `ApplicationFormConfig.useAttachment`, `JobPostingAttachmentRequirement`, 첨부 엔드포인트는 **모두 그대로 유지**한다(증명사진·경력기술서가 같은 엔드포인트를 쓴다).
+  - 대체: 경력기술서는 경력 섹션에서 첨부한다(위 "지원자 경력" 참고). 증명사진은 기본정보 섹션(`sectionType=BASIC_INFO`) 유지.
+- 프론트: ~~`src/views/applicant/application/sections/AttachmentSection.vue`~~(삭제), `src/api/application/sections/attachmentApi.ts`(유지 — 증명사진·경력기술서가 사용), `src/types/application/sections/attachment.ts`(유지, 섹션 전용 상수/타입만 제거)
 - 백엔드: `com.shinyoung.recruit.controller.ApplicationAttachmentController` (기존 구현, 무변경)
+
+아래는 **폐지 이전 계약 기록**이다. 엔드포인트 계약 자체는 여전히 유효하다.
 
 #### 섹션 노출 규칙 (`ApplicationFormConfig.useAttachment`)  🟢 확정 (백엔드 구현·테스트 / 프론트 반영·type-check)
 

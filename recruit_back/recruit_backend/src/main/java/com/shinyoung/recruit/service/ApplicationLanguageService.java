@@ -101,6 +101,7 @@ public class ApplicationLanguageService {
                 request.examDate(),
                 request.expiredDate(),
                 request.issuingOrganization(),
+                request.registrationNumber(),
                 request.sortOrder()
         );
     }

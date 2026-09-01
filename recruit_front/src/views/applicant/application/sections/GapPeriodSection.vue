@@ -27,10 +27,14 @@
             </colgroup>
             <tbody>
               <tr>
-                <th>시작일<em> *</em></th>
-                <td><a-date-picker v-model:value="item.startDate" value-format="YYYY-MM-DD" /></td>
-                <th>종료일<em> *</em></th>
-                <td><a-date-picker v-model:value="item.endDate" value-format="YYYY-MM-DD" /></td>
+                <th>공백기간<em> *</em></th>
+                <td colspan="3">
+                  <div class="period-input">
+                    <a-date-picker v-model:value="item.startDate" value-format="YYYY-MM-DD" placeholder="시작일" />
+                    <span>~</span>
+                    <a-date-picker v-model:value="item.endDate" value-format="YYYY-MM-DD" placeholder="종료일" />
+                  </div>
+                </td>
               </tr>
               <tr>
                 <th>구분<em> *</em></th>
@@ -154,7 +158,7 @@ function validate(): boolean {
     const item = items[i]
     if (!item) continue
     if (!item.startDate || !item.endDate || !item.gapType || !item.reason) {
-      message.warning(`공백 ${i + 1}: 시작일, 종료일, 구분, 사유는 필수입니다.`)
+      message.warning(`공백 ${i + 1}: 공백기간, 구분, 사유는 필수입니다.`)
       return false
     }
   }
@@ -337,6 +341,14 @@ defineExpose({ saveDraft, validateBeforeSubmit })
 .add-btn:hover {
   border-color: #6f8f3d;
   background: #f1f6ea;
+}
+.period-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.period-input :deep(.ant-picker) {
+  width: 180px;
 }
 em {
   color: #ff4d4f;

@@ -591,6 +591,7 @@ class AdminApplicationSectionServiceTest {
                 LocalDate.of(2025, 1, 1),
                 LocalDate.of(2027, 1, 1),
                 "Issuer",
+                null,
                 sortOrder
         );
     }

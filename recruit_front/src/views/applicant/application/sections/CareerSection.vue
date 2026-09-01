@@ -1,5 +1,6 @@
 <template>
   <div class="section-body">
+    <p class="section-guide">* 최근 경력부터 순서대로 입력해 주세요.</p>
 
     <div v-if="notApplicable" class="na-box">경력사항 없음으로 표시되었습니다.</div>
 
@@ -42,14 +43,16 @@
             </tr>
             <tr>
                 <th>최종직급</th>
-                <td class="last-position" colspan="5">
+                <td class="last-position" colspan="3">
                     <a-input class="last-position-box" v-model:value="item.positionTitle" placeholder="예) 대리" />
                     <span class="last-position-text">승진일</span>
                     <a-date-picker class="last-position-box" v-model:value="item.promotionDate" value-format="YYYY-MM-DD" />
-                    <span class="last-position-text">연봉</span>
-                    <a-input class="last-position-salary-box" v-model:value="item.currentSalary" :rows="2" placeholder="예) 0000" />
+                </td>
+                <th>연봉</th>
+                <td class="last-position">
+                    <a-input class="last-position-salary-box" v-model:value="item.currentSalary" placeholder="예) 0000" />
                     <span>만원</span>
-                </td> 
+                </td>
             </tr>
             <tr>
                 <th>퇴직사유</th>
@@ -75,6 +78,31 @@
       <button type="button" class="add-btn" @click="addItem">
         <PlusOutlined /> 경력사항 추가
       </button>
+
+      <!-- 경력사항이 1건 이상일 때만 노출한다. -->
+      <div v-if="items.length > 0" class="career-description">
+        <table class="field-table">
+          <colgroup>
+            <col style="width: 18%" /><col style="width: 82%" />
+          </colgroup>
+          <tbody>
+            <tr>
+              <th>경력기술서</th>
+              <td>
+                <a-upload
+                  v-model:file-list="careerDescriptionFiles"
+                  :max-count="1"
+                  :before-upload="() => false"
+                >
+                  <a-button v-if="careerDescriptionFiles.length === 0">
+                    <UploadOutlined /> 파일 선택
+                  </a-button>
+                </a-upload>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </template>
 
   </div>
@@ -82,11 +110,14 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { DeleteOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import type { CareerItem, CareerReplaceRequest } from '@/types/application/sections/career';
 import { applicationCareerApi } from '@/api/application/sections/careerApi';
+import { attachmentApi } from '@/api/application/sections/attachmentApi';
 import { SearchOutlined } from '@ant-design/icons-vue'
 import type { SectionComponentProps } from '@/types/application'
+import type { UploadFile } from 'ant-design-vue'
+import type { AttachmentResponse } from '@/types/application/sections/attachment'
 import { logClientEvent } from '@/common/clientEventLogger';
 import { getApiErrorMessage } from '@/api/apiError';
 
@@ -95,6 +126,10 @@ const props = defineProps<SectionComponentProps>()
 const loading = ref(false)
 const notApplicable = ref(false)
 const items = reactive<CareerItem[]>([])
+
+/** 경력기술서(경력 섹션당 1건). 저장된 파일은 attachmentId 를 uid 로 갖는다. */
+const careerDescriptionFiles = ref<UploadFile[]>([])
+const careerDescriptionAttachment = ref<AttachmentResponse | null>(null)
 
 function createEmptyItem(): CareerItem {
   return {
@@ -182,6 +217,51 @@ function validate(): boolean {
   return true
 }
 
+// 경력기술서는 sectionType=CAREER + attachmentType=CAREER_DESCRIPTION 으로 식별한다.
+// (백엔드에 sectionType 필터가 없어 전체 첨부가 내려오므로 반드시 걸러낸다.)
+async function loadCareerDescription() {
+  const result = await attachmentApi.getApplicationAttachments(props.applicationId)
+  const attachment = (result.data.data ?? []).find(
+    (row) => row.sectionType === 'CAREER' && row.attachmentType === 'CAREER_DESCRIPTION',
+  )
+  careerDescriptionAttachment.value = attachment ?? null
+  careerDescriptionFiles.value = attachment
+    ? [{ uid: String(attachment.attachmentId), name: attachment.originalFileName, status: 'done' }]
+    : []
+}
+
+async function saveCareerDescription() {
+  // 경력사항을 모두 지웠으면 첨부도 함께 정리한다.
+  if (items.length === 0) careerDescriptionFiles.value = []
+
+  const saved = careerDescriptionAttachment.value
+  const file = careerDescriptionFiles.value[0]?.originFileObj
+  // originFileObj 가 없고 행이 남아 있으면 이미 업로드된 파일이다. 다시 올리지 않는다.
+  const unchanged = !file && careerDescriptionFiles.value.length > 0
+  if (unchanged) return
+  if (!file && !saved) return
+
+  if (saved) {
+    await attachmentApi.deleteApplicationAttachments(props.applicationId, saved.attachmentId)
+    careerDescriptionAttachment.value = null
+  }
+  if (!file) return
+
+  const formData = new FormData()
+  formData.append('file', file)
+  const result = await attachmentApi.postApplicationAttachmentsFile(formData, {
+    applicationId: props.applicationId,
+    attachmentType: 'CAREER_DESCRIPTION',
+    sectionType: 'CAREER',
+  })
+  careerDescriptionAttachment.value = result.data.data
+  careerDescriptionFiles.value = [{
+    uid: String(result.data.data.attachmentId),
+    name: result.data.data.originalFileName,
+    status: 'done',
+  }]
+}
+
 async function loadMyCareers() {
   loading.value = true
   try {
@@ -199,6 +279,7 @@ async function saveDraft() {
     const requestBody = { careers: buildPayload().careers }
     const result = await applicationCareerApi.postApplicationCareer(props.applicationId, requestBody)
     setItems(result.data.data.careers ?? [])
+    await saveCareerDescription()
     return result.data.data
   } catch (error) {
     console.error(error);
@@ -231,6 +312,7 @@ function validateBeforeSubmit(): boolean {
 
 onMounted(async () => {
   await loadMyCareers();
+  await loadCareerDescription();
 });
 
 defineExpose({ saveDraft, validateBeforeSubmit })
@@ -367,6 +449,15 @@ defineExpose({ saveDraft, validateBeforeSubmit })
   border-color: #6f8f3d;
   background: #f1f6ea;
 }
+.section-guide {
+  margin: 0 0 14px;
+  color: var(--app-primary-color);
+  font-size: 13px;
+  font-weight: 500;
+}
+.career-description {
+  margin-top: 18px;
+}
 em {
   color: #ff4d4f;
   font-style: normal;
@@ -431,8 +522,8 @@ em {
 }
 
 .last-position-salary-box {
-    width: 10%;
-    margin-right: 15px;
+    width: 60%;
+    margin-right: 6px;
 }
 
 .last-position-text {

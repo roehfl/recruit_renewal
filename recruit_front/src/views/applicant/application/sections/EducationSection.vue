@@ -1,5 +1,7 @@
 <template>
   <div class="section-body">
+    <p class="section-guide">* 고등학교부터 시간순으로 입력해 주세요.</p>
+
     <div class="card-list">
       <div v-for="(item, index) in items" :key="index" class="item-card">
         <div class="item-card-head">
@@ -27,7 +29,7 @@
                 <td>
                   <a-select
                     v-model:value="item.educationLevel" :options="educationLevelOptions(item)"
-                    placeholder="선택" style="width: 145px"
+                    placeholder="선택" style="width: 110px"
                   />
                 </td>
 
@@ -46,10 +48,9 @@
 
                 <!-- 입학년월 -->
                 <td>
-                  <a-date-picker v-if="item.educationLevel !== 'HIGH_SCHOOL'"  
+                  <a-date-picker
                     v-model:value="item.admissionDate" value-format="YYYY-MM-DD" style="width: 120px"
                   />
-                  <div v-else style="text-align: center; width: 120px">-</div>
                 </td>
 
                 <!-- 졸업년월 -->
@@ -161,35 +162,42 @@
           </div>
           <table class="field-table">
             <colgroup>
-              <col style="width: 14%" /><col style="width: 43%" /><col style="width: 43%" />
+              <col style="width: 14%" /><col style="width: 72%" /><col style="width: 14%" />
             </colgroup>
             <thead>
               <tr>
-                <th>학년</th> <th>1학기</th> <th>2학기</th>
+                <th>학기</th> <th>평점</th> <th></th>
               </tr>    
             </thead>
             <tbody>
-              <tr v-for="row in semesterRows" :key="row[0]?.schoolYear">
-                <td>{{ row[0]?.schoolYear }}학년</td>
+              <tr v-for="(grade, gradeIndex) in majorForm.semesterGrades" :key="gradeIndex">
+                <td>{{ gradeIndex + 1 }}학기</td>
                 <td>
                   <div class="grade-input">
-                    <a-input-number v-model:value="row[0].gradePoint" style="width: 80px" :min="0" :step="0.01"/>
+                    <a-input-number v-model:value="grade.gradePoint" style="width: 80px" :min="0" :step="0.01"/>
                     <span> 점 /  </span>
-                    <a-input-number v-model:value="row[0].maxGradePoint" style="width: 80px" :min="0" :step="0.5"/>
+                    <a-input-number v-model:value="grade.maxGradePoint" style="width: 80px" :min="0" :step="0.5"/>
                     <span> 만점</span>
                   </div>
                 </td>
                 <td>
-                  <div class="grade-input">
-                    <a-input-number v-model:value="row[1].gradePoint" style="width: 80px" :min="0" :step="0.01"/>
-                    <span> 점 /  </span>
-                    <a-input-number v-model:value="row[1].maxGradePoint" style="width: 80px" :min="0" :step="0.5"/>
-                    <span> 만점</span>
-                  </div>
+                  <button
+                    v-if="gradeIndex >= DEFAULT_SEMESTER_COUNT" type="button" class="remove-btn"
+                    @click="removeSemesterGrade(gradeIndex)"
+                  >
+                    <DeleteOutlined /> 삭제
+                  </button>
                 </td>
               </tr>
             </tbody>
           </table>
+          <button
+            type="button" class="add-btn"
+            :disabled="majorForm.semesterGrades.length >= MAX_SEMESTER_COUNT"
+            @click="addSemesterGrade"
+          >
+            <PlusOutlined /> 학기 추가 ({{ majorForm.semesterGrades.length }}/{{ MAX_SEMESTER_COUNT }})
+          </button>
         </div>
       </a-modal>
     </div>
@@ -303,14 +311,14 @@ function removeItem(index: number) {
 
 // 학교 구분
 const educationLevelType: { value: educationLevelType; label: string }[] = [
-  { value: 'HIGH_SCHOOL', label: '최종 고등학교' },
+  { value: 'HIGH_SCHOOL', label: '고등학교' },
   { value: 'COLLEGE', label: '전문대학교' },
   { value: 'UNIVERSITY', label: '대학교' },
   { value: 'MASTER', label: '대학원(석사)' },
   { value: 'DOCTOR', label: '대학원(박사)' },
 ]
 
-// 최종 고등학교는 1개만 입력 가능하므로, 다른 학력이 이미 선택했으면 옵션을 막는다.
+// 고등학교는 1개만 입력 가능하므로, 다른 학력이 이미 선택했으면 옵션을 막는다.
 function educationLevelOptions(current: EducationItem) {
   const highSchoolTaken = items.some(item => item !== current && item.educationLevel === 'HIGH_SCHOOL')
   return educationLevelType.map(option => ({
@@ -393,7 +401,7 @@ const openMajorModal = ( education: EducationItem ) => {
     if (!selecedEducation.value.educationLevel) return message.warn('학교 구분을 먼저 선택하세요.');
 
     const additionalMajorType = (isGraduate.value)? 'MT_003' : education.additionalMajorType || undefined;
-    const semesterGrades = createDefaultSemesterGrades(education.educationLevel);
+    const semesterGrades = createDefaultSemesterGrades(education.semesterGrades ?? []);
 
     education.semesterGrades?.forEach(saveDraft => {
       const target = semesterGrades.find(grade => grade.schoolYear === saveDraft.schoolYear && grade.semester === saveDraft.semester)
@@ -426,37 +434,45 @@ const majorForm: {
   overallMaxGradePoint: null,
 })
 
-// 학교 구분에 따라 학점 개수 
-const createDefaultSemesterGrades = ( educationLevel : educationLevelType | undefined ): semesterGradeItem[] => {
-    const maxYear = ( educationLevel === "MASTER" || educationLevel === "DOCTOR" )? 3 : 4;
-    const grades: semesterGradeItem[] = [];
+// 기본 1~8학기를 만들고, 9학기부터는 '학기 추가'로 늘린다(상한 16학기, 백엔드와 동일).
+const DEFAULT_SEMESTER_COUNT = 8
+const MAX_SEMESTER_COUNT = 16
 
-    for (let year = 1; year <= maxYear; year++) {
-        grades.push(
-            createSemesterGrade(year, 1),
-            createSemesterGrade(year, 2)
-        )
-    }
-    return grades;
-}
-const createSemesterGrade = (schoolYear: number, semester: number): semesterGradeItem => ({
-    schoolYear,
-    semester,
+// 백엔드는 (학년, 학기) 쌍으로 저장하므로 N학기 → 학년 ceil(N/2) / 학기 (N-1)%2+1 로 환산한다.
+const createSemesterGrade = (ordinal: number): semesterGradeItem => ({
+    schoolYear: Math.ceil(ordinal / 2),
+    semester: (ordinal - 1) % 2 + 1,
     gradePoint: null,
     maxGradePoint: null,
 })
 
-const semesterRows = computed<[semesterGradeItem, semesterGradeItem][]>(() => {
-    const rows: [semesterGradeItem, semesterGradeItem][] = []
+const semesterOrdinal = (grade: semesterGradeItem) => (grade.schoolYear - 1) * 2 + grade.semester
 
-    for (let i=0; i<majorForm.semesterGrades.length; i+=2){
-        rows.push([
-            majorForm.semesterGrades[i]!,
-            majorForm.semesterGrades[i+1]!,
-        ])
+// 저장된 학기 수가 기본 8학기를 넘으면 그만큼 칸을 늘려서 표시한다.
+const createDefaultSemesterGrades = ( saved: semesterGradeItem[] ): semesterGradeItem[] => {
+    const savedMax = saved.reduce((max, grade) => Math.max(max, semesterOrdinal(grade)), 0)
+    const count = Math.min(Math.max(DEFAULT_SEMESTER_COUNT, savedMax), MAX_SEMESTER_COUNT)
+
+    const grades: semesterGradeItem[] = []
+    for (let ordinal = 1; ordinal <= count; ordinal++) {
+        grades.push(createSemesterGrade(ordinal))
     }
-    return rows;
-})
+    return grades;
+}
+
+const addSemesterGrade = () => {
+    if (majorForm.semesterGrades.length >= MAX_SEMESTER_COUNT) return
+    majorForm.semesterGrades.push(createSemesterGrade(majorForm.semesterGrades.length + 1))
+}
+
+const removeSemesterGrade = (index: number) => {
+    majorForm.semesterGrades.splice(index, 1)
+    // 남은 칸의 (학년, 학기)를 화면 순서에 맞춰 다시 매긴다.
+    majorForm.semesterGrades.forEach((grade, gradeIndex) => {
+        grade.schoolYear = Math.ceil((gradeIndex + 1) / 2)
+        grade.semester = gradeIndex % 2 + 1
+    })
+}
 // 전공 타입  
 const majorTypeList = ref<CommonCodeItems[]>([])
 const majorTypeOptions = computed(() => 
@@ -518,7 +534,7 @@ const vaildation = () => {
     }
 
     if (items.filter(item => item?.educationLevel === 'HIGH_SCHOOL').length > 1) {
-      throw new Error('최종 고등학교는 1개만 입력할 수 있습니다.')
+      throw new Error('고등학교는 1개만 입력할 수 있습니다.')
     }
 
     for (let i = 0; i < items.length; i++) {
@@ -736,6 +752,23 @@ defineExpose({ saveDraft, validateBeforeSubmit })
 .add-btn:hover {
   border-color: #6f8f3d;
   background: #f1f6ea;
+}
+
+.section-guide {
+  margin: 0 0 14px;
+  color: var(--app-primary-color);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.add-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.add-btn:disabled:hover {
+  border-color: #b7c4a8;
+  background: #f8faf6;
 }
 
 .modal-span {

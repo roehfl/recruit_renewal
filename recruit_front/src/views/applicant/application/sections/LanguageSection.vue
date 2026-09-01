@@ -58,15 +58,8 @@
               <tr>
                 <th>점수/등급</th>
                 <td><a-input v-model:value="item.scoreOrGrade" placeholder="예) 950점 / 1급 / Level 7" /></td>
-                <th>회화능력</th>
-                <td>
-                  <a-select
-                    v-model:value="item.conversationalAbility"
-                    :options="conversationOptions"
-                    placeholder="선택"
-                    allow-clear
-                  />
-                </td>
+                <th>등록번호</th>
+                <td><a-input v-model:value="item.registrationNumber" placeholder="예) 12345678" /></td>
               </tr>
               <tr>
                 <th>응시일자<em> *</em></th>
@@ -114,11 +107,6 @@ const props = defineProps<SectionComponentProps>()
 const loading = ref(false)
 const notApplicable = ref(false)
 const items = reactive<LanguageItem[]>([])
-
-const conversationList = ref<CommonCodeItems[]>([])
-const conversationOptions = computed(() =>
-  conversationList.value.map((code) => ({ value: code.code, label: code.displayName })),
-)
 
 // 직접입력. 관리자가 그룹에 등록하지 않아도 항상 마지막 선택지로 붙인다.
 const ETC_CODE = 'ETC'
@@ -169,7 +157,7 @@ function createEmptyItem(): LanguageItem {
     testCode: undefined,
     testName: '',
     scoreOrGrade: '',
-    conversationalAbility: undefined,
+    registrationNumber: '',
     examDate: '',
     expiredDate: '',
     issuingOrganization: '',
@@ -187,7 +175,7 @@ function setItems(list: LanguageResponse[]) {
       testCode: row.testCode ?? undefined,
       testName: row.testName,
       scoreOrGrade: row.scoreOrGrade ?? '',
-      conversationalAbility: row.conversationalAbility ?? undefined,
+      registrationNumber: row.registrationNumber ?? '',
       examDate: row.examDate ?? '',
       expiredDate: row.expiredDate ?? '',
       issuingOrganization: row.issuingOrganization ?? '',
@@ -212,7 +200,7 @@ function buildPayload(): LanguageReplaceRequest {
       testCode: item.testCode ?? '',
       testName: item.testName,
       scoreOrGrade: item.scoreOrGrade || undefined,
-      conversationalAbility: item.conversationalAbility || undefined,
+      registrationNumber: item.registrationNumber || undefined,
       examDate: item.examDate,
       expiredDate: item.expiredDate || undefined,
       issuingOrganization: item.issuingOrganization || undefined,
@@ -280,11 +268,6 @@ async function loadLanguageTypeCodes() {
   languageTypeList.value = result.data.data ?? []
 }
 
-async function loadConversationCodes() {
-  const result = await commonCodeApi.getCommonCodes('LANGUAGE_CONVERSATION')
-  conversationList.value = result.data.data ?? []
-}
-
 async function saveDraft() {
   if (!validate()) throw new Error('입력값을 확인해주세요.')
   loading.value = true
@@ -314,7 +297,6 @@ function validateBeforeSubmit(): boolean {
 onMounted(() => {
   loadLanguages()
   loadLanguageTypeCodes()
-  loadConversationCodes()
 })
 
 defineExpose({ saveDraft, validateBeforeSubmit })

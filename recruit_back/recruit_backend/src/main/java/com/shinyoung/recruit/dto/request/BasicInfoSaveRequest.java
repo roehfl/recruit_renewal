@@ -27,6 +27,7 @@ public record BasicInfoSaveRequest(
         @Size(max = 50) String disabilityTypeCode,
         @Size(max = 10) String zipCode,
         @Size(max = 200) String addressBasic,
-        @Size(max = 200) String addressDetail
+        @Size(max = 200) String addressDetail,
+        @Size(max = 50) String applicationRouteCode
 ) {
 }

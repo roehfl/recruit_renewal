@@ -26,7 +26,8 @@ public record BasicInfoResponse(
         String disabilityTypeCode,
         String zipCode,
         String addressBasic,
-        String addressDetail
+        String addressDetail,
+        String applicationRouteCode
 ) {
 
     public static BasicInfoResponse of(ApplicationBasicInfo basicInfo) {
@@ -37,7 +38,8 @@ public record BasicInfoResponse(
                 basicInfo.getMobilePhone(), basicInfo.getEmergencyPhone(), basicInfo.getEmail(),
                 basicInfo.getVeteranStatus(), basicInfo.getVeteranType(), basicInfo.getDisabilityStatus(),
                 basicInfo.getDisabilityGradeCode(), basicInfo.getDisabilityTypeCode(),
-                basicInfo.getZipCode(), basicInfo.getAddressBasic(), basicInfo.getAddressDetail());
+                basicInfo.getZipCode(), basicInfo.getAddressBasic(), basicInfo.getAddressDetail(),
+                basicInfo.getApplicationRouteCode());
     }
 
     /** 미저장 시 Applicant 기반 prefill projection(B안). 저장 가능 필드만 채우고 basicInfoId=null, persisted=false. */
@@ -49,6 +51,6 @@ public record BasicInfoResponse(
                 applicant.getPhoneNumber(), null, applicant.getEmail(),
                 null, null, null,
                 null, null,
-                null, null, null);
+                null, null, null, null);
     }
 }

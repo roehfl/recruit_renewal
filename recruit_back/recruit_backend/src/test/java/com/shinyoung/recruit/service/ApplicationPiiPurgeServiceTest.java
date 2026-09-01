@@ -165,7 +165,7 @@ class ApplicationPiiPurgeServiceTest {
                 "12-345-678", LocalDate.of(2030, 5, 1), "합격", 1));
         languageRepository.save(ApplicationLanguage.create(
                 application, "ENGLISH", "영어", "TOEIC", "TOEIC", "900", "상", LocalDate.of(2024, 1, 1),
-                LocalDate.of(2026, 1, 1), "ETS", 1));
+                LocalDate.of(2026, 1, 1), "ETS", null, 1));
         militaryRepository.save(ApplicationMilitary.create(
                 application, MilitarySubjectType.COMPLETED, MilitaryServiceType.ACTIVE_DUTY,
                 MilitaryBranch.ARMY, MilitaryRank.SERGEANT,
@@ -210,7 +210,7 @@ class ApplicationPiiPurgeServiceTest {
                 application, "홍길동", "Hong", NationalityType.DOMESTIC, null,
                 LocalDate.of(1995, 1, 1), "01012345678", "01099998888", "hong@example.com",
                 VeteranStatus.SUBJECT, "국가유공자", DisabilityStatus.NOT_SUBJECT, null, null,
-                "06236", "서울시 강남구", "101동"));
+                "06236", "서울시 강남구", "101동", null));
 
         entityManager.flush();
 

@@ -123,6 +123,7 @@ public interface ApplicationPiiPurgeRepository extends Repository<JobApplication
                 l.languageCode = null, l.testCode = null,
                 l.scoreOrGrade = null, l.conversationalAbility = null,
                 l.expiredDate = null, l.issuingOrganization = null,
+                l.registrationNumber = null,
                 l.createdBy = null, l.updatedBy = null
             where l.jobApplication.id = :applicationId""")
     int purgeLanguages(@Param("applicationId") Long applicationId);

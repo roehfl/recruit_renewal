@@ -27,6 +27,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ApplicationEducationService {
 
+    /** 학력 1건당 입력 가능한 학기 상한(기본 8학기 + 추가 8학기). */
+    static final int MAX_SEMESTER_GRADES = 16;
+
     private final ApplicationSectionAccessService sectionAccessService;
     private final ApplicationEducationRepository educationRepository;
     private final ApplicationEducationSemesterGradeRepository semesterGradeRepository;
@@ -86,6 +89,10 @@ public class ApplicationEducationService {
                 if (++highSchoolCount > 1) {
                     throw new InvalidJobApplicationException("High school education must not be more than one.");
                 }
+            }
+            if (semesterGrades.size() > MAX_SEMESTER_GRADES) {
+                throw new InvalidJobApplicationException(
+                        "Semester grades must not be more than " + MAX_SEMESTER_GRADES + ".");
             }
             semesterGrades.forEach(this::validateSemesterGrade);
         }

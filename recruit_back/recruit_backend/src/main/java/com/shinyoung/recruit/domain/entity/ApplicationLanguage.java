@@ -59,6 +59,9 @@ public class ApplicationLanguage extends BaseEntity {
 
     private String issuingOrganization;
 
+    /** 성적표 등록번호. */
+    private String registrationNumber;
+
     @Column(nullable = false)
     private Integer sortOrder;
 
@@ -73,6 +76,7 @@ public class ApplicationLanguage extends BaseEntity {
             LocalDate examDate,
             LocalDate expiredDate,
             String issuingOrganization,
+            String registrationNumber,
             Integer sortOrder
     ) {
         this.jobApplication = jobApplication;
@@ -85,6 +89,7 @@ public class ApplicationLanguage extends BaseEntity {
         this.examDate = examDate;
         this.expiredDate = expiredDate;
         this.issuingOrganization = issuingOrganization;
+        this.registrationNumber = registrationNumber;
         this.sortOrder = sortOrder;
     }
 
@@ -99,6 +104,7 @@ public class ApplicationLanguage extends BaseEntity {
             LocalDate examDate,
             LocalDate expiredDate,
             String issuingOrganization,
+            String registrationNumber,
             Integer sortOrder
     ) {
         return new ApplicationLanguage(
@@ -112,6 +118,7 @@ public class ApplicationLanguage extends BaseEntity {
                 examDate,
                 expiredDate,
                 issuingOrganization,
+                registrationNumber,
                 sortOrder
         );
     }

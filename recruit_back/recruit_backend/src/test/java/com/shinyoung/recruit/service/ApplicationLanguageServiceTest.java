@@ -106,7 +106,7 @@ class ApplicationLanguageServiceTest {
                 applicationId,
                 new LanguageReplaceRequest(List.of(new LanguageRequest(
                         "ENGLISH", "English", "TOEIC", "TOEIC", "950", "BUSINESS",
-                        LocalDate.of(2024, 1, 1), LocalDate.of(2026, 1, 1), "ETS", 0))));
+                        LocalDate.of(2024, 1, 1), LocalDate.of(2026, 1, 1), "ETS", null, 0))));
 
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).scoreOrGrade()).isEqualTo("950");
@@ -251,6 +251,7 @@ class ApplicationLanguageServiceTest {
                         LocalDate.of(2024, 1, 1),
                         null,
                         null,
+                        null,
                         0
                 )))
         )).isInstanceOf(InvalidJobApplicationException.class);
@@ -268,6 +269,7 @@ class ApplicationLanguageServiceTest {
                         LocalDate.of(2024, 1, 1),
                         null,
                         null,
+                        null,
                         0
                 )))
         )).isInstanceOf(InvalidJobApplicationException.class);
@@ -283,6 +285,7 @@ class ApplicationLanguageServiceTest {
                         "900",
                         null,
                         LocalDate.of(2024, 1, 1),
+                        null,
                         null,
                         null,
                         0
@@ -302,6 +305,7 @@ class ApplicationLanguageServiceTest {
                         LocalDate.of(2024, 1, 1),
                         null,
                         null,
+                        null,
                         0
                 )))
         )).isInstanceOf(InvalidJobApplicationException.class);
@@ -315,6 +319,7 @@ class ApplicationLanguageServiceTest {
                         "TOEIC",
                         "TOEIC",
                         "900",
+                        null,
                         null,
                         null,
                         null,
@@ -335,6 +340,7 @@ class ApplicationLanguageServiceTest {
                         null,
                         LocalDate.of(2025, 1, 1),
                         LocalDate.of(2024, 12, 31),
+                        null,
                         null,
                         0
                 )))
@@ -401,6 +407,7 @@ class ApplicationLanguageServiceTest {
                 LocalDate.of(2024, 1, 1),
                 LocalDate.of(2026, 1, 1),
                 "ETS",
+                null,
                 sortOrder
         );
     }

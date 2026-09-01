@@ -132,9 +132,21 @@
             </tr>
 
             <tr>
-              <th>e-mail<em> *</em></th>
+              <th>이메일<em> *</em></th>
               <td>
                 <a-input v-model:value="form.email" />
+              </td>
+            </tr>
+
+            <tr>
+              <th>지원 경로</th>
+              <td colspan="3">
+                <a-form-item>
+                  <a-select
+                    v-model:value="form.applicationRouteCode" :options="applicationRouteOptions"
+                    style="width: 220px" placeholder="선택" allow-clear
+                  />
+                </a-form-item>
               </td>
             </tr>
           </tbody>
@@ -249,6 +261,15 @@ const disabilityStatusOptions = computed(() =>
   }))
 )
 
+// 지원 경로
+const applicationRouteList = ref<CommonCodeItems[]>([])
+const applicationRouteOptions = computed(() =>
+  applicationRouteList.value.map( item =>({
+    value: item.code,
+    label: item.displayName,
+  }))
+)
+
 // 장애 등급 
 const disabilityGradeList = ref<CommonCodeItems[]>([])
 const disabilityGradeOptions = computed(() => 
@@ -275,6 +296,7 @@ const form = reactive<BasicInfoParams>({
     email:authStore.loginId,            // 이메일
     mobilePhone:authStore.phoneNumber,  // 전화번호 
     emergencyPhone:undefined,           // 비상연락처
+    applicationRouteCode:undefined,     // 지원 경로
 })
 
 // 내외국인 '내국인' 클릭 시 드롭박스 초기화 
@@ -455,6 +477,7 @@ async function loadCommonCode(groupCode: string) {
     if (groupCode === 'DISABILITY_GRADE')     disabilityGradeList.value= result.data.data;
     else if(groupCode === 'DISABILITY_TYPE')  disabilityStatusList.value = result.data.data;
     else if(groupCode === 'NATIONALITY')      nationalityList.value = result.data.data || undefined;
+    else if(groupCode === 'APPLICATION_ROUTE') applicationRouteList.value = result.data.data;
 
   } finally {
     loading.value = false
@@ -597,6 +620,7 @@ onMounted(() => {
   loadCommonCode('DISABILITY_TYPE')
   loadCommonCode('DISABILITY_GRADE')
   loadCommonCode('NATIONALITY')
+  loadCommonCode('APPLICATION_ROUTE')
 })
 
 defineExpose({ saveDraft, validateBeforeSubmit })

@@ -44,6 +44,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -611,6 +612,58 @@ class ApplicationEducationServiceTest {
                 .map(JobPosition::getId)
                 .findFirst()
                 .orElseThrow();
+    }
+
+    @Test
+    void semester_grades_over_the_limit_are_rejected() {
+        Applicant applicant = createApplicant("education-semester-limit", "Education Semester Limit");
+        Long jobPostingId = createPublishedJobPosting(true);
+        Long applicationId = createApplication(applicant, jobPostingId);
+
+        // 16학기(8학년 x 2학기) 까지는 허용한다.
+        List<EducationResponse> responses = applicationEducationService.replaceEducations(
+                applicant.getId(),
+                applicationId,
+                new EducationReplaceRequest(List.of(universityWithSemesterGrades(0, 16)))
+        );
+        assertThat(responses.get(0).semesterGrades()).hasSize(16);
+
+        // 17학기부터는 거부한다.
+        assertThatThrownBy(() -> applicationEducationService.replaceEducations(
+                applicant.getId(),
+                applicationId,
+                new EducationReplaceRequest(List.of(universityWithSemesterGrades(0, 17)))
+        )).isInstanceOf(InvalidJobApplicationException.class);
+    }
+
+    private EducationRequest universityWithSemesterGrades(Integer sortOrder, int semesterCount) {
+        List<SemesterGradeRequest> grades = new ArrayList<>();
+        for (int ordinal = 1; ordinal <= semesterCount; ordinal++) {
+            grades.add(grade((ordinal + 1) / 2, (ordinal - 1) % 2 + 1));
+        }
+        return new EducationRequest(
+                EducationLevel.UNIVERSITY,
+                "Shinyoung University",
+                "Computer Science",
+                null,
+                null,
+                null,
+                LocalDate.of(2021, 3, 1),
+                LocalDate.of(2025, 2, 28),
+                GraduationStatus.GRADUATED,
+                DayNightType.DAY,
+                CampusType.MAIN,
+                false,
+                "KR",
+                sortOrder,
+                grades,
+                null,
+                null,
+                new BigDecimal("3.8"),
+                new BigDecimal("4.5"),
+                null,
+                null
+        );
     }
 
     private EducationRequest highSchoolEducation(Integer sortOrder) {

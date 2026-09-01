@@ -27,6 +27,7 @@ export interface BasicInfoParams {
     zipCode?: string
     addressBasic?: string
     addressDetail?: string
+    applicationRouteCode?: string | undefined
 }
 
 export interface ApiResponseBasicInfoResponse {

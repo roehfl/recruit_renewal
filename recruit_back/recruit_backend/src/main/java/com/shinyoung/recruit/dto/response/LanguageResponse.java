@@ -15,6 +15,7 @@ public record LanguageResponse(
         LocalDate examDate,
         LocalDate expiredDate,
         String issuingOrganization,
+        String registrationNumber,
         Integer sortOrder
 ) {
 
@@ -30,6 +31,7 @@ public record LanguageResponse(
                 language.getExamDate(),
                 language.getExpiredDate(),
                 language.getIssuingOrganization(),
+                language.getRegistrationNumber(),
                 language.getSortOrder()
         );
     }

@@ -66,7 +66,7 @@ class ApplicationPdfServiceTest {
                 LocalDate.of(1995, 1, 1),
                 "01099998888", null, "basic@new.com",
                 VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         basicInfoRepository.saveAndFlush(basicInfo);
 
         // stub renderer to return dummy bytes
@@ -102,7 +102,7 @@ class ApplicationPdfServiceTest {
                 null,
                 null, null, null,
                 null, null, null,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         basicInfoRepository.saveAndFlush(purgedBasicInfo);
 
         given(pdfRenderer.render(any(ApplicationPdfView.class))).willReturn(new byte[]{0x25, 0x50, 0x44, 0x46});

@@ -27,7 +27,6 @@ import AwardSection from '@/views/applicant/application/sections/AwardSection.vu
 import CertificateSection from '@/views/applicant/application/sections/CertificateSection.vue'
 import GapPeriodSection from '@/views/applicant/application/sections/GapPeriodSection.vue'
 import QuestionAnswerSection from '@/views/applicant/application/sections/QuestionAnswerSection.vue'
-import AttachmentSection from '@/views/applicant/application/sections/AttachmentSection.vue'
 import MilitarySection from './application/sections/MilitarySection.vue'
 
 /**
@@ -84,7 +83,8 @@ const ApplicationSectionPlaceholder = defineComponent({
  *   ...
  * }
  */
-const sectionComponentMap: Record<ApplicationSectionType, Component> = {
+/** ATTACHMENT 는 지원서 화면에서 제외한다(경력기술서는 경력 섹션에서 직접 첨부한다). */
+const sectionComponentMap: Partial<Record<ApplicationSectionType, Component>> = {
   // BASIC_INFO: ApplicationSectionPlaceholder,
   BASIC_INFO: BasicInfoSection,
   MILITARY: MilitarySection,
@@ -95,10 +95,9 @@ const sectionComponentMap: Record<ApplicationSectionType, Component> = {
   AWARD: AwardSection,
   GAP_PERIOD: GapPeriodSection,
   QUESTION_ANSWER: QuestionAnswerSection,
-  ATTACHMENT: AttachmentSection,
 }
 
-const sectionNameMap: Record<ApplicationSectionType, string> = {
+const sectionNameMap: Partial<Record<ApplicationSectionType, string>> = {
   BASIC_INFO: '기본 정보',
   MILITARY: '병역',
   EDUCATION: '학력',
@@ -108,7 +107,6 @@ const sectionNameMap: Record<ApplicationSectionType, string> = {
   AWARD: '수상',
   GAP_PERIOD: '공백기간',
   QUESTION_ANSWER: '자기소개/질문',
-  ATTACHMENT: '첨부파일',
 }
 
 /**
@@ -125,7 +123,6 @@ const completionSectionCodeMap: Partial<Record<ApplicationSectionType, string>> 
   AWARD: 'AWARD',
   GAP_PERIOD: 'GAP_PERIOD',
   QUESTION_ANSWER: 'QUESTION',
-  ATTACHMENT: 'ATTACHMENT',
 }
 
 // 백엔드가 실제로 완성도를 판정하는 sectionCode 집합.
@@ -191,8 +188,11 @@ const pages = computed<ApplicationFormPage[]>(() => {
   return rawPages
     .map((page) => ({
       ...page,
-      items: [...(page.items ?? [])].sort(compareBySortOrder),
+      items: [...(page.items ?? [])]
+        .filter((item) => item.sectionType !== 'ATTACHMENT')
+        .sort(compareBySortOrder),
     }))
+    .filter((page) => page.items.length > 0)
     .sort(compareBySortOrder)
 })
 

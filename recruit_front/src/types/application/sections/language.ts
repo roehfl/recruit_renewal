@@ -6,7 +6,7 @@ export interface LanguageItem {
   testCode?: string
   testName: string
   scoreOrGrade?: string
-  conversationalAbility?: string
+  registrationNumber?: string
   examDate: string
   expiredDate?: string
   issuingOrganization?: string
@@ -19,7 +19,7 @@ export interface LanguageRequestItem {
   testCode: string
   testName: string
   scoreOrGrade?: string
-  conversationalAbility?: string
+  registrationNumber?: string
   examDate: string
   expiredDate?: string
   issuingOrganization?: string
@@ -37,7 +37,7 @@ export interface LanguageResponse {
   testCode?: string
   testName: string
   scoreOrGrade?: string
-  conversationalAbility?: string
+  registrationNumber?: string
   examDate: string
   expiredDate?: string
   issuingOrganization?: string

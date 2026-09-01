@@ -90,7 +90,7 @@ class ApplicationBasicInfoServiceTest {
         BasicInfoResponse second = basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
                 new BasicInfoSaveRequest("김철수", null, NationalityType.DOMESTIC, null,
                         LocalDate.of(1990, 5, 5), "01099998888", null, "kim@example.com",
-                        VeteranStatus.SUBJECT, "국가유공자", DisabilityStatus.NOT_SUBJECT, null, null, null, null, null));
+                        VeteranStatus.SUBJECT, "국가유공자", DisabilityStatus.NOT_SUBJECT, null, null, null, null, null, null));
 
         assertThat(second.basicInfoId()).isEqualTo(first.basicInfoId());
         assertThat(second.nameKorean()).isEqualTo("김철수");
@@ -124,7 +124,7 @@ class ApplicationBasicInfoServiceTest {
         assertThatThrownBy(() -> basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
                 new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, "US",
                         LocalDate.of(1995, 1, 1), "01012345678", null, "a@b.com",
-                        VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null)))
+                        VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null, null)))
                 .isInstanceOf(InvalidJobApplicationException.class);
     }
 
@@ -170,7 +170,7 @@ class ApplicationBasicInfoServiceTest {
         assertThatThrownBy(() -> basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
                 new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
                         LocalDate.of(1995, 1, 1), "010-abc-1234", null, "a@b.com",
-                        VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null)))
+                        VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null, null)))
                 .isInstanceOf(InvalidJobApplicationException.class);
     }
 
@@ -205,7 +205,7 @@ class ApplicationBasicInfoServiceTest {
         assertThatThrownBy(() -> basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
                 new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
                         LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
-                        VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, "G1", "T1", null, null, null)))
+                        VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, "G1", "T1", null, null, null, null)))
                 .isInstanceOf(InvalidJobApplicationException.class);
     }
 
@@ -218,14 +218,14 @@ class ApplicationBasicInfoServiceTest {
         assertThatThrownBy(() -> basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
                 new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
                         LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
-                        VeteranStatus.SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null)))
+                        VeteranStatus.SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null, null)))
                 .isInstanceOf(InvalidJobApplicationException.class);
 
         // SUBJECT + 종류 → 성공 + 평문 라운드트립
         BasicInfoResponse ok = basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
                 new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
                         LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
-                        VeteranStatus.SUBJECT, "국가유공자", DisabilityStatus.NOT_SUBJECT, null, null, null, null, null));
+                        VeteranStatus.SUBJECT, "국가유공자", DisabilityStatus.NOT_SUBJECT, null, null, null, null, null, null));
         assertThat(ok.veteranType()).isEqualTo("국가유공자");
     }
 
@@ -237,7 +237,7 @@ class ApplicationBasicInfoServiceTest {
         assertThatThrownBy(() -> basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
                 new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
                         LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
-                        VeteranStatus.NOT_SUBJECT, "국가유공자", DisabilityStatus.NOT_SUBJECT, null, null, null, null, null)))
+                        VeteranStatus.NOT_SUBJECT, "국가유공자", DisabilityStatus.NOT_SUBJECT, null, null, null, null, null, null)))
                 .isInstanceOf(InvalidJobApplicationException.class);
     }
 
@@ -257,30 +257,58 @@ class ApplicationBasicInfoServiceTest {
                 .isInstanceOf(InvalidJobApplicationException.class);
     }
 
+    @Test
+    void application_route_requires_active_common_code() {
+        Applicant applicant = createApplicant("bi-route", "Route");
+        Long applicationId = createApplication(applicant);
+
+        // 미등록/비활성 코드 → 거부
+        assertThatThrownBy(() -> basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
+                applicationRouteRequest("ZZ"))).isInstanceOf(InvalidJobApplicationException.class);
+
+        // 활성 코드 → 성공
+        commonCodeRepository.save(CommonCode.create("APPLICATION_ROUTE", "HOMEPAGE", "채용 홈페이지", 1, true, null));
+        BasicInfoResponse ok = basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
+                applicationRouteRequest("HOMEPAGE"));
+        assertThat(ok.applicationRouteCode()).isEqualTo("HOMEPAGE");
+
+        // 미입력(선택 항목) → 성공
+        BasicInfoResponse blank = basicInfoService.saveBasicInfo(applicant.getId(), applicationId,
+                applicationRouteRequest(null));
+        assertThat(blank.applicationRouteCode()).isNull();
+    }
+
     // ---- fixtures ----
 
     private BasicInfoSaveRequest domesticRequest() {
         return new BasicInfoSaveRequest("홍길동", "Hong", NationalityType.DOMESTIC, null,
                 LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
-                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, "06236", "서울", "101호");
+                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, "06236", "서울", "101호", null);
     }
 
     private BasicInfoSaveRequest foreignRequest(String countryCode) {
         return new BasicInfoSaveRequest("홍길동", null, NationalityType.FOREIGN, countryCode,
                 LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
-                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null);
+                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null, null);
     }
 
     private BasicInfoSaveRequest disabilityRequest(String grade, String type) {
         return new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
                 LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
-                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.SUBJECT, grade, type, null, null, null);
+                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.SUBJECT, grade, type, null, null, null, null);
     }
 
     private BasicInfoSaveRequest ageRequest(LocalDate birthDate) {
         return new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
                 birthDate, "01012345678", null, "hong@example.com",
-                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null);
+                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null, null);
+    }
+
+    private BasicInfoSaveRequest applicationRouteRequest(String applicationRouteCode) {
+        return new BasicInfoSaveRequest("홍길동", null, NationalityType.DOMESTIC, null,
+                LocalDate.of(1995, 1, 1), "01012345678", null, "hong@example.com",
+                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT, null, null, null, null, null,
+                applicationRouteCode);
     }
 
     private Applicant createApplicant(String loginId, String userName) {

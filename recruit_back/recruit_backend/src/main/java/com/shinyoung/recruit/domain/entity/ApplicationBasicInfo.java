@@ -100,6 +100,10 @@ public class ApplicationBasicInfo extends BaseEntity {
     @Column(length = 2000)
     private String addressDetail;
 
+    /** 공통코드 APPLICATION_ROUTE 코드값(지원 경로). */
+    @Column(length = 50)
+    private String applicationRouteCode;
+
     private ApplicationBasicInfo(
             JobApplication jobApplication,
             String nameKorean,
@@ -117,7 +121,8 @@ public class ApplicationBasicInfo extends BaseEntity {
             String disabilityTypeCode,
             String zipCode,
             String addressBasic,
-            String addressDetail
+            String addressDetail,
+            String applicationRouteCode
     ) {
         this.jobApplication = jobApplication;
         this.nameKorean = nameKorean;
@@ -136,6 +141,7 @@ public class ApplicationBasicInfo extends BaseEntity {
         this.zipCode = zipCode;
         this.addressBasic = addressBasic;
         this.addressDetail = addressDetail;
+        this.applicationRouteCode = applicationRouteCode;
     }
 
     public static ApplicationBasicInfo create(
@@ -155,12 +161,14 @@ public class ApplicationBasicInfo extends BaseEntity {
             String disabilityTypeCode,
             String zipCode,
             String addressBasic,
-            String addressDetail
+            String addressDetail,
+            String applicationRouteCode
     ) {
         return new ApplicationBasicInfo(
                 jobApplication, nameKorean, nameEnglish, nationalityType, countryCode, birthDate,
                 mobilePhone, emergencyPhone, email, veteranStatus, veteranType, disabilityStatus,
-                disabilityGradeCode, disabilityTypeCode, zipCode, addressBasic, addressDetail
+                disabilityGradeCode, disabilityTypeCode, zipCode, addressBasic, addressDetail,
+                applicationRouteCode
         );
     }
 
@@ -180,7 +188,8 @@ public class ApplicationBasicInfo extends BaseEntity {
             String disabilityTypeCode,
             String zipCode,
             String addressBasic,
-            String addressDetail
+            String addressDetail,
+            String applicationRouteCode
     ) {
         this.nameKorean = nameKorean;
         this.nameEnglish = nameEnglish;
@@ -198,5 +207,6 @@ public class ApplicationBasicInfo extends BaseEntity {
         this.zipCode = zipCode;
         this.addressBasic = addressBasic;
         this.addressDetail = addressDetail;
+        this.applicationRouteCode = applicationRouteCode;
     }
 }

@@ -1191,7 +1191,7 @@ class JobApplicationServiceTest {
                 LocalDate.of(2024, 3, 1), "12345", null, null, 0));
         languageRepository.save(ApplicationLanguage.create(
                 certApplication, "ENGLISH", "영어", "OPIC", "OPIc", "IH", "HIGH",
-                LocalDate.of(2025, 1, 1), null, "ACTFL", 0));
+                LocalDate.of(2025, 1, 1), null, "ACTFL", null, 0));
 
         assertThat(searchApplicationIds(jobPostingId, search().certificateName("정보처리").build()))
                 .containsExactly(certApplicationId);
@@ -1300,7 +1300,7 @@ class JobApplicationServiceTest {
         basicInfoRepository.save(ApplicationBasicInfo.create(
                 application, application.getApplicantNameSnapshot(), null, NationalityType.DOMESTIC, null, birthDate,
                 "01012345678", null, "test@example.com", VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT,
-                null, null, null, null, null));
+                null, null, null, null, null, null));
     }
 
     private void seedEducation(

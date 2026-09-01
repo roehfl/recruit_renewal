@@ -409,6 +409,7 @@ class AdminApplicationSectionControllerTest {
                 LocalDate.of(2025, 1, 1),
                 LocalDate.of(2027, 1, 1),
                 "ETS",
+                null,
                 0
         ));
         militaryRepository.save(ApplicationMilitary.create(

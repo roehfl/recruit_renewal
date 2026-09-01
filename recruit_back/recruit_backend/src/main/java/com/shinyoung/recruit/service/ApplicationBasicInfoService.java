@@ -26,6 +26,7 @@ public class ApplicationBasicInfoService {
     static final String GROUP_NATIONALITY = "NATIONALITY";
     static final String GROUP_DISABILITY_GRADE = "DISABILITY_GRADE";
     static final String GROUP_DISABILITY_TYPE = "DISABILITY_TYPE";
+    static final String GROUP_APPLICATION_ROUTE = "APPLICATION_ROUTE";
 
     static final int MIN_AGE = 14;
     static final int MAX_AGE = 100;
@@ -60,7 +61,8 @@ public class ApplicationBasicInfoService {
                 request.birthDate(), request.mobilePhone(), request.emergencyPhone(), request.email(),
                 request.veteranStatus(), request.veteranType(), request.disabilityStatus(),
                 request.disabilityGradeCode(), request.disabilityTypeCode(),
-                request.zipCode(), request.addressBasic(), request.addressDetail());
+                request.zipCode(), request.addressBasic(), request.addressDetail(),
+                request.applicationRouteCode());
 
         return BasicInfoResponse.of(basicInfo);
     }
@@ -72,6 +74,7 @@ public class ApplicationBasicInfoService {
         validateNationality(request);
         validateVeteran(request);
         validateDisability(request);
+        validateApplicationRoute(request);
         validateBirthDate(request.birthDate());
         validatePhone("Mobile phone", request.mobilePhone(), true);
         validatePhone("Emergency phone", request.emergencyPhone(), false);
@@ -116,6 +119,15 @@ public class ApplicationBasicInfoService {
         }
     }
 
+    private void validateApplicationRoute(BasicInfoSaveRequest request) {
+        if (isBlank(request.applicationRouteCode())) {
+            return;
+        }
+        if (!commonCodeRepository.existsByGroupCodeAndCodeAndActiveTrue(GROUP_APPLICATION_ROUTE, request.applicationRouteCode())) {
+            throw new InvalidJobApplicationException("Application route code is not an active common code.");
+        }
+    }
+
     private void validateBirthDate(LocalDate birthDate) {
         LocalDate today = LocalDate.now(clock);
         int age = Period.between(birthDate, today).getYears();
@@ -147,6 +159,7 @@ public class ApplicationBasicInfoService {
                 request.birthDate(), request.mobilePhone(), request.emergencyPhone(), request.email(),
                 request.veteranStatus(), request.veteranType(), request.disabilityStatus(),
                 request.disabilityGradeCode(), request.disabilityTypeCode(),
-                request.zipCode(), request.addressBasic(), request.addressDetail());
+                request.zipCode(), request.addressBasic(), request.addressDetail(),
+                request.applicationRouteCode());
     }
 }

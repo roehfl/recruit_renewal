@@ -59,6 +59,7 @@ const formConfig = ref<AdminApplicationFormConfig>({
   useMilitary: true, requireMilitary: null,
   useAward: true, requireAward: null,
   useGapPeriod: true, requireGapPeriod: null,
+  // 지원서 첨부 섹션은 폐지됐다(경력기술서는 경력 섹션에서 첨부). 계약 유지를 위해 false 로만 보낸다.
   useAttachment: false,
 })
 
@@ -432,9 +433,6 @@ onBeforeUnmount(() => {
             >
               필수
             </a-checkbox>
-          </div>
-          <div class="config-item">
-            <a-checkbox v-model:checked="formConfig.useAttachment">첨부파일</a-checkbox>
           </div>
         </div>
       </a-card>

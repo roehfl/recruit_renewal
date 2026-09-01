@@ -30,6 +30,8 @@ public record LanguageRequest(
 
         String issuingOrganization,
 
+        String registrationNumber,
+
         @NotNull(message = "Sort order is required.")
         @Min(value = 0, message = "Sort order must be greater than or equal to 0.")
         Integer sortOrder

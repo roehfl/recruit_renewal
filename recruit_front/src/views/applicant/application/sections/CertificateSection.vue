@@ -31,7 +31,7 @@
               <tr>
                 <th>취득일자<em> *</em></th>
                 <td><a-date-picker v-model:value="item.acquiredDate" value-format="YYYY-MM-DD" /></td>
-                <th>유효기간</th>
+                <th>유효일자</th>
                 <td><a-date-picker v-model:value="item.expiredDate" value-format="YYYY-MM-DD" /></td>
               </tr>
               <tr>
