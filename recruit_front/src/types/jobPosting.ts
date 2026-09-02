@@ -123,7 +123,6 @@ export interface AdminJobPostingSaveRequest {
   pinned: boolean
   displayOrder: number
   jobPositions: AdminJobPositionForm[]
-  applicationFormConfig: AdminApplicationFormConfig
 }
 
 export interface AdminJobPostingDetail {

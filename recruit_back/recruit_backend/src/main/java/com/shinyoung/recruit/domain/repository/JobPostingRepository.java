@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
@@ -64,6 +65,23 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
             @Param("status") JobPostingStatus status,
             @Param("now") LocalDateTime now,
             Pageable pageable
+    );
+
+    /**
+     * 지원서 설정 현황판용 조회. 설정 상태는 질문·첨부·레이아웃을 합쳐 계산해야 하므로
+     * SQL 로 좁힐 수 있는 조건(상태·제목)만 여기서 처리하고 나머지는 서비스에서 거른다.
+     */
+    @Query("""
+            select jobPosting
+            from JobPosting jobPosting
+            left join fetch jobPosting.applicationFormConfig
+            where (:status is null or jobPosting.status = :status)
+              and (:keyword is null or lower(jobPosting.title) like lower(concat('%', :keyword, '%')))
+            order by jobPosting.receptionStartDateTime asc, jobPosting.id desc
+            """)
+    List<JobPosting> findAllForApplicationFormSummary(
+            @Param("status") JobPostingStatus status,
+            @Param("keyword") String keyword
     );
 
     @EntityGraph(attributePaths = {"jobPositions", "applicationFormConfig"})

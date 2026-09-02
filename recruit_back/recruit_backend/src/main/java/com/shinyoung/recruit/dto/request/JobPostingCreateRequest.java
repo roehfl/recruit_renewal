@@ -24,7 +24,8 @@ public record JobPostingCreateRequest(
         Boolean pinned,
         @Min(0) Integer displayOrder,
         @NotEmpty List<@Valid JobPositionRequest> jobPositions,
-        @NotNull @Valid ApplicationFormConfigRequest applicationFormConfig
+        /** 생략 가능. 없으면 서버가 기본 설정을 만든다. 지원서 양식은 전용 API가 단일 출처다. */
+        @Valid ApplicationFormConfigRequest applicationFormConfig
 ) {
     public JobPostingCreateRequest(
             String title,

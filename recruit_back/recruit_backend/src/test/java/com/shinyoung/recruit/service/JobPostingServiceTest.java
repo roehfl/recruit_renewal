@@ -56,6 +56,9 @@ class JobPostingServiceTest {
     private ApplicationFormLayoutService applicationFormLayoutService;
 
     @Autowired
+    private ApplicationFormConfigService applicationFormConfigService;
+
+    @Autowired
     private JobPostingImageService jobPostingImageService;
 
     @Autowired
@@ -199,8 +202,7 @@ class JobPostingServiceTest {
                 null,
                 null,
                 null,
-                List.of(new JobPositionRequest("백엔드", 1)),
-                new ApplicationFormConfigRequest(true, false, false, false, false, false, false)
+                List.of(new JobPositionRequest("백엔드", 1))
         );
         assertThatThrownBy(() -> jobPostingService.update(id, update)).isInstanceOf(InvalidJobPostingException.class);
     }
@@ -237,8 +239,7 @@ class JobPostingServiceTest {
                 null,
                 null,
                 null,
-                List.of(new JobPositionRequest("백엔드", 1)),
-                new ApplicationFormConfigRequest(true, false, false, false, false, false, false)
+                List.of(new JobPositionRequest("백엔드", 1))
         );
         assertThatThrownBy(() -> jobPostingService.update(id, update)).isInstanceOf(InvalidJobPostingException.class);
     }
@@ -403,60 +404,6 @@ class JobPostingServiceTest {
     }
 
     @Test
-    void application_form_required_update_preserves_omitted_values_when_section_stays_enabled() {
-        Long id = jobPostingService.create(createRequest(new ApplicationFormConfigRequest(
-                true,
-                true,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false
-        )));
-
-        jobPostingService.update(id, updateRequest(new ApplicationFormConfigRequest(true, true, false, false, false, false, false)));
-
-        JobPostingDetailResponse detail = jobPostingService.getJobPosting(id);
-        assertThat(detail.applicationFormConfig().requireEducation()).isTrue();
-        assertThat(detail.applicationFormConfig().requireCareer()).isFalse();
-    }
-
-    @Test
-    void application_form_required_update_resets_omitted_value_when_section_is_disabled() {
-        Long id = jobPostingService.create(createRequest(new ApplicationFormConfigRequest(
-                true,
-                true,
-                true,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false
-        )));
-
-        jobPostingService.update(id, updateRequest(new ApplicationFormConfigRequest(true, false, false, false, false, false, false)));
-
-        JobPostingDetailResponse detail = jobPostingService.getJobPosting(id);
-        assertThat(detail.applicationFormConfig().useCareer()).isFalse();
-        assertThat(detail.applicationFormConfig().requireCareer()).isFalse();
-    }
-
-    @Test
     void application_form_required_cannot_be_true_when_section_is_disabled() {
         JobPostingCreateRequest request = createRequest(new ApplicationFormConfigRequest(
                 true,
@@ -496,8 +443,7 @@ class JobPostingServiceTest {
                 "<p>수정</p>",
                 LocalDateTime.of(2026, 6, 1, 9, 0),
                 LocalDateTime.of(2026, 6, 2, 18, 0),
-                List.of(),
-                new ApplicationFormConfigRequest(true, false, false, false, false, false, false)
+                List.of()
         );
 
         assertThatThrownBy(() -> jobPostingService.update(id, update)).isInstanceOf(InvalidJobPostingException.class);
@@ -525,8 +471,7 @@ class JobPostingServiceTest {
                         List.of(),
                         EmploymentType.INTERN,
                         0
-                )),
-                new ApplicationFormConfigRequest(true, false, false, false, false, false, false)
+                ))
         );
 
         jobPostingService.update(id, update);
@@ -613,14 +558,8 @@ class JobPostingServiceTest {
                 ApplicationSectionType.MILITARY,
                 ApplicationSectionType.AWARD
         ));
-        jobPostingService.update(id, new JobPostingUpdateRequest(
-                "수정",
-                "<p>수정</p>",
-                LocalDateTime.of(2026, 7, 1, 9, 0),
-                LocalDateTime.of(2026, 7, 2, 18, 0),
-                List.of(new JobPositionRequest("백엔드", 1)),
-                new ApplicationFormConfigRequest(true, true, true, true, true, true, true)
-        ));
+        // 저장된 레이아웃에 없는 섹션(공백기간)을 켜서 활성 섹션과 레이아웃을 어긋나게 만든다.
+        applicationFormConfigService.save(id, new ApplicationFormConfigRequest(true, true, true, true, true, true, true));
 
         assertThatThrownBy(() -> jobPostingService.publish(id))
                 .isInstanceOf(InvalidJobPostingException.class)
@@ -726,17 +665,6 @@ class JobPostingServiceTest {
         return new JobPostingCreateRequest(
                 "2026 상반기 채용",
                 "<p>내용</p>",
-                LocalDateTime.of(2026, 6, 1, 9, 0),
-                LocalDateTime.of(2026, 6, 2, 18, 0),
-                List.of(new JobPositionRequest("백엔드", 1)),
-                applicationFormConfig
-        );
-    }
-
-    private JobPostingUpdateRequest updateRequest(ApplicationFormConfigRequest applicationFormConfig) {
-        return new JobPostingUpdateRequest(
-                "수정",
-                "<p>수정</p>",
                 LocalDateTime.of(2026, 6, 1, 9, 0),
                 LocalDateTime.of(2026, 6, 2, 18, 0),
                 List.of(new JobPositionRequest("백엔드", 1)),

@@ -1,6 +1,5 @@
 package com.shinyoung.recruit.service;
 
-import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.JobPositionWorkLocation;
@@ -8,7 +7,6 @@ import com.shinyoung.recruit.domain.repository.CommonCodeRepository;
 import com.shinyoung.recruit.domain.repository.JobPositionCountProjection;
 import com.shinyoung.recruit.domain.repository.JobPositionRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
-import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.dto.request.JobPostingImageMetaRequest;
@@ -55,6 +53,7 @@ public class JobPostingService {
     private final JobPositionRepository jobPositionRepository;
     private final CommonCodeRepository commonCodeRepository;
     private final ApplicationFormLayoutService applicationFormLayoutService;
+    private final ApplicationFormConfigService applicationFormConfigService;
     private final JobPostingImageService jobPostingImageService;
     private final Clock clock;
 
@@ -98,7 +97,7 @@ public class JobPostingService {
         );
 
         jobPosting.replaceJobPositions(toJobPositions(request.jobPositions()));
-        jobPosting.updateApplicationFormConfig(toCreateApplicationFormConfig(request.applicationFormConfig()));
+        jobPosting.updateApplicationFormConfig(applicationFormConfigService.createFrom(request.applicationFormConfig()));
 
         JobPosting saved = jobPostingRepository.save(jobPosting);
         return saved.getId();
@@ -138,10 +137,7 @@ public class JobPostingService {
                 defaultDisplayOrder(request.displayOrder())
         );
         jobPosting.replaceJobPositions(toJobPositions(request.jobPositions()));
-        jobPosting.updateApplicationFormConfig(toUpdateApplicationFormConfig(
-                request.applicationFormConfig(),
-                jobPosting.getApplicationFormConfig()
-        ));
+        // 지원서 양식은 전용 API(ApplicationFormConfigService)가 단일 출처다. 공고 수정은 건드리지 않는다.
 
         return jobPosting.getId();
     }
@@ -389,106 +385,6 @@ public class JobPostingService {
                     return JobPositionWorkLocation.of(code, name);
                 })
                 .toList();
-    }
-
-    private ApplicationFormConfig toCreateApplicationFormConfig(ApplicationFormConfigRequest request) {
-        boolean requireEducation = defaultRequired(request.requireEducation(), request.useEducation());
-        boolean requireCareer = defaultRequired(request.requireCareer(), request.useCareer());
-        boolean requireCertificate = defaultRequired(request.requireCertificate(), false);
-        boolean requireLanguage = defaultRequired(request.requireLanguage(), false);
-        boolean requireMilitary = defaultRequired(request.requireMilitary(), request.useMilitary());
-        boolean requireAward = defaultRequired(request.requireAward(), false);
-        boolean requireGapPeriod = defaultRequired(request.requireGapPeriod(), false);
-        validateApplicationFormRequirement(request, requireEducation, requireCareer, requireCertificate, requireLanguage, requireMilitary, requireAward, requireGapPeriod);
-        return ApplicationFormConfig.create(
-                request.useEducation(),
-                requireEducation,
-                request.useCareer(),
-                requireCareer,
-                request.useCertificate(),
-                requireCertificate,
-                request.useLanguage(),
-                requireLanguage,
-                request.useMilitary(),
-                requireMilitary,
-                request.useAward(),
-                requireAward,
-                request.useGapPeriod(),
-                requireGapPeriod,
-                request.useAttachment()
-        );
-    }
-
-    private ApplicationFormConfig toUpdateApplicationFormConfig(
-            ApplicationFormConfigRequest request,
-            ApplicationFormConfig currentConfig
-    ) {
-        if (currentConfig == null) {
-            return toCreateApplicationFormConfig(request);
-        }
-
-        boolean requireEducation = resolveUpdatedRequired(request.useEducation(), request.requireEducation(), currentConfig.isRequireEducation());
-        boolean requireCareer = resolveUpdatedRequired(request.useCareer(), request.requireCareer(), currentConfig.isRequireCareer());
-        boolean requireCertificate = resolveUpdatedRequired(request.useCertificate(), request.requireCertificate(), currentConfig.isRequireCertificate());
-        boolean requireLanguage = resolveUpdatedRequired(request.useLanguage(), request.requireLanguage(), currentConfig.isRequireLanguage());
-        boolean requireMilitary = resolveUpdatedRequired(request.useMilitary(), request.requireMilitary(), currentConfig.isRequireMilitary());
-        boolean requireAward = resolveUpdatedRequired(request.useAward(), request.requireAward(), currentConfig.isRequireAward());
-        boolean requireGapPeriod = resolveUpdatedRequired(request.useGapPeriod(), request.requireGapPeriod(), currentConfig.isRequireGapPeriod());
-        validateApplicationFormRequirement(request, requireEducation, requireCareer, requireCertificate, requireLanguage, requireMilitary, requireAward, requireGapPeriod);
-
-        return ApplicationFormConfig.create(
-                request.useEducation(),
-                requireEducation,
-                request.useCareer(),
-                requireCareer,
-                request.useCertificate(),
-                requireCertificate,
-                request.useLanguage(),
-                requireLanguage,
-                request.useMilitary(),
-                requireMilitary,
-                request.useAward(),
-                requireAward,
-                request.useGapPeriod(),
-                requireGapPeriod,
-                request.useAttachment()
-        );
-    }
-
-    private boolean defaultRequired(Boolean requestedRequired, boolean defaultValue) {
-        return requestedRequired == null ? defaultValue : requestedRequired;
-    }
-
-    private boolean resolveUpdatedRequired(boolean useSection, Boolean requestedRequired, boolean currentRequired) {
-        if (requestedRequired != null) {
-            return requestedRequired;
-        }
-        return useSection && currentRequired;
-    }
-
-    private void validateApplicationFormRequirement(
-            ApplicationFormConfigRequest request,
-            boolean requireEducation,
-            boolean requireCareer,
-            boolean requireCertificate,
-            boolean requireLanguage,
-            boolean requireMilitary,
-            boolean requireAward,
-            boolean requireGapPeriod
-    ) {
-        validateApplicationFormRequirement(request.useEducation(), requireEducation, "education");
-        validateApplicationFormRequirement(request.useCareer(), requireCareer, "career");
-        validateApplicationFormRequirement(request.useCertificate(), requireCertificate, "certificate");
-        validateApplicationFormRequirement(request.useLanguage(), requireLanguage, "language");
-        validateApplicationFormRequirement(request.useMilitary(), requireMilitary, "military");
-        validateApplicationFormRequirement(request.useAward(), requireAward, "award");
-        validateApplicationFormRequirement(request.useGapPeriod(), requireGapPeriod, "gap period");
-    }
-
-    private void validateApplicationFormRequirement(boolean useSection, boolean requireSection, String sectionName) {
-        if (!useSection && requireSection) {
-            throw new InvalidJobPostingException(sectionName + " section cannot be required when disabled.");
-        }
     }
 
     private JobPostingType defaultPostingType(JobPostingType postingType) {

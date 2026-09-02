@@ -116,8 +116,9 @@ class JobPostingControllerTest {
                 .andExpect(jsonPath("$.data.visible").value(true))
                 .andExpect(jsonPath("$.data.pinned").value(false))
                 .andExpect(jsonPath("$.data.displayOrder").value(2))
-                .andExpect(jsonPath("$.data.applicationFormConfig.useCareer").value(false))
-                .andExpect(jsonPath("$.data.applicationFormConfig.requireCareer").value(false))
+                // 공고 수정 요청에 담긴 지원서 양식은 무시된다(전용 API가 단일 출처). 등록 시 값이 그대로 유지된다.
+                .andExpect(jsonPath("$.data.applicationFormConfig.useCareer").value(true))
+                .andExpect(jsonPath("$.data.applicationFormConfig.requireCareer").value(true))
                 .andExpect(jsonPath("$.data.jobPositions[0].employmentType").value("INTERN"));
     }
 

@@ -75,6 +75,20 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/jobPosting/AdminQuestionTemplateEditView.vue'),
       },
       {
+        path: 'application-forms',
+        name: 'AdminApplicationFormList',
+        component: () => import('@/views/admin/applicationForm/AdminApplicationFormListView.vue'),
+      },
+      {
+        // 설정 상세는 메뉴에 등록하지 않는 화면이라 activeMenuPath 로 현황 메뉴를 활성으로 표시한다.
+        path: 'application-forms/:jobPostingId',
+        name: 'AdminApplicationFormDetail',
+        component: () => import('@/views/admin/applicationForm/AdminApplicationFormDetailView.vue'),
+        meta: {
+          activeMenuPath: '/admin/application-forms',
+        },
+      },
+      {
         path: 'question-templates',
         name: 'AdminQuestionTemplates',
         component: () => import('@/views/admin/jobPosting/AdminQuestionTemplatesView.vue')

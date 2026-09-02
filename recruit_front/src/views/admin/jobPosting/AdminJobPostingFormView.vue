@@ -6,7 +6,6 @@ import { adminJobPostingApi } from '@/api/adminJobPostingApi'
 import { commonCodeApi } from '@/api/commonApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import type {
-  AdminApplicationFormConfig,
   AdminJobPositionForm,
   AdminJobPostingSaveRequest,
 } from '@/types/jobPosting'
@@ -51,18 +50,6 @@ const jobPositions = ref<AdminJobPositionForm[]>([
   { positionName: '', applicationType: 'NEW_GRADUATE_OR_EXPERIENCED', jobTitle: null, workLocationCodes: [], employmentType: 'FULL_TIME', sortOrder: 0 },
 ])
 
-const formConfig = ref<AdminApplicationFormConfig>({
-  useEducation: true, requireEducation: null,
-  useCareer: true, requireCareer: null,
-  useCertificate: true, requireCertificate: null,
-  useLanguage: true, requireLanguage: null,
-  useMilitary: true, requireMilitary: null,
-  useAward: true, requireAward: null,
-  useGapPeriod: true, requireGapPeriod: null,
-  // 지원서 첨부 섹션은 폐지됐다(경력기술서는 경력 섹션에서 첨부). 계약 유지를 위해 false 로만 보낸다.
-  useAttachment: false,
-})
-
 const images = ref<EditableImage[]>([])
 const removedImageIds = ref<number[]>([])
 
@@ -85,16 +72,6 @@ const employmentTypeOptions = [
   { value: 'PART_TIME', label: '파트타임' },
   { value: 'ETC', label: '기타' },
 ]
-const formSections: { useKey: keyof AdminApplicationFormConfig; requireKey: keyof AdminApplicationFormConfig; label: string }[] = [
-  { useKey: 'useEducation', requireKey: 'requireEducation', label: '학력' },
-  { useKey: 'useCareer', requireKey: 'requireCareer', label: '경력' },
-  { useKey: 'useCertificate', requireKey: 'requireCertificate', label: '자격증' },
-  { useKey: 'useLanguage', requireKey: 'requireLanguage', label: '어학' },
-  { useKey: 'useMilitary', requireKey: 'requireMilitary', label: '병역' },
-  { useKey: 'useAward', requireKey: 'requireAward', label: '포상' },
-  { useKey: 'useGapPeriod', requireKey: 'requireGapPeriod', label: '공백기간' },
-]
-
 let imageKeySeq = 0
 // 언마운트 시 세대를 올려, 진행 중이던 병렬 이미지 로딩이 stale objectURL을 남기지 않게 한다.
 let imageLoadGeneration = 0
@@ -190,7 +167,6 @@ const buildSaveRequest = (): AdminJobPostingSaveRequest => ({
   pinned: pinned.value,
   displayOrder: displayOrder.value,
   jobPositions: jobPositions.value.map((position, index) => ({ ...position, sortOrder: index })),
-  applicationFormConfig: formConfig.value,
 })
 
 const save = async () => {
@@ -275,7 +251,6 @@ const loadForEdit = async () => {
       ...position,
       workLocationCodes: workLocations.map((it) => it.code),
     }))
-    formConfig.value = detail.applicationFormConfig
     const generation = ++imageLoadGeneration
     const settled = await Promise.allSettled(detail.images.map(async (image): Promise<EditableImage> => {
       const blob = await adminJobPostingApi.fetchImageBlob(editingId.value!, image.id)
@@ -417,26 +392,6 @@ onBeforeUnmount(() => {
         </div>
       </a-card>
 
-      <a-card title="지원서 양식 구성" :bordered="false" class="form-card">
-        <div class="config-grid">
-          <div v-for="section in formSections" :key="section.useKey" class="config-item">
-            <a-checkbox
-              :checked="Boolean(formConfig[section.useKey])"
-              @update:checked="(checked: boolean) => { (formConfig[section.useKey] as boolean) = checked; if (!checked) (formConfig[section.requireKey] as boolean | null) = false }"
-            >
-              {{ section.label }}
-            </a-checkbox>
-            <a-checkbox
-              :checked="Boolean(formConfig[section.requireKey])"
-              :disabled="!formConfig[section.useKey]"
-              @update:checked="(checked: boolean) => { (formConfig[section.requireKey] as boolean | null) = checked }"
-            >
-              필수
-            </a-checkbox>
-          </div>
-        </div>
-      </a-card>
-
       <div class="form-actions">
         <a-button @click="router.back()">취소</a-button>
         <a-button type="primary" :loading="saving" @click="save">저장</a-button>
@@ -521,15 +476,6 @@ onBeforeUnmount(() => {
 }
 .position-input {
   width: 140px;
-}
-.config-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px 16px;
-}
-.config-item {
-  display: flex;
-  gap: 12px;
 }
 .form-actions {
   display: flex;

@@ -84,7 +84,8 @@ export interface availableSectionsItem {
 export interface formLayoutPageItem {
   pageNo: number
   title: string
-  description: string
+  /** 백엔드는 설명이 없으면 null 을 내려준다. */
+  description: string | null
   sortOrder: number
   items: ItemResponse[]
 }
@@ -95,4 +96,63 @@ export interface ApplicationFormLayoutResponse {
   editable: boolean
   pages: formLayoutPageItem[]
   availableSections: availableSectionsItem[]
+}
+
+/** POST /admin/job-postings/{id}/application-form-layout 요청. 레이아웃 전체를 치환한다. */
+export interface ApplicationFormLayoutSaveRequest {
+  pages: {
+    pageNo: number
+    title: string
+    description: string | null
+    sortOrder: number
+    items: { sectionType: sectionType; sortOrder: number }[]
+  }[]
+}
+
+/** GET .../application-form-layout/preview 응답. 활성 섹션만, 빈 페이지는 제외된 지원자 관점 구성이다. */
+export interface ApplicationFormLayoutPreviewResponse {
+  jobPostingId: number
+  jobPostingTitle: string
+  pages: {
+    pageNo: number
+    title: string
+    description: string | null
+    sortOrder: number
+    items: {
+      sectionType: sectionType
+      sectionName: string
+      required: boolean
+      sortOrder: number
+    }[]
+  }[]
+}
+
+export type ApplicationFormConfigState = 'MISSING' | 'RELAYOUT_REQUIRED' | 'DEFAULT' | 'OK'
+
+/** GET /admin/application-forms 검색 조건. 값이 없으면 해당 조건을 보내지 않는다. */
+export interface AdminApplicationFormSummarySearchRequest {
+  status?: 'DRAFT' | 'PUBLISHED' | 'CLOSED'
+  receptionStatus?: 'UPCOMING' | 'ACCEPTING' | 'CLOSED'
+  configState?: ApplicationFormConfigState
+  editableOnly?: boolean
+  keyword?: string
+}
+
+/** 지원서 설정 현황판의 한 행. */
+export interface AdminApplicationFormSummary {
+  jobPostingId: number
+  title: string
+  postingType: string
+  status: 'DRAFT' | 'PUBLISHED' | 'CLOSED'
+  receptionStatus: 'UPCOMING' | 'ACCEPTING' | 'CLOSED'
+  receptionStartDateTime: string
+  receptionEndDateTime: string
+  sectionSummary: { enabledCount: number; requiredCount: number }
+  activeQuestionCount: number
+  requiredQuestionCount: number
+  layoutStored: boolean
+  pageCount: number
+  configState: ApplicationFormConfigState
+  editable: boolean
+  updatedAt: string
 }
