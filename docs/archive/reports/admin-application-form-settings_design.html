@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>지원서 설정 관리자 화면 - 설계</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal (recruit)</div>
+  <h1>지원서 설정 관리자 화면 - 설계</h1>
+  <span class="badge done">설계 완료</span>
+  <span class="badge pending">구현 대기</span>
+  <span class="badge muted">작성일: 2026-09-02</span>
+</header>
+
+<main>
+
+  <!-- ===== 요약 + 현황 ===== -->
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>공고별 지원서 설정을 <strong>지원서 설정</strong> 대메뉴로 분리하고, 현황판과 공고별 설정 상세(탭) 두 화면으로 구성한다.</p>
+      <p>핵심은 백엔드가 강제하는 불변식 <code>placedSections == enabledSections</code>다. 이를 위반한 공고는 지원자 <code>form-page</code> 조회가 예외로 막히므로, 현황판이 이를 <code>RELAYOUT_REQUIRED</code>로 탐지하고 폼 구성 화면(A안)이 위반 상태를 만들 수 없게 막는다.</p>
+      <p>또한 <code>applicationFormConfig</code>를 공고 등록/수정 요청에서 제거하고 전용 엔드포인트로 분리해, 공고 수정 화면이 설정값을 덮어쓰는 사고를 구조적으로 차단한다.</p>
+      <p>구현은 3개 slice로 나눈다: 계약 분리(백엔드) → 현황판 → 설정 상세 탭.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">시안 선택 완료 (A안)</span></p>
+      <p><span class="badge done">API 계약 초안 반영</span></p>
+      <p><span class="badge info">레이아웃 API 백엔드 기구현</span></p>
+      <p><span class="badge pending">신규 엔드포인트 2개 대기</span></p>
+      <p><span class="badge pending">프론트 화면 전체 대기</span></p>
+      <p><span class="badge out">자기소개서 질문 탭 제외</span></p>
+    </div>
+  </section>
+
+  <!-- ===== 범위 ===== -->
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>설계 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>메뉴/라우트 정보 구조(IA)</li>
+          <li>지원서 설정 현황판: 컬럼 · 필터 · <code>configState</code> 판정</li>
+          <li>공고별 지원서 설정 상세: 탭 구조</li>
+          <li>폼 구성 화면 A안(팔레트 + 페이지 캔버스) 조작 규칙</li>
+          <li>공고 등록/수정 API에서 지원서 양식 분리</li>
+          <li>편집 가능 시점 통일(접수 시작 전만)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li><code>AdminApplicationFormController</code> (Java 코드 없음)</li>
+          <li>요약 집계 쿼리 (JPQL 없음)</li>
+          <li>프론트 화면 2개 · API 모듈 1개</li>
+          <li>레이아웃 저장(POST)·미리보기 프론트 연동</li>
+          <li>메뉴 데이터 등록 (운영 작업)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>자기소개서 질문 관리 탭 (자리만 확보)</li>
+          <li>질문 템플릿 관리 화면 (기구현, 메뉴 위치만 이동)</li>
+          <li>첨부 요구사항 관리 화면</li>
+          <li>사이드바 3단계 메뉴 지원</li>
+          <li>레이아웃 동시편집 잠금(낙관적 잠금)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 정보 구조 ===== -->
+  <section>
+    <h2>정보 구조 (IA)</h2>
+    <div class="card">
+      <p>기존 관리자 사이드바는 <strong>2단계까지만 렌더링</strong>한다(<code>AdminSidebar.vue</code>는 <code>group.children</code>까지만 순회). 따라서 3단계 구조를 쓰지 않고, <code>지원서 설정</code>을 대메뉴로 승격하여 2단계를 유지한다.</p>
+      <pre>
+관리자 사이드바 (2단계 유지)
+  ├── 공고 관리
+  │     ├── 공고 목록          /admin/job-postings
+  │     └── 공고 등록          /admin/job-postings/new
+  │
+  └── 지원서 설정                                   ← 신규 대메뉴
+        ├── 지원서 설정 현황    /admin/application-forms
+        └── 질문 템플릿 관리    /admin/question-templates   ← 전역 스코프, 위치만 이동
+
+메뉴에 등록하지 않는 화면 (route meta activeMenuPath 로 활성 표시)
+  └── 공고별 지원서 설정        /admin/application-forms/:jobPostingId
+        ├── [지원서 양식]  탭
+        └── [폼 구성]      탭
+              (자기소개서 질문 탭은 이번 범위 제외)
+      </pre>
+      <ul class="list">
+        <li><strong>스코프 분리가 IA의 근거다.</strong> 지원서 양식·폼 구성·자기소개서 질문은 <code>jobPostingId</code>에 종속되고, 질문 템플릿만 전역(<code>/admin/question-templates</code>)이다. 전역 화면만 사이드바에 직접 두고, 공고 종속 화면은 상세 탭으로 묶는다.</li>
+        <li><strong>이름 충돌 회피.</strong> 관리자에는 이미 지원자가 제출한 실물을 보는 <code>지원 현황</code> / <code>입사지원서</code> 화면이 있다. 설정 화면은 "지원서 설정" 계열 이름을 써서 구분한다.</li>
+        <li>탭 UI는 <code>MenuManageView</code>의 <code>nav.site-tabs</code> / <code>button.site-tab</code>(밑줄형 커스텀 탭, <code>role="tablist"</code>) 패턴을 재사용한다. <code>a-tabs</code>를 새로 도입하지 않는다.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===== API ===== -->
+  <section>
+    <h2>API 목록</h2>
+
+    <h3>신규</h3>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>Slice</th></tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/admin/application-forms</code></td>
+        <td>공고별 지원서 설정 요약 목록(필터·페이지)</td>
+        <td><span class="badge info">S2</span></td>
+      </tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/admin/job-postings/{jobPostingId}/application-form-config</code></td>
+        <td>지원서 양식(섹션 사용/필수) 단독 저장</td>
+        <td><span class="badge info">S1</span></td>
+      </tr>
+    </table>
+
+    <h3>변경 (요청 축소)</h3>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>변경 내용</th><th>Slice</th></tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/admin/job-postings</code></td>
+        <td>요청에서 <code>applicationFormConfig</code> 제거. 서버가 기본 <code>ApplicationFormConfig</code>를 생성해 붙인다</td>
+        <td><span class="badge info">S1</span></td>
+      </tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/admin/job-postings/{id}</code></td>
+        <td>요청에서 <code>applicationFormConfig</code> 제거. 이 API는 더 이상 양식 설정을 건드리지 않는다</td>
+        <td><span class="badge info">S1</span></td>
+      </tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/admin/job-postings/{id}</code></td>
+        <td>변경 없음. <strong>응답의 <code>applicationFormConfig</code>는 그대로 유지</strong>한다(설정 화면이 읽어야 함)</td>
+        <td><span class="badge muted">-</span></td>
+      </tr>
+    </table>
+
+    <h3>기존 (백엔드 구현 완료 / 프론트 신규 연동)</h3>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>상태</th></tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/admin/job-postings/{jobPostingId}/application-form-layout</code></td>
+        <td>레이아웃 + 섹션 가용성 조회</td>
+        <td><span class="badge pending">프론트 GET만 존재</span></td>
+      </tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/admin/job-postings/{jobPostingId}/application-form-layout</code></td>
+        <td>레이아웃 전체 치환 저장</td>
+        <td><span class="badge pending">프론트 미구현</span></td>
+      </tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/admin/job-postings/{jobPostingId}/application-form-layout/preview</code></td>
+        <td>지원자 관점 미리보기</td>
+        <td><span class="badge pending">프론트 미구현</span></td>
+      </tr>
+    </table>
+
+    <h3>컨트롤러 배치</h3>
+    <table>
+      <tr><th>컨트롤러</th><th>담당</th><th>상태</th></tr>
+      <tr><td><code>AdminApplicationFormController</code></td><td>요약 목록, 양식 설정 저장</td><td><span class="badge pending">신규</span></td></tr>
+      <tr><td><code>AdminApplicationFormLayoutController</code></td><td>레이아웃 조회·저장·미리보기</td><td><span class="badge done">기구현</span></td></tr>
+      <tr><td><code>JobPostingController</code></td><td>공고 등록·수정 (요청에서 양식 제거)</td><td><span class="badge warn">수정</span></td></tr>
+      <tr><td><code>QuestionTemplateController</code></td><td>질문 템플릿(전역)</td><td><span class="badge done">기구현·무변경</span></td></tr>
+    </table>
+  </section>
+
+  <!-- ===== 현황판 ===== -->
+  <section>
+    <h2>지원서 설정 현황판</h2>
+    <div class="card">
+      <h3>설계 배경</h3>
+      <p>기존 <code>GET /admin/job-postings</code>는 <strong>필터 파라미터가 <code>page</code>/<code>size</code>뿐</strong>이고, 설정 관련 필드도 없다. 공고마다 레이아웃 API를 호출해 채우는 방식은 N+1인 데다, <code>getLayout</code>은 <code>applicationFormConfig</code>가 없으면 예외를 던지므로 목록 전체가 실패한다. 따라서 전용 요약 엔드포인트를 신설한다.</p>
+    </div>
+
+    <h3>컬럼</h3>
+    <table>
+      <tr><th>컬럼</th><th>필드</th><th>설명</th></tr>
+      <tr><td>공고명</td><td><code>title</code>, <code>postingType</code></td><td>클릭 시 설정 상세로 이동</td></tr>
+      <tr><td>공고/접수 상태</td><td><code>status</code>, <code>receptionStatus</code></td><td>배지 2개</td></tr>
+      <tr><td>접수기간</td><td><code>receptionStartDateTime</code> ~ <code>receptionEndDateTime</code></td><td></td></tr>
+      <tr><td>섹션</td><td><code>sectionSummary.enabledCount</code>, <code>requiredCount</code></td><td>"8개 (필수 3)" 형태로 <strong>한 칸에 합침</strong></td></tr>
+      <tr><td>자기소개서 질문</td><td><code>activeQuestionCount</code>, <code>requiredQuestionCount</code></td><td>질문 탭이 범위 외여도 <strong>이 컬럼은 유지</strong>한다. 레이아웃 불변식 위반의 주 원인이 질문 추가이기 때문</td></tr>
+      <tr><td>폼 레이아웃</td><td><code>layoutStored</code>, <code>pageCount</code></td><td>"저장됨 4페이지" 또는 "기본값"</td></tr>
+      <tr><td>설정 상태</td><td><code>configState</code>, <code>editable</code></td><td>아래 판정. <code>editable == false</code>는 자물쇠 표시로 흡수</td></tr>
+      <tr><td>최종 수정</td><td><code>updatedAt</code></td><td></td></tr>
+    </table>
+    <p class="small">초안의 10컬럼에서 "사용/필수 섹션"을 한 칸으로, "편집 가능"을 설정 상태 배지로 합쳐 8컬럼으로 축소했다.</p>
+
+    <h3><code>configState</code> 판정</h3>
+    <table>
+      <tr><th>값</th><th>조건</th><th>의미</th></tr>
+      <tr>
+        <td><span class="badge out">RELAYOUT_REQUIRED</span></td>
+        <td><code>layoutStored && placedSections != enabledSections</code></td>
+        <td><strong>지원자 form-page 조회가 실패하는 상태.</strong> 최우선 경고이며 기본 정렬 최상단</td>
+      </tr>
+      <tr>
+        <td><span class="badge out">MISSING</span></td>
+        <td><code>applicationFormConfig == null</code></td>
+        <td>게시 불가. 기존 데이터에만 존재할 수 있다</td>
+      </tr>
+      <tr>
+        <td><span class="badge pending">DEFAULT</span></td>
+        <td><code>!layoutStored</code></td>
+        <td><code>ApplicationFormLayoutDefaultFactory</code> 결과로 동작 중. 정상 동작하지만 확정되지 않음</td>
+      </tr>
+      <tr>
+        <td><span class="badge done">OK</span></td>
+        <td><code>layoutStored && placedSections == enabledSections</code></td>
+        <td>정상</td>
+      </tr>
+    </table>
+    <p class="small"><code>editable</code>(접수 시작 전 &amp;&amp; 미마감)은 <code>configState</code>와 직교하는 별도 필드로 내려, 화면에서 자물쇠 아이콘으로 덧붙인다.</p>
+
+    <h3>필터</h3>
+    <table>
+      <tr><th>파라미터</th><th>값</th><th>비고</th></tr>
+      <tr><td><code>status</code></td><td><code>DRAFT | PUBLISHED | CLOSED</code></td><td>기본: 마감 제외</td></tr>
+      <tr><td><code>receptionStatus</code></td><td><code>UPCOMING | ACCEPTING | CLOSED</code></td><td></td></tr>
+      <tr><td><code>configState</code></td><td><code>OK | DEFAULT | RELAYOUT_REQUIRED | MISSING</code></td><td>이 화면의 고유 필터</td></tr>
+      <tr><td><code>editableOnly</code></td><td>boolean</td><td>"지금 고칠 수 있는 것만"</td></tr>
+      <tr><td><code>keyword</code></td><td>공고명 부분일치</td><td></td></tr>
+    </table>
+    <p class="small">기본 정렬: <code>RELAYOUT_REQUIRED</code> 우선 → 접수 시작일 임박순. 페이지 크기 20.</p>
+
+    <h3>집계 전략</h3>
+    <p>공고별 질문 수 · 첨부 요구 수 · 레이아웃 페이지/항목은 <strong><code>group by</code> 집계 쿼리로 한 번에</strong> 조회한 뒤 메모리에서 조인한다. 공고당 개별 조회(N+1)를 금지한다.</p>
+    <pre>
+페이지 조회 1회         : job_posting (필터 + 페이징)
+집계 쿼리 3회 (in 절)   : job_posting_question   group by job_posting_id
+                          job_posting_attachment_requirement  group by job_posting_id
+                          application_form_page(+item)        group by job_posting_id
+메모리 조인 → configState 계산 → 응답
+    </pre>
+  </section>
+
+  <!-- ===== 폼 구성 A안 ===== -->
+  <section>
+    <h2>폼 구성 화면 — A안 (팔레트 + 페이지 캔버스)</h2>
+    <div class="card">
+      <p>좌측 팔레트에 미배치 섹션을 모아두고, 우측 페이지 카드로 드래그해 배치한다. <strong>팔레트가 비어야 저장 버튼이 활성화</strong>되어, 서버 불변식이 화면상의 명확한 목표로 번역된다.</p>
+      <pre>
+┌──────────────┬─────────────────────────────────────────┐
+│ 미배치 섹션   │  [1] 기본 정보            ↑ ↓ ✕          │
+│  · 포상       │       ⠿ 기본정보  (필수)                 │
+│  · 공백기간   │       ⠿ 병역      (필수)                 │
+│  남은 2개     │                                          │
+│              │  [2] 학력 · 경력          ↑ ↓ ✕          │
+│ 비활성 섹션   │       ⠿ 학력      (필수)                 │
+│  · 첨부파일   │       ⠿ 경력      (선택)                 │
+│   (미사용)    │                                          │
+│              │  [3] 추가 기록            ↑ ↓ ✕          │
+│              │       ⠿ 자격증 / 어학                     │
+│              │       ┌ 여기에 끌어다 놓기 ┐              │
+│              │  ＋ 페이지 추가                           │
+└──────────────┴─────────────────────────────────────────┘
+      </pre>
+      <ul class="list">
+        <li><strong>팔레트 3구역</strong>: 미배치(점선 강조) / 배치 완료(숨김 또는 흐리게) / 비활성(회색 + "공고 수정 화면에서 변경" 안내)</li>
+        <li><strong>페이지 카드</strong>: 제목 인라인 편집(필수, 100자), 설명(500자), 순서 <code>↑ ↓</code>, 삭제. 항목이 0개가 되는 삭제는 허용하되 저장 시 차단</li>
+        <li><strong>저장 payload 매핑</strong>: 카드 순서 → <code>pageNo</code>/<code>sortOrder</code>(0부터 재부여), 카드 내 칩 순서 → 항목 <code>sortOrder</code></li>
+        <li><strong>진입 시 경고</strong>: <code>RELAYOUT_REQUIRED</code> 상태면 "새로 활성화된 섹션이 있어 재배치가 필요합니다" 배너를 띄우고, 해당 섹션을 팔레트 미배치로 표시한다</li>
+        <li><strong>읽기 전용</strong>: <code>editable == false</code>면 드래그·편집을 모두 잠그고 미리보기 중심으로 표시한다</li>
+        <li><strong>한글 라벨</strong>: 백엔드 <code>sectionName</code>은 영문("Basic Info", "Questions")이므로 프론트에 <code>sectionType</code> 기준 한글 매핑 상수를 둔다</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===== 검증 규칙 ===== -->
+  <section>
+    <h2>검증 및 비즈니스 규칙</h2>
+
+    <h3>레이아웃 저장 가드 (<code>ApplicationFormLayoutValidator</code>, 기구현)</h3>
+    <table>
+      <tr><th>규칙</th><th>내용</th><th>화면 대응</th></tr>
+      <tr>
+        <td>배치 = 활성</td>
+        <td><code>placedSections.equals(effectiveEnabledSections)</code>. 활성인데 미배치도, 비활성인데 배치도 모두 실패</td>
+        <td>팔레트 잔여 0일 때만 저장 활성화</td>
+      </tr>
+      <tr><td>페이지 최소 1개</td><td>빈 레이아웃 불가</td><td>마지막 페이지 삭제 차단</td></tr>
+      <tr><td>항목 최소 1개</td><td>페이지당 항목 0개 불가</td><td>빈 페이지에 저장 시 경고</td></tr>
+      <tr><td>제목/설명</td><td>제목 필수 100자, 설명 500자</td><td>입력 시 실시간 검증</td></tr>
+      <tr><td>순서 유일성</td><td><code>pageNo</code>·페이지 <code>sortOrder</code> 중복 불가, 항목 <code>sortOrder</code>는 페이지 내 중복 불가</td><td>저장 직전 재부여로 보장</td></tr>
+      <tr><td>사용/필수 불변</td><td>레이아웃 API로는 섹션 사용/필수를 바꿀 수 없다</td><td>칩의 필수 배지는 읽기 전용</td></tr>
+    </table>
+
+    <h3>편집 가능 시점 (2026-09-02 통일)</h3>
+    <table>
+      <tr><th>대상</th><th>변경 전</th><th>변경 후</th></tr>
+      <tr><td>레이아웃 저장</td><td>접수 시작 전 &amp;&amp; 미마감</td><td><span class="badge done">동일 (변경 없음)</span></td></tr>
+      <tr><td>양식 설정(<code>applicationFormConfig</code>)</td><td>공고 수정 API에 포함 → <strong>마감만 차단</strong>(접수 중 변경 가능)</td><td><span class="badge warn">접수 시작 전 &amp;&amp; 미마감으로 통일</span></td></tr>
+    </table>
+    <p class="small">접수 중 섹션을 끄면 이미 제출된 지원서와 어긋난다. 접수 중 섹션 변경은 실무에서 사용하지 않는 것으로 확인되어 레이아웃과 동일 규칙으로 좁혔다.</p>
+
+    <h3>등록 시 기본 설정 생성</h3>
+    <div class="transition">
+      <span class="state">공고 등록 요청</span>
+      <span class="arrow">→</span>
+      <span class="action">서버가 기본 config 생성</span>
+      <span class="arrow">→</span>
+      <span class="state">DEFAULT</span>
+      <span class="arrow">→</span>
+      <span class="action">설정 화면에서 확정</span>
+      <span class="arrow">→</span>
+      <span class="state">OK</span>
+    </div>
+    <p><code>applicationFormConfig</code>를 <code>null</code>로 두지 않는 이유: config가 없으면 <code>getLayout</code>·<code>saveLayout</code>·<code>getPreview</code>가 <code>requireFormConfig</code> 예외를 던지고, 게시도 불가하며, 지원자 <code>form-page</code> 흐름도 막힌다. 기존 코드가 config 존재를 전제로 작성되어 있어 <code>null</code>을 정상 상태로 승격하려면 <code>ApplicationFormPageService</code>, <code>ApplicationSectionAccessService</code>, <code>ApplicationSubmitValidator</code> 등 여러 지점의 전제를 재작성해야 한다.</p>
+  </section>
+
+  <!-- ===== Slice 계획 ===== -->
+  <section>
+    <h2>Slice 계획</h2>
+    <table>
+      <tr><th>Slice</th><th>범위</th><th>상태</th></tr>
+      <tr>
+        <td><strong>S1</strong><br>양식 설정 분리</td>
+        <td>
+          <code>JobPostingCreateRequest</code>/<code>JobPostingUpdateRequest</code>에서 <code>applicationFormConfig</code> 제거,
+          <code>JobPostingService.create</code>의 기본 config 생성,
+          <code>POST .../application-form-config</code> 신설(병합·검증 로직 이관),
+          기존 테스트 호출부 수정,
+          프론트 <code>AdminJobPostingFormView</code>의 양식 카드 제거
+        </td>
+        <td><span class="badge pending">대기</span></td>
+      </tr>
+      <tr>
+        <td><strong>S2</strong><br>설정 현황판</td>
+        <td>
+          <code>GET /admin/application-forms</code> + 집계 쿼리 + <code>configState</code> 계산,
+          <code>AdminApplicationFormListView</code>, 필터/정렬, 메뉴 데이터 등록
+        </td>
+        <td><span class="badge pending">대기</span></td>
+      </tr>
+      <tr>
+        <td><strong>S3</strong><br>설정 상세 탭</td>
+        <td>
+          <code>AdminApplicationFormDetailView</code>(탭 호스트),
+          [지원서 양식] 탭, [폼 구성] 탭(A안 · 드래그앤드롭 · 저장 · 미리보기),
+          한글 라벨 매핑, 읽기 전용 모드
+        </td>
+        <td><span class="badge pending">대기</span></td>
+      </tr>
+    </table>
+    <p class="small">S1이 선행이다. S3의 [지원서 양식] 탭이 S1의 신규 엔드포인트에 의존한다. S2와 S3는 병행 가능하다.</p>
+  </section>
+
+  <!-- ===== 결정 로그 ===== -->
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr>
+        <td>1</td>
+        <td>폼 구성 화면은 A안(팔레트 + 페이지 캔버스)</td>
+        <td>사용자 선택. 전체 구조 조망과 페이지 간 이동이 가장 직관적</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><code>지원서 설정</code>을 대메뉴로 승격, 2단계 유지</td>
+        <td><code>AdminSidebar.vue</code>가 <code>group.children</code>까지만 렌더링해 3단계를 지원하지 않는다</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>공고 종속 화면은 상세 탭, 전역 화면(질문 템플릿)만 사이드바</td>
+        <td>탭 3종은 <code>jobPostingId</code> 필수. 사이드바 직접 진입 시 "어느 공고?" 선택 단계가 매번 필요해진다</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>현황판 진입 화면을 공고 목록 재탕이 아닌 설정 상태 대시보드로</td>
+        <td>목록 중복을 피하고, <code>RELAYOUT_REQUIRED</code> 탐지라는 고유 가치를 부여</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td><code>applicationFormConfig</code>를 공고 등록/수정 요청에서 제거</td>
+        <td>공고 수정 화면이 낡은 값으로 설정을 덮어쓰는 사고를 구조적으로 차단. 병합 로직 중복도 제거</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>등록 시 config를 <code>null</code>이 아닌 서버 기본값으로 생성</td>
+        <td>기존 코드가 config 존재를 전제로 한다. 기본값의 단일 출처가 프론트에서 백엔드로 이동하는 부수 효과도 있다</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td>양식 설정 편집을 접수 시작 전으로 제한</td>
+        <td>레이아웃과 규칙을 통일. 접수 중 섹션 변경은 실무 미사용이며 제출된 지원서와 어긋난다</td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td>탭 UI는 <code>MenuManageView</code>의 <code>site-tabs</code> 패턴 재사용</td>
+        <td>사용자 지정. 접근성 속성(<code>role="tablist"</code>)까지 이미 갖춰져 있어 신규 컴포넌트 도입이 불필요</td>
+      </tr>
+      <tr>
+        <td>9</td>
+        <td>요약 집계는 <code>group by</code> + 메모리 조인</td>
+        <td>공고별 레이아웃 API 호출은 N+1이며, config가 없는 공고에서 예외로 목록 전체가 실패한다</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- ===== 미결 사항 ===== -->
+  <section>
+    <h2>미결 사항</h2>
+    <table>
+      <tr><th>#</th><th>질문</th><th>현재 입장</th></tr>
+      <tr>
+        <td>1</td>
+        <td>기존 DB에 <code>application_form_config</code>가 없는 공고가 있는가? 백필이 필요한가?</td>
+        <td>운영 확인 필요. 존재한다면 현황판에 <code>MISSING</code>으로 노출되며, 기본값 백필 스크립트로 정리한다</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>현황판에서 <code>RELAYOUT_REQUIRED</code> 공고를 일괄 정정하는 기능이 필요한가?</td>
+        <td>이번 범위 제외. 개별 진입으로 처리하고, 빈도가 높으면 후속 검토</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>레이아웃 저장에 동시편집 보호가 필요한가?</td>
+        <td>현재 API는 낙관적 잠금이 없다. 관리자 동시 편집 빈도가 낮다고 보고 이번 범위 제외</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>자기소개서 질문 관리 탭은 언제 붙이는가?</td>
+        <td>탭 자리만 확보하고 후속 slice로 미룬다. 백엔드 <code>JobPostingQuestionController</code>는 이미 구현되어 있다</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- ===== 다음 단계 ===== -->
+  <section>
+    <h2>다음 단계 권장</h2>
+    <div class="card">
+      <p><strong>S1(양식 설정 분리)부터 착수</strong>한다. 백엔드 요청 DTO 축소와 신규 엔드포인트가 나머지 두 slice의 선행 조건이며, 기존 테스트 컴파일 에러가 함께 발생하므로 독립 slice로 처리하는 편이 안전하다.</p>
+      <p>검증은 변경 범위만 실행한다. 백엔드는 <code>JobPosting</code>·<code>ApplicationForm</code> 관련 패키지 테스트, 프론트는 <code>npm run type-check</code>를 기준으로 한다.</p>
+      <p>S1 완료 후 계약 문서의 해당 항목을 확정 상태로 갱신하고, S2·S3를 병행한다.</p>
+      <p class="small">관련 문서: 시안 비교는 <code>docs/design/지원서 폼 레이아웃 관리자 시안.html</code>, 계약 초안은 <code>api-contract.md</code>의 "지원서 설정 현황" / "공고별 지원서 설정" / "공고 등록·수정에서 지원서 양식 분리" 섹션.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

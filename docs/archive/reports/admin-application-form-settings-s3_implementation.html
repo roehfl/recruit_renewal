@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>S3 지원서 설정 상세 탭 - 구현</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal (recruit)</div>
+  <h1>S3 지원서 설정 상세 탭 - 구현</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge done">브라우저 검증 완료</span>
+  <span class="badge muted">작성일: 2026-09-02</span>
+</header>
+
+<main>
+
+  <!-- ===== 요약 + 현황 ===== -->
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>공고별 지원서 설정 화면 <code>/admin/application-forms/:jobPostingId</code> 를 탭 호스트 + 탭 2개로 구현했다. 탭은 <code>MenuManageView</code> 의 밑줄형 <code>site-tabs</code> 패턴을 그대로 쓴다.</p>
+      <p><strong>[지원서 양식]</strong> 탭은 S1에서 만든 전용 엔드포인트로 섹션 사용/필수를 저장한다. <strong>[폼 구성]</strong> 탭은 시안 A(팔레트 + 페이지 캔버스)를 드래그앤드롭으로 구현했고, 미배치 서랍이 비어야만 저장 버튼이 열린다.</p>
+      <p>드래그앤드롭은 신규 의존성 없이 <strong>HTML5 네이티브 DnD</strong> 로 구현했다.</p>
+      <p>S1에서 생긴 "양식을 편집할 화면이 없다"는 기능 공백이 닫혔다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">화면 3개 구현</span></p>
+      <p><span class="badge done">API 모듈 신설</span></p>
+      <p><span class="badge done">type-check 통과</span></p>
+      <p><span class="badge done">브라우저 동작 검증</span></p>
+      <p><span class="badge done">API 계약 🟢 확정</span></p>
+      <p><span class="badge pending">설정 현황판은 S2</span></p>
+      <p><span class="badge out">자기소개서 질문 탭 제외</span></p>
+    </div>
+  </section>
+
+  <!-- ===== 범위 ===== -->
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>탭 호스트 <code>AdminApplicationFormDetailView</code></li>
+          <li>[지원서 양식] 탭 (섹션 사용/필수 저장)</li>
+          <li>[폼 구성] 탭 (A안 · DnD · 저장 · 미리보기)</li>
+          <li>API 모듈 <code>adminApplicationFormApi</code></li>
+          <li>섹션 한글 라벨 매핑 <code>applicationSection.ts</code></li>
+          <li>레이아웃 저장/미리보기 타입 추가</li>
+          <li>읽기 전용 모드</li>
+          <li>공고 상세에서의 진입 버튼</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>지원서 설정 현황판 (S2)</li>
+          <li>사이드바 메뉴 등록 (S2, 운영 데이터 작업)</li>
+          <li>자기소개서 질문 탭</li>
+          <li>프론트 단위 테스트</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>키보드 기반 항목 이동(접근성 보완)</li>
+          <li>레이아웃 동시편집 잠금</li>
+          <li>첨부 요구사항 관리 화면</li>
+          <li>드래그 라이브러리 도입</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 화면 구조 ===== -->
+  <section>
+    <h2>화면 구조</h2>
+    <div class="card">
+      <pre>
+/admin/application-forms/:jobPostingId          AdminApplicationFormDetailView
+  ├─ 헤더: 공고 제목 · 상태 배지 · 접수기간 · [공고 상세] 버튼
+  ├─ site-tabs: [지원서 양식] [폼 구성]         (MenuManageView 와 동일 규약)
+  │
+  ├─ ApplicationFormConfigTab                   POST .../application-form-config
+  │     섹션 7종 사용/필수 체크박스 그리드
+  │
+  └─ ApplicationFormLayoutTab                   GET·POST .../application-form-layout
+        ├─ 좌: 미배치 서랍 + 비활성 섹션
+        └─ 우: 페이지 카드(제목·설명·↑↓·삭제) + 칩 DnD + [페이지 추가]
+      </pre>
+      <ul class="list">
+        <li>탭 전환 시 <code>:key</code> 를 바꿔 <strong>리마운트</strong>한다. 양식 변경이 폼 구성의 활성 섹션 집합을 바꾸므로 항상 최신 상태를 다시 읽어야 한다.</li>
+        <li>양식 저장 성공 시 공고 상세를 재조회하고 세대 값을 올려, 이후 폼 구성 탭이 새 활성 섹션으로 열린다.</li>
+        <li>편집 가능 여부는 클라이언트 시계로 계산하지 않고 서버가 내려준 <code>status</code> + <code>receptionStatus === 'UPCOMING'</code> 로 판단한다. 백엔드 가드와 같은 의미다.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===== 폼 구성 탭 ===== -->
+  <section>
+    <h2>폼 구성 탭 (시안 A) 구현 규칙</h2>
+    <div class="card">
+      <h3>불변식을 화면에서 지키는 방법</h3>
+      <p>서버는 <code>placedSections == enabledSections</code> 를 강제한다. 화면은 저장 버튼을 막아 이 상태를 만들지 않는다.</p>
+      <table>
+        <tr><th>차단 조건</th><th>안내 문구</th></tr>
+        <tr><td><code>!editable</code></td><td>접수가 시작되었거나 마감된 공고는 폼 구성을 수정할 수 없습니다.</td></tr>
+        <tr><td>미배치 섹션 존재</td><td>배치되지 않은 섹션이 N개 있습니다. 모두 페이지에 배치해야 저장할 수 있습니다.</td></tr>
+        <tr><td>페이지 0개</td><td>페이지를 최소 1개 만들어야 합니다.</td></tr>
+        <tr><td>항목 0개인 페이지</td><td>N페이지에 배치된 섹션이 없습니다.</td></tr>
+        <tr><td>제목 공백</td><td>N페이지의 제목을 입력해 주세요.</td></tr>
+      </table>
+      <p class="small">제목 100자 · 설명 500자 초과는 저장 직전 한 번 더 확인한다. 서버 검증과 동일한 한계값이다.</p>
+
+      <h3>저장 이후 섹션이 꺼진 경우</h3>
+      <p>저장된 레이아웃에 지금은 비활성인 섹션이 남아 있으면(질문 삭제 등) 로드 시 그 항목을 <strong>제외하고</strong> 경고 배너로 알린다. 저장하면 정리된 상태가 반영된다. 설계 단계에서 지목한 <code>RELAYOUT_REQUIRED</code> 상황의 반대 방향 케이스다.</p>
+
+      <h3>드래그앤드롭</h3>
+      <ul class="list">
+        <li>HTML5 네이티브 DnD(<code>draggable</code> · <code>dragstart</code> · <code>drop</code>). 라이브러리를 추가하지 않았다.</li>
+        <li>페이지 카드에 드롭하면 <strong>끝에 추가</strong>, 칩 위에 드롭하면 <strong>그 앞에 삽입</strong>한다.</li>
+        <li>팔레트에 드롭하면 미배치로 되돌린다.</li>
+        <li>같은 페이지 안에서 앞 항목을 뒤로 옮길 때 제거로 인덱스가 당겨지는 것을 보정한다.</li>
+        <li>페이지 삭제 시 그 페이지의 항목은 사라지지 않고 팔레트로 돌아간다.</li>
+      </ul>
+
+      <h3>저장 payload</h3>
+      <pre>
+pages[i] → { pageNo: i+1, sortOrder: i, title, description(빈 문자열이면 null),
+             items: [{ sectionType, sortOrder: j }] }
+      </pre>
+      <p class="small"><code>pageNo</code> 와 <code>sortOrder</code> 를 저장 시점에 다시 부여해 중복·구멍을 원천 차단한다.</p>
+    </div>
+  </section>
+
+  <!-- ===== 변경 파일 ===== -->
+  <section>
+    <h2>변경 파일</h2>
+    <table>
+      <tr><th>파일</th><th>구분</th><th>내용</th></tr>
+      <tr><td><code>src/views/admin/applicationForm/AdminApplicationFormDetailView.vue</code></td><td><span class="badge done">신규</span></td><td>탭 호스트</td></tr>
+      <tr><td><code>src/views/admin/applicationForm/ApplicationFormConfigTab.vue</code></td><td><span class="badge done">신규</span></td><td>지원서 양식 탭</td></tr>
+      <tr><td><code>src/views/admin/applicationForm/ApplicationFormLayoutTab.vue</code></td><td><span class="badge done">신규</span></td><td>폼 구성 탭 (A안)</td></tr>
+      <tr><td><code>src/api/admin/adminApplicationFormApi.ts</code></td><td><span class="badge done">신규</span></td><td>양식 저장 · 레이아웃 조회/저장/미리보기</td></tr>
+      <tr><td><code>src/common/applicationSection.ts</code></td><td><span class="badge done">신규</span></td><td><code>SECTION_LABELS</code> · <code>SECTION_SOURCE_LABELS</code></td></tr>
+      <tr><td><code>src/types/admin/application.ts</code></td><td><span class="badge warn">수정</span></td><td>레이아웃 저장/미리보기 타입 추가, <code>description</code> 을 <code>string | null</code> 로 정정</td></tr>
+      <tr><td><code>src/routes/adminRoutes.ts</code></td><td><span class="badge warn">수정</span></td><td><code>AdminApplicationFormDetail</code> 라우트 추가</td></tr>
+      <tr><td><code>src/views/admin/jobPosting/AdminJobPostingDetailView.vue</code></td><td><span class="badge warn">수정</span></td><td>"지원서 설정" 진입 버튼 추가</td></tr>
+      <tr><td><code>api-contract.md</code></td><td><span class="badge warn">수정</span></td><td>레이아웃 3개 엔드포인트 🟢 확정</td></tr>
+    </table>
+    <div class="card">
+      <h3>범위를 넘은 변경 1건</h3>
+      <p>공고 상세 화면에 <strong>"지원서 설정" 버튼</strong>을 추가했다. 설계상 진입 경로는 S2 현황판이지만, S2 전까지는 URL 직접 입력 외에 화면에 닿을 방법이 없어 S3의 목적(기능 공백 해소) 자체가 성립하지 않기 때문이다. route meta <code>activeMenuPath</code> 도 잠정적으로 <code>/admin/job-postings</code> 를 가리킨다. S2에서 현황판 메뉴가 생기면 두 값 모두 정리 대상이다.</p>
+    </div>
+  </section>
+
+  <!-- ===== 검증 ===== -->
+  <section>
+    <h2>검증 결과</h2>
+    <div class="card">
+      <p><code>npm run type-check</code> <span class="badge done">통과</span></p>
+      <p>백엔드가 없는 상태라 dev 서버에서 <strong>API 어댑터를 캔드 응답으로 대체</strong>해 화면을 실제로 렌더하고 조작했다. 소스는 수정하지 않았다.</p>
+      <table>
+        <tr><th>확인 항목</th><th>결과</th></tr>
+        <tr><td>탭 호스트 렌더 · 탭 전환</td><td><span class="badge done">정상</span> 헤더/접수기간/밑줄 탭, [폼 구성] 전환 시 리마운트 확인</td></tr>
+        <tr><td>레이아웃 초기 로드</td><td><span class="badge done">정상</span> 페이지 2개, 배치 칩 4개, 미배치 2개, 비활성 1개</td></tr>
+        <tr><td>팔레트 → 페이지 끝 드롭</td><td><span class="badge done">정상</span></td></tr>
+        <tr><td>팔레트 → 칩 앞 삽입</td><td><span class="badge done">정상</span></td></tr>
+        <tr><td>페이지 → 팔레트 반환</td><td><span class="badge done">정상</span> 저장 버튼이 다시 잠김</td></tr>
+        <tr><td>저장 버튼 활성 조건</td><td><span class="badge done">정상</span> 미배치 0일 때만 활성</td></tr>
+        <tr><td>저장 payload 형태</td><td><span class="badge done">정상</span> <code>pageNo</code> 1-base, <code>sortOrder</code> 0-base, 빈 설명 <code>null</code></td></tr>
+        <tr><td>미리보기 모달</td><td><span class="badge done">정상</span> 페이지·항목·필수 배지 표시</td></tr>
+        <tr><td>양식 탭: 섹션 끄면 필수 해제·비활성</td><td><span class="badge done">정상</span></td></tr>
+        <tr><td>양식 탭: 저장 payload</td><td><span class="badge done">정상</span> 15개 필드 그대로 전송</td></tr>
+        <tr><td>읽기 전용 모드</td><td><span class="badge done">정상</span> 체크박스·저장 모두 비활성, 안내 배너 노출</td></tr>
+      </table>
+      <p class="small">로그인 세션과 실제 공고 데이터가 필요한 통합 확인은 하지 않았다. 백엔드 계약은 S1에서 테스트 59건으로 검증되어 있다.</p>
+    </div>
+  </section>
+
+  <!-- ===== 알려진 한계 ===== -->
+  <section>
+    <h2>알려진 한계</h2>
+    <table>
+      <tr><th>#</th><th>항목</th><th>현재 상태</th></tr>
+      <tr>
+        <td>1</td>
+        <td>진입 경로가 잠정적이다</td>
+        <td>공고 상세 버튼으로만 들어간다. S2에서 현황판 메뉴가 생기면 <code>activeMenuPath</code> 와 함께 정리한다</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>드래그앤드롭에 키보드 대안이 없다</td>
+        <td>페이지 순서는 ↑↓ 버튼으로 가능하지만 항목 이동은 드래그 전용이다. 접근성 보완은 후속 과제</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>동시편집 보호가 없다</td>
+        <td>레이아웃 저장은 전체 치환이며 낙관적 잠금이 없다. 두 관리자가 동시에 저장하면 나중 저장이 이긴다</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>프론트 단위 테스트가 없다</td>
+        <td>브라우저 수동 검증으로 대체했다. 저장 payload 변환과 드롭 인덱스 보정은 단위 테스트 대상으로 적합하다</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- ===== 다음 단계 ===== -->
+  <section>
+    <h2>다음 단계 권장</h2>
+    <div class="card">
+      <p><strong>S2(지원서 설정 현황판)</strong> 로 넘어간다. 신규 요약 API(<code>GET /admin/application-forms</code>)와 <code>group by</code> 집계, <code>configState</code> 계산이 백엔드 작업의 핵심이다.</p>
+      <p>S2 완료 시 함께 정리할 항목: 사이드바 <code>지원서 설정</code> 대메뉴 등록(운영 데이터), 상세 화면의 <code>activeMenuPath</code> 를 <code>/admin/application-forms</code> 로 변경, 공고 상세의 진입 버튼 유지 여부 결정.</p>
+      <p class="small">관련 문서: 설계 <code>docs/archive/reports/admin-application-form-settings_design.html</code>, S1 <code>docs/archive/reports/admin-application-form-settings-s1_implementation.html</code>, 계약 <code>api-contract.md</code>.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

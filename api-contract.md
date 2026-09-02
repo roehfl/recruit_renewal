@@ -727,3 +727,105 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 영향: `JobPosition.jobGroup` 필드, 공고 등록/수정 요청의 `jobPositions[].jobGroup`, 공고 상세(관리자·공개) 응답의 `jobGroup`, 지원현황 검색 조건 `jobGroup`, `AdminApplicationSummaryResponse.jobGroup`
 - 프론트에서 `jobGroup` 을 실제로 노출하던 곳은 관리자 공고 등록 폼의 "직군" 입력 하나뿐이었고, 검색폼·그리드 컬럼에는 없었다
 - DB 컬럼 `job_position.job_group` 은 `ddl-auto: update` 특성상 자동 삭제되지 않는다. 정리는 수동 DDL 로 한다
+
+---
+
+### 화면: 지원서 설정 현황 (AdminApplicationFormListView)  🟡 초안 (2026-09-02)
+
+- 프론트: `src/views/admin/applicationForm/AdminApplicationFormListView.vue`, `src/api/admin/adminApplicationFormApi.ts` (신규)
+- 백엔드: `com.shinyoung.recruit.controller.AdminApplicationFormController` (신규)
+- 배경: 공고별 지원서 설정 상태를 한 표에서 조망한다. 특히 **질문/첨부 추가로 활성 섹션이 늘어 저장된 레이아웃이 `placed == enabled` 불변식을 위반한 공고**를 찾아내는 것이 이 화면의 존재 이유다(위반 시 지원자 `form-page` 조회가 예외로 막힌다)
+
+#### GET `/admin/application-forms`  🟢 확정(2026-09-02, front-back 반영 완료)
+
+- 설명: 공고별 지원서 설정 요약 목록(페이지). 공고 목록 API와 별개다 — 기존 `GET /admin/job-postings` 는 필터 파라미터가 없고 설정 관련 필드도 없다
+- 요청(query): `{ status?, receptionStatus?, configState?, editableOnly?, keyword?, page=0, size=20 }`
+  - `status`: `DRAFT | PUBLISHED | CLOSED`
+  - `receptionStatus`: `UPCOMING | ACCEPTING | CLOSED`
+  - `configState`: `OK | DEFAULT | RELAYOUT_REQUIRED | MISSING`
+  - `editableOnly`: boolean (접수 시작 전 & 미마감만)
+  - 기본 정렬: `RELAYOUT_REQUIRED` 우선 → 접수 시작일 임박순
+- 응답(200): `ApiResponse<PageResponse<{ jobPostingId, title, postingType, status, receptionStatus, receptionStartDateTime, receptionEndDateTime, sectionSummary: { enabledCount, requiredCount }, activeQuestionCount, requiredQuestionCount, layoutStored, pageCount, configState, editable, updatedAt }>>`
+- `configState` 판정(서버 계산, 단일 출처):
+  - `MISSING`: `applicationFormConfig == null` → 게시 불가
+  - `RELAYOUT_REQUIRED`: `layoutStored && placedSections != enabledSections` → **지원자 form-page 조회 실패 상태**
+  - `DEFAULT`: `!layoutStored` → `ApplicationFormLayoutDefaultFactory` 결과로 동작 중
+  - `OK`: `layoutStored && placedSections == enabledSections`
+  - `editable == false` 는 별도 필드로 내려 화면에서 🔒 로 덧붙인다(상태값과 직교)
+- 성능: 질문 수·첨부요구 수는 기존 집계 쿼리(`countActiveQuestionPolicyByJobPostingIds`, `countPolicyByJobPostingIds`)를 재사용하고, 레이아웃은 `findLayoutItemsByJobPostingIds` 로 (공고, pageNo, sectionType) 을 한 번에 읽어 메모리 조합한다. 공고당 개별 조회는 하지 않는다
+- 파생값 필터의 한계: `receptionStatus`·`configState`·`editableOnly` 는 계산 후에만 판정할 수 있어 **SQL 로 좁힌 뒤 메모리에서 거르고 페이징**한다. SQL 로 넘기는 조건은 `status`·`keyword` 뿐이다. 공고 테이블 규모가 작다는 전제이며, 규모가 커지면 파생값을 컬럼으로 승격해야 한다
+- `size` 는 1~100. 벗어나면 400
+- 마감 제외는 서버 조건이 아니라 **화면 기본값**이다(프론트가 응답에서 `status === 'CLOSED'` 를 거른다). `status` 에 "마감 제외"를 표현할 값이 없기 때문
+- 매핑: front `adminApplicationFormApi.getSummaries()` ↔ back `AdminApplicationFormController.getSummaries()`
+
+---
+
+### 화면: 공고별 지원서 설정 (AdminApplicationFormDetailView)  🟡 초안 (2026-09-02)
+
+- 프론트: `src/views/admin/applicationForm/AdminApplicationFormDetailView.vue` (탭 호스트, 신규)
+- 라우트: `/admin/application-forms/:jobPostingId` — 메뉴에 없는 화면이라 route meta `activeMenuPath` 로 `지원서 설정 현황` 을 활성 표시한다
+- 탭 UI는 `MenuManageView` 의 `nav.site-tabs` / `button.site-tab` (밑줄형 커스텀 탭, `role="tablist"`) 패턴을 그대로 쓴다
+- 탭 구성: **[지원서 양식] [폼 구성]** — `자기소개서 질문` 탭은 이번 범위에서 제외(`TABS` 상수에 자리만 비워둔다)
+- 편집 가능 여부는 클라이언트 시계로 계산하지 않고 공고 상세의 `status` + `receptionStatus === 'UPCOMING'` 으로 판단한다(백엔드 가드와 동일 의미)
+- 진입 경로: **지원서 설정 현황(`/admin/application-forms`)의 행 클릭**이 기본이며, 공고 상세 헤더의 "지원서 설정" 버튼으로도 들어간다. route meta `activeMenuPath` 는 `/admin/application-forms` 를 가리킨다
+
+#### POST `/admin/job-postings/{jobPostingId}/application-form-config`  🟢 확정(2026-09-02, front-back 반영 완료)
+
+- 설명: 지원서 양식(섹션 사용/필수) 단독 저장. 공고 등록/수정 API에서 분리된 전용 엔드포인트다
+- 요청: 기존 `ApplicationFormConfigRequest` 재사용 — `{ useEducation, requireEducation?, useCareer, requireCareer?, useCertificate, requireCertificate?, useLanguage, requireLanguage?, useMilitary, requireMilitary?, useAward, requireAward?, useGapPeriod, requireGapPeriod?, useAttachment }`
+- 응답(200): `ApiResponse<ApplicationFormConfigResponse>`
+- 편집 가능 조건: **접수 시작 전 && 미마감**. `ApplicationFormLayoutService.validateEditable` 과 동일한 규칙으로 맞춘다(2026-09-02 결정 — 접수 중 섹션 변경은 실무에서 쓰지 않으며, 제출된 지원서와 어긋나는 것을 막는다)
+- 오류: 400 접수 시작 후/마감, 404 공고 없음
+- 이동 완료: `JobPostingService` 의 `toCreateApplicationFormConfig` / `toUpdateApplicationFormConfig` / `resolveUpdatedRequired` / `validateApplicationFormRequirement` 병합·검증 로직을 `ApplicationFormConfigService` 로 옮겼다
+- `require*` 를 생략(null)하면 **기존 설정값을 유지**한다. 단 해당 섹션을 끄면 필수도 함께 해제된다(`resolveUpdatedRequired`)
+- 매핑: front `adminApplicationFormApi.saveFormConfig()` ↔ back `AdminApplicationFormConfigController.saveConfig()`
+- 컨트롤러는 경로 체계를 맞춰 `AdminApplicationFormConfigController` 로 둔다(요약 목록용 `AdminApplicationFormController` 와 분리)
+
+#### GET·POST `/admin/job-postings/{jobPostingId}/application-form-layout`  🟢 확정(2026-09-02, front-back 반영 완료)
+
+- 백엔드는 `AdminApplicationFormLayoutController` 로 기구현. 프론트는 S3에서 `adminApplicationFormApi` 로 GET·POST·preview 를 모두 연동했다
+- 관리자 지원서 상세(`Application.vue`)가 쓰는 기존 `adminApplicationApi.getApplicationFormLayout()` 은 용도가 달라 그대로 둔다
+- 응답(GET): `ApiResponse<{ jobPostingId, layoutStored, editable, pages: [{ pageNo, title, description, sortOrder, items: [{ sectionType, sectionName, sortOrder, enabled, required, placed }] }], availableSections: [{ sectionType, sectionName, enabled, required, placed, source }] }>`
+- 요청(POST): `{ pages: [{ pageNo, title, description?, sortOrder, items: [{ sectionType, sortOrder }] }] }` — **전체 치환**(delete 후 재삽입). 부분 저장 없음, 낙관적 잠금 없음
+- 화면이 반드시 지켜야 할 서버 불변식(`ApplicationFormLayoutValidator`):
+  1. 배치 섹션 집합 == 활성 섹션 집합 (미배치 잔여 0이어야 저장 가능)
+  2. 페이지 ≥ 1, 페이지당 항목 ≥ 1
+  3. 제목 필수(≤100), 설명 ≤500, `pageNo`·페이지 `sortOrder` 중복 불가, 항목 `sortOrder` 는 페이지 내 중복 불가
+  4. 섹션 사용/필수 여부는 이 API로 못 바꾼다(양식 탭·질문·첨부요구에서 파생)
+- `sectionName` 은 영문("Basic Info", "Questions")이므로 프론트가 `src/common/applicationSection.ts` 의 `SECTION_LABELS`(sectionType → 한글)로 매핑한다. `source` 도 `SECTION_SOURCE_LABELS` 로 "어디서 켜지는 섹션인지" 안내한다
+- 매핑: front `adminApplicationFormApi.getLayout()` / `saveLayout()` ↔ back `AdminApplicationFormLayoutController.getLayout()` / `saveLayout()`
+
+#### GET `/admin/job-postings/{jobPostingId}/application-form-layout/preview`  🟢 확정(2026-09-02, front-back 반영 완료)
+
+- 설명: 활성 섹션만 남기고 빈 페이지를 제외한 지원자 관점 미리보기
+- 응답: `ApiResponse<{ jobPostingId, jobPostingTitle, pages: [{ pageNo, title, description, sortOrder, items: [{ sectionType, sectionName, required, sortOrder }] }] }>`
+
+---
+
+### 변경: 공고 등록/수정에서 지원서 양식 분리  🟡 초안 (2026-09-02)
+
+- 배경: `applicationFormConfig` 가 `JobPostingCreateRequest` / `JobPostingUpdateRequest` 에 `@NotNull @Valid` 로 묶여 있어, 공고 수정 화면이 낡은 값을 들고 저장하면 설정 화면에서 바꾼 값을 되돌려버린다. 요청에서 제거해 구조적으로 차단한다
+
+#### POST `/admin/job-postings` (등록)  🟢 확정(2026-09-02, 선택 필드로 완화)
+
+- 변경: `applicationFormConfig` 의 `@NotNull` 을 제거해 **생략 가능**하게 했다. 생략하면 `ApplicationFormConfigService.createFrom(null)` 이 기본 설정을 만든다
+- 제거가 아니라 완화한 이유: 필드를 삭제하면 `new JobPostingCreateRequest(...)` 호출부 74곳(테스트 56개 파일)이 깨지고, 서버 기본값을 무엇으로 잡느냐에 따라 제출 검증 테스트의 의미까지 바뀐다. 덮어쓰기 위험은 수정(update)에만 있으므로 등록은 완화로 충분하다
+- 기본값은 분리 이전 등록 화면의 기본값과 동일하다: **전 섹션 사용, 학력·경력·병역만 필수, 첨부 미사용**. 동작 보존이 목적이다
+- null 로 두지 않는 이유: config 가 없으면 `getLayout`/`saveLayout`/`getPreview` 가 `requireFormConfig` 예외, 게시 불가, 지원자 form-page 흐름도 막힌다
+- 프론트는 이 필드를 더 이상 보내지 않는다(`AdminJobPostingSaveRequest` 에서 제거)
+
+#### POST `/admin/job-postings/{id}` (수정)  🟢 확정(2026-09-02, 필드 제거)
+
+- 변경: 요청에서 `applicationFormConfig` **제거**. 이 API는 더 이상 양식 설정을 건드리지 않는다
+- 이전 클라이언트가 이 필드를 그대로 보내도 400이 되지 않고 **무시**된다(Jackson 미지정 속성 무시)
+- `GET /admin/job-postings/{id}` **응답의 `applicationFormConfig` 는 그대로 유지**한다(설정 화면·현황판이 읽어야 함). 요청에서만 제거
+
+#### 딸려온 변경 (S1 구현 완료)
+
+- `JobPostingUpdateRequest` 호출부 6곳 정리(`JobPostingServiceTest`)
+- 병합 로직 테스트 2건을 `JobPostingServiceTest` → `ApplicationFormConfigServiceTest` 로 이관
+- `JobPostingControllerTest.update_job_posting_with_extended_fields_success`: 수정 요청의 양식이 **무시되는지**를 검증하도록 기대값 변경
+- `JobPostingServiceTest.게시_시_저장된_레이아웃이_현재_설정과_불일치하면_실패`: 불일치를 update 가 아니라 `applicationFormConfigService.save` 로 만든다
+- 프론트: `AdminJobPostingSaveRequest.applicationFormConfig` 제거, `AdminJobPostingFormView.vue` 의 "지원서 양식 구성" 카드 + `formConfig` ref + `formSections` 상수 + 관련 스타일 삭제
+- 남은 공백: 양식 설정을 편집할 화면이 S3(설정 상세 탭) 전까지 없다. 등록 시 기본값으로 생성되며, 기존 공고의 설정은 그대로 유지된다
+- 운영 확인: 기존 DB에 `application_form_config` 가 없는 공고가 있으면 현황판에 `MISSING` 으로 뜬다. 백필 여부 확인 필요

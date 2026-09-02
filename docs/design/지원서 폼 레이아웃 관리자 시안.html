@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>지원서 폼 레이아웃 관리자 시안</title>
+<style>
+:root{
+  --primary:#0f4726; --primary-hover:#146135; --primary-soft:#f4f8f0;
+  --olive:#6f8f3d; --emerald:#2f6f55;
+  --error:#ff4d4f; --warning:#d97706; --info:#1677ff; --success:#2f855a;
+  --text:#1f2937; --text-sub:#6b7280; --text-muted:#9ca3af;
+  --bg-page:#f5f7fa; --bg-surface:#fff; --bg-muted:#f9fafb; --bg-selected:#f4f8f0;
+  --bd:#e5e7eb; --bd-strong:#d1d5db; --bd-subtle:#eee;
+  --r:8px; --r-sm:4px; --r-lg:12px;
+  --shadow:0 4px 14px rgba(0,0,0,.04); --shadow-panel:0 8px 24px rgba(31,41,55,.06);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Pretendard","Malgun Gothic",-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg-page);color:var(--text);line-height:1.55;font-size:14px}
+.wrap{max-width:1240px;margin:0 auto;padding:32px 24px 80px}
+h1{font-size:24px;font-weight:800;letter-spacing:-.4px}
+h2{font-size:19px;font-weight:750;margin:0 0 4px}
+h3{font-size:15px;font-weight:700;margin:0 0 8px}
+p{color:var(--text-sub)}
+code{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace;font-size:12.5px;background:#eef2f0;color:#26503a;padding:1px 5px;border-radius:var(--r-sm)}
+
+/* ---------- 문서 헤더 ---------- */
+.doc-head{background:var(--primary);color:#fff;border-radius:var(--r-lg);padding:26px 28px;margin-bottom:22px;box-shadow:var(--shadow-panel)}
+.doc-head h1{color:#fff}
+.doc-head p{color:#cfe0c8;margin-top:6px}
+.doc-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.doc-meta span{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#e8f0e6;font-size:12px;padding:4px 10px;border-radius:100px}
+
+.card{background:var(--bg-surface);border:1px solid var(--bd);border-radius:var(--r-lg);padding:20px 22px;margin-bottom:18px;box-shadow:var(--shadow)}
+.card > h2{margin-bottom:10px}
+
+/* ---------- 제약 박스 ---------- */
+.rules{list-style:none;display:grid;gap:8px;margin-top:12px}
+.rules li{display:flex;gap:10px;align-items:flex-start;background:var(--bg-muted);border:1px solid var(--bd);border-left:3px solid var(--olive);border-radius:var(--r);padding:10px 12px}
+.rules .no{flex:0 0 auto;width:20px;height:20px;border-radius:50%;background:var(--primary);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;margin-top:1px}
+.rules b{color:var(--text)}
+.rules span.t{color:var(--text-sub);font-size:13.5px}
+
+/* ---------- 탭 ---------- */
+.tabs{display:flex;gap:8px;margin:26px 0 14px;flex-wrap:wrap}
+.tab{border:1px solid var(--bd-strong);background:var(--bg-surface);color:var(--text-sub);padding:10px 18px;border-radius:100px;cursor:pointer;font-size:14px;font-weight:600;transition:.15s}
+.tab:hover{background:var(--bg-selected)}
+.tab.on{background:var(--primary);border-color:var(--primary);color:#fff;box-shadow:0 8px 20px rgb(15 71 38 / 18%)}
+.pane{display:none}
+.pane.on{display:block}
+
+/* ---------- 목업 프레임 ---------- */
+.mock{border:1px solid var(--bd-strong);border-radius:var(--r-lg);overflow:hidden;background:var(--bg-page);box-shadow:var(--shadow-panel)}
+.mock-bar{display:flex;align-items:center;gap:8px;background:#eceff2;border-bottom:1px solid var(--bd-strong);padding:8px 12px}
+.dot{width:10px;height:10px;border-radius:50%;background:#cdd3d8}
+.mock-url{margin-left:8px;font-size:11.5px;color:var(--text-muted);font-family:ui-monospace,monospace}
+.mock-body{display:flex;min-height:520px}
+.side{flex:0 0 168px;background:var(--bg-surface);border-right:1px solid var(--bd);padding:14px 10px}
+.side .logo{font-weight:800;color:var(--primary);font-size:13px;padding:6px 10px 14px}
+.side a{display:block;padding:7px 10px;border-radius:var(--r-sm);color:var(--text-sub);font-size:12.5px;text-decoration:none}
+.side a.on{background:var(--bg-selected);color:var(--primary);font-weight:700}
+.content{flex:1;min-width:0;padding:16px 18px;overflow:hidden}
+
+/* 화면 상단 */
+.pg-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
+.pg-title{font-size:16px;font-weight:750}
+.pg-sub{font-size:12px;color:var(--text-muted);margin-top:2px}
+.btns{display:flex;gap:6px;flex-shrink:0}
+.btn{border:1px solid var(--bd-strong);background:#fff;color:var(--text);font-size:12px;padding:6px 12px;border-radius:var(--r-sm);cursor:default;white-space:nowrap}
+.btn.pri{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+.btn.ghost{color:var(--text-sub)}
+
+.banner{display:flex;gap:8px;align-items:center;border-radius:var(--r);padding:8px 12px;font-size:12.5px;margin-bottom:12px}
+.banner.warn{background:#fff8ec;border:1px solid #fde2b8;color:#8a5a09}
+.banner.ok{background:#f0f9f4;border:1px solid #c6e6d3;color:#1f6b45}
+.banner.err{background:#fff1f0;border:1px solid #ffccc7;color:#a8262a}
+
+/* 배지 */
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:100px;line-height:1.5}
+.badge.req{background:#fff1f0;color:#c0392b;border:1px solid #ffd4d1}
+.badge.opt{background:var(--bg-muted);color:var(--text-muted);border:1px solid var(--bd)}
+.badge.src{background:#eef4ff;color:#2b5fbf;border:1px solid #d3e0fb}
+.badge.draft{background:#fff8ec;color:#8a5a09;border:1px solid #fde2b8}
+
+/* ---------- 시안 A: 팔레트 + 캔버스 ---------- */
+.a-grid{display:grid;grid-template-columns:210px 1fr;gap:14px}
+.panel{background:var(--bg-surface);border:1px solid var(--bd);border-radius:var(--r);padding:12px}
+.panel h4{font-size:12px;font-weight:750;color:var(--text-sub);margin-bottom:8px;letter-spacing:.2px}
+.chip{display:flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--bd-strong);border-radius:var(--r-sm);padding:7px 9px;font-size:12.5px;margin-bottom:6px}
+.chip .grip{color:var(--bd-strong);font-size:12px;letter-spacing:-1px}
+.chip .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip.unplaced{border-style:dashed;border-color:var(--warning);background:#fffdf7}
+.chip.locked{background:var(--bg-muted);color:var(--text-muted)}
+.chip.ghost{border-style:dashed;color:var(--text-muted);background:var(--bg-muted);justify-content:center}
+.pal-count{font-size:11.5px;color:var(--warning);font-weight:700;margin-top:6px}
+
+.page-card{background:var(--bg-surface);border:1px solid var(--bd);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+.page-card.drop{border:1px dashed var(--olive);background:#fbfdf7}
+.page-card-head{display:flex;align-items:center;gap:8px;padding:9px 11px;background:var(--bg-muted);border-bottom:1px solid var(--bd)}
+.page-no{background:var(--primary);color:#fff;font-size:11px;font-weight:700;width:20px;height:20px;border-radius:var(--r-sm);display:grid;place-items:center}
+.inp{border:1px solid transparent;background:transparent;font-size:13px;font-weight:650;color:var(--text);padding:2px 6px;border-radius:var(--r-sm);width:auto;flex:1;min-width:0}
+.inp.box{border-color:var(--bd-strong);background:#fff;font-weight:400}
+.mini{font-size:11px;color:var(--text-muted)}
+.page-card-body{padding:9px 11px}
+.icon-btn{border:none;background:transparent;color:var(--text-muted);font-size:12px;cursor:default;padding:2px 4px}
+
+/* ---------- 시안 B: 3단 ---------- */
+.b-grid{display:grid;grid-template-columns:190px 1fr 200px;gap:12px}
+.list-row{display:flex;align-items:center;gap:7px;border:1px solid var(--bd);border-radius:var(--r-sm);padding:8px 9px;font-size:12.5px;margin-bottom:6px;background:#fff}
+.list-row.on{border-color:var(--primary);background:var(--bg-selected);font-weight:650;color:var(--primary)}
+.list-row .cnt{margin-left:auto;font-size:11px;color:var(--text-muted)}
+.check-row{display:flex;align-items:center;gap:9px;padding:8px 9px;border-bottom:1px solid var(--bd-subtle);font-size:12.5px}
+.check-row:last-child{border-bottom:none}
+.cb{width:14px;height:14px;border:1.5px solid var(--bd-strong);border-radius:3px;flex:0 0 auto;display:grid;place-items:center;font-size:10px;color:#fff}
+.cb.on{background:var(--primary);border-color:var(--primary)}
+.cb.dis{background:var(--bg-muted);border-color:var(--bd)}
+.check-row.dis{color:var(--text-muted)}
+.where{margin-left:auto;font-size:11px;color:var(--info)}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:11.5px;color:var(--text-sub);font-weight:650;margin-bottom:4px}
+.field .box{width:100%;border:1px solid var(--bd-strong);border-radius:var(--r-sm);padding:7px 9px;font-size:12.5px;background:#fff;color:var(--text)}
+.summary-pg{border-left:2px solid var(--bd-strong);padding-left:9px;margin-bottom:10px}
+.summary-pg.on{border-left-color:var(--primary)}
+.summary-pg b{font-size:12px;display:block;margin-bottom:3px}
+.summary-pg span{display:block;font-size:11.5px;color:var(--text-sub)}
+
+/* ---------- 시안 C: 세로 폼 ---------- */
+.c-wrap{max-width:640px;margin:0 auto}
+.pg-divider{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
+.pg-divider .line{flex:1;height:1px;background:var(--bd)}
+.pg-divider .split{font-size:11px;color:var(--text-muted);border:1px dashed var(--bd-strong);border-radius:100px;padding:2px 10px;background:#fff}
+.pg-band{display:flex;align-items:center;gap:8px;background:var(--primary-soft);border:1px solid #d9e6d2;border-left:3px solid var(--primary);border-radius:var(--r);padding:8px 11px;margin-bottom:8px}
+.sec-row{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid var(--bd);border-radius:var(--r);padding:9px 11px;margin-bottom:6px}
+.sec-row.locked{background:var(--bg-muted)}
+.sel{border:1px solid var(--bd-strong);border-radius:var(--r-sm);background:#fff;font-size:11.5px;color:var(--text-sub);padding:3px 7px;margin-left:auto}
+
+/* ---------- 장단점 ---------- */
+.pc{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.pc > div{border:1px solid var(--bd);border-radius:var(--r);padding:12px 14px;background:var(--bg-muted)}
+.pc h4{font-size:12.5px;font-weight:750;margin-bottom:7px}
+.pc.good h4{color:var(--success)}
+.pc ul{list-style:none;display:grid;gap:5px}
+.pc li{font-size:12.5px;color:var(--text-sub);padding-left:14px;position:relative}
+.pc li::before{position:absolute;left:0;top:0}
+.pc .good li::before{content:"＋";color:var(--success);font-weight:700}
+.pc .bad li::before{content:"－";color:var(--error);font-weight:700}
+
+.note{background:#f7faf5;border:1px solid #dfe8d8;border-radius:var(--r);padding:12px 14px;margin-top:14px;font-size:13px;color:#3f5540}
+.note b{color:var(--primary)}
+
+/* ---------- 표 ---------- */
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
+th,td{border:1px solid var(--bd);padding:9px 11px;text-align:left;vertical-align:top}
+th{background:var(--bg-muted);font-weight:700;font-size:12.5px;color:var(--text-sub)}
+td.hi{background:var(--primary-soft);font-weight:600}
+.star{color:var(--olive);font-weight:700}
+.q{display:grid;gap:8px;margin-top:10px}
+.q li{list-style:none;background:var(--bg-muted);border:1px solid var(--bd);border-left:3px solid var(--info);border-radius:var(--r);padding:10px 12px;font-size:13px}
+.q li b{display:block;margin-bottom:2px}
+.q li span{color:var(--text-sub);font-size:12.5px}
+@media(max-width:900px){.pc{grid-template-columns:1fr}.a-grid,.b-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="doc-head">
+    <h1>지원서 폼 레이아웃 — 관리자 화면 시안</h1>
+    <p>공고별 지원서 섹션을 페이지로 그루핑하고 순서를 정하는 관리자 화면. 백엔드 API는 이미 구현되어 있으며, 시안은 그 계약을 그대로 만족하도록 설계했다.</p>
+    <div class="doc-meta">
+      <span>GET · POST /admin/job-postings/{id}/application-form-layout</span>
+      <span>GET .../preview</span>
+      <span>2026-09-02</span>
+    </div>
+  </div>
+
+  <div class="card" style="border-left:3px solid var(--primary)">
+    <h2>확정 (2026-09-02)</h2>
+    <p><b>시안 A(팔레트 + 페이지 캔버스)로 확정되었다.</b> 확정된 정보 구조·API 계약·구현 slice 계획은 설계 보고서 <code>docs/archive/reports/admin-application-form-settings_design.html</code>가 단일 출처다. 이 문서는 시안 비교 기록으로 남긴다.</p>
+  </div>
+
+  <!-- ============ API 제약 ============ -->
+  <div class="card">
+    <h2>1. API가 강제하는 제약 (모든 시안 공통 전제)</h2>
+    <p><code>ApplicationFormLayoutValidator</code> · <code>ApplicationFormLayoutService</code>에서 읽어낸 불변식이다. 화면 설계는 이 5가지를 어길 수 없다.</p>
+    <ul class="rules">
+      <li><span class="no">1</span><span class="t"><b>배치된 섹션 집합 == 활성 섹션 집합.</b> 활성인데 안 놓아도, 비활성인데 놓아도 저장 실패다(<code>placedSections.equals(effectiveEnabledSections)</code>). 즉 "미배치 서랍"에 뭔가 남은 상태로는 저장할 수 없다.</span></li>
+      <li><span class="no">2</span><span class="t"><b>섹션의 사용/필수 여부는 이 화면에서 못 바꾼다.</b> 학력·경력 등은 공고 등록/수정 화면의 <code>ApplicationFormConfig</code>, 자기소개서는 질문 등록 여부, 첨부는 첨부요구 행에서 파생된다(<code>availableSections[].source</code>). 이 화면은 <b>그루핑 + 순서</b>만 다룬다.</span></li>
+      <li><span class="no">3</span><span class="t"><b>페이지는 최소 1개, 각 페이지는 항목 최소 1개.</b> 제목 필수(100자), 설명 500자, <code>pageNo</code>·페이지 <code>sortOrder</code>는 중복 불가, 항목 <code>sortOrder</code>는 페이지 내 중복 불가.</span></li>
+      <li><span class="no">4</span><span class="t"><b>저장은 전체 치환(POST 1회).</b> 페이지 단위 부분 저장 API가 없다 — 화면 전체를 한 번에 보내고 서버가 delete 후 재삽입한다. 낙관적 잠금도 없다.</span></li>
+      <li><span class="no">5</span><span class="t"><b>편집 가능 조건: 접수 시작 전 &amp; 마감 아님.</b> <code>editable=false</code>면 읽기 전용이어야 한다. 또 <code>layoutStored=false</code>면 지금 보이는 건 저장된 값이 아니라 <b>기본 레이아웃 초안</b>이므로 그렇게 표시해야 한다.</span></li>
+    </ul>
+    <div class="note">
+      <b>부가 발견</b> — 백엔드 <code>sectionName</code>은 영문("Basic Info", "Questions")이라 프론트에서 한글 라벨 매핑이 필요하다. 그리고 활성 섹션이 늘어난 뒤(예: 질문 추가) 기존 저장 레이아웃은 제약 1을 위반하게 되므로, <b>화면 진입 시 "새 섹션이 생겨 재배치가 필요합니다" 안내</b>가 세 시안 모두에 필요하다.
+    </div>
+  </div>
+
+  <!-- ============ 탭 ============ -->
+  <div class="tabs">
+    <button class="tab on" data-p="a">시안 A · 팔레트 + 페이지 캔버스</button>
+    <button class="tab" data-p="b">시안 B · 3단 마스터-디테일</button>
+    <button class="tab" data-p="c">시안 C · 폼 순서 그대로 편집</button>
+  </div>
+
+  <!-- ---------- 시안 A ---------- -->
+  <div class="pane on" id="p-a">
+    <div class="card">
+      <h2>시안 A — 팔레트 + 페이지 캔버스 (드래그앤드롭)</h2>
+      <p>왼쪽 서랍에 섹션을 모아두고, 오른쪽 페이지 카드로 끌어다 놓는다. 서랍이 비어야 저장 버튼이 켜진다.</p>
+
+      <div class="mock" style="margin-top:14px">
+        <div class="mock-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="mock-url">/admin/job-postings/12/form-layout</span></div>
+        <div class="mock-body">
+          <nav class="side">
+            <div class="logo">신영증권 채용관리</div>
+            <a>대시보드</a><a class="on">채용공고</a><a>지원서 현황</a><a>질문 템플릿</a><a>공통코드</a><a>메뉴 관리</a>
+          </nav>
+          <div class="content">
+            <div class="pg-head">
+              <div>
+                <div class="pg-title">지원서 폼 구성 <span class="badge draft">기본 레이아웃 · 미저장</span></div>
+                <div class="pg-sub">2026 상반기 신입공채 · 접수 시작 2026-09-15</div>
+              </div>
+              <div class="btns"><button class="btn ghost">기본값으로 초기화</button><button class="btn">미리보기</button><button class="btn pri">저장</button></div>
+            </div>
+
+            <div class="banner warn">⚠ 배치되지 않은 섹션이 2개 있습니다. 모두 페이지에 배치해야 저장할 수 있습니다.</div>
+
+            <div class="a-grid">
+              <div class="panel">
+                <h4>미배치 섹션</h4>
+                <div class="chip unplaced"><span class="grip">⠿</span><span class="nm">포상</span><span class="badge opt">선택</span></div>
+                <div class="chip unplaced"><span class="grip">⠿</span><span class="nm">공백기간</span><span class="badge opt">선택</span></div>
+                <div class="pal-count">남은 2개</div>
+                <h4 style="margin-top:14px">비활성 섹션</h4>
+                <div class="chip locked"><span class="nm">첨부파일</span><span class="mini">미사용</span></div>
+                <div class="mini" style="margin-top:6px;line-height:1.4">사용 여부는 공고 수정 화면에서 변경합니다.</div>
+              </div>
+
+              <div>
+                <div class="page-card">
+                  <div class="page-card-head">
+                    <span class="page-no">1</span>
+                    <input class="inp" value="기본 정보" readonly>
+                    <span class="mini">2개 항목</span>
+                    <button class="icon-btn">↑</button><button class="icon-btn">↓</button><button class="icon-btn">✕</button>
+                  </div>
+                  <div class="page-card-body">
+                    <div class="chip"><span class="grip">⠿</span><span class="nm">기본정보</span><span class="badge req">필수</span><span class="badge src">항상</span></div>
+                    <div class="chip"><span class="grip">⠿</span><span class="nm">병역</span><span class="badge req">필수</span><span class="badge src">공고설정</span></div>
+                  </div>
+                </div>
+
+                <div class="page-card">
+                  <div class="page-card-head">
+                    <span class="page-no">2</span>
+                    <input class="inp" value="학력 · 경력" readonly>
+                    <span class="mini">2개 항목</span>
+                    <button class="icon-btn">↑</button><button class="icon-btn">↓</button><button class="icon-btn">✕</button>
+                  </div>
+                  <div class="page-card-body">
+                    <div class="chip"><span class="grip">⠿</span><span class="nm">학력</span><span class="badge req">필수</span><span class="badge src">공고설정</span></div>
+                    <div class="chip"><span class="grip">⠿</span><span class="nm">경력</span><span class="badge opt">선택</span><span class="badge src">공고설정</span></div>
+                  </div>
+                </div>
+
+                <div class="page-card drop">
+                  <div class="page-card-head">
+                    <span class="page-no">3</span>
+                    <input class="inp" value="추가 기록" readonly>
+                    <span class="mini">2개 항목</span>
+                    <button class="icon-btn">↑</button><button class="icon-btn">↓</button><button class="icon-btn">✕</button>
+                  </div>
+                  <div class="page-card-body">
+                    <div class="chip"><span class="grip">⠿</span><span class="nm">자격증</span><span class="badge opt">선택</span></div>
+                    <div class="chip"><span class="grip">⠿</span><span class="nm">어학</span><span class="badge opt">선택</span></div>
+                    <div class="chip ghost">여기에 끌어다 놓기</div>
+                  </div>
+                </div>
+
+                <div class="page-card">
+                  <div class="page-card-head">
+                    <span class="page-no">4</span>
+                    <input class="inp" value="자기소개서" readonly>
+                    <span class="mini">1개 항목</span>
+                    <button class="icon-btn">↑</button><button class="icon-btn">↓</button><button class="icon-btn">✕</button>
+                  </div>
+                  <div class="page-card-body">
+                    <div class="chip"><span class="grip">⠿</span><span class="nm">자기소개서</span><span class="badge req">필수</span><span class="badge src">질문</span></div>
+                  </div>
+                </div>
+
+                <div class="chip ghost" style="justify-content:center;padding:10px">＋ 페이지 추가</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pc">
+        <div class="good"><h4>장점</h4><ul>
+          <li>제약 1(전부 배치)이 "서랍 비우기"라는 눈에 보이는 목표로 번역된다</li>
+          <li>페이지 간 이동·순서를 한 화면에서 직관적으로 처리</li>
+          <li>공고별 페이지 수가 달라도 전체 구조가 한눈에 보인다</li>
+        </ul></div>
+        <div class="bad"><h4>단점</h4><ul>
+          <li>DnD 라이브러리 도입 필요(vuedraggable 등) — 구현·QA 비용 최대</li>
+          <li>섹션이 10개 안팎이라 DnD가 과잉일 수 있다</li>
+          <li>키보드/접근성 대응이 별도 작업</li>
+        </ul></div>
+      </div>
+      <div class="note"><b>저장 매핑</b> — 페이지 카드 순서 → <code>pageNo</code>/<code>sortOrder</code>(0부터 재부여), 카드 내 칩 순서 → 항목 <code>sortOrder</code>. 미배치 서랍이 비었을 때만 저장 버튼 활성.</div>
+    </div>
+  </div>
+
+  <!-- ---------- 시안 B ---------- -->
+  <div class="pane" id="p-b">
+    <div class="card">
+      <h2>시안 B — 3단 마스터-디테일 (체크박스 방식)</h2>
+      <p>왼쪽에서 페이지를 고르고, 가운데에서 그 페이지의 제목·설명·포함 섹션을 체크로 지정한다. 오른쪽은 전체 요약. 기존 <code>MenuManageView</code>의 3단 컬럼 관례와 같은 계열이다.</p>
+
+      <div class="mock" style="margin-top:14px">
+        <div class="mock-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="mock-url">/admin/job-postings/12/form-layout</span></div>
+        <div class="mock-body">
+          <nav class="side">
+            <div class="logo">신영증권 채용관리</div>
+            <a>대시보드</a><a class="on">채용공고</a><a>지원서 현황</a><a>질문 템플릿</a><a>공통코드</a><a>메뉴 관리</a>
+          </nav>
+          <div class="content">
+            <div class="pg-head">
+              <div>
+                <div class="pg-title">지원서 폼 구성</div>
+                <div class="pg-sub">2026 상반기 신입공채 · 저장됨 2026-08-30 14:22</div>
+              </div>
+              <div class="btns"><button class="btn ghost">기본값으로 초기화</button><button class="btn">미리보기</button><button class="btn pri">저장</button></div>
+            </div>
+
+            <div class="banner ok">✓ 활성 섹션 8개가 모두 배치되었습니다. 저장할 수 있습니다.</div>
+
+            <div class="b-grid">
+              <div class="panel">
+                <h4>페이지 <span style="float:right;font-weight:400">4개</span></h4>
+                <div class="list-row"><span class="page-no">1</span>기본 정보<span class="cnt">2</span></div>
+                <div class="list-row on"><span class="page-no">2</span>학력 · 경력<span class="cnt">2</span></div>
+                <div class="list-row"><span class="page-no">3</span>추가 기록<span class="cnt">3</span></div>
+                <div class="list-row"><span class="page-no">4</span>자기소개서<span class="cnt">1</span></div>
+                <div class="chip ghost" style="margin-top:8px">＋ 페이지 추가</div>
+                <div style="display:flex;gap:6px;margin-top:8px"><button class="btn" style="flex:1">↑ 위로</button><button class="btn" style="flex:1">↓ 아래로</button></div>
+              </div>
+
+              <div class="panel">
+                <h4>2페이지 편집</h4>
+                <div class="field"><label>페이지 제목 <span style="color:var(--error)">*</span></label><div class="box">학력 · 경력</div></div>
+                <div class="field"><label>설명 (선택)</label><div class="box" style="color:var(--text-muted)">최종 학력부터 입력해 주세요.</div></div>
+                <div class="field" style="margin-bottom:4px"><label>이 페이지에 포함할 섹션</label></div>
+                <div style="border:1px solid var(--bd);border-radius:var(--r-sm);background:#fff">
+                  <div class="check-row dis"><span class="cb dis"></span>기본정보 <span class="badge req">필수</span><span class="where">1페이지</span></div>
+                  <div class="check-row dis"><span class="cb dis"></span>병역 <span class="badge req">필수</span><span class="where">1페이지</span></div>
+                  <div class="check-row"><span class="cb on">✓</span>학력 <span class="badge req">필수</span><span class="where">↑ ↓</span></div>
+                  <div class="check-row"><span class="cb on">✓</span>경력 <span class="badge opt">선택</span><span class="where">↑ ↓</span></div>
+                  <div class="check-row dis"><span class="cb dis"></span>자격증 <span class="badge opt">선택</span><span class="where">3페이지</span></div>
+                  <div class="check-row dis"><span class="cb dis"></span>어학 <span class="badge opt">선택</span><span class="where">3페이지</span></div>
+                  <div class="check-row dis"><span class="cb dis"></span>포상 <span class="badge opt">선택</span><span class="where">3페이지</span></div>
+                  <div class="check-row dis"><span class="cb dis"></span>자기소개서 <span class="badge req">필수</span><span class="where">4페이지</span></div>
+                  <div class="check-row dis"><span class="cb"></span>첨부파일 <span class="mini">비활성</span></div>
+                </div>
+                <div class="mini" style="margin-top:7px">다른 페이지에 배치된 섹션은 회색으로 표시되며, 체크하면 이 페이지로 이동합니다.</div>
+              </div>
+
+              <div class="panel">
+                <h4>전체 구성</h4>
+                <div class="summary-pg"><b>1. 기본 정보</b><span>기본정보 · 병역</span></div>
+                <div class="summary-pg on"><b>2. 학력 · 경력</b><span>학력 · 경력</span></div>
+                <div class="summary-pg"><b>3. 추가 기록</b><span>자격증 · 어학 · 포상</span></div>
+                <div class="summary-pg"><b>4. 자기소개서</b><span>자기소개서</span></div>
+                <div class="mini" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)">활성 8 / 배치 8<br>미배치 0</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pc">
+        <div class="good"><h4>장점</h4><ul>
+          <li>드래그 없이 체크박스 + ↑↓ 버튼만으로 구현 — 비용 최소, 버그 여지 적음</li>
+          <li>"이 섹션이 지금 몇 페이지에 있는지"가 항상 보인다</li>
+          <li>기존 관리자 3단 컬럼(MenuManageView) 조작 관례와 일치</li>
+        </ul></div>
+        <div class="bad"><h4>단점</h4><ul>
+          <li>페이지를 하나씩 오가며 편집 — 재배치가 잦으면 클릭 수가 많다</li>
+          <li>섹션 목록이 페이지마다 반복 렌더되어 화면이 다소 빽빽</li>
+          <li>지원자가 볼 실제 흐름은 오른쪽 요약으로만 짐작</li>
+        </ul></div>
+      </div>
+      <div class="note"><b>저장 매핑</b> — 왼쪽 목록 순서 → <code>pageNo</code>/<code>sortOrder</code>, 가운데 체크된 섹션의 표시 순서 → 항목 <code>sortOrder</code>. 체크 해제 시 미배치가 되므로 오른쪽 "미배치 n" 카운터가 0이 아니면 저장 차단.</div>
+    </div>
+  </div>
+
+  <!-- ---------- 시안 C ---------- -->
+  <div class="pane" id="p-c">
+    <div class="card">
+      <h2>시안 C — 지원자 폼 순서 그대로 편집 (페이지 = 구분선)</h2>
+      <p>섹션을 지원자가 보게 될 순서대로 한 줄로 세우고, 사이에 "여기서 페이지 나누기"를 끼운다. 섹션이 목록을 떠날 수 없으므로 <b>제약 1(전부 배치)을 구조적으로 위반할 수 없다.</b></p>
+
+      <div class="mock" style="margin-top:14px">
+        <div class="mock-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="mock-url">/admin/job-postings/12/form-layout</span></div>
+        <div class="mock-body">
+          <nav class="side">
+            <div class="logo">신영증권 채용관리</div>
+            <a>대시보드</a><a class="on">채용공고</a><a>지원서 현황</a><a>질문 템플릿</a><a>공통코드</a><a>메뉴 관리</a>
+          </nav>
+          <div class="content">
+            <div class="pg-head">
+              <div>
+                <div class="pg-title">지원서 폼 구성</div>
+                <div class="pg-sub">2026 상반기 신입공채 · 지원자에게 보이는 순서 그대로입니다</div>
+              </div>
+              <div class="btns"><button class="btn ghost">기본값으로 초기화</button><button class="btn">미리보기</button><button class="btn pri">저장</button></div>
+            </div>
+
+            <div class="banner ok">✓ 4개 페이지 · 활성 섹션 8개. 저장할 수 있습니다.</div>
+
+            <div class="c-wrap">
+              <div class="pg-band"><span class="page-no">1</span><input class="inp" value="기본 정보" readonly><span class="mini">설명 추가</span></div>
+              <div class="sec-row locked"><span class="grip" style="color:var(--bd-strong)">⠿</span>기본정보 <span class="badge req">필수</span><span class="badge src">항상</span><span class="mini" style="margin-left:auto">고정</span></div>
+              <div class="sec-row"><span class="grip" style="color:var(--bd-strong)">⠿</span>병역 <span class="badge req">필수</span><span class="badge src">공고설정</span><span class="sel">1페이지 ▾</span></div>
+
+              <div class="pg-divider"><span class="line"></span><span class="split">＋ 여기서 페이지 나누기</span><span class="line"></span></div>
+
+              <div class="pg-band"><span class="page-no">2</span><input class="inp" value="학력 · 경력" readonly><span class="mini">✕ 페이지 합치기</span></div>
+              <div class="sec-row"><span class="grip" style="color:var(--bd-strong)">⠿</span>학력 <span class="badge req">필수</span><span class="sel">2페이지 ▾</span></div>
+              <div class="sec-row"><span class="grip" style="color:var(--bd-strong)">⠿</span>경력 <span class="badge opt">선택</span><span class="sel">2페이지 ▾</span></div>
+
+              <div class="pg-divider"><span class="line"></span><span class="split">＋ 여기서 페이지 나누기</span><span class="line"></span></div>
+
+              <div class="pg-band"><span class="page-no">3</span><input class="inp" value="추가 기록" readonly><span class="mini">✕ 페이지 합치기</span></div>
+              <div class="sec-row"><span class="grip" style="color:var(--bd-strong)">⠿</span>자격증 <span class="badge opt">선택</span><span class="sel">3페이지 ▾</span></div>
+              <div class="sec-row"><span class="grip" style="color:var(--bd-strong)">⠿</span>어학 <span class="badge opt">선택</span><span class="sel">3페이지 ▾</span></div>
+              <div class="sec-row"><span class="grip" style="color:var(--bd-strong)">⠿</span>포상 <span class="badge opt">선택</span><span class="sel">3페이지 ▾</span></div>
+
+              <div class="pg-divider"><span class="line"></span><span class="split">＋ 여기서 페이지 나누기</span><span class="line"></span></div>
+
+              <div class="pg-band"><span class="page-no">4</span><input class="inp" value="자기소개서" readonly><span class="mini">✕ 페이지 합치기</span></div>
+              <div class="sec-row"><span class="grip" style="color:var(--bd-strong)">⠿</span>자기소개서 <span class="badge req">필수</span><span class="badge src">질문</span><span class="sel">4페이지 ▾</span></div>
+
+              <div class="mini" style="text-align:center;margin-top:12px">비활성 섹션(첨부파일)은 표시되지 않습니다. 사용 여부는 공고 수정 화면에서 변경하세요.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pc">
+        <div class="good"><h4>장점</h4><ul>
+          <li>섹션이 목록을 벗어날 수 없어 "미배치" 상태가 원천적으로 없다 → 저장 실패 사실상 제거</li>
+          <li>빈 페이지도 만들 수 없다(구분선 사이가 비면 자동 합쳐짐) → 제약 3 자동 충족</li>
+          <li>편집 화면 순서 = 지원자가 보는 순서. 미리보기 의존도가 낮다</li>
+          <li>드롭다운만으로도 조작 가능해 DnD를 나중에 얹는 점진 구현이 가능</li>
+        </ul></div>
+        <div class="bad"><h4>단점</h4><ul>
+          <li>섹션·페이지가 많아지면 세로로 길어져 전체 조망이 어렵다</li>
+          <li>"페이지 통째로 순서 바꾸기"가 자연스럽지 않다(섹션을 여럿 옮겨야 함)</li>
+          <li>페이지 설명 입력 위치가 상대적으로 눈에 덜 띈다</li>
+        </ul></div>
+      </div>
+      <div class="note"><b>저장 매핑</b> — 세로 순서를 위에서부터 훑으며 구분선 기준으로 잘라 <code>pages[]</code> 생성, 각 조각 내 순서가 항목 <code>sortOrder</code>. 화면 상태가 곧 payload라 변환 로직이 가장 단순하다.</div>
+    </div>
+  </div>
+
+  <!-- ============ 비교 ============ -->
+  <div class="card">
+    <h2>2. 비교</h2>
+    <table>
+      <thead><tr><th style="width:150px">기준</th><th>A · 팔레트+캔버스</th><th>B · 3단 마스터-디테일</th><th>C · 폼 순서 그대로</th></tr></thead>
+      <tbody>
+        <tr><th>주 조작</th><td>드래그앤드롭</td><td>체크박스 + ↑↓</td><td>드롭다운(+선택적 DnD)</td></tr>
+        <tr><th>구현 비용</th><td>높음 (DnD 라이브러리)</td><td class="hi">낮음</td><td>중간</td></tr>
+        <tr><th>저장 실패 위험</th><td>중간 (서랍 남김 가능)</td><td>중간 (체크 해제 후 방치)</td><td class="hi">거의 없음 (구조적 차단)</td></tr>
+        <tr><th>전체 조망</th><td class="hi">좋음</td><td>보통 (요약 컬럼 필요)</td><td>보통 (스크롤)</td></tr>
+        <tr><th>지원자 흐름 예측</th><td>보통</td><td>낮음</td><td class="hi">가장 높음</td></tr>
+        <tr><th>페이지 순서 변경</th><td class="hi">쉬움</td><td class="hi">쉬움 (↑↓)</td><td>불편</td></tr>
+        <tr><th>기존 관리자 관례</th><td>신규 패턴</td><td class="hi">MenuManageView와 동일 계열</td><td>신규 패턴</td></tr>
+        <tr><th>읽기 전용 모드</th><td>칩 고정 처리</td><td>입력 비활성</td><td class="hi">그대로 미리보기가 됨</td></tr>
+      </tbody>
+    </table>
+    <div class="note" style="margin-top:16px">
+      <b>추천 — C(우선) / B(차선).</b> 이 API의 최대 함정은 "활성 = 배치" 불변식이라 저장 시점에 400이 나기 쉬운 것인데, C는 그 상태 자체를 만들 수 없게 한다. 페이지 순서 변경이 자주 필요하다는 요구가 있으면 B가 낫다. A는 조작감은 가장 좋지만 섹션 10개 규모에 DnD 도입 비용이 커서 후순위로 본다.
+    </div>
+  </div>
+
+  <!-- ============ 결정 필요 ============ -->
+  <div class="card">
+    <h2>3. 시안 선택과 별개로 확인이 필요한 항목</h2>
+    <ul class="q">
+      <li><b>화면 진입 경로</b><span>공고 상세에 탭으로 붙일지, 공고 수정 화면의 마지막 단계로 붙일지, 별도 라우트(<code>/admin/job-postings/:id/form-layout</code>)로 둘지. 섹션 사용여부(공고 수정)와 그루핑(이 화면)이 나뉘어 있어 왕복이 생긴다.</span></li>
+      <li><b>접수 시작 후 진입 시</b><span><code>editable=false</code>. 화면 전체를 읽기 전용으로 할지, preview API 화면으로 리다이렉트할지.</span></li>
+      <li><b>미저장 기본 레이아웃</b><span><code>layoutStored=false</code>일 때 자동 저장할지, 배지만 띄우고 관리자가 저장을 눌러야 확정할지.</span></li>
+      <li><b>섹션 한글 라벨</b><span>백엔드가 영문 <code>sectionName</code>을 주므로 프론트 상수로 매핑한다(<code>sectionType</code> 기준). 백엔드를 한글로 바꿀지 여부.</span></li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+document.querySelectorAll('.tab').forEach(function(t){
+  t.addEventListener('click', function(){
+    document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on')});
+    document.querySelectorAll('.pane').forEach(function(x){x.classList.remove('on')});
+    t.classList.add('on');
+    document.getElementById('p-' + t.dataset.p).classList.add('on');
+  });
+});
+</script>
+</body>
+</html>
