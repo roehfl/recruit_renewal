@@ -768,13 +768,20 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 탭 구성: **[지원서 양식] [폼 구성]** — `자기소개서 질문` 탭은 이번 범위에서 제외(`TABS` 상수에 자리만 비워둔다)
 - 편집 가능 여부는 클라이언트 시계로 계산하지 않고 공고 상세의 `status` + `receptionStatus === 'UPCOMING'` 으로 판단한다(백엔드 가드와 동일 의미)
 - 진입 경로: **지원서 설정 현황(`/admin/application-forms`)의 행 클릭**이 기본이며, 공고 상세 헤더의 "지원서 설정" 버튼으로도 들어간다. route meta `activeMenuPath` 는 `/admin/application-forms` 를 가리킨다
+- **첨부 섹션(`ATTACHMENT`) 표시 정책**: 독립 첨부 섹션은 2026-09-01 프론트에서 폐지됐다(위 "지원자 첨부파일" 참고). 파일 첨부는 경력 섹션(경력기술서)과 기본정보(증명사진)에서만 받는다
+  - 폼 구성 탭의 **비활성 섹션 목록에서 `ATTACHMENT` 를 감춘다.** 켤 수 있는 섹션으로 안내하면 폐지된 섹션을 다시 쓰라는 뜻이 된다
+  - 다만 첨부 요구사항 행이 있어 `enabled = true` 인 레거시 공고는 팔레트에 그대로 노출한다. 배치하지 않으면 `placed == enabled` 불변식 때문에 저장 자체가 막히는데, 화면이 이유를 설명하지 못하게 되기 때문
+  - 백엔드 정책(`enabled = useAttachment || hasAttachmentRequirements`)은 **무변경**이다
 
 #### POST `/admin/job-postings/{jobPostingId}/application-form-config`  🟢 확정(2026-09-02, front-back 반영 완료)
 
 - 설명: 지원서 양식(섹션 사용/필수) 단독 저장. 공고 등록/수정 API에서 분리된 전용 엔드포인트다
 - 요청: 기존 `ApplicationFormConfigRequest` 재사용 — `{ useEducation, requireEducation?, useCareer, requireCareer?, useCertificate, requireCertificate?, useLanguage, requireLanguage?, useMilitary, requireMilitary?, useAward, requireAward?, useGapPeriod, requireGapPeriod?, useAttachment }`
 - 응답(200): `ApiResponse<ApplicationFormConfigResponse>`
-- 편집 가능 조건: **접수 시작 전 && 미마감**. `ApplicationFormLayoutService.validateEditable` 과 동일한 규칙으로 맞춘다(2026-09-02 결정 — 접수 중 섹션 변경은 실무에서 쓰지 않으며, 제출된 지원서와 어긋나는 것을 막는다)
+- 편집 가능 조건: `ApplicationFormEditWindow` 가 단일 출처다 — **마감이면 불가, 작성 중(DRAFT)이면 항상 가능, 게시됨(PUBLISHED)이면 접수 시작 전까지**
+  - 잠그는 이유는 이미 제출된 지원서와 어긋나지 않게 하기 위함이고, 지원서는 게시된 공고의 접수가 시작돼야 생긴다. DRAFT 는 지원서가 0건이라 접수일이 지나도 잠글 이유가 없다
+  - `publish` 는 접수 시작일이 과거인지 보지 않으므로(`validateReceptionPeriod` 는 start<end 만 검사), DRAFT 를 접수일로 잠그면 "발행은 되는데 설정은 못 고치는" 상태가 생겼다(2026-09-02 수정)
+  - 발행 후 접수 전 구간을 열어 두는 것도 의도다. 이 구간에 질문이 추가되면 `RELAYOUT_REQUIRED` 가 되는데, 되돌릴 수단(unpublish)이 없어 여기서 못 고치면 마감 외에 방법이 없다
 - 오류: 400 접수 시작 후/마감, 404 공고 없음
 - 이동 완료: `JobPostingService` 의 `toCreateApplicationFormConfig` / `toUpdateApplicationFormConfig` / `resolveUpdatedRequired` / `validateApplicationFormRequirement` 병합·검증 로직을 `ApplicationFormConfigService` 로 옮겼다
 - `require*` 를 생략(null)하면 **기존 설정값을 유지**한다. 단 해당 섹션을 끄면 필수도 함께 해제된다(`resolveUpdatedRequired`)
