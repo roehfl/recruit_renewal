@@ -174,6 +174,10 @@ const applicationStatusTypeMap: Record<string, string> = {
   WITHDRAWN: '제출취소'
 }
 
+/* 철회하지 않았고 접수기간 중이면 제출 후에도 수정할 수 있다(서버 editable 규칙과 동일). */
+const canEditApplication = (record?: MyApplicationListItem): boolean =>
+  record?.applicationStatus !== 'WITHDRAWN' && record?.accepting === true
+
 const settingModalOpen = () => {
   isSettingModalOpen.value = true;
 }
@@ -280,9 +284,9 @@ const columns: TableColumnsType<MyApplicationListItem> = [
     width: 150,
     align: 'center',
     customRender: ({ record }) =>
-      record?.applicationStatus !== 'DRAFT'
-        ? '-'
-        : h(Button, { onClick: () => goForm(record) }, () => '바로가기'),
+      canEditApplication(record)
+        ? h(Button, { onClick: () => goForm(record) }, () => '바로가기')
+        : '-',
   },
   {
     title: '전형결과 확인',
@@ -295,7 +299,7 @@ const columns: TableColumnsType<MyApplicationListItem> = [
 
 const goForm = async (record: MyApplicationListItem) => {
   
-  if(record.applicationStatus !== 'DRAFT') return
+  if(!canEditApplication(record)) return
   const selectedApplication = applicationListItems.value.find((item) => item.applicationId === record.applicationId)
   await router.push({
     path: `/applicant/${record.applicationId}/form`,

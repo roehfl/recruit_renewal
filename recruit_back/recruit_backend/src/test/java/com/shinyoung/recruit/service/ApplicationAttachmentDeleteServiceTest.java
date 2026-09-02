@@ -46,6 +46,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = {
@@ -171,8 +172,7 @@ class ApplicationAttachmentDeleteServiceTest {
 
         BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(owner.getId(), applicationId);
-        assertThatThrownBy(() -> deleteService.deleteForApplicant(owner.getId(), applicationId, attachmentId))
-                .isInstanceOf(InvalidJobApplicationException.class);
+        assertThatCode(() -> deleteService.deleteForApplicant(owner.getId(), applicationId, attachmentId)).doesNotThrowAnyException();
 
         Applicant withdrawnApplicant = createApplicant("delete-withdrawn", "Delete Withdrawn");
         Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting());

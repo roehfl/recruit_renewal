@@ -74,6 +74,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
@@ -402,7 +403,7 @@ class JobApplicationServiceTest {
     }
 
     @Test
-    void update_draft_fails_when_application_is_not_draft() {
+    void update_draft_fails_when_application_is_withdrawn() {
         Applicant submittedApplicant = createApplicant("applicant-update-submitted", "Applicant M");
         Long submittedPostingId = createPublishedJobPosting("Submitted Update Posting");
         List<Long> submittedPositionIds = jobPositionIds(submittedPostingId);
@@ -413,11 +414,11 @@ class JobApplicationServiceTest {
         seedBasicInfo(submittedApplicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
-        assertThatThrownBy(() -> jobApplicationService.updateDraft(
+        assertThatCode(() -> jobApplicationService.updateDraft(
                 submittedApplicant.getId(),
                 submittedApplicationId,
                 new ApplicationUpdateRequest(submittedPositionIds.get(1))
-        )).isInstanceOf(InvalidJobApplicationException.class);
+        )).doesNotThrowAnyException();
 
         Applicant withdrawnApplicant = createApplicant("applicant-update-withdrawn", "Applicant N");
         Long withdrawnPostingId = createPublishedJobPosting("Withdrawn Update Posting");

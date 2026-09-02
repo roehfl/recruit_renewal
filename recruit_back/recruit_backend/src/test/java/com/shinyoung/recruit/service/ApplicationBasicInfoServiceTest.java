@@ -37,6 +37,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
@@ -187,11 +188,16 @@ class ApplicationBasicInfoServiceTest {
     }
 
     @Test
-    void save_fails_when_application_is_not_draft() {
+    void save_fails_when_application_is_withdrawn() {
         Applicant applicant = createApplicant("bi-submitted", "Submitted");
         Long applicationId = createApplication(applicant);
         basicInfoService.saveBasicInfo(applicant.getId(), applicationId, domesticRequest());
         jobApplicationService.submit(applicant.getId(), applicationId);
+
+        assertThatCode(() -> basicInfoService.saveBasicInfo(applicant.getId(), applicationId, domesticRequest()))
+                .doesNotThrowAnyException();
+
+        jobApplicationService.withdraw(applicant.getId(), applicationId);
 
         assertThatThrownBy(() -> basicInfoService.saveBasicInfo(applicant.getId(), applicationId, domesticRequest()))
                 .isInstanceOf(InvalidJobApplicationException.class);

@@ -49,6 +49,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
@@ -244,23 +245,33 @@ class ApplicationEducationServiceTest {
     }
 
     @Test
-    void replace_fails_when_application_is_not_draft() {
+    void replace_fails_when_application_is_withdrawn() {
         Applicant submittedApplicant = createApplicant("education-submitted", "Education Submitted");
-        Long submittedPostingId = createPublishedJobPosting(false);
+        Long submittedPostingId = createPublishedJobPosting(true);
         Long submittedApplicationId = createApplication(submittedApplicant, submittedPostingId);
         BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(submittedApplicationId).orElseThrow());
-        jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
-
-        assertThatThrownBy(() -> applicationEducationService.replaceEducations(
+        applicationEducationService.replaceEducations(
                 submittedApplicant.getId(),
                 submittedApplicationId,
                 new EducationReplaceRequest(List.of(universityEducation(0)))
-        )).isInstanceOf(InvalidJobApplicationException.class);
+        );
+        jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
+
+        assertThatCode(() -> applicationEducationService.replaceEducations(
+                submittedApplicant.getId(),
+                submittedApplicationId,
+                new EducationReplaceRequest(List.of(universityEducation(0)))
+        )).doesNotThrowAnyException();
 
         Applicant withdrawnApplicant = createApplicant("education-withdrawn", "Education Withdrawn");
-        Long withdrawnPostingId = createPublishedJobPosting(false);
+        Long withdrawnPostingId = createPublishedJobPosting(true);
         Long withdrawnApplicationId = createApplication(withdrawnApplicant, withdrawnPostingId);
         BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(withdrawnApplicationId).orElseThrow());
+        applicationEducationService.replaceEducations(
+                withdrawnApplicant.getId(),
+                withdrawnApplicationId,
+                new EducationReplaceRequest(List.of(universityEducation(0)))
+        );
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);
 

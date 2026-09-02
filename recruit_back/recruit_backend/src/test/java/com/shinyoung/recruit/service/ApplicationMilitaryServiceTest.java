@@ -42,6 +42,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
@@ -185,21 +186,23 @@ class ApplicationMilitaryServiceTest {
     }
 
     @Test
-    void save_fails_when_application_is_not_draft() {
+    void save_fails_when_application_is_withdrawn() {
         Applicant submittedApplicant = createApplicant("military-submitted", "Military Submitted");
-        Long submittedApplicationId = createApplication(submittedApplicant, createPublishedJobPosting(false));
+        Long submittedApplicationId = createApplication(submittedApplicant, createPublishedJobPosting(true));
         BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(submittedApplicationId).orElseThrow());
+        applicationMilitaryService.saveMilitary(submittedApplicant.getId(), submittedApplicationId, completedRequest());
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
-        assertThatThrownBy(() -> applicationMilitaryService.saveMilitary(
+        assertThatCode(() -> applicationMilitaryService.saveMilitary(
                 submittedApplicant.getId(),
                 submittedApplicationId,
                 subjectRequest(MilitarySubjectType.SUBJECT)
-        )).isInstanceOf(InvalidJobApplicationException.class);
+        )).doesNotThrowAnyException();
 
         Applicant withdrawnApplicant = createApplicant("military-withdrawn", "Military Withdrawn");
-        Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting(false));
+        Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting(true));
         BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(withdrawnApplicationId).orElseThrow());
+        applicationMilitaryService.saveMilitary(withdrawnApplicant.getId(), withdrawnApplicationId, completedRequest());
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);
 

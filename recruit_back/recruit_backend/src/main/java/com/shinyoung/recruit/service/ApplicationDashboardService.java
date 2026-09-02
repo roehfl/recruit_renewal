@@ -37,7 +37,7 @@ public class ApplicationDashboardService {
         ApplicationCompletionReadChecker.CompletionReadinessResult completion = completionReadChecker.check(application);
         ApplicationResultSummary resultSummary = loadResultSummary(applicationId);
 
-        boolean editable = application.getStatus() == JobApplicationStatus.DRAFT && accepting;
+        boolean editable = application.getStatus() != JobApplicationStatus.WITHDRAWN && accepting;
         boolean submittable = application.getStatus() == JobApplicationStatus.DRAFT
                 && accepting
                 && completion.summary().submitBlockingIssueCount() == 0;

@@ -39,6 +39,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
@@ -151,17 +152,17 @@ class ApplicationLanguageServiceTest {
     }
 
     @Test
-    void replace_fails_when_application_is_not_draft() {
+    void replace_fails_when_application_is_withdrawn() {
         Applicant submittedApplicant = createApplicant("language-submitted", "Language Submitted");
         Long submittedApplicationId = createApplication(submittedApplicant, createPublishedJobPosting(true));
         BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(submittedApplicationId).orElseThrow());
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
-        assertThatThrownBy(() -> applicationLanguageService.replaceLanguages(
+        assertThatCode(() -> applicationLanguageService.replaceLanguages(
                 submittedApplicant.getId(),
                 submittedApplicationId,
                 new LanguageReplaceRequest(List.of(language("English", "TOEIC", 0)))
-        )).isInstanceOf(InvalidJobApplicationException.class);
+        )).doesNotThrowAnyException();
 
         Applicant withdrawnApplicant = createApplicant("language-withdrawn", "Language Withdrawn");
         Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting(true));

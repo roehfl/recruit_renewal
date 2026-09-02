@@ -137,7 +137,7 @@ public class JobApplicationService {
     public Long updateDraft(Long applicantId, Long applicationId, ApplicationUpdateRequest request) {
         JobApplication application = findApplication(applicantId, applicationId);
         validatePublishedAndAccepting(application.getJobPosting());
-        validateDraftForUpdate(application);
+        validateWritableForUpdate(application);
 
         JobPosition jobPosition = findJobPosition(request.jobPositionId(), application.getJobPosting().getId());
         String workLocationCode = normalizeWorkLocationCode(request.workLocationCode());
@@ -427,9 +427,9 @@ public class JobApplicationService {
                 && (jobPosting.getDisplayEndDateTime() == null || !now.isAfter(jobPosting.getDisplayEndDateTime()));
     }
 
-    private void validateDraftForUpdate(JobApplication application) {
-        if (application.getStatus() != JobApplicationStatus.DRAFT) {
-            throw new InvalidJobApplicationException("임시저장 상태의 지원서만 수정할 수 있습니다.");
+    private void validateWritableForUpdate(JobApplication application) {
+        if (application.getStatus() == JobApplicationStatus.WITHDRAWN) {
+            throw new InvalidJobApplicationException("철회된 지원서는 수정할 수 없습니다.");
         }
     }
 

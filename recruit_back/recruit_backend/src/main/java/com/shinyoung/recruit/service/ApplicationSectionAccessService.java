@@ -26,8 +26,8 @@ public class ApplicationSectionAccessService {
     }
 
     public void validateWritable(JobApplication application) {
-        if (application.getStatus() != JobApplicationStatus.DRAFT) {
-            throw new InvalidJobApplicationException("Application detail can be modified only in DRAFT status.");
+        if (application.getStatus() == JobApplicationStatus.WITHDRAWN) {
+            throw new InvalidJobApplicationException("Withdrawn application detail cannot be modified.");
         }
         if (application.getJobPosting().getStatus() != JobPostingStatus.PUBLISHED) {
             throw new InvalidJobApplicationException("Application detail can be modified only for a published job posting.");

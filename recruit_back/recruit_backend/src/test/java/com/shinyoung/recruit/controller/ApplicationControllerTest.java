@@ -245,13 +245,14 @@ class ApplicationControllerTest {
     }
 
     @Test
-    void update_draft_invalid_state_returns_api_response() throws Exception {
+    void update_withdrawn_invalid_state_returns_api_response() throws Exception {
         Applicant applicant = createApplicant("api-update-state", "Api Update State");
         Long jobPostingId = createPublishedJobPosting();
         List<Long> jobPositionIds = jobPositionIds(jobPostingId);
         Long applicationId = createApplication(applicant, jobPostingId, jobPositionIds.get(0));
         BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(applicant.getId(), applicationId);
+        jobApplicationService.withdraw(applicant.getId(), applicationId);
         authenticate(applicant);
 
         mockMvc.perform(post("/api/applications/{applicationId}", applicationId)
@@ -508,7 +509,7 @@ class ApplicationControllerTest {
                 .andExpect(jsonPath("$.data.jobPositionName").value("Backend"))
                 .andExpect(jsonPath("$.data.applicationStatus").value("SUBMITTED"))
                 .andExpect(jsonPath("$.data.accepting").value(true))
-                .andExpect(jsonPath("$.data.editable").value(false))
+                .andExpect(jsonPath("$.data.editable").value(true))
                 .andExpect(jsonPath("$.data.submittable").value(false))
                 .andExpect(jsonPath("$.data.withdrawable").value(true))
                 .andExpect(jsonPath("$.data.submittedAt").exists())

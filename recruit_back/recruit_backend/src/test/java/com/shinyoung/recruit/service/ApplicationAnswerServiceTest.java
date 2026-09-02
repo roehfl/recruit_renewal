@@ -44,6 +44,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
@@ -257,11 +258,11 @@ class ApplicationAnswerServiceTest {
         BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(submittedApplicationId).orElseThrow());
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
-        assertThatThrownBy(() -> applicationAnswerService.replaceAnswers(
+        assertThatCode(() -> applicationAnswerService.replaceAnswers(
                 submittedApplicant.getId(),
                 submittedApplicationId,
                 new ApplicationAnswerReplaceRequest(List.of(new ApplicationAnswerRequest(submittedQuestion.questionId(), "answer")))
-        )).isInstanceOf(InvalidJobApplicationException.class);
+        )).doesNotThrowAnyException();
 
         Applicant withdrawnApplicant = createApplicant("answer-withdrawn", "Answer Withdrawn");
         Long withdrawnPostingId = createJobPosting();

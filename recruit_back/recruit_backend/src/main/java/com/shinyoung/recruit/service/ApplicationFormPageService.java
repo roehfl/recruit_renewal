@@ -64,7 +64,7 @@ public class ApplicationFormPageService {
         layoutValidator.validate(pages, enabledSections, requiredSections);
 
         boolean accepting = isAccepting(jobPosting);
-        boolean editable = application.getStatus() == JobApplicationStatus.DRAFT && accepting;
+        boolean editable = application.getStatus() != JobApplicationStatus.WITHDRAWN && accepting;
         return ApplicationFormPageResponse.from(
                 application,
                 accepting,

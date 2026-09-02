@@ -40,6 +40,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
@@ -359,20 +360,20 @@ class ApplicationCareerServiceTest {
     }
 
     @Test
-    void replace_fails_when_application_is_not_draft() {
+    void replace_fails_when_application_is_withdrawn() {
         Applicant submittedApplicant = createApplicant("career-submitted", "Career Submitted");
-        Long submittedApplicationId = createApplication(submittedApplicant, createPublishedJobPosting(false));
+        Long submittedApplicationId = createApplication(submittedApplicant, createPublishedJobPosting(true));
         BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(submittedApplicationId).orElseThrow());
         jobApplicationService.submit(submittedApplicant.getId(), submittedApplicationId);
 
-        assertThatThrownBy(() -> applicationCareerService.replaceCareers(
+        assertThatCode(() -> applicationCareerService.replaceCareers(
                 submittedApplicant.getId(),
                 submittedApplicationId,
                 new CareerReplaceRequest(List.of())
-        )).isInstanceOf(InvalidJobApplicationException.class);
+        )).doesNotThrowAnyException();
 
         Applicant withdrawnApplicant = createApplicant("career-withdrawn", "Career Withdrawn");
-        Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting(false));
+        Long withdrawnApplicationId = createApplication(withdrawnApplicant, createPublishedJobPosting(true));
         BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(withdrawnApplicationId).orElseThrow());
         jobApplicationService.submit(withdrawnApplicant.getId(), withdrawnApplicationId);
         jobApplicationService.withdraw(withdrawnApplicant.getId(), withdrawnApplicationId);

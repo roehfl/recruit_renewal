@@ -222,6 +222,9 @@ const selectedPositionText = computed(() => {
 
 const canEdit = computed(() => formPage.value?.editable === true)
 
+/* 최종 제출은 임시저장 상태에서만 가능하다. 제출 이후에는 수정·임시저장만 허용한다. */
+const canSubmit = computed(() => canEdit.value && formPage.value?.applicationStatus === 'DRAFT')
+
 /*
  * 지원분야 변경 모달. 임시저장(DRAFT) 상태에서만 열 수 있고, 저장은 POST /applications/{id} 한 번이다.
  * 후보 목록은 공개 공고 상세를 재사용해 받아오며(모달 최초 오픈 시 1회) 별도 API를 두지 않는다.
@@ -803,7 +806,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
                 임시저장
               </a-button>
 
-              <a-button type="primary" :disabled="!canEdit" :loading="submitting" @click="confirmSubmit">
+              <a-button type="primary" :disabled="!canSubmit" :loading="submitting" @click="confirmSubmit">
                 <SendOutlined />
                 최종 제출
               </a-button>

@@ -43,6 +43,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = {
@@ -240,14 +241,14 @@ class ApplicationAttachmentFileServiceTest {
         BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(owner.getId(), applicationId);
 
-        assertThatThrownBy(() -> applicationAttachmentFileService.upload(
+        assertThatCode(() -> applicationAttachmentFileService.upload(
                 owner.getId(),
                 applicationId,
                 file("resume.pdf", "application/pdf", "content"),
                 AttachmentType.RESUME,
                 ApplicationSectionType.APPLICATION,
                 null
-        )).isInstanceOf(InvalidJobApplicationException.class);
+        )).doesNotThrowAnyException();
     }
 
     private MockMultipartFile file(String originalFileName, String contentType, String content) {

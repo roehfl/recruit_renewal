@@ -215,10 +215,10 @@ class ApplicationFormPageServiceTest {
     }
 
     @Test
-    void editable_is_true_only_for_draft_accepting_application() {
+    void editable_is_false_only_for_withdrawn_application() {
         JobPosting acceptingPosting = posting(JobPostingStatus.PUBLISHED, config());
         stubApplication(application(JobApplicationStatus.SUBMITTED, acceptingPosting));
-        assertThat(formPageService.getFormPage(APPLICANT_ID, APPLICATION_ID).editable()).isFalse();
+        assertThat(formPageService.getFormPage(APPLICANT_ID, APPLICATION_ID).editable()).isTrue();
 
         stubApplication(application(JobApplicationStatus.WITHDRAWN, acceptingPosting));
         assertThat(formPageService.getFormPage(APPLICANT_ID, APPLICATION_ID).editable()).isFalse();
