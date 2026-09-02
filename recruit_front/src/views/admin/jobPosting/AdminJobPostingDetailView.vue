@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { adminJobPostingApi } from '@/api/adminJobPostingApi'
+import { adminApplicationFormApi } from '@/api/admin/adminApplicationFormApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import JobPostingImageStack from '@/components/jobPosting/JobPostingImageStack.vue'
 import HtmlView from '@/views/common/htmlView.vue'
@@ -50,10 +51,27 @@ const loadDetail = async () => {
   }
 }
 
-const publish = () => {
+/*
+ * 지원서 설정을 한 번도 저장하지 않아도 발행 자체는 된다(기본 레이아웃으로 동작).
+ * 다만 관리자가 확인하지 않은 채 나가는 일이 없도록 발행 직전에 한 번 짚어준다.
+ */
+const isLayoutStored = async (): Promise<boolean> => {
+  try {
+    const response = await adminApplicationFormApi.getLayout(postingId.value)
+    return response.data.data.layoutStored
+  } catch {
+    // 지원서 항목 설정이 없으면 레이아웃 조회 자체가 실패한다. 이 경우도 확인 대상으로 본다.
+    return false
+  }
+}
+
+const publish = async () => {
+  const layoutStored = await isLayoutStored()
   Modal.confirm({
-    title: '공고를 발행할까요?',
-    content: '발행하면 지원자 화면에 노출됩니다. 미리보기 검수를 완료했는지 확인해 주세요.',
+    title: layoutStored ? '공고를 발행할까요?' : '지원서 설정을 확인하지 않았습니다',
+    content: layoutStored
+      ? '발행하면 지원자 화면에 노출됩니다. 미리보기 검수를 완료했는지 확인해 주세요.'
+      : '지원서 폼 구성을 저장한 적이 없어 기본 구성으로 발행됩니다. 이대로 발행할까요?',
     okText: '발행',
     cancelText: '취소',
     async onOk() {

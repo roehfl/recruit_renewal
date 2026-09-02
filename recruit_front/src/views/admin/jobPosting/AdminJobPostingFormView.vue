@@ -182,8 +182,9 @@ const save = async () => {
         buildSaveRequest(),
         images.value.map((image) => ({ file: image.file!, altText: image.altText.trim() })),
       )
-      message.success('공고가 등록되었습니다. 미리보기로 검수 후 발행해 주세요.')
-      void router.push({ name: 'AdminJobPostingDetail', params: { id: response.data.data } })
+      message.success('공고가 등록되었습니다. 지원서 설정을 마친 뒤 발행해 주세요.')
+      // 작성 → 지원서 설정 → 발행 순서를 화면 동선으로 드러낸다.
+      void router.push({ name: 'AdminApplicationFormDetail', params: { jobPostingId: response.data.data } })
       return
     }
 
