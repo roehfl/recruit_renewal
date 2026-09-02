@@ -294,7 +294,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
 /* 로고 이미지 원본 비율을 유지한다. */
 .brand-logo-img {
   display: block;
-  height: 40px;
+  height: 28px;
   width: auto;
   object-fit: contain;
 }
