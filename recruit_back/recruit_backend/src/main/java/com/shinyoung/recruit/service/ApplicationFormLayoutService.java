@@ -142,21 +142,17 @@ public class ApplicationFormLayoutService {
     }
 
     private boolean isEditable(JobPosting jobPosting) {
-        if (jobPosting.getStatus() == JobPostingStatus.CLOSED) {
-            return false;
-        }
-        LocalDateTime now = LocalDateTime.now(clock);
-        return now.isBefore(jobPosting.getReceptionStartDateTime());
+        return ApplicationFormEditWindow.isEditable(jobPosting, LocalDateTime.now(clock));
     }
 
     private void validateEditable(JobPosting jobPosting) {
+        if (isEditable(jobPosting)) {
+            return;
+        }
         if (jobPosting.getStatus() == JobPostingStatus.CLOSED) {
             throw new InvalidApplicationFormLayoutException("마감된 채용공고의 레이아웃은 수정할 수 없습니다.");
         }
-        LocalDateTime now = LocalDateTime.now(clock);
-        if (!now.isBefore(jobPosting.getReceptionStartDateTime())) {
-            throw new InvalidApplicationFormLayoutException("접수가 시작된 채용공고의 레이아웃은 수정할 수 없습니다.");
-        }
+        throw new InvalidApplicationFormLayoutException("접수가 시작된 채용공고의 레이아웃은 수정할 수 없습니다.");
     }
 
     private List<ApplicationFormPage> toEntities(JobPosting jobPosting, ApplicationFormLayoutSaveRequest request) {

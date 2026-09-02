@@ -14,7 +14,6 @@ import com.shinyoung.recruit.dto.response.AdminApplicationFormSummaryResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.enumeration.ApplicationFormConfigState;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
-import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.enumeration.ReceptionStatus;
 import com.shinyoung.recruit.exception.InvalidJobPostingException;
 import lombok.RequiredArgsConstructor;
@@ -140,7 +139,7 @@ public class AdminApplicationFormSummaryService {
                 layout.stored(),
                 layout.pageCount(),
                 resolveConfigState(config, enabledSections, layout),
-                isEditable(jobPosting, now),
+                ApplicationFormEditWindow.isEditable(jobPosting, now),
                 jobPosting.getUpdatedAt()
         );
     }
@@ -161,13 +160,6 @@ public class AdminApplicationFormSummaryService {
             return ApplicationFormConfigState.RELAYOUT_REQUIRED;
         }
         return ApplicationFormConfigState.OK;
-    }
-
-    private boolean isEditable(JobPosting jobPosting, LocalDateTime now) {
-        if (jobPosting.getStatus() == JobPostingStatus.CLOSED) {
-            return false;
-        }
-        return now.isBefore(jobPosting.getReceptionStartDateTime());
     }
 
     private boolean matches(

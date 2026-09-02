@@ -38,12 +38,17 @@ const statusColorMap: Record<string, string> = {
 }
 
 /*
- * 편집 가능 조건은 백엔드와 동일하다(접수 시작 전 && 미마감).
- * 클라이언트 시계로 계산하지 않고 서버가 내려준 receptionStatus 를 그대로 쓴다.
+ * 편집 가능 조건은 백엔드 ApplicationFormEditWindow 와 동일하다.
+ * 작성 중(DRAFT) 공고는 지원서가 0건이라 접수일이 지나도 수정할 수 있고,
+ * 게시된 공고는 접수 시작 전까지만 수정할 수 있다.
+ * 클라이언트 시계로 계산하지 않고 서버가 내려준 status/receptionStatus 를 그대로 쓴다.
  */
-const editable = computed(
-  () => detail.value !== null && detail.value.status !== 'CLOSED' && detail.value.receptionStatus === 'UPCOMING',
-)
+const editable = computed(() => {
+  if (detail.value === null || detail.value.status === 'CLOSED') {
+    return false
+  }
+  return detail.value.status === 'DRAFT' || detail.value.receptionStatus === 'UPCOMING'
+})
 
 const formatDateTime = (value: string | null) => (value ? value.replace('T', ' ').slice(0, 16) : '-')
 

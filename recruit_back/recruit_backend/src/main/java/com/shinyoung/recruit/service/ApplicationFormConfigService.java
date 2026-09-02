@@ -74,18 +74,15 @@ public class ApplicationFormConfigService {
         return ApplicationFormConfigResponse.from(jobPosting.getApplicationFormConfig());
     }
 
-    /**
-     * 지원서 양식은 레이아웃과 같은 시점 규칙을 따른다(접수 시작 전 && 미마감).
-     * 접수 중에 섹션을 끄면 이미 제출된 지원서와 어긋나기 때문이다.
-     */
+    /** 지원서 양식은 레이아웃과 같은 시점 규칙을 따른다(ApplicationFormEditWindow). */
     private void validateEditable(JobPosting jobPosting) {
+        if (ApplicationFormEditWindow.isEditable(jobPosting, LocalDateTime.now(clock))) {
+            return;
+        }
         if (jobPosting.getStatus() == JobPostingStatus.CLOSED) {
             throw new InvalidJobPostingException("마감된 채용공고의 지원서 양식은 수정할 수 없습니다.");
         }
-        LocalDateTime now = LocalDateTime.now(clock);
-        if (!now.isBefore(jobPosting.getReceptionStartDateTime())) {
-            throw new InvalidJobPostingException("접수가 시작된 채용공고의 지원서 양식은 수정할 수 없습니다.");
-        }
+        throw new InvalidJobPostingException("접수가 시작된 채용공고의 지원서 양식은 수정할 수 없습니다.");
     }
 
     private ApplicationFormConfig merge(ApplicationFormConfigRequest request, ApplicationFormConfig currentConfig) {

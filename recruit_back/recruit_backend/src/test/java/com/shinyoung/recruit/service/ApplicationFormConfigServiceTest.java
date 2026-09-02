@@ -154,8 +154,23 @@ class ApplicationFormConfigServiceTest {
     }
 
     @Test
-    void 접수가_시작되면_양식을_수정할_수_없다() {
+    void 작성_중_공고는_접수일이_지나도_양식을_수정할_수_있다() {
+        // 지원서는 게시된 공고의 접수가 시작돼야 생긴다. DRAFT 는 지원서가 0건이라 잠글 이유가 없다.
         Long id = jobPostingService.create(createRequest(STARTED_RECEPTION_START, STARTED_RECEPTION_END, null));
+
+        ApplicationFormConfigResponse response = applicationFormConfigService.save(
+                id,
+                new ApplicationFormConfigRequest(true, false, false, false, false, false, false)
+        );
+
+        assertThat(response.useEducation()).isTrue();
+        assertThat(response.useCareer()).isFalse();
+    }
+
+    @Test
+    void 게시된_공고는_접수가_시작되면_양식을_수정할_수_없다() {
+        Long id = jobPostingService.create(createRequest(STARTED_RECEPTION_START, STARTED_RECEPTION_END, null));
+        jobPostingService.publish(id);
 
         ApplicationFormConfigRequest request =
                 new ApplicationFormConfigRequest(true, false, false, false, false, false, false);

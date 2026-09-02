@@ -142,6 +142,8 @@ class AdminApplicationFormSummaryServiceTest {
     void 편집_가능한_공고만_볼_수_있다() {
         Long editableId = createPosting("접수 전 공고", FUTURE_START, FUTURE_END);
         Long startedId = createPosting("접수 중 공고", STARTED_START, STARTED_END);
+        // DRAFT 는 접수일과 무관하게 편집 가능하므로, 잠기려면 게시되어 있어야 한다.
+        jobPostingService.publish(startedId);
 
         PageResponse<AdminApplicationFormSummaryResponse> result = summaryService.getSummaries(
                 new AdminApplicationFormSummarySearchRequest(null, null, null, true, null),
