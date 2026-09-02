@@ -47,7 +47,14 @@ const sectionMeta = computed<Record<string, availableSectionsItem>>(() =>
   Object.fromEntries(sections.value.map((section) => [section.sectionType, section])),
 )
 
-const disabledSections = computed(() => sections.value.filter((section) => !section.enabled))
+/*
+ * 첨부 섹션은 2026-09-01 프론트에서 폐지됐다(파일 첨부는 경력기술서·증명사진으로만 받는다).
+ * 백엔드 enum 과 정책은 남아 있지만 관리자에게 "켤 수 있는 섹션"으로 보여줄 이유가 없으므로
+ * 비활성 목록에서 감춘다. 다만 레거시 데이터로 이미 활성인 공고는 배치해야 저장되므로 팔레트에는 그대로 나온다.
+ */
+const disabledSections = computed(() =>
+  sections.value.filter((section) => !section.enabled && section.sectionType !== 'ATTACHMENT'),
+)
 
 const isRequired = (type: sectionType) => Boolean(sectionMeta.value[type]?.required)
 
@@ -421,6 +428,24 @@ onMounted(load)
 }
 .tab-alert {
   margin-bottom: 14px;
+}
+/* 기본 success 톤이 어두워 "저장할 수 있다"는 신호가 약하다. 더 밝고 선명한 녹색으로 올린다. */
+.tab-alert.ant-alert-success {
+  background: #e9fdf3;
+  border-color: #6fe0ab;
+
+  :deep(.ant-alert-message) {
+    color: #0b8f52;
+    font-weight: 700;
+  }
+
+  :deep(.ant-alert-description) {
+    color: #2b7a58;
+  }
+
+  :deep(.anticon) {
+    color: #12b76a;
+  }
 }
 
 .layout-grid {
