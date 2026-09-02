@@ -35,7 +35,6 @@
                 <div class="itme-nice" v-if="!isNiceAuthComplete">
                     <div class="item-nice-left-area">
                         <div class="item-nice-title">
-                        <span class="item-nice-icon">NICE</span>
                         <span class="item-nice-text">본인인증을 진행해주세요</span>
                         </div>
                         <span class="item-nice-description">이름 · 전화번호 입력을 통해 본인인증을 진행합니다.</span>
@@ -363,7 +362,8 @@ const clickToEmailCertificationButton = async () => {
 }
 
 .remove-btn:hover {
-  background: #fff2f0;
+  /* background: #fff2f0; */
+  background: var(--app-bg-btn-hover);
 }
 
 /* =========================
@@ -451,7 +451,7 @@ const clickToEmailCertificationButton = async () => {
 }
 
 .item-nice-description {
-  margin-left: 10px;
+  margin-left: 4px;
   margin-bottom: 10px;
   color: white;
 }
@@ -476,18 +476,17 @@ const clickToEmailCertificationButton = async () => {
 
 .itme-mail-area {
     width: 95%;
-    margin-bottom: 10px;
 }
 
 .item-abreast {
   display: flex;
-  align-items: start;
+  align-items: center;
   width: 100%;
+  margin-bottom: 20px;
 }
 
 .item {
   margin-right: 15px;
-  margin-bottom: 10px;
 }
 
 .mail-button {

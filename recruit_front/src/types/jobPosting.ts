@@ -160,3 +160,27 @@ export interface NewPostingImage {
   file: File
   altText: string
 }
+
+export interface QuestionTemplateRequest {
+  title: string
+  questionText: string
+  helperText: string | null
+  category: 'SELF_INTRODUCTION' | 'GENERAL' | 'JOB_SPECIFIC' | 'ETC'
+  answerType: 'SHORT_TEXT' | 'LONG_TEXT'
+  defaultRequired: boolean
+  defaultMaxLength: number
+}
+
+export interface QuestionTemplateItem {
+  templateId: number,
+  title: string,
+  questionText: string ,
+  helperText: string | null,
+  category: 'SELF_INTRODUCTION' | 'GENERAL' | 'JOB_SPECIFIC' | 'ETC',
+  answerType: 'SHORT_TEXT' | 'LONG_TEXT',
+  defaultRequired: boolean,
+  defaultMaxLength: number,
+  active: boolean | null,
+  createdAt: string | null,
+  updatedAt: string | null
+}

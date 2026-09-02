@@ -122,7 +122,6 @@ const handleLogin = async () => {
           :rules="rules"
           layout="vertical"
           autocomplete="off"
-          @finish="handleLogin"
         >
           <a-form-item label="아이디" name="loginId">
             <a-input v-model:value="form.loginId" size="large" placeholder="이메일 또는 사내 계정">
@@ -147,6 +146,7 @@ const handleLogin = async () => {
             size="large"
             block
             :loading="loading"
+            @click="handleLogin"
           >
             로그인
           </a-button>

@@ -7,6 +7,12 @@ import type {
   AdminJobPostingSaveRequest,
   NewPostingImage,
 } from '@/types/jobPosting'
+import type {
+  QuestionTemplateItem,
+  QuestionTemplateRequest,
+  QuestionRequest,
+  QuestionItem
+} from '@/types/question'
 
 const UPLOAD_TIMEOUT_MS = 120000 // 기본 10초로는 다장 이미지 업로드가 끊길 수 있다.
 
@@ -62,4 +68,39 @@ export const adminJobPostingApi = {
   fetchImageBlob(id: number, imageId: number) {
     return apiClient.get<Blob>(`/admin/job-postings/${id}/images/${imageId}/file`, { responseType: 'blob' })
   },
+
+  // 질문 템플릿
+  createQuestionTemplate(request: QuestionTemplateRequest) {
+    return apiClient.post<ApiResponse<QuestionTemplateRequest>>(`/admin/question-templates`, request)
+  },
+  updateQuestionTemplate(templateId: number, request: QuestionTemplateRequest) {
+    return apiClient.post<ApiResponse<QuestionTemplateRequest>>(`/admin/question-templates/${templateId}`, request)
+  },
+  selectQuestionTemplate(templateId: number) {
+    return apiClient.get<ApiResponse<QuestionTemplateItem>>(`/admin/question-templates/${templateId}`)
+  },
+  getQuestionTemplates(page = 0, size = 20) {
+    return apiClient.get<ApiResponse<PageResponse<QuestionTemplateItem>>>(`/admin/question-templates`, {
+      params: {
+        page,
+        size
+      },
+    })
+  },
+  getQuestionTemplatesActive(page = 0, size = 50, active: boolean) {
+    return apiClient.get<ApiResponse<PageResponse<QuestionTemplateItem>>>(`/admin/question-templates`, {
+      params: {
+        page,
+        size,
+        active
+      },
+    })
+  },
+  setQuestionActive(templateId: number) {
+    return apiClient.post<ApiResponse<QuestionTemplateItem>>(`/admin/question-templates/${templateId}/activate`)
+  },
+  setQuestionDeactive(templateId: number) {
+    return apiClient.post<ApiResponse<QuestionTemplateItem>>(`/admin/question-templates/${templateId}/deactivate`)
+  },
+
 }

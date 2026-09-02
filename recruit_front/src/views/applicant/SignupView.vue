@@ -14,65 +14,64 @@
         layout="vertical"
         autocomplete="off">
 
-          <a-form-item label="이메일" name="loginId">
-            <div class="item-abreast">
-              <a-input class="item" size="large" placeholder="이메일을 입력해주세요."
-                v-model:value="form.loginId" :disabled="isEmailCertificationDone"></a-input>   
-              <a-button type="primary" class="mail-button" v-if="!isEmailCertificationDone"
-                @click="clickToEmailCheckButton">메일 인증</a-button>
+            <a-form-item label="이메일" name="loginId">
+              <div class="item-abreast">
+                <a-input class="item" size="large" placeholder="이메일을 입력해주세요."
+                  v-model:value="form.loginId" :disabled="isEmailCertificationDone"></a-input>   
+                <a-button type="primary" class="mail-button" v-if="!isEmailCertificationDone"
+                  @click="clickToEmailCheckButton">메일 인증</a-button>
                 <a-button type="primary" class="mail-button" v-if="isEmailCertificationDone"
-                :disabled="isEmailCertificationDone">인증 완료</a-button>
-            </div>
-            <span class="item-description">수신 가능한 E-mail입력 (해당 메일로 전형결과 등 안내 예정)</span>
-          </a-form-item>
-
-          <a-form-item>
-            <div class="item-abreast" v-if="isEmailCertification">
-              <a-input class="item" size="large" placeholder="이메일 인증번호를 입력해주세요.">
-                <template #prefix>
-                </template>
-              </a-input>    
-              <a-button type="primary" class="mail-button" @click="clickToEmailCertificationButton">인증확인</a-button>
-            </div>
-          </a-form-item>
-          
-          <div class="item-abreast">
-            <a-form-item class="item" label="비밀번호" name="password">
-              <a-input-password v-model:value="form.password" size="large" placeholder="비밀번호를 입력해주세요."></a-input-password>
-            </a-form-item>
-            <a-form-item label="비밀번호확인" name="passwordConfirm"
-            :validate-status="isPasswordMismatch ? 'error' : ''"
-            :help="isPasswordMismatch ? '비밀번호가 일치하지 않습니다.' : ''">
-              <a-input-password v-model:value="form.passwordConfirm" size="large" placeholder="비밀번호를 다시 입력해주세요."></a-input-password>
-            </a-form-item>
-          </div>
-          
-          <a-form-item class="item-group" v-if="!isNiceAuthComplete">
-            <div class="itme-nice">
-              <div class="item-nice-left-area">
-                <div class="item-nice-title">
-                  <span class="item-nice-icon">NICE</span>
-                  <span class="item-nice-text">본인인증을 진행해주세요</span>
-                </div>
-                <span class="item-nice-description">이름 · 전화번호 입력을 통해 본인인증을 진행합니다.</span>
+                  :disabled="isEmailCertificationDone">인증 완료</a-button>
               </div>
-                <a-button class="item-nice-button" @click="clickToNiceAuthPopupOpen" :disable="isNiceAuthComplete">본인 인증</a-button>
-            </div>            
-            <span class="item-description">수신 가능한 전화번호 입력 (해당 연락처로 전형결과등 안내 예정)</span>
-          </a-form-item>
+              <span class="item-description">수신 가능한 E-mail입력 (해당 메일로 전형결과 등 안내 예정)</span>
+            </a-form-item>
 
-          <a-form-item class="item-group" v-if="isNiceAuthComplete">
-            <div class="itme-nice-complete">
-              <div class="item-nice-left-area">
-                <div class="item-nice-title">
-                  <span class="item-nice-icon">NICE</span>
-                  <span class="item-nice-text">본인인증이 완료되었습니다</span>
-                </div>
-                <span class="item-nice-description">인증 완료 후 재인증이 불가능합니다.</span>
+            <a-form-item>
+              <div class="item-abreast" v-if="isEmailCertification">
+                <a-input class="item" size="large" placeholder="이메일 인증번호를 입력해주세요.">
+                  <template #prefix>
+                  </template>
+                </a-input>    
+                <a-button type="primary" class="mail-button" @click="clickToEmailCertificationButton">인증확인</a-button>
               </div>
-              <!-- TODO: 인증 완료 된 상태면 "인증 완료" 문구를 띄우거나  버튼을 막아버리기 -->
-                <a-button class="item-nice-button">인증 완료</a-button>
+            </a-form-item>
+            
+            <div class="item-abreast">
+              <a-form-item class="item" label="비밀번호" name="password">
+                <a-input-password v-model:value="form.password" size="large" placeholder="비밀번호를 입력해주세요."></a-input-password>
+              </a-form-item>
+              <a-form-item class="item" label="비밀번호확인" name="passwordConfirm"
+              :validate-status="isPasswordMismatch ? 'error' : ''">
+              <!-- :help="isPasswordMismatch ? '비밀번호가 일치하지 않습니다.' : ''" -->
+                <a-input-password v-model:value="form.passwordConfirm" size="large" placeholder="비밀번호를 다시 입력해주세요."></a-input-password>
+                <!-- < message="검증 메시지 예시: 이름은 필수 입력 항목입니다." type="warning" show-icon /> -->
+              </a-form-item>
             </div>
+            
+            <a-form-item class="item-group" v-if="!isNiceAuthComplete">
+              <div class="itme-nice">
+                <div class="item-nice-left-area">
+                  <div class="item-nice-title">
+                    <span class="item-nice-text">본인인증을 진행해주세요</span>
+                  </div>
+                  <span class="item-nice-description">이름 · 전화번호 입력을 통해 본인인증을 진행합니다.</span>
+                </div>
+                  <a-button class="item-nice-button" @click="clickToNiceAuthPopupOpen" :disable="isNiceAuthComplete">본인 인증</a-button>
+              </div>            
+              <span class="item-description">수신 가능한 전화번호 입력 (해당 연락처로 전형결과등 안내 예정)</span>
+            </a-form-item>
+
+            <a-form-item class="item-group" v-if="isNiceAuthComplete">
+              <div class="itme-nice-complete">
+                <div class="item-nice-left-area">
+                  <div class="item-nice-title">
+                    <span class="item-nice-text">본인인증이 완료되었습니다</span>
+                  </div>
+                  <span class="item-nice-description">인증 완료 후 재인증이 불가능합니다.</span>
+                </div>
+                <!-- TODO: 인증 완료 된 상태면 "인증 완료" 문구를 띄우거나  버튼을 막아버리기 -->
+                  <a-button class="item-nice-button" disable>인증 완료</a-button>
+              </div>
 
             <div class="item-abreast">
               <a-input v-model:value="form.name" class="item" size="large" disabled></a-input>
@@ -138,27 +137,6 @@ const form = reactive<SignupForm>({
 })
 
 const rules = {
-  loginId: [
-    {
-      required: true,
-      message: '아이디를 입력하세요.',
-      trigger: 'blur',
-    },
-  ],
-  phoneNumber: [
-    {
-      required: true,
-      message: '전화번호를 입력하세요.',
-      trigger: 'blur',
-    },
-  ],
-  name: [
-    {
-      required: true,
-      message: '이름을 입력하세요.',
-      trigger: 'blur',
-    },
-  ],
   password: [
     {
       required: true,
@@ -355,7 +333,7 @@ async function clickToSignupButton() {
 
 .item-abreast {
   display: flex;
-  align-items: start;
+  align-items: center;
   width: 100%;
 }
 
@@ -400,21 +378,6 @@ async function clickToSignupButton() {
   justify-content: flex-start;
 }
 
-.item-nice-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 55px;
-  padding: 3px;
-  margin: 7px;
-  border-radius: 5px;
-
-  background-color: white;
-
-  font-weight: 600;
-  color: #33338E;
-}
-
 .item-nice-text {
   margin-left: 5px;
   font-weight: 500;
@@ -427,7 +390,7 @@ async function clickToSignupButton() {
 }
 
 .item-nice-description {
-  margin-left: 10px;
+  margin-left: 4px;
   margin-bottom: 10px;
   color: white;
 }

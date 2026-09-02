@@ -2,7 +2,6 @@
   <div class="nice-auth-modal">
     <div class="popup-header">
       <div class="header-left">
-        <div class="item-nice-icon">NICE</div>
         <div class="item-nice-text">휴대폰 본인인증</div>
       </div>
       <close-outlined class="close-icon" @click="closePopup"/>
@@ -124,21 +123,6 @@ const complete = async() => {
   width: 200px;
   height: 40px;
   gap: 20px;
-}
-
-.item-nice-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 55px;
-  padding: 3px;
-  margin: 7px;
-  border-radius: 5px;
-
-  background-color: white;
-
-  font-weight: 600;
-  color: #33338E;
 }
 
 .item-nice-text {
