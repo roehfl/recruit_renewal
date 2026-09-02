@@ -49,13 +49,13 @@
                 <!-- 입학년월 -->
                 <td>
                   <a-date-picker
-                    v-model:value="item.admissionDate" value-format="YYYY-MM-DD" style="width: 120px"
+                    v-model:value="item.admissionDate" picker="month" value-format="YYYY-MM-DD" style="width: 120px"
                   />
                 </td>
 
                 <!-- 졸업년월 -->
                 <td>
-                  <a-date-picker v-model:value="item.graduationDate" value-format="YYYY-MM-DD" style="width: 120px" />
+                  <a-date-picker v-model:value="item.graduationDate" picker="month" value-format="YYYY-MM-DD" style="width: 120px" />
                 </td>
 
                 <!-- 입학구분 -->
