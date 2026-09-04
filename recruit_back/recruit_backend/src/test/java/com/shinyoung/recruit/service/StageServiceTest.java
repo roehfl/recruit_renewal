@@ -10,6 +10,7 @@ import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.domain.repository.StageRepository;
+import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
@@ -66,6 +67,9 @@ class StageServiceTest {
 
     @Autowired
     private StageRepository stageRepository;
+
+    @Autowired
+    private StageResultRepository stageResultRepository;
 
     @Autowired
     private ApplicationBasicInfoRepository basicInfoRepository;
@@ -602,6 +606,37 @@ class StageServiceTest {
 
         assertThatThrownBy(() -> stageService.getStage(jobPostingId, stageId))
                 .isInstanceOf(StageNotFoundException.class);
+    }
+
+    @Test
+    void delete_ready_stage_removes_initialized_stage_results() {
+        Long jobPostingId = createJobPosting();
+        Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        jobPostingService.publish(jobPostingId);
+        createSubmittedApplication("delete-ready-results", jobPostingId);
+        stageResultService.initialize(stageId);
+        assertThat(stageResultRepository.countByStageId(stageId)).isEqualTo(1);
+
+        stageService.delete(jobPostingId, stageId);
+
+        assertThat(stageResultRepository.countByStageId(stageId)).isZero();
+        assertThatThrownBy(() -> stageService.getStage(jobPostingId, stageId))
+                .isInstanceOf(StageNotFoundException.class);
+    }
+
+    @Test
+    void delete_ready_stage_keeps_other_stage_results() {
+        Long jobPostingId = createJobPosting();
+        Long deletedStageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        Long keptStageId = stageService.create(jobPostingId, createStageRequest(1, false));
+        jobPostingService.publish(jobPostingId);
+        createSubmittedApplication("delete-ready-other", jobPostingId);
+        stageResultService.initialize(deletedStageId);
+        stageResultService.initialize(keptStageId);
+
+        stageService.delete(jobPostingId, deletedStageId);
+
+        assertThat(stageResultRepository.countByStageId(keptStageId)).isEqualTo(1);
     }
 
     @Test

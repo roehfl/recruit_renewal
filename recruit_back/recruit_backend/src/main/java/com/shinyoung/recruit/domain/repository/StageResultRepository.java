@@ -44,6 +44,9 @@ public interface StageResultRepository extends JpaRepository<StageResult, Long> 
 
     long countByStageIdAndResultStatus(Long stageId, StageResultStatus resultStatus);
 
+    /** READY 단계 삭제 시 함께 정리한다(StageService.delete). 판정 전 PENDING placeholder 만 대상이 된다. */
+    void deleteByStageId(Long stageId);
+
     @Query("""
             select result
             from StageResult result

@@ -385,6 +385,17 @@ DELETE 메서드 검토:
 - `IN_PROGRESS`, `RESULT_ANNOUNCED`, `CLOSED`는 삭제 불가.
 - Application/StageResult 도입 이후에는 연결 데이터가 있으면 삭제 불가.
 
+2026-09-04 확정(전형결과 관리 S4 결함 수정): 위 마지막 줄을 `StageResult`에 한해 뒤집는다. `READY` 단계를 삭제하면 그 단계의 `StageResult`도 함께 삭제한다(`StageService.delete`).
+
+근거:
+
+- `StageResult` 판정 write 경로(`updateResult` / `bulkUpdateResults`)는 `IN_PROGRESS`를 요구하고 단계 상태 전이는 되돌릴 수 없으므로, `READY` 단계에 붙은 결과 행은 항상 `PENDING` placeholder다. 보호할 판정 데이터가 존재할 수 없다.
+- `StageResult` 단건 삭제 API가 없으므로 차단만 하면 `initialize`(대상자 불러오기) 이후 관리자가 단계를 정리할 수단이 사라진다.
+- 삭제된 placeholder는 단계를 다시 만든 뒤 `initialize`로 동일하게 복원된다(제출 지원서에서 파생되는 값).
+- 판정 데이터 보호라는 원 설계 의도는 기존 `READY`-only 검증이 그대로 지킨다.
+
+`Interview` / `InterviewEvaluation`의 `stage_id` FK는 이 결정 범위 밖이며 별도 정책이 필요하다.
+
 ## 7.2 상태 전이 규칙
 
 추천 상태 전이:
