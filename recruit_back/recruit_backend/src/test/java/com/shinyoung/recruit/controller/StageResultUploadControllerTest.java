@@ -18,12 +18,17 @@ import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.StageResultService;
+import com.shinyoung.recruit.service.StageResultUploadParser;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.usermodel.XSSFDataValidation;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,9 +67,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class StageResultUploadControllerTest {
 
-    private static final List<String> HEADER = List.of(
-            "stageResultId", "applicationId", "applicantName",
-            "stageResultUpdatedAt", "resultStatus", "score", "comment");
+    private static final List<String> HEADER = StageResultUploadParser.HEADERS;
 
     private static final String XLSX_CONTENT_TYPE =
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -122,6 +125,43 @@ class StageResultUploadControllerTest {
     }
 
     @Test
+    void upload_template_uses_korean_headers_labels_shading_and_result_dropdown() throws Exception {
+        Fixture fixture = fixtureWithResults("A", "B");
+
+        MvcResult result = performTemplate(fixture.stageId());
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(
+                new ByteArrayInputStream(result.getResponse().getContentAsByteArray()))) {
+            XSSFSheet sheet = workbook.getSheetAt(0);
+            assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("시스템ID(수정금지)");
+            assertThat(sheet.getRow(0).getCell(4).getStringCellValue()).isEqualTo("결과");
+            // 초기화 직후라 결과는 대기(PENDING) 라벨로 prefill
+            assertThat(sheet.getRow(1).getCell(4).getStringCellValue()).isEqualTo("대기");
+            // 읽기전용 4열 음영, 편집 열은 음영 없음
+            assertThat(sheet.getRow(1).getCell(0).getCellStyle().getFillPattern())
+                    .isEqualTo(FillPatternType.SOLID_FOREGROUND);
+            assertThat(sheet.getRow(1).getCell(3).getCellStyle().getFillPattern())
+                    .isEqualTo(FillPatternType.SOLID_FOREGROUND);
+            assertThat(sheet.getRow(1).getCell(4).getCellStyle().getFillPattern())
+                    .isEqualTo(FillPatternType.NO_FILL);
+            // 헤더 틀고정
+            assertThat(sheet.getPaneInformation()).isNotNull();
+            assertThat(sheet.getPaneInformation().isFreezePane()).isTrue();
+            // 결과 열 드롭다운(명시 목록, 대기 제외)
+            List<XSSFDataValidation> validations = sheet.getDataValidations();
+            assertThat(validations).hasSize(1);
+            XSSFDataValidation validation = validations.get(0);
+            assertThat(validation.getValidationConstraint().getExplicitListValues())
+                    .containsExactly("합격", "불합격", "보류", "결시", "철회");
+            CellRangeAddress range = validation.getRegions().getCellRangeAddress(0);
+            assertThat(range.getFirstColumn()).isEqualTo(4);
+            assertThat(range.getLastColumn()).isEqualTo(4);
+            assertThat(range.getFirstRow()).isEqualTo(1);
+            assertThat(range.getLastRow()).isEqualTo(2); // 데이터 2행
+        }
+    }
+
+    @Test
     void upload_template_unknown_stage_returns_not_found() throws Exception {
         mockMvc.perform(get("/api/admin/stages/{stageId}/results/upload-template", 999999L)
                         .with(authentication(adminAuthentication())))
@@ -153,7 +193,7 @@ class StageResultUploadControllerTest {
     }
 
     @Test
-    void preview_flags_blank_result_status_and_pending_as_error() throws Exception {
+    void preview_flags_blank_result_status_and_pending_revert_as_error() throws Exception {
         Fixture fixture = fixtureWithResults("A", "B");
         preset(fixture.stageId(), StageResultStatus.PASSED);
         List<Current> rows = currentRows(fixture.stageId());
@@ -161,7 +201,7 @@ class StageResultUploadControllerTest {
         List<List<String>> data = new ArrayList<>();
         data.add(HEADER);
         data.add(rowOf(rows.get(0), "", "", ""));        // blank resultStatus → error
-        data.add(rowOf(rows.get(1), "PENDING", "", "")); // PENDING not allowed → error
+        data.add(rowOf(rows.get(1), "PENDING", "", "")); // 판정된 행을 대기로 → error
 
         mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
                 .andExpect(status().isOk())
@@ -217,6 +257,73 @@ class StageResultUploadControllerTest {
                         .with(authentication(adminAuthentication())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.errorCount").value(1));
+    }
+
+    @Test
+    void preview_accepts_korean_result_labels() throws Exception {
+        Fixture fixture = fixtureWithResults("A", "B");
+        preset(fixture.stageId(), StageResultStatus.PASSED);
+        List<Current> rows = currentRows(fixture.stageId());
+
+        List<List<String>> data = new ArrayList<>();
+        data.add(HEADER);
+        data.add(rowOf(rows.get(0), "보류", "", ""));   // changed (PASSED → HOLD)
+        data.add(rowOf(rows.get(1), "합격", "", ""));   // unchanged (already PASSED)
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.changedCount").value(1))
+                .andExpect(jsonPath("$.data.unchangedCount").value(1))
+                .andExpect(jsonPath("$.data.errorCount").value(0))
+                .andExpect(jsonPath("$.data.committable").value(true));
+    }
+
+    @Test
+    void preview_treats_untouched_pending_rows_as_unchanged() throws Exception {
+        Fixture fixture = fixtureWithResults("A", "B"); // 초기화 직후 = 전원 PENDING
+        List<Current> rows = currentRows(fixture.stageId());
+
+        List<List<String>> data = new ArrayList<>();
+        data.add(HEADER);
+        data.add(rowOf(rows.get(0), "대기", "", ""));   // 손대지 않은 행 → unchanged
+        data.add(rowOf(rows.get(1), "합격", "", ""));   // 판정 → changed
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.changedCount").value(1))
+                .andExpect(jsonPath("$.data.unchangedCount").value(1))
+                .andExpect(jsonPath("$.data.errorCount").value(0))
+                .andExpect(jsonPath("$.data.committable").value(true));
+    }
+
+    @Test
+    void preview_rejects_pending_with_score_or_comment_change() throws Exception {
+        Fixture fixture = fixtureWithResults("A");
+        List<Current> rows = currentRows(fixture.stageId());
+
+        List<List<String>> data = new ArrayList<>();
+        data.add(HEADER);
+        data.add(rowOf(rows.get(0), "대기", "10", "")); // 대기 유지 + 점수 입력 → error
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.errorCount").value(1))
+                .andExpect(jsonPath("$.data.rows[0].errors[0]").value("대기 상태에서는 점수·코멘트를 입력할 수 없습니다. 결과를 먼저 판정하세요."));
+    }
+
+    @Test
+    void preview_rejects_pending_with_comment_change() throws Exception {
+        Fixture fixture = fixtureWithResults("A");
+        List<Current> rows = currentRows(fixture.stageId());
+
+        List<List<String>> data = new ArrayList<>();
+        data.add(HEADER);
+        data.add(rowOf(rows.get(0), "대기", "", "메모")); // 대기 유지 + 코멘트 입력 → error
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.errorCount").value(1))
+                .andExpect(jsonPath("$.data.rows[0].errors[0]").value("대기 상태에서는 점수·코멘트를 입력할 수 없습니다. 결과를 먼저 판정하세요."));
     }
 
     // ---------- commit ----------
@@ -367,6 +474,30 @@ class StageResultUploadControllerTest {
     }
 
     @Test
+    void commit_applies_partial_decisions_and_leaves_pending_rows() throws Exception {
+        Fixture fixture = fixtureWithResults("A", "B"); // 전원 PENDING
+        List<Current> rows = currentRows(fixture.stageId());
+
+        List<List<String>> data = new ArrayList<>();
+        data.add(HEADER);
+        data.add(rowOf(rows.get(0), "대기", "", ""));
+        data.add(rowOf(rows.get(1), "불합격", "40", "서류 미비"));
+
+        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId(), data))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.outcome").value("APPLIED"))
+                .andExpect(jsonPath("$.data.changedCount").value(1))
+                .andExpect(jsonPath("$.data.unchangedCount").value(1));
+
+        assertThat(stageResultRepository.findById(rows.get(0).srId()).orElseThrow().getResultStatus())
+                .isEqualTo(StageResultStatus.PENDING);
+        StageResult decided = stageResultRepository.findById(rows.get(1).srId()).orElseThrow();
+        assertThat(decided.getResultStatus()).isEqualTo(StageResultStatus.FAILED);
+        assertThat(decided.getScore()).isEqualByComparingTo("40");
+        assertThat(decided.getComment()).isEqualTo("서류 미비");
+    }
+
+    @Test
     void preview_rejects_numeric_token_cell_as_error() throws Exception {
         Fixture fixture = fixtureWithResults("A");
         preset(fixture.stageId(), StageResultStatus.PASSED);
@@ -419,9 +550,10 @@ class StageResultUploadControllerTest {
     @Test
     void preview_rejects_wrong_header() throws Exception {
         Fixture fixture = fixtureWithResults("A");
-        List<List<String>> data = List.of(
-                List.of("wrong", "applicationId", "applicantName",
-                        "stageResultUpdatedAt", "resultStatus", "score", "comment"));
+        // 헤더 문자열이 바뀌어도 "1열만 다름"이라는 의도가 유지되도록 복사본의 첫 열만 훼손한다.
+        List<String> wrongHeader = new ArrayList<>(HEADER);
+        wrongHeader.set(0, "wrong");
+        List<List<String>> data = List.of(wrongHeader);
 
         mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
                 .andExpect(status().isBadRequest());

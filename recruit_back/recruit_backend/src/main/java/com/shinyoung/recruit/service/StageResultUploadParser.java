@@ -34,9 +34,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class StageResultUploadParser {
 
+    /** upload-template 헤더 시그니처(순서 고정). 앞 4열은 읽기전용 echo/토큰, 뒤 3열만 편집 대상. */
     public static final List<String> HEADERS = List.of(
-            "stageResultId", "applicationId", "applicantName",
-            "stageResultUpdatedAt", "resultStatus", "score", "comment");
+            "시스템ID(수정금지)", "수험번호(수정금지)", "이름(수정금지)", "수정토큰(수정금지)",
+            "결과", "점수", "코멘트");
 
     private static final int COLUMN_COUNT = 7;
     private static final int TOKEN_COLUMN = 3;
@@ -100,7 +101,7 @@ public class StageResultUploadParser {
     private void validateHeader(Sheet sheet) {
         Row header = sheet.getRow(0);
         if (header == null) {
-            throw new InvalidStageResultUploadException("업로드 템플릿 헤더가 없습니다. upload-template을 사용하세요.");
+            throw new InvalidStageResultUploadException("업로드 템플릿 헤더가 없습니다. 엑셀 템플릿 다운로드 파일을 사용하세요.");
         }
         for (int c = 0; c < COLUMN_COUNT; c++) {
             Cell cell = header.getCell(c);
@@ -109,7 +110,7 @@ public class StageResultUploadParser {
                     : "";
             if (!HEADERS.get(c).equals(value)) {
                 throw new InvalidStageResultUploadException(
-                        "업로드 템플릿 헤더가 올바르지 않습니다. upload-template을 사용하세요.");
+                        "업로드 템플릿 헤더가 올바르지 않습니다. 엑셀 템플릿 다운로드 파일을 사용하세요.");
             }
         }
     }

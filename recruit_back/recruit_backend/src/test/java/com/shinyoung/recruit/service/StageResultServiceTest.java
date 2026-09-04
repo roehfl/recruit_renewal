@@ -2,6 +2,7 @@ package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
+import com.shinyoung.recruit.domain.entity.ApplicationEducation;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
@@ -9,6 +10,7 @@ import com.shinyoung.recruit.domain.entity.Stage;
 import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.domain.repository.StageRepository;
@@ -25,6 +27,10 @@ import com.shinyoung.recruit.dto.request.StageResultUpdateRequest;
 import com.shinyoung.recruit.dto.response.AdminStageResultResponse;
 import com.shinyoung.recruit.dto.response.StageResultBulkUpdateResponse;
 import com.shinyoung.recruit.dto.response.StageResultInitializeResponse;
+import com.shinyoung.recruit.enumeration.CampusType;
+import com.shinyoung.recruit.enumeration.DayNightType;
+import com.shinyoung.recruit.enumeration.EducationLevel;
+import com.shinyoung.recruit.enumeration.GraduationStatus;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageStatus;
 import com.shinyoung.recruit.enumeration.StageType;
@@ -43,6 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Comparator;
@@ -90,6 +97,9 @@ class StageResultServiceTest {
 
     @Autowired
     private StageResultRepository stageResultRepository;
+
+    @Autowired
+    private ApplicationEducationRepository educationRepository;
 
     @Test
     void initialize_ready_stage_creates_pending_results_for_submitted_applications_only() {
@@ -170,6 +180,50 @@ class StageResultServiceTest {
 
         assertThat(response.createdCount()).isEqualTo(1);
         assertThat(stageResultRepository.existsByStageIdAndJobApplicationId(stageId, otherApplicationId)).isFalse();
+    }
+
+    @Test
+    void get_results_includes_grid_fields_and_previous_stage_result() {
+        Long jobPostingId = createJobPosting();
+        Long applicationId = createSubmittedApplication("stage-result-grid", jobPostingId);
+        JobApplication application = jobApplicationRepository.findById(applicationId).orElseThrow();
+        educationRepository.save(education(application, EducationLevel.UNIVERSITY, "Second University", 0));
+        educationRepository.save(education(application, EducationLevel.HIGH_SCHOOL, "First High School", 1));
+        Long documentStageId = createStage(jobPostingId, 0, false);
+        Long interviewStageId = createStage(jobPostingId, 1, true);
+        Long documentResultId = initializeAndFirstResultId(documentStageId);
+        stageService.start(jobPostingId, documentStageId);
+        stageResultService.updateResult(documentStageId, documentResultId,
+                new StageResultUpdateRequest(StageResultStatus.PASSED, new BigDecimal("80"), null), ACTOR);
+        stageResultService.initialize(interviewStageId);
+
+        AdminStageResultResponse document = stageResultService.getResults(documentStageId).get(0);
+        AdminStageResultResponse interview = stageResultService.getResults(interviewStageId).get(0);
+
+        assertThat(document.decidedBy()).isEqualTo(ACTOR);
+        assertThat(document.workLocation()).isEqualTo(application.getWorkLocationNameSnapshot());
+        assertThat(document.applicationType()).isEqualTo(application.getJobPosition().getApplicationType());
+        assertThat(document.finalEducationLevel()).isEqualTo(EducationLevel.UNIVERSITY);
+        assertThat(document.finalSchoolName()).isEqualTo("Second University");
+        assertThat(document.previousStageResultStatus()).isNull(); // 첫 단계
+        assertThat(interview.previousStageResultStatus()).isEqualTo(StageResultStatus.PASSED);
+        assertThat(interview.decidedBy()).isNull(); // 초기화 직후 미판정
+    }
+
+    @Test
+    void update_result_response_carries_grid_fields() {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-grid-update", jobPostingId);
+        Long stageId = createStage(jobPostingId);
+        Long resultId = initializeAndFirstResultId(stageId);
+        stageService.start(jobPostingId, stageId);
+
+        AdminStageResultResponse response = stageResultService.updateResult(stageId, resultId,
+                new StageResultUpdateRequest(StageResultStatus.HOLD, null, "검토"), ACTOR);
+
+        assertThat(response.decidedBy()).isEqualTo(ACTOR);
+        assertThat(response.previousStageResultStatus()).isNull();
+        assertThat(response.finalEducationLevel()).isNull(); // 학력 미입력
     }
 
     @Test
@@ -505,6 +559,31 @@ class StageResultServiceTest {
     private void setStageStatus(Long stageId, StageStatus stageStatus) {
         Stage stage = stageRepository.findById(stageId).orElseThrow();
         ReflectionTestUtils.setField(stage, "status", stageStatus);
+    }
+
+    private ApplicationEducation education(
+            JobApplication application,
+            EducationLevel educationLevel,
+            String schoolName,
+            Integer sortOrder
+    ) {
+        return ApplicationEducation.create(
+                application,
+                educationLevel,
+                schoolName,
+                educationLevel == EducationLevel.HIGH_SCHOOL ? null : "Computer Science",
+                null,
+                null,
+                null,
+                LocalDate.of(2021, 3, 1),
+                LocalDate.of(2025, 2, 28),
+                GraduationStatus.GRADUATED,
+                DayNightType.DAY,
+                CampusType.MAIN,
+                false,
+                "KR",
+                sortOrder
+        );
     }
 
     private Applicant createApplicant(String loginId) {

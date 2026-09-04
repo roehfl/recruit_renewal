@@ -257,6 +257,7 @@ public class JobApplicationService {
                 .collect(Collectors.toMap(info -> info.getJobApplication().getId(), info -> info));
 
         // 최종학력 행 = 최고 EducationLevel(선언 순서 = 서열), 동률이면 id 가 큰 행 — 검색 필터의 최종 판정과 동일 기준.
+        // 같은 규칙을 AdminStageResultEnricher(전형결과 그리드)도 쓴다 — 한쪽만 바꾸면 두 화면의 값이 어긋난다.
         Comparator<ApplicationEducation> finalEducationComparator = Comparator
                 .comparingInt((ApplicationEducation education) -> education.getEducationLevel().ordinal())
                 .thenComparing(ApplicationEducation::getId);

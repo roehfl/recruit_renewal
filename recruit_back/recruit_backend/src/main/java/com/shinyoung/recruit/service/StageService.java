@@ -84,12 +84,20 @@ public class StageService {
         validateJobPostingEditable(jobPosting);
 
         Stage stage = findStage(jobPostingId, stageId);
-        validateStageEditable(stage);
         validateStageRequest(
                 request.stageName(),
                 request.stageType(),
                 request.stageOrder()
         );
+
+        if (stage.getStatus() == StageStatus.IN_PROGRESS) {
+            // 진행 중 단계는 발표일시만 조정할 수 있다(발표일 연기 등 운영 필요). 나머지 필드는 현재 값과 같아야 한다.
+            validateOnlyAnnouncementDateTimeChanged(stage, request);
+            stage.updateResultAnnouncementDateTime(request.resultAnnouncementDateTime());
+            return stage.getId();
+        }
+
+        validateStageEditable(stage);
         validateStageOrderForUpdate(jobPostingId, request.stageOrder(), stageId);
         validateFinalStageForUpdate(jobPostingId, request.finalStage(), stageId);
 
@@ -230,6 +238,17 @@ public class StageService {
     private void validateStageEditable(Stage stage) {
         if (stage.getStatus() != StageStatus.READY) {
             throw new InvalidStageException("Only READY stage can be changed.");
+        }
+    }
+
+    private void validateOnlyAnnouncementDateTimeChanged(Stage stage, StageUpdateRequest request) {
+        boolean lockedFieldChanged = !stage.getStageName().equals(request.stageName())
+                || stage.getStageType() != request.stageType()
+                || !stage.getStageOrder().equals(request.stageOrder())
+                || stage.isFinalStage() != request.finalStage();
+        if (lockedFieldChanged) {
+            throw new InvalidStageException(
+                    "In progress stage allows changing resultAnnouncementDateTime only.");
         }
     }
 

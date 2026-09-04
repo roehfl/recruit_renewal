@@ -45,6 +45,7 @@ public class StageResultService {
     private final Clock clock;
     private final ActivityLogService activityLogService;
     private final AuditRequestContextResolver auditRequestContextResolver;
+    private final AdminStageResultEnricher enricher;
 
     @Transactional
     public StageResultInitializeResponse initialize(Long stageId) {
@@ -82,9 +83,7 @@ public class StageResultService {
 
     public List<AdminStageResultResponse> getResults(Long stageId) {
         findStage(stageId);
-        return stageResultRepository.findByStageIdForAdminList(stageId).stream()
-                .map(AdminStageResultResponse::from)
-                .toList();
+        return enricher.toResponses(stageResultRepository.findByStageIdForAdminList(stageId));
     }
 
     @Transactional
@@ -111,7 +110,7 @@ public class StageResultService {
         // 커밋된 변경의 성공 증적 — 비즈니스 tx 에 join(in-tx, ADR-0006). 전후값은 CorrectionHistory 가 보유.
         recordCorrectAudit(stage, actor, String.valueOf(resultId),
                 stageResult.getJobApplication().getId(), new StageResultChangeMetadata(stageId, 1));
-        return AdminStageResultResponse.from(stageResult);
+        return enricher.toResponse(stageResult);
     }
 
     @Transactional

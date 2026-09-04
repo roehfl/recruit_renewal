@@ -28,6 +28,7 @@ public class StageResultCorrectionService {
     private final StageResultRepository stageResultRepository;
     private final StageResultCorrectionHistoryRepository correctionHistoryRepository;
     private final Clock clock;
+    private final AdminStageResultEnricher enricher;
 
     @Transactional
     public AdminStageResultResponse correctResult(
@@ -66,7 +67,7 @@ public class StageResultCorrectionService {
         );
         correctionHistoryRepository.save(history);
 
-        return AdminStageResultResponse.from(stageResult);
+        return enricher.toResponse(stageResult);
     }
 
     public List<StageResultCorrectionHistoryResponse> getHistories(Long stageId, Long resultId) {

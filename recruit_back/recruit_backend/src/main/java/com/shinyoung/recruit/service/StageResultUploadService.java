@@ -19,6 +19,11 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.DataValidation;
+import org.apache.poi.ss.usermodel.DataValidationConstraint;
+import org.apache.poi.ss.usermodel.DataValidationHelper;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.util.CellRangeAddressList;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,6 +38,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -45,6 +51,8 @@ import java.util.stream.Collectors;
  * <p>행은 {@code stageResultId}(존재) + {@code applicationId} 일치 + path {@code stageId} 소속의
  * 3중 교차검증을 모두 만족해야 유효하다. 편집 컬럼은 {@code resultStatus}/{@code score}/{@code comment}뿐이고,
  * 빈칸은 resultStatus=오류, score/comment=null clear로 해석한다. 변경 없는 행은 commit에서 제외한다.
+ * 결과 값은 한글 라벨(합격/불합격/보류/결시/철회) 또는 enum 이름을 받는다. 파일 값이 대기이고 DB도 PENDING이면
+ * 미변경으로 분류해 부분 판정 업로드를 허용한다({@link StageResultStatusLabels}).
  * commit은 변경 대상 행에 대해 {@code stageResultUpdatedAt} 토큰을 현재 DB 값과 비교해 낙관적 동시성을
  * 검사하고, 오류/STALE이 하나라도 있으면 0건 적용(all-or-nothing)으로 거부한다.
  */
@@ -56,24 +64,20 @@ public class StageResultUploadService {
     private static final DateTimeFormatter TOKEN_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     private static final int COMMENT_MAX_LENGTH = 2000;
 
-    /** 편집 허용 resultStatus = StageResultStatus − PENDING. */
-    private static final Set<StageResultStatus> ALLOWED_STATUSES = Set.of(
-            StageResultStatus.PASSED,
-            StageResultStatus.FAILED,
-            StageResultStatus.ABSENT,
-            StageResultStatus.HOLD,
-            StageResultStatus.WITHDRAWN);
+    /** 결과 열 인덱스(0-based). 드롭다운 대상. */
+    private static final int RESULT_COLUMN = 4;
 
     private static final ExcelExportSpec<StageResultUploadTemplateRow> TEMPLATE_SPEC = new ExcelExportSpec<>(
             "stage-result-upload",
             List.of(
-                    new ExportColumn<>("stageResultId", StageResultUploadTemplateRow::stageResultId),
-                    new ExportColumn<>("applicationId", StageResultUploadTemplateRow::applicationId),
-                    new ExportColumn<>("applicantName", StageResultUploadTemplateRow::applicantName),
-                    new ExportColumn<>("stageResultUpdatedAt", StageResultUploadTemplateRow::stageResultUpdatedAt),
-                    new ExportColumn<>("resultStatus", StageResultUploadTemplateRow::resultStatus),
-                    new ExportColumn<>("score", StageResultUploadTemplateRow::score),
-                    new ExportColumn<>("comment", StageResultUploadTemplateRow::comment)));
+                    new ExportColumn<>(StageResultUploadParser.HEADERS.get(0), StageResultUploadTemplateRow::stageResultId, true),
+                    new ExportColumn<>(StageResultUploadParser.HEADERS.get(1), StageResultUploadTemplateRow::applicationId, true),
+                    new ExportColumn<>(StageResultUploadParser.HEADERS.get(2), StageResultUploadTemplateRow::applicantName, true),
+                    new ExportColumn<>(StageResultUploadParser.HEADERS.get(3), StageResultUploadTemplateRow::stageResultUpdatedAt, true),
+                    new ExportColumn<>(StageResultUploadParser.HEADERS.get(4), StageResultUploadTemplateRow::resultStatus),
+                    new ExportColumn<>(StageResultUploadParser.HEADERS.get(5), StageResultUploadTemplateRow::score),
+                    new ExportColumn<>(StageResultUploadParser.HEADERS.get(6), StageResultUploadTemplateRow::comment)),
+            StageResultUploadService::decorateTemplateSheet);
 
     private final StageRepository stageRepository;
     private final StageResultRepository stageResultRepository;
@@ -95,7 +99,7 @@ public class StageResultUploadService {
                         String.valueOf(result.getJobApplication().getId()),
                         result.getJobApplication().getApplicantNameSnapshot(),
                         formatToken(result.getUpdatedAt()),
-                        result.getResultStatus() == null ? "" : result.getResultStatus().name(),
+                        StageResultStatusLabels.label(result.getResultStatus()),
                         result.getScore() == null ? "" : result.getScore().toPlainString(),
                         result.getComment() == null ? "" : result.getComment()))
                 .toList();
@@ -198,36 +202,47 @@ public class StageResultUploadService {
             errors.add("수식(formula) 셀은 허용되지 않습니다.");
         }
         if (row.tokenCellNotString()) {
-            errors.add("stageResultUpdatedAt은 문자열 셀이어야 합니다.");
+            errors.add("수정토큰은 문자열 셀이어야 합니다.");
         }
 
         Long stageResultId = parseLong(row.stageResultId());
         if (stageResultId == null) {
-            errors.add("stageResultId는 필수이며 숫자여야 합니다.");
+            errors.add("시스템ID는 필수이며 숫자여야 합니다.");
         }
         Long applicationId = parseLong(row.applicationId());
         if (applicationId == null) {
-            errors.add("applicationId는 필수이며 숫자여야 합니다.");
+            errors.add("수험번호는 필수이며 숫자여야 합니다.");
         }
 
         StageResultStatus newStatus = parseResultStatus(blankToNull(row.resultStatus()), errors);
         BigDecimal newScore = parseScore(blankToNull(row.score()), errors);
         String newComment = blankToNull(row.comment());
         if (newComment != null && newComment.length() > COMMENT_MAX_LENGTH) {
-            errors.add("comment는 2000자 이하여야 합니다.");
+            errors.add("코멘트는 2000자 이하여야 합니다.");
         }
 
         if (stageResultId != null && duplicateIds.contains(stageResultId)) {
-            errors.add("stageResultId가 파일 내에서 중복되었습니다.");
+            errors.add("시스템ID가 파일 내에서 중복되었습니다.");
         }
 
         StageResult current = stageResultId == null ? null : resultMap.get(stageResultId);
         if (stageResultId != null && !duplicateIds.contains(stageResultId)) {
             if (current == null) {
-                errors.add("해당 단계의 StageResult가 아니거나 존재하지 않습니다.");
+                errors.add("이 단계의 대상자가 아니거나 존재하지 않습니다.");
             } else if (applicationId != null
                     && !current.getJobApplication().getId().equals(applicationId)) {
-                errors.add("applicationId가 StageResult와 일치하지 않습니다.");
+                errors.add("수험번호가 시스템ID와 일치하지 않습니다.");
+            }
+        }
+
+        // 대기(PENDING) 규칙: 현재도 대기면 "손대지 않은 행"으로 보고 미변경 처리한다(부분 판정 업로드 허용).
+        // 판정된 행을 대기로 되돌리거나, 대기인 채로 점수·코멘트만 넣는 것은 bulk가 거부하므로 여기서 막는다.
+        if (current != null && newStatus == StageResultStatus.PENDING) {
+            if (current.getResultStatus() != StageResultStatus.PENDING) {
+                errors.add("판정된 결과를 대기로 되돌릴 수 없습니다. 다른 관리자가 이미 판정했다면 템플릿을 다시 받으세요.");
+            } else if (!scoreEquals(current.getScore(), newScore)
+                    || !Objects.equals(blankToNull(current.getComment()), newComment)) {
+                errors.add("대기 상태에서는 점수·코멘트를 입력할 수 없습니다. 결과를 먼저 판정하세요.");
             }
         }
 
@@ -271,20 +286,15 @@ public class StageResultUploadService {
 
     private StageResultStatus parseResultStatus(String raw, List<String> errors) {
         if (raw == null) {
-            errors.add("resultStatus는 필수입니다.");
+            errors.add("결과는 필수입니다.");
             return null;
         }
-        try {
-            StageResultStatus parsed = StageResultStatus.valueOf(raw);
-            if (!ALLOWED_STATUSES.contains(parsed)) {
-                errors.add("허용되지 않는 resultStatus입니다: " + raw);
-                return null;
-            }
-            return parsed;
-        } catch (IllegalArgumentException e) {
-            errors.add("허용되지 않는 resultStatus입니다: " + raw);
+        Optional<StageResultStatus> parsed = StageResultStatusLabels.parse(raw);
+        if (parsed.isEmpty()) {
+            errors.add("허용되지 않는 결과입니다: " + abbreviate(raw) + " (합격/불합격/보류/결시/철회)");
             return null;
         }
+        return parsed.get();
     }
 
     private BigDecimal parseScore(String raw, List<String> errors) {
@@ -294,9 +304,14 @@ public class StageResultUploadService {
         try {
             return new BigDecimal(raw);
         } catch (NumberFormatException e) {
-            errors.add("score 형식이 올바르지 않습니다: " + raw);
+            errors.add("점수 형식이 올바르지 않습니다: " + abbreviate(raw));
             return null;
         }
+    }
+
+    /** 오류 문구에 사용자 입력을 되비출 때 응답 크기가 셀 길이에 비례해 커지지 않도록 자른다. */
+    private static String abbreviate(String raw) {
+        return raw.length() > 50 ? raw.substring(0, 50) + "…" : raw;
     }
 
     private Map<Long, StageResult> loadResultMap(Long stageId) {
@@ -333,6 +348,22 @@ public class StageResultUploadService {
             return false;
         }
         return a.compareTo(b) == 0;
+    }
+
+    /** 헤더 틀고정 + 결과 열 드롭다운(합격/불합격/보류/결시/철회). 데이터가 0행이어도 2행에는 걸어 둔다. */
+    private static void decorateTemplateSheet(Sheet sheet, int dataRowCount) {
+        sheet.createFreezePane(0, 1);
+        DataValidationHelper helper = sheet.getDataValidationHelper();
+        DataValidationConstraint constraint = helper.createExplicitListConstraint(
+                StageResultStatusLabels.uploadChoices().toArray(String[]::new));
+        CellRangeAddressList range = new CellRangeAddressList(
+                1, Math.max(1, dataRowCount), RESULT_COLUMN, RESULT_COLUMN);
+        DataValidation validation = helper.createValidation(constraint, range);
+        validation.setEmptyCellAllowed(false);
+        validation.setShowErrorBox(true);
+        validation.setErrorStyle(DataValidation.ErrorStyle.STOP);
+        validation.createErrorBox("결과", "합격 / 불합격 / 보류 / 결시 / 철회 중 하나를 선택하세요.");
+        sheet.addValidationData(validation);
     }
 
     private static String formatToken(LocalDateTime updatedAt) {

@@ -1,7 +1,10 @@
 package com.shinyoung.recruit.service;
 
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
@@ -51,8 +54,9 @@ public class ExcelExportWriter {
         try (OutputStream out = Files.newOutputStream(tempFile)) {
             Sheet sheet = workbook.createSheet(spec.sheetName());
             List<ExportColumn<T>> columns = spec.columns();
+            CellStyle readOnlyStyle = createReadOnlyStyle(workbook);
 
-            writeHeader(sheet, columns, escapeFormulaPrefix);
+            writeHeader(sheet, columns, escapeFormulaPrefix, readOnlyStyle);
 
             int rowIndex = 1;
             int page = 0;
@@ -64,12 +68,18 @@ public class ExcelExportWriter {
                 for (T row : batch) {
                     Row excelRow = sheet.createRow(rowIndex++);
                     for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
-                        writeStringCell(excelRow, columnIndex, columns.get(columnIndex).value(row), escapeFormulaPrefix);
+                        ExportColumn<T> column = columns.get(columnIndex);
+                        writeStringCell(excelRow, columnIndex, column.value(row), escapeFormulaPrefix,
+                                column.readOnly() ? readOnlyStyle : null);
                     }
                 }
                 if (batch.size() < PAGE_SIZE) {
                     break;
                 }
+            }
+
+            if (spec.decorator() != null) {
+                spec.decorator().decorate(sheet, rowIndex - 1);
             }
 
             workbook.write(out);
@@ -88,16 +98,40 @@ public class ExcelExportWriter {
         }
     }
 
-    private <T> void writeHeader(Sheet sheet, List<ExportColumn<T>> columns, boolean escapeFormulaPrefix) {
+    /** 읽기전용 열 음영(회색 25%). workbook당 한 번만 만든다 — 셀마다 style을 만들면 style 한도를 넘는다. */
+    private CellStyle createReadOnlyStyle(SXSSFWorkbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        return style;
+    }
+
+    private <T> void writeHeader(
+            Sheet sheet,
+            List<ExportColumn<T>> columns,
+            boolean escapeFormulaPrefix,
+            CellStyle readOnlyStyle
+    ) {
         Row header = sheet.createRow(0);
         for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
-            writeStringCell(header, columnIndex, columns.get(columnIndex).header(), escapeFormulaPrefix);
+            ExportColumn<T> column = columns.get(columnIndex);
+            writeStringCell(header, columnIndex, column.header(), escapeFormulaPrefix,
+                    column.readOnly() ? readOnlyStyle : null);
         }
     }
 
-    private void writeStringCell(Row row, int columnIndex, String value, boolean escapeFormulaPrefix) {
+    private void writeStringCell(
+            Row row,
+            int columnIndex,
+            String value,
+            boolean escapeFormulaPrefix,
+            CellStyle style
+    ) {
         Cell cell = row.createCell(columnIndex, CellType.STRING);
         cell.setCellValue(escapeFormulaPrefix ? sanitize(value) : nullSafe(value));
+        if (style != null) {
+            cell.setCellStyle(style);
+        }
     }
 
     private String nullSafe(String value) {

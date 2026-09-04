@@ -274,13 +274,77 @@ class StageServiceTest {
     }
 
     @Test
-    void update_stage_fails_when_stage_status_is_not_ready() {
+    void update_closed_stage_fails() {
+        Long jobPostingId = createJobPosting();
+        Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        Stage stage = stageRepository.findById(stageId).orElseThrow();
+        ReflectionTestUtils.setField(stage, "status", StageStatus.CLOSED);
+
+        assertThatThrownBy(() -> stageService.update(jobPostingId, stageId, updateStageRequest(0, false)))
+                .isInstanceOf(InvalidStageException.class);
+    }
+
+    @Test
+    void update_in_progress_stage_changes_announcement_datetime_only() {
+        Long jobPostingId = createJobPosting();
+        Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        Stage stage = stageRepository.findById(stageId).orElseThrow();
+        ReflectionTestUtils.setField(stage, "status", StageStatus.IN_PROGRESS);
+        LocalDateTime postponed = LocalDateTime.of(2026, 8, 1, 10, 0);
+
+        stageService.update(jobPostingId, stageId, new StageUpdateRequest(
+                "Document screening", StageType.DOCUMENT, 0, postponed, false));
+
+        Stage updated = stageRepository.findById(stageId).orElseThrow();
+        assertThat(updated.getResultAnnouncementDateTime()).isEqualTo(postponed);
+        assertThat(updated.getStageName()).isEqualTo("Document screening");
+        assertThat(updated.getStatus()).isEqualTo(StageStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void update_in_progress_stage_fails_when_locked_field_changes() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
         Stage stage = stageRepository.findById(stageId).orElseThrow();
         ReflectionTestUtils.setField(stage, "status", StageStatus.IN_PROGRESS);
 
-        assertThatThrownBy(() -> stageService.update(jobPostingId, stageId, updateStageRequest(0, false)))
+        assertThatThrownBy(() -> stageService.update(jobPostingId, stageId, new StageUpdateRequest(
+                "Renamed", StageType.DOCUMENT, 0, LocalDateTime.of(2026, 8, 1, 10, 0), false)))
+                .isInstanceOf(InvalidStageException.class)
+                .hasMessageContaining("resultAnnouncementDateTime");
+        assertThatThrownBy(() -> stageService.update(jobPostingId, stageId, new StageUpdateRequest(
+                "Document screening", StageType.DOCUMENT, 5, LocalDateTime.of(2026, 8, 1, 10, 0), false)))
+                .isInstanceOf(InvalidStageException.class);
+        assertThatThrownBy(() -> stageService.update(jobPostingId, stageId, new StageUpdateRequest(
+                "Document screening", StageType.DOCUMENT, 0, LocalDateTime.of(2026, 8, 1, 10, 0), true)))
+                .isInstanceOf(InvalidStageException.class);
+        assertThatThrownBy(() -> stageService.update(jobPostingId, stageId, new StageUpdateRequest(
+                "Document screening", StageType.FIRST_INTERVIEW, 0, LocalDateTime.of(2026, 8, 1, 10, 0), false)))
+                .isInstanceOf(InvalidStageException.class);
+    }
+
+    @Test
+    void update_in_progress_stage_can_clear_announcement_datetime() {
+        Long jobPostingId = createJobPosting();
+        Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        Stage stage = stageRepository.findById(stageId).orElseThrow();
+        ReflectionTestUtils.setField(stage, "status", StageStatus.IN_PROGRESS);
+
+        stageService.update(jobPostingId, stageId, new StageUpdateRequest(
+                "Document screening", StageType.DOCUMENT, 0, null, false));
+
+        assertThat(stageRepository.findById(stageId).orElseThrow().getResultAnnouncementDateTime()).isNull();
+    }
+
+    @Test
+    void update_announced_stage_fails_even_for_announcement_datetime() {
+        Long jobPostingId = createJobPosting();
+        Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        Stage stage = stageRepository.findById(stageId).orElseThrow();
+        ReflectionTestUtils.setField(stage, "status", StageStatus.RESULT_ANNOUNCED);
+
+        assertThatThrownBy(() -> stageService.update(jobPostingId, stageId, new StageUpdateRequest(
+                "Document screening", StageType.DOCUMENT, 0, LocalDateTime.of(2026, 8, 1, 10, 0), false)))
                 .isInstanceOf(InvalidStageException.class);
     }
 

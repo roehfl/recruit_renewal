@@ -100,6 +100,11 @@ public class Stage extends BaseEntity {
         this.finalStage = finalStage;
     }
 
+    /** 진행 중 단계에서 허용되는 유일한 변경(발표일 연기 등). 이름·유형·순서·최종단계는 건드리지 않는다. */
+    public void updateResultAnnouncementDateTime(LocalDateTime resultAnnouncementDateTime) {
+        this.resultAnnouncementDateTime = resultAnnouncementDateTime;
+    }
+
     public void reorder(Integer stageOrder) {
         this.stageOrder = stageOrder;
     }
