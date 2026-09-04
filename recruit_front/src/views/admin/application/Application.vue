@@ -7,7 +7,7 @@ import { commonCodeApi } from '@/api/commonApi'
 import { adminJobPostingApi } from '@/api/admin/adminJobPostingApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import type { CommonCodeItems } from '@/types/commonCode'
-import type { AdminJobPostingDetail, } from '@/types/admin/jobPosting'
+import type { AdminJobPostingDetail, } from '@/types/jobPosting'
 import type { availableSectionsItem, AdminApplicationDetailResponse } from '@/types/admin/application'
 import type {
   AdminBasicInfoResponse,
