@@ -1,16 +1,3 @@
-export interface AdminJobPostingListItem {
-  id: number
-  title: string
-  postingType: string
-  status: 'DRAFT' | 'PUBLISHED' | 'CLOSED'
-  receptionStatus: 'UPCOMING' | 'ACCEPTING' | 'CLOSED'
-  accepting: boolean
-  receptionStartDateTime: string
-  receptionEndDateTime: string
-  positionCount: number
-  jobPositions : AdminJobPosition[]
-}
-
 /** 모집분야의 후보 근무지(CommonCode 그룹 WORK_LOCATION). */
 export interface WorkLocationOption {
   code: string
@@ -69,16 +56,4 @@ export interface AdminJobPostingDetail {
   positionCount: number
   jobPositions: AdminJobPosition[]
   applicationFormConfig: AdminApplicationFormConfig
-}
-
-export interface AdminJobPostingListItem {
-  id: number
-  title: string
-  postingType: string
-  status: 'DRAFT' | 'PUBLISHED' | 'CLOSED'
-  receptionStatus: 'UPCOMING' | 'ACCEPTING' | 'CLOSED'
-  accepting: boolean
-  receptionStartDateTime: string
-  receptionEndDateTime: string
-  positionCount: number
 }
