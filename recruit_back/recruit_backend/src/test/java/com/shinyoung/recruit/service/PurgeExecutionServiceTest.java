@@ -101,7 +101,7 @@ class PurgeExecutionServiceTest {
                 "stage_result_correction_history", "stage_result", "stage",
                 "application_attachment", "application_answer", "application_basic_info",
                 "application_education_semester_grade", "application_education",
-                "application_career_profile", "application_career", "application_certificate",
+                "application_career", "application_certificate",
                 "application_language", "application_military", "application_award", "application_gap_period",
                 "job_application", "job_posting_question", "job_posting_attachment_requirement",
                 "application_form_config", "job_position", "job_posting",
