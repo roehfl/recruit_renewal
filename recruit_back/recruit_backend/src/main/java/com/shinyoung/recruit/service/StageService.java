@@ -187,6 +187,11 @@ public class StageService {
 
         Stage stage = findStage(jobPostingId, stageId);
         validateStageStatus(stage, StageStatus.READY, "Only READY stage can be deleted.");
+        // READY 단계에 붙은 StageResult 는 "대상자 불러오기"가 만든 PENDING placeholder 뿐이다. 판정 write 경로
+        // (updateResult/bulkUpdateResults)는 IN_PROGRESS 를 요구하고 상태는 되돌릴 수 없으므로 판정 데이터가 섞일 수
+        // 없다. 대상자 단건 삭제 API 가 없어 차단하면 관리자가 빠져나갈 수 없으므로 단계와 함께 정리한다.
+        // 삭제한 placeholder 는 단계를 다시 만든 뒤 initialize 로 동일하게 복원된다.
+        stageResultRepository.deleteByStageId(stageId);
         stageRepository.delete(stage);
         return stageId;
     }
