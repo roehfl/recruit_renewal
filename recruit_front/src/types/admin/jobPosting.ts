@@ -1,9 +1,11 @@
-/** 모집분야의 후보 근무지(CommonCode 그룹 WORK_LOCATION). */
-export interface WorkLocationOption {
-  code: string
-  name: string
-}
+import type { WorkLocationOption } from '@/types/jobPosting'
 
+/**
+ * 관리자 공고 등록·수정 폼이 다루는 모집분야.
+ *
+ * 공고 목록·상세 타입(`AdminJobPostingListItem`, `AdminJobPostingDetail`)과
+ * 그 부속 타입은 `@/types/jobPosting` 이 단일 출처다. 여기에 중복 선언하지 않는다.
+ */
 export interface AdminJobPosition {
   id: number | null
   positionName: string
@@ -12,48 +14,4 @@ export interface AdminJobPosition {
   workLocations: WorkLocationOption[]
   employmentType: 'FULL_TIME' | 'CONTRACT' | 'INTERN' | 'FREELANCE' | 'PART_TIME' | 'ETC'
   sortOrder: number
-}
-
-export type AdminJobPostingStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED'
-
-export interface AdminApplicationFormConfig {
-  useEducation: boolean
-  requireEducation: boolean | null
-  useCareer: boolean
-  requireCareer: boolean | null
-  useCertificate: boolean
-  requireCertificate: boolean | null
-  useLanguage: boolean
-  requireLanguage: boolean | null
-  useMilitary: boolean
-  requireMilitary: boolean | null
-  useAward: boolean
-  requireAward: boolean | null
-  useGapPeriod: boolean
-  requireGapPeriod: boolean | null
-  useAttachment: boolean
-}
-export interface AdminJobPostingDetail {
-  id: number
-  title: string
-  postingType: string
-  summary: string | null
-  contentHtml: string | null
-  receptionStartDateTime: string
-  receptionEndDateTime: string
-  receptionStatus: 'UPCOMING' | 'ACCEPTING' | 'CLOSED'
-  accepting: boolean
-  status: AdminJobPostingStatus
-  visible: boolean
-  pinned: boolean
-  displayOrder: number
-  displayStartDateTime: string | null
-  displayEndDateTime: string | null
-  publishedAt: string | null
-  closedAt: string | null
-  createdAt: string
-  updatedAt: string
-  positionCount: number
-  jobPositions: AdminJobPosition[]
-  applicationFormConfig: AdminApplicationFormConfig
 }

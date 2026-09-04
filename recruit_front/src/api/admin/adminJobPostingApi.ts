@@ -1,8 +1,7 @@
 import { apiClient } from '../client'
 import type { ApiResponse } from '@/types/api'
 import type { PageResponse } from '@/types/page'
-import type { AdminJobPostingListItem } from '@/types/jobPosting'
-import type { AdminJobPostingDetail } from '@/types/admin/jobPosting'
+import type { AdminJobPostingDetail, AdminJobPostingListItem } from '@/types/jobPosting'
 
 const UPLOAD_TIMEOUT_MS = 120000 // 기본 10초로는 다장 이미지 업로드가 끊길 수 있다.
 
