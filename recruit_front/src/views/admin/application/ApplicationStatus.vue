@@ -15,7 +15,6 @@ import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { formatDate } from '@/common/dateUtil'
 import type { CommonCodeItems } from '@/types/commonCode'
 import type { TableColumnsType } from 'ant-design-vue'
-import SchoolModalBody from '../../common/SchoolModalBody.vue'
 import { apiClient } from '@/api/client'
 import { commonCodeApi } from '@/api/commonApi'
 
@@ -31,21 +30,11 @@ interface TableRow {
 const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
-const schoolModalOpen = ref(false)
-const schoolModalBodyRef = ref<InstanceType<typeof SchoolModalBody>>();
-
-const handleSchoolConfirm = () => {
-  const schoolForm = schoolModalBodyRef.value?.schoolForm;
-  searchRequest.schoolName = schoolForm?.schoolName
-
-  schoolModalOpen.value = false
-}
-
-const selectRowKeys = ref<string[]>([]);
+const selectRowKeys = ref<number[]>([]);
 
 const rowSelection = {
-  selectRowKeys, 
-  onchange: (keys: string[]) => {
+  selectedRowKeys: selectRowKeys, 
+  onChange: (keys: number[]) => {
     selectRowKeys.value = keys;
   },
 }
@@ -151,7 +140,6 @@ const jobWorkLocationOptions = computed(() => {
 const changeJobPosting = async (jobPostingId: number): Promise<void> => {
   selectedJobPostingId.value = jobPostingId;
   Object.assign(searchRequest, initialSearchRequest);
-  selectRowKeys.value = [];
   refreshing.value = true
   loadFailed.value = false
   try {
@@ -199,6 +187,7 @@ const initialSearchRequest: AdminApplicationSearchRequest = {
     birthDateTo: undefined,           // 생년월일 TO
     applicationType: undefined,       // 지원 구분 
     name: undefined,                  // 이름
+    phoneNumber: undefined,           // 연락처
     languageLevel: undefined,         // 외국어 수준
     stageResultStatus: undefined,     // 전형별 결과
     finalSchoolCondition: undefined,  // 최종학교 조건
@@ -216,6 +205,7 @@ const searchRequest = reactive<AdminApplicationSearchRequest>({
 const save = async () => {
   applications.value = [];
   loading.value = true
+  selectRowKeys.value = [];
 
   try {
     if (selectedJobPostingId.value) {
@@ -382,7 +372,7 @@ onMounted(async () => {
               </td>
               <th>연락처</th>
               <td>
-                <a-input v-model:value="searchRequest.certificateName" style="width: 200px" 
+                <a-input v-model:value="searchRequest.phoneNumber" style="width: 200px" 
                   placeholder="01012345678" :maxlength="11" @keydown="onlyNumber"
                 />
               </td>
@@ -412,14 +402,9 @@ onMounted(async () => {
           <a-button>엑셀 다운로드</a-button>
         </div>
         <div>
-          <a-table :columns="columns" :data-source="applications" :pagination="{ pageSize: 5 }" :row-selection="rowSelection" row-key="applicationId">
+          <a-table :columns="columns" :data-source="applications" :pagination="{ pageSize: 10 }" :row-selection="rowSelection" row-key="applicationId">
             <template #bodyCell="{ column, record }">
-              <!-- <template v-if="column.key === 'status'">
-                <a-tag :color="statusColorMap[record.status]">{{ statusLabelMap[record.status] ?? record.status }}</a-tag>
-                {{ statusLabelMap[record.status] ?? record.status }}
-              </template> -->
               <template v-if="column.key === 'stageType'">
-                <!-- <a-tag :color="statusColorMap[record.status]">{{ statusLabelMap[record.status] ?? record.status }}</a-tag> -->
                 {{ statusLabelMap[record.status] ?? record.status }}
               </template>
               <template v-else-if="column.key === 'finalEducationLevel'">
@@ -442,22 +427,8 @@ onMounted(async () => {
           </a-table>
 
         </div>
-        <div class="config-grid">
-        </div>
       </a-card>
 
-      <!-- 학교 모달 -->
-      <a-modal
-        v-model:open="schoolModalOpen"
-        title="학교 찾기"
-        @ok="handleSchoolConfirm"
-      >
-        <SchoolModalBody 
-          ref="schoolModalBodyRef"
-          :open="schoolModalOpen"
-          :education-level="searchRequest.finalEducationLevel"
-        />
-      </a-modal>
     </a-spin>
   </div>
 </template>
@@ -465,7 +436,6 @@ onMounted(async () => {
 <style scoped>
 .job-posting-form {
   padding: 24px;
-  /* max-width: 1080px; */
 }
 .page-header {
   margin-bottom: 16px;
@@ -501,12 +471,6 @@ onMounted(async () => {
     text-align: center;
 }
 
-em {
-    color: red;
-    font-style: normal;    
-}
-
-
 .form-actions {
   margin-top: 12px;
   display: flex;
@@ -532,7 +496,8 @@ em {
   flex-wrap: wrap;
 }
 .posting-select {
-  min-width: 280px;
+  /* min-width: 280px; */
+  width: 100%;
 }
 
 .flex-div-area{
@@ -541,23 +506,23 @@ em {
   align-items: center;
 }
 
-.shcoolNameSearchBtn { 
-  margin-left: 8px;
-}
-
 :deep(.ant-table-tbody >tr.ant-table-row-selected >td){
   background: var(--app-bg-selected);
 }
-
 :deep(.ant-table-tbody >tr.ant-table-row-selected:hover>td){
   background: #e8f0de;
 }
-
 :deep(.ant-table) { 
-  /* font-size: 13px; */
   text-align-last: center;
+  /* font-size: 13.5px; */
 }
-
+:deep(.ant-table-thead>tr>th),
+:deep(.ant-table-tbody>tr>td) {
+  padding: 12px;
+}
+:deep(.ant-table-tbody>tr>td:last-child) {
+  padding: 8px;
+}
 :deep(.ant-input) {
   width: 100%;
   text-overflow: ellipsis;
@@ -566,6 +531,7 @@ em {
 .careerButton{
   font-size: 10px;
   padding: 0px 8px;
+  height: 30px;
 }
 
 :deep(.applicationId-link) {

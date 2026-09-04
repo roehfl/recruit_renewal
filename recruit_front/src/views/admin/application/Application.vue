@@ -24,6 +24,7 @@ import type {
 } from '@/types/admin/applicationSections'
 import { getLabel } from '@/types/admin/applicationSections'
 import { adminApplicationApi } from '@/api/admin/adminApplicationApi'
+import { formatDate } from '@/common/dateUtil'
 import logoImage from '@/assets/images/logo.png'
 
 interface EditableImage {
@@ -304,13 +305,15 @@ onBeforeUnmount(() => {
 
             <tr>
               <th>내/외국인</th>
-              <td v-if="basicInfo?.nationalityType === 'DOMESTIC'">내국인</td>
+              <td v-if="!basicInfo?.nationalityType"></td>
+              <td v-else-if="basicInfo?.nationalityType === 'DOMESTIC'">내국인</td>
               <td v-else> 
                 외국인 ({{ nationalityList.find(item => item.code === basicInfo?.countryCode)?.displayName  }})
               </td>
 
               <th>보훈여부</th>
-              <td colspan="2" v-if="basicInfo?.veteranStatus === 'NOT_SUBJECT'">비대상</td>
+              <td colspan="2" v-if="!basicInfo?.veteranStatus"></td>
+              <td colspan="2" v-else-if="basicInfo?.veteranStatus === 'NOT_SUBJECT'">비대상</td>
               <td colspan="2" v-else> 
                 대상 ({{ basicInfo?.veteranType }})
               </td>
@@ -321,7 +324,8 @@ onBeforeUnmount(() => {
               <td> {{ basicInfo?.birthDate }} </td>
 
               <th>장애여부</th>
-              <td colspan="2" v-if="basicInfo?.disabilityStatus === 'NOT_SUBJECT'">비대상</td>
+              <td colspan="2" v-if="!basicInfo?.disabilityStatus"></td>
+              <td colspan="2" v-else-if="basicInfo?.disabilityStatus === 'NOT_SUBJECT'">비대상</td>
               <td colspan="2" v-else> 
                 대상 (등급: {{ disabilityGradeList.find(item => item.code === basicInfo?.disabilityGradeCode)?.displayName  }}
                 / 유형:  {{ disabilityStatusList.find(item => item.code === basicInfo?.disabilityTypeCode)?.displayName  }})
@@ -334,7 +338,9 @@ onBeforeUnmount(() => {
               <th style="border-bottom: 0;">주소</th>
               <td colspan="2">
                 <div class="field">
-                  <span> ({{ basicInfo?.zipCode }}) {{ basicInfo?.addressBasic }}, {{ basicInfo?.addressDetail }} </span>
+                  <div v-if="basicInfo?.zipCode"> ({{ basicInfo?.zipCode }}) </div>
+                  <div v-if="basicInfo?.addressBasic"> {{ basicInfo?.addressBasic }}</div>
+                  <div v-if="basicInfo?.addressDetail">, {{ basicInfo?.addressDetail }}</div>
                 </div>
               </td>
             </tr>
@@ -395,8 +401,7 @@ onBeforeUnmount(() => {
                 <!-- 학교명 -->
                 <td> {{ education?.schoolName }} </td>
                 <!-- 입학년월 -->
-                <td v-if="education.educationLevel !== 'HIGH_SCHOOL'"> {{ education?.admissionDate }} </td>
-                <td v-else class="text-center">-</td>
+                <td > {{ education?.admissionDate }} </td>
                 <!-- 졸업년월 -->
                 <td> {{ education?.graduationDate }} </td>
                 <!-- 졸업구분 -->
@@ -475,7 +480,7 @@ onBeforeUnmount(() => {
                 <!-- 최종직급 -->
                 <td> {{ career.positionTitle }} </td>
                 <!-- 승진일 -->
-                <td> {{ career.promotionDate }} </td>
+                <td> {{ formatDate(career.promotionDate, 'YYYY-MM') }} </td>
                 <!-- 연봉  -->
                 <td> {{ Number(career.currentSalary).toLocaleString() }} </td>
                 <!-- 퇴직사유   -->
@@ -563,7 +568,7 @@ onBeforeUnmount(() => {
               <tr v-for="award in awards" :key="award.awardId">
                 <td> {{ award.awardName }} </td>
                 <td> {{ award.awardingOrganization }} </td>
-                <td> {{ award.awardDate }} </td>
+                <td> {{ formatDate(award.awardDate, 'YYYY-MM') }} </td>
               </tr>
             </template>
             <tr v-else>
@@ -589,7 +594,7 @@ onBeforeUnmount(() => {
             <template v-if="gapPeriods.length">
               <tr v-for="gapPeriod in gapPeriods" :key="gapPeriod.gapPeriodId">
                 <td> {{ getLabel('GAP_PERIOD', 'gapType', gapPeriod.gapType) }} </td>
-                <td> {{ gapPeriod.startDate }} ~ {{ gapPeriod.endDate }} </td>
+                <td> {{ formatDate(gapPeriod.startDate, 'YYYY-MM') }} ~ {{ formatDate(gapPeriod.endDate, 'YYYY-MM') }} </td>
                 <td> {{ gapPeriod.reason }} </td>
                 <td> {{ gapPeriod.description }} </td>
               </tr>
@@ -662,9 +667,11 @@ onBeforeUnmount(() => {
 
 .field {
   display: flex;
-  flex-direction: column;
   gap: 4px;
-  word-break: keep-all;
+  flex-wrap: wrap;
+}
+.field > div {
+  white-space: nowrap;
 }
 
 .brand-logo {

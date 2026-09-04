@@ -35,6 +35,7 @@ export interface AdminApplicationSearchRequest {
   birthDateTo: string | undefined
   applicationType: string | undefined
   name: string | undefined
+  phoneNumber: string | undefined
   languageLevel: string | undefined
   stageResultStatus: string | undefined
   finalSchoolCondition: string | undefined
