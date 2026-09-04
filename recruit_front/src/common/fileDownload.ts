@@ -2,7 +2,7 @@ import type { AxiosResponse } from 'axios'
 
 /**
  * blob 응답을 파일로 저장한다. 서버가 노출하면 Content-Disposition 의 `filename*=UTF-8''` 를 쓰고,
- * 아니면 호출부가 준 기본값을 쓴다. 현재 백엔드 CORS 는 이 헤더를 노출하지 않아 대개 기본값이 쓰인다.
+ * 아니면 호출부가 준 기본값을 쓴다.
  */
 export const saveBlobResponse = (response: AxiosResponse<Blob>, fallbackFileName: string): void => {
   const disposition = response.headers['content-disposition']

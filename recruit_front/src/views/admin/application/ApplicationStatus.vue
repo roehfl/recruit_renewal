@@ -14,6 +14,7 @@ import type {
 } from '@/types/admin/application'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { formatDate } from '@/common/dateUtil'
+import { saveBlobResponse } from '@/common/fileDownload'
 import type { CommonCodeItems } from '@/types/commonCode'
 import type { TableColumnsType } from 'ant-design-vue'
 import { apiClient } from '@/api/client'
@@ -225,21 +226,7 @@ const careerDescriptionDownload = async (url: string) => {
   try {
     const response = await apiClient.get(url, {responseType: 'blob'});
     
-    const contentDisposition = response.headers['content-disposition'];
-    let fileName = '경력기술서';
-    const match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i,);
-    if (match) fileName = decodeURIComponent(match[1]);
-    
-    const blobUrl = URL.createObjectURL(response.data); 
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = fileName;
-
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-
-    URL.revokeObjectURL(blobUrl);
+    saveBlobResponse(response, '경력기술서');
   } catch (error) {
     message.error(getApiErrorMessage(error, '경력기술서 다운로드에 실패했습니다.'))
   } finally {

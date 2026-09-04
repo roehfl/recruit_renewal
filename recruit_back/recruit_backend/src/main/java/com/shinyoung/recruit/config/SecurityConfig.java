@@ -62,7 +62,8 @@ public class SecurityConfig {
                 "Content-Type", "X-Requested-With", "X-XSRF-TOKEN"
         ));
         // FE가 실패 업무 API 응답에서 X-Request-Id를 읽어 relatedCorrelationId로 보낸다(Phase 09f, 설계 7장).
-        corsConfiguration.setExposedHeaders(List.of("X-Request-Id"));
+        // Content-Disposition: 첨부/엑셀 다운로드에서 FE가 원본 파일명을 읽으려면 노출이 필요하다.
+        corsConfiguration.setExposedHeaders(List.of("X-Request-Id", "Content-Disposition"));
         corsConfiguration.setAllowCredentials(true);
         corsConfiguration.setMaxAge(3600L);
         source.registerCorsConfiguration("/**", corsConfiguration);
