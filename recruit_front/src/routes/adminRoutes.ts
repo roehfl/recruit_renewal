@@ -70,6 +70,11 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/application/Application.vue'),
       },
       {
+        path: 'stage-results',
+        name: 'AdminStageResult',
+        component: () => import('@/views/admin/stageResult/AdminStageResultView.vue'),
+      },
+      {
         path: 'question-template/:id?/edit',
         name: 'AdminJobPostingQuestionTemplateEdit',
         component: () => import('@/views/admin/jobPosting/AdminQuestionTemplateEditView.vue'),

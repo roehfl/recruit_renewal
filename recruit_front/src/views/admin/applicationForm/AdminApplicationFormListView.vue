@@ -91,6 +91,7 @@ const columns = [
   { title: '폼 레이아웃', key: 'layout', width: 130 },
   { title: '설정 상태', key: 'configState', width: 130 },
   { title: '최종 수정', key: 'updatedAt', width: 140 },
+  { title: '', key: 'stageResults', width: 100 },
 ]
 
 const pagination = computed(() => ({
@@ -163,6 +164,10 @@ const handleTableChange = (nextPagination: { current?: number }) => {
 
 const goToDetail = (row: AdminApplicationFormSummary) => {
   void router.push({ name: 'AdminApplicationFormDetail', params: { jobPostingId: row.jobPostingId } })
+}
+
+const goToStageResults = (jobPostingId: number) => {
+  void router.push({ name: 'AdminStageResult', query: { jobPostingId: String(jobPostingId) } })
 }
 
 onMounted(load)
@@ -262,6 +267,10 @@ onMounted(load)
         </template>
         <template v-else-if="column.key === 'updatedAt'">
           {{ formatDateTime(record.updatedAt) }}
+        </template>
+        <template v-else-if="column.key === 'stageResults'">
+          <!-- 행 클릭이 지원서 설정 상세로 가므로 버튼 클릭은 전파를 막는다. -->
+          <a-button size="small" @click.stop="goToStageResults(record.jobPostingId)">전형 단계</a-button>
         </template>
       </template>
     </a-table>

@@ -118,6 +118,10 @@ const goToApplicationForm = () => {
   void router.push({ name: 'AdminApplicationFormDetail', params: { jobPostingId: postingId.value } })
 }
 
+const goToStageResults = () => {
+  void router.push({ name: 'AdminStageResult', query: { jobPostingId: String(postingId.value) } })
+}
+
 onMounted(loadDetail)
 </script>
 
@@ -137,6 +141,7 @@ onMounted(loadDetail)
             <a-button @click="router.push({ name: 'AdminJobPostingList' })">목록</a-button>
             <a-button v-if="detail.status !== 'CLOSED'" @click="goToEdit">수정</a-button>
             <a-button @click="goToApplicationForm">지원서 설정</a-button>
+            <a-button @click="goToStageResults">전형 단계</a-button>
             <a-button v-if="detail.status === 'DRAFT'" type="primary" :loading="acting" @click="publish">발행</a-button>
             <a-button v-if="detail.status === 'PUBLISHED'" danger :loading="acting" @click="close">마감</a-button>
           </div>
