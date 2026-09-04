@@ -18,6 +18,11 @@ public interface InterviewRepository extends JpaRepository<Interview, Long> {
 
     List<Interview> findByJobPostingIdAndStatusOrderByStartDateTimeAsc(Long jobPostingId, InterviewStatus status);
 
+    /** READY 단계 삭제 가드 — DRAFT 가 아닌(= 이미 노출된) 면접이 붙어 있는지(StageService.delete). */
+    boolean existsByStageIdAndStatusNot(Long stageId, InterviewStatus status);
+
+    List<Interview> findByStageIdAndStatus(Long stageId, InterviewStatus status);
+
     @Query("""
             select interview
             from Interview interview

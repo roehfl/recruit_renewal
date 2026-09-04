@@ -2,6 +2,7 @@ package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.Stage;
+import com.shinyoung.recruit.domain.repository.InterviewRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.domain.repository.StageRepository;
 import com.shinyoung.recruit.domain.repository.StageResultRepository;
@@ -14,6 +15,7 @@ import com.shinyoung.recruit.dto.response.StageListResponse;
 import com.shinyoung.recruit.enumeration.AuditActionResult;
 import com.shinyoung.recruit.enumeration.AuditActionType;
 import com.shinyoung.recruit.enumeration.AuditTargetType;
+import com.shinyoung.recruit.enumeration.InterviewStatus;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageStatus;
@@ -39,6 +41,7 @@ public class StageService {
     private final StageRepository stageRepository;
     private final JobPostingRepository jobPostingRepository;
     private final StageResultRepository stageResultRepository;
+    private final InterviewRepository interviewRepository;
     private final ActivityLogService activityLogService;
     private final AuditRequestContextResolver auditRequestContextResolver;
 
@@ -187,11 +190,15 @@ public class StageService {
 
         Stage stage = findStage(jobPostingId, stageId);
         validateStageStatus(stage, StageStatus.READY, "Only READY stage can be deleted.");
+        validateNoExposedInterview(stageId);
         // READY 단계에 붙은 StageResult 는 "대상자 불러오기"가 만든 PENDING placeholder 뿐이다. 판정 write 경로
         // (updateResult/bulkUpdateResults)는 IN_PROGRESS 를 요구하고 상태는 되돌릴 수 없으므로 판정 데이터가 섞일 수
         // 없다. 대상자 단건 삭제 API 가 없어 차단하면 관리자가 빠져나갈 수 없으므로 단계와 함께 정리한다.
         // 삭제한 placeholder 는 단계를 다시 만든 뒤 initialize 로 동일하게 복원된다.
         stageResultRepository.deleteByStageId(stageId);
+        // DRAFT 면접은 관리자 내부 초안이라 지원자/면접관에게 노출되지 않고(VISIBLE_STATUSES = CONFIRMED, CANCELLED)
+        // 평가도 붙을 수 없다(평가 생성은 CONFIRMED 필수). 참가자는 Interview 의 cascade/orphanRemoval 로 함께 지워진다.
+        interviewRepository.deleteAll(interviewRepository.findByStageIdAndStatus(stageId, InterviewStatus.DRAFT));
         stageRepository.delete(stage);
         return stageId;
     }
@@ -260,6 +267,16 @@ public class StageService {
     private void validateStageStatus(Stage stage, StageStatus expectedStatus, String message) {
         if (stage.getStatus() != expectedStatus) {
             throw new InvalidStageException(message);
+        }
+    }
+
+    /**
+     * 확정/취소된 면접은 지원자·면접관에게 이미 노출됐고 InterviewEvaluation 이 붙어 있을 수 있다(평가 경로에는
+     * stage 상태 가드가 없다). 되돌릴 수 없는 데이터이므로 함께 지우지 않고 삭제 자체를 막는다.
+     */
+    private void validateNoExposedInterview(Long stageId) {
+        if (interviewRepository.existsByStageIdAndStatusNot(stageId, InterviewStatus.DRAFT)) {
+            throw new InvalidStageException("Stage with confirmed or cancelled interview cannot be deleted.");
         }
     }
 
