@@ -68,6 +68,7 @@ const stageResultStatusMap: Record<string, string> = {
   HOLD: '보류',
 }
 const applicationTypeOptions = [
+  { value: '', label: '전체' },
   { value: 'NEW_GRADUATE', label: '신입' },
   { value: 'EXPERIENCED', label: '경력' },
   { value: 'NEW_GRADUATE_OR_EXPERIENCED', label: '신입/경력' },
@@ -100,14 +101,18 @@ const refreshing = ref(false)
 const loadFailed = ref(false)
 
 const stageTypeList = ref<CommonCodeItems[]>([])
-const stageTypeOptions = computed(() =>
-  stageTypeList.value.map((code) => ({ value: code.code, label: code.displayName })),
-)
+const stageTypeOptions = computed(() => {
+  const options = stageTypeList.value.map((code) => ({ value: code.code, label: code.displayName }))
+  options.unshift({ value: '', label: '전체' })
+  return options
+})
 
 const stageResultStatusList = ref<CommonCodeItems[]>([])
-const stageResultStatusOptions = computed(() =>
-  stageResultStatusList.value.map((code) => ({ value: code.code, label: code.displayName })),
-)
+const stageResultStatusOptions = computed(() => {
+  const options = stageResultStatusList.value.map((code) => ({ value: code.code, label: code.displayName }))
+  options.unshift({ value: '', label: '전체' })
+  return options
+})
 
 const jobPositions = ref<AdminJobPosition[]>([
   { id: null, positionName: '', applicationType: 'NEW_GRADUATE_OR_EXPERIENCED', jobTitle: null, workLocations: [], employmentType: 'FULL_TIME', sortOrder: 0 },
@@ -123,10 +128,12 @@ const jobPostingOptions = computed(() => {
   }))
 })
 const jobPositionOptions = computed(() => {
-  return jobPositions.value.map((posting) => ({
+  const options = jobPositions.value.map((posting) => ({
     value: posting.id,
     label: posting.positionName,
   }))
+  options.unshift({ value: null, label: '전체' })
+  return options
 })
 // 근무지 검색은 공통코드 code 로 비교한다. 공고의 모집분야들이 제시한 후보를 코드 기준으로 중복 제거한다.
 const jobWorkLocationOptions = computed(() => {
@@ -136,7 +143,9 @@ const jobWorkLocationOptions = computed(() => {
       workLocations.set(workLocation.code, workLocation.name)
     })
   })
-  return [...workLocations].map(([code, name]) => ({ value: code, label: name }))
+  const options = [...workLocations].map(([code, name]) => ({ value: code, label: name }))
+  options.unshift({ value: '', label: '전체' })
+  return options
 })
 
 const changeJobPosting = async (jobPostingId: number): Promise<void> => {
@@ -156,18 +165,22 @@ const changeJobPosting = async (jobPostingId: number): Promise<void> => {
   }
 }
 
-const changeJobPosition = async (jobPositionId: number) => {
-  searchRequest.jobPositionId = jobPositionId;
+const changeJobPosition = async (jobPositionId: number | null) => {
+  searchRequest.jobPositionId = jobPositionId ?? undefined;
 }
 
-const refresh = async (): Promise<void> => {
+// 검색 조건만 초기값으로 되돌린다. 선택한 공고와 모집분야 목록은 유지하므로 재조회하지 않는다.
+const refresh = (): void => {
   if (selectedJobPostingId.value === null || refreshing.value) return
 
-  await changeJobPosting(selectedJobPostingId.value)
+  Object.assign(searchRequest, initialSearchRequest)
 }
 
-const goApplication = async (applicationId: number) => {
-  await router.push(`applications/${applicationId}`)
+// 지원서 상세는 메인 프레임을 벗어나 새 탭으로 연다. 상대경로 window.open 은 현재 URL 기준으로
+// 해석돼 라우트 변경에 취약하므로, router 가 계산한 절대 경로(href)를 쓴다.
+const goApplication = (applicationId: number) => {
+  const { href } = router.resolve({ name: 'AdminApplication', params: { applicationId } })
+  window.open(href, '_blank', 'noopener')
 }
 
 // 전화번호 입력 input (숫자만 입력 가능하도록)
