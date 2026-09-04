@@ -6,7 +6,8 @@ import { message } from 'ant-design-vue'
 import { adminJobPostingApi } from '@/api/admin/adminJobPostingApi'
 import { adminApplicationApi } from '@/api/admin/adminApplicationApi'
 import { getApiErrorMessage } from '@/api/apiError'
-import type { AdminJobPosition, AdminJobPostingListItem, } from '@/types/admin/jobPosting'
+import type { AdminJobPosition } from '@/types/admin/jobPosting'
+import type { AdminJobPostingListItem } from '@/types/jobPosting'
 import type { 
   AdminApplicationSummaryResponse,
   AdminApplicationSearchRequest,
