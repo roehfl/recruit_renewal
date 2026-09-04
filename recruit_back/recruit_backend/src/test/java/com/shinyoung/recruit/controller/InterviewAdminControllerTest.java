@@ -159,6 +159,56 @@ class InterviewAdminControllerTest {
     }
 
     @Test
+    void delete_draft_interview_returns_api_response() throws Exception {
+        JobPosting jobPosting = saveJobPosting();
+        Stage interviewStage = saveStage(jobPosting, StageType.FIRST_INTERVIEW, 1);
+        Long interviewId = interviewService.createDraft(
+                jobPosting.getId(),
+                createRequest(interviewStage.getId(), start())
+        );
+
+        mockMvc.perform(post("/api/admin/interviews/{interviewId}/delete", interviewId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value(interviewId));
+
+        mockMvc.perform(get("/api/admin/interviews/{interviewId}", interviewId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void delete_confirmed_interview_returns_bad_request() throws Exception {
+        JobPosting jobPosting = saveJobPosting();
+        Stage documentStage = saveStage(jobPosting, StageType.DOCUMENT, 1);
+        documentStage.announce();
+        Stage interviewStage = saveStage(jobPosting, StageType.FIRST_INTERVIEW, 2);
+        JobApplication application = saveSubmittedApplication(jobPosting);
+        saveStageResult(documentStage, application, StageResultStatus.PASSED);
+        Employee employee = saveEmployee();
+        Long interviewId = interviewService.createDraft(
+                jobPosting.getId(),
+                createRequest(interviewStage.getId(), start())
+        );
+        interviewService.replaceParticipants(
+                interviewId,
+                new InterviewParticipantReplaceRequest(
+                        List.of(new InterviewCandidateParticipantRequest(application.getId(), 1)),
+                        List.of(new InterviewInterviewerParticipantRequest(employee.getId(), 1))
+                )
+        );
+        interviewService.confirm(interviewId);
+
+        mockMvc.perform(post("/api/admin/interviews/{interviewId}/delete", interviewId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void adminInterviewApisRequireAdminAuthentication() throws Exception {
         JobPosting jobPosting = saveJobPosting();
         Applicant applicant = saveApplicant();

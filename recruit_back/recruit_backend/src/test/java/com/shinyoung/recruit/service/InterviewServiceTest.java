@@ -73,6 +73,9 @@ class InterviewServiceTest {
     @Autowired
     private EmployeeRepository employeeRepository;
 
+    @Autowired
+    private InterviewEvaluationAdminService interviewEvaluationAdminService;
+
     @Test
     void createDraft_createsDraftInterviewOnlyForInterviewStage() {
         JobPosting jobPosting = saveJobPosting();
@@ -201,6 +204,95 @@ class InterviewServiceTest {
 
         assertThatThrownBy(() -> interviewService.cancel(interviewId))
                 .isInstanceOf(InvalidInterviewException.class);
+    }
+
+    @Test
+    void delete_removesDraftInterviewWithParticipants() {
+        JobPosting jobPosting = saveJobPosting();
+        Stage interviewStage = saveStage(jobPosting, StageType.FIRST_INTERVIEW, 1);
+        Long interviewId = interviewService.createDraft(jobPosting.getId(), createRequest(interviewStage.getId(), start()));
+        JobApplication application = saveSubmittedApplication(jobPosting);
+        Employee employee = saveEmployee();
+        interviewService.replaceParticipants(
+                interviewId,
+                new InterviewParticipantReplaceRequest(
+                        List.of(new InterviewCandidateParticipantRequest(application.getId(), 1)),
+                        List.of(new InterviewInterviewerParticipantRequest(employee.getId(), 1))
+                )
+        );
+
+        interviewService.delete(interviewId);
+
+        assertThat(interviewRepository.findById(interviewId)).isEmpty();
+        assertThat(participantRepository.findByInterviewIdOrderByRoleAscSortOrderAscIdAsc(interviewId)).isEmpty();
+    }
+
+    @Test
+    void delete_removesCancelledInterview() {
+        JobPosting jobPosting = saveJobPosting();
+        Stage documentStage = saveStage(jobPosting, StageType.DOCUMENT, 1);
+        documentStage.announce();
+        Stage interviewStage = saveStage(jobPosting, StageType.FIRST_INTERVIEW, 2);
+        Long interviewId = saveConfirmedInterview(jobPosting, documentStage, interviewStage);
+        interviewService.cancel(interviewId);
+
+        interviewService.delete(interviewId);
+
+        assertThat(interviewRepository.findById(interviewId)).isEmpty();
+        assertThat(participantRepository.findByInterviewIdOrderByRoleAscSortOrderAscIdAsc(interviewId)).isEmpty();
+    }
+
+    @Test
+    void delete_rejectsConfirmedInterview() {
+        JobPosting jobPosting = saveJobPosting();
+        Stage documentStage = saveStage(jobPosting, StageType.DOCUMENT, 1);
+        documentStage.announce();
+        Stage interviewStage = saveStage(jobPosting, StageType.FIRST_INTERVIEW, 2);
+        Long interviewId = saveConfirmedInterview(jobPosting, documentStage, interviewStage);
+
+        assertThatThrownBy(() -> interviewService.delete(interviewId))
+                .isInstanceOf(InvalidInterviewException.class);
+    }
+
+    @Test
+    void delete_rejectsWhenEvaluationExists() {
+        JobPosting jobPosting = saveJobPosting();
+        Stage documentStage = saveStage(jobPosting, StageType.DOCUMENT, 1);
+        documentStage.announce();
+        Stage interviewStage = saveStage(jobPosting, StageType.FIRST_INTERVIEW, 2);
+        Long interviewId = saveConfirmedInterview(jobPosting, documentStage, interviewStage);
+        interviewEvaluationAdminService.initialize(interviewId);
+        interviewService.cancel(interviewId);
+
+        assertThatThrownBy(() -> interviewService.delete(interviewId))
+                .isInstanceOf(InvalidInterviewException.class);
+    }
+
+    @Test
+    void delete_rejects_after_stage_result_announced() {
+        JobPosting jobPosting = saveJobPosting();
+        Stage interviewStage = saveStage(jobPosting, StageType.FIRST_INTERVIEW, 1);
+        Long interviewId = interviewService.createDraft(jobPosting.getId(), createRequest(interviewStage.getId(), start()));
+        interviewStage.announce();
+
+        assertThatThrownBy(() -> interviewService.delete(interviewId))
+                .isInstanceOf(InvalidInterviewException.class);
+    }
+
+    private Long saveConfirmedInterview(JobPosting jobPosting, Stage documentStage, Stage interviewStage) {
+        JobApplication application = saveSubmittedApplication(jobPosting);
+        saveStageResult(documentStage, application, StageResultStatus.PASSED);
+        Employee employee = saveEmployee();
+        Long interviewId = interviewService.createDraft(jobPosting.getId(), createRequest(interviewStage.getId(), start()));
+        interviewService.replaceParticipants(
+                interviewId,
+                new InterviewParticipantReplaceRequest(
+                        List.of(new InterviewCandidateParticipantRequest(application.getId(), 1)),
+                        List.of(new InterviewInterviewerParticipantRequest(employee.getId(), 1))
+                )
+        );
+        interviewService.confirm(interviewId);
+        return interviewId;
     }
 
     private InterviewCreateRequest createRequest(Long stageId, LocalDateTime startDateTime) {

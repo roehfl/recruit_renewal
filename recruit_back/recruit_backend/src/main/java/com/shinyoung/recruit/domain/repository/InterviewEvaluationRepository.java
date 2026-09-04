@@ -12,6 +12,9 @@ public interface InterviewEvaluationRepository extends JpaRepository<InterviewEv
 
     List<InterviewEvaluation> findByInterviewId(Long interviewId);
 
+    /** 면접 삭제 가드 — 평가가 하나라도 붙어 있으면 삭제하지 않는다(InterviewService.delete). */
+    boolean existsByInterviewId(Long interviewId);
+
     boolean existsByInterviewIdAndCandidateParticipantIdAndInterviewerParticipantId(
             Long interviewId,
             Long candidateParticipantId,

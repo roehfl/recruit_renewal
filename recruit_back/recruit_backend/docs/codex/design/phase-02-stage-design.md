@@ -404,7 +404,7 @@ DELETE 메서드 검토:
 - `DRAFT` 면접: 관리자 내부 초안이고 외부 비노출이며 평가가 붙을 수 없다(평가는 `CONFIRMED` 필수). `StageResult`의 `PENDING` placeholder와 동일한 성격이므로 단계와 함께 삭제한다. `InterviewParticipant`는 `Interview`의 `cascade = ALL` + `orphanRemoval`로 함께 정리된다.
 - `CONFIRMED` / `CANCELLED` 면접: 이미 노출됐고 평가가 붙어 있을 수 있으므로 삭제하지 않고 단계 삭제 자체를 `InvalidStageException`(400)으로 막는다.
 
-남은 제약: 확정 면접이 있는 READY 단계는 삭제 수단이 없다(`cancel`은 상태만 바꾸고 행은 남는다). 해소하려면 면접 삭제 API가 별도로 필요하다.
+막다른 길은 면접 삭제 API로 해소했다(`POST /admin/interviews/{interviewId}/delete`, phase-04 설계서 8.1/11.6). 탈출 경로는 **면접 취소 → 면접 삭제 → 단계 삭제**다. 다만 평가(`InterviewEvaluation`)가 붙은 면접은 삭제되지 않으므로, 평가까지 진행된 단계는 여전히 삭제할 수 없다 — 판정 데이터 보호 원칙상 의도된 제약이다.
 
 ## 7.2 상태 전이 규칙
 
