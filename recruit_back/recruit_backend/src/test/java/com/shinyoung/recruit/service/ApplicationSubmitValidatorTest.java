@@ -2,6 +2,7 @@ package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.domain.entity.ApplicationAnswer;
 import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
+import com.shinyoung.recruit.domain.entity.ApplicationBasicInfo;
 import com.shinyoung.recruit.domain.entity.ApplicationFormConfig;
 import com.shinyoung.recruit.domain.entity.ApplicationMilitary;
 import com.shinyoung.recruit.domain.entity.JobApplication;
@@ -11,6 +12,7 @@ import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
 import com.shinyoung.recruit.domain.repository.ApplicationAnswerRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAwardRepository;
+import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationCertificateRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationEducationRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationGapPeriodRepository;
@@ -21,9 +23,12 @@ import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
 import com.shinyoung.recruit.enumeration.AttachmentDeleteActorType;
 import com.shinyoung.recruit.enumeration.AttachmentType;
+import com.shinyoung.recruit.enumeration.DisabilityStatus;
 import com.shinyoung.recruit.enumeration.MilitarySubjectType;
+import com.shinyoung.recruit.enumeration.NationalityType;
 import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
+import com.shinyoung.recruit.enumeration.VeteranStatus;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -79,6 +84,9 @@ class ApplicationSubmitValidatorTest {
     @Mock
     private ApplicationAttachmentRepository attachmentRepository;
 
+    @Mock
+    private ApplicationBasicInfoRepository basicInfoRepository;
+
     @InjectMocks
     private ApplicationSubmitValidator validator;
 
@@ -92,6 +100,8 @@ class ApplicationSubmitValidatorTest {
                 .thenReturn(List.of());
         lenient().when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
                 .thenReturn(List.of());
+        lenient().when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID))
+                .thenReturn(Optional.of(validBasicInfo()));
     }
 
     @Test
@@ -207,8 +217,8 @@ class ApplicationSubmitValidatorTest {
         ApplicationFormConfig config = config();
         when(config.isUseEducation()).thenReturn(true);
         when(config.isRequireEducation()).thenReturn(false);
-        when(config.isUseCareer()).thenReturn(true);
-        when(config.isRequireCareer()).thenReturn(false);
+        lenient().when(config.isUseCareer()).thenReturn(true);
+        lenient().when(config.isRequireCareer()).thenReturn(false);
         when(config.isUseMilitary()).thenReturn(true);
         when(config.isRequireMilitary()).thenReturn(false);
 
@@ -444,6 +454,15 @@ class ApplicationSubmitValidatorTest {
         when(application.getId()).thenReturn(APPLICATION_ID);
         when(application.getJobPosting()).thenReturn(jobPosting);
         return application;
+    }
+
+    private ApplicationBasicInfo validBasicInfo() {
+        return ApplicationBasicInfo.create(
+                mock(JobApplication.class),
+                "홍길동", null, NationalityType.DOMESTIC, null,
+                LocalDate.of(1995, 1, 1), "01012345678", null, "test@example.com",
+                VeteranStatus.NOT_SUBJECT, null, DisabilityStatus.NOT_SUBJECT,
+                null, null, null, null, null, null);
     }
 
     private ApplicationFormConfig config() {
