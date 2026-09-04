@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { LockOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { useAuthStore } from '@/stores/authStore'
+import { ADMIN_ROLES } from '@/routes/adminRoutes'
 import logoImage from '@/assets/images/logo.png'
 
 interface LoginForm {
@@ -48,10 +49,12 @@ const moveAfterLogin = () => {
     return
   }
 
-  // if (authStore.userType === 'Employee') {
-  //   router.replace('/admin/dashboard')
-  //   return
-  // }
+  const isAdmin = ADMIN_ROLES.some((role) => authStore.roles.includes(role))
+
+  if (isAdmin) {
+    router.replace('/admin')
+    return
+  }
 
   router.replace('/applicant')
 }
