@@ -836,3 +836,80 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 프론트: `AdminJobPostingSaveRequest.applicationFormConfig` 제거, `AdminJobPostingFormView.vue` 의 "지원서 양식 구성" 카드 + `formConfig` ref + `formSections` 상수 + 관련 스타일 삭제
 - 남은 공백: 양식 설정을 편집할 화면이 S3(설정 상세 탭) 전까지 없다. 등록 시 기본값으로 생성되며, 기존 공고의 설정은 그대로 유지된다
 - 운영 확인: 기존 DB에 `application_form_config` 가 없는 공고가 있으면 현황판에 `MISSING` 으로 뜬다. 백필 여부 확인 필요
+
+---
+
+### 화면: 전형결과 관리 (AdminStageResultView)  🟢 확정 (2026-09-04, front-back 반영 완료)
+
+- 프론트: `src/views/admin/stageResult/`(본체 뷰 + 스텝퍼·카운트·그리드·업로드 미리보기 모달·정정 모달·단계 설정 드로어 + `useStageLifecycle`) + `src/api/admin/adminStageApi.ts` + `src/types/admin/stage.ts` + `src/common/fileDownload.ts`
+- 진행 상황: S1(백엔드)·S2(화면 본체)·S3(엑셀·정정)·S4(단계 설정) 완료. **세 변경 모두 front-back 반영 완료.**
+- 진입점: 사이드바 메뉴 `/admin/stage-results`(**관리자 메뉴 관리 화면에서 등록해야 뜬다 — 코드 변경 아님**), 공고 상세의 "전형 단계" 버튼, 지원서 설정 현황판 행의 "전형 단계" 버튼
+- 백엔드: `StageController`, `StageResultController`, `StageResultUploadController`, `AdminExportController`
+- 설계: `docs/superpowers/specs/2026-09-04-admin-stage-result-management-design.md` (§5)
+- 그대로 사용(형태 변경 없음): `GET /admin/job-postings/{id}/stages`, `POST …/stages`, `POST …/stages/{stageId}/delete`, `POST …/stages/reorder`, `POST …/stages/{stageId}/start|announce|close`, `GET /admin/stages/{stageId}/results`, `POST …/results/initialize`, `POST …/results/{resultId}`, `POST …/results/bulk`, `POST …/results/{resultId}/correct`, `GET …/results/{resultId}/histories`, `GET …/results/upload-template`, `POST …/results/upload/preview`, `POST …/results/upload/commit`, `GET …/results/export`
+  - 이 중 결과를 돌려주는 5개는 **응답 DTO 필드가 늘었다**(변경 1), `POST …/stages/{stageId}`(단계 수정)는 **가드가 완화됐다**(변경 2), `upload-template`/`upload/*`는 **엑셀 시트 내용과 행 오류 문구가 바뀌었다**(변경 3). 경로·HTTP 메서드·요청 형태는 전부 그대로다
+
+#### 변경 1: `AdminStageResultResponse` 그리드 열 추가  🟢 확정
+
+- 적용 엔드포인트(같은 DTO를 쓰는 곳 전부):
+  - `GET /admin/stages/{stageId}/results` → `ApiResponse<List<AdminStageResultResponse>>`
+  - `POST …/results/initialize` → `ApiResponse<{ stageId, createdCount, existingCount, skippedCount, results[] }>`
+  - `POST …/results/bulk` → `ApiResponse<{ stageId, updatedCount, results[] }>`
+  - `POST …/results/{resultId}`(단건 판정) → `ApiResponse<AdminStageResultResponse>`
+  - `POST …/results/{resultId}/correct`(발표 후 정정) → `ApiResponse<AdminStageResultResponse>`
+  - `initialize`·`bulk` 의 `results` 는 목록 조회와 같은 내용(단계 전체 결과)이다. 응답 하나로 그리드를 갱신할 수 있다
+- 응답 행(기존 필드 유지, 뒤에 6개 추가): `{ stageResultId, stageId, applicationId, applicantName, jobPositionId, jobPositionName, applicationStatus, resultStatus, score, comment, submittedAt, decidedAt, decidedBy, workLocation, applicationType, finalEducationLevel, finalSchoolName, previousStageResultStatus }`
+- 추가 필드 의미와 null 조건:
+  - `decidedBy` — 판정자(관리자 로그인 id). 아직 판정되지 않았으면 null. 관리자 전용 응답이라 노출한다(지원자용 DTO는 변경 없음)
+  - `workLocation` — 지원자가 선택한 근무지 표시명 스냅샷. 근무지 후보가 없는 모집분야면 null
+  - `applicationType` — 모집분야 지원구분(`NEW_GRADUATE | EXPERIENCED | NEW_GRADUATE_OR_EXPERIENCED`)
+  - `finalEducationLevel` — 최종학력 행의 학력(`HIGH_SCHOOL | COLLEGE | UNIVERSITY | MASTER | DOCTOR`). 학력 행이 하나도 없으면 null
+  - `finalSchoolName` — 같은 행의 학교명. 학력 행이 없으면 null
+  - `previousStageResultStatus` — 같은 공고에서 `stageOrder` 가 바로 앞인 단계의 결과(`StageResultStatus`). 첫 단계이거나, 직전 단계에 이 지원서의 결과 행이 없으면 null
+- **최종학력 판정은 지원현황 조회와 같은 규칙이다**: 최고 `EducationLevel`(enum 선언 순서 = 서열), 동률이면 id 가 큰 행. `JobApplicationService.loadAdminSummaryEnrichments` 와 같은 비교자를 쓴다 — 두 화면이 같은 지원자에게 다른 학교를 보여주면 안 된다
+- 파생값은 `AdminStageResultEnricher` 가 단계 단위 배치 2회(학력 / 직전 단계 결과)로 채운다. 한 번에 넘기는 결과가 **모두 같은 단계**라는 전제이며, 그리드가 무페이징이라 단계 전체를 한 번에 읽는다. 결과 목록에 페이징을 도입하면 이 전제를 다시 봐야 한다
+
+#### 변경 2: 진행 중 단계 발표일시 수정 허용  🟢 확정
+
+- `POST /admin/job-postings/{jobPostingId}/stages/{stageId}` — 요청(`StageUpdateRequest`)·응답(`ApiResponse<Long>`, 값은 stageId) **형태 불변**: `{ stageName, stageType, stageOrder, resultAnnouncementDateTime?, finalStage }`
+- 상태별 허용(판정 순서대로):
+  - 공고가 `CLOSED` 면 단계 상태와 무관하게 400 (기존)
+  - 단계 `READY` — 전체 필드 수정 가능. 순서 중복·최종단계 유일성 검증 그대로 (기존)
+  - 단계 `IN_PROGRESS` — **`resultAnnouncementDateTime` 만 변경 가능**(신규 완화). 발표일 연기 같은 운영을 위해 연다
+  - 단계 `RESULT_ANNOUNCED`·`CLOSED` — 400 (기존)
+- `IN_PROGRESS` 에서 `stageName`·`stageType`·`stageOrder`·`finalStage` 중 하나라도 **현재 값과 다르면 400**이다. 값이 같으면 그 필드는 무시하고 발표일시만 반영한다(순서·최종단계 재검증은 건너뛴다 — 바뀌지 않음이 보장되므로)
+- `resultAnnouncementDateTime` 은 null 을 보내면 비워진다(발표일시 미정으로 되돌리기)
+- 잠긴 필드도 `@NotBlank`/`@NotNull` 검증은 그대로다. **프론트는 진행 중 단계를 수정할 때 잠긴 4개 필드에 현재 값을 그대로 채워 보내야 한다**(비우면 400)
+- 400 메시지는 이 API의 기존 관례대로 영문이다 — 잠긴 필드 변경 시 `In progress stage allows changing resultAnnouncementDateTime only.`, `RESULT_ANNOUNCED`·`CLOSED` 는 기존 `Only READY stage can be changed.`. 설계서 §5.2가 적어 둔 한글 문구는 채택하지 않았고, 사용자 문구는 프론트가 만든다
+- **프론트 반영(S4 단계 설정 드로어):** 진행 중 단계 행에서 발표일시 입력만 열고 이름·유형·최종단계는 잠근다. 저장 시 잠긴 4개 필드에 **원본 값을 그대로 실어** 형식 검증을 통과시킨다. 순서도 원본 값을 보낸다 — 화면 배열 위치로 다시 매기면 손대지 않은 진행 중 단계가 "순서 바뀜"으로 판정돼 400이 난다
+- **함께 쓰는 단계 CRUD** — `POST …/stages`(생성), `POST …/stages/{stageId}/delete`(삭제, **READY만**), `POST …/stages/reorder`(순서). `reorder` 는 **공고의 모든 단계를 빠짐없이** 보내야 하고 **전 단계가 READY** 여야 한다. 그래서 드로어는 순서 조작을 두 갈래로 나눈다: 전부 READY면 위/아래 이동 후 `reorder` 1회, 시작된 단계가 있으면 READY 행을 "맨 뒤로"만 보내고 `update` 로 처리한다
+
+#### 변경 3: 엑셀 업로드 템플릿 한글화  🟢 확정
+
+- `GET /admin/stages/{stageId}/results/upload-template` 응답은 그대로 xlsx 스트림이다. **시트 내용만 바뀐다.**
+- 헤더 7열(순서 고정. 파서가 이 문자열과 정확히 대조한다):
+
+  | 시스템ID(수정금지) | 수험번호(수정금지) | 이름(수정금지) | 수정토큰(수정금지) | 결과 | 점수 | 코멘트 |
+  | --- | --- | --- | --- | --- | --- | --- |
+
+- 앞 4열(읽기전용)은 헤더·데이터 셀 모두 **회색 25% 음영**. 열 숨김은 하지 않는다. **헤더 행 틀고정**(freeze pane)
+- **결과 열 드롭다운**: 명시 목록 `합격 / 불합격 / 보류 / 결시 / 철회`. 적용 범위는 2행 ~ (데이터 행 수 + 1)행이며, 데이터가 0행이어도 2행에는 걸어 둔다. **빈칸을 허용하지 않고**(`setEmptyCellAllowed(false)`) 목록 밖 값은 엑셀이 STOP 으로 막으며 "합격 / 불합격 / 보류 / 결시 / 철회 중 하나를 선택하세요." 를 안내한다
+- 결과 값 한글 라벨(`StageResultStatusLabels`): `PENDING=대기`, `PASSED=합격`, `FAILED=불합격`, `HOLD=보류`, `ABSENT=결시`, `WITHDRAWN=철회`. 프리필은 이 라벨로 내려간다
+- ⚠️ **값 체계가 비대칭이다.** 엑셀은 한글 라벨로 주고받지만 **JSON 응답은 enum 이름 그대로** 내려간다(`resultStatus`, `previousStageResultStatus`, `applicationType`, `finalEducationLevel`). 라벨을 내려주는 API는 없고 결과 상태는 공통코드도 아니므로, **프론트가 화면 표시용 라벨 맵을 직접 갖는다.** 그 맵은 위 6개 라벨과 **글자까지 같아야 한다** — 한쪽만 바꾸면 엑셀 드롭다운의 단어와 화면 배지의 단어가 갈라진다. 백엔드 라벨을 바꾸려면 이 계약과 프론트 맵을 함께 고친다
+  - **`대기` 는 프리필 전용이라 드롭다운 목록에는 없다**(업로드로 대기를 새로 지정할 수 없기 때문). 이미 프리필된 셀 값은 그대로 유지된다
+  - 파싱 허용 범위: 한글 라벨 정확 일치 **또는 enum 이름**(`PASSED`, `passed` 등 대소문자 무시). 앞뒤 공백은 trim
+- **부분 판정 업로드 규칙**(전원 판정 전에도 올릴 수 있게 하는 규칙):
+  - 파일 값 `대기` + DB 현재 값 PENDING → **미변경(`UNCHANGED`)** 으로 분류해 commit 대상에서 제외한다. 프리필된 대기 행을 손대지 않고 올려도 파일 전체가 거부되지 않는다
+  - 판정된 행(DB가 PENDING 이 아님)을 `대기` 로 되돌리면 → **행 오류**
+  - DB가 PENDING 인 채로 점수·코멘트만 입력하면 → **행 오류**(bulk 가 어차피 거부하는 조합을 여기서 먼저 막는다)
+- 주요 행 오류 문구(실제 문자열):
+  - `결과는 필수입니다.`
+  - `허용되지 않는 결과입니다: <입력값> (합격/불합격/보류/결시/철회)`
+  - `점수 형식이 올바르지 않습니다: <입력값>`
+  - `판정된 결과를 대기로 되돌릴 수 없습니다. 다른 관리자가 이미 판정했다면 템플릿을 다시 받으세요.`
+  - `대기 상태에서는 점수·코멘트를 입력할 수 없습니다. 결과를 먼저 판정하세요.`
+  - `코멘트는 2000자 이하여야 합니다.` / `시스템ID는 필수이며 숫자여야 합니다.` / `수험번호는 필수이며 숫자여야 합니다.` / `수험번호가 시스템ID와 일치하지 않습니다.` / `이 단계의 대상자가 아니거나 존재하지 않습니다.` / `시스템ID가 파일 내에서 중복되었습니다.` / `수식(formula) 셀은 허용되지 않습니다.` / `수정토큰은 문자열 셀이어야 합니다.`
+  - 오류 문구에 사용자 입력을 되비출 때는 **50자까지만 싣고 `…` 로 자른다**(셀 길이에 비례해 응답이 커지지 않도록)
+- 파일 자체가 거부되는 경우는 기존과 같이 400(`ApiResponse.fail(message)`, 행 결과 없음)이다. **이전 영문 헤더로 받아 둔 템플릿 파일은 헤더 불일치로 거부된다** — 호환은 유지하지 않고 `업로드 템플릿 헤더가 올바르지 않습니다. 엑셀 템플릿 다운로드 파일을 사용하세요.` 로 재다운로드를 유도한다
+- **응답 DTO 형태는 불변**이다: preview 는 `StageResultUploadPreviewResponse`, commit 은 `StageResultUploadCommitResponse`(`outcome`: `APPLIED`(200) / `REJECTED_VALIDATION`(400) / `REJECTED_STALE`(409)), 행 상태는 `CHANGED | UNCHANGED | ERROR | STALE` 그대로다. all-or-nothing(오류·STALE 1건이라도 있으면 0건 반영)도 그대로
+- `GET …/results/export`(결과 목록 다운로드)는 이번 변경 대상이 아니다. 열 목록(영문 필드명 12열)이 그대로라 **변경 1로 늘어난 6개 필드는 export 시트에 나오지 않는다.** 업로드 소스로도 쓸 수 없다(헤더가 업로드 템플릿과 다르다)

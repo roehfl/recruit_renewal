@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>전형결과 관리 관리자 시안</title>
+<style>
+:root{
+  --primary:#0f4726; --primary-hover:#146135; --primary-soft:#f4f8f0;
+  --olive:#6f8f3d; --emerald:#2f6f55;
+  --error:#ff4d4f; --warning:#d97706; --info:#1677ff; --success:#2f855a;
+  --text:#1f2937; --text-sub:#6b7280; --text-muted:#9ca3af;
+  --bg-page:#f5f7fa; --bg-surface:#fff; --bg-muted:#f9fafb; --bg-selected:#f4f8f0;
+  --bd:#e5e7eb; --bd-strong:#d1d5db; --bd-subtle:#eee;
+  --r:8px; --r-sm:4px; --r-lg:12px;
+  --shadow:0 4px 14px rgba(0,0,0,.04); --shadow-panel:0 8px 24px rgba(31,41,55,.06);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Pretendard","Malgun Gothic",-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg-page);color:var(--text);line-height:1.55;font-size:14px}
+.wrap{max-width:1280px;margin:0 auto;padding:32px 24px 80px}
+h1{font-size:24px;font-weight:800;letter-spacing:-.4px}
+h2{font-size:19px;font-weight:750;margin:0 0 4px}
+h3{font-size:15px;font-weight:700;margin:0 0 8px}
+p{color:var(--text-sub)}
+code{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace;font-size:12.5px;background:#eef2f0;color:#26503a;padding:1px 5px;border-radius:var(--r-sm)}
+
+.doc-head{background:var(--primary);color:#fff;border-radius:var(--r-lg);padding:26px 28px;margin-bottom:22px;box-shadow:var(--shadow-panel)}
+.doc-head h1{color:#fff}
+.doc-head p{color:#cfe0c8;margin-top:6px}
+.doc-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.doc-meta span{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#e8f0e6;font-size:12px;padding:4px 10px;border-radius:100px}
+
+.card{background:var(--bg-surface);border:1px solid var(--bd);border-radius:var(--r-lg);padding:20px 22px;margin-bottom:18px;box-shadow:var(--shadow)}
+.card > h2{margin-bottom:10px}
+.rules{list-style:none;display:grid;gap:8px;margin-top:12px}
+.rules li{display:flex;gap:10px;align-items:flex-start;background:var(--bg-muted);border:1px solid var(--bd);border-left:3px solid var(--olive);border-radius:var(--r);padding:10px 12px}
+.rules .no{flex:0 0 auto;width:20px;height:20px;border-radius:50%;background:var(--primary);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;margin-top:1px}
+.rules b{color:var(--text)}
+.rules span.t{color:var(--text-sub);font-size:13.5px}
+
+.tabs{display:flex;gap:8px;margin:26px 0 14px;flex-wrap:wrap}
+.tab{border:1px solid var(--bd-strong);background:var(--bg-surface);color:var(--text-sub);padding:10px 18px;border-radius:100px;cursor:pointer;font-size:14px;font-weight:600;transition:.15s}
+.tab:hover{background:var(--bg-selected)}
+.tab.on{background:var(--primary);border-color:var(--primary);color:#fff;box-shadow:0 8px 20px rgb(15 71 38 / 18%)}
+.pane{display:none}
+.pane.on{display:block}
+.note{font-size:12.5px;color:var(--text-sub);margin:0 0 12px}
+.note b{color:var(--text)}
+
+/* ---------- 목업 프레임 ---------- */
+.mock{border:1px solid var(--bd-strong);border-radius:var(--r-lg);overflow:hidden;background:var(--bg-page);box-shadow:var(--shadow-panel);margin-bottom:16px}
+.mock-bar{display:flex;align-items:center;gap:8px;background:#eceff2;border-bottom:1px solid var(--bd-strong);padding:8px 12px}
+.dot{width:10px;height:10px;border-radius:50%;background:#cdd3d8}
+.mock-url{margin-left:8px;font-size:11.5px;color:var(--text-muted);font-family:ui-monospace,monospace}
+.mock-body{display:flex;min-height:520px}
+.side{flex:0 0 160px;background:var(--bg-surface);border-right:1px solid var(--bd);padding:14px 10px}
+.side .logo{font-weight:800;color:var(--primary);font-size:13px;padding:6px 10px 14px}
+.side a{display:block;padding:7px 10px;border-radius:var(--r-sm);color:var(--text-sub);font-size:12.5px;text-decoration:none}
+.side a.on{background:var(--bg-selected);color:var(--primary);font-weight:700}
+.content{flex:1;min-width:0;padding:16px 18px;overflow:hidden;position:relative}
+
+.pg-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
+.pg-title{font-size:16px;font-weight:750}
+.pg-sub{font-size:12px;color:var(--text-muted);margin-top:2px}
+.btns{display:flex;gap:6px;flex-shrink:0;align-items:center}
+.btn{border:1px solid var(--bd-strong);background:#fff;color:var(--text);font-size:12px;padding:6px 12px;border-radius:var(--r-sm);cursor:default;white-space:nowrap}
+.btn.pri{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+.btn.ghost{color:var(--text-sub)}
+.btn.dis{background:var(--bg-muted);color:var(--text-muted);border-color:var(--bd)}
+.btn.sm{font-size:11.5px;padding:4px 9px}
+.btn.danger{color:#a8262a;border-color:#ffccc7}
+.btn.warn{color:#8a5a09;border-color:#fde2b8;background:#fffaf0}
+.tip{font-size:11px;color:var(--text-muted);white-space:nowrap}
+
+.sel{border:1px solid var(--bd-strong);border-radius:var(--r-sm);background:#fff;font-size:12px;color:var(--text);padding:5px 26px 5px 9px;position:relative;white-space:nowrap}
+.sel::after{content:"▾";position:absolute;right:8px;top:4px;color:var(--text-muted);font-size:11px}
+.sel.ph{color:var(--text-muted)}
+.sel.wide{min-width:300px}
+.inp{border:1px solid var(--bd-strong);border-radius:var(--r-sm);background:#fff;font-size:12px;color:var(--text-muted);padding:5px 9px;white-space:nowrap}
+
+/* 스텝퍼 (시안 A) */
+.stepper{display:flex;align-items:stretch;gap:0;background:#fff;border:1px solid var(--bd);border-radius:var(--r);margin-bottom:12px;overflow:hidden}
+.step{flex:1;display:flex;align-items:center;gap:10px;padding:10px 14px;border-right:1px solid var(--bd);position:relative;cursor:default}
+.step:last-of-type{border-right:none}
+.step .n{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--bd-strong);color:var(--text-muted);font-size:11.5px;font-weight:700;display:grid;place-items:center;flex:0 0 auto}
+.step .nm{font-size:13px;font-weight:650}
+.step .st{font-size:11px;color:var(--text-muted);margin-top:1px}
+.step.done .n{background:#e8f4ec;border-color:#a8d5b8;color:var(--success)}
+.step.on{background:var(--bg-selected);box-shadow:inset 0 -3px 0 var(--primary)}
+.step.on .n{background:var(--primary);border-color:var(--primary);color:#fff}
+.step.on .nm{color:var(--primary)}
+.step-cfg{flex:0 0 auto;display:flex;align-items:center;padding:0 12px;border-left:1px solid var(--bd);background:var(--bg-muted)}
+
+/* 좌측 레일 (시안 B) */
+.b-grid{display:grid;grid-template-columns:200px 1fr;gap:12px}
+.rail{background:#fff;border:1px solid var(--bd);border-radius:var(--r);padding:10px;align-self:start}
+.rail h4{font-size:11.5px;color:var(--text-sub);font-weight:750;margin:0 0 8px;display:flex;justify-content:space-between;align-items:center}
+.rail-item{display:flex;gap:8px;align-items:center;border:1px solid var(--bd);border-radius:var(--r-sm);padding:8px 9px;margin-bottom:6px;background:#fff}
+.rail-item.on{border-color:var(--primary);background:var(--bg-selected)}
+.rail-item .n{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--bd-strong);font-size:10.5px;font-weight:700;display:grid;place-items:center;color:var(--text-muted);flex:0 0 auto}
+.rail-item.done .n{background:#e8f4ec;border-color:#a8d5b8;color:var(--success)}
+.rail-item.on .n{background:var(--primary);border-color:var(--primary);color:#fff}
+.rail-item .nm{font-size:12.5px;font-weight:650;line-height:1.2}
+.rail-item .st{font-size:10.5px;color:var(--text-muted)}
+.rail-cnt{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:10px;font-size:11px;color:var(--text-sub)}
+.rail-cnt b{color:var(--text)}
+
+/* 배너 / 카운트 */
+.banner{display:flex;gap:8px;align-items:center;border-radius:var(--r);padding:8px 12px;font-size:12.5px;margin-bottom:12px}
+.banner.warn{background:#fff8ec;border:1px solid #fde2b8;color:#8a5a09}
+.banner.ok{background:#f0f9f4;border:1px solid #c6e6d3;color:#1f6b45}
+.banner.err{background:#fff1f0;border:1px solid #ffccc7;color:#a8262a}
+.banner.info{background:#eef4ff;border:1px solid #d3e0fb;color:#2b5fbf}
+.banner .sp{flex:1}
+.counts{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.cnt{flex:1;min-width:88px;background:#fff;border:1px solid var(--bd);border-radius:var(--r);padding:8px 10px}
+.cnt .l{font-size:11px;color:var(--text-muted)}
+.cnt .v{font-size:18px;font-weight:800;line-height:1.2}
+.cnt.pend .v{color:var(--warning)} .cnt.pass .v{color:var(--success)} .cnt.fail .v{color:#c0392b} .cnt.hold .v{color:var(--info)}
+.cnt.on{border-color:var(--primary);background:var(--bg-selected)}
+
+/* 툴바 / 그리드 */
+.toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.toolbar .sp{flex:1}
+.bulk{display:flex;align-items:center;gap:4px;background:var(--bg-selected);border:1px solid #d9e6d2;border-radius:var(--r-sm);padding:3px 4px 3px 9px;font-size:12px}
+.bulk b{color:var(--primary);margin-right:4px}
+.grid{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--bd);font-size:12px}
+.grid th{background:var(--bg-muted);color:var(--text-sub);font-weight:700;font-size:11.5px;padding:8px 8px;border-bottom:1px solid var(--bd);text-align:center;white-space:nowrap}
+.grid td{padding:6px 8px;border-bottom:1px solid var(--bd-subtle);text-align:center;white-space:nowrap}
+.grid tr.dirty td{background:#fffdf3}
+.grid tr.dirty td:first-child{box-shadow:inset 3px 0 0 var(--warning)}
+.grid tr.chk td{background:var(--bg-selected)}
+.grid a{color:var(--primary);text-decoration:underline;font-weight:600}
+.cb{width:13px;height:13px;border:1.5px solid var(--bd-strong);border-radius:3px;display:inline-grid;place-items:center;font-size:9px;color:#fff;vertical-align:middle}
+.cb.on{background:var(--primary);border-color:var(--primary)}
+.rsel{display:inline-block;border:1px solid var(--bd-strong);border-radius:var(--r-sm);background:#fff;font-size:11.5px;padding:3px 22px 3px 8px;position:relative;min-width:76px;text-align:left}
+.rsel::after{content:"▾";position:absolute;right:6px;top:2px;color:var(--text-muted);font-size:10px}
+.rsel.pass{color:var(--success);font-weight:700} .rsel.fail{color:#c0392b;font-weight:700} .rsel.hold{color:var(--info);font-weight:700} .rsel.pend{color:var(--warning)} .rsel.abs{color:var(--text-sub)}
+.rsel.lock{background:var(--bg-muted);border-color:var(--bd)}
+.rsel.lock::after{content:""}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:100px;line-height:1.5;white-space:nowrap}
+.badge.pass{background:#e8f4ec;color:#1f6b45;border:1px solid #c6e6d3}
+.badge.fail{background:#fff1f0;color:#c0392b;border:1px solid #ffd4d1}
+.badge.hold{background:#eef4ff;color:#2b5fbf;border:1px solid #d3e0fb}
+.badge.pend{background:#fff8ec;color:#8a5a09;border:1px solid #fde2b8}
+.badge.abs{background:var(--bg-muted);color:var(--text-muted);border:1px solid var(--bd)}
+.badge.gray{background:var(--bg-muted);color:var(--text-sub);border:1px solid var(--bd)}
+.badge.chg{background:#fff8ec;color:#8a5a09;border:1px solid #fde2b8}
+.badge.err{background:#fff1f0;color:#a8262a;border:1px solid #ffccc7}
+.badge.lock{background:#f3f4f6;color:#4b5563;border:1px solid #d1d5db}
+.muted{color:var(--text-muted)}
+.mini{font-size:11px;color:var(--text-muted)}
+.pager{display:flex;justify-content:flex-end;gap:4px;margin-top:8px;font-size:11.5px;color:var(--text-sub)}
+.pager span{border:1px solid var(--bd);border-radius:var(--r-sm);padding:2px 7px;background:#fff}
+.pager span.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+.arrow{color:var(--text-muted);margin:0 3px}
+
+/* 빈 상태 */
+.empty{border:1px dashed var(--bd-strong);border-radius:var(--r);background:#fff;padding:36px 20px;text-align:center}
+.empty h4{font-size:14px;font-weight:750;margin-bottom:4px}
+.empty p{font-size:12.5px;margin-bottom:12px}
+
+/* 모달 / 드로어 */
+.overlay{position:absolute;inset:0;background:rgba(17,24,39,.35);display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fff;border-radius:var(--r-lg);box-shadow:0 20px 60px rgba(0,0,0,.25);width:100%;max-width:820px;max-height:100%;overflow:hidden;display:flex;flex-direction:column}
+.modal .modal-b{overflow:auto;min-height:0}
+.modal.sm{max-width:480px}
+.modal-h{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--bd);font-weight:750;font-size:14px}
+.modal-b{padding:14px 16px}
+.modal-f{display:flex;justify-content:flex-end;gap:6px;padding:10px 16px;border-top:1px solid var(--bd);background:var(--bg-muted);align-items:center}
+.modal-f .sp{flex:1;font-size:11.5px;color:var(--text-sub)}
+.drawer-ov{position:absolute;inset:0;background:rgba(17,24,39,.25);display:flex;justify-content:flex-end}
+.drawer{width:520px;background:#fff;height:100%;box-shadow:-12px 0 40px rgba(0,0,0,.18);display:flex;flex-direction:column}
+.drawer .modal-b{flex:1;overflow:auto}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:11.5px;color:var(--text-sub);font-weight:650;margin-bottom:4px}
+.field .box{width:100%;border:1px solid var(--bd-strong);border-radius:var(--r-sm);padding:7px 9px;font-size:12.5px;background:#fff;color:var(--text)}
+.field .box.ph{color:var(--text-muted)}
+.field .box.ta{min-height:64px}
+.kv{display:grid;grid-template-columns:90px 1fr;gap:4px 10px;font-size:12.5px;margin-bottom:12px}
+.kv dt{color:var(--text-sub)} .kv dd{font-weight:600}
+
+.stage-row{border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:#fff}
+.stage-row.lock{background:var(--bg-muted)}
+.stage-row .top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.stage-row .grip{color:var(--bd-strong);font-size:14px;letter-spacing:-2px}
+.stage-row .top .nm{flex:1;border:1px solid var(--bd-strong);border-radius:var(--r-sm);padding:5px 8px;font-size:12.5px;font-weight:650;background:#fff}
+.stage-row.lock .top .nm{border-color:transparent;background:transparent}
+.stage-row .fields{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end}
+.stage-row .fields label{display:block;font-size:10.5px;color:var(--text-muted);margin-bottom:2px}
+.stage-row .fields .box{border:1px solid var(--bd-strong);border-radius:var(--r-sm);padding:4px 8px;font-size:12px;background:#fff;white-space:nowrap}
+.stage-row.lock .fields .box{border-color:var(--bd);background:var(--bg-muted);color:var(--text-sub)}
+.radio{display:inline-flex;align-items:center;gap:4px;font-size:12px}
+.radio i{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--bd-strong);display:inline-block}
+.radio.on i{border:4px solid var(--primary)}
+
+.pc{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.pc > div{border:1px solid var(--bd);border-radius:var(--r);padding:12px 14px;background:var(--bg-muted)}
+.pc h4{font-size:12.5px;font-weight:750;margin-bottom:7px}
+.pc.good h4{color:var(--success)} .pc.bad h4{color:#c0392b}
+.pc ul{padding-left:16px;font-size:12.5px;color:var(--text-sub)}
+.pc li{margin-bottom:3px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.flow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12.5px;margin:10px 0}
+.flow .s{background:#fff;border:1px solid var(--bd-strong);border-radius:100px;padding:4px 12px;font-weight:600}
+.flow .s.hi{background:var(--primary);color:#fff;border-color:var(--primary)}
+.flow .ar{color:var(--text-muted)}
+table.spec{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:10px}
+table.spec th,table.spec td{border:1px solid var(--bd);padding:7px 10px;text-align:left;vertical-align:top}
+table.spec th{background:var(--bg-muted);font-weight:700;white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="doc-head">
+  <h1>전형결과 관리 관리자 시안</h1>
+  <p>as-is 서류/1차/최종 서브메뉴 + 엑셀 왕복 구조를, 공고 → 전형 단계 단일 화면 + 화면 내 판정 + 엑셀 보조 경로로 재구성한다.</p>
+  <div class="doc-meta">
+    <span>2026-09-04</span><span>메뉴 1개 · 화면 1개 + 드로어/모달</span><span>백엔드 Stage / StageResult / Upload API 기존 구현 활용</span><span>서류검증 필터 보류</span>
+  </div>
+</div>
+
+<div class="card">
+  <h2>확정된 방향</h2>
+  <ul class="rules">
+    <li><span class="no">1</span><div><b>공고 선택 → 단계 탭</b><br><span class="t">단계는 공고별 동적 목록(Stage). 고정 서브메뉴 대신 공고에 설정된 단계가 그대로 탭이 된다.</span></div></li>
+    <li><span class="no">2</span><div><b>화면에서 직접 판정</b><br><span class="t">행 체크 → 합격/불합격/보류/결시 일괄 적용, 또는 행별 셀렉트. "변경사항 저장" 한 번으로 bulk API 호출. 엑셀은 보조 경로로 유지하되 업로드 전 미리보기(diff) 필수.</span></div></li>
+    <li><span class="no">3</span><div><b>단계 상태가 UI를 결정</b><br><span class="t">READY: 초기화·시작 / IN_PROGRESS: 편집·발표 / 발표·마감 후: 잠금 + 사유 필수 정정. 백엔드 가드와 1:1.</span></div></li>
+    <li><span class="no">4</span><div><b>단계 설정은 이 화면의 드로어</b><br><span class="t">공고 상세·지원서 설정 현황판에는 "전형 단계 설정 →" 링크만 둔다(절충).</span></div></li>
+  </ul>
+  <div class="flow">
+    <span class="s">공고 선택</span><span class="ar">→</span><span class="s">단계 설정(없으면)</span><span class="ar">→</span><span class="s">대상자 초기화</span><span class="ar">→</span><span class="s">전형 시작</span><span class="ar">→</span><span class="s hi">판정 (화면 / 엑셀)</span><span class="ar">→</span><span class="s">결과 발표</span><span class="ar">→</span><span class="s">정정(사유)</span><span class="ar">→</span><span class="s">마감</span>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab on" data-t="a">시안 A · 상단 스텝퍼</div>
+  <div class="tab" data-t="b">시안 B · 좌측 단계 레일</div>
+  <div class="tab" data-t="s">상태별 화면 (READY / 발표 후)</div>
+  <div class="tab" data-t="u">엑셀 업로드 미리보기</div>
+  <div class="tab" data-t="c">단계 설정 드로어</div>
+  <div class="tab" data-t="x">A vs B 비교</div>
+</div>
+
+<!-- ================= 시안 A ================= -->
+<div class="pane on" id="pane-a">
+<p class="note"><b>진행 중(IN_PROGRESS) 단계 화면.</b> 스텝퍼가 단계 진행을 한눈에 보여주고, 그 아래 배너·카운트·툴바·그리드가 이어진다. 행 3개는 아직 저장 전 변경(노란 배경), 행 2개는 체크 선택 상태.</p>
+<div class="mock">
+  <div class="mock-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="mock-url">/admin/stage-results?jobPostingId=12&amp;stageId=34</span></div>
+  <div class="mock-body">
+    <div class="side">
+      <div class="logo">신영증권 채용관리</div>
+      <a>대시보드</a><a>공고 관리</a><a>지원서 설정</a><a>지원현황 조회</a><a class="on">전형결과 관리</a><a>질문 템플릿</a><a>FAQ 관리</a><a>공통코드</a><a>메뉴 관리</a><a>권한 관리</a>
+    </div>
+    <div class="content">
+      <div class="pg-head">
+        <div>
+          <div class="pg-title">전형결과 관리</div>
+          <div class="pg-sub">공고를 선택하고 단계별로 결과를 판정·발표합니다.</div>
+        </div>
+        <div class="btns">
+          <span class="sel wide">2026 하반기 신입사원 공개채용 · 접수마감</span>
+        </div>
+      </div>
+
+      <div class="stepper">
+        <div class="step done"><span class="n">✓</span><div><div class="nm">서류전형</div><div class="st">발표완료 · 08-29</div></div></div>
+        <div class="step on"><span class="n">2</span><div><div class="nm">1차 면접</div><div class="st">진행중 · 발표예정 09-20</div></div></div>
+        <div class="step"><span class="n">3</span><div><div class="nm">최종 면접</div><div class="st">대기</div></div></div>
+        <div class="step-cfg"><span class="btn sm ghost">⚙ 단계 설정</span></div>
+      </div>
+
+      <div class="banner warn">⏳ <b>1차 면접 진행 중</b> · 발표 예정 2026-09-20 10:00 <span class="sp"></span><span>대기 37건이 남아 발표할 수 없습니다.</span></div>
+
+      <div class="counts">
+        <div class="cnt on"><div class="l">대상 전체</div><div class="v">128</div></div>
+        <div class="cnt pend"><div class="l">대기</div><div class="v">37</div></div>
+        <div class="cnt pass"><div class="l">합격</div><div class="v">61</div></div>
+        <div class="cnt fail"><div class="l">불합격</div><div class="v">24</div></div>
+        <div class="cnt hold"><div class="l">보류</div><div class="v">4</div></div>
+        <div class="cnt"><div class="l">결시</div><div class="v">2</div></div>
+      </div>
+
+      <div class="toolbar">
+        <span class="sel ph">지원분야 전체</span><span class="sel ph">근무지 전체</span><span class="sel">결과: 대기</span><span class="inp">이름</span>
+        <span class="sp"></span>
+        <span class="btn sm">엑셀 템플릿 ↓</span><span class="btn sm">엑셀 업로드 ↑</span>
+      </div>
+      <div class="toolbar">
+        <span class="bulk"><b>선택 2건</b><span class="btn sm">합격</span><span class="btn sm">불합격</span><span class="btn sm">보류</span><span class="btn sm">결시</span></span>
+        <span class="mini">저장 전 변경 3건</span>
+        <span class="sp"></span>
+        <span class="btn sm ghost">변경 취소</span><span class="btn sm pri">변경사항 저장 (3)</span><span class="btn sm dis">결과 발표</span>
+      </div>
+
+      <table class="grid">
+        <thead><tr><th><span class="cb"></span></th><th>수험번호</th><th>이름</th><th>지원분야</th><th>근무지</th><th>지원구분</th><th>최종학력</th><th>서류 결과</th><th>결과</th><th>점수</th><th>코멘트</th><th>판정일시</th><th>판정자</th></tr></thead>
+        <tbody>
+          <tr class="dirty"><td><span class="cb"></span></td><td><a>10231</a></td><td>김하늘</td><td>리테일영업</td><td>서울 본사</td><td>신입</td><td>대학교</td><td><span class="badge pass">합격</span></td><td><span class="rsel pass">합격</span></td><td>88.5</td><td class="muted">—</td><td class="muted">저장 전</td><td class="muted">—</td></tr>
+          <tr class="dirty"><td><span class="cb"></span></td><td><a>10232</a></td><td>이준서</td><td>리테일영업</td><td>부산</td><td>신입</td><td>대학교</td><td><span class="badge pass">합격</span></td><td><span class="rsel fail">불합격</span></td><td>61.0</td><td class="muted">—</td><td class="muted">저장 전</td><td class="muted">—</td></tr>
+          <tr class="chk"><td><span class="cb on">✓</span></td><td><a>10233</a></td><td>박서연</td><td>IB</td><td>서울 본사</td><td>신입</td><td>대학원(석사)</td><td><span class="badge pass">합격</span></td><td><span class="rsel pend">대기</span></td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td></tr>
+          <tr class="chk"><td><span class="cb on">✓</span></td><td><a>10234</a></td><td>최민준</td><td>IB</td><td>서울 본사</td><td>경력</td><td>대학교</td><td><span class="badge pass">합격</span></td><td><span class="rsel pend">대기</span></td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td></tr>
+          <tr><td><span class="cb"></span></td><td><a>10235</a></td><td>정지우</td><td>IT</td><td>서울 본사</td><td>신입</td><td>대학교</td><td><span class="badge pass">합격</span></td><td><span class="rsel pass">합격</span></td><td>91.0</td><td>PT 우수</td><td>09-03 14:20</td><td>hr_kim</td></tr>
+          <tr><td><span class="cb"></span></td><td><a>10236</a></td><td>강도윤</td><td>IT</td><td>대구</td><td>신입</td><td>전문대학교</td><td><span class="badge pass">합격</span></td><td><span class="rsel hold">보류</span></td><td>74.5</td><td>추가 검토</td><td>09-03 14:21</td><td>hr_kim</td></tr>
+          <tr class="dirty"><td><span class="cb"></span></td><td><a>10237</a></td><td>윤서아</td><td>리테일영업</td><td>서울 본사</td><td>신입</td><td>대학교</td><td><span class="badge pass">합격</span></td><td><span class="rsel abs">결시</span></td><td class="muted">—</td><td>불참 통보</td><td class="muted">저장 전</td><td class="muted">—</td></tr>
+          <tr><td><span class="cb"></span></td><td><a>10238</a></td><td>임시우</td><td>WM</td><td>서울 본사</td><td>경력</td><td>대학교</td><td><span class="badge pass">합격</span></td><td><span class="rsel pend">대기</span></td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td></tr>
+        </tbody>
+      </table>
+      <div class="pager"><span>‹</span><span class="on">1</span><span>2</span><span>3</span><span>…</span><span>13</span><span>›</span><span class="muted" style="border:none">10건 / 페이지</span></div>
+    </div>
+  </div>
+</div>
+<p class="note">그리드 메모: "서류 결과" 열은 <b>직전 단계 결과</b>를 읽기 전용 배지로 보여줌(왜 이 사람이 대상자인지 즉시 확인). 수험번호 링크는 기존 지원서 상세로 이동. 점수·코멘트는 결과 셀렉트와 같은 저장 단위.</p>
+</div>
+
+<!-- ================= 시안 B ================= -->
+<div class="pane" id="pane-b">
+<p class="note"><b>같은 상태, 단계 내비게이션만 좌측 레일로.</b> 레일에 단계별 미니 카운트가 붙고, 본문은 그리드에 집중한다. 단계가 5개 이상이거나 단계명이 길 때 유리.</p>
+<div class="mock">
+  <div class="mock-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="mock-url">/admin/stage-results?jobPostingId=12&amp;stageId=34</span></div>
+  <div class="mock-body">
+    <div class="side">
+      <div class="logo">신영증권 채용관리</div>
+      <a>대시보드</a><a>공고 관리</a><a>지원서 설정</a><a>지원현황 조회</a><a class="on">전형결과 관리</a><a>질문 템플릿</a><a>FAQ 관리</a><a>공통코드</a><a>메뉴 관리</a><a>권한 관리</a>
+    </div>
+    <div class="content">
+      <div class="pg-head">
+        <div>
+          <div class="pg-title">전형결과 관리</div>
+          <div class="pg-sub">공고를 선택하고 단계별로 결과를 판정·발표합니다.</div>
+        </div>
+        <div class="btns"><span class="sel wide">2026 하반기 신입사원 공개채용 · 접수마감</span></div>
+      </div>
+      <div class="b-grid">
+        <div class="rail">
+          <h4>전형 단계 <span class="btn sm ghost">⚙</span></h4>
+          <div class="rail-item done"><span class="n">✓</span><div><div class="nm">서류전형</div><div class="st">발표완료 · 08-29</div></div></div>
+          <div class="rail-item on"><span class="n">2</span><div><div class="nm">1차 면접</div><div class="st">진행중 · 09-20 발표</div></div></div>
+          <div class="rail-item"><span class="n">3</span><div><div class="nm">최종 면접</div><div class="st">대기</div></div></div>
+          <div class="rail-cnt"><span>대상 <b>128</b></span><span>대기 <b style="color:var(--warning)">37</b></span><span>합격 <b style="color:var(--success)">61</b></span><span>불합격 <b style="color:#c0392b">24</b></span><span>보류 <b style="color:var(--info)">4</b></span><span>결시 <b>2</b></span></div>
+        </div>
+        <div>
+          <div class="banner warn">⏳ <b>1차 면접 진행 중</b> · 발표 예정 2026-09-20 10:00 <span class="sp"></span><span>대기 37건 남음</span></div>
+          <div class="toolbar">
+            <span class="sel ph">지원분야 전체</span><span class="sel ph">근무지 전체</span><span class="sel">결과: 대기</span><span class="inp">이름</span>
+            <span class="sp"></span>
+            <span class="btn sm">엑셀 템플릿 ↓</span><span class="btn sm">엑셀 업로드 ↑</span>
+          </div>
+          <div class="toolbar">
+            <span class="bulk"><b>선택 2건</b><span class="btn sm">합격</span><span class="btn sm">불합격</span><span class="btn sm">보류</span><span class="btn sm">결시</span></span>
+            <span class="mini">저장 전 변경 3건</span>
+            <span class="sp"></span>
+            <span class="btn sm ghost">변경 취소</span><span class="btn sm pri">변경사항 저장 (3)</span><span class="btn sm dis">결과 발표</span>
+          </div>
+          <table class="grid">
+            <thead><tr><th><span class="cb"></span></th><th>수험번호</th><th>이름</th><th>지원분야</th><th>근무지</th><th>서류 결과</th><th>결과</th><th>점수</th><th>코멘트</th><th>판정일시</th></tr></thead>
+            <tbody>
+              <tr class="dirty"><td><span class="cb"></span></td><td><a>10231</a></td><td>김하늘</td><td>리테일영업</td><td>서울 본사</td><td><span class="badge pass">합격</span></td><td><span class="rsel pass">합격</span></td><td>88.5</td><td class="muted">—</td><td class="muted">저장 전</td></tr>
+              <tr class="dirty"><td><span class="cb"></span></td><td><a>10232</a></td><td>이준서</td><td>리테일영업</td><td>부산</td><td><span class="badge pass">합격</span></td><td><span class="rsel fail">불합격</span></td><td>61.0</td><td class="muted">—</td><td class="muted">저장 전</td></tr>
+              <tr class="chk"><td><span class="cb on">✓</span></td><td><a>10233</a></td><td>박서연</td><td>IB</td><td>서울 본사</td><td><span class="badge pass">합격</span></td><td><span class="rsel pend">대기</span></td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td></tr>
+              <tr class="chk"><td><span class="cb on">✓</span></td><td><a>10234</a></td><td>최민준</td><td>IB</td><td>서울 본사</td><td><span class="badge pass">합격</span></td><td><span class="rsel pend">대기</span></td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td></tr>
+              <tr><td><span class="cb"></span></td><td><a>10235</a></td><td>정지우</td><td>IT</td><td>서울 본사</td><td><span class="badge pass">합격</span></td><td><span class="rsel pass">합격</span></td><td>91.0</td><td>PT 우수</td><td>09-03 14:20</td></tr>
+              <tr><td><span class="cb"></span></td><td><a>10236</a></td><td>강도윤</td><td>IT</td><td>대구</td><td><span class="badge pass">합격</span></td><td><span class="rsel hold">보류</span></td><td>74.5</td><td>추가 검토</td><td>09-03 14:21</td></tr>
+              <tr class="dirty"><td><span class="cb"></span></td><td><a>10237</a></td><td>윤서아</td><td>리테일영업</td><td>서울 본사</td><td><span class="badge pass">합격</span></td><td><span class="rsel abs">결시</span></td><td class="muted">—</td><td>불참 통보</td><td class="muted">저장 전</td></tr>
+            </tbody>
+          </table>
+          <div class="pager"><span>‹</span><span class="on">1</span><span>2</span><span>3</span><span>…</span><span>13</span><span>›</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ================= 상태별 ================= -->
+<div class="pane" id="pane-s">
+<p class="note"><b>단계 상태에 따라 같은 화면이 어떻게 달라지는지.</b> 아래 3개는 스텝퍼(시안 A) 기준. 레일(시안 B)도 본문은 동일.</p>
+
+<h3>S-1. 단계가 없는 공고 (빈 상태)</h3>
+<div class="mock">
+  <div class="mock-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="mock-url">/admin/stage-results?jobPostingId=15</span></div>
+  <div class="mock-body" style="min-height:260px">
+    <div class="side"><div class="logo">신영증권 채용관리</div><a>대시보드</a><a>공고 관리</a><a>지원서 설정</a><a>지원현황 조회</a><a class="on">전형결과 관리</a></div>
+    <div class="content">
+      <div class="pg-head"><div><div class="pg-title">전형결과 관리</div></div><div class="btns"><span class="sel wide">2026 경력직 IT개발 수시채용 · 접수중</span></div></div>
+      <div class="empty">
+        <h4>이 공고에는 전형 단계가 아직 없습니다</h4>
+        <p>서류전형 → 면접 순서로 단계를 만들면 지원자 결과를 판정할 수 있습니다.</p>
+        <span class="btn pri">전형 단계 설정</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>S-2. READY 단계 (초기화 전 / 후)</h3>
+<div class="two">
+  <div class="mock">
+    <div class="mock-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="mock-url">초기화 전</span></div>
+    <div class="mock-body" style="min-height:300px">
+      <div class="content">
+        <div class="stepper">
+          <div class="step on"><span class="n">1</span><div><div class="nm">서류전형</div><div class="st">대기</div></div></div>
+          <div class="step"><span class="n">2</span><div><div class="nm">1차 면접</div><div class="st">대기</div></div></div>
+          <div class="step-cfg"><span class="btn sm ghost">⚙</span></div>
+        </div>
+        <div class="banner info">🗂 <b>서류전형 준비 중</b> · 접수 마감 08-20 <span class="sp"></span></div>
+        <div class="empty" style="padding:26px 16px">
+          <h4>대상자를 아직 불러오지 않았습니다</h4>
+          <p>제출 완료 지원서 <b>128건</b>을 대상자로 등록합니다. (임시저장·철회 제외)</p>
+          <span class="btn pri">대상자 초기화</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="mock">
+    <div class="mock-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="mock-url">초기화 후 · 시작 전</span></div>
+    <div class="mock-body" style="min-height:300px">
+      <div class="content">
+        <div class="stepper">
+          <div class="step on"><span class="n">1</span><div><div class="nm">서류전형</div><div class="st">대기 · 대상 128</div></div></div>
+          <div class="step"><span class="n">2</span><div><div class="nm">1차 면접</div><div class="st">대기</div></div></div>
+          <div class="step-cfg"><span class="btn sm ghost">⚙</span></div>
+        </div>
+        <div class="banner info">🗂 <b>서류전형 준비 완료</b> · 대상 128명 <span class="sp"></span><span class="btn sm">대상자 다시 불러오기</span><span class="btn sm pri">전형 시작</span></div>
+        <div class="counts"><div class="cnt on"><div class="l">대상</div><div class="v">128</div></div><div class="cnt pend"><div class="l">대기</div><div class="v">128</div></div></div>
+        <table class="grid">
+          <thead><tr><th>수험번호</th><th>이름</th><th>지원분야</th><th>결과</th></tr></thead>
+          <tbody>
+            <tr><td><a>10231</a></td><td>김하늘</td><td>리테일영업</td><td><span class="rsel pend lock">대기</span></td></tr>
+            <tr><td><a>10232</a></td><td>이준서</td><td>리테일영업</td><td><span class="rsel pend lock">대기</span></td></tr>
+            <tr><td><a>10233</a></td><td>박서연</td><td>IB</td><td><span class="rsel pend lock">대기</span></td></tr>
+          </tbody>
+        </table>
+        <p class="mini" style="margin-top:6px">시작 전엔 결과 셀렉트 잠금. "다시 불러오기"는 늦게 제출된 지원서만 추가(기존 행 유지).</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top:16px">S-3. 발표 완료 단계 + 정정 모달</h3>
+<div class="mock">
+  <div class="mock-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="mock-url">/admin/stage-results?jobPostingId=12&amp;stageId=33</span></div>
+  <div class="mock-body" style="min-height:600px">
+    <div class="side"><div class="logo">신영증권 채용관리</div><a>대시보드</a><a>공고 관리</a><a>지원서 설정</a><a>지원현황 조회</a><a class="on">전형결과 관리</a></div>
+    <div class="content">
+      <div class="stepper">
+        <div class="step on done"><span class="n">✓</span><div><div class="nm">서류전형</div><div class="st">발표완료 · 08-29</div></div></div>
+        <div class="step"><span class="n">2</span><div><div class="nm">1차 면접</div><div class="st">진행중</div></div></div>
+        <div class="step"><span class="n">3</span><div><div class="nm">최종 면접</div><div class="st">대기</div></div></div>
+        <div class="step-cfg"><span class="btn sm ghost">⚙</span></div>
+      </div>
+      <div class="banner ok">🔒 <b>서류전형 발표 완료</b> · 2026-08-29 10:00 · 결과는 잠겨 있으며 행별 <b>정정</b>만 가능합니다(사유 기록). <span class="sp"></span><span class="btn sm">엑셀 다운로드</span><span class="btn sm warn">단계 마감</span></div>
+      <div class="toolbar"><span class="sel ph">지원분야 전체</span><span class="sel ph">근무지 전체</span><span class="sel ph">결과 전체</span><span class="inp">이름</span></div>
+      <table class="grid">
+        <thead><tr><th>수험번호</th><th>이름</th><th>지원분야</th><th>결과</th><th>점수</th><th>코멘트</th><th>판정일시</th><th>정정</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><a>10231</a></td><td>김하늘</td><td>리테일영업</td><td><span class="badge pass">합격</span></td><td>82</td><td class="muted">—</td><td>08-27 16:02</td><td class="muted">—</td><td><span class="btn sm">정정</span></td></tr>
+          <tr><td><a>10240</a></td><td>한지민</td><td>WM</td><td><span class="badge pass">합격</span></td><td>70</td><td>불합격→합격</td><td>09-01 09:10</td><td><span class="badge lock">정정 1회</span> <a class="mini">이력</a></td><td><span class="btn sm">정정</span></td></tr>
+          <tr><td><a>10241</a></td><td>오현우</td><td>IT</td><td><span class="badge fail">불합격</span></td><td>55</td><td class="muted">—</td><td>08-27 16:02</td><td class="muted">—</td><td><span class="btn sm">정정</span></td></tr>
+        </tbody>
+      </table>
+
+      <div class="overlay">
+        <div class="modal sm">
+          <div class="modal-h">결과 정정 · 10241 오현우 <span class="muted">✕</span></div>
+          <div class="modal-b">
+            <div class="banner warn" style="margin-bottom:12px">발표 후 정정입니다. 사유가 이력에 남고, 지원자 화면에는 최신 결과만 표시됩니다.</div>
+            <dl class="kv"><dt>단계</dt><dd>서류전형 (발표완료)</dd><dt>현재 결과</dt><dd><span class="badge fail">불합격</span> · 55점</dd></dl>
+            <div class="field"><label>변경할 결과</label><div class="box">합격 ▾</div></div>
+            <div class="two"><div class="field"><label>점수</label><div class="box">72</div></div><div class="field"><label>코멘트</label><div class="box ph">선택</div></div></div>
+            <div class="field"><label>정정 사유 <span style="color:var(--error)">*</span></label><div class="box ta ph">채점 누락분 반영 (면접위원 B 점수표)</div></div>
+          </div>
+          <div class="modal-f"><span class="sp">처리자: hr_kim · 지금</span><span class="btn">취소</span><span class="btn pri">정정 저장</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ================= 엑셀 업로드 ================= -->
+<div class="pane" id="pane-u">
+<p class="note"><b>엑셀 왕복은 유지하되 "업로드 → 바로 반영"이 아니라 "업로드 → 미리보기 → 적용".</b> 백엔드 preview/commit API 그대로. 오류가 1건이라도 있으면 전체 거부(부분 반영 없음)이므로 미리보기에서 오류 행을 먼저 고치게 유도.</p>
+<div class="mock">
+  <div class="mock-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="mock-url">1차 면접 · 엑셀 업로드</span></div>
+  <div class="mock-body" style="min-height:640px">
+    <div class="side"><div class="logo">신영증권 채용관리</div><a>대시보드</a><a>공고 관리</a><a>지원서 설정</a><a>지원현황 조회</a><a class="on">전형결과 관리</a></div>
+    <div class="content">
+      <div class="stepper" style="opacity:.5">
+        <div class="step done"><span class="n">✓</span><div><div class="nm">서류전형</div><div class="st">발표완료</div></div></div>
+        <div class="step on"><span class="n">2</span><div><div class="nm">1차 면접</div><div class="st">진행중</div></div></div>
+        <div class="step"><span class="n">3</span><div><div class="nm">최종 면접</div><div class="st">대기</div></div></div>
+      </div>
+      <div class="overlay" style="align-items:flex-start;padding-top:24px">
+        <div class="modal">
+          <div class="modal-h">엑셀 업로드 미리보기 · 1차 면접 <span class="muted">✕</span></div>
+          <div class="modal-b">
+            <div class="toolbar" style="margin-bottom:10px">
+              <span class="inp" style="color:var(--text)">📄 1차면접_결과_20260904.xlsx</span><span class="btn sm">파일 변경</span>
+              <span class="sp"></span>
+              <span class="badge gray">총 128행</span><span class="badge chg">변경 41</span><span class="badge gray">미변경 84</span><span class="badge err">오류 3</span>
+            </div>
+            <div class="banner err" style="margin-bottom:10px">⚠ 오류 3건이 있어 적용할 수 없습니다. 파일을 수정한 뒤 다시 업로드하세요. (오류가 하나라도 있으면 전체가 반영되지 않습니다)</div>
+            <div class="toolbar" style="margin-bottom:6px"><span class="sel">보기: 오류 + 변경</span><span class="mini">미변경 행은 적용 대상에서 제외됩니다</span></div>
+            <table class="grid">
+              <thead><tr><th>행</th><th>수험번호</th><th>이름</th><th>결과 (이전 → 새)</th><th>점수</th><th>코멘트</th><th>판정</th></tr></thead>
+              <tbody>
+                <tr><td>7</td><td>10231</td><td>김하늘</td><td><span class="badge pend">대기</span><span class="arrow">→</span><span class="badge pass">합격</span></td><td class="muted">— → 88.5</td><td class="muted">—</td><td><span class="badge chg">변경</span></td></tr>
+                <tr><td>8</td><td>10232</td><td>이준서</td><td><span class="badge pend">대기</span><span class="arrow">→</span><span class="badge fail">불합격</span></td><td class="muted">— → 61</td><td class="muted">—</td><td><span class="badge chg">변경</span></td></tr>
+                <tr><td>12</td><td>10236</td><td>강도윤</td><td><span class="badge hold">보류</span><span class="arrow">→</span><span class="badge pass">합격</span></td><td>74.5 → 79</td><td>추가 검토 → 재면접 통과</td><td><span class="badge chg">변경</span></td></tr>
+                <tr style="background:#fff5f5"><td>19</td><td>10243</td><td>서예준</td><td><span class="badge pend">대기</span><span class="arrow">→</span><span class="muted">"합"</span></td><td class="muted">—</td><td class="muted">—</td><td><span class="badge err">오류</span> <span class="mini">허용값 아님(합격/불합격/보류/결시/철회)</span></td></tr>
+                <tr style="background:#fff5f5"><td>23</td><td>10247</td><td>—</td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td><td><span class="badge err">오류</span> <span class="mini">이 단계 대상자가 아님</span></td></tr>
+                <tr style="background:#fff5f5"><td>40</td><td>10231</td><td>김하늘</td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td><td><span class="badge err">오류</span> <span class="mini">중복 행 (7행과 동일 수험번호)</span></td></tr>
+              </tbody>
+            </table>
+            <div class="pager"><span>‹</span><span class="on">1</span><span>2</span><span>3</span><span>›</span></div>
+          </div>
+          <div class="modal-f"><span class="sp">적용 시 변경 41건이 한 번에 반영되고, 미리보기 이후 다른 관리자가 수정한 행이 있으면 전체가 거부됩니다.</span><span class="btn">취소</span><span class="btn dis">적용 (오류 3건)</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<table class="spec">
+  <tr><th>단계</th><th>동작</th><th>API</th></tr>
+  <tr><td>1. 템플릿 다운로드</td><td>현재 결과가 채워진 xlsx. 수험번호·이름·토큰 열은 읽기 전용, 결과·점수·코멘트만 편집.</td><td><code>GET /admin/stages/{stageId}/results/upload-template</code></td></tr>
+  <tr><td>2. 업로드 → 미리보기</td><td>파일 선택 즉시 preview 호출. 위 모달 표시. 저장 없음.</td><td><code>POST …/upload/preview</code></td></tr>
+  <tr><td>3. 적용</td><td>오류 0건일 때만 활성. commit 결과 APPLIED면 그리드 새로고침, 거부(검증/STALE)면 실패 행만 다시 표시.</td><td><code>POST …/upload/commit</code></td></tr>
+</table>
+</div>
+
+<!-- ================= 단계 설정 ================= -->
+<div class="pane" id="pane-c">
+<p class="note"><b>단계 설정 드로어.</b> 스텝퍼의 ⚙ 또는 빈 상태 버튼, 그리고 공고 상세의 "전형 단계 설정 →" 링크에서 열린다. 시작된 단계(IN_PROGRESS 이후)는 잠금, READY만 편집·삭제.</p>
+<div class="mock">
+  <div class="mock-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="mock-url">/admin/stage-results?jobPostingId=12 · 단계 설정</span></div>
+  <div class="mock-body" style="min-height:560px">
+    <div class="side"><div class="logo">신영증권 채용관리</div><a>대시보드</a><a>공고 관리</a><a>지원서 설정</a><a>지원현황 조회</a><a class="on">전형결과 관리</a></div>
+    <div class="content">
+      <div class="stepper" style="opacity:.5">
+        <div class="step done"><span class="n">✓</span><div><div class="nm">서류전형</div><div class="st">발표완료</div></div></div>
+        <div class="step on"><span class="n">2</span><div><div class="nm">1차 면접</div><div class="st">진행중</div></div></div>
+        <div class="step"><span class="n">3</span><div><div class="nm">최종 면접</div><div class="st">대기</div></div></div>
+      </div>
+      <div class="drawer-ov">
+        <div class="drawer">
+          <div class="modal-h">전형 단계 설정 · 2026 하반기 신입사원 공개채용 <span class="muted">✕</span></div>
+          <div class="modal-b">
+            <div class="banner info" style="margin-bottom:12px">시작된 단계가 있어 순서 드래그는 불가하며, 대기 단계는 "맨 뒤로"만 이동할 수 있습니다. 시작된 단계는 발표일시만 조정 가능합니다.</div>
+
+            <div class="stage-row lock">
+              <div class="top"><span class="grip">⋮⋮</span><span class="nm">서류전형</span><span class="badge pass">발표완료</span></div>
+              <div class="fields">
+                <div><label>유형</label><div class="box">서류 (DOCUMENT)</div></div>
+                <div><label>발표일시</label><div class="box">2026-08-29 10:00</div></div>
+                <div><label>최종 단계</label><span class="radio"><i></i> 아니오</span></div>
+                <div><span class="btn sm dis">삭제</span></div>
+              </div>
+            </div>
+
+            <div class="stage-row lock">
+              <div class="top"><span class="grip">⋮⋮</span><span class="nm">1차 면접</span><span class="badge pend">진행중</span></div>
+              <div class="fields">
+                <div><label>유형</label><div class="box">1차 면접 (FIRST_INTERVIEW)</div></div>
+                <div><label>발표일시</label><div class="box" style="border-color:var(--bd-strong);background:#fff;color:var(--text)">2026-09-20 10:00</div></div>
+                <div><label>최종 단계</label><span class="radio"><i></i> 아니오</span></div>
+                <div><span class="btn sm dis">삭제</span></div>
+              </div>
+            </div>
+
+            <div class="stage-row">
+              <div class="top"><span class="grip">⋮⋮</span><span class="nm">최종 면접</span><span class="badge gray">대기</span></div>
+              <div class="fields">
+                <div><label>유형</label><div class="box">최종 면접 (FINAL_INTERVIEW) ▾</div></div>
+                <div><label>발표일시</label><div class="box">2026-10-08 10:00</div></div>
+                <div><label>최종 단계</label><span class="radio on"><i></i> 예</span></div>
+                <div><span class="btn sm ghost">맨 뒤로</span> <span class="btn sm danger">삭제</span></div>
+              </div>
+            </div>
+
+            <div class="stage-row" style="border-style:dashed;background:var(--bg-muted)">
+              <div class="top"><span class="grip" style="opacity:.4">⋮⋮</span><span class="nm" style="color:var(--text-muted);font-weight:400">새 단계 이름</span><span class="badge gray">신규</span></div>
+              <div class="fields">
+                <div><label>유형</label><div class="box" style="color:var(--text-muted)">선택 ▾</div></div>
+                <div><label>발표일시</label><div class="box" style="color:var(--text-muted)">선택</div></div>
+                <div><label>최종 단계</label><span class="radio"><i></i> 아니오</span></div>
+                <div><span class="btn sm ghost">취소</span></div>
+              </div>
+            </div>
+            <span class="btn sm" style="margin-top:2px">+ 단계 추가</span>
+            <p class="mini" style="margin-top:14px">유형 후보: 서류 / 1차 면접 / 2차 면접 / 최종 면접 / 기타. 최종 단계는 하나만. 공고가 마감(CLOSED)되면 드로어 전체 읽기 전용.</p>
+          </div>
+          <div class="modal-f"><span class="sp">변경 2건 (최종 면접 수정, 신규 1)</span><span class="btn">닫기</span><span class="btn pri">저장</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ================= 비교 ================= -->
+<div class="pane" id="pane-x">
+<div class="two">
+  <div class="card" style="margin:0">
+    <h2>시안 A · 상단 스텝퍼</h2>
+    <div class="pc good"><h4>장점</h4><ul><li>전형 흐름(서류 → 1차 → 최종)이 진행 상태와 함께 한 줄로 읽힘</li><li>그리드 가로폭 온전히 사용 (열 13개도 여유)</li><li>지원서 설정·공고 화면과 같은 세로 흐름, 학습 비용 낮음</li></ul></div>
+    <div class="pc bad" style="margin-top:8px"><h4>단점</h4><ul><li>단계 6개 이상이면 스텝 폭이 좁아짐 (현실적으론 3~4개)</li><li>단계별 카운트를 스텝 안에 다 못 넣음 (선택 단계만 아래 카운트 카드)</li></ul></div>
+  </div>
+  <div class="card" style="margin:0">
+    <h2>시안 B · 좌측 단계 레일</h2>
+    <div class="pc good"><h4>장점</h4><ul><li>단계 수·이름 길이에 강함</li><li>레일에 선택 단계 카운트를 항상 노출, 본문은 그리드만</li></ul></div>
+    <div class="pc bad" style="margin-top:8px"><h4>단점</h4><ul><li>사이드바 + 레일 = 좌측 내비 2겹, 그리드 폭 200px 손해</li><li>진행 순서가 세로라 "흐름" 느낌 약함</li><li>다른 관리자 화면과 구조 상이</li></ul></div>
+  </div>
+</div>
+<div class="card" style="margin-top:14px">
+  <h2>추천: 시안 A</h2>
+  <p>단계는 공고당 3~4개가 현실적이고, 그리드 열이 많아 가로폭이 중요. 스텝퍼가 라이프사이클(대기→진행→발표→마감)을 시각적으로 강제해 "지금 뭘 해야 하는지"가 배너와 함께 드러남. 단계가 6개를 넘는 공고가 생기면 스텝퍼를 가로 스크롤로 처리.</p>
+  <table class="spec">
+    <tr><th>확인 요청</th><th>기본안</th></tr>
+    <tr><td>단계 내비게이션</td><td>A 스텝퍼 / B 레일 중 택1</td></tr>
+    <tr><td>판정 저장 방식</td><td>행 변경을 모아 "변경사항 저장" 1회 (bulk). 행별 즉시 저장 아님 → 실수 취소 가능</td></tr>
+    <tr><td>그리드 열</td><td>수험번호·이름·지원분야·근무지·지원구분·최종학력·직전 단계 결과·결과·점수·코멘트·판정일시·판정자. 백엔드 응답에 근무지·지원구분·학력·직전결과 추가 필요</td></tr>
+    <tr><td>결과 발표 버튼</td><td>대기 0건일 때만 활성 + 확인 모달("지원자 128명에게 결과가 공개됩니다")</td></tr>
+    <tr><td>철회(WITHDRAWN) 결과값</td><td>일괄 버튼엔 미노출, 행 셀렉트에서만 선택 가능</td></tr>
+  </table>
+</div>
+</div>
+
+</div>
+<script>
+document.querySelectorAll('.tab').forEach(function(t){
+  t.addEventListener('click',function(){
+    document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on')});
+    document.querySelectorAll('.pane').forEach(function(x){x.classList.remove('on')});
+    t.classList.add('on');
+    document.getElementById('pane-'+t.dataset.t).classList.add('on');
+  });
+});
+</script>
+</body>
+</html>
