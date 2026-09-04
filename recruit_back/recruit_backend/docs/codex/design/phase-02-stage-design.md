@@ -394,7 +394,17 @@ DELETE 메서드 검토:
 - 삭제된 placeholder는 단계를 다시 만든 뒤 `initialize`로 동일하게 복원된다(제출 지원서에서 파생되는 값).
 - 판정 데이터 보호라는 원 설계 의도는 기존 `READY`-only 검증이 그대로 지킨다.
 
-`Interview` / `InterviewEvaluation`의 `stage_id` FK는 이 결정 범위 밖이며 별도 정책이 필요하다.
+`Interview`의 `stage_id` FK도 같은 결함(FK 위반 500)을 가지지만 판단 기준이 다르다. `StageResult`와 달리 "READY ⟹ 무의미한 데이터"가 성립하지 않기 때문이다.
+
+- 면접 확정(`InterviewService.confirm`)과 평가 생성/작성(`InterviewEvaluationAdminService.initialize`, `InterviewerEvaluationService`)에는 **stage 상태 가드가 없다**. `interview.isConfirmed()`만 요구하므로 READY 단계에서도 SUBMITTED 평가까지 만들어질 수 있다.
+- `ApplicantInterviewService` / `InterviewerInterviewService`의 `VISIBLE_STATUSES`가 `CONFIRMED`, `CANCELLED`라, 확정·취소 면접은 stage 상태와 무관하게 지원자·면접관에게 이미 노출된 상태다.
+
+따라서 상태로 경계를 나눈다.
+
+- `DRAFT` 면접: 관리자 내부 초안이고 외부 비노출이며 평가가 붙을 수 없다(평가는 `CONFIRMED` 필수). `StageResult`의 `PENDING` placeholder와 동일한 성격이므로 단계와 함께 삭제한다. `InterviewParticipant`는 `Interview`의 `cascade = ALL` + `orphanRemoval`로 함께 정리된다.
+- `CONFIRMED` / `CANCELLED` 면접: 이미 노출됐고 평가가 붙어 있을 수 있으므로 삭제하지 않고 단계 삭제 자체를 `InvalidStageException`(400)으로 막는다.
+
+남은 제약: 확정 면접이 있는 READY 단계는 삭제 수단이 없다(`cancel`은 상태만 바꾸고 행은 남는다). 해소하려면 면접 삭제 API가 별도로 필요하다.
 
 ## 7.2 상태 전이 규칙
 

@@ -882,7 +882,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 잠긴 필드도 `@NotBlank`/`@NotNull` 검증은 그대로다. **프론트는 진행 중 단계를 수정할 때 잠긴 4개 필드에 현재 값을 그대로 채워 보내야 한다**(비우면 400)
 - 400 메시지는 이 API의 기존 관례대로 영문이다 — 잠긴 필드 변경 시 `In progress stage allows changing resultAnnouncementDateTime only.`, `RESULT_ANNOUNCED`·`CLOSED` 는 기존 `Only READY stage can be changed.`. 설계서 §5.2가 적어 둔 한글 문구는 채택하지 않았고, 사용자 문구는 프론트가 만든다
 - **프론트 반영(S4 단계 설정 드로어):** 진행 중 단계 행에서 발표일시 입력만 열고 이름·유형·최종단계는 잠근다. 저장 시 잠긴 4개 필드에 **원본 값을 그대로 실어** 형식 검증을 통과시킨다. 순서도 원본 값을 보낸다 — 화면 배열 위치로 다시 매기면 손대지 않은 진행 중 단계가 "순서 바뀜"으로 판정돼 400이 난다
-- **함께 쓰는 단계 CRUD** — `POST …/stages`(생성), `POST …/stages/{stageId}/delete`(삭제, **READY만**. 대상자를 불러온 뒤에도 삭제 가능 — 해당 단계의 `StageResult`(전부 PENDING)를 함께 삭제한다), `POST …/stages/reorder`(순서). `reorder` 는 **공고의 모든 단계를 빠짐없이** 보내야 하고 **전 단계가 READY** 여야 한다. 그래서 드로어는 순서 조작을 두 갈래로 나눈다: 전부 READY면 위/아래 이동 후 `reorder` 1회, 시작된 단계가 있으면 READY 행을 "맨 뒤로"만 보내고 `update` 로 처리한다
+- **함께 쓰는 단계 CRUD** — `POST …/stages`(생성), `POST …/stages/{stageId}/delete`(삭제, **READY만**. 대상자를 불러온 뒤에도 삭제 가능 — 해당 단계의 `StageResult`(전부 PENDING)와 `DRAFT` 면접을 함께 삭제한다. 확정·취소 면접이 하나라도 있으면 400), `POST …/stages/reorder`(순서). `reorder` 는 **공고의 모든 단계를 빠짐없이** 보내야 하고 **전 단계가 READY** 여야 한다. 그래서 드로어는 순서 조작을 두 갈래로 나눈다: 전부 READY면 위/아래 이동 후 `reorder` 1회, 시작된 단계가 있으면 READY 행을 "맨 뒤로"만 보내고 `update` 로 처리한다
 
 #### 변경 3: 엑셀 업로드 템플릿 한글화  🟢 확정
 

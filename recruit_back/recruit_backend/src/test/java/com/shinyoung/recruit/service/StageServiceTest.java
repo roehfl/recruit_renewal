@@ -2,10 +2,14 @@ package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
+import com.shinyoung.recruit.domain.entity.Employee;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.Stage;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.domain.repository.EmployeeRepository;
+import com.shinyoung.recruit.domain.repository.InterviewParticipantRepository;
+import com.shinyoung.recruit.domain.repository.InterviewRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
@@ -13,6 +17,10 @@ import com.shinyoung.recruit.domain.repository.StageRepository;
 import com.shinyoung.recruit.domain.repository.StageResultRepository;
 import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
+import com.shinyoung.recruit.dto.request.InterviewCandidateParticipantRequest;
+import com.shinyoung.recruit.dto.request.InterviewCreateRequest;
+import com.shinyoung.recruit.dto.request.InterviewInterviewerParticipantRequest;
+import com.shinyoung.recruit.dto.request.InterviewParticipantReplaceRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
@@ -24,6 +32,7 @@ import com.shinyoung.recruit.dto.request.StageUpdateRequest;
 import com.shinyoung.recruit.dto.response.AdminStageResultResponse;
 import com.shinyoung.recruit.dto.response.StageDetailResponse;
 import com.shinyoung.recruit.dto.response.StageListResponse;
+import com.shinyoung.recruit.enumeration.InterviewMethod;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageStatus;
 import com.shinyoung.recruit.enumeration.StageType;
@@ -70,6 +79,18 @@ class StageServiceTest {
 
     @Autowired
     private StageResultRepository stageResultRepository;
+
+    @Autowired
+    private InterviewService interviewService;
+
+    @Autowired
+    private InterviewRepository interviewRepository;
+
+    @Autowired
+    private InterviewParticipantRepository interviewParticipantRepository;
+
+    @Autowired
+    private EmployeeRepository employeeRepository;
 
     @Autowired
     private ApplicationBasicInfoRepository basicInfoRepository;
@@ -640,6 +661,49 @@ class StageServiceTest {
     }
 
     @Test
+    void delete_ready_stage_removes_draft_interviews() {
+        Long jobPostingId = createJobPosting();
+        Long stageId = stageService.create(jobPostingId, interviewStageRequest(0));
+        jobPostingService.publish(jobPostingId);
+        Long applicationId = createSubmittedApplication("stage-delete-draft-interview", jobPostingId);
+        Long interviewId = createDraftInterviewWithParticipants(
+                jobPostingId, stageId, applicationId, "delete-draft-interview");
+
+        stageService.delete(jobPostingId, stageId);
+
+        assertThat(interviewRepository.findById(interviewId)).isEmpty();
+        assertThat(interviewParticipantRepository
+                .findByInterviewIdOrderByRoleAscSortOrderAscIdAsc(interviewId)).isEmpty();
+    }
+
+    @Test
+    void delete_fails_when_stage_has_confirmed_interview() {
+        Long jobPostingId = createJobPosting();
+        Long stageId = createConfirmableInterviewStage(jobPostingId);
+        Long applicationId = passDocumentStage(jobPostingId, "delete-confirmed-interview");
+        Long interviewId = createDraftInterviewWithParticipants(
+                jobPostingId, stageId, applicationId, "delete-confirmed-interview");
+        interviewService.confirm(interviewId);
+
+        assertThatThrownBy(() -> stageService.delete(jobPostingId, stageId))
+                .isInstanceOf(InvalidStageException.class);
+    }
+
+    @Test
+    void delete_fails_when_stage_has_cancelled_interview() {
+        Long jobPostingId = createJobPosting();
+        Long stageId = createConfirmableInterviewStage(jobPostingId);
+        Long applicationId = passDocumentStage(jobPostingId, "delete-cancelled-interview");
+        Long interviewId = createDraftInterviewWithParticipants(
+                jobPostingId, stageId, applicationId, "delete-cancelled-interview");
+        interviewService.confirm(interviewId);
+        interviewService.cancel(interviewId);
+
+        assertThatThrownBy(() -> stageService.delete(jobPostingId, stageId))
+                .isInstanceOf(InvalidStageException.class);
+    }
+
+    @Test
     void delete_fails_when_job_posting_is_closed() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
@@ -730,6 +794,71 @@ class StageServiceTest {
                     "employee01"
             );
         }
+    }
+
+    private StageCreateRequest interviewStageRequest(int stageOrder) {
+        return new StageCreateRequest(
+                "First interview",
+                StageType.FIRST_INTERVIEW,
+                stageOrder,
+                LocalDateTime.of(2026, 7, 1, 10, 0),
+                false
+        );
+    }
+
+    /** 면접 확정은 직전 단계의 PASSED 결과를 요구한다. 문서 단계(order 0) + 면접 단계(order 1)를 만들고 공고를 게시한다. */
+    private Long createConfirmableInterviewStage(Long jobPostingId) {
+        stageService.create(jobPostingId, createStageRequest(0, false));
+        Long interviewStageId = stageService.create(jobPostingId, interviewStageRequest(1));
+        jobPostingService.publish(jobPostingId);
+        return interviewStageId;
+    }
+
+    private Long passDocumentStage(Long jobPostingId, String suffix) {
+        Long applicationId = createSubmittedApplication("stage-" + suffix, jobPostingId);
+        Long documentStageId = stageRepository.findByJobPostingIdOrderByStageOrderAscIdAsc(jobPostingId).get(0).getId();
+        stageService.start(jobPostingId, documentStageId);
+        stageResultService.initialize(documentStageId);
+        for (AdminStageResultResponse result : stageResultService.getResults(documentStageId)) {
+            stageResultService.updateResult(
+                    documentStageId,
+                    result.stageResultId(),
+                    new StageResultUpdateRequest(StageResultStatus.PASSED, null, null),
+                    "employee01"
+            );
+        }
+        stageService.announce(jobPostingId, documentStageId);
+        return applicationId;
+    }
+
+    private Long createDraftInterviewWithParticipants(
+            Long jobPostingId,
+            Long stageId,
+            Long applicationId,
+            String suffix
+    ) {
+        Employee employee = new Employee();
+        employee.setLoginId("employee-" + suffix);
+        employee.setName("Interviewer");
+        employee.setDeptName("HR-" + suffix);
+        employee = employeeRepository.saveAndFlush(employee);
+
+        Long interviewId = interviewService.createDraft(jobPostingId, new InterviewCreateRequest(
+                stageId,
+                "Group A",
+                LocalDateTime.of(2026, 7, 10, 10, 0),
+                LocalDateTime.of(2026, 7, 10, 11, 0),
+                InterviewMethod.IN_PERSON,
+                "Head office",
+                "Room 1",
+                null,
+                "memo"
+        ));
+        interviewService.replaceParticipants(interviewId, new InterviewParticipantReplaceRequest(
+                List.of(new InterviewCandidateParticipantRequest(applicationId, 1)),
+                List.of(new InterviewInterviewerParticipantRequest(employee.getId(), 1))
+        ));
+        return interviewId;
     }
 
     private Long createSubmittedApplication(String loginId, Long jobPostingId) {
