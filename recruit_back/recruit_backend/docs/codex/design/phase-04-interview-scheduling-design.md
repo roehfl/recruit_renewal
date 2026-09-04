@@ -185,6 +185,7 @@ Important implementation notes:
 | `POST` | `/admin/interviews/{interviewId}/participants` | Replace participant assignment set. | `InterviewParticipantReplaceRequest`. | Updated participant list. |
 | `POST` | `/admin/interviews/{interviewId}/confirm` | Confirm schedule after validation. | Optional confirmation memo. | Updated status/detail. |
 | `POST` | `/admin/interviews/{interviewId}/cancel` | Cancel schedule. | Optional cancel reason. | Updated status/detail. |
+| `POST` | `/admin/interviews/{interviewId}/delete` | Physically delete a `DRAFT` or `CANCELLED` schedule. | None. | Deleted interview id. |
 
 Admin response may include:
 
@@ -344,6 +345,17 @@ If the project intentionally allows admins to prepare interview assignments befo
 | `CONFIRMED` | update | rejected | Later phase can add amendment/versioning if needed. |
 | `CONFIRMED` | replace participants | rejected | Later phase can add partial cancellation/amendment if needed. |
 | `CANCELLED` | update/confirm | rejected | Reopen is out of scope for the first slice. |
+| `DRAFT` | delete | deleted | Allowed. Never exposed outside admin, so no evaluation can exist. |
+| `CANCELLED` | delete | deleted | Allowed only when the schedule has no `InterviewEvaluation`. |
+| `CONFIRMED` | delete | rejected | Must be cancelled first so candidates/interviewers see the cancellation. |
+
+Delete rationale (2026-09-04, added while fixing the stage-delete FK defect):
+
+- `StageService.delete` blocks a READY stage that carries a `CONFIRMED`/`CANCELLED` interview, which left such a stage permanently undeletable because `cancel` only changes status and keeps the row. This command is the escape path: cancel, delete the schedule, then delete the stage.
+- `CONFIRMED` is rejected on purpose. Applicant/interviewer read APIs expose `CONFIRMED` and `CANCELLED` schedules, so deleting a confirmed one would make a communicated commitment vanish without notice. Cancelling first keeps the cancellation visible.
+- Any `InterviewEvaluation` row blocks the delete. `DRAFT` evaluations are not empty placeholders — an interviewer can temporarily save grade/recommendation/comment before submitting — so no evaluation is safe to destroy here. There is no evaluation delete API, so a schedule that reached evaluation stays undeletable by design.
+- `InterviewParticipant` rows are removed by the existing `cascade = ALL` + `orphanRemoval` on `Interview.participants`; no separate cleanup is needed.
+- No `ActivityLog` entry is recorded, consistent with the other interview commands (create/update/confirm/cancel are all unaudited) and with the Phase 09b audit taxonomy, which targets result decisions and data egress rather than schedule configuration.
 
 ### 11.7 Visibility Rules
 

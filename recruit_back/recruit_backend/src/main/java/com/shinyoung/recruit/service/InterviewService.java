@@ -8,6 +8,7 @@ import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.Stage;
 import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.repository.EmployeeRepository;
+import com.shinyoung.recruit.domain.repository.InterviewEvaluationRepository;
 import com.shinyoung.recruit.domain.repository.InterviewParticipantRepository;
 import com.shinyoung.recruit.domain.repository.InterviewRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
@@ -71,6 +72,7 @@ public class InterviewService {
     private final JobApplicationRepository jobApplicationRepository;
     private final EmployeeRepository employeeRepository;
     private final StageResultRepository stageResultRepository;
+    private final InterviewEvaluationRepository interviewEvaluationRepository;
 
     public List<AdminInterviewSummaryResponse> getAdminInterviews(
             Long jobPostingId,
@@ -204,6 +206,29 @@ public class InterviewService {
         }
         interview.cancel();
         return interview.getId();
+    }
+
+    /**
+     * 면접 물리 삭제. 확정 면접이 붙은 READY 단계를 지울 수 없던 막다른 길을 푸는 경로다
+     * (StageService.delete 는 DRAFT 가 아닌 면접이 있으면 차단한다).
+     *
+     * <p>DRAFT(외부 비노출) 와 CANCELLED(취소가 이미 지원자·면접관에게 노출됨) 만 허용한다. CONFIRMED 를 바로
+     * 지우면 통보 없이 약속이 사라지므로 cancel 을 먼저 요구한다. 평가가 하나라도 있으면 판정 데이터이므로 막는다
+     * (DRAFT 평가도 면접관이 임시 저장한 내용을 담을 수 있다). 참가자는 Interview 의 cascade + orphanRemoval 로
+     * 함께 정리된다.
+     */
+    @Transactional
+    public Long delete(Long interviewId) {
+        Interview interview = findInterview(interviewId);
+        if (interview.isConfirmed()) {
+            throw new InvalidInterviewException("CONFIRMED interview must be cancelled before delete.");
+        }
+        validateStageMutable(interview.getStage());
+        if (interviewEvaluationRepository.existsByInterviewId(interviewId)) {
+            throw new InvalidInterviewException("Interview with evaluation cannot be deleted.");
+        }
+        interviewRepository.delete(interview);
+        return interviewId;
     }
 
     private Interview findInterview(Long interviewId) {

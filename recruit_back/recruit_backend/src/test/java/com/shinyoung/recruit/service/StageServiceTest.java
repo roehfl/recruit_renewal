@@ -704,6 +704,23 @@ class StageServiceTest {
     }
 
     @Test
+    void delete_ready_stage_succeeds_after_confirmed_interview_is_cancelled_and_deleted() {
+        Long jobPostingId = createJobPosting();
+        Long stageId = createConfirmableInterviewStage(jobPostingId);
+        Long applicationId = passDocumentStage(jobPostingId, "delete-after-interview-removed");
+        Long interviewId = createDraftInterviewWithParticipants(
+                jobPostingId, stageId, applicationId, "delete-after-interview-removed");
+        interviewService.confirm(interviewId);
+        interviewService.cancel(interviewId);
+        interviewService.delete(interviewId);
+
+        stageService.delete(jobPostingId, stageId);
+
+        assertThatThrownBy(() -> stageService.getStage(jobPostingId, stageId))
+                .isInstanceOf(StageNotFoundException.class);
+    }
+
+    @Test
     void delete_fails_when_job_posting_is_closed() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));

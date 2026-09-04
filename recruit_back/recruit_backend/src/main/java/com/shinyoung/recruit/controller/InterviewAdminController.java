@@ -87,4 +87,11 @@ public class InterviewAdminController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(interviewService.cancel(interviewId)));
     }
+
+    @PostMapping("/interviews/{interviewId}/delete")
+    public ResponseEntity<ApiResponse<Long>> delete(
+            @PathVariable Long interviewId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(interviewService.delete(interviewId)));
+    }
 }
