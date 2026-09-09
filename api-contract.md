@@ -506,6 +506,47 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 오류: 400(page/size 범위 위반, enum 값 오류), 404(`jobPostingId` 미존재)
 - 제외 확정: 성별(도메인 없음), 연락처(암호화 컬럼 검색 불가), 채용구분 연도
 
+#### GET `/admin/applications/{applicationId}/pdf`  🟡 초안 (2026-09-09, 설계 승인 — 표시 내용 개편)
+
+- 설명: 지원서 1건을 A4 PDF로 다운로드. Phase 07e에서 구현된 엔드포인트이며, **경로·요청·응답 형태는 변경 없고 PDF 내용 구성만 개편**한다(표시 모델 재설계 + 템플릿 재작성).
+- 요청: 없음 (path variable만)
+- 응답(200): `application/pdf` (`ApiResponse` 래핑 없음)
+  - `Content-Disposition: attachment; filename="{applicationId}_{이름}.pdf"` (UTF-8 `filename*` 병기). 07e의 `application-{id}.pdf`에서 변경
+  - 보안 헤더: `no-store`, `no-cache`, `nosniff`
+- PDF 구성(화면 `Application.vue` 순서 기준): 지원사항 → 기본정보(사진 포함) → 병역 → 학력(+학기별 성적) → 경력 → 자격 → 어학 → 수상 → 공백기간 → 자기소개서
+  - 첨부파일(ATTACHMENT) 섹션 제외. 전형결과 제외
+  - 사진은 `attachmentType=ETC` + `sectionType=BASIC_INFO` 중 최신 1건을 base64 인라인 embed (S2)
+- 오류: 404(`applicationId` 미존재), 500(렌더 실패 — `PdfGenerationException`)
+- 매핑: front `adminApplicationApi.downloadApplicationPdf()` ↔ back `ApplicationPdfController.applicationPdf()`
+
+#### POST `/admin/applications/pdf/bulk`  🟢 백엔드 구현·검증 완료 (2026-09-09) / 프론트 연동 대기
+
+- 설명: 목록에서 체크한 지원서 다건을 PDF로 렌더해 zip으로 다운로드. 개별 PDF 내용은 단건 엔드포인트와 동일.
+- 요청: `{ applicationIds: number[] }`
+  - 중복 id 제거 후 카운트. **최대 20건** (`recruit.pdf.bulk-max-count`)
+  - 빈 배열 400
+- 응답(200): `application/zip` (`ApiResponse` 래핑 없음)
+  - `Content-Disposition: attachment; filename="applications-yyyyMMddHHmmss.zip"`
+  - zip 내부 파일명 `{applicationId}_{이름}.pdf`
+  - 보안 헤더: `no-store`, `no-cache`, `nosniff`
+- 오류: 400(빈 배열 / 20건 초과 — "한 번에 최대 20건까지 다운로드할 수 있습니다. (요청 N건)"), 404(id 하나라도 미존재 시 전체 실패), 500(렌더 실패)
+- 감사: 담긴 지원서마다 단건과 동일한 `APPLICATION_PDF` 감사를 남긴다(건별). 같은 `requestId`로 한 요청임을 묶어 볼 수 있다. PII 값 미기록
+- zip 을 temp 파일에 다 만들고 감사를 남긴 뒤 스트리밍을 시작한다(egress fail-close). 전송 완료 후 temp 삭제
+- 중복 id 는 제거 후 카운트. 파일명이 겹치면 `이름(2).pdf` 로 접미사를 붙여 덮어쓰지 않는다
+- 조회 성격이나 id 배열 전달을 위해 `POST` 사용(의도된 선택)
+- 매핑: front `adminApplicationApi.downloadApplicationPdfBulk()` ↔ back `ApplicationPdfController.applicationPdfBulk()`
+
+#### GET `/admin/applications/export`, GET `/admin/job-postings/{jobPostingId}/applications/export`  🟢 필터 확장 완료 (2026-09-09)
+
+- 설명: 검색 조건에 맞는 지원현황 엑셀 다운로드.
+- 요청: 목록 조회와 **동일한** `AdminApplicationSearchRequest` 전체(query string). `page`/`size`는 받지 않고 전체 행을 내보낸다.
+- 이전 결함: 파라미터가 `jobPostingId`/`jobPositionId`/`status` 3개뿐이라, 화면에서 이름 등으로 검색한 뒤 엑셀을 받으면 필터가 적용되지 않은 전체 결과가 내려왔다. 목록은 17개를 지원하는데 export만 3개에 머물러 있었다.
+- 조치: 조건 생성을 `AdminApplicationSearchConditionFactory`로, 조회 절을 `JobApplicationRepository.ADMIN_SEARCH_WHERE` 상수로 목록과 공유해 같은 불일치가 재발하지 않게 했다.
+- 감사: 적용된 `jobPostingId`/`jobPositionId`/canonical `status` 기록(기존과 동일).
+- 응답(200): `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` (스트리밍)
+- 오류: 400(enum 값 오류), 404(`jobPostingId` 미존재), 413 상당(`ExportRowLimitExceededException` — 행 수 상한 초과)
+- 매핑: front `adminApplicationApi.downloadApplicationsExcel()` ↔ back `AdminExportController.exportApplicationsByJobPosting()`
+
 ### 화면: 관리자 질문 템플릿 (전역 질문 은행)
 
 - 프론트: (미구현) 질문 템플릿 관리 화면 + `src/api/questionTemplateApi.ts`

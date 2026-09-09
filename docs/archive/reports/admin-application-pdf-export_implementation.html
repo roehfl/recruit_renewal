@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>admin 지원서 PDF 저장 / A4 출력 / 일괄 다운로드 - 구현</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal — 통합 화면 슬라이스</div>
+  <h1>admin 지원서 PDF 저장 / A4 출력 / 일괄 다운로드 — 구현</h1>
+  <span class="badge done">S1~S5 구현 완료</span>
+  <span class="badge done">테스트 60건 통과</span>
+  <span class="badge warn">런타임 검증 미실시</span>
+  <span class="badge muted">작성일: 2026-09-09</span>
+</header>
+
+<main>
+
+  <!-- ===== 요약 + 현황 ===== -->
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>관리자 지원서 상세를 A4 PDF로 저장하고, 목록에서 선택한 지원서를 zip으로 일괄 다운로드한다. 단건·일괄 모두 백엔드 openhtmltopdf 단일 경로로 처리한다.</p>
+      <p>Phase 07e가 deferred 처리했던 <strong>batch/zip · 학기별 성적 상세표 · 사진 binary embed</strong> 세 항목을 모두 회수했다. 표시 모델을 <code>Field(label, value)</code>에서 <code>Section(columns, rows)</code>로 재설계해 관리자 화면과 같은 가로 표를 렌더한다.</p>
+      <p>작업 중 <strong>기존 결함 3건</strong>을 발견해 함께 고쳤다: 엑셀 export 필터 불일치, 목록 서버 페이징 미연결, blob 다운로드 오류 메시지 손실.</p>
+      <p>백엔드 4개(S1~S3, S5) + 프론트 1개(S4) slice를 모두 구현했고 테스트 60건이 통과한다. 브라우저 런타임 검증은 실시하지 못했다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">S1 표시 모델·템플릿</span></p>
+      <p><span class="badge done">S2 사진 embed</span></p>
+      <p><span class="badge done">S3 일괄 zip</span></p>
+      <p><span class="badge done">S4 프론트 연동·UI 정리</span></p>
+      <p><span class="badge done">S5 엑셀 export 필터 확장</span></p>
+      <p><span class="badge done">api-contract 🟢 갱신</span></p>
+      <p><span class="badge warn">렌더 시간 실측 미실시</span></p>
+      <p><span class="badge warn">브라우저 검증 미실시</span></p>
+    </div>
+  </section>
+
+  <!-- ===== 범위 ===== -->
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 완료</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>표시 모델 재설계 + 화면 구조 미러 템플릿</li>
+          <li>enum 한글 라벨 매핑 (설계 범위 밖이었던 추가 작업)</li>
+          <li>증명사진 base64 인라인 embed</li>
+          <li>일괄 zip 엔드포인트 + 20건 상한 + 건별 감사</li>
+          <li>상세 [PDF 저장] / 목록 [PDF 인쇄] 연동</li>
+          <li>목록 UI 정리(미리보기 제거, 그룹 헤더 3열 제거)</li>
+          <li>엑셀 export 필터를 목록과 동일하게 확장</li>
+          <li>목록 서버 페이징 연결 (범위 밖 결함 수정)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미검증</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>브라우저 런타임 동작</li>
+          <li>일괄 20건 실제 렌더 소요 시간</li>
+          <li>실데이터 기준 PDF 레이아웃</li>
+          <li>페이징 21건째 이후 표시</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>첨부파일(ATTACHMENT) 섹션</li>
+          <li>전형결과 / <code>StageResult</code></li>
+          <li>지원자 본인 PDF 다운로드</li>
+          <li>목록 <code>인쇄</code> 버튼 (껍데기 보존)</li>
+          <li>비동기 배치 방식 일괄</li>
+          <li>영속 <code>ActivityLog</code> 이관</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== API ===== -->
+  <section>
+    <h2>API 목록</h2>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>상태</th></tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/api/admin/applications/{applicationId}/pdf</code></td>
+        <td>지원서 1건 PDF</td>
+        <td><span class="badge info">기존 · 내용 개편</span></td>
+      </tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/api/admin/applications/pdf/bulk</code></td>
+        <td>선택 지원서 zip 다운로드</td>
+        <td><span class="badge done">신규</span></td>
+      </tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/api/admin/applications/export</code><br><code>/api/admin/job-postings/{jobPostingId}/applications/export</code></td>
+        <td>지원현황 엑셀</td>
+        <td><span class="badge done">필터 확장</span></td>
+      </tr>
+    </table>
+    <p class="small">파일명 규약 — 단건/zip 내부: <code>{수험번호}_{이름}.pdf</code> (수험번호는 화면상 <code>applicationId</code>), zip: <code>applications-yyyyMMddHHmmss.zip</code>. 보안 헤더는 세 경로 모두 <code>no-store</code> / <code>no-cache</code> / <code>nosniff</code> + attachment disposition(ASCII fallback + UTF-8 <code>filename*</code>).</p>
+  </section>
+
+  <!-- ===== 표시 모델 ===== -->
+  <section>
+    <h2>표시 모델 재설계</h2>
+    <div class="two">
+      <div class="card">
+        <h3>이전 (Phase 07e)</h3>
+        <p><span class="badge out">가로 표 불가</span></p>
+        <pre>Section(title, records, emptyMessage)
+  └ RecordRow(fields)
+      └ Field(label, value)</pre>
+        <p class="small">라벨이 값에 1:1로 묶여 <code>라벨 | 값</code> 세로 2열만 렌더할 수 있었다.</p>
+      </div>
+      <div class="card">
+        <h3>현재</h3>
+        <p><span class="badge done">구현 완료</span></p>
+        <pre>ApplicationPdfView(
+    Header header,
+    BasicInfo basicInfo,
+    List&lt;Section&gt; sections)
+
+Section(title, note, layout,
+        columns, columnWidths,
+        rows, emptyMessage)
+
+enum Layout { TABLE, GRADE, QA }</pre>
+      </div>
+    </div>
+    <table>
+      <tr><th>구성</th><th>Layout</th><th>구현 내용</th></tr>
+      <tr><td>지원사항</td><td><span class="badge muted">전용</span></td><td>채용구분 / 지원구분 / 지원분야 / 직무·근무지 2행</td></tr>
+      <tr><td>기본 정보</td><td><span class="badge muted">전용 fragment</span></td><td>사진 <code>rowspan</code> + 이름·연락처 2단 중첩. 불규칙 병합이라 유일하게 전용 처리</td></tr>
+      <tr><td>병역 / 학력 / 경력 / 자격 / 어학 / 수상 / 공백기간</td><td><span class="badge info">TABLE</span></td><td>템플릿 루프 하나로 전부 렌더. 화면 <code>colgroup</code> 비율을 <code>columnWidths</code>로 이식</td></tr>
+      <tr><td>학기별 성적</td><td><span class="badge info">GRADE</span></td><td>화면 로직 그대로 — 1~8학기 항상 출력, 5학년 이상 성적이 있으면 9~16학기 표를 덧붙임. 값 가운데 정렬 + <code>※</code> 안내 문구. 공채 공고에서만 노출</td></tr>
+      <tr><td>자기소개서</td><td><span class="badge info">QA</span></td><td>질문 + <code>white-space: pre-wrap</code> 답변. 화면의 <code>a-textarea</code>와 달리 분량이 잘리지 않음</td></tr>
+    </table>
+    <p class="small">섹션 순서는 관리자 화면(<code>Application.vue</code>) 기준으로 재정렬했다: 지원사항 → 기본정보 → 병역 → 학력(+성적) → 경력 → 자격 → 어학 → 수상 → 공백기간 → 자기소개서.</p>
+  </section>
+
+  <!-- ===== 설계에 없던 추가 작업 ===== -->
+  <section>
+    <h2>설계에 없던 추가 작업</h2>
+    <div class="card">
+      <h3>enum 한글 라벨 매핑</h3>
+      <p><span class="badge warn">구현 중 발견</span></p>
+      <p>섹션 DTO가 enum을 그대로 노출하고 기존 <code>str()</code>이 <code>enumValue.name()</code>을 반환해, PDF에 <code>HIGH_SCHOOL</code>·<code>MASTER_SERGEANT</code> 같은 영문이 출력되고 있었다. 화면은 프론트 <code>getLabel()</code>로 변환하지만 백엔드에는 대응물이 없었다.</p>
+      <p><code>ApplicationPdfLabels</code>를 신규 추가해 PDF 전용으로 격리했다. 도메인 enum은 수정하지 않았다(다른 경로에 영향을 주지 않기 위함). 국적·장애 등급/유형처럼 공통코드 기반 값은 <code>CommonCodeService</code>로 조회한다.</p>
+    </div>
+    <div class="card">
+      <h3>PDF 다운로드 타임아웃</h3>
+      <p><span class="badge warn">구현 중 발견</span></p>
+      <p>프론트 <code>apiClient</code>의 기본 timeout이 <strong>10초</strong>였다. 일괄 20건은 렌더에 그 이상 걸릴 수 있어 그대로 두면 반드시 타임아웃이 난다. 요청별 timeout(단건 30초 / 일괄 120초)을 지정했다.</p>
+    </div>
+  </section>
+
+  <!-- ===== 발견한 기존 결함 ===== -->
+  <section>
+    <h2>함께 고친 기존 결함</h2>
+    <table>
+      <tr><th>#</th><th>결함</th><th>증상</th><th>조치</th></tr>
+      <tr>
+        <td>1</td>
+        <td>엑셀 export 필터 불일치</td>
+        <td>목록 조회는 검색 조건 17개를 지원하는데 export는 3개(<code>jobPostingId</code>/<code>jobPositionId</code>/<code>status</code>)만 받았다. 화면에서 이름으로 검색한 뒤 엑셀을 받으면 필터가 빠진 전체 결과가 내려가 PII가 의도보다 많이 반출됐다.</td>
+        <td>조건 생성을 <code>AdminApplicationSearchConditionFactory</code>로, 조회 절을 <code>ADMIN_SEARCH_WHERE</code> 상수로 공유 (S5)</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>목록 서버 페이징 미연결</td>
+        <td>프론트가 <code>page</code>를 넘기지 않아 항상 첫 20건만 조회하고, 화면은 그것을 <code>pageSize: 10</code>으로 두 페이지에 나눠 보여줬다. 21건째부터는 화면에 나타나지 않았다.</td>
+        <td><code>loadApplications(page)</code> 분리 + <code>@change</code> 서버 재조회. <code>pageSize</code>를 20으로 맞춰 일괄 상한과 일치시킴</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>blob 다운로드 오류 메시지 손실</td>
+        <td><code>responseType: 'blob'</code> 요청은 오류 응답 본문도 Blob으로 와서 <code>getApiErrorMessage</code>가 서버 메시지를 꺼내지 못한다. 상한 초과 안내가 표시되지 않았다.</td>
+        <td><code>getBlobErrorMessage</code>를 공용 모듈에 추가</td>
+      </tr>
+    </table>
+    <p class="small">범위 밖이지만 보고만 하고 수정하지 않은 것 — 프론트 라벨 테이블 오타(<code>ENFOLLED</code> vs 백엔드 <code>ENROLLED</code>)로 화면에서 "재학"이 영문으로 표시된다. 백엔드 PDF는 정상 처리한다. <code>careerDescriptionDownload</code>와 전형결과 엑셀에도 결함 3번과 같은 문제가 남아 있다.</p>
+  </section>
+
+  <!-- ===== 일괄 다운로드 ===== -->
+  <section>
+    <h2>일괄 다운로드 처리 순서</h2>
+    <pre>중복 id 제거 → 20건 상한 검증(초과 시 400)
+  → temp zip 파일에 순차 렌더
+  → 담긴 지원서마다 감사 기록
+  → StreamingResponseBody 전송 시작
+  → 전송 완료 후 temp 삭제</pre>
+    <div class="transition">
+      <span class="state">렌더 완료</span><span class="arrow">→</span>
+      <span class="state">감사 기록</span><span class="arrow">→</span>
+      <span class="state">200 전송 시작</span>
+    </div>
+    <p class="small"><strong>감사까지 끝낸 뒤에 전송을 시작한다.</strong> 스트리밍이 시작되면 이미 <code>200</code>이 나가 오류 상태코드로 되돌릴 수 없기 때문이다. 감사 실패 시 temp를 지우고 예외를 전파해 응답이 나가지 않는다(egress fail-close, 기존 export 규약과 동일).</p>
+    <table>
+      <tr><th>항목</th><th>구현</th></tr>
+      <tr><td>상한</td><td><code>recruit.pdf.bulk-max-count = 20</code>. 목록 조회 API가 한 화면에 내려주는 건수와 같아 "보이는 것 전부 선택"이 항상 성립</td></tr>
+      <tr><td>중복 id</td><td>선택 순서를 유지한 채 제거 후 카운트(반복 전송으로 상한 우회 불가)</td></tr>
+      <tr><td>메모리</td><td>PDF 한 건분만 올리고 즉시 zip 엔트리로 흘려보냄</td></tr>
+      <tr><td>부분 실패</td><td>fail-fast. id 하나라도 없으면 전체 404. "20건 요청했는데 18건만 들어 있는" 상황을 운영자가 놓치지 않게 함</td></tr>
+      <tr><td>파일명 충돌</td><td>겹치면 <code>이름(2).pdf</code>로 접미사. 덮어쓰기는 조용한 데이터 손실이라 방어</td></tr>
+      <tr><td>감사</td><td>지원서마다 기존 <code>APPLICATION_PDF</code> 감사를 남긴다(건별). 같은 <code>requestId</code>로 한 요청임을 묶어 조회 가능. 새 <code>AuditActionType</code>은 추가하지 않음</td></tr>
+    </table>
+  </section>
+
+  <!-- ===== 사진 embed ===== -->
+  <section>
+    <h2>사진 embed</h2>
+    <p>설계에서 "PoC 선행"으로 남겼던 리스크를 해소했다. <strong>openhtmltopdf 1.0.10이 <code>data:</code> 스킴 이미지를 정상 렌더한다.</strong> 커스텀 <code>FSUriResolver</code>는 불필요했다.</p>
+    <table>
+      <tr><th>항목</th><th>구현</th></tr>
+      <tr><td>선별 규칙</td><td>화면과 동일 — <code>attachmentType=ETC</code> + <code>sectionType=BASIC_INFO</code> 중 마지막 항목</td></tr>
+      <tr><td>파일 읽기</td><td>기존 <code>ApplicationAttachmentDownloadService.downloadForAdmin()</code> 재사용</td></tr>
+      <tr><td>포맷</td><td><code>image/jpeg</code>, <code>image/png</code>만 허용. <code>contentType</code>의 파라미터(<code>; charset=...</code>)는 잘라냄</td></tr>
+      <tr><td>용량 상한</td><td>5MB. DB <code>fileSize</code>와 <strong>실제 스트림 양쪽</strong>에서 검사(메타데이터 불일치 이력이 있어 방어)</td></tr>
+      <tr><td>실패 처리</td><td>사진만 생략하고 PDF는 정상 생성(경고 로그)</td></tr>
+      <tr><td>사진 없음</td><td>빈칸 + "사진 없음". 화면은 회사 로고를 fallback으로 쓰지만 인쇄물에서는 혼란을 준다고 판단</td></tr>
+    </table>
+    <p class="small">이 동작이 깨지면 사진 칸이 <strong>조용히 비므로</strong> 텍스트 검증으로는 잡히지 않는다. <code>ApplicationPdfPhotoEmbedTest</code>가 PDF 안에 이미지 XObject가 실렸는지로 회귀를 고정한다.</p>
+  </section>
+
+  <!-- ===== A4 레이아웃 ===== -->
+  <section>
+    <h2>A4 레이아웃</h2>
+    <pre>@page { size: A4; margin: 14mm 14mm 16mm; }   /* 인쇄 가능 폭 182mm */
+table    { table-layout: fixed; }
+th, td   { word-wrap: break-word; overflow-wrap: break-word; }
+tr       { page-break-inside: avoid; }
+.keep    { page-break-inside: avoid; }        /* keep-section-together=true */
+thead    { display: table-header-group; }</pre>
+    <table>
+      <tr><th>항목</th><th>결과</th><th>비고</th></tr>
+      <tr><td>가로 폭</td><td><span class="badge done">1페이지 보장</span></td><td>서버 확정 렌더라 브라우저·사용자 배율 설정과 무관</td></tr>
+      <tr><td>세로</td><td><span class="badge muted">N페이지</span></td><td>분량에 따라 가변. 표 중간 잘림 없음</td></tr>
+      <tr><td>페이지 바꿈</td><td><span class="badge done">B안 채택</span></td><td><code>recruit.pdf.keep-section-together = true</code>. 섹션을 통째로 유지</td></tr>
+    </table>
+    <div class="card">
+      <h3>CSS 지원 관련 확인 사항</h3>
+      <ul class="list">
+        <li><code>word-break: break-all</code>은 openhtmltopdf가 해석하지 않는다. 긴 이메일이 셀 경계를 넘어 그려지던 문제를 <code>word-wrap: break-word</code>로 해결했다.</li>
+        <li><code>table-layout: fixed</code>가 없으면 긴 무공백 문자열 하나가 표를 밀어 폭을 초과시킨다. openhtmltopdf는 초과분을 축소하지 않고 <strong>잘라내므로</strong> 필수다.</li>
+        <li><code>page-break-inside: avoid</code>는 정상 동작한다. 페이지 바꿈 두 방식의 결과가 같아 보였던 것은 섹션이 페이지 경계에 걸리지 않았기 때문이며, 표를 22행으로 키우자 4페이지 대 5페이지로 갈렸다.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===== 프론트 ===== -->
+  <section>
+    <h2>프론트 변경</h2>
+    <table>
+      <tr><th>화면</th><th>변경</th></tr>
+      <tr>
+        <td><code>Application.vue</code><br><span class="small">지원서 상세</span></td>
+        <td>헤더에 [PDF 저장] 버튼 추가. 서버 렌더 PDF를 blob으로 받아 저장</td>
+      </tr>
+      <tr>
+        <td><code>ApplicationStatus.vue</code><br><span class="small">지원현황 목록</span></td>
+        <td>서버 페이징 연결, [PDF 인쇄] → 일괄 다운로드, [엑셀 다운로드] → export, [미리보기] 제거, 검색조건 표 그룹 헤더 3열 제거</td>
+      </tr>
+      <tr>
+        <td><code>adminApplicationApi.ts</code></td>
+        <td><code>downloadApplicationPdf</code> / <code>downloadApplicationPdfBulk</code> / <code>downloadApplicationsExcel</code> 추가 + PDF 전용 timeout</td>
+      </tr>
+      <tr>
+        <td><code>fileDownload.ts</code></td>
+        <td><code>getBlobErrorMessage</code> 추가</td>
+      </tr>
+    </table>
+    <h3>목록 버튼 영역 정리</h3>
+    <p>기존에 배치되어 있던 버튼 4개는 모두 <code>@click</code> 핸들러가 없는 껍데기였다. 새 버튼을 추가하는 대신 기존 자리를 연결했다.</p>
+    <table>
+      <tr><th>버튼</th><th>처리</th></tr>
+      <tr><td><code>인쇄</code></td><td><span class="badge muted">껍데기 보존</span> 용도 미정</td></tr>
+      <tr><td><code>PDF 인쇄</code></td><td><span class="badge done">일괄 다운로드 연결</span> 선택 0건이면 비활성, 선택 건수 표시</td></tr>
+      <tr><td><code>미리보기</code></td><td><span class="badge out">제거</span> 수험번호 클릭으로 상세가 새 탭에 열려 중복</td></tr>
+      <tr><td><code>엑셀 다운로드</code></td><td><span class="badge done">export 연결</span> 화면 검색조건 그대로 전달</td></tr>
+    </table>
+    <h3>검색조건 표</h3>
+    <p><code>채용정보</code>/<code>인적사항</code>/<code>기타</code> 그룹 헤더 열을 제거해 5열 → 4열(<code>12/38/12/38</code>)로 줄였다. <code>rowspan</code>이 사라져 4개 행이 모두 <code>th/td/th/td</code> 균일 구조가 됐고, 사용처가 없어진 <code>.depth1</code> CSS도 제거했다.</p>
+  </section>
+
+  <!-- ===== 변경 파일 ===== -->
+  <section>
+    <h2>변경 파일</h2>
+    <div class="two">
+      <div class="card">
+        <h3>신규 (main)</h3>
+        <ul class="list">
+          <li><code>service/ApplicationPdfLabels.java</code></li>
+          <li><code>service/ApplicationPhotoLoader.java</code></li>
+          <li><code>service/ApplicationPdfBulkService.java</code></li>
+          <li><code>service/ApplicationPdfZipFile.java</code></li>
+          <li><code>service/AdminApplicationSearchConditionFactory.java</code></li>
+          <li><code>dto/request/ApplicationPdfBulkRequest.java</code></li>
+          <li><code>exception/PdfBulkLimitExceededException.java</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>신규 (test)</h3>
+        <ul class="list">
+          <li><code>service/ApplicationPhotoLoaderTest.java</code> (7)</li>
+          <li><code>service/ApplicationPdfPhotoEmbedTest.java</code> (2)</li>
+          <li><code>service/ApplicationPdfBulkServiceTest.java</code> (5)</li>
+          <li><code>controller/ApplicationPdfBulkControllerTest.java</code> (6)</li>
+        </ul>
+      </div>
+    </div>
+    <table>
+      <tr><th>수정 파일</th><th>내용</th></tr>
+      <tr><td><code>dto/response/ApplicationPdfView.java</code></td><td>표시 모델 재설계(<code>BasicInfo</code>, <code>Layout</code>, <code>columns</code>/<code>columnWidths</code>/<code>note</code>)</td></tr>
+      <tr><td><code>service/ApplicationPdfService.java</code></td><td>매핑 전면 재작성, 섹션 순서 정렬, 성적 표 로직, 사진 연동, 파일명 규약</td></tr>
+      <tr><td><code>service/ApplicationPdfRenderer.java</code></td><td><code>basicInfo</code>/<code>keepSectionTogether</code> context 추가</td></tr>
+      <tr><td><code>controller/ApplicationPdfController.java</code></td><td>일괄 엔드포인트 + 건별 감사 + zip 스트리밍</td></tr>
+      <tr><td><code>config/PdfProperties.java</code></td><td><code>bulkMaxCount</code>, <code>keepSectionTogether</code></td></tr>
+      <tr><td><code>exception/GlobalExceptionHandler.java</code></td><td><code>PdfBulkLimitExceededException</code> → 400</td></tr>
+      <tr><td><code>templates/application-pdf.html</code></td><td>화면 구조 미러 템플릿으로 전면 재작성</td></tr>
+      <tr><td><code>service/ApplicationExportService.java</code></td><td>검색 조건 전체 수용, 공유 factory 사용</td></tr>
+      <tr><td><code>service/JobApplicationService.java</code></td><td>조건 생성을 factory에 위임, 중복 헬퍼 3개 제거</td></tr>
+      <tr><td><code>controller/AdminExportController.java</code></td><td><code>@ModelAttribute</code>로 검색 조건 수용</td></tr>
+      <tr><td><code>domain/repository/JobApplicationRepository.java</code></td><td><code>ADMIN_SEARCH_WHERE</code> 상수 추출, export 쿼리 2종 조건 확장</td></tr>
+      <tr><td>프론트 4개 파일</td><td><code>+179 / -19</code></td></tr>
+    </table>
+  </section>
+
+  <!-- ===== 테스트 ===== -->
+  <section>
+    <h2>테스트 결과</h2>
+    <p class="small">실행: <code>./gradlew test --tests "*Export*" --tests "*ApplicationPdf*" --tests "*ApplicationPhotoLoader*"</code></p>
+    <table>
+      <tr><th>테스트</th><th>건수</th><th>결과</th></tr>
+      <tr><td><code>AdminDatasetExportControllerTest</code></td><td>12</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><code>AdminExportControllerTest</code></td><td>10</td><td><span class="badge done">통과</span> (필터 검증 3건 추가)</td></tr>
+      <tr><td><code>ApplicationPdfBulkControllerTest</code></td><td>6</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><code>ApplicationPhotoLoaderTest</code></td><td>7</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><code>ApplicationPdfBulkServiceTest</code></td><td>5</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><code>ApplicationPdfControllerTest</code></td><td>4</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><code>ApplicationPdfSecurityHardeningTest</code></td><td>3</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><code>ApplicationPdfServiceTest</code></td><td>3</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><code>ApplicationPdfPhotoEmbedTest</code></td><td>2</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><code>ApplicationExportServiceTest</code></td><td>2</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><code>ExcelExportWriterTest</code> / <code>ExcelExportServiceTest</code> / <code>AdminExportRowCapTest</code></td><td>6</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><strong>합계</strong></td><td><strong>60</strong></td><td><span class="badge done">failures=0 errors=0</span></td></tr>
+    </table>
+    <p>프론트: <code>npm run type-check</code> 통과.</p>
+    <div class="card">
+      <h3>테스트가 잡아낸 회귀 3건</h3>
+      <ul class="list">
+        <li><strong>렌더러 context 누락</strong> — <code>basicInfo</code>를 Thymeleaf context에 넣지 않아 기본정보 표가 통째로 사라졌다. 보안 하드닝 테스트가 잡았다.</li>
+        <li><strong>fallback 동작 손상</strong> — BasicInfo row가 없을 때 Applicant 값으로 fallback하는 Phase 07e 동작을 제거할 뻔했다. 기존 서비스 테스트가 잡아 복원했다.</li>
+        <li><strong>flaky 테스트</strong> — <code>StreamingResponseBody</code>는 비동기라 MockMvc에서 <code>asyncDispatch</code>가 필요하다. 누락 시 단독 실행에서는 통과하고 함께 돌리면 zip 본문이 비어 실패했다.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>실행하지 못한 검증</h3>
+      <ul class="list">
+        <li><strong>전체 리그레션</strong> — <code>service</code> 패키지 전체 실행 시 여러 Spring 컨텍스트가 동시에 떠 <code>OutOfMemoryError: Java heap space</code>가 발생한다. 이번 변경과 무관한 환경 문제이며, 확인하려면 힙을 늘려 별도 실행해야 한다.</li>
+        <li><strong>브라우저 런타임</strong> — 프리뷰가 열리지 않았고(뷰포트 0x0), 관리자 화면 확인에는 백엔드 기동 + LDAP 로그인 + 지원자 데이터가 필요하다.</li>
+        <li><strong>렌더 시간 실측</strong> — 테스트는 지원서 2건 기준이라 20건 실사용 소요 시간은 확인되지 않았다.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===== 미결 사항 ===== -->
+  <section>
+    <h2>미결 사항</h2>
+    <table>
+      <tr><th>#</th><th>항목</th><th>현재 입장</th></tr>
+      <tr>
+        <td>1</td>
+        <td>일괄 20건 렌더 소요 시간</td>
+        <td>추정 6~20초. 실측 후 상한(20)과 프론트 timeout(120초) 적정성을 재확인한다</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>실데이터 기준 PDF 레이아웃</td>
+        <td>더미 데이터로만 확인했다. 실제 지원서(장문 자기소개서, 다수 자격증)로 검증 필요</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>목록 <code>인쇄</code> 버튼 용도</td>
+        <td>껍데기로 보존 중. 브라우저 인쇄 동선이 필요한지 아니면 제거할지 미정</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>표 경계선 색</td>
+        <td>화면은 <code>#f0f0f0</code>이나 인쇄 시 선이 사라져 <code>#d9d9d9</code>로 한 단계 진하게 적용. 화면 그대로가 낫다면 되돌린다</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>경력 <code>최종직급(승진일)</code> 표현</td>
+        <td>화면은 헤더를 <code>colspan="2"</code>로 묶고 값을 두 칸으로 나눈다. PDF는 한 칸에 <code>대리 (2024-01)</code>로 합쳤다</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>페이지 이동 시 선택 초기화</td>
+        <td>화면에 보이지 않는 항목이 선택된 채 남으면 의도치 않은 PII 반출로 이어져 초기화하도록 했다. 페이지를 넘나들며 누적 선택이 필요하면 되돌릴 수 있다</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td>PII export 권한 분리</td>
+        <td>현재는 기존 admin 권한 사용. <code>AdminExportController.EXPORT_APPLICATION_PII</code> 상수가 분리 의도를 남겨두었으므로 role matrix 세분화 시 함께 적용</td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td>프론트 라벨 오타 (<code>ENFOLLED</code>)</td>
+        <td>범위 밖이라 미수정. 화면에서 "재학"이 영문으로 표시된다</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- ===== 다음 단계 ===== -->
+  <section>
+    <h2>다음 단계 권장</h2>
+    <div class="card">
+      <ol class="list">
+        <li><strong>런타임 검증</strong> — 지원자 21명 이상인 공고에서 페이징, 단건/일괄 PDF, 엑셀 필터 적용을 확인한다.</li>
+        <li><strong>렌더 시간 실측</strong> — 일괄 20건 소요 시간을 측정해 미결 1번을 닫는다.</li>
+        <li><strong>실데이터 PDF 검토</strong> — 레이아웃 조정이 필요하면 템플릿만 수정하면 된다.</li>
+        <li><strong>전체 리그레션</strong> — 힙을 늘려 <code>./gradlew clean test</code>를 별도 실행한다.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h3>향후 Phase 후보</h3>
+      <ul class="list">
+        <li>지원자 본인 PDF 다운로드 (Phase 07e부터 deferred 유지)</li>
+        <li>PII export 권한 분리</li>
+        <li>다른 export 엔드포인트(전형결과·면접·면접평가)에 같은 필터 불일치가 있는지 점검</li>
+        <li>blob 오류 메시지 헬퍼를 기존 다운로드 경로에도 적용</li>
+        <li>대량 일괄이 요구되면 비동기 배치 + 다운로드 링크 발급 방식 검토</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===== 참조 ===== -->
+  <section>
+    <h2>참조 문서</h2>
+    <table>
+      <tr><th>문서</th><th>관련 내용</th></tr>
+      <tr><td><code>docs/archive/reports/admin-application-pdf-export_design.html</code></td><td>이번 구현의 설계 문서. 렌더링 방식 비교와 결정 로그</td></tr>
+      <tr><td><code>docs/adr/0001-application-pdf-openhtmltopdf-avoid-itext-agpl.md</code></td><td>렌더링 스택 선정 근거(iText AGPL 회피, CJK 폰트 번들)</td></tr>
+      <tr><td><code>docs/codex/implementation/phase-07e-application-pdf.md</code></td><td>단건 PDF 최초 구현. 이번에 회수한 deferred 항목 3건의 출처</td></tr>
+      <tr><td><code>api-contract.md</code></td><td>지원현황 조회 섹션 — PDF 단건/일괄, 엑셀 export 계약 🟢</td></tr>
+    </table>
+  </section>
+
+</main>
+</body>
+</html>

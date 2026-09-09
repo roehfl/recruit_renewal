@@ -1,7 +1,7 @@
 package com.shinyoung.recruit.controller;
 
+import com.shinyoung.recruit.dto.request.AdminApplicationSearchRequest;
 import com.shinyoung.recruit.enumeration.InterviewStatus;
-import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.AdminDatasetExportService;
 import com.shinyoung.recruit.service.ApplicationExportService;
@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -51,46 +52,46 @@ public class AdminExportController {
     private final ExportAuditLogger exportAuditLogger;
     private final CurrentEmployeeService currentEmployeeService;
 
+    /**
+     * 목록 조회와 같은 검색 조건을 그대로 받는다({@code page}/{@code size}만 무시). 화면에서 걸어둔 필터가
+     * 엑셀에도 적용되어야 보이는 결과와 받은 파일이 일치한다.
+     */
     @GetMapping("/admin/applications/export")
     public ResponseEntity<StreamingResponseBody> exportApplications(
             @RequestParam(required = false) Long jobPostingId,
-            @RequestParam(required = false) Long jobPositionId,
-            @RequestParam(required = false) String status,
+            @ModelAttribute AdminApplicationSearchRequest searchRequest,
             @AuthenticationPrincipal CustomUserDetails userDetails,
             HttpServletRequest request
     ) {
-        return export(jobPostingId, jobPositionId, status, userDetails, request);
+        return export(jobPostingId, searchRequest, userDetails, request);
     }
 
     @GetMapping("/admin/job-postings/{jobPostingId}/applications/export")
     public ResponseEntity<StreamingResponseBody> exportApplicationsByJobPosting(
             @PathVariable Long jobPostingId,
-            @RequestParam(required = false) Long jobPositionId,
-            @RequestParam(required = false) String status,
+            @ModelAttribute AdminApplicationSearchRequest searchRequest,
             @AuthenticationPrincipal CustomUserDetails userDetails,
             HttpServletRequest request
     ) {
-        return export(jobPostingId, jobPositionId, status, userDetails, request);
+        return export(jobPostingId, searchRequest, userDetails, request);
     }
 
     private ResponseEntity<StreamingResponseBody> export(
             Long jobPostingId,
-            Long jobPositionId,
-            String status,
+            AdminApplicationSearchRequest searchRequest,
             CustomUserDetails userDetails,
             HttpServletRequest request
     ) {
         String actor = currentEmployeeService.getCurrentEmployeeActor(userDetails);
-        // audit filter 에는 raw status 가 아니라 canonical 값(enum name)을 남긴다(9b 리뷰 Medium 2).
-        JobApplicationStatus parsedStatus = applicationExportService.parseStatus(status);
-        ExcelExportFile file = applicationExportService.exportApplications(jobPostingId, jobPositionId, status);
+        ExcelExportFile file = applicationExportService.exportApplications(jobPostingId, searchRequest);
         // egress fail-close(Phase 09b): 감사 기록 실패 시 응답 없이 전파 — temp xlsx 누수 방지(리뷰 2차 #3).
         try {
             exportAuditLogger.logApplicationsExport(
                     auditContext(actor, userDetails, request),
                     jobPostingId,
-                    jobPositionId,
-                    parsedStatus == null ? null : parsedStatus.name(),
+                    searchRequest.jobPositionId(),
+                    // audit filter 에는 raw 입력이 아니라 canonical 값(enum name)을 남긴다(9b 리뷰 Medium 2).
+                    canonicalStatus(searchRequest.status()),
                     file
             );
             return excelExportResponseFactory.toResponse(file);
@@ -98,6 +99,11 @@ public class AdminExportController {
             deleteQuietly(file);
             throw e;
         }
+    }
+
+    private String canonicalStatus(String status) {
+        var parsed = applicationExportService.parseStatus(status);
+        return parsed == null ? null : parsed.name();
     }
 
     @GetMapping("/admin/stages/{stageId}/results/export")

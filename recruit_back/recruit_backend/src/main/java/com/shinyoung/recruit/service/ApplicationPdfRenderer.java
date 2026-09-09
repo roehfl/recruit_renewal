@@ -59,7 +59,9 @@ public class ApplicationPdfRenderer {
     private String renderHtml(ApplicationPdfView view) {
         Context context = new Context(Locale.KOREA);
         context.setVariable("header", view.header());
+        context.setVariable("basicInfo", view.basicInfo());
         context.setVariable("sections", view.sections());
+        context.setVariable("keepSectionTogether", pdfProperties.isKeepSectionTogether());
         return templateEngine.process(TEMPLATE_NAME, context);
     }
 

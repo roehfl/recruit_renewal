@@ -45,16 +45,19 @@ class ApplicationExportServiceTest {
                 jobApplicationRepository,
                 jobPostingRepository,
                 excelExportWriter,
-                exportProperties
+                exportProperties,
+                new AdminApplicationSearchConditionFactory()
         );
     }
 
     @Test
     void export가_row_cap을_초과하면_writer를_호출하지_않고_거부한다() throws IOException {
         given(exportProperties.getMaxRows()).willReturn(1L);
-        given(jobApplicationRepository.countExportApplications(isNull(), isNull(), isNull())).willReturn(5L);
+        given(jobApplicationRepository.countExportApplications(
+                isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(),
+                isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull())).willReturn(5L);
 
-        assertThatThrownBy(() -> applicationExportService.exportApplications(null, null, null))
+        assertThatThrownBy(() -> applicationExportService.exportApplications(null, null))
                 .isInstanceOf(ExportRowLimitExceededException.class)
                 .hasMessageContaining(ExportRowLimitExceededException.CODE);
 
@@ -66,10 +69,12 @@ class ApplicationExportServiceTest {
         Path tempFile = Files.createTempFile("row-cap-within-", ".xlsx");
         try {
             given(exportProperties.getMaxRows()).willReturn(50_000L);
-            given(jobApplicationRepository.countExportApplications(isNull(), isNull(), isNull())).willReturn(3L);
+            given(jobApplicationRepository.countExportApplications(
+                isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(),
+                isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull())).willReturn(3L);
             given(excelExportWriter.writeToTempFile(any(), any())).willReturn(tempFile);
 
-            ExcelExportFile file = applicationExportService.exportApplications(null, null, null);
+            ExcelExportFile file = applicationExportService.exportApplications(null, null);
 
             assertThat(file.path()).isEqualTo(tempFile);
             assertThat(file.rowCount()).isEqualTo(3L);

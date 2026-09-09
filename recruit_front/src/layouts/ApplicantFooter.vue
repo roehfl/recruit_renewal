@@ -1,8 +1,8 @@
 <template>
   <footer class="app-footer">
     <div class="footer-inner">
-      <p class="copyright">COPYRIGHT SHINYOUNG SECURITIES CO.,LTD. ALL RIGHTS RESERVED</p>
-
+      <p class="copyright">ⓒ Shinyoung Securities Co., LTD</p>
+      <p class="copy-sub">|</p>
       <RouterLink class="privacy-link" to="/applicant/privacy"> 개인정보처리방침 </RouterLink>
     </div>
   </footer>
@@ -18,14 +18,14 @@
   flex: 0 0 auto;
   width: 100%;
   height: var(--app-footer-height);
-  background: var(--app-color-primary);
+  /* background: var(--app-color-primary); */
 }
 
 .footer-inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+  justify-content: right;
+  gap: 8px;
 
   width: 100%;
   height: 100%;
@@ -34,16 +34,20 @@
 
 .copyright {
   margin: 0;
-  color: rgb(255 255 255 / 72%);
+  color: var(--app-text-primary);
   font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
+  font-weight: 600;
+}
+.copy-sub {
+  margin: 0;
+  color: var(--app-border-soft);
+  font-size: 11px;
 }
 
 .privacy-link {
-  color: #ffffff;
+  color: var(--app-text-primary);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   text-decoration: none;
 }
 

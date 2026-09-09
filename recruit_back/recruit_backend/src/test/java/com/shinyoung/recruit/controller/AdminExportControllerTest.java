@@ -131,6 +131,54 @@ class AdminExportControllerTest {
         assertThat(submittedRows).allSatisfy(row -> assertThat(row.get(6)).isEqualTo("SUBMITTED"));
     }
 
+    /*
+     * export 는 오랫동안 jobPostingId/jobPositionId/status 3개만 지원해, 화면에서 이름으로 검색한 뒤
+     * 엑셀을 받으면 필터가 빠진 전체 결과가 내려갔다. 목록 조회와 같은 조건을 쓰는지 고정한다.
+     */
+    @Test
+    void export_applications_filters_by_name_like_the_list_query() throws Exception {
+        Long jobPostingId = createJobPosting("name-filter");
+        persistApplication(jobPostingId, "nm-1", "홍길동", "01000000001", "n1@example.com", true, false);
+        persistApplication(jobPostingId, "nm-2", "홍길순", "01000000002", "n2@example.com", true, false);
+        persistApplication(jobPostingId, "nm-3", "김철수", "01000000003", "n3@example.com", true, false);
+
+        MvcResult all = performExport(get("/api/admin/applications/export")
+                .with(authentication(adminAuthentication())));
+        assertThat(dataRowsOf(all)).hasSize(3);
+
+        MvcResult filtered = performExport(get("/api/admin/applications/export")
+                .param("name", "홍길")
+                .with(authentication(adminAuthentication())));
+        List<List<String>> rows = dataRowsOf(filtered);
+        assertThat(rows).hasSize(2);
+        assertThat(rows).allSatisfy(row -> assertThat(row.get(1)).startsWith("홍길"));
+    }
+
+    @Test
+    void export_applications_filters_by_phone_number_ignoring_hyphen() throws Exception {
+        Long jobPostingId = createJobPosting("phone-filter");
+        persistApplication(jobPostingId, "ph-1", "대상자", "010-1234-5678", "p1@example.com", true, false);
+        persistApplication(jobPostingId, "ph-2", "비대상자", "01099998888", "p2@example.com", true, false);
+
+        MvcResult filtered = performExport(get("/api/admin/applications/export")
+                .param("phoneNumber", "01012345678")
+                .with(authentication(adminAuthentication())));
+
+        List<List<String>> rows = dataRowsOf(filtered);
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).get(1)).isEqualTo("대상자");
+    }
+
+    @Test
+    void export_applications_rejects_invalid_enum_filter() throws Exception {
+        createJobPosting("invalid-enum");
+
+        mockMvc.perform(get("/api/admin/applications/export")
+                        .param("applicationType", "NOT_A_TYPE")
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isBadRequest());
+    }
+
     @Test
     void export_applications_filters_by_job_position() throws Exception {
         Long jobPostingId = createJobPostingWithPositions("position-filter", "Backend", "Frontend");

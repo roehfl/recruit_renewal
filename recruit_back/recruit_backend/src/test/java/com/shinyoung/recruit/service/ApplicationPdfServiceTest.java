@@ -79,14 +79,16 @@ class ApplicationPdfServiceTest {
         ArgumentCaptor<ApplicationPdfView> captor = ArgumentCaptor.forClass(ApplicationPdfView.class);
         verify(pdfRenderer).render(captor.capture());
         ApplicationPdfView.Header header = captor.getValue().header();
+        ApplicationPdfView.BasicInfo basicInfoView = captor.getValue().basicInfo();
 
         assertThat(header.applicantName()).isEqualTo("새이름");
-        assertThat(header.phoneNumber()).isEqualTo("01099998888");
-        assertThat(header.email()).isEqualTo("basic@new.com");
+        // 연락처는 표시용으로 하이픈을 넣어 렌더한다.
+        assertThat(basicInfoView.mobilePhone()).isEqualTo("010-9999-8888");
+        assertThat(basicInfoView.email()).isEqualTo("basic@new.com");
         // Must NOT use Applicant's live values
         assertThat(header.applicantName()).isNotEqualTo("Old Name");
-        assertThat(header.phoneNumber()).isNotEqualTo("01000000000");
-        assertThat(header.email()).isNotEqualTo("applicant@old.com");
+        assertThat(basicInfoView.mobilePhone()).doesNotContain("0000");
+        assertThat(basicInfoView.email()).isNotEqualTo("applicant@old.com");
     }
 
     @Test
@@ -114,14 +116,16 @@ class ApplicationPdfServiceTest {
         ArgumentCaptor<ApplicationPdfView> captor = ArgumentCaptor.forClass(ApplicationPdfView.class);
         verify(pdfRenderer).render(captor.capture());
         ApplicationPdfView.Header header = captor.getValue().header();
+        ApplicationPdfView.BasicInfo basicInfoView = captor.getValue().basicInfo();
 
         assertThat(header.applicantName()).isNull();
-        assertThat(header.phoneNumber()).isNull();
-        assertThat(header.email()).isNull();
+        // 표시 모델이므로 값 없음은 빈 문자열로 렌더된다.
+        assertThat(basicInfoView.mobilePhone()).isEmpty();
+        assertThat(basicInfoView.email()).isNull();
         // Must NOT fall back to Applicant live values
         assertThat(header.applicantName()).isNotEqualTo("Live Name");
-        assertThat(header.phoneNumber()).isNotEqualTo("01011112222");
-        assertThat(header.email()).isNotEqualTo("live@applicant.com");
+        assertThat(basicInfoView.mobilePhone()).doesNotContain("1111");
+        assertThat(basicInfoView.email()).isNotEqualTo("live@applicant.com");
     }
 
     @Test
@@ -140,12 +144,13 @@ class ApplicationPdfServiceTest {
         ArgumentCaptor<ApplicationPdfView> captor = ArgumentCaptor.forClass(ApplicationPdfView.class);
         verify(pdfRenderer).render(captor.capture());
         ApplicationPdfView.Header header = captor.getValue().header();
+        ApplicationPdfView.BasicInfo basicInfoView = captor.getValue().basicInfo();
 
         // name comes from applicantNameSnapshot
         assertThat(header.applicantName()).isEqualTo("Snapshot Name");
         // phone and email come from live Applicant
-        assertThat(header.phoneNumber()).isEqualTo("01033334444");
-        assertThat(header.email()).isEqualTo("snapshot@example.com");
+        assertThat(basicInfoView.mobilePhone()).isEqualTo("010-3333-4444");
+        assertThat(basicInfoView.email()).isEqualTo("snapshot@example.com");
     }
 
     // ---------- helpers ----------
