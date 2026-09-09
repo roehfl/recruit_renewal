@@ -108,7 +108,7 @@ public class JobPostingPublicService {
             return Map.of();
         }
 
-        return jobPostingQuestionRepository.countActiveQuestionPolicyByJobPostingIds(jobPostingIds).stream()
+        return jobPostingQuestionRepository.countQuestionPolicyByJobPostingIds(jobPostingIds).stream()
                 .collect(Collectors.toMap(
                         JobPostingQuestionPolicyCount::jobPostingId,
                         questionPolicyCount -> questionPolicyCount
@@ -134,7 +134,7 @@ public class JobPostingPublicService {
     }
 
     private JobPostingQuestionPolicyCount getQuestionPolicyCount(Long jobPostingId) {
-        return jobPostingQuestionRepository.countActiveQuestionPolicyByJobPostingIds(List.of(jobPostingId)).stream()
+        return jobPostingQuestionRepository.countQuestionPolicyByJobPostingIds(List.of(jobPostingId)).stream()
                 .findFirst()
                 .orElseGet(() -> JobPostingQuestionPolicyCount.empty(jobPostingId));
     }

@@ -268,7 +268,7 @@ class ApplicationAnswerControllerTest {
     }
 
     @Test
-    void submitted_application_replace_returns_api_response() throws Exception {
+    void submitted_application_replace_is_allowed_during_reception() throws Exception {
         Applicant applicant = createApplicant("answer-api-submitted", "Answer Api Submitted");
         Long jobPostingId = createJobPosting();
         JobPostingQuestionResponse question = createQuestion(jobPostingId, 0);
@@ -278,12 +278,13 @@ class ApplicationAnswerControllerTest {
         jobApplicationService.submit(applicant.getId(), applicationId);
         authenticate(applicant);
 
+        // 제출된 지원서도 접수기간 중에는 수정할 수 있다(ApplicationSectionAccessService.validateWritable).
+        // 다른 섹션(예: ApplicationAwardServiceTest)도 같은 규칙을 검증한다.
         mockMvc.perform(post("/api/applications/{applicationId}/answers", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(answerJson(question.questionId(), "answer")))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
     }
 
     @Test

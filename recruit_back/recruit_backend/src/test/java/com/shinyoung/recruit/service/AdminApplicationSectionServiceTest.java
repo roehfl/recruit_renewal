@@ -346,12 +346,9 @@ class AdminApplicationSectionServiceTest {
     }
 
     @Test
-    void get_answers_excludes_inactive_and_foreign_question_answers() {
+    void get_answers_excludes_foreign_question_answers() {
         JobApplication application = createApplication("admin-section-answer-filter");
-        JobPostingQuestion active = question(application.getJobPosting(), "Active Question", 0, false);
-        JobPostingQuestion inactive = question(application.getJobPosting(), "Inactive Question", 1, true);
-        inactive.deactivate();
-        applicationAnswerRepository.save(ApplicationAnswer.create(application, inactive, "inactive answer"));
+        JobPostingQuestion own = question(application.getJobPosting(), "Own Question", 0, false);
 
         JobApplication otherApplication = createApplication("admin-section-answer-other");
         JobPostingQuestion foreign = question(otherApplication.getJobPosting(), "Foreign Question", 0, true);
@@ -360,7 +357,7 @@ class AdminApplicationSectionServiceTest {
         List<AdminApplicationAnswerResponse> responses = adminApplicationSectionService.getAnswers(application.getId());
 
         assertThat(responses).extracting(AdminApplicationAnswerResponse::questionId)
-                .containsExactly(active.getId());
+                .containsExactly(own.getId());
         assertThat(responses.get(0).answerText()).isNull();
     }
 

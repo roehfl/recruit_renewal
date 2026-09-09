@@ -588,8 +588,6 @@ class JobPostingPublicServiceTest {
         ));
         createQuestion(id, 0, true);
         createQuestion(id, 1, false);
-        JobPostingQuestionResponse inactiveQuestion = createQuestion(id, 2, true);
-        jobPostingQuestionService.deactivateQuestion(id, inactiveQuestion.questionId());
         jobPostingService.publish(id);
 
         ApplicationFormRequiredPolicyResponse detailPolicy =

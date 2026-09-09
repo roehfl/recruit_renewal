@@ -172,7 +172,8 @@ class ApplicationAwardControllerTest {
     }
 
     @Test
-    void submitted_application_replace_returns_api_response() throws Exception {
+    void submitted_application_replace_is_allowed_during_reception() throws Exception {
+        // 제출된 지원서도 접수기간 중에는 수정할 수 있다(ApplicationSectionAccessService.validateWritable).
         Applicant applicant = createApplicant("award-api-submitted", "Award Api Submitted");
         Long applicationId = createApplication(applicant, createPublishedJobPosting(true));
         BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
@@ -182,9 +183,8 @@ class ApplicationAwardControllerTest {
         mockMvc.perform(post("/api/applications/{applicationId}/awards", applicationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validAwardJson()))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
     }
 
     @Test

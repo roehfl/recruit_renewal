@@ -17,7 +17,6 @@ public record JobPostingQuestionResponse(
         Integer minLength,
         Integer maxLength,
         Integer sortOrder,
-        Boolean active,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -34,7 +33,6 @@ public record JobPostingQuestionResponse(
                 question.getMinLength(),
                 question.getMaxLength(),
                 question.getSortOrder(),
-                question.getActive(),
                 question.getCreatedAt(),
                 question.getUpdatedAt()
         );

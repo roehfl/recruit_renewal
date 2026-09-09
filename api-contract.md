@@ -586,6 +586,41 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 매핑: front (미구현) ↔ back `QuestionTemplateController.activateTemplate()`
 - 참고: 공고별 질문(`JobPostingQuestion`)에는 activate 명령이 없다. 비활성 시 `sortOrder`가 남아 있고 중복 검사는 active 행만 대상이라, 재활성 시 sortOrder 충돌 해소 정책이 먼저 필요하다
 
+### 화면: 공고별 질문 구성 (관리자 — 공고 질문)  🟢 확정 (2026-09-09)
+
+- 프론트: `src/views/admin/jobPosting/*` + `src/types/question.ts`(`QuestionItem`)
+- 백엔드: `com.shinyoung.recruit.controller.JobPostingQuestionController`, `service.JobPostingQuestionService`
+- 질문 **생성·삭제·순서변경**은 DRAFT 공고에서만 허용한다. 따라서 삭제 시점에는 지원자 답변이 존재할 수 없다.
+- **수정**은 발행 후에도 가능하되 `questionText`/`helperText`만 바꿀 수 있다(오타 수정 목적). 정책 필드(`category`/`answerType`/`required`/`minLength`/`maxLength`/`sortOrder`)를 바꾸려 하면 400 — 이미 작성된 답변이 소급해서 정책 위반이 되기 때문이다.
+- 전역 질문 템플릿(`QuestionTemplate`)과 달리 **공고 질문에는 `active` 개념이 없다.** 등록하면 사용하고, 필요 없으면 삭제한다.
+
+#### GET `/api/admin/job-postings/{jobPostingId}/questions`
+
+- 응답(200): `ApiResponse<List<JobPostingQuestionResponse>>` — `sortOrder` 오름차순, 동순위는 id 오름차순
+- `JobPostingQuestionResponse`: `{ questionId, questionTemplateId, questionText, helperText, category, answerType, required, minLength, maxLength, sortOrder, createdAt, updatedAt }`
+- 2026-09-09 `active` 필드 제거
+
+#### POST `/api/admin/job-postings/{jobPostingId}/questions`, POST `/api/admin/job-postings/{jobPostingId}/questions/{questionId}`
+
+- 생성/수정. 템플릿에서 가져오거나(`questionTemplateId`) 직접 입력한다
+- 비활성 **템플릿**은 신규 질문 생성에 사용할 수 없다(템플릿 쪽 `active`는 유지)
+- 생성은 DRAFT 전용. 수정은 발행 후에도 문구 한정으로 허용(2026-09-09)
+- 이미 답변한 지원자의 관리자 화면·PDF 는 답변 시점 스냅샷(`ApplicationAnswer.questionTextSnapshot`)을 보여주므로 문구 수정이 반영되지 않는다. 지원자가 본 문구를 보존하기 위한 의도된 동작이다
+- 오류: 400(검증 실패 / 생성 시 DRAFT 아님 / 발행 후 정책 필드 변경 / `sortOrder` 중복), 404(공고·질문·템플릿 미존재)
+
+#### POST `/api/admin/job-postings/{jobPostingId}/questions/reorder`
+
+- 전체 질문의 `sortOrder`를 한 번에 재배치. 요청에 현재 질문 전부가 포함되어야 한다
+- 응답(200): `ApiResponse<List<JobPostingQuestionResponse>>`
+
+#### POST `/api/admin/job-postings/{jobPostingId}/questions/{questionId}/delete`  🟢 hard delete 로 변경 (2026-09-09)
+
+- 질문 row 를 실제로 삭제한다. 이전에는 `active=false` soft delete 였다
+- 응답(200): `ApiResponse<Void>` (이전에는 `active=false`인 질문 객체를 반환)
+- 오류: 400(DRAFT 아님), 404(공고·질문 미존재)
+- DRAFT 공고에서만 호출 가능하므로 `ApplicationAnswer` FK 위반이 발생하지 않는다. 발행 후에는 삭제할 수 없다
+
+
 ### 화면: FAQ (지원자 FaqView / 관리자 AdminFaqManageView)
 
 - 프론트: `src/views/applicant/FaqView.vue`, `src/views/admin/faq/AdminFaqManageView.vue`, `src/api/faqApi.ts`, `src/api/adminFaqApi.ts`

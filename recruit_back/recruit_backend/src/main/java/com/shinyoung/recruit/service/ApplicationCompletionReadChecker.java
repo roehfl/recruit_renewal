@@ -206,7 +206,7 @@ public class ApplicationCompletionReadChecker {
 
     private void checkQuestions(JobApplication application, ReadinessAccumulator accumulator) {
         List<JobPostingQuestion> questions = jobPostingQuestionRepository
-                .findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(application.getJobPosting().getId());
+                .findByJobPostingIdOrderBySortOrderAscIdAsc(application.getJobPosting().getId());
         if (questions.isEmpty()) {
             return;
         }

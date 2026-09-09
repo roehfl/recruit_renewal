@@ -24,7 +24,6 @@ import lombok.NoArgsConstructor;
         name = "job_posting_question",
         indexes = {
                 @Index(name = "idx_job_posting_question_posting", columnList = "job_posting_id"),
-                @Index(name = "idx_job_posting_question_posting_active", columnList = "job_posting_id, active"),
                 @Index(name = "idx_job_posting_question_posting_sort", columnList = "job_posting_id, sort_order"),
                 @Index(name = "idx_job_posting_question_template", columnList = "question_template_id")
         }
@@ -69,9 +68,6 @@ public class JobPostingQuestion extends BaseEntity {
     @Column(name = "sort_order", nullable = false)
     private Integer sortOrder;
 
-    @Column(nullable = false)
-    private Boolean active;
-
     private JobPostingQuestion(
             JobPosting jobPosting,
             QuestionTemplate questionTemplate,
@@ -94,7 +90,6 @@ public class JobPostingQuestion extends BaseEntity {
         this.minLength = minLength;
         this.maxLength = maxLength;
         this.sortOrder = sortOrder;
-        this.active = true;
     }
 
     public static JobPostingQuestion createFromTemplate(
@@ -172,7 +167,4 @@ public class JobPostingQuestion extends BaseEntity {
         this.sortOrder = sortOrder;
     }
 
-    public void deactivate() {
-        this.active = false;
-    }
 }

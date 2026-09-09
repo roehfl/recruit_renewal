@@ -73,7 +73,7 @@ public class AdminApplicationFormSummaryService {
 
         List<Long> jobPostingIds = jobPostings.stream().map(JobPosting::getId).toList();
         Map<Long, JobPostingQuestionPolicyCount> questionCounts = toMap(
-                jobPostingQuestionRepository.countActiveQuestionPolicyByJobPostingIds(jobPostingIds),
+                jobPostingQuestionRepository.countQuestionPolicyByJobPostingIds(jobPostingIds),
                 JobPostingQuestionPolicyCount::jobPostingId
         );
         Map<Long, JobPostingAttachmentRequirementPolicyCount> attachmentCounts = toMap(

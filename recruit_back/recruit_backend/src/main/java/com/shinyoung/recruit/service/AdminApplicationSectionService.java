@@ -160,7 +160,7 @@ public class AdminApplicationSectionService {
     public List<AdminApplicationAnswerResponse> getAnswers(Long applicationId) {
         JobApplication application = findApplication(applicationId);
         List<JobPostingQuestion> questions = jobPostingQuestionRepository
-                .findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(application.getJobPosting().getId());
+                .findByJobPostingIdOrderBySortOrderAscIdAsc(application.getJobPosting().getId());
         if (questions.isEmpty()) {
             return List.of();
         }

@@ -108,7 +108,7 @@ public class ApplicationSubmitValidator {
 
     private void validateAnswers(JobApplication application) {
         List<JobPostingQuestion> questions = jobPostingQuestionRepository
-                .findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(application.getJobPosting().getId());
+                .findByJobPostingIdOrderBySortOrderAscIdAsc(application.getJobPosting().getId());
         if (questions.isEmpty()) {
             return;
         }

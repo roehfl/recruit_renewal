@@ -13,19 +13,17 @@ public interface JobPostingQuestionRepository extends JpaRepository<JobPostingQu
 
     List<JobPostingQuestion> findByJobPostingIdOrderBySortOrderAscIdAsc(Long jobPostingId);
 
-    List<JobPostingQuestion> findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(Long jobPostingId);
-
     Optional<JobPostingQuestion> findByIdAndJobPostingId(Long id, Long jobPostingId);
 
-    boolean existsByJobPostingIdAndActiveTrueAndSortOrder(Long jobPostingId, Integer sortOrder);
+    boolean existsByJobPostingIdAndSortOrder(Long jobPostingId, Integer sortOrder);
 
-    boolean existsByJobPostingIdAndActiveTrueAndSortOrderAndIdNot(Long jobPostingId, Integer sortOrder, Long id);
+    boolean existsByJobPostingIdAndSortOrderAndIdNot(Long jobPostingId, Integer sortOrder, Long id);
 
-    boolean existsByJobPostingIdAndActiveTrue(Long jobPostingId);
+    boolean existsByJobPostingId(Long jobPostingId);
 
-    boolean existsByJobPostingIdAndActiveTrueAndRequiredTrue(Long jobPostingId);
+    boolean existsByJobPostingIdAndRequiredTrue(Long jobPostingId);
 
-    long countByJobPostingIdAndActiveTrue(Long jobPostingId);
+    long countByJobPostingId(Long jobPostingId);
 
     @Query("""
             select new com.shinyoung.recruit.domain.repository.JobPostingQuestionPolicyCount(
@@ -35,10 +33,9 @@ public interface JobPostingQuestionRepository extends JpaRepository<JobPostingQu
             )
             from JobPostingQuestion question
             where question.jobPosting.id in :jobPostingIds
-              and question.active = true
             group by question.jobPosting.id
             """)
-    List<JobPostingQuestionPolicyCount> countActiveQuestionPolicyByJobPostingIds(
+    List<JobPostingQuestionPolicyCount> countQuestionPolicyByJobPostingIds(
             @Param("jobPostingIds") Collection<Long> jobPostingIds
     );
 }

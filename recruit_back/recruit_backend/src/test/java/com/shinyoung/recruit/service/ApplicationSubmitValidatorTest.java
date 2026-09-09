@@ -92,7 +92,7 @@ class ApplicationSubmitValidatorTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+        lenient().when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of());
         lenient().when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(List.of());
@@ -316,7 +316,7 @@ class ApplicationSubmitValidatorTest {
     void required_answer_passes_when_non_blank_answer_exists() {
         JobPostingQuestion question = question(100L, true, QuestionAnswerType.LONG_TEXT, 1000);
         ApplicationAnswer answer = answer(question, "answer");
-        when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+        when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(question));
         when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(List.of(answer));
@@ -328,7 +328,7 @@ class ApplicationSubmitValidatorTest {
     @Test
     void optional_answer_passes_when_answer_is_missing_or_blank() {
         JobPostingQuestion missing = question(100L, false, QuestionAnswerType.LONG_TEXT, 1000);
-        when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+        when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(missing));
         when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(List.of());
 
@@ -337,7 +337,7 @@ class ApplicationSubmitValidatorTest {
 
         JobPostingQuestion blank = question(101L, false, QuestionAnswerType.SHORT_TEXT, 500);
         ApplicationAnswer blankAnswer = answer(blank, "   ");
-        when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+        when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(blank));
         when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(List.of(blankAnswer));
@@ -349,7 +349,7 @@ class ApplicationSubmitValidatorTest {
     @Test
     void required_answer_fails_when_answer_row_is_missing() {
         JobPostingQuestion question = question(100L, true, QuestionAnswerType.LONG_TEXT, 1000);
-        when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+        when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(question));
         when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(List.of());
 
@@ -368,7 +368,7 @@ class ApplicationSubmitValidatorTest {
     void answer_validation_fails_when_answer_exceeds_question_max_length() {
         JobPostingQuestion question = question(100L, false, QuestionAnswerType.LONG_TEXT, 10);
         ApplicationAnswer answer = answer(question, "a".repeat(11));
-        when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+        when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(question));
         when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(List.of(answer));
@@ -381,7 +381,7 @@ class ApplicationSubmitValidatorTest {
     void answer_validation_fails_when_short_text_exceeds_type_limit() {
         JobPostingQuestion question = question(100L, false, QuestionAnswerType.SHORT_TEXT, 1000);
         ApplicationAnswer answer = answer(question, "a".repeat(501));
-        when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+        when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(question));
         when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(List.of(answer));
@@ -394,7 +394,7 @@ class ApplicationSubmitValidatorTest {
     void answer_validation_fails_when_long_text_exceeds_type_limit() {
         JobPostingQuestion question = question(100L, false, QuestionAnswerType.LONG_TEXT, 6000);
         ApplicationAnswer answer = answer(question, "a".repeat(5001));
-        when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+        when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(question));
         when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(List.of(answer));
@@ -408,7 +408,7 @@ class ApplicationSubmitValidatorTest {
         JobPostingQuestion activeOptional = question(100L, false, QuestionAnswerType.LONG_TEXT, 1000);
         JobPostingQuestion inactiveRequired = question(101L, true, QuestionAnswerType.LONG_TEXT, 1000);
         ApplicationAnswer inactiveAnswer = answer(inactiveRequired, null);
-        when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+        when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(activeOptional));
         when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(List.of(inactiveAnswer));
@@ -421,7 +421,7 @@ class ApplicationSubmitValidatorTest {
     void answer_validation_uses_type_default_when_question_max_length_is_null() {
         JobPostingQuestion question = question(100L, false, QuestionAnswerType.SHORT_TEXT, null);
         ApplicationAnswer answer = answer(question, "a".repeat(501));
-        when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+        when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(question));
         when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(List.of(answer));
@@ -495,7 +495,7 @@ class ApplicationSubmitValidatorTest {
     private void assertRequiredAnswerTextFails(String answerText) {
         JobPostingQuestion question = question(100L, true, QuestionAnswerType.LONG_TEXT, 1000);
         ApplicationAnswer answer = answer(question, answerText);
-        when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+        when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(question));
         when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(List.of(answer));

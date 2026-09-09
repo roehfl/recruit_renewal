@@ -76,9 +76,9 @@ class ApplicationFormLayoutServiceTest {
 
         lenient().when(applicationFormPageRepository.findByJobPostingIdWithItems(JOB_POSTING_ID))
                 .thenReturn(List.of());
-        lenient().when(jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrue(JOB_POSTING_ID))
+        lenient().when(jobPostingQuestionRepository.existsByJobPostingId(JOB_POSTING_ID))
                 .thenReturn(false);
-        lenient().when(jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrueAndRequiredTrue(JOB_POSTING_ID))
+        lenient().when(jobPostingQuestionRepository.existsByJobPostingIdAndRequiredTrue(JOB_POSTING_ID))
                 .thenReturn(false);
         lenient().when(attachmentRequirementRepository.existsByJobPostingId(JOB_POSTING_ID))
                 .thenReturn(false);
@@ -175,8 +175,8 @@ class ApplicationFormLayoutServiceTest {
                 LocalDateTime.of(2026, 7, 1, 9, 0),
                 LocalDateTime.of(2026, 7, 30, 18, 0));
         stubPosting(posting);
-        when(jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrue(JOB_POSTING_ID)).thenReturn(true);
-        when(jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrueAndRequiredTrue(JOB_POSTING_ID)).thenReturn(true);
+        when(jobPostingQuestionRepository.existsByJobPostingId(JOB_POSTING_ID)).thenReturn(true);
+        when(jobPostingQuestionRepository.existsByJobPostingIdAndRequiredTrue(JOB_POSTING_ID)).thenReturn(true);
         when(attachmentRequirementRepository.existsByJobPostingId(JOB_POSTING_ID)).thenReturn(true);
         when(attachmentRequirementRepository.existsByJobPostingIdAndRequiredTrue(JOB_POSTING_ID)).thenReturn(true);
 
@@ -542,7 +542,7 @@ class ApplicationFormLayoutServiceTest {
         JobPosting posting = posting(JobPostingStatus.DRAFT, config,
                 LocalDateTime.of(2026, 7, 1, 9, 0),
                 LocalDateTime.of(2026, 7, 30, 18, 0));
-        when(jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrue(JOB_POSTING_ID)).thenReturn(true);
+        when(jobPostingQuestionRepository.existsByJobPostingId(JOB_POSTING_ID)).thenReturn(true);
 
         ApplicationFormPage page = ApplicationFormPage.create(posting, 1, "Page 1", null, 0);
         page.addItem(ApplicationSectionType.BASIC_INFO, 0);
@@ -579,8 +579,8 @@ class ApplicationFormLayoutServiceTest {
                 LocalDateTime.of(2026, 7, 1, 9, 0),
                 LocalDateTime.of(2026, 7, 30, 18, 0));
         stubPosting(posting);
-        when(jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrue(JOB_POSTING_ID)).thenReturn(true);
-        when(jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrueAndRequiredTrue(JOB_POSTING_ID)).thenReturn(false);
+        when(jobPostingQuestionRepository.existsByJobPostingId(JOB_POSTING_ID)).thenReturn(true);
+        when(jobPostingQuestionRepository.existsByJobPostingIdAndRequiredTrue(JOB_POSTING_ID)).thenReturn(false);
 
         AdminApplicationFormLayoutResponse response = layoutService.getLayout(JOB_POSTING_ID);
 
