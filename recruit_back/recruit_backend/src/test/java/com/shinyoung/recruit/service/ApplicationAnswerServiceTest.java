@@ -84,13 +84,11 @@ class ApplicationAnswerServiceTest {
     private JobApplicationRepository jobApplicationRepository;
 
     @Test
-    void get_questions_returns_active_questions_and_existing_answers() {
+    void get_questions_returns_questions_and_existing_answers() {
         Applicant applicant = createApplicant("answer-get", "Answer Get");
         Long jobPostingId = createJobPosting();
         JobPostingQuestionResponse second = createQuestion(jobPostingId, 2, QuestionAnswerType.LONG_TEXT, 3000, true);
         JobPostingQuestionResponse first = createQuestion(jobPostingId, 0, QuestionAnswerType.SHORT_TEXT, 500, false);
-        JobPostingQuestionResponse inactive = createQuestion(jobPostingId, 1, QuestionAnswerType.LONG_TEXT, 3000, true);
-        jobPostingQuestionService.deactivateQuestion(jobPostingId, inactive.questionId());
         publish(jobPostingId);
         Long applicationId = createApplication(applicant, jobPostingId);
         applicationAnswerService.replaceAnswers(applicant.getId(), applicationId, new ApplicationAnswerReplaceRequest(List.of(
@@ -327,8 +325,6 @@ class ApplicationAnswerServiceTest {
         Applicant applicant = createApplicant("answer-invalid", "Answer Invalid");
         Long jobPostingId = createJobPosting();
         JobPostingQuestionResponse active = createQuestion(jobPostingId, 0, QuestionAnswerType.LONG_TEXT, 3000, true);
-        JobPostingQuestionResponse inactive = createQuestion(jobPostingId, 1, QuestionAnswerType.LONG_TEXT, 3000, true);
-        jobPostingQuestionService.deactivateQuestion(jobPostingId, inactive.questionId());
         Long otherJobPostingId = createJobPosting();
         JobPostingQuestionResponse other = createQuestion(otherJobPostingId, 0, QuestionAnswerType.LONG_TEXT, 3000, true);
         publish(jobPostingId);
@@ -363,11 +359,6 @@ class ApplicationAnswerServiceTest {
                 applicant.getId(),
                 applicationId,
                 new ApplicationAnswerReplaceRequest(List.of(new ApplicationAnswerRequest(other.questionId(), "answer")))
-        )).isInstanceOf(InvalidApplicationAnswerException.class);
-        assertThatThrownBy(() -> applicationAnswerService.replaceAnswers(
-                applicant.getId(),
-                applicationId,
-                new ApplicationAnswerReplaceRequest(List.of(new ApplicationAnswerRequest(inactive.questionId(), "answer")))
         )).isInstanceOf(InvalidApplicationAnswerException.class);
     }
 

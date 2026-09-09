@@ -45,7 +45,6 @@ export interface QuestionItem {
     minLength: number | null,
     maxLength: number | null,
     sortOrder: number | null,
-    active: boolean | null,
     createdAt: string | null,
     updatedAt: string | null
 }

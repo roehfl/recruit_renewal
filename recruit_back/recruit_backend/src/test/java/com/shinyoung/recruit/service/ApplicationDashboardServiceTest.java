@@ -136,7 +136,7 @@ class ApplicationDashboardServiceTest {
 
         lenient().when(stageResultRepository.findVisibleByJobApplicationIdForApplicant(APPLICATION_ID))
                 .thenReturn(List.of());
-        lenient().when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+        lenient().when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of());
         lenient().when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(List.of());
@@ -297,7 +297,7 @@ class ApplicationDashboardServiceTest {
         JobPostingQuestion missing = question(1000L, true, QuestionAnswerType.LONG_TEXT, 1000);
         JobPostingQuestion blank = question(1001L, true, QuestionAnswerType.SHORT_TEXT, 500);
         ApplicationAnswer blankAnswer = answer(blank, " ");
-        when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+        when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(missing, blank));
         when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(List.of(blankAnswer));
@@ -316,7 +316,7 @@ class ApplicationDashboardServiceTest {
     void answer_length_violation_is_blocking_without_exposing_answer_text() {
         JobPostingQuestion question = question(1000L, false, QuestionAnswerType.SHORT_TEXT, 1000);
         ApplicationAnswer longAnswer = answer(question, "a".repeat(501));
-        when(jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+        when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(question));
         when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
                 .thenReturn(List.of(longAnswer));

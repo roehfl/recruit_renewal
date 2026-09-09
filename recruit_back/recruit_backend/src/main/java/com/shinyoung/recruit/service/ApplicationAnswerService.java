@@ -70,7 +70,7 @@ public class ApplicationAnswerService {
     }
 
     private List<JobPostingQuestion> getActiveQuestions(JobApplication application) {
-        return jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(
+        return jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(
                 application.getJobPosting().getId()
         );
     }

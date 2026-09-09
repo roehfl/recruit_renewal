@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -96,9 +97,7 @@ public class JobPostingQuestionService {
     ) {
         validateRequestExists(request);
         JobPosting jobPosting = findJobPosting(jobPostingId);
-        validateJobPostingDraft(jobPosting);
         JobPostingQuestion question = findQuestion(jobPostingId, questionId);
-        validateQuestionActive(question);
 
         QuestionSnapshot snapshot = new QuestionSnapshot(
                 request.questionText(),
@@ -111,7 +110,12 @@ public class JobPostingQuestionService {
                 request.sortOrder()
         );
         validateQuestionSnapshot(snapshot);
-        validateSortOrderForUpdate(jobPostingId, request.sortOrder(), questionId);
+
+        if (jobPosting.getStatus() == JobPostingStatus.DRAFT) {
+            validateSortOrderForUpdate(jobPostingId, request.sortOrder(), questionId);
+        } else {
+            validateTextOnlyUpdate(question, snapshot);
+        }
 
         question.update(
                 snapshot.questionText(),
@@ -132,30 +136,32 @@ public class JobPostingQuestionService {
         JobPosting jobPosting = findJobPosting(jobPostingId);
         validateJobPostingDraft(jobPosting);
 
-        List<JobPostingQuestion> activeQuestions =
-                jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(jobPostingId);
-        validateReorderRequest(activeQuestions, request);
+        List<JobPostingQuestion> questions =
+                jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(jobPostingId);
+        validateReorderRequest(questions, request);
 
-        Map<Long, JobPostingQuestion> questionMap = activeQuestions.stream()
+        Map<Long, JobPostingQuestion> questionMap = questions.stream()
                 .collect(Collectors.toMap(JobPostingQuestion::getId, question -> question));
         for (JobPostingQuestionOrderRequest item : request.questions()) {
             questionMap.get(item.questionId()).changeOrder(item.sortOrder());
         }
 
-        return jobPostingQuestionRepository.findByJobPostingIdAndActiveTrueOrderBySortOrderAscIdAsc(jobPostingId).stream()
+        return jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(jobPostingId).stream()
                 .map(JobPostingQuestionResponse::from)
                 .toList();
     }
 
+    /**
+     * 공고 질문을 삭제한다. 질문 편집은 DRAFT 공고에서만 허용되므로(아래 {@code validateJobPostingDraft})
+     * 이 시점에는 지원자 답변이 존재할 수 없어 ApplicationAnswer FK 를 건드리지 않는다.
+     */
     @Transactional
-    public JobPostingQuestionResponse deactivateQuestion(Long jobPostingId, Long questionId) {
+    public void deleteQuestion(Long jobPostingId, Long questionId) {
         JobPosting jobPosting = findJobPosting(jobPostingId);
         validateJobPostingDraft(jobPosting);
         JobPostingQuestion question = findQuestion(jobPostingId, questionId);
-        validateQuestionActive(question);
 
-        question.deactivate();
-        return JobPostingQuestionResponse.from(question);
+        jobPostingQuestionRepository.delete(question);
     }
 
     private void ensureJobPostingExists(Long jobPostingId) {
@@ -189,9 +195,24 @@ public class JobPostingQuestionService {
         }
     }
 
-    private void validateQuestionActive(JobPostingQuestion question) {
-        if (!Boolean.TRUE.equals(question.getActive())) {
-            throw new InvalidJobPostingQuestionException("Inactive question cannot be changed.");
+    /**
+     * 발행된 공고에서는 문구(questionText/helperText)만 고칠 수 있다. 오타 수정을 허용하되
+     * 답변 정책(answerType/required/minLength/maxLength)과 순서를 바꾸면 이미 작성된 답변이
+     * 소급해서 정책 위반 상태가 되므로 막는다.
+     *
+     * <p>이미 답변한 지원자의 관리자 화면·PDF 는 답변 시점 스냅샷을 보여주므로 문구 수정이 반영되지 않는다.
+     * 지원자가 본 문구를 그대로 보존하기 위한 의도된 동작이다.
+     */
+    private void validateTextOnlyUpdate(JobPostingQuestion question, QuestionSnapshot snapshot) {
+        boolean policyChanged = question.getCategory() != snapshot.category()
+                || question.getAnswerType() != snapshot.answerType()
+                || !Objects.equals(question.getRequired(), snapshot.required())
+                || !Objects.equals(question.getMinLength(), snapshot.minLength())
+                || !Objects.equals(question.getMaxLength(), snapshot.maxLength())
+                || !Objects.equals(question.getSortOrder(), snapshot.sortOrder());
+        if (policyChanged) {
+            throw new InvalidJobPostingQuestionException(
+                    "Only question text can be changed after the job posting is published.");
         }
     }
 
@@ -268,13 +289,13 @@ public class JobPostingQuestionService {
     }
 
     private void validateSortOrderForCreate(Long jobPostingId, Integer sortOrder) {
-        if (jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrueAndSortOrder(jobPostingId, sortOrder)) {
+        if (jobPostingQuestionRepository.existsByJobPostingIdAndSortOrder(jobPostingId, sortOrder)) {
             throw new InvalidJobPostingQuestionException("Question sort order already exists.");
         }
     }
 
     private void validateSortOrderForUpdate(Long jobPostingId, Integer sortOrder, Long questionId) {
-        if (jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrueAndSortOrderAndIdNot(
+        if (jobPostingQuestionRepository.existsByJobPostingIdAndSortOrderAndIdNot(
                 jobPostingId,
                 sortOrder,
                 questionId
@@ -283,12 +304,12 @@ public class JobPostingQuestionService {
         }
     }
 
-    private void validateReorderRequest(List<JobPostingQuestion> activeQuestions, JobPostingQuestionReorderRequest request) {
+    private void validateReorderRequest(List<JobPostingQuestion> questions, JobPostingQuestionReorderRequest request) {
         if (request == null || request.questions() == null || request.questions().isEmpty()) {
             throw new InvalidJobPostingQuestionException("Question reorder items are required.");
         }
 
-        Map<Long, JobPostingQuestion> questionMap = activeQuestions.stream()
+        Map<Long, JobPostingQuestion> questionMap = questions.stream()
                 .collect(Collectors.toMap(JobPostingQuestion::getId, question -> question));
         Set<Long> requestedIds = new HashSet<>();
         Set<Integer> requestedOrders = new HashSet<>();
@@ -315,8 +336,8 @@ public class JobPostingQuestionService {
         if (hasDuplicatedId) {
             throw new InvalidJobPostingQuestionException("Question id is duplicated.");
         }
-        if (requestedIds.size() != activeQuestions.size()) {
-            throw new InvalidJobPostingQuestionException("Reorder request must include all active questions.");
+        if (requestedIds.size() != questions.size()) {
+            throw new InvalidJobPostingQuestionException("Reorder request must include all questions.");
         }
     }
 

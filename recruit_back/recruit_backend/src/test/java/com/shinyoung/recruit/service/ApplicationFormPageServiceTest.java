@@ -78,9 +78,9 @@ class ApplicationFormPageServiceTest {
 
         lenient().when(applicationFormPageRepository.findByJobPostingIdWithItems(JOB_POSTING_ID))
                 .thenReturn(List.of());
-        lenient().when(jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrue(JOB_POSTING_ID))
+        lenient().when(jobPostingQuestionRepository.existsByJobPostingId(JOB_POSTING_ID))
                 .thenReturn(false);
-        lenient().when(jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrueAndRequiredTrue(JOB_POSTING_ID))
+        lenient().when(jobPostingQuestionRepository.existsByJobPostingIdAndRequiredTrue(JOB_POSTING_ID))
                 .thenReturn(false);
         lenient().when(attachmentRequirementRepository.existsByJobPostingId(JOB_POSTING_ID))
                 .thenReturn(false);
@@ -228,9 +228,9 @@ class ApplicationFormPageServiceTest {
     void form_config_question_and_attachment_policy_drive_sections() {
         ApplicationFormConfig config = config(false, false, false, false, false, true, true);
         stubApplication(application(JobApplicationStatus.DRAFT, posting(JobPostingStatus.PUBLISHED, config)));
-        when(jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrue(JOB_POSTING_ID))
+        when(jobPostingQuestionRepository.existsByJobPostingId(JOB_POSTING_ID))
                 .thenReturn(true);
-        when(jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrueAndRequiredTrue(JOB_POSTING_ID))
+        when(jobPostingQuestionRepository.existsByJobPostingIdAndRequiredTrue(JOB_POSTING_ID))
                 .thenReturn(true);
         when(attachmentRequirementRepository.existsByJobPostingId(JOB_POSTING_ID))
                 .thenReturn(true);

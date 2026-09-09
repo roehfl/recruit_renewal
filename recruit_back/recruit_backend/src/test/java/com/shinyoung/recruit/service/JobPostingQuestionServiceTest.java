@@ -54,7 +54,6 @@ class JobPostingQuestionServiceTest {
         assertThat(response.questionTemplateId()).isNull();
         assertThat(response.questionText()).isEqualTo("Why do you want to join us?");
         assertThat(response.category()).isEqualTo(QuestionCategory.JOB_SPECIFIC);
-        assertThat(response.active()).isTrue();
     }
 
     @Test
@@ -143,19 +142,16 @@ class JobPostingQuestionServiceTest {
     }
 
     @Test
-    void get_questions_returns_sort_order_asc_and_inactive_also() {
+    void get_questions_returns_sort_order_asc() {
         Long jobPostingId = createJobPosting();
-        JobPostingQuestionResponse second = jobPostingQuestionService.createQuestion(jobPostingId, directRequest(2));
+        JobPostingQuestionResponse third = jobPostingQuestionService.createQuestion(jobPostingId, directRequest(2));
         JobPostingQuestionResponse first = jobPostingQuestionService.createQuestion(jobPostingId, directRequest(0));
-        JobPostingQuestionResponse inactive = jobPostingQuestionService.createQuestion(jobPostingId, directRequest(1));
-        jobPostingQuestionService.deactivateQuestion(jobPostingId, inactive.questionId());
+        JobPostingQuestionResponse second = jobPostingQuestionService.createQuestion(jobPostingId, directRequest(1));
 
         List<JobPostingQuestionResponse> questions = jobPostingQuestionService.getQuestions(jobPostingId);
 
         assertThat(questions).extracting(JobPostingQuestionResponse::questionId)
-                .containsExactly(first.questionId(), inactive.questionId(), second.questionId());
-        assertThat(questions).extracting(JobPostingQuestionResponse::active)
-                .containsExactly(true, false, true);
+                .containsExactly(first.questionId(), second.questionId(), third.questionId());
     }
 
     @Test
@@ -182,25 +178,66 @@ class JobPostingQuestionServiceTest {
     }
 
     @Test
-    void update_question_fails_after_publish() {
+    void update_question_policy_fails_after_publish() {
         Long jobPostingId = createJobPosting();
         JobPostingQuestionResponse created = jobPostingQuestionService.createQuestion(jobPostingId, directRequest(0));
         jobPostingService.publish(jobPostingId);
 
+        // updateRequest 는 answerType/required/maxLength 까지 바꾼다. 이미 작성된 답변이
+        // 소급해서 정책 위반이 되므로 발행 후에는 막아야 한다.
         assertThatThrownBy(() -> jobPostingQuestionService.updateQuestion(jobPostingId, created.questionId(), updateRequest(0)))
                 .isInstanceOf(InvalidJobPostingQuestionException.class);
     }
 
     @Test
-    void deactivate_question_is_soft_delete() {
+    void update_question_text_is_allowed_after_publish() {
+        Long jobPostingId = createJobPosting();
+        JobPostingQuestionResponse created = jobPostingQuestionService.createQuestion(jobPostingId, directRequest(0));
+        jobPostingService.publish(jobPostingId);
+
+        // 오타 수정 목적. 문구 외 필드는 기존 값 그대로 보낸다.
+        JobPostingQuestionResponse updated = jobPostingQuestionService.updateQuestion(
+                jobPostingId,
+                created.questionId(),
+                new JobPostingQuestionUpdateRequest(
+                        "Why do you want to join us?(수정)",
+                        "Focus on role fit.(수정)",
+                        QuestionCategory.JOB_SPECIFIC,
+                        QuestionAnswerType.LONG_TEXT,
+                        true,
+                        null,
+                        3000,
+                        0
+                )
+        );
+
+        assertThat(updated.questionText()).isEqualTo("Why do you want to join us?(수정)");
+        assertThat(updated.helperText()).isEqualTo("Focus on role fit.(수정)");
+        assertThat(updated.answerType()).isEqualTo(QuestionAnswerType.LONG_TEXT);
+        assertThat(updated.maxLength()).isEqualTo(3000);
+    }
+
+    @Test
+    void delete_question_fails_after_publish() {
+        Long jobPostingId = createJobPosting();
+        JobPostingQuestionResponse created = jobPostingQuestionService.createQuestion(jobPostingId, directRequest(0));
+        jobPostingService.publish(jobPostingId);
+
+        // 발행 후 삭제는 막는다. 답변이 달린 질문이 사라지면 ApplicationAnswer FK 가 깨진다.
+        assertThatThrownBy(() -> jobPostingQuestionService.deleteQuestion(jobPostingId, created.questionId()))
+                .isInstanceOf(InvalidJobPostingQuestionException.class);
+    }
+
+    @Test
+    void delete_question_removes_row() {
         Long jobPostingId = createJobPosting();
         JobPostingQuestionResponse created = jobPostingQuestionService.createQuestion(jobPostingId, directRequest(0));
 
-        JobPostingQuestionResponse deactivated = jobPostingQuestionService.deactivateQuestion(jobPostingId, created.questionId());
+        jobPostingQuestionService.deleteQuestion(jobPostingId, created.questionId());
 
-        assertThat(deactivated.active()).isFalse();
-        JobPostingQuestion entity = jobPostingQuestionRepository.findById(created.questionId()).orElseThrow();
-        assertThat(entity.getActive()).isFalse();
+        // 등록하면 사용하고 필요 없으면 지운다. 비활성 상태로 남기지 않는다.
+        assertThat(jobPostingQuestionRepository.findById(created.questionId())).isEmpty();
+        assertThat(jobPostingQuestionService.getQuestions(jobPostingId)).isEmpty();
     }
 
     @Test

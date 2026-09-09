@@ -58,12 +58,11 @@ public class JobPostingQuestionController {
     }
 
     @PostMapping("/{questionId}/delete")
-    public ResponseEntity<ApiResponse<JobPostingQuestionResponse>> deactivateQuestion(
+    public ResponseEntity<ApiResponse<Void>> deleteQuestion(
             @PathVariable Long jobPostingId,
             @PathVariable Long questionId
     ) {
-        return ResponseEntity.ok(ApiResponse.success(
-                jobPostingQuestionService.deactivateQuestion(jobPostingId, questionId)
-        ));
+        jobPostingQuestionService.deleteQuestion(jobPostingId, questionId);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 }

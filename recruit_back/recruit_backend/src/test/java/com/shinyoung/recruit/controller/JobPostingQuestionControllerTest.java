@@ -77,8 +77,7 @@ class JobPostingQuestionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.questionId").isNumber())
-                .andExpect(jsonPath("$.data.questionText").value("Why do you want to join us?"))
-                .andExpect(jsonPath("$.data.active").value(true));
+                .andExpect(jsonPath("$.data.questionText").value("Why do you want to join us?"));
     }
 
     @Test
@@ -143,14 +142,18 @@ class JobPostingQuestionControllerTest {
     }
 
     @Test
-    void delete_command_deactivates_question_success() throws Exception {
+    void delete_command_removes_question_success() throws Exception {
         Long jobPostingId = createJobPosting();
         JobPostingQuestionResponse question = createQuestion(jobPostingId, 0);
 
         mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/questions/{questionId}/delete", jobPostingId, question.questionId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.active").value(false));
+                .andExpect(jsonPath("$.success").value(true));
+
+        // 실제로 지워지므로 목록에서 사라진다(비활성으로 남기지 않는다).
+        mockMvc.perform(get("/api/admin/job-postings/{jobPostingId}/questions", jobPostingId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
     }
 
     @Test

@@ -129,7 +129,7 @@ public class ApplicationFormLayoutService {
         return ApplicationFormLayoutSectionPolicy.enabledSections(
                 formConfig,
                 attachmentRequirementRepository.existsByJobPostingId(jobPostingId),
-                jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrue(jobPostingId)
+                jobPostingQuestionRepository.existsByJobPostingId(jobPostingId)
         );
     }
 
@@ -137,7 +137,7 @@ public class ApplicationFormLayoutService {
         return ApplicationFormLayoutSectionPolicy.requiredSections(
                 formConfig,
                 attachmentRequirementRepository.existsByJobPostingIdAndRequiredTrue(jobPostingId),
-                jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrueAndRequiredTrue(jobPostingId)
+                jobPostingQuestionRepository.existsByJobPostingIdAndRequiredTrue(jobPostingId)
         );
     }
 

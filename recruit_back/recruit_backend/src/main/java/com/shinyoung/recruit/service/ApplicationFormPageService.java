@@ -52,12 +52,12 @@ public class ApplicationFormPageService {
         Set<ApplicationSectionType> enabledSections = ApplicationFormLayoutSectionPolicy.enabledSections(
                 formConfig,
                 attachmentRequirementRepository.existsByJobPostingId(jobPostingId),
-                jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrue(jobPostingId)
+                jobPostingQuestionRepository.existsByJobPostingId(jobPostingId)
         );
         Set<ApplicationSectionType> requiredSections = ApplicationFormLayoutSectionPolicy.requiredSections(
                 formConfig,
                 attachmentRequirementRepository.existsByJobPostingIdAndRequiredTrue(jobPostingId),
-                jobPostingQuestionRepository.existsByJobPostingIdAndActiveTrueAndRequiredTrue(jobPostingId)
+                jobPostingQuestionRepository.existsByJobPostingIdAndRequiredTrue(jobPostingId)
         );
 
         List<ApplicationFormPage> pages = loadStoredOrDefaultLayout(jobPosting, enabledSections);
