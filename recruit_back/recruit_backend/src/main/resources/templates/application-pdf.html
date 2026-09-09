@@ -28,6 +28,8 @@
         th, td { border: 1px solid #d9d9d9; padding: 5pt 6pt; vertical-align: middle;
                  word-wrap: break-word; overflow-wrap: break-word; }
 
+        /* 화면 1080px 기준 비율을 그대로 쓰면 182mm 에서는 라벨이 줄바꿈된다.
+           라벨 열은 문구가 한 줄에 들어가도록 폭을 따로 계산했다. */
         th { background: #fafafa; font-weight: 600; text-align: left; }
         thead th { text-align: center; }
         /* 화면 .depth1: 상위 라벨 아래 붙는 2단 헤더는 굵기를 죽인다. */
@@ -70,7 +72,7 @@
     <h2>지원사항</h2>
     <table>
         <colgroup>
-            <col style="width:10%"/><col style="width:35%"/><col style="width:10%"/><col style="width:45%"/>
+            <col style="width:13%"/><col style="width:32%"/><col style="width:13%"/><col style="width:42%"/>
         </colgroup>
         <tbody>
         <tr>
@@ -90,8 +92,8 @@
     <h2>기본 정보</h2>
     <table>
         <colgroup>
-            <col style="width:10%"/><col style="width:25%"/>
-            <col style="width:10%"/><col style="width:10%"/><col style="width:45%"/>
+            <col style="width:12%"/><col style="width:20%"/>
+            <col style="width:12%"/><col style="width:14%"/><col style="width:42%"/>
         </colgroup>
         <tbody>
         <tr>

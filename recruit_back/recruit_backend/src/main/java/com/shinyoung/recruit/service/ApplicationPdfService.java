@@ -353,7 +353,7 @@ public class ApplicationPdfService {
         List<String> values = new ArrayList<>();
         for (int number = from; number <= to; number++) {
             columns.add(number <= lastLabeled ? number + "학기" : "");
-            widths.add("8%");
+            widths.add("12.5%");
             values.add(semesterGradeText(byNumber.get(number)));
         }
         return new Section(title, note, Layout.GRADE, columns, widths, List.of(new Row(values)), EMPTY);
@@ -408,7 +408,8 @@ public class ApplicationPdfService {
                 "경력사항",
                 List.of("회사명(소재지)", "부서명(담당업무)", "근무기간", "고용형태",
                         "최종직급(승진일)", "연봉(만원)", "퇴직 사유"),
-                List.of(),
+                // 헤더 문구가 길어 균등 분배로는 줄바꿈된다. 문구 길이에 맞춰 폭을 배분한다.
+                List.of("17%", "19%", "12%", "10%", "17%", "13%", "12%"),
                 rows);
     }
 
