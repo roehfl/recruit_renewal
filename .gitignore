@@ -2,6 +2,9 @@
 node_modules/
 dist/
 
+# 소스 백업 압축본. 실수로 커밋되면 저장소가 수 MB씩 불어난다.
+*.zip
+
 # 기타
 *.log
 .DS_Store
