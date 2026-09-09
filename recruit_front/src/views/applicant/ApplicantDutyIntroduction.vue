@@ -6,14 +6,14 @@
 
         <h1 class="page-title">직무소개</h1>
 
-        <section class="main-visual">
+        <!-- <section class="main-visual">
             <div class="visual-text">
                 <h1>신영증권 직무소개</h1>
                 <span
                 @click="goRecruits()"
                 >입사지원 바로가기</span>
             </div>
-        </section>
+        </section> -->
 
             <div class="quick-link-grid">
             <a-card
@@ -292,7 +292,7 @@ const dutyList = ref<DutyItem[]>([
   max-width: none;
   min-height: 150px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  gap: 40px;
 }
 
 .quick-link-card {

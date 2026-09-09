@@ -71,11 +71,6 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/application/ApplicationStatus.vue'),
       },
       {
-        path: 'applications/:applicationId',
-        name: 'AdminApplication',
-        component: () => import('@/views/admin/application/Application.vue'),
-      },
-      {
         path: 'stage-results',
         name: 'AdminStageResult',
         component: () => import('@/views/admin/stageResult/AdminStageResultView.vue'),
@@ -105,5 +100,14 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/jobPosting/AdminQuestionTemplatesView.vue')
       }
     ],
+  },
+  {
+    path: '/admin/applications/:applicationId',
+    name: 'AdminApplication',
+    component: () => import('@/views/admin/application/Application.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['ROLE_ADMIN', 'ROLE_RECRUIT_ADMIN'],
+    },
   },
 ]

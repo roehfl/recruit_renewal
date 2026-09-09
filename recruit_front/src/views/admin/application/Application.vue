@@ -1,7 +1,7 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { commonCodeApi } from '@/api/commonApi'
 import { adminJobPostingApi } from '@/api/admin/adminJobPostingApi'
@@ -26,15 +26,6 @@ import { getLabel } from '@/types/admin/applicationSections'
 import { adminApplicationApi } from '@/api/admin/adminApplicationApi'
 import { formatDate } from '@/common/dateUtil'
 import logoImage from '@/assets/images/logo.png'
-
-interface EditableImage {
-  key: string
-  id: number | null          // 기존 이미지면 서버 id, 신규면 null
-  file: File | null          // 신규 파일
-  altText: string
-  originalAltText: string    // 수정 여부 판단용
-  previewUrl: string
-}
 
 const basicInfo = ref<AdminBasicInfoResponse>();
 const military = ref<AdminMilitaryResponse>();
@@ -77,7 +68,6 @@ const applicationTypeMap: Record<string, string> = {
   NEW_GRADUATE_OR_EXPERIENCED: '신입/경력',
 }
 const route = useRoute()
-const router = useRouter();
 const loading = ref(false)
 const isPhotoLoading = ref(true)
 const applicationId = Number(route.params.applicationId)
@@ -87,7 +77,6 @@ const jobPositionData = ref()
 const applicationData = ref<AdminApplicationDetailResponse>()
 const formLayouut = ref()
 const sectionData = ref<availableSectionsItem[]>([])
-const images = ref<EditableImage[]>([])
 const originAttachments = ref<AttachmentResponse[]>([])
 const photoUrls = ref<string>()
 
@@ -95,21 +84,46 @@ const nationalityList = ref<CommonCodeItems[]>([])
 const disabilityStatusList = ref<CommonCodeItems[]>([])
 const disabilityGradeList = ref<CommonCodeItems[]>([])
 
-const semesterList = [
-  { schoolYear: 1, semester: 1 },
-  { schoolYear: 1, semester: 2 },
-  { schoolYear: 2, semester: 1 },
-  { schoolYear: 2, semester: 2 },
-  { schoolYear: 3, semester: 1 },
-  { schoolYear: 3, semester: 2 },
-  { schoolYear: 4, semester: 1 },
-  { schoolYear: 4, semester: 2 },
-]
+interface Semester { 
+  semesterNumber: number;
+  schoolYear: number;
+  semester: number;
+}
+const defaultSemesterList: Semester[] = Array.from( { length: 8 },
+  (_, index) => {
+    const semesterNumber = index + 1;
+    return {
+      semesterNumber,
+      schoolYear: Math.floor(index / 2) + 1,
+      semester: (index % 2) + 1,
+    }
+  }
+)
+const secondSemesterList: Semester[] = Array.from( { length: 8 },
+  (_, index) => {
+    const semesterNumber = index + 9;
+    return {
+      semesterNumber,
+      schoolYear: Math.floor(index / 2) + 5,
+      semester: (index % 2) + 1,
+    }
+  }
+)
+const hasAdditionalSemester = (education: AdminEducationResponse) => {
+  return education.semesterGrades?.some(grade => grade.schoolYear >= 5) ?? false;
+};
+const getLastSemesterNumber = (education: AdminEducationResponse) => {
+  if (!education.semesterGrades.length) return 8;
 
-const getSemesterGradeText = (education: AdminEducationResponse, semester: {schoolYear: number, semester: number}) => {
+  const lastSemester = Math.max(
+    ...education.semesterGrades.map(grade => (grade.schoolYear - 1) * 2 + grade.semester)
+  )
+  return Math.max(lastSemester, 8);
+}
+const getSemesterGradeText = (education: AdminEducationResponse, semester: Semester) => {
   // 대학원(석사/박사)은 4학년 자체가 입력 대상이 아님
   if ( (education.educationLevel === "MASTER" || education.educationLevel === "DOCTOR") && semester.schoolYear === 4 ) { 
-    return '-'
+    // return '-'
   }
 
   const grade = education.semesterGrades?.find( (item) => item.schoolYear === semester.schoolYear && item.semester === semester.semester);
@@ -121,13 +135,10 @@ const getSemesterGradeText = (education: AdminEducationResponse, semester: {scho
 
 const formatPhoneNumber = (phone?: string) => {
   if (!phone) return '';
-  return phone.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
-}
-
-// 목록 페이지로 이동 
-function goRecruitPage(): void {
-  router.back();
-  // router.push('/admin/applications');
+  if (phone.length <= 3) return phone;
+  else if (phone.length <= 7) return `${phone.slice(0,3)}-${phone.slice(3)}`
+  return `${phone.slice(0,3)}-${phone.slice(3,7)}-${phone.slice(7,11)}`
+  // return phone.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
 }
 
 // SECTION enabled API 호출
@@ -228,15 +239,14 @@ onMounted(async () => {
 
 })
 onBeforeUnmount(() => {
-  images.value.forEach((image) => URL.revokeObjectURL(image.previewUrl))
+  if (photoUrls.value) URL.revokeObjectURL(photoUrls.value)
 })
 </script>
 
 <template>
   <div class="application-form">
     <header class="page-header">
-      <h2 class="page-title">입사지원서</h2>
-      <a-button @click="goRecruitPage">목록</a-button>
+      <h2>입사지원서</h2>
     </header>
 
     <a-spin :spinning="loading">
@@ -278,9 +288,6 @@ onBeforeUnmount(() => {
                     <img v-if="photoUrls" :src="photoUrls" :alt="photoUrls" class="posting-image"/>
                     <img v-else :src="logoImage" alt="신영증권 로고" />
                   </template>
-                  <!-- <img :src="photoUrls || logoImage" :alt="photoUrls" class="posting-image"/>
-                  <img v-if="photoUrls" :src="photoUrls || logoImage" :alt="photoUrls" class="posting-image"/>
-                  <img v-else :src="logoImage" alt="신영증권 로고" /> -->
                 </span>
               </td>
 
@@ -296,7 +303,6 @@ onBeforeUnmount(() => {
               <th rowspan="2">연락처</th>
               <th class="depth1">휴대폰</th>
               <td>{{ formatPhoneNumber(basicInfo?.mobilePhone) }}</td>
-              <!-- <td>{{ basicInfo?.mobilePhone }}</td> -->
             </tr>
             <tr>
               <th class="depth1">비상연락처</th>
@@ -422,38 +428,44 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-if="jobPostingData?.postingType === `PUBLIC_RECRUITMENT`" aria-label="성적" class="education-div">
-        <table class="table-area">
-          <colgroup>
-            <col style="width:28%"/>
-            <col style="width:8%"/><col style="width:8%"/><col style="width:8%"/><col style="width:8%"/>
-            <col style="width:8%"/><col style="width:8%"/><col style="width:8%"/><col style="width:8%"/>
-          </colgroup>
-          <thead>
-            <tr>
-              <th rowspan="2">학교 학기별 성적</th>
-              <th colspan="2" class="text-center">1학년</th><th colspan="2" class="text-center">2학년</th>
-              <th colspan="2" class="text-center">3학년</th><th colspan="2" class="text-center">4학년</th>
-            </tr>    
-            <tr class="text-center">
-              <th>1학기</th><th>2학기</th><th>1학기</th><th>2학기</th><th>1학기</th><th>2학기</th><th>1학기</th><th>2학기</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template v-if="educations.length">
-              <tr  v-for="education in educations" :key="education.educationId" >
-                <template v-if="education.educationLevel !== 'HIGH_SCHOOL'" >
-                  <td>{{ education.schoolName }}</td>
-                  <td v-for="semester in semesterList" :key="`${semester.schoolYear}-${semester.semester}`" class="text-center">
-                    {{ getSemesterGradeText(education, semester) }} 
-                  </td>
-                </template>
-              </tr>
-            </template>
-            <tr v-else>
-              <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
-            </tr>
-          </tbody>
-        </table>
+        <template v-for="education in educations" :key="education.educationId" >
+          <template v-if="education.educationLevel !== 'HIGH_SCHOOL'" >
+            <div class="education-semester">
+              <div class="school-div">
+                <div class="school-title">■ {{ education.schoolName }} 성적</div>
+                <div class="school-description">※ 교환학생 및 계절학기 성적은 기재하지 않음</div>
+              </div>
+              <table class="table-area">
+                <colgroup>
+                  <col style="width:8%"/><col style="width:8%"/><col style="width:8%"/><col style="width:8%"/>
+                  <col style="width:8%"/><col style="width:8%"/><col style="width:8%"/><col style="width:8%"/>
+                </colgroup>
+                <tbody>
+                  <!-- 기본 학기(8학기) 성적 -->
+                  <tr>
+                    <th v-for="semester in defaultSemesterList" :key="semester.semesterNumber" class="text-center">{{ semester.semesterNumber }}학기</th>
+                  </tr>    
+                  <tr>
+                    <td v-for="semester in defaultSemesterList" :key="semester.semesterNumber" class="text-center">
+                      {{ getSemesterGradeText(education, semester) }} 
+                    </td>
+                  </tr>
+                  <!-- 추가 학기(16학기) 성적 -->
+                  <tr v-if="hasAdditionalSemester(education)">
+                    <th v-for="semester in secondSemesterList" :key="semester.semesterNumber" class="text-center">
+                      <template v-if="semester.semesterNumber <= getLastSemesterNumber(education)">{{ semester.semesterNumber }}학기</template>
+                    </th>
+                  </tr>
+                  <tr v-if="hasAdditionalSemester(education)">
+                    <td v-for="semester in secondSemesterList" :key="semester.semesterNumber" class="text-center">
+                      {{ getSemesterGradeText(education, semester) }} 
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
+        </template>
       </div>
     </a-card>
 
@@ -499,7 +511,7 @@ onBeforeUnmount(() => {
       <div aria-label="자격">
         <table class="table-area">
           <colgroup>
-            <!-- <col style="width: 45%" /><col style="width: 25%" /><col style="width: 15%" /><col style="width: 15%" /> -->
+            <col style="width: 45%" /><col style="width: 25%" /><col style="width: 15%" /><col style="width: 15%" />
           </colgroup>
           <thead>
             <tr>
@@ -629,18 +641,10 @@ onBeforeUnmount(() => {
 .application-form {
   padding: 24px;
   max-width: 1080px;
+  margin: 0 auto;
 }
 .page-header {
-  margin-bottom: 16px;
-  display: flex;
-  justify-content: space-between;
-}
-.page-title {
-  margin: 0 0 4px;
-}
-.page-description {
-  margin: 0;
-  color: #888;
+  margin-bottom: 20px;
 }
 .form-card {
   margin-bottom: 16px;
@@ -690,16 +694,31 @@ onBeforeUnmount(() => {
 .education-div {
   margin-top: 20px;
 }
-
-.semester-head th {
-  padding: 4px 0;
-  text-align: center;
+.education-semester {
+  margin-top: 16px;
 }
-
+.education-semester .table-area th, 
+.education-semester .table-area td {
+  padding: 6px;
+}
+.school-div {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+.school-title {
+  font-size: 15px;
+  font-weight: 500;
+  margin-left: 2px;
+}
+.school-description {
+  margin: 0;
+  font-weight: 300;
+}
 .text-center,
 .text-center th {
   text-align: center !important;
-
 }
 
 .q-text {
