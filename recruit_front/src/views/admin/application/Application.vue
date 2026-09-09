@@ -3,6 +3,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { PrinterOutlined } from '@ant-design/icons-vue'
 import { commonCodeApi } from '@/api/commonApi'
 import { adminJobPostingApi } from '@/api/admin/adminJobPostingApi'
 import { getApiErrorMessage } from '@/api/apiError'
@@ -25,6 +26,7 @@ import type {
 import { getLabel } from '@/types/admin/applicationSections'
 import { adminApplicationApi } from '@/api/admin/adminApplicationApi'
 import { formatDate } from '@/common/dateUtil'
+import { getBlobErrorMessage, saveBlobResponse } from '@/common/fileDownload'
 import logoImage from '@/assets/images/logo.png'
 
 const basicInfo = ref<AdminBasicInfoResponse>();
@@ -238,6 +240,21 @@ onMounted(async () => {
   }
 
 })
+// 서버가 렌더한 A4 PDF 를 그대로 받는다. 출력은 받은 PDF 를 열어서 인쇄한다.
+const downloadingPdf = ref(false)
+const downloadPdf = async () => {
+  if (downloadingPdf.value) return
+  downloadingPdf.value = true
+  try {
+    const response = await adminApplicationApi.downloadApplicationPdf(applicationId)
+    saveBlobResponse(response, `${applicationId}_지원서.pdf`)
+  } catch (error) {
+    message.error(await getBlobErrorMessage(error, '지원서 PDF를 내려받지 못했습니다.'))
+  } finally {
+    downloadingPdf.value = false
+  }
+}
+
 onBeforeUnmount(() => {
   if (photoUrls.value) URL.revokeObjectURL(photoUrls.value)
 })
@@ -247,6 +264,10 @@ onBeforeUnmount(() => {
   <div class="application-form">
     <header class="page-header">
       <h2>입사지원서</h2>
+      <a-button :loading="downloadingPdf" @click="downloadPdf">
+        <PrinterOutlined />
+        PDF 저장
+      </a-button>
     </header>
 
     <a-spin :spinning="loading">
@@ -644,7 +665,13 @@ onBeforeUnmount(() => {
   margin: 0 auto;
 }
 .page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 20px;
+}
+.page-header h2 {
+  margin: 0;
 }
 .form-card {
   margin-bottom: 16px;

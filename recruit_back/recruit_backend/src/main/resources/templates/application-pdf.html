@@ -2,57 +2,173 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8"/>
-    <title>지원서</title>
+    <title>입사지원서</title>
     <style>
-        @page { size: A4; margin: 18mm 14mm; }
-        body { font-family: 'ApplicationPdfFont', sans-serif; font-size: 10pt; color: #111; }
-        h1 { font-size: 16pt; margin: 0 0 2pt; }
-        .meta { color: #555; font-size: 8pt; margin-bottom: 10pt; }
-        table.header { width: 100%; border-collapse: collapse; margin-bottom: 12pt; }
-        table.header td { border: 1px solid #999; padding: 4pt 6pt; vertical-align: top; }
-        td.label { background: #f0f0f0; width: 18%; font-weight: bold; }
-        h2 { font-size: 12pt; border-bottom: 2px solid #333; padding-bottom: 2pt; margin: 14pt 0 6pt; }
-        .record { border: 1px solid #bbb; margin-bottom: 6pt; }
-        .record table { width: 100%; border-collapse: collapse; }
-        .record td { border-bottom: 1px solid #eee; padding: 3pt 6pt; vertical-align: top; }
-        .record td.label { background: #fafafa; width: 18%; }
-        .value { white-space: pre-wrap; word-break: break-all; }
-        .empty { color: #888; font-style: italic; padding: 2pt 0; }
+        /* 인쇄 가능 폭 = 210mm - 28mm = 182mm. 이 폭 안에서 가로 1페이지를 보장한다. */
+        @page { size: A4; margin: 14mm 14mm 16mm; }
+
+        /* 관리자 화면(Application.vue)의 구조와 비율을 그대로 옮긴다.
+           화면은 1080px, 여기는 182mm 라 절대 크기만 줄이고 열 비율은 동일하게 둔다. */
+        body { font-family: 'ApplicationPdfFont', sans-serif; font-size: 9pt; line-height: 1.5; color: #1f2937; }
+
+        h1 { font-size: 15pt; margin: 0 0 14pt; }
+
+        /* 화면 a-card 헤더에 대응. ant-design 은 16px/500 에 옅은 하단선을 쓴다. */
+        h2 { font-size: 11pt; font-weight: 500; margin: 0 0 8pt;
+             padding-bottom: 5pt; border-bottom: 1px solid #d9d9d9; page-break-after: avoid; }
+
+        .card { margin-bottom: 12pt; }
+
+        /* table-layout:fixed 가 없으면 긴 무공백 문자열 하나가 표를 밀어 폭을 초과시킨다.
+           openhtmltopdf 는 초과분을 축소하지 않고 잘라내므로 반드시 필요하다. */
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; border: 1px solid #d9d9d9; }
+
+        /* 화면 .table-area 는 #f0f0f0 경계선을 쓰지만 인쇄에서는 선이 사라져 한 단계 진하게 둔다.
+           word-break 는 openhtmltopdf 가 해석하지 않으므로 줄바꿈은 word-wrap 이 담당한다. */
+        th, td { border: 1px solid #d9d9d9; padding: 5pt 6pt; vertical-align: middle;
+                 word-wrap: break-word; overflow-wrap: break-word; }
+
+        th { background: #fafafa; font-weight: 600; text-align: left; }
+        thead th { text-align: center; }
+        /* 화면 .depth1: 상위 라벨 아래 붙는 2단 헤더는 굵기를 죽인다. */
+        th.depth1 { font-weight: normal; }
+
+        .center, .center th, .center td { text-align: center; }
+        .empty { color: #8a8a8a; padding: 4pt 1pt; }
+
+        /* 화면 .school-div: 제목 왼쪽, 안내 문구 오른쪽. */
+        .grade-head { margin-bottom: 3pt; }
+        .grade-title { font-size: 10pt; font-weight: 500; }
+        .grade-note { font-weight: 300; font-size: 8pt; float: right; }
+        /* 추가 학기 표는 위 표에 그대로 이어 붙인다(화면은 한 표 안 4행). */
+        .attached { margin-top: -1px; margin-bottom: 12pt; }
+
+        .photo, .photo img { width: 26mm; height: 34mm; }
+        .photo-none { color: #8a8a8a; font-size: 8pt; }
+
+        /* 화면 .q-text + readonly a-textarea 에 대응. */
+        .qa { margin-bottom: 10pt; }
+        .qa-q { font-size: 10pt; font-weight: 500; margin: 0 0 5pt; }
+        .qa-a { white-space: pre-wrap; margin: 0; padding: 6pt;
+                border: 1px solid #d9d9d9; border-radius: 3pt; }
+
+        /* 기본은 행 단위로만 쪼개지지 않게 해 페이지를 조밀하게 채운다. */
+        tr { page-break-inside: avoid; }
+        /* recruit.pdf.keep-section-together=true 일 때 각 섹션에 붙는 클래스.
+           openhtmltopdf 는 후손 셀렉터 조합에서 page-break 를 놓치므로 단일 클래스로 건다. */
+        .keep { page-break-inside: avoid; }
+
+        thead { display: table-header-group; }
     </style>
 </head>
 <body>
-    <h1 th:text="${header.applicantName()}">applicant</h1>
-    <div class="meta">지원서 ID: <span th:text="${header.applicationId()}">0</span></div>
 
-    <table class="header">
+<h1>입사지원서</h1>
+
+<!-- 지원사항 -->
+<div class="card" th:classappend="${keepSectionTogether} ? 'keep' : ''">
+    <h2>지원사항</h2>
+    <table>
+        <colgroup>
+            <col style="width:10%"/><col style="width:35%"/><col style="width:10%"/><col style="width:45%"/>
+        </colgroup>
+        <tbody>
         <tr>
-            <td class="label">이름</td><td class="value" th:text="${header.applicantName()}"></td>
-            <td class="label">상태</td><td class="value" th:text="${header.status()}"></td>
+            <th>채용구분</th><td th:text="${header.jobPostingTitle()}"></td>
+            <th>지원구분</th><td th:text="${header.applicationType()}"></td>
         </tr>
         <tr>
-            <td class="label">연락처</td><td class="value" th:text="${header.phoneNumber()}"></td>
-            <td class="label">이메일</td><td class="value" th:text="${header.email()}"></td>
+            <th>지원분야</th><td th:text="${header.jobPositionName()}"></td>
+            <th>직무/근무지</th><td th:text="${header.workLocation()}"></td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- 기본 정보: 사진 rowspan 과 이름/연락처 2단 중첩 때문에 전용 표로 둔다 -->
+<div class="card" th:if="${basicInfo != null}" th:classappend="${keepSectionTogether} ? 'keep' : ''">
+    <h2>기본 정보</h2>
+    <table>
+        <colgroup>
+            <col style="width:10%"/><col style="width:25%"/>
+            <col style="width:10%"/><col style="width:10%"/><col style="width:45%"/>
+        </colgroup>
+        <tbody>
+        <tr>
+            <th rowspan="4">사진</th>
+            <td rowspan="4" class="center">
+                <span class="photo" th:if="${basicInfo.photoDataUri() != null}">
+                    <img th:src="${basicInfo.photoDataUri()}" alt="사진"/>
+                </span>
+                <span class="photo-none" th:if="${basicInfo.photoDataUri() == null}">사진 없음</span>
+            </td>
+            <th rowspan="2">이름</th>
+            <th class="depth1">한글명</th><td th:text="${basicInfo.nameKorean()}"></td>
         </tr>
         <tr>
-            <td class="label">지원공고</td><td class="value" th:text="${header.jobPostingTitle()}"></td>
-            <td class="label">지원분야</td><td class="value" th:text="${header.jobPositionName()}"></td>
+            <th class="depth1">영문명</th><td th:text="${basicInfo.nameEnglish()}"></td>
         </tr>
         <tr>
-            <td class="label">제출일시</td><td class="value" colspan="3" th:text="${header.submittedAt()}"></td>
+            <th rowspan="2">연락처</th>
+            <th class="depth1">휴대폰</th><td th:text="${basicInfo.mobilePhone()}"></td>
         </tr>
+        <tr>
+            <th class="depth1">비상연락처</th><td th:text="${basicInfo.emergencyPhone()}"></td>
+        </tr>
+        <tr>
+            <th>내/외국인</th><td th:text="${basicInfo.nationality()}"></td>
+            <th>보훈여부</th><td colspan="2" th:text="${basicInfo.veteran()}"></td>
+        </tr>
+        <tr>
+            <th>생년월일</th><td th:text="${basicInfo.birthDate()}"></td>
+            <th>장애여부</th><td colspan="2" th:text="${basicInfo.disability()}"></td>
+        </tr>
+        <tr>
+            <th>이메일</th><td th:text="${basicInfo.email()}"></td>
+            <th>주소</th><td colspan="2" th:text="${basicInfo.address()}"></td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- 나머지 섹션 -->
+<div th:each="section : ${sections}"
+     th:class="${section.title().isEmpty()} ? 'attached' : 'card'"
+     th:classappend="${keepSectionTogether} ? 'keep' : ''">
+
+    <!-- 성적 표는 화면처럼 제목 옆에 안내 문구를 둔다. -->
+    <div th:if="${!section.title().isEmpty() and section.note() != null}" class="grade-head">
+        <span class="grade-note" th:text="${section.note()}">주석</span>
+        <span class="grade-title" th:text="${section.title()}">제목</span>
+    </div>
+    <h2 th:if="${!section.title().isEmpty() and section.note() == null}" th:text="${section.title()}">섹션</h2>
+
+    <div th:if="${section.rows().isEmpty()}" class="empty" th:text="${section.emptyMessage()}">없음</div>
+
+    <table th:if="${!section.rows().isEmpty() and section.layout().name() != 'QA'}"
+           th:classappend="${section.layout().name() == 'GRADE'} ? 'center' : ''">
+        <colgroup th:if="${!section.columnWidths().isEmpty()}">
+            <col th:each="width : ${section.columnWidths()}" th:style="'width:' + ${width}"/>
+        </colgroup>
+        <thead>
+        <tr>
+            <th th:each="column : ${section.columns()}" th:text="${column}">열</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="row : ${section.rows()}">
+            <td th:each="value : ${row.values()}" th:text="${value}">값</td>
+        </tr>
+        </tbody>
     </table>
 
-    <div th:each="section : ${sections}">
-        <h2 th:text="${section.title()}">section</h2>
-        <div class="empty" th:if="${section.records().isEmpty()}" th:text="${section.emptyMessage()}">없음</div>
-        <div class="record" th:each="rec : ${section.records()}">
-            <table>
-                <tr th:each="f : ${rec.fields()}">
-                    <td class="label" th:text="${f.label()}">label</td>
-                    <td class="value" th:text="${f.value()}">value</td>
-                </tr>
-            </table>
+    <div th:if="${!section.rows().isEmpty() and section.layout().name() == 'QA'}">
+        <div class="qa" th:each="row : ${section.rows()}">
+            <p class="qa-q" th:text="${row.values()[0]}">질문</p>
+            <p class="qa-a" th:text="${row.values()[1]}">답변</p>
         </div>
     </div>
+</div>
+
 </body>
 </html>

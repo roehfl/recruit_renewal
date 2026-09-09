@@ -23,75 +23,11 @@ import java.util.Optional;
 
 public interface JobApplicationRepository extends JpaRepository<JobApplication, Long> {
 
-    Optional<JobApplication> findByIdAndApplicantId(Long id, Long applicantId);
-
-    /** reconciliation(09e) — 바이너리 삭제 미완(PURGE_PENDING) 잔여 건 재처리 대상(chunk 단위, 09e 리뷰 Medium 1). */
-    List<JobApplication> findByPurgeResultOrderByIdAsc(PurgeResult purgeResult, Pageable pageable);
-
-    /** health-scan 치명탐지(09e §6.1) — 후보 applicationId 중 최종 PURGED 인 것만(파기 후 파일 잔존 판정). */
-    @Query("select j.id from JobApplication j where j.id in :ids and j.purgeResult = :purgeResult")
-    List<Long> findIdsByIdInAndPurgeResult(
-            @Param("ids") List<Long> ids,
-            @Param("purgeResult") PurgeResult purgeResult);
-
-    Optional<JobApplication> findByApplicantIdAndJobPostingId(Long applicantId, Long jobPostingId);
-
-    boolean existsByApplicantIdAndJobPostingId(Long applicantId, Long jobPostingId);
-
-    @EntityGraph(attributePaths = {
-            "jobPosting",
-            "jobPosting.applicationFormConfig",
-            "jobPosition",
-            "jobPosition.jobPosting"
-    })
-    @Query("""
-            select application
-            from JobApplication application
-            where application.id = :applicationId
-              and application.applicant.id = :applicantId
-            """)
-    Optional<JobApplication> findFormPageByIdAndApplicantId(
-            @Param("applicationId") Long applicationId,
-            @Param("applicantId") Long applicantId
-    );
-
-    @EntityGraph(attributePaths = {"applicant", "jobPosting", "jobPosition"})
-    List<JobApplication> findByJobPostingId(Long jobPostingId);
-
-    @EntityGraph(attributePaths = {"jobPosting", "jobPosition"})
-    @Query("""
-            select application
-            from JobApplication application
-            where application.applicant.id = :applicantId
-            """)
-    Page<JobApplication> findMyApplications(@Param("applicantId") Long applicantId, Pageable pageable);
-
-    @EntityGraph(attributePaths = {"jobPosting", "jobPosting.applicationFormConfig", "jobPosition"})
-    @Query("""
-            select application
-            from JobApplication application
-            where application.id = :applicationId
-              and application.applicant.id = :applicantId
-            """)
-    Optional<JobApplication> findDashboardByIdAndApplicantId(
-            @Param("applicationId") Long applicationId,
-            @Param("applicantId") Long applicantId
-    );
-
-    /**
-     * 관리자 지원현황 조회 통합 검색. 모든 조건은 null 이면 미적용(null-guard) — 공고 지정/비지정 목록이 이 쿼리 하나를 공유한다.
-     *
-     * <p>{@code phoneNumber} 는 숫자만 남긴 값으로 들어오며, 저장값도 하이픈/공백을 제거해 비교한다.
-     *
-     * <p>최종학력 판정은 지원서 학력 행들의 최고 레벨 기준이며, CASE rank(HIGH_SCHOOL=0…DOCTOR=4)는
-     * {@code EducationLevel} 선언 순서(= {@code AdminApplicationSearchCondition.finalEducationRank()})와 일치해야 한다.
-     * 졸업여부/최종학교조건도 같은 최종학력 행 기준으로 판정한다. {@code finalSchoolCondition} 은 enum 5분기 비교를 위해
-     * name 문자열로 받는다.
+    /*
+     * 관리자 지원현황 검색 조건. 목록 조회와 엑셀 export 가 같은 절을 써야 화면에 보이는 결과와
+     * 내려받은 파일이 일치한다. 한쪽만 고치면 다시 어긋나므로 상수로 공유한다.
      */
-    @EntityGraph(attributePaths = {"applicant", "jobPosting", "jobPosition"})
-    @Query("""
-            select application
-            from JobApplication application
+    String ADMIN_SEARCH_WHERE = """
             where (:jobPostingId is null or application.jobPosting.id = :jobPostingId)
               and (:jobPositionId is null or application.jobPosition.id = :jobPositionId)
               and (:status is null or application.status = :status)
@@ -161,7 +97,79 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
                     where stageResult.jobApplication = application
                       and (:stageType is null or stageResult.stage.stageType = :stageType)
                       and (:stageResultStatus is null or stageResult.resultStatus = :stageResultStatus)))
+            """;
+
+
+    Optional<JobApplication> findByIdAndApplicantId(Long id, Long applicantId);
+
+    /** reconciliation(09e) — 바이너리 삭제 미완(PURGE_PENDING) 잔여 건 재처리 대상(chunk 단위, 09e 리뷰 Medium 1). */
+    List<JobApplication> findByPurgeResultOrderByIdAsc(PurgeResult purgeResult, Pageable pageable);
+
+    /** health-scan 치명탐지(09e §6.1) — 후보 applicationId 중 최종 PURGED 인 것만(파기 후 파일 잔존 판정). */
+    @Query("select j.id from JobApplication j where j.id in :ids and j.purgeResult = :purgeResult")
+    List<Long> findIdsByIdInAndPurgeResult(
+            @Param("ids") List<Long> ids,
+            @Param("purgeResult") PurgeResult purgeResult);
+
+    Optional<JobApplication> findByApplicantIdAndJobPostingId(Long applicantId, Long jobPostingId);
+
+    boolean existsByApplicantIdAndJobPostingId(Long applicantId, Long jobPostingId);
+
+    @EntityGraph(attributePaths = {
+            "jobPosting",
+            "jobPosting.applicationFormConfig",
+            "jobPosition",
+            "jobPosition.jobPosting"
+    })
+    @Query("""
+            select application
+            from JobApplication application
+            where application.id = :applicationId
+              and application.applicant.id = :applicantId
             """)
+    Optional<JobApplication> findFormPageByIdAndApplicantId(
+            @Param("applicationId") Long applicationId,
+            @Param("applicantId") Long applicantId
+    );
+
+    @EntityGraph(attributePaths = {"applicant", "jobPosting", "jobPosition"})
+    List<JobApplication> findByJobPostingId(Long jobPostingId);
+
+    @EntityGraph(attributePaths = {"jobPosting", "jobPosition"})
+    @Query("""
+            select application
+            from JobApplication application
+            where application.applicant.id = :applicantId
+            """)
+    Page<JobApplication> findMyApplications(@Param("applicantId") Long applicantId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"jobPosting", "jobPosting.applicationFormConfig", "jobPosition"})
+    @Query("""
+            select application
+            from JobApplication application
+            where application.id = :applicationId
+              and application.applicant.id = :applicantId
+            """)
+    Optional<JobApplication> findDashboardByIdAndApplicantId(
+            @Param("applicationId") Long applicationId,
+            @Param("applicantId") Long applicantId
+    );
+
+    /**
+     * 관리자 지원현황 조회 통합 검색. 모든 조건은 null 이면 미적용(null-guard) — 공고 지정/비지정 목록이 이 쿼리 하나를 공유한다.
+     *
+     * <p>{@code phoneNumber} 는 숫자만 남긴 값으로 들어오며, 저장값도 하이픈/공백을 제거해 비교한다.
+     *
+     * <p>최종학력 판정은 지원서 학력 행들의 최고 레벨 기준이며, CASE rank(HIGH_SCHOOL=0…DOCTOR=4)는
+     * {@code EducationLevel} 선언 순서(= {@code AdminApplicationSearchCondition.finalEducationRank()})와 일치해야 한다.
+     * 졸업여부/최종학교조건도 같은 최종학력 행 기준으로 판정한다. {@code finalSchoolCondition} 은 enum 5분기 비교를 위해
+     * name 문자열로 받는다.
+     */
+    @EntityGraph(attributePaths = {"applicant", "jobPosting", "jobPosition"})
+    @Query("""
+            select application
+            from JobApplication application
+            """ + ADMIN_SEARCH_WHERE)
     Page<JobApplication> searchForAdmin(
             @Param("jobPostingId") Long jobPostingId,
             @Param("jobPositionId") Long jobPositionId,
@@ -221,14 +229,26 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
     @Query("""
             select count(application)
             from JobApplication application
-            where (:jobPostingId is null or application.jobPosting.id = :jobPostingId)
-              and (:jobPositionId is null or application.jobPosition.id = :jobPositionId)
-              and (:status is null or application.status = :status)
-            """)
+            """ + ADMIN_SEARCH_WHERE)
     long countExportApplications(
             @Param("jobPostingId") Long jobPostingId,
             @Param("jobPositionId") Long jobPositionId,
-            @Param("status") JobApplicationStatus status
+            @Param("status") JobApplicationStatus status,
+            @Param("applicationType") JobPositionApplicationType applicationType,
+            @Param("workLocation") String workLocation,
+            @Param("name") String name,
+            @Param("phoneNumber") String phoneNumber,
+            @Param("birthDateFrom") LocalDate birthDateFrom,
+            @Param("birthDateTo") LocalDate birthDateTo,
+            @Param("finalEducationRank") Integer finalEducationRank,
+            @Param("schoolName") String schoolName,
+            @Param("graduationStatus") GraduationStatus graduationStatus,
+            @Param("finalSchoolCondition") String finalSchoolCondition,
+            @Param("certificateName") String certificateName,
+            @Param("languageName") String languageName,
+            @Param("languageLevel") String languageLevel,
+            @Param("stageType") StageType stageType,
+            @Param("stageResultStatus") StageResultStatus stageResultStatus
     );
 
     @Query("""
@@ -246,15 +266,28 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
                 application.updatedAt)
             from JobApplication application
             join application.applicant applicant
-            where (:jobPostingId is null or application.jobPosting.id = :jobPostingId)
-              and (:jobPositionId is null or application.jobPosition.id = :jobPositionId)
-              and (:status is null or application.status = :status)
+            """ + ADMIN_SEARCH_WHERE + """
             order by application.createdAt desc, application.id desc
             """)
     List<ApplicationExportRow> findExportApplications(
             @Param("jobPostingId") Long jobPostingId,
             @Param("jobPositionId") Long jobPositionId,
             @Param("status") JobApplicationStatus status,
+            @Param("applicationType") JobPositionApplicationType applicationType,
+            @Param("workLocation") String workLocation,
+            @Param("name") String name,
+            @Param("phoneNumber") String phoneNumber,
+            @Param("birthDateFrom") LocalDate birthDateFrom,
+            @Param("birthDateTo") LocalDate birthDateTo,
+            @Param("finalEducationRank") Integer finalEducationRank,
+            @Param("schoolName") String schoolName,
+            @Param("graduationStatus") GraduationStatus graduationStatus,
+            @Param("finalSchoolCondition") String finalSchoolCondition,
+            @Param("certificateName") String certificateName,
+            @Param("languageName") String languageName,
+            @Param("languageLevel") String languageLevel,
+            @Param("stageType") StageType stageType,
+            @Param("stageResultStatus") StageResultStatus stageResultStatus,
             Pageable pageable
     );
 }

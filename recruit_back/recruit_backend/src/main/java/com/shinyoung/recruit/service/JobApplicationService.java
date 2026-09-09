@@ -72,6 +72,7 @@ public class JobApplicationService {
     private final ApplicationEducationRepository applicationEducationRepository;
     private final ApplicationAttachmentRepository applicationAttachmentRepository;
     private final ApplicationSubmitValidator applicationSubmitValidator;
+    private final AdminApplicationSearchConditionFactory searchConditionFactory;
     private final Clock clock;
 
     @Transactional
@@ -312,63 +313,12 @@ public class JobApplicationService {
         }));
     }
 
+    /** 조건 생성은 엑셀 export 와 공유한다(같은 필터를 써야 화면과 산출물이 일치한다). */
     private AdminApplicationSearchCondition buildSearchCondition(Long jobPostingId, AdminApplicationSearchRequest request) {
-        if (request.birthDateFrom() != null && request.birthDateTo() != null
-                && request.birthDateFrom().isAfter(request.birthDateTo())) {
-            throw new InvalidJobApplicationException("생년월일 검색 범위가 올바르지 않습니다.");
-        }
-        return new AdminApplicationSearchCondition(
-                jobPostingId,
-                request.jobPositionId(),
-                parseStatus(request.status()),
-                parseSearchEnum(JobPositionApplicationType.class, request.applicationType(), "지원구분"),
-                normalizeSearchText(request.workLocation()),
-                normalizeSearchText(request.name()),
-                normalizePhoneNumber(request.phoneNumber()),
-                request.birthDateFrom(),
-                request.birthDateTo(),
-                parseSearchEnum(EducationLevel.class, request.finalEducationLevel(), "최종학력"),
-                normalizeSearchText(request.schoolName()),
-                parseSearchEnum(GraduationStatus.class, request.graduationStatus(), "졸업여부"),
-                parseSearchEnum(FinalSchoolCondition.class, request.finalSchoolCondition(), "최종학교조건"),
-                normalizeSearchText(request.certificateName()),
-                normalizeSearchText(request.languageName()),
-                normalizeSearchText(request.languageLevel()),
-                parseSearchEnum(StageType.class, request.stageType(), "전형단계"),
-                parseSearchEnum(StageResultStatus.class, request.stageResultStatus(), "전형결과")
-        );
+        return searchConditionFactory.create(jobPostingId, request);
     }
 
-    private <E extends Enum<E>> E parseSearchEnum(Class<E> type, String value, String label) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return Enum.valueOf(type, value.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            throw new InvalidJobApplicationException(label + " 값이 올바르지 않습니다. value=" + value);
-        }
-    }
 
-    /**
-     * 휴대폰 검색어에서 숫자만 남긴다. 저장값의 하이픈/공백 유무가 제각각이라 양쪽을 같은 방식으로
-     * 정규화해야 {@code 010-1234-5678} 저장분을 {@code 01012345678} 로도 찾을 수 있다.
-     */
-    private String normalizePhoneNumber(String value) {
-        if (value == null) {
-            return null;
-        }
-        String digits = value.replaceAll("[^0-9]", "");
-        return digits.isEmpty() ? null : digits;
-    }
-
-    private String normalizeSearchText(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
 
     private JobApplication findApplication(Long applicantId, Long applicationId) {
         return jobApplicationRepository.findByIdAndApplicantId(applicationId, applicantId)

@@ -14,7 +14,7 @@ import type {
 } from '@/types/admin/application'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { formatDate } from '@/common/dateUtil'
-import { saveBlobResponse } from '@/common/fileDownload'
+import { getBlobErrorMessage, saveBlobResponse } from '@/common/fileDownload'
 import type { CommonCodeItems } from '@/types/commonCode'
 import type { TableColumnsType } from 'ant-design-vue'
 import { apiClient } from '@/api/client'
@@ -32,6 +32,9 @@ interface TableRow {
 const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
+// 백엔드 recruit.pdf.bulk-max-count 와 같은 값. 서버가 최종 검증하고 여기서는 UX 안내만 한다.
+const PDF_BULK_MAX_COUNT = 20
+
 const selectRowKeys = ref<number[]>([]);
 
 const rowSelection = {
@@ -151,6 +154,7 @@ const jobWorkLocationOptions = computed(() => {
 const changeJobPosting = async (jobPostingId: number): Promise<void> => {
   selectedJobPostingId.value = jobPostingId;
   Object.assign(searchRequest, initialSearchRequest);
+  resetPaging();
   refreshing.value = true
   loadFailed.value = false
   try {
@@ -174,6 +178,14 @@ const refresh = (): void => {
   if (selectedJobPostingId.value === null || refreshing.value) return
 
   Object.assign(searchRequest, initialSearchRequest)
+  resetPaging()
+}
+
+const resetPaging = (): void => {
+  applications.value = []
+  selectRowKeys.value = []
+  pagination.current = 1
+  pagination.total = 0
 }
 
 // 지원서 상세는 메인 프레임을 벗어나 새 탭으로 연다. 상대경로 window.open 은 현재 URL 기준으로
@@ -217,21 +229,84 @@ const searchRequest = reactive<AdminApplicationSearchRequest>({
   ...initialSearchRequest,
 });
 
+// 서버 페이징. a-table 의 current 는 1-based, 백엔드 page 는 0-based 라 호출 시점에 변환한다.
+const pagination = reactive({
+  current: 1,
+  pageSize: 20,
+  total: 0,
+  showSizeChanger: false,
+})
+
+// 검색 버튼: 조건이 바뀌었으므로 항상 첫 페이지부터 다시 조회한다.
 const save = async () => {
+  await loadApplications(1)
+}
+
+// 페이지 이동 시 이전 페이지의 선택은 버린다. 화면에 보이지 않는 항목이 선택된 채로 남으면
+// 일괄 다운로드에서 의도하지 않은 지원서가 함께 나갈 수 있다.
+const handleTableChange = async (page: { current?: number }) => {
+  await loadApplications(page.current ?? 1)
+}
+
+const loadApplications = async (page: number) => {
   applications.value = [];
   loading.value = true
   selectRowKeys.value = [];
 
   try {
     if (selectedJobPostingId.value) {
-      const response = await adminApplicationApi.getApplications(selectedJobPostingId.value, searchRequest);
+      const response = await adminApplicationApi.getApplications(
+        selectedJobPostingId.value,
+        searchRequest,
+        page - 1,
+        pagination.pageSize,
+      );
 
-      applications.value = response.data.data.content;
+      const pageResponse = response.data.data;
+      applications.value = pageResponse.content;
+      pagination.current = pageResponse.page + 1;
+      pagination.total = pageResponse.totalElements;
     }
   } catch (error) {
     message.error(getApiErrorMessage(error, '지원현황 조회에 실패했습니다.'))
   } finally {
     loading.value = false
+  }
+}
+
+// 선택한 지원서를 zip 으로 받는다. 상한 초과는 서버가 400 으로 막지만, 화면에서도 먼저 안내한다.
+const downloadingPdf = ref(false)
+const downloadSelectedPdf = async () => {
+  if (downloadingPdf.value || selectRowKeys.value.length === 0) return
+  if (selectRowKeys.value.length > PDF_BULK_MAX_COUNT) {
+    message.warning(`한 번에 최대 ${PDF_BULK_MAX_COUNT}건까지 다운로드할 수 있습니다. (선택 ${selectRowKeys.value.length}건)`)
+    return
+  }
+
+  downloadingPdf.value = true
+  try {
+    const response = await adminApplicationApi.downloadApplicationPdfBulk([...selectRowKeys.value])
+    saveBlobResponse(response, '지원서.zip')
+  } catch (error) {
+    message.error(await getBlobErrorMessage(error, '지원서 PDF를 내려받지 못했습니다.'))
+  } finally {
+    downloadingPdf.value = false
+  }
+}
+
+// 화면에 걸어둔 검색 조건 그대로 엑셀을 받는다(목록과 같은 조건이라 보이는 결과와 일치한다).
+const downloadingExcel = ref(false)
+const downloadExcel = async () => {
+  if (downloadingExcel.value || selectedJobPostingId.value === null) return
+
+  downloadingExcel.value = true
+  try {
+    const response = await adminApplicationApi.downloadApplicationsExcel(selectedJobPostingId.value, searchRequest)
+    saveBlobResponse(response, '지원현황.xlsx')
+  } catch (error) {
+    message.error(await getBlobErrorMessage(error, '지원현황 엑셀을 내려받지 못했습니다.'))
+  } finally {
+    downloadingExcel.value = false
   }
 }
 
@@ -296,12 +371,11 @@ onMounted(async () => {
         <div>
           <table class="table-area">
           <colgroup>
-            <col style="width: 15%;">  <col style="width: 12%;">  <col style="width: 30%;">
-            <col style="width: 13%;">  <col style="width: 25%;">
+            <col style="width: 12%;">  <col style="width: 38%;">
+            <col style="width: 12%;">  <col style="width: 38%;">
           </colgroup>
           <tbody>
             <tr>
-              <th rowspan="2" class="depth1">채용정보</th>
               <th>채용구분</th> 
               <td>
                 <div class="filter-bar">
@@ -341,7 +415,6 @@ onMounted(async () => {
             </tr>
 
             <tr>
-              <th class="depth1">인적사항</th>
               <th>생년월일</th>
               <td>
                 <div class="flex-div-area">
@@ -357,7 +430,6 @@ onMounted(async () => {
             </tr>
 
             <tr>
-              <th class="depth1">기타</th>
               <th>전형별 결과</th> 
               <td>
                 <div class="flex-div-area">
@@ -398,12 +470,17 @@ onMounted(async () => {
       <a-card :bordered="false" class="form-card">
         <div class="button-area">
           <a-button>인쇄</a-button>
-          <a-button>PDF 인쇄</a-button>
-          <a-button>미리보기</a-button>
-          <a-button>엑셀 다운로드</a-button>
+          <a-button :loading="downloadingPdf" :disabled="selectRowKeys.length === 0" @click="downloadSelectedPdf">
+            PDF 인쇄
+          </a-button>
+          <a-button :loading="downloadingExcel" :disabled="selectedJobPostingId === null" @click="downloadExcel">
+            엑셀 다운로드
+          </a-button>
+          <span v-if="selectRowKeys.length" class="selected-count">{{ selectRowKeys.length }}건 선택</span>
         </div>
         <div>
-          <a-table :columns="columns" :data-source="applications" :pagination="{ pageSize: 10 }" :row-selection="rowSelection" row-key="applicationId">
+          <a-table :columns="columns" :data-source="applications" :pagination="pagination"
+            :row-selection="rowSelection" row-key="applicationId" @change="handleTableChange">
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'stageType'">
                 {{ statusLabelMap[record.status] ?? record.status }}
@@ -466,17 +543,16 @@ onMounted(async () => {
     text-align: left;
     padding: 8px 16px;
 }
-.table-area .depth1 {
-    background: #EEE;
-    border-bottom: 1px solid #dadada;
-    text-align: center;
-}
-
 .form-actions {
   margin-top: 12px;
   display: flex;
   justify-content: center;
   gap: 8px;
+}
+.selected-count {
+  margin-left: 4px;
+  font-size: 13px;
+  color: #595959;
 }
 .button-area {
   display: flex;

@@ -72,8 +72,9 @@ class ApplicationPdfControllerTest {
 
         byte[] body = result.getResponse().getContentAsByteArray();
         assertThat(result.getResponse().getContentType()).isEqualTo("application/pdf");
+        // 파일명은 수험번호(applicationId)_이름 형태. 일괄 zip 안에서 운영자가 구분할 수 있어야 한다.
         assertThat(result.getResponse().getHeader("Content-Disposition"))
-                .contains("application-" + application.getId() + ".pdf");
+                .contains(application.getId() + "_홍길동.pdf");
         assertThat(result.getResponse().getHeader("Cache-Control")).isEqualTo("no-store");
         assertThat(result.getResponse().getHeader("X-Content-Type-Options")).isEqualTo("nosniff");
 

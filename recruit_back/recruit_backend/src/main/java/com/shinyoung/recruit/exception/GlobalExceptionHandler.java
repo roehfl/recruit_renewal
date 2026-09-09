@@ -285,6 +285,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail("Export 파일 생성에 실패했습니다."));
     }
 
+    @ExceptionHandler(PdfBulkLimitExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handlePdfBulkLimitExceeded(PdfBulkLimitExceededException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(PdfGenerationException.class)
     public ResponseEntity<ApiResponse<Void>> handlePdfGeneration(PdfGenerationException e) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
