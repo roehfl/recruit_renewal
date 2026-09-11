@@ -1,134 +1,187 @@
 <template>
   <section class="recruits-page">
     <div class="page-inner">
-
       <h1 class="page-title">채용공고</h1>
 
-      <div aria-label="채용절차">
-        <a-form layout="inline" class="search-form">
-          <a-form-item label="키워드">
-            <a-input
-              v-model:value="searchType.keyword"
-              placeholder="공고명"
-              @pressEnter="onSearchClick"
-          /></a-form-item>
-          <a-form-item label="공고유형">
-            <a-select v-model:value="searchType.status" style="width: 140px" :options="statusTypes" />
-          </a-form-item>
+      <div class="recruit-layout">
+        <aside class="filter-panel">
+          <div class="filter-head">
+            <span class="filter-title">Filters</span>
+            <button type="button" class="reset-button" @click="onReset">
+              초기화
+              <ReloadOutlined />
+            </button>
+          </div>
 
-          <a-form-item>
-            <a-space>
-              <a-button type="primary" @click="onSearchClick">조회</a-button>
-              <a-button @click="onSearchReset">초기화</a-button>
-            </a-space>
-          </a-form-item>
-        </a-form>
+          <div class="keyword-box">
+            <input v-model="keyword" type="text" placeholder="공고명을 검색해주세요" />
+            <SearchOutlined class="keyword-icon" />
+          </div>
+
+          <div class="filter-group division-group">
+            <button type="button" class="filter-toggle" @click="divisionOpen = !divisionOpen">
+              <span class="filter-group-title">구분</span>
+              <DownOutlined :class="['chevron', { collapsed: !divisionOpen }]" />
+            </button>
+            <div v-show="divisionOpen" class="chip-list">
+              <button
+                v-for="option in divisionOptions"
+                :key="option.value"
+                type="button"
+                :class="['chip', { active: division === option.value }]"
+                @click="division = option.value"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+          </div>
+
+          <div class="filter-divider" />
+
+          <div class="filter-group">
+            <span class="filter-group-title">접수상태</span>
+            <div class="chip-list">
+              <button
+                v-for="option in statusOptions"
+                :key="option.value"
+                type="button"
+                :class="['chip', { active: status === option.value }]"
+                @click="status = option.value"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <div class="recruit-main">
+          <p class="recruit-count">
+            현재 진행중인 채용은 <strong>{{ filteredJobPostings.length }}</strong>건 입니다.
+          </p>
+
+          <a-spin :spinning="loading">
+            <ul class="recruit-list">
+              <li v-for="posting in filteredJobPostings" :key="posting.id" class="recruit-item">
+                <div class="recruit-info">
+                  <a class="recruit-title" @click="goDetail(posting.id)">{{ posting.title }}</a>
+                  <div class="recruit-meta">
+                    <span v-if="postingTypeMap[posting.postingType]" class="type-badge">
+                      {{ postingTypeMap[posting.postingType] }}
+                    </span>
+                    <span :class="['dday-badge', { soon: isDeadlineSoon(posting.receptionEndDateTime) }]">
+                      {{ getDDay(posting.receptionEndDateTime) }}
+                    </span>
+                    <span class="recruit-period">{{ formatDate(posting.receptionStartDateTime, 'YYYY.MM.DD') }} ~ {{ formatDate(posting.receptionEndDateTime, 'YYYY.MM.DD') }}</span>
+                  </div>
+                </div>
+                <button type="button" class="link-button" aria-label="공고 링크 복사" @click="copyPostingUrl(posting)">
+                  <LinkOutlined />
+                </button>
+              </li>
+            </ul>
+
+            <div v-if="!loading && filteredJobPostings.length === 0" class="empty-box">
+              조건에 맞는 채용공고가 없습니다.
+            </div>
+          </a-spin>
+        </div>
       </div>
-      <div class="jobPostingTable">
-        <a-table :columns="columns" :data-source="jobPostings" :pagination="{ pageSize: 8 }" />
-      </div>
+
+      <button type="button" class="top-button" aria-label="맨 위로" @click="scrollToTop">
+        <UpOutlined />
+        <span>TOP</span>
+      </button>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, h, ref } from 'vue'
-import type { TableColumnsType } from 'ant-design-vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
+import { DownOutlined, LinkOutlined, ReloadOutlined, SearchOutlined, UpOutlined } from '@ant-design/icons-vue'
 import type { JobPostingListItem } from '@/types/jobPosting'
 import { boardApi } from '@/api/boardApi'
-import { useRouter } from 'vue-router'
-import { formatDate } from '@/common/dateUtil'
+import { formatDate, getDDay, isDeadlineSoon } from '@/common/dateUtil'
+import { copyText } from '@/common/clipboardUtil'
 
-const loading = ref(false)
-const originJobPostings = ref<JobPostingListItem[]>([])
-const jobPostings = ref<JobPostingListItem[]>([])
-const searchForm = reactive({
-  type: 'ALL' as 'ALL' | 'TITLE' | 'CONTENT',
-  status: 'PUBLISHED',
-  keyword: '',
-})
-const pagination = reactive({ current: 1, pageSize: 10, total: 0 })
+type DivisionFilter = 'ALL' | 'PUBLIC_RECRUITMENT' | 'EXPERIENCED_RECRUITMENT'
+type StatusFilter = 'ALL' | 'ACCEPTING' | 'UPCOMING'
+
+// 공개 목록 API 의 최대 페이지 크기. 화면에 페이지네이션이 없어 한 번에 받는다.
+const PAGE_SIZE = 100
+
 const router = useRouter()
+const loading = ref(false)
+const jobPostings = ref<JobPostingListItem[]>([])
+const keyword = ref('')
+const division = ref<DivisionFilter>('ALL')
+const status = ref<StatusFilter>('ALL')
+const divisionOpen = ref(true)
 
+// 공고 유형(JobPostingType): 신입 = PUBLIC_RECRUITMENT, 경력 = EXPERIENCED_RECRUITMENT
 const postingTypeMap: Record<string, string> = {
-  PUBLIC_RECRUITMENT: '공개',
-  ROLLING_RECRUITMENT: '수시',
-}
-const recruitStatusTypeMap: Record<string, string> = {
-  ACCEPTING: '진행중',
-  CLOSED: '마감',
-  UPCOMING: '예정',
+  PUBLIC_RECRUITMENT: '신입',
+  EXPERIENCED_RECRUITMENT: '경력',
 }
 
-const searchType = ref({ keyword: '', status: 'ALL' as string | undefined })
-
-const statusTypes = [
+const divisionOptions: { label: string; value: DivisionFilter }[] = [
   { label: '전체', value: 'ALL' },
-  { label: '공개', value: 'PUBLIC_RECRUITMENT' },
-  { label: '수시', value: 'ROLLING_RECRUITMENT' },
+  { label: '신입', value: 'PUBLIC_RECRUITMENT' },
+  { label: '경력', value: 'EXPERIENCED_RECRUITMENT' },
 ]
-const onSearchReset = () => {
-  searchType.value = { keyword: '', status: 'ALL' }
-  jobPostings.value = originJobPostings.value
-}
 
-const onSearchClick = () => {
-  jobPostings.value = originJobPostings.value.filter((item) => {
-    const keywordMatched  =  !searchType.value.keyword || item.title.includes(searchType.value.keyword)
-    const statusMatched   =  (searchType.value.status === 'ALL')? item : item.postingType === searchType.value.status
+const statusOptions: { label: string; value: StatusFilter }[] = [
+  { label: '전체', value: 'ALL' },
+  { label: '접수중', value: 'ACCEPTING' },
+  { label: '예정', value: 'UPCOMING' },
+]
 
-    return keywordMatched && statusMatched
-  })
-}
+const filteredJobPostings = computed<JobPostingListItem[]>(() => {
+  const trimmedKeyword = keyword.value.trim()
+  return jobPostings.value.filter(
+    (item) =>
+      (!trimmedKeyword || item.title.includes(trimmedKeyword)) &&
+      (division.value === 'ALL' || item.postingType === division.value) &&
+      (status.value === 'ALL' || item.receptionStatus === status.value),
+  )
+})
+
 async function loadJobPostings() {
   loading.value = true
   try {
     const result = await boardApi.fetchJobPostings({
-      page: pagination.current - 1,
-      size: pagination.pageSize,
-      type: searchForm.type,
+      page: 0,
+      size: PAGE_SIZE,
+      type: 'ALL',
       status: 'OPEN',
-      keyword: searchType.value.keyword,
+      keyword: '',
     })
 
-    originJobPostings.value = result.data.data.content
-    jobPostings.value = result.data.data.content
-    pagination.total = result.data.data.totalElements
+    // 진행중인 채용만 노출한다(접수 마감 공고 제외).
+    jobPostings.value = result.data.data.content.filter((item) => item.receptionStatus !== 'CLOSED')
   } finally {
     loading.value = false
   }
 }
 
-const columns: TableColumnsType<JobPostingListItem> = [
-  {
-    title: '공고명',
-    dataIndex: 'title',
-    key: 'title',
-    customRender: ({ text, record }) => h('a', { onClick: () => goDetail(record.id) }, text),
-  },
-  {
-    title: '공고유형',
-    dataIndex: 'postingType',
-    key: 'postingType',
-    customRender: ({ text }: { text: string }) => postingTypeMap[text] || '-',
-    width: 120,
-  },
-  {
-    title: '상태',
-    dataIndex: 'receptionStatus',
-    key: 'status',
-    width: 120,
-    customRender: ({ text }) =>
-      h('span', { class: `status-tag ${text}` }, recruitStatusTypeMap[text]),
-  },
-  {
-    title: '접수기간',
-    key: 'receptionPeriod',
-    customRender: ({ record }) =>
-      `${formatDate(record.receptionStartDateTime, 'YYYY-MM-DD HH:mm')} ~ ${formatDate(record.receptionEndDateTime, 'YYYY-MM-DD HH:mm')}`,
-    width: 280,
-  },
-]
+const onReset = () => {
+  keyword.value = ''
+  division.value = 'ALL'
+  status.value = 'ALL'
+}
+
+// 공고 상세 URL 클립보드 복사
+const copyPostingUrl = async (posting: JobPostingListItem) => {
+  const url = new URL(router.resolve(`/applicant/${posting.id}/detail`).href, window.location.origin).href
+
+  try {
+    await copyText(url)
+    message.success(`“${posting.title}” 링크가 복사되었습니다.`)
+  } catch {
+    message.warning('클립보드 복사에 실패했습니다.')
+  }
+}
 
 const goDetail = async (id: number) => {
   const selectedPosting = jobPostings.value.find((item) => item.id === id)
@@ -140,13 +193,17 @@ const goDetail = async (id: number) => {
   })
 }
 
+const scrollToTop = () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
 onMounted(() => {
   loadJobPostings()
 })
 </script>
 
 <style scoped>
-.recruitProcedure-page {
+.recruits-page {
   width: 100%;
   background: #ffffff;
   color: var(--tap-text);
@@ -156,7 +213,6 @@ onMounted(() => {
   max-width: var(--app-frame-width);
   margin: 0 auto;
   padding: 98px var(--app-frame-padding-x) 88px;
-  /* padding: 42px 20px 88px; */
 }
 
 .page-title {
@@ -168,99 +224,316 @@ onMounted(() => {
   color: var(--tap-text);
 }
 
-.sample-page {
-  max-width: var(--app-frame-width);
-  margin: 0 auto;
-  padding: 32px var(--app-frame-padding-x) 60px;
+.recruit-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 232px) minmax(0, 1fr);
+  gap: 56px;
+  align-items: start;
 }
 
-.search-form {
-  margin-bottom: 16px;
+/* =========================
+   필터 영역
+========================= */
+
+.filter-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
 }
 
-:deep(.ant-descriptions-item-label) {
-  font-size: 16px;
-  font-weight: 500;
-}
-
-:deep(.ant-descriptions-item-content) {
-  font-size: 16px;
-}
-
-.jobPosting-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.jobPosting-item {
+.filter-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 0;
-  border-top: 1px solid #edf0f2;
+}
+
+.filter-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.reset-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--app-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
 }
 
-.jobPosting-item:hover .jobPosting-text {
-  color: var(--app-color-primary-emerald);
-  /* text-decoration: double; */
+.reset-button:hover {
+  color: var(--app-color-primary);
 }
 
-.jobPosting-main {
+.keyword-box {
   display: flex;
   align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 14px 0 16px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: #f5f7fa;
+}
+
+.keyword-box:focus-within {
+  border-color: var(--app-color-primary);
+  background: #ffffff;
+}
+
+.keyword-box input {
+  flex: 1;
   min-width: 0;
-  gap: 6px;
-}
-
-.jobPosting-text {
-  overflow: hidden;
-  color: var(--app-text-primary);
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--tap-text);
   font-size: 14px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.jobPosting-date {
-  flex-shrink: 0;
+.keyword-box input::placeholder {
   color: var(--app-text-muted);
-  font-size: 12px;
 }
 
-:deep(.ant-table-cell) .status-tag {
-  margin: 0;
+.keyword-icon {
+  color: var(--app-text-secondary);
+  font-size: 17px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.division-group {
+  padding-top: 8px;
+}
+
+.filter-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
   border: 0;
   background: transparent;
-  padding: 0;
-  font-weight: 500;
+  color: var(--tap-text);
+  cursor: pointer;
+}
+
+.filter-group-title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.chevron {
+  font-size: 14px;
+  transition: transform 0.2s ease;
+}
+
+.chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.filter-divider {
+  height: 1px;
+  margin-top: 4px;
+  background: #e5e7eb;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 8px 16px;
+  border: 1px solid #dfe5dc;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #5b6b5f;
   font-size: 13px;
-  line-height: 1.2;
-}
-:deep(.ant-table-cell) .status-tag.ACCEPTING {
-  color: var(--app-color-success);
-}
-
-:deep(.ant-table-cell) .status-tag.UPCOMING {
-  color: #d46b08;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-:deep(.ant-table-cell) .status-tag.CLOSED {
-  color: var(--app-text-muted);
+.chip.active {
+  border-color: var(--app-color-primary);
+  background: var(--app-color-primary);
+  color: #ffffff;
+  font-weight: 600;
 }
 
 /* =========================
-   그리드 영역
+   목록 영역
 ========================= */
 
-.jobPostingTable {
-  border: 1px solid var(--app-border-subtle);
-  border-radius: 10px;
+.recruit-main {
+  min-width: 0;
+}
 
-  background-color: #ffffff;
-  box-shadow: 0 5px 20px var(--tap-panel-shadow);
+.recruit-count {
+  margin: 0 0 18px;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.recruit-count strong {
+  color: var(--app-color-primary);
+  font-weight: 700;
+}
+
+.recruit-list {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid #e5e7eb;
+  list-style: none;
+}
+
+.recruit-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 26px 4px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.recruit-item:hover {
+  background: #f8faf6;
+}
+
+.recruit-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.recruit-title {
+  color: var(--tap-text);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.03em;
+  text-wrap: pretty;
+  cursor: pointer;
+}
+
+.recruit-title:hover {
+  color: var(--app-color-primary);
+}
+
+.recruit-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.type-badge,
+.dday-badge {
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.type-badge {
+  background: #f4f8f0;
+  color: var(--app-color-primary);
+  font-weight: 600;
+}
+
+.dday-badge {
+  background: #f5f7fa;
+  color: var(--app-text-secondary);
+  font-weight: 700;
+}
+
+.dday-badge.soon {
+  background: #fdf3e7;
+  color: var(--app-color-warning);
+}
+
+.recruit-period {
+  margin-left: 4px;
+  color: var(--app-text-secondary);
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+
+.link-button {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--app-text-secondary);
+  font-size: 19px;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  background: #f4f8f0;
+  color: var(--app-color-primary);
+}
+
+.empty-box {
+  padding: 64px 0;
+  color: var(--app-text-muted);
+  font-size: 15px;
+  text-align: center;
+}
+
+.top-button {
+  position: fixed;
+  right: 40px;
+  bottom: 48px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 56px;
+  height: 56px;
+  border: 1px solid #e5e7eb;
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--tap-text);
+  font-size: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+}
+
+.top-button span {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.top-button:hover {
+  border-color: var(--app-color-primary);
+  color: var(--app-color-primary);
 }
 
 /* =========================
@@ -275,8 +548,18 @@ onMounted(() => {
     font-size: 30px;
   }
 
-  .benefit-tabs {
-    margin-top: 30px;
+  .recruit-layout {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .recruit-title {
+    font-size: 18px;
+  }
+
+  .top-button {
+    right: 16px;
+    bottom: 24px;
   }
 }
 </style>

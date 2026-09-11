@@ -45,8 +45,8 @@ const receptionStatusLabelMap: Record<string, string> = {
   CLOSED: '접수 종료',
 }
 const postingTypeLabelMap: Record<string, string> = {
-  PUBLIC_RECRUITMENT: '공개채용',
-  EXPERIENCED_RECRUITMENT: '경력채용',
+  PUBLIC_RECRUITMENT: '신입',
+  EXPERIENCED_RECRUITMENT: '경력',
   INTERN_RECRUITMENT: '인턴채용',
   ROLLING_RECRUITMENT: '수시채용',
 }

@@ -353,7 +353,7 @@ const campusType: { value: campusType; label: string }[] = [
 ]
 
 const isPostingPUBLIC = () => {
-  return props.formPage.postingType === 'PUBLIC_RECRUITMENT' || props.formPage.postingType === 'EXPERIENCED_RECRUITMENT'
+  return props.formPage.postingType === 'PUBLIC_RECRUITMENT'
 }
 
 // 학교 검색 모달
