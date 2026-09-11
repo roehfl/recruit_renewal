@@ -263,7 +263,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
   - `completionSummary`: `{ requiredSectionCount, completedRequiredSectionCount, requiredMissingCount, optionalSectionCount, completedOptionalSectionCount, optionalIncompleteCount, requiredCompletionRate, submitBlockingIssueCount }`
   - `requiredMissingSections` / `optionalIncompleteSections`: `[{ sectionCode, sectionName, required, complete, reasonCode, message }]` — **미완 섹션만** 담김(완료 섹션은 목록에 없음).
   - 그 외: `{ applicationId, jobPostingId, jobPostingTitle, jobPositionName, applicationStatus, accepting, editable, submittable, withdrawable, submittedAt, withdrawnAt, latestAnnouncedStageName, latestResultStatus }`
-- 플래그 규칙(2026-09-02 변경): `editable = status != WITHDRAWN && accepting` — **최종 제출(SUBMITTED) 이후에도 접수기간 중이면 수정 가능**. `submittable = status == DRAFT && accepting && 결함 0`(재제출 없음), `withdrawable = status == SUBMITTED && accepting`.
+- 플래그 규칙(2026-09-02 변경): `editable = status != WITHDRAWN && accepting` — **최종 제출(SUBMITTED) 이후에도 접수기간 중이면 수정 가능**. `submittable = status != WITHDRAWN && accepting && 결함 0`(2026-09-11 변경: 제출 후 재제출 허용, 이전에는 DRAFT 전용. `POST /applications/{id}/submit`도 WITHDRAWN만 거부하며, 재제출 시 `submittedAt`은 마지막 제출 시각으로 갱신), `withdrawable = status == SUBMITTED && accepting`.
 - 프론트 완료 판정: 필수 섹션은 `sectionCode`가 `requiredMissingSections`에 **없으면** 완료로 본다. 프론트 `ApplicationSectionType` ↔ 백엔드 `sectionCode` 매핑 필요 — 대부분 동일하나 **`QUESTION_ANSWER` ↔ `QUESTION`**. **`CAREER`는 checker 판정 대상이 아님**(완료 확정 불가 → 완료로 단정하지 않음).
 - 갱신 시점: 화면 최초 로드(form-page 조회 직후) + **임시저장 성공 직후** 재조회하여 카운터 재계산.
 - 매핑: front `dashboardApi.getDashboard()` ↔ back `ApplicationController.getDashboard()`.
@@ -279,7 +279,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 용도: 지원서 작성 화면의 폼 메타/레이아웃 로드. 응답 `postingType`으로 프론트가 채용유형별 UI 분기(학력 성적 입력: 신입=`PUBLIC_RECRUITMENT`=학기별+평균, 경력=`EXPERIENCED_RECRUITMENT`=평균만. 2026-09-11 신입/경력 체계로 변경, `INTERN_RECRUITMENT`·`ROLLING_RECRUITMENT`는 레거시로 평균만)를 판단한다.
 - 변경(2026-07-06, 🟢 확정): 응답에 `postingType`(`JobPostingType`) 추가.
 - 응답(200): `ApiResponse<{ applicationId, jobPostingId, jobPostingTitle, jobPostingStatus, postingType, jobPositionId, jobPositionName, applicationStatus, receptionStartDateTime, receptionEndDateTime, accepting, editable, submittedAt, withdrawnAt, formConfig, sections:[...] }>`
-- `editable` 규칙(2026-09-02 변경): `status != WITHDRAWN && accepting`. 제출 이후에도 접수기간 중이면 true다. 프론트는 `editable`로 섹션 편집/임시저장을, `applicationStatus == 'DRAFT'`로 최종 제출 버튼을 제어한다.
+- `editable` 규칙(2026-09-02 변경): `status != WITHDRAWN && accepting`. 제출 이후에도 접수기간 중이면 true다. 프론트는 `editable`로 섹션 편집/임시저장과 최종 제출 버튼을 함께 제어한다(2026-09-11 변경: 제출 후에도 접수기간 중이면 재제출 가능. 이전에는 `applicationStatus == 'DRAFT'`일 때만 제출 버튼 활성).
 - `postingType` 값: `"PUBLIC_RECRUITMENT" | "EXPERIENCED_RECRUITMENT" | "INTERN_RECRUITMENT" | "ROLLING_RECRUITMENT"`. 공고 미설정 시 백엔드 기본값 `PUBLIC_RECRUITMENT`.
 - 유형→성적모드 매핑은 **프론트**에 위치(백엔드 학력 검증 무변경). 주의: 현재 학력 검증은 비고졸 평균평점 필수·학기별 선택이므로, 공개·인턴이라도 평균 입력란을 숨기면 저장이 400으로 막힌다(평균 유지 필요).
 - 매핑: front form-page 로드 ↔ back `ApplicationController.getFormPage()`.

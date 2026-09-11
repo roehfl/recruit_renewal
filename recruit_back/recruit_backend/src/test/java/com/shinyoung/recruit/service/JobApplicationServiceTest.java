@@ -545,7 +545,7 @@ class JobApplicationServiceTest {
     }
 
     @Test
-    void submit_fails_when_application_is_not_draft_or_owner_is_invalid() {
+    void submit_fails_when_application_is_withdrawn_or_owner_is_invalid() {
         Applicant applicant = createApplicant("applicant-submit-invalid", "Applicant T");
         Applicant otherApplicant = createApplicant("applicant-submit-other", "Applicant U");
         Long jobPostingId = createPublishedJobPosting();
@@ -560,8 +560,10 @@ class JobApplicationServiceTest {
         seedBasicInfo(applicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(applicant.getId(), applicationId);
 
-        assertThatThrownBy(() -> jobApplicationService.submit(applicant.getId(), applicationId))
-                .isInstanceOf(InvalidJobApplicationException.class);
+        // 제출 후 접수기간 중에는 다시 제출할 수 있다(재제출).
+        assertThat(jobApplicationService.submit(applicant.getId(), applicationId)).isEqualTo(applicationId);
+        assertThat(jobApplicationRepository.findById(applicationId).orElseThrow().getStatus())
+                .isEqualTo(JobApplicationStatus.SUBMITTED);
 
         jobApplicationService.withdraw(applicant.getId(), applicationId);
 

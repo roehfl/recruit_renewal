@@ -154,7 +154,7 @@ public class JobApplicationService {
     public Long submit(Long applicantId, Long applicationId) {
         JobApplication application = findApplication(applicantId, applicationId);
         validatePublishedAndAccepting(application.getJobPosting());
-        validateDraftForSubmit(application);
+        validateSubmittable(application);
         validateApplicationFormConfig(application.getJobPosting());
         validateSelectedJobPosition(application);
         validateWorkLocationChoice(application.getJobPosition(), application.getWorkLocationCode());
@@ -384,9 +384,10 @@ public class JobApplicationService {
         }
     }
 
-    private void validateDraftForSubmit(JobApplication application) {
-        if (application.getStatus() != JobApplicationStatus.DRAFT) {
-            throw new InvalidJobApplicationException("임시저장 상태의 지원서만 제출할 수 있습니다.");
+    /** 임시저장·제출 상태면 제출할 수 있다. 제출 후 수정한 내용은 접수기간 중 다시 제출한다(재제출). */
+    private void validateSubmittable(JobApplication application) {
+        if (application.getStatus() == JobApplicationStatus.WITHDRAWN) {
+            throw new InvalidJobApplicationException("철회된 지원서는 제출할 수 없습니다.");
         }
     }
 
