@@ -214,8 +214,8 @@ const pageTitle = computed(() => {
 
 const canEdit = computed(() => formPage.value?.editable === true)
 
-/* 최종 제출은 임시저장 상태에서만 가능하다. 제출 이후에는 수정·임시저장만 허용한다. */
-const canSubmit = computed(() => canEdit.value && formPage.value?.applicationStatus === 'DRAFT')
+/* 수정 가능하면 최종 제출도 가능하다. 제출 후 수정한 내용은 접수기간 중 다시 최종 제출한다(재제출). */
+const canSubmit = computed(() => canEdit.value)
 
 /*
  * 지원분야(모집분야·근무지) 선택. 후보 목록은 공개 공고 상세(GET /job-postings/{id})를 재사용하며 별도 API를 두지 않는다.
@@ -676,7 +676,9 @@ async function saveCurrentPage(): Promise<void> {
 function confirmSubmit(): void {
   Modal.confirm({
     title: '최종 제출',
-    content: '최종 제출 후에는 지원서 수정이 제한될 수 있습니다. 제출하시겠습니까?',
+    content: formPage.value?.applicationStatus === 'SUBMITTED'
+      ? '이미 제출한 지원서입니다. 현재 내용으로 다시 제출하시겠습니까?'
+      : '최종 제출 후에는 지원서 수정이 제한될 수 있습니다. 제출하시겠습니까?',
     okText: '최종 제출',
     cancelText: '취소',
     async onOk() {

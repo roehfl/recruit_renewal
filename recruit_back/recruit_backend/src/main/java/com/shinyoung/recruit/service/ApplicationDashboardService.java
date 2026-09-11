@@ -38,7 +38,8 @@ public class ApplicationDashboardService {
         ApplicationResultSummary resultSummary = loadResultSummary(applicationId);
 
         boolean editable = application.getStatus() != JobApplicationStatus.WITHDRAWN && accepting;
-        boolean submittable = application.getStatus() == JobApplicationStatus.DRAFT
+        // 제출(SUBMITTED) 후에도 접수기간 중이면 다시 제출할 수 있다.
+        boolean submittable = application.getStatus() != JobApplicationStatus.WITHDRAWN
                 && accepting
                 && completion.summary().submitBlockingIssueCount() == 0;
         boolean withdrawable = application.getStatus() == JobApplicationStatus.SUBMITTED && accepting;

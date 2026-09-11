@@ -36,22 +36,6 @@
             </div>
           </div>
 
-          <div class="filter-divider" />
-
-          <div class="filter-group">
-            <span class="filter-group-title">접수상태</span>
-            <div class="chip-list">
-              <button
-                v-for="option in statusOptions"
-                :key="option.value"
-                type="button"
-                :class="['chip', { active: status === option.value }]"
-                @click="status = option.value"
-              >
-                {{ option.label }}
-              </button>
-            </div>
-          </div>
         </aside>
 
         <div class="recruit-main">
@@ -106,7 +90,6 @@ import { formatDate, getDDay, isDeadlineSoon } from '@/common/dateUtil'
 import { copyText } from '@/common/clipboardUtil'
 
 type DivisionFilter = 'ALL' | 'PUBLIC_RECRUITMENT' | 'EXPERIENCED_RECRUITMENT'
-type StatusFilter = 'ALL' | 'ACCEPTING' | 'UPCOMING'
 
 // 공개 목록 API 의 최대 페이지 크기. 화면에 페이지네이션이 없어 한 번에 받는다.
 const PAGE_SIZE = 100
@@ -116,7 +99,6 @@ const loading = ref(false)
 const jobPostings = ref<JobPostingListItem[]>([])
 const keyword = ref('')
 const division = ref<DivisionFilter>('ALL')
-const status = ref<StatusFilter>('ALL')
 const divisionOpen = ref(true)
 
 // 공고 유형(JobPostingType): 신입 = PUBLIC_RECRUITMENT, 경력 = EXPERIENCED_RECRUITMENT
@@ -131,19 +113,12 @@ const divisionOptions: { label: string; value: DivisionFilter }[] = [
   { label: '경력', value: 'EXPERIENCED_RECRUITMENT' },
 ]
 
-const statusOptions: { label: string; value: StatusFilter }[] = [
-  { label: '전체', value: 'ALL' },
-  { label: '접수중', value: 'ACCEPTING' },
-  { label: '예정', value: 'UPCOMING' },
-]
-
 const filteredJobPostings = computed<JobPostingListItem[]>(() => {
   const trimmedKeyword = keyword.value.trim()
   return jobPostings.value.filter(
     (item) =>
       (!trimmedKeyword || item.title.includes(trimmedKeyword)) &&
-      (division.value === 'ALL' || item.postingType === division.value) &&
-      (status.value === 'ALL' || item.receptionStatus === status.value),
+      (division.value === 'ALL' || item.postingType === division.value),
   )
 })
 
@@ -158,8 +133,8 @@ async function loadJobPostings() {
       keyword: '',
     })
 
-    // 진행중인 채용만 노출한다(접수 마감 공고 제외).
-    jobPostings.value = result.data.data.content.filter((item) => item.receptionStatus !== 'CLOSED')
+    // 접수중인 공고만 노출한다(접수 예정·마감 제외).
+    jobPostings.value = result.data.data.content.filter((item) => item.receptionStatus === 'ACCEPTING')
   } finally {
     loading.value = false
   }
@@ -168,7 +143,6 @@ async function loadJobPostings() {
 const onReset = () => {
   keyword.value = ''
   division.value = 'ALL'
-  status.value = 'ALL'
 }
 
 // 공고 상세 URL 클립보드 복사
@@ -342,12 +316,6 @@ onMounted(() => {
 
 .chevron.collapsed {
   transform: rotate(-90deg);
-}
-
-.filter-divider {
-  height: 1px;
-  margin-top: 4px;
-  background: #e5e7eb;
 }
 
 .chip-list {

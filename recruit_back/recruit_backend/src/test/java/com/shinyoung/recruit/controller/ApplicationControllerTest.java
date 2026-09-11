@@ -295,11 +295,26 @@ class ApplicationControllerTest {
     }
 
     @Test
+    void resubmit_submitted_application_returns_api_response() throws Exception {
+        Applicant applicant = createApplicant("api-resubmit", "Api Resubmit");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
+        jobApplicationService.submit(applicant.getId(), applicationId);
+        authenticate(applicant);
+
+        mockMvc.perform(post("/api/applications/{applicationId}/submit", applicationId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value(applicationId));
+    }
+
+    @Test
     void submit_invalid_state_returns_api_response() throws Exception {
         Applicant applicant = createApplicant("api-submit-state", "Api Submit State");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
         jobApplicationService.submit(applicant.getId(), applicationId);
+        jobApplicationService.withdraw(applicant.getId(), applicationId);
         authenticate(applicant);
 
         mockMvc.perform(post("/api/applications/{applicationId}/submit", applicationId))
@@ -510,7 +525,7 @@ class ApplicationControllerTest {
                 .andExpect(jsonPath("$.data.applicationStatus").value("SUBMITTED"))
                 .andExpect(jsonPath("$.data.accepting").value(true))
                 .andExpect(jsonPath("$.data.editable").value(true))
-                .andExpect(jsonPath("$.data.submittable").value(false))
+                .andExpect(jsonPath("$.data.submittable").value(true))
                 .andExpect(jsonPath("$.data.withdrawable").value(true))
                 .andExpect(jsonPath("$.data.submittedAt").exists())
                 .andExpect(jsonPath("$.data.withdrawnAt").doesNotExist())

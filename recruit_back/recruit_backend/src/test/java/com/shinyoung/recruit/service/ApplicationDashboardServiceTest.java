@@ -219,14 +219,15 @@ class ApplicationDashboardServiceTest {
     }
 
     @Test
-    void submitted_accepting_application_is_editable_and_withdrawable() {
+    void submitted_accepting_application_is_editable_resubmittable_and_withdrawable() {
         JobApplication application = application(JobApplicationStatus.SUBMITTED, acceptingPosting(config()));
         stubDashboard(application);
+        when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
 
         ApplicationDashboardResponse response = dashboardService.getDashboard(APPLICANT_ID, APPLICATION_ID);
 
         assertThat(response.editable()).isTrue();
-        assertThat(response.submittable()).isFalse();
+        assertThat(response.submittable()).isTrue();
         assertThat(response.withdrawable()).isTrue();
     }
 
