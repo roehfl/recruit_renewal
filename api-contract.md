@@ -276,7 +276,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 
 #### GET `/applications/{applicationId}/form-page`  🟢 확정 (백엔드 구현·검증 완료)
 
-- 용도: 지원서 작성 화면의 폼 메타/레이아웃 로드. 응답 `postingType`으로 프론트가 채용유형별 UI 분기(예: 학력 성적 입력을 공개·인턴=학기별, 경력·수시=평균만 표시)를 판단한다.
+- 용도: 지원서 작성 화면의 폼 메타/레이아웃 로드. 응답 `postingType`으로 프론트가 채용유형별 UI 분기(학력 성적 입력: 신입=`PUBLIC_RECRUITMENT`=학기별+평균, 경력=`EXPERIENCED_RECRUITMENT`=평균만. 2026-09-11 신입/경력 체계로 변경, `INTERN_RECRUITMENT`·`ROLLING_RECRUITMENT`는 레거시로 평균만)를 판단한다.
 - 변경(2026-07-06, 🟢 확정): 응답에 `postingType`(`JobPostingType`) 추가.
 - 응답(200): `ApiResponse<{ applicationId, jobPostingId, jobPostingTitle, jobPostingStatus, postingType, jobPositionId, jobPositionName, applicationStatus, receptionStartDateTime, receptionEndDateTime, accepting, editable, submittedAt, withdrawnAt, formConfig, sections:[...] }>`
 - `editable` 규칙(2026-09-02 변경): `status != WITHDRAWN && accepting`. 제출 이후에도 접수기간 중이면 true다. 프론트는 `editable`로 섹션 편집/임시저장을, `applicationStatus == 'DRAFT'`로 최종 제출 버튼을 제어한다.
@@ -771,6 +771,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 변경: 요청에 `workLocationCode` 추가 → `{ jobPostingId, jobPositionId, workLocationCode? }`
 - 검증: 선택 직무의 후보가 1건 이상인데 `workLocationCode`가 없으면 400 / 후보에 없는 코드면 400 / 후보 0건인데 값을 보내면 400
 - 저장: `JobApplication.workLocationCode` + `workLocationNameSnapshot`(선택 시점 `displayName` 스냅샷, 기존 `jobPositionNameSnapshot`과 동일 규약)
+- 호출 시점(2026-09-11 변경, 요청 형태 불변): 공고 상세에서는 모집분야를 고르지 않는다. 상세 '지원하기' → 지원서 작성 시작 화면(`/applicant/{jobPostingId}/apply`)에서 모집분야·근무지 선택 후 '지원서 작성' 버튼으로 호출한다. 모집분야가 1개여도 자동 생성하지 않는다.
 
 #### POST `/applications/{applicationId}`  🟢 확정(2026-08-31) (지원분야 수정)
 
@@ -779,7 +780,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 #### GET `/applications/{applicationId}/form-page`  🟢 확정(2026-08-31) (표시용 확장)
 
 - 변경: 응답에 `workLocationCode` + `workLocationName` 추가(스냅샷 기준, 미선택이면 null). 지원서 작성 화면 헤더의 "모집분야 / 근무지" 읽기전용 표시와, 지원분야 변경 모달의 초기 선택값으로 쓴다
-- 지원분야 변경(2026-08-31): 지원서 작성 화면 헤더의 "변경" 버튼이 모달을 열고 `POST /applications/{applicationId}` 로 저장한다. 모집분야·근무지 후보 목록은 **공개 공고 상세(`GET /job-postings/{id}`)를 재사용**하며 전용 API를 두지 않는다. 철회 전(DRAFT·SUBMITTED)이고 접수기간 중이면 노출한다(`editable`, 2026-09-02 변경 — 이전에는 DRAFT 전용)
+- 지원분야 변경(2026-09-11 변경): 지원서 작성 화면 헤더의 모집분야·근무지 **상시 드롭다운**을 바꾸면 확인 창 후 `POST /applications/{applicationId}` 로 저장한다(취소 시 저장된 값 복구). 이전의 "변경" 버튼+모달은 폐지. 모집분야·근무지 후보 목록은 **공개 공고 상세(`GET /job-postings/{id}`)를 재사용**하며 전용 API를 두지 않는다. 철회 전(DRAFT·SUBMITTED)이고 접수기간 중이면 노출한다(`editable`, 2026-09-02 변경 — 이전에는 DRAFT 전용)
 
 #### GET `/admin/applications`, GET `/admin/job-postings/{jobPostingId}/applications`  🟢 확정(2026-08-31) (근무지 조건 의미 변경)
 

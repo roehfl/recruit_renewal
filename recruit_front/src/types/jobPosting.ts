@@ -39,6 +39,10 @@ export interface JobPositionPublicOption {
 export interface JobPostingDetail {
   id: number
   title: string
+  postingType: string
+  receptionStatus: string
+  receptionStartDateTime: string
+  receptionEndDateTime: string
   contentHtml: string
   images: JobPostingImage[]
   jobPositions?: JobPositionPublicOption[]

@@ -82,6 +82,15 @@ export const applicantRoutes: RouteRecordRaw[] = [
         },
       },
       {
+        path: ':jobPostingId/apply',    // 채용공고 > 지원서 작성 시작(모집분야 선택 후 지원서 생성)
+        name: 'ApplicationStart',
+        component: () => import('@/views/applicant/ApplicationFormView.vue'),
+        meta: {
+          public: true,
+          activeMenuPath: '/applicant/recruits',
+        },
+      },
+      {
         path: 'dutyIntroduction',
         name: 'ApplicantDutyIntroduction',
         component: () => import('@/views/applicant/ApplicantDutyIntroduction.vue'),

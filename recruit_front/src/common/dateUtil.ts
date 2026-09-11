@@ -95,3 +95,10 @@ export const getDDay = (endDateTime: DateInput): string => {
 
   return `D-${diffDay}`
 }
+
+// 마감 7일 이내(D-DAY 포함)면 true. D-day 강조 표시에 쓴다.
+export const isDeadlineSoon = (endDateTime: DateInput): boolean => {
+  const dday = getDDay(endDateTime)
+  if (dday === 'D-DAY') return true
+  return dday.startsWith('D-') && Number(dday.slice(2)) <= 7
+}

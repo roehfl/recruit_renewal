@@ -54,10 +54,8 @@ const images = ref<EditableImage[]>([])
 const removedImageIds = ref<number[]>([])
 
 const postingTypeOptions = [
-  { value: 'PUBLIC_RECRUITMENT', label: '공개채용' },
-  { value: 'EXPERIENCED_RECRUITMENT', label: '경력채용' },
-  { value: 'INTERN_RECRUITMENT', label: '인턴채용' },
-  { value: 'ROLLING_RECRUITMENT', label: '수시채용' },
+  { value: 'PUBLIC_RECRUITMENT', label: '신입' },
+  { value: 'EXPERIENCED_RECRUITMENT', label: '경력' },
 ]
 const applicationTypeOptions = [
   { value: 'NEW_GRADUATE', label: '신입' },

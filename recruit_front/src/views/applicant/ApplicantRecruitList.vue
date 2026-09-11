@@ -7,11 +7,6 @@
       </div>
     </div>
 
-    <a-tabs v-model:activeKey="activeTab" class="recruit-tabs" :tabBarGutter="8">
-      <a-tab-pane key="PUBLIC_RECRUITMENT" tab="공개채용" />
-      <a-tab-pane key="ROLLING_RECRUITMENT" tab="수시채용" />
-    </a-tabs>
-
     <div class="recruit-list">
       <template v-if="filteredRecruitList.length > 0">
         <button
@@ -58,12 +53,9 @@ import { boardApi } from '@/api/boardApi'
 import type { JobPostingListItem } from '@/types/jobPosting'
 import { formatDate, getDDay } from '@/common/dateUtil'
 
-type RecruitType = 'PUBLIC_RECRUITMENT' | 'ROLLING_RECRUITMENT'
-
 const router = useRouter()
 const loading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0 })
-const activeTab = ref<RecruitType>('PUBLIC_RECRUITMENT')
 
 const originJobPostings = ref<JobPostingListItem[]>([])
 const jobPostings = ref<JobPostingListItem[]>([])
@@ -106,9 +98,7 @@ async function loadJobPostings() {
 const HOME_RECRUIT_LIMIT = 4
 
 const filteredRecruitList = computed<JobPostingListItem[]>(() => {
-  return jobPostings.value
-    .filter((item) => item.postingType === activeTab.value)
-    .slice(0, HOME_RECRUIT_LIMIT)
+  return jobPostings.value.slice(0, HOME_RECRUIT_LIMIT)
 })
 
 const goRecruitDetail = async (recruitId: number): Promise<void> => {
@@ -153,48 +143,6 @@ onMounted(() => {
   color: var(--app-text-secondary);
   font-size: 14px;
   line-height: 1.45;
-}
-
-.recruit-tabs {
-  margin-top: 8px;
-}
-
-:deep(.ant-tabs-nav) {
-  margin-bottom: 0px;
-}
-
-:deep(.ant-tabs-tab) {
-  padding: 0;
-}
-
-:deep(.ant-tabs-tab-btn) {
-  min-width: 96px;
-  padding: 9px 18px;
-  border-radius: 8px;
-  color: var(--tap-muted);
-  font-size: 15px;
-  text-align: center;
-}
-
-:deep(.ant-tabs-tab-btn:hover) {
-  color: var(--app-color-primary);
-  font-weight: 500;
-}
-
-/* :deep(.ant-tabs-tab-active .ant-tabs-tab-btn) {
-  background: var(--app-bg-btn-hover);
-  color: var(--app-color-primary);
-  font-weight: 600;
-} */
-
-:deep(.ant-tabs-tab-active .ant-tabs-tab-btn) {
-  /* background: color-mix(in srgb, var(--app-color-primary) 5%, transparent); */
-  color: var(--app-color-primary);
-  font-weight: 600;
-}
-
-:deep(.ant-tabs-ink-bar) {
-  /* display: none; */
 }
 
 .recruit-list {
