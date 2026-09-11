@@ -2,10 +2,10 @@
 import { computed, defineComponent, h, ref, watch } from 'vue'
 import type { Component, ComponentPublicInstance } from 'vue'
 import type { ApplicationSectionType, ApplicationFormItem, ApplicationFormPage, ApplicationFormPageResponse, SectionActionHandle } from '@/types/application'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
-  EditOutlined,
+  FormOutlined,
   LeftOutlined,
   ReloadOutlined,
   RightOutlined,
@@ -209,15 +209,7 @@ const stepItems = computed<ApplicationStepItem[]>(() => {
 })
 
 const pageTitle = computed(() => {
-  return formPage.value?.jobPostingTitle ?? formPage.value?.postingTitle ?? '지원서 작성'
-})
-
-const selectedPositionText = computed(() => {
-  if (!formPage.value?.jobPositionName) {
-    return '모집분야 미선택'
-  }
-
-  return formPage.value.jobPositionName
+  return formPage.value?.jobPostingTitle ?? formPage.value?.postingTitle ?? postingTitle.value ?? '지원서 작성'
 })
 
 const canEdit = computed(() => formPage.value?.editable === true)
@@ -226,15 +218,30 @@ const canEdit = computed(() => formPage.value?.editable === true)
 const canSubmit = computed(() => canEdit.value && formPage.value?.applicationStatus === 'DRAFT')
 
 /*
- * 지원분야 변경 모달. 임시저장(DRAFT) 상태에서만 열 수 있고, 저장은 POST /applications/{id} 한 번이다.
- * 후보 목록은 공개 공고 상세를 재사용해 받아오며(모달 최초 오픈 시 1회) 별도 API를 두지 않는다.
+ * 지원분야(모집분야·근무지) 선택. 후보 목록은 공개 공고 상세(GET /job-postings/{id})를 재사용하며 별도 API를 두지 않는다.
+ * - 작성 시작(:jobPostingId/apply): 모집분야를 고른 뒤 '지원서 작성' 버튼으로 지원서를 만든다(POST /applications). 자동 생성은 하지 않는다.
+ * - 작성(:applicationId/form): 드롭다운을 바꾸면 확인 후 POST /applications/{id} 로 저장하고, 취소하면 저장된 값으로 되돌린다.
  */
-const positionModalOpen = ref(false)
-const positionModalLoading = ref(false)
-const positionModalSaving = ref(false)
+const router = useRouter()
+
+const startJobPostingId = computed<number | null>(() => {
+  const raw = route.params.jobPostingId
+  const value = Array.isArray(raw) ? raw[0] : raw
+  const parsed = Number(value)
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+})
+
+// 아직 지원서가 없는 작성 시작 단계
+const isStartMode = computed(() => applicationId.value === null && startJobPostingId.value !== null)
+
+const postingTitle = ref<string>()
 const postingPositions = ref<JobPositionPublicOption[]>([])
-const editingPositionId = ref<number | undefined>()
-const editingWorkLocationCode = ref<string | undefined>()
+const loadedPostingId = ref<number | null>(null)
+const selectedPositionId = ref<number | undefined>()
+const selectedWorkLocationCode = ref<string | undefined>()
+const positionSaving = ref(false)
+const creating = ref(false)
 
 const positionOptions = computed(() =>
   postingPositions.value.map((position) => ({ label: position.positionName, value: position.id })),
@@ -245,59 +252,97 @@ function workLocationOptionsOf(positionId: number | undefined): { label: string;
   return (position?.workLocations ?? []).map((it) => ({ label: it.name, value: it.code }))
 }
 
-const editingWorkLocationOptions = computed(() => workLocationOptionsOf(editingPositionId.value))
+const workLocationOptions = computed(() => workLocationOptionsOf(selectedPositionId.value))
 
-// 모집분야를 바꾸면 근무지 선택을 초기화한다. 후보가 1개뿐이면 자동 선택한다(공고 상세와 동일 규칙).
-function handleEditingPositionChange(value: number): void {
-  editingPositionId.value = value
-  const options = workLocationOptionsOf(value)
-  editingWorkLocationCode.value = options.length === 1 ? options[0]!.value : undefined
-}
+const canChangePosition = computed(() => isStartMode.value || (canEdit.value && !positionSaving.value))
 
-async function openPositionModal(): Promise<void> {
-  const jobPostingId = formPage.value?.jobPostingId
-  if (!jobPostingId) {
+// 모집분야만 바꾸고 근무지를 아직 고르지 않은 상태(근무지를 고르면 저장한다)
+const positionPending = computed(
+  () => !isStartMode.value && selectedPositionId.value !== formPage.value?.jobPositionId,
+)
+
+async function loadPostingPositions(jobPostingId: number): Promise<void> {
+  if (loadedPostingId.value === jobPostingId) {
     return
   }
 
-  positionModalOpen.value = true
-  editingPositionId.value = formPage.value?.jobPositionId
-  editingWorkLocationCode.value = formPage.value?.workLocationCode ?? undefined
-
-  if (postingPositions.value.length > 0) {
-    return
-  }
-
-  positionModalLoading.value = true
   try {
     const response = await boardApi.fetchJobPostingDetail(jobPostingId)
+    postingTitle.value = response.data.data.title
     postingPositions.value = response.data.data.jobPositions ?? []
+    loadedPostingId.value = jobPostingId
   } catch (error) {
     message.error(getErrorMessage(error, '모집분야 목록을 불러오지 못했습니다.'))
-    positionModalOpen.value = false
-  } finally {
-    positionModalLoading.value = false
   }
+}
+
+// 저장된 지원분야로 선택값을 되돌린다(작성 시작 단계는 미선택).
+function resetPositionSelection(): void {
+  selectedPositionId.value = formPage.value?.jobPositionId
+  selectedWorkLocationCode.value = formPage.value?.workLocationCode ?? undefined
+}
+
+function selectionText(): string {
+  const positionLabel = positionOptions.value.find((it) => it.value === selectedPositionId.value)?.label ?? ''
+  const workLocationLabel = workLocationOptions.value.find((it) => it.value === selectedWorkLocationCode.value)?.label
+
+  return workLocationLabel
+    ? `선택한 모집분야는 '${positionLabel}', 근무지는 '${workLocationLabel}' 입니다.`
+    : `선택한 모집분야는 '${positionLabel}' 입니다.`
+}
+
+// 모집분야를 바꾸면 근무지 선택을 초기화한다. 후보가 1개뿐이면 자동 선택한다.
+// 작성 단계에서는 근무지까지 정해지면 변경 확인을 띄운다(후보가 여러 개면 근무지 선택 시).
+function handlePositionChange(value: number): void {
+  if (!isStartMode.value && value === formPage.value?.jobPositionId) {
+    resetPositionSelection()
+    return
+  }
+
+  selectedPositionId.value = value
+  const options = workLocationOptionsOf(value)
+  selectedWorkLocationCode.value = options.length === 1 ? options[0]!.value : undefined
+
+  if (!isStartMode.value && options.length <= 1) {
+    confirmPositionChange()
+  }
+}
+
+function handleWorkLocationChange(value: string): void {
+  selectedWorkLocationCode.value = value
+
+  if (!isStartMode.value) {
+    confirmPositionChange()
+  }
+}
+
+function confirmPositionChange(): void {
+  Modal.confirm({
+    icon: null,
+    title: '지원분야 변경',
+    content: `${selectionText()} 지원분야를 변경하시겠습니까?`,
+    okText: '변경',
+    cancelText: '취소',
+    async onOk() {
+      await savePositionChange()
+    },
+    onCancel() {
+      resetPositionSelection()
+    },
+  })
 }
 
 async function savePositionChange(): Promise<void> {
   const id = applicationId.value
-  if (!id || !editingPositionId.value) {
-    message.warning('모집분야를 선택해주세요.')
+  if (!id || !selectedPositionId.value) {
     return
   }
 
-  // 후보 근무지가 있는 모집분야는 근무지 선택이 필수다(백엔드와 동일 규칙).
-  if (editingWorkLocationOptions.value.length > 0 && !editingWorkLocationCode.value) {
-    message.warning('근무지를 선택해주세요.')
-    return
-  }
-
-  positionModalSaving.value = true
+  positionSaving.value = true
   try {
     const response = await apiClient.post<ApiResponse<unknown>>(`/applications/${id}`, {
-      jobPositionId: editingPositionId.value,
-      workLocationCode: editingWorkLocationCode.value ?? null,
+      jobPositionId: selectedPositionId.value,
+      workLocationCode: selectedWorkLocationCode.value ?? null,
     })
 
     if (!response.data.success) {
@@ -305,26 +350,84 @@ async function savePositionChange(): Promise<void> {
     }
 
     message.success('지원분야를 변경했습니다.')
-    positionModalOpen.value = false
     await fetchFormPage(id)
   } catch (error) {
     message.error(getErrorMessage(error, '지원분야 변경에 실패했습니다.'))
+    resetPositionSelection()
   } finally {
-    positionModalSaving.value = false
+    positionSaving.value = false
+  }
+}
+
+function confirmCreateApplication(): void {
+  if (!selectedPositionId.value) {
+    message.warning('모집분야를 선택해주세요.')
+    return
+  }
+
+  // 후보 근무지가 있는 모집분야는 근무지 선택이 필수다(백엔드와 동일 규칙).
+  if (workLocationOptions.value.length > 0 && !selectedWorkLocationCode.value) {
+    message.warning('근무지를 선택해주세요.')
+    return
+  }
+
+  Modal.confirm({
+    icon: null,
+    title: '지원서 작성',
+    content: `${selectionText()} 지원서를 작성하시겠습니까?`,
+    okText: '지원서 작성',
+    cancelText: '취소',
+    async onOk() {
+      await createApplication()
+    },
+  })
+}
+
+async function createApplication(): Promise<void> {
+  const jobPostingId = startJobPostingId.value
+  if (!jobPostingId) {
+    return
+  }
+
+  creating.value = true
+  try {
+    const response = await apiClient.post<ApiResponse<number>>('/applications', {
+      jobPostingId,
+      jobPositionId: selectedPositionId.value,
+      workLocationCode: selectedWorkLocationCode.value ?? null,
+    })
+
+    if (!response.data.success) {
+      throw new Error(response.data.message || '지원서 작성에 실패했습니다.')
+    }
+
+    // 작성 시작 화면은 히스토리에 남기지 않는다(뒤로가기 시 공고 상세로 돌아간다).
+    await router.replace(`/applicant/${response.data.data}/form`)
+  } catch (error) {
+    message.error(getErrorMessage(error, '지원서 작성에 실패했습니다.'))
+  } finally {
+    creating.value = false
   }
 }
 const isFirstPage = computed(() => currentPageIndex.value <= 0)
 const isLastPage = computed(() => currentPageIndex.value >= pages.value.length - 1)
 
 watch(
-  applicationId,
-  async (id) => {
-    if (!id) {
-      message.error('지원서 식별자가 올바르지 않습니다.')
+  [applicationId, startJobPostingId],
+  async ([id, jobPostingId]) => {
+    if (id) {
+      await fetchFormPage(id)
       return
     }
 
-    await fetchFormPage(id)
+    if (jobPostingId) {
+      formPage.value = null
+      resetPositionSelection()
+      await loadPostingPositions(jobPostingId)
+      return
+    }
+
+    message.error('지원서 식별자가 올바르지 않습니다.')
   },
   { immediate: true },
 )
@@ -482,9 +585,10 @@ async function fetchFormPage(id = applicationId.value): Promise<void> {
     }
 
     formPage.value = response.data.data
+    resetPositionSelection()
     currentPageIndex.value = 0
     sectionRefs.value.clear()
-    await fetchCompletion(id)
+    await Promise.all([fetchCompletion(id), loadPostingPositions(response.data.data.jobPostingId)])
   } catch (error) {
     message.error(getErrorMessage(error, '지원서 구성 조회에 실패했습니다.'))
   } finally {
@@ -701,7 +805,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
             <h1>{{ pageTitle }}</h1>
           </div>
 
-          <a-space wrap>
+          <a-space v-if="!isStartMode" wrap>
             <a-tag v-if="formPage?.accepting" color="green">접수중</a-tag>
             <a-tag v-else color="default">접수상태 확인 필요</a-tag>
             <a-tag v-if="canEdit" color="blue">수정 가능</a-tag>
@@ -715,24 +819,46 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
         <!-- 지원 대상(모집분야·근무지). 지원서 전체의 전제라 헤더에서 가장 눈에 띄어야 한다. -->
         <div class="apply-target">
-          <dl class="apply-target-fields">
+          <div class="apply-target-fields">
             <div class="apply-target-field">
-              <dt class="apply-target-label">모집분야</dt>
-              <dd class="apply-target-value">{{ selectedPositionText }}</dd>
+              <span class="apply-target-label">모집분야</span>
+              <a-select
+                :value="selectedPositionId"
+                :options="positionOptions"
+                :disabled="!canChangePosition"
+                placeholder="모집분야를 선택해주세요"
+                class="apply-target-select"
+                @change="handlePositionChange"
+              />
             </div>
-            <div v-if="formPage?.workLocationName" class="apply-target-field">
-              <dt class="apply-target-label">근무지</dt>
-              <dd class="apply-target-value">{{ formPage.workLocationName }}</dd>
+            <div v-if="workLocationOptions.length > 0" class="apply-target-field">
+              <span class="apply-target-label">근무지</span>
+              <a-select
+                :value="selectedWorkLocationCode"
+                :options="workLocationOptions"
+                :disabled="!canChangePosition || workLocationOptions.length === 1"
+                placeholder="근무지를 선택해주세요"
+                class="apply-target-select location"
+                @change="handleWorkLocationChange"
+              />
             </div>
-          </dl>
-          <a-button v-if="canEdit" class="apply-target-change" @click="openPositionModal">
-            <EditOutlined />
-            지원분야 변경
+          </div>
+          <a-button
+            v-if="isStartMode"
+            type="primary"
+            class="apply-target-create"
+            :loading="creating"
+            @click="confirmCreateApplication"
+          >
+            <FormOutlined />
+            지원서 작성
           </a-button>
         </div>
+        <p v-if="isStartMode" class="apply-target-hint">모집분야를 선택한 뒤 '지원서 작성' 버튼을 눌러주세요.</p>
+        <p v-else-if="positionPending" class="apply-target-hint">근무지를 선택하면 지원분야가 변경됩니다.</p>
       </a-card>
 
-      <a-spin :spinning="loading">
+      <a-spin v-if="!isStartMode" :spinning="loading">
         <template v-if="pages.length > 0">
           <a-card class="steps-card" :bordered="false">
             <div class="steps-scroll">
@@ -818,48 +944,10 @@ function getErrorMessage(error: unknown, fallback: string): string {
       </a-spin>
     </div>
 
-    <a-modal
-      v-model:open="positionModalOpen"
-      title="지원분야 변경"
-      :confirm-loading="positionModalSaving"
-      ok-text="변경"
-      cancel-text="취소"
-      @ok="savePositionChange"
-    >
-      <a-spin :spinning="positionModalLoading">
-        <a-form layout="vertical">
-          <a-form-item label="모집분야" required>
-            <a-select
-              :value="editingPositionId"
-              :options="positionOptions"
-              placeholder="모집분야를 선택해주세요"
-              style="width: 100%"
-              @change="handleEditingPositionChange"
-            />
-          </a-form-item>
-          <a-form-item v-if="editingWorkLocationOptions.length > 0" label="근무지" required>
-            <a-select
-              v-model:value="editingWorkLocationCode"
-              :options="editingWorkLocationOptions"
-              :disabled="editingWorkLocationOptions.length === 1"
-              placeholder="근무지를 선택해주세요"
-              style="width: 100%"
-            />
-          </a-form-item>
-        </a-form>
-        <p class="position-modal-hint">임시저장 상태에서만 변경할 수 있습니다. 최종 제출 후에는 변경할 수 없습니다.</p>
-      </a-spin>
-    </a-modal>
   </section>
 </template>
 
 <style scoped lang="scss">
-.position-modal-hint {
-  margin: 0;
-  font-size: 13px;
-  color: #8c8c8c;
-}
-
 .application-form-page {
   width: 100%;
   background: var(--app-bg-page);
@@ -917,14 +1005,13 @@ function getErrorMessage(error: unknown, fallback: string): string {
 .apply-target-fields {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px 40px;
-  margin: 0;
+  gap: 14px 24px;
 }
 
 .apply-target-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .apply-target-label {
@@ -934,29 +1021,23 @@ function getErrorMessage(error: unknown, fallback: string): string {
   letter-spacing: 0.08em;
 }
 
-.apply-target-value {
-  margin: 0;
-  color: var(--app-text-primary);
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.3;
+.apply-target-select {
+  width: 280px;
 }
 
-.apply-target-change {
+.apply-target-select.location {
+  width: 200px;
+}
+
+.apply-target-create {
   flex-shrink: 0;
-  height: var(--app-control-height);
-  padding: 0 13px;
-  border-color: var(--app-color-primary-emerald);
-  color: var(--app-color-primary-emerald);
-  font-size: 13px;
   font-weight: 700;
 }
 
-.apply-target-change:hover {
-  border-color: var(--app-color-primary-hover);
-  color: var(--app-color-primary-hover);
-  background: var(--app-bg-btn-hover);
+.apply-target-hint {
+  margin: 10px 0 0;
+  color: var(--app-text-secondary);
+  font-size: 13px;
 }
 
 .steps-card {
@@ -1238,10 +1319,13 @@ function getErrorMessage(error: unknown, fallback: string): string {
   }
 
   .apply-target-fields {
-    gap: 12px 28px;
+    flex-direction: column;
+    gap: 12px;
   }
 
-  .apply-target-change {
+  .apply-target-select,
+  .apply-target-select.location,
+  .apply-target-create {
     width: 100%;
   }
 

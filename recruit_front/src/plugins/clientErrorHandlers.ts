@@ -70,6 +70,7 @@ function sanitizeStackLine(line: string): string {
     .replace(/\b(applicationId|jobPostingId|id)=\d+\b/gi, '$1=*')
     .replace(/\/applicant\/\d+\/form/g, '/applicant/*/form')
     .replace(/\/applicant\/\d+\/detail/g, '/applicant/*/detail')
+    .replace(/\/applicant\/\d+\/apply/g, '/applicant/*/apply')
     .replace(/\p{C}+/gu, ' ')
     .trim()
     .slice(0, 250)
@@ -86,6 +87,7 @@ function sanitizeFilename(filename: string | undefined): string | null {
     .replace(/[?#].*$/, '')
     .replace(/\/applicant\/\d+\/form/g, '/applicant/*/form')
     .replace(/\/applicant\/\d+\/detail/g, '/applicant/*/detail')
+    .replace(/\/applicant\/\d+\/apply/g, '/applicant/*/apply')
     .slice(0, 200)
 }
 
