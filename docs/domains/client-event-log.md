@@ -1,7 +1,7 @@
 # 클라이언트 이벤트 로그 (`client-event-log`)
 
 > 경로 표기 `{BE}` `{BT}` `{BR}` `{FE}` — 정의: [_index.md](_index.md). API 경로는 `/api` 접두 생략.
-> 관련 카드: [privacy-audit](privacy-audit.md)(서버 감사 로그 `ActivityLog`·`AuditHmac`·`ROLE_PRIVACY_ADMIN`) · [auth-account](auth-account.md)(`SecurityConfig` 경로 규칙·CORS `X-Request-Id` 노출·`authApi` 텔레메트리 옵션) · [application](application.md)(수동 로깅하는 지원서 섹션 화면) · [job-posting](job-posting.md)(`ApplicationDetailView`의 `skipClientEventLog`)
+> 관련 카드: [privacy-audit](privacy-audit.md)(서버 감사 로그 `ActivityLog`·`AuditHmac`·`ROLE_PRIVACY_ADMIN`) · [auth-account](auth-account.md)(`SecurityConfig` 경로 규칙·CORS `X-Request-Id` 노출·`authApi` 텔레메트리 옵션) · [application-sections](application-sections.md)(수동 로깅하는 지원서 섹션 화면) · [job-posting](job-posting.md)(`ApplicationDetailView`의 `skipClientEventLog`)
 
 ## 요약
 
@@ -10,7 +10,7 @@
 - 원문 PII 미저장: `message`는 safe code만, `metadata`는 eventType별 allowlist, 사용자는 HMAC만, IP·UA는 서버 추출.
 - 3단 in-memory rate limit(1분 고정 윈도우) 초과 429. 보존 90일(매일 04:00 스케줄러 + 수동 트리거).
 - 관리자 조회·cleanup API는 **FE 화면 없음**(운영자 직접 호출).
-- **소유 화면 없음.** FE 송신 지점 3종: ① 전역 오류 핸들러 ② `apiClient` 응답 인터셉터(HTTP 오류) ③ 지원서 섹션 화면의 수동 `logClientEvent`([application](application.md) 소유).
+- **소유 화면 없음.** FE 송신 지점 3종: ① 전역 오류 핸들러 ② `apiClient` 응답 인터셉터(HTTP 오류) ③ 지원서 섹션 화면의 수동 `logClientEvent`([application-sections](application-sections.md) 소유).
 
 ## 용어
 
@@ -192,7 +192,7 @@
 - 요청별 axios config 옵션: `skipClientEventLog: true` → 기록 안 함, `skipSessionExpiredLog: true` → 401만 기록 안 함, `clientEventContext` → `pageCode`·`componentCode`·`operation`·`jobPostingId`·`applicationId` 첨부(현재 사용처 없음).
 - 현재 옵션 사용처: `authApi.me`(`skipClientEventLog`, 비로그인 401이 정상)·`authApi.login`(`skipSessionExpiredLog`, 로그인 실패 401) — `{FE}/api/authApi.ts`([auth-account](auth-account.md)). 기지원 단건 조회(404가 정상) — `{FE}/views/applicant/ApplicationDetailView.vue`([job-posting](job-posting.md)).
 
-**송신 지점 ③ 화면 수동 로깅** — [application](application.md) 소유 섹션 화면이 저장 실패 catch에서 `logClientEvent`를 부른다.
+**송신 지점 ③ 화면 수동 로깅** — [application-sections](application-sections.md) 소유 섹션 화면이 저장 실패 catch에서 `logClientEvent`를 부른다.
 - 코드는 각 화면이 문자열 리터럴로 정한다(공용 상수·enum 없음). 규약: `pageCode = APPLICATION_FORM_<섹션>`, `operation = SAVE_DRAFT_<섹션>`, `message` = eventType과 같은 코드, `applicationId` 포함.
 - 같은 실패를 `apiClient` 인터셉터가 `API_ERROR`로도 보낸다. `relatedCorrelationId`·`httpStatus`는 자동 이벤트에만 있으니 두 행은 `clientSessionId`+시각으로 묶는다.
 - 현재 코드(⚠ = 잘못 복사됨·불일치):

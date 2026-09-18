@@ -1,7 +1,7 @@
 # 질문 템플릿·공고별 질문 (`question`)
 
 > 경로 표기 `{BE}` `{BT}` `{BR}` `{FE}` — 정의: [_index.md](_index.md). API 경로는 `/api` 접두 생략.
-> 관련 카드: [job-posting](job-posting.md) (공고·공고 상태·`adminJobPostingApi` 공유) · [application-form](application-form.md) (질문 탭을 품은 양식 상세 화면·편집 가능 판정·필수 정책 집계) · [application](application.md) (지원자 질문 조회·답변 저장·제출 검증) · [admin-application](admin-application.md) (관리자 답변 조회·PDF)
+> 관련 카드: [job-posting](job-posting.md) (공고·공고 상태·`adminJobPostingApi` 공유) · [application-form](application-form.md) (질문 탭을 품은 양식 상세 화면·편집 가능 판정·필수 정책 집계) · [application-sections](application-sections.md) (지원자 질문 조회·답변 저장) · [application](application.md) (제출 검증) · [admin-application](admin-application.md) (관리자 답변 조회·PDF)
 
 ## 요약
 
@@ -22,7 +22,7 @@
 | `QuestionCategory` | `SELF_INTRODUCTION`(자기소개) / `GENERAL`(기본질문) / `JOB_SPECIFIC`(직무질문) / `ETC`(기타). 자기소개서는 별도 도메인이 아니라 이 category로 처리 |
 | `QuestionAnswerType` | `SHORT_TEXT`(단답형, `maxLength` ≤ 500) / `LONG_TEXT`(서술형, `maxLength` ≤ 5000) |
 | 공고 상태 | `JobPostingStatus` = `DRAFT` / `PUBLISHED` / `CLOSED` ([job-posting](job-posting.md) 소유) |
-| 답변 스냅샷 | `ApplicationAnswer.questionTextSnapshot` 등 — 답변 저장 시점의 질문 값 ([application](application.md) 소유) |
+| 답변 스냅샷 | `ApplicationAnswer.questionTextSnapshot` 등 — 답변 저장 시점의 질문 값 ([application-sections](application-sections.md) 소유) |
 
 ## 파일 지도
 
@@ -78,12 +78,12 @@
 
 | 상태 | 메서드 | 경로 | 요청 요약 | 응답 요약 | 권한 |
 |---|---|---|---|---|---|
-| 🔴 | GET | /admin/question-templates | query `page`(0), `size`(20, 1~100), `active?`(미지정=전체) | `PageResponse<QuestionTemplateResponse>` | ADMIN·RECRUIT_ADMIN |
-| 🔴 | GET | /admin/question-templates/{templateId} | — | `QuestionTemplateResponse`(비활성도 조회 가능) | ADMIN·RECRUIT_ADMIN |
-| 🔴 | POST | /admin/question-templates | `{ title, questionText, helperText?, category, answerType, defaultRequired, defaultMaxLength }` | `QuestionTemplateResponse`(`active=true`) | ADMIN·RECRUIT_ADMIN |
-| 🔴 | POST | /admin/question-templates/{templateId} | 생성과 동일(`active` 없음) | `QuestionTemplateResponse` | ADMIN·RECRUIT_ADMIN |
-| 🔴 | POST | /admin/question-templates/{templateId}/deactivate | — | `QuestionTemplateResponse`(`active=false`), 멱등 | ADMIN·RECRUIT_ADMIN |
-| 🟡 | POST | /admin/question-templates/{templateId}/activate | — | `QuestionTemplateResponse`(`active=true`), 이미 활성이면 400 | ADMIN·RECRUIT_ADMIN |
+| 🟢 | GET | /admin/question-templates | query `page`(0), `size`(20, 1~100), `active?`(미지정=전체) | `PageResponse<QuestionTemplateResponse>` | ADMIN·RECRUIT_ADMIN |
+| 🟢 | GET | /admin/question-templates/{templateId} | — | `QuestionTemplateResponse`(비활성도 조회 가능) | ADMIN·RECRUIT_ADMIN |
+| 🟢 | POST | /admin/question-templates | `{ title, questionText, helperText?, category, answerType, defaultRequired, defaultMaxLength }` | `QuestionTemplateResponse`(`active=true`) | ADMIN·RECRUIT_ADMIN |
+| 🟢 | POST | /admin/question-templates/{templateId} | 생성과 동일(`active` 없음) | `QuestionTemplateResponse` | ADMIN·RECRUIT_ADMIN |
+| 🟢 | POST | /admin/question-templates/{templateId}/deactivate | — | `QuestionTemplateResponse`(`active=false`), 멱등 | ADMIN·RECRUIT_ADMIN |
+| 🟢 | POST | /admin/question-templates/{templateId}/activate | — | `QuestionTemplateResponse`(`active=true`), 이미 활성이면 400 | ADMIN·RECRUIT_ADMIN |
 | 🟢 | GET | /admin/job-postings/{jobPostingId}/questions | — | `List<JobPostingQuestionResponse>`(`sortOrder`↑, `id`↑) | ADMIN·RECRUIT_ADMIN |
 | 🟢 | POST | /admin/job-postings/{jobPostingId}/questions | `{ questionTemplateId?, questionText?, helperText?, category?, answerType?, required?, minLength?, maxLength?, sortOrder }` | `JobPostingQuestionResponse` | ADMIN·RECRUIT_ADMIN |
 | 🟢 | POST | /admin/job-postings/{jobPostingId}/questions/{questionId} | `{ questionText, helperText?, category, answerType, required, minLength?, maxLength, sortOrder }` | `JobPostingQuestionResponse` | ADMIN·RECRUIT_ADMIN |
@@ -99,7 +99,7 @@
 
 **질문 템플릿 (전역 질문 은행)** — 삭제 API 없음, `active` 플래그 soft disable만(DB row 유지).
 
-- 상태 메모: 옛 계약 원문은 템플릿 5개 🔴 "백엔드 구현됨 / 프론트 미반영", activate 🟡 "백엔드 구현·검증 완료(2026-08-19) / 프론트 미반영"이다. 현재는 FE(`AdminQuestionTemplatesView.vue`, `AdminQuestionTemplateEditView.vue`, `QuestionTemplatesModalBody.vue`)가 6개 모두 호출하며 요청·응답 모양은 백엔드와 맞다. 🟢 승격은 사용자 확인 후 한다.
+- 상태 메모: 2026-09-19 코드 기준 확정(FE 호출 확인). FE(`AdminQuestionTemplatesView.vue`, `AdminQuestionTemplateEditView.vue`, `QuestionTemplatesModalBody.vue`)가 6개 모두 호출하며 요청·응답 모양은 백엔드와 맞다.
 - GET 목록: 정렬 지정 없음(`findAll(pageable)`/`findByActive`). FE 목록 화면은 `active` 없이 size 10, 불러오기 모달은 `active=true` size 6.
 - GET 단건: 비활성 템플릿도 허용. 오류 404(미존재).
 - POST 생성/수정: 요청에 `active` 없음 — 활성 상태는 수정 API로 못 바꾸고 deactivate/activate 명령으로만 전이. 오류 400(검증 실패, enum 값 오류 포함), 404(수정 시 미존재).
@@ -117,7 +117,7 @@
 - reorder: 전체 질문의 `sortOrder`를 한 번에 재배치. 요청에 현재 질문 전부가 정확히 한 번씩 있어야 한다. 빈 목록은 400.
 - delete: 2026-09-09 hard delete로 변경(이전 `active=false` soft delete, 응답도 이전엔 질문 객체). 경로는 유지. 오류 400(DRAFT 아님), 404(공고·질문 미존재). 발행 후에는 삭제 불가.
 - 매핑(FE `adminJobPostingApi` ↔ BE `JobPostingQuestionController`): `getQuestionList` ↔ `getQuestions`, `saveQuestion` ↔ `createQuestion`, `updateQuestion` ↔ `updateQuestion`, `reOrderQuestion` ↔ `reorderQuestions`, `deleteQuestion` ↔ `deleteQuestion`.
-- 지원자 쪽 질문·답변 API(`/applications/{applicationId}/questions`, `/applications/{applicationId}/answers`)는 [application](application.md), 관리자 답변 조회는 [admin-application](admin-application.md).
+- 지원자 쪽 질문·답변 API(`/applications/{applicationId}/questions`, `/applications/{applicationId}/answers`)는 [application-sections](application-sections.md), 관리자 답변 조회는 [admin-application](admin-application.md).
 
 ## 규칙·불변식
 
@@ -177,7 +177,7 @@
 ### 게시 후 수정 허용 범위 변경
 
 1. `{BE}/service/JobPostingQuestionService.java` — `validateTextOnlyUpdate`(허용 필드), `validateJobPostingDraft`(구조 변경 허용 상태).
-2. 답변 소급 위반 가능성 확인: `{BE}/service/ApplicationAnswerService.java`, `{BE}/service/ApplicationSubmitValidator.java`([application](application.md)).
+2. 답변 소급 위반 가능성 확인: `{BE}/service/ApplicationAnswerService.java`([application-sections](application-sections.md)), `{BE}/service/ApplicationSubmitValidator.java`([application](application.md)).
 3. `JobPostingQuestionServiceTest`의 `update_question_policy_fails_after_publish`·`update_question_text_is_allowed_after_publish` 갱신.
 4. 프론트: `ApplicationFormQuestionTab.vue` 알림 문구·disabled 조건. `editable`/`structureEditable` 계산은 [application-form](application-form.md) 카드 소유 파일에서.
 5. 카드 규칙 6·7·21~23 갱신 → `node tools/check-docs.mjs`.
@@ -186,7 +186,7 @@
 
 1. enum: `{BE}/enumeration/QuestionAnswerType.java` / `{BE}/enumeration/QuestionCategory.java`. enum 유지 원칙(CommonCode로 옮기지 않음, 함정 참고).
 2. 길이 상한은 여러 곳에 중복돼 있다: `QuestionTemplateService`(상수 원천), `JobPostingQuestionService.validateLength`, `{BE}/service/ApplicationAnswerService.java`, `{BE}/service/ApplicationCompletionReadChecker.java`, `{BE}/service/ApplicationSubmitValidator.java` — 전부 맞춘다.
-3. 프론트 한글 라벨·라디오가 중복돼 있다: `AdminQuestionTemplatesView.vue`, `AdminQuestionTemplateEditView.vue`, `ApplicationFormQuestionTab.vue`, `QuestionTemplatesModalBody.vue`, `AddQuestionBody.vue`(`TYPE_MAX_LENGTH`), `{FE}/types/question.ts`. 지원자 화면 쪽(`{FE}/types/application/sections/questionAnswer.ts` 등)은 [application](application.md) 카드.
+3. 프론트 한글 라벨·라디오가 중복돼 있다: `AdminQuestionTemplatesView.vue`, `AdminQuestionTemplateEditView.vue`, `ApplicationFormQuestionTab.vue`, `QuestionTemplatesModalBody.vue`, `AddQuestionBody.vue`(`TYPE_MAX_LENGTH`), `{FE}/types/question.ts`. 지원자 화면 쪽(`{FE}/types/application/sections/questionAnswer.ts` 등)은 [application-sections](application-sections.md) 카드.
 4. 테스트: 이 카드 4개 + 영향 받는 `ApplicationAnswerServiceTest`·`ApplicationSubmitValidatorTest`.
 5. 카드 `## 용어` 갱신 → `node tools/check-docs.mjs`.
 

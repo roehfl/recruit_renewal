@@ -1,7 +1,7 @@
 # 관리자 지원현황·상세·엑셀·PDF (`admin-application`)
 
 > 경로 표기 `{BE}` `{BT}` `{BR}` `{FE}` — 정의: [_index.md](_index.md). API 경로는 `/api` 접두 생략.
-> 관련 카드: [application](application.md)(조회 구현·섹션 엔티티) · [stage-result](stage-result.md) · [attachment](attachment.md) · [interview](interview.md)(면접 평가 조회) · [statistics](statistics.md) · [privacy-audit](privacy-audit.md) · [application-form](application-form.md) · [job-posting](job-posting.md) · [master-data](master-data.md) · [auth-account](auth-account.md)
+> 관련 카드: [application](application.md)(조회 구현) · [application-sections](application-sections.md)(섹션 엔티티) · [stage-result](stage-result.md) · [attachment](attachment.md) · [interview](interview.md)(면접 평가 조회) · [statistics](statistics.md) · [privacy-audit](privacy-audit.md) · [application-form](application-form.md) · [job-posting](job-posting.md) · [master-data](master-data.md) · [auth-account](auth-account.md)
 
 ## 요약
 
@@ -103,7 +103,7 @@ JSON 응답은 `ApiResponse<T>`, 파일 응답은 래핑 없음(오류만 JSON).
 | 🟢 | GET | /admin/stages/{stageId}/results/export | path | xlsx | 관리자+임직원 |
 | 🟢 | GET | /admin/job-postings/{jobPostingId}/interviews/export | `stageId?`·`status?`·`from?`·`to?`(ISO date-time) | xlsx | 관리자+임직원 |
 | 🟢 | GET | /admin/stages/{stageId}/interview-evaluations/export | path | xlsx | 관리자+임직원 |
-| 🟡 | GET | /admin/applications/{applicationId}/pdf | path | `application/pdf` | 관리자+임직원 |
+| 🟢 | GET | /admin/applications/{applicationId}/pdf | path | `application/pdf` | 관리자+임직원 |
 | 🟢 | POST | /admin/applications/pdf/bulk | `{ applicationIds: number[] }` | `application/zip` | 관리자+임직원 |
 
 ### 엔드포인트 상세
@@ -138,7 +138,7 @@ JSON 응답은 `ApiResponse<T>`, 파일 응답은 래핑 없음(오류만 JSON).
 
 **카탈로그** — 🟢(2026-09-18). `group`은 한글 라벨(안정 키 아님), 순서 = 선언 순.
 
-**PDF 단건** — 🟡 초안(2026-09-09 표시 내용 개편, 경로·형태 불변)
+**PDF 단건** — 🟢 확정(2026-09-19 코드 기준. 2026-09-09 표시 내용 개편, 경로·형태 불변, FE `Application.vue`가 호출)
 - 파일명 `{applicationId}_{이름}.pdf`(+`filename*`, 이름이 비면 `{applicationId}.pdf`).
 - 구성: 지원사항 → 기본정보(사진) → 병역 → 학력 → 학기별 성적(공채만) → 경력 → 자격 → 어학 → 수상 → 공백기간 → 자기소개서. 첨부 목록·전형결과 제외. layout 설정과 무관하게 전 섹션.
 - 사진: `ETC`+`BASIC_INFO` 첨부 중 목록 마지막, JPEG/PNG·5MB 이하, 실패 시 생략.
@@ -218,7 +218,7 @@ JSON 응답은 `ApiResponse<T>`, 파일 응답은 래핑 없음(오류만 JSON).
 
 ### 엑셀 컬럼 추가·기본값 변경
 1. `{BE}/service/ApplicationExportColumn.java`에 상수 추가(선언 위치 = 열 순서).
-2. 새 섹션 데이터면 `ApplicationExportSection` + assembler `load()` 배치 조회(리포지토리는 [application](application.md) 소유).
+2. 새 섹션 데이터면 `ApplicationExportSection` + assembler `load()` 배치 조회(리포지토리는 [application-sections](application-sections.md) 소유).
 3. `{BE}/service/ApplicationExportRowAssembler.java` `value()`에 표기(PDF와 같게, 마스킹 대상 금지).
 4. `{BT}/service/ApplicationExportColumnTest.java`, `{BT}/service/ApplicationExportRowAssemblerTest.java`. FE 무변경. 카드 기본 컬럼 갱신, `node tools/check-docs.mjs`.
 

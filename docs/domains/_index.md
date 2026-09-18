@@ -24,7 +24,8 @@
 | [job-posting](job-posting.md) | 공고·직무·근무지·공고 이미지·첨부 요건 | 관리자·지원자 |
 | [question](question.md) | 질문 템플릿·공고별 질문 | 관리자 |
 | [application-form](application-form.md) | 공고별 지원서 양식 설정(config·layout) | 관리자 |
-| [application](application.md) | 지원서 작성·제출·내 지원 현황 | 지원자 |
+| [application](application.md) | 지원서 생성·제출·철회·내 지원 현황·완성도·폼 로드 | 지원자 |
+| [application-sections](application-sections.md) | 지원서 섹션 9종(기본정보~자기소개) 조회·저장 | 지원자 |
 | [attachment](attachment.md) | 첨부파일 저장·다운로드·삭제·저장소 점검 | 지원자·관리자 |
 | [admin-application](admin-application.md) | 지원현황 검색·지원서 상세·엑셀·PDF | 관리자 |
 | [stage-result](stage-result.md) | 전형·전형결과(업로드·정정·지원자 조회) | 관리자·지원자 |
@@ -66,7 +67,8 @@
 | `/admin/job-postings`(기본·`/images`·`/attachment-requirements`) · `/job-postings`(단, `/job-postings/{id}/application`은 application) | job-posting |
 | `/admin/question-templates` · `/admin/job-postings/{id}/questions` | question |
 | `/admin/application-forms` · `/admin/job-postings/{id}/application-form-config` · `/admin/job-postings/{id}/application-form-layout` | application-form |
-| `/applications`(기본·섹션·`/answers`·`/questions`) | application |
+| `/applications`(기본·`/me`·`/submit`·`/withdraw`·`/form-page`·`/dashboard`) · `/job-postings/{id}/application` | application |
+| `/applications/{id}/` + `basic-info`·`educations`·`careers`·`certificates`·`languages`·`military`·`awards`·`gap-periods`·`questions`·`answers` | application-sections |
 | `/applications/{id}/attachments` · `/admin/applications/{id}/attachments/{attachmentId}/…` · `/admin/attachments/storage-health` | attachment |
 | `/admin/applications`(검색·상세·섹션 조회·`/export`·`/pdf`) · `/admin/job-postings/{id}/applications` | admin-application |
 | `/admin/job-postings/{id}/stages` · `/admin/stages/{id}/results`(단, `/export`는 admin-application) · `/applications/{id}/stage-results` | stage-result |
@@ -86,7 +88,8 @@
 | 공고, 채용공고, 모집분야, 직무(`JobPosition`), 근무지, 공고 이미지, 첨부 요건, 신입/경력, 마감 | job-posting |
 | 질문 템플릿, 질문 은행, 공고 질문 | question |
 | 지원서 양식, 지원서 설정, 폼 레이아웃, 필수/선택 항목, 수정 가능 기간 | application-form |
-| 지원서 작성·제출, 기본정보, 보훈, 학력, 학기별 성적, 경력, 자격증, 어학, 병역, 수상, 공백기간, 자기소개·답변, 완성도, 내 지원 현황 | application |
+| 지원서 작성·제출·철회, 지원분야, 완성도, 지원서 대시보드, 편집 가능, 내 지원 현황 | application |
+| 기본정보, 보훈, 학력, 학기별 성적, 경력, 경력기술서, 자격증, 어학, 병역, 수상, 공백기간, 자기소개·답변, 섹션 임시저장 | application-sections |
 | 첨부파일, 파일 업로드/다운로드, 저장소 점검 | attachment |
 | 지원현황, 지원서 검색, 관리자 지원서 상세, 엑셀 다운로드, 컬럼 선택, PDF | admin-application |
 | 전형, 전형결과, 합격/불합격, 결과 업로드, 결과 정정, 지원자 결과 조회 | stage-result |

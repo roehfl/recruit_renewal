@@ -1,7 +1,7 @@
 # 지원서 양식 설정 (`application-form`)
 
 > 경로 표기 `{BE}` `{BT}` `{BR}` `{FE}` — 정의: [_index.md](_index.md). API 경로는 `/api` 접두 생략.
-> 관련 카드: [job-posting](job-posting.md)(공고·발행·첨부 요건·공고 상세 API) · [question](question.md)(질문 탭) · [application](application.md)(지원자 form-page 엔드포인트·섹션 저장·제출 검증) · [attachment](attachment.md) · [admin-application](admin-application.md)(레이아웃 GET 사용) · [stage-result](stage-result.md)(현황판 "전형 단계" 버튼)
+> 관련 카드: [job-posting](job-posting.md)(공고·발행·첨부 요건·공고 상세 API) · [question](question.md)(질문 탭) · [application](application.md)(지원자 form-page 엔드포인트·제출 검증) · [application-sections](application-sections.md)(섹션 저장) · [attachment](attachment.md) · [admin-application](admin-application.md)(레이아웃 GET 사용) · [stage-result](stage-result.md)(현황판 "전형 단계" 버튼)
 
 ## 요약
 
@@ -10,7 +10,7 @@
 - 레이아웃을 저장한 적이 없으면 읽을 때마다 기본 레이아웃을 **계산**한다(DB 저장 안 함).
 - 지원자 form-page 조립 서비스 `ApplicationFormPageService`는 이 카드 소유다. 엔드포인트 `GET /applications/{id}/form-page`와 응답 계약은 [application](application.md) 카드.
 - 같은 폴더의 `{FE}/views/admin/applicationForm/ApplicationFormQuestionTab.vue`와 `{FE}/views/admin/applicationForm/questionModal/*`는 [question](question.md) 카드 소유다(상세 화면에 탭으로만 붙는다).
-- 옛 계약의 화면 섹션 상태: "지원서 설정 현황", "공고별 지원서 설정", "변경: 공고 등록/수정에서 지원서 양식 분리" 모두 🟡 초안(2026-09-02). 엔드포인트별 상태는 API 표에 있다.
+- 화면 섹션 "지원서 설정 현황"·"공고별 지원서 설정"·"변경: 공고 등록/수정에서 지원서 양식 분리"는 2026-09-19 코드 기준으로 확정됐다(옛 계약 문구와 달랐으나 2026-09-19 코드 기준으로 확정). 엔드포인트별 상태는 API 표에 있다.
 
 ## 용어
 
@@ -83,7 +83,7 @@
 
 | 상태 | 메서드 | 경로 | 요청 요약 | 응답 요약 | 권한 |
 |---|---|---|---|---|---|
-| 🔴 | GET | /admin/application-forms | query `{ status?, receptionStatus?, configState?, editableOnly?, keyword?, excludeClosed?, page=0, size=20 }` | `PageResponse<{ jobPostingId, title, postingType, status, receptionStatus, receptionStartDateTime, receptionEndDateTime, sectionSummary{enabledCount, requiredCount}, activeQuestionCount, requiredQuestionCount, layoutStored, pageCount, configState, editable, updatedAt }>` | 관리자 |
+| 🟢 | GET | /admin/application-forms | query `{ status?, receptionStatus?, configState?, editableOnly?, keyword?, excludeClosed?, page=0, size=20 }` | `PageResponse<{ jobPostingId, title, postingType, status, receptionStatus, receptionStartDateTime, receptionEndDateTime, sectionSummary{enabledCount, requiredCount}, activeQuestionCount, requiredQuestionCount, layoutStored, pageCount, configState, editable, updatedAt }>` | 관리자 |
 | 🟢 | POST | /admin/job-postings/{jobPostingId}/application-form-config | `{ useEducation, requireEducation?, useCareer, requireCareer?, useCertificate, requireCertificate?, useLanguage, requireLanguage?, useMilitary, requireMilitary?, useAward, requireAward?, useGapPeriod, requireGapPeriod?, useAttachment }` | `ApplicationFormConfigResponse`(같은 15필드, 모두 boolean) | 관리자 |
 | 🟢 | GET | /admin/job-postings/{jobPostingId}/application-form-layout | — | `{ jobPostingId, layoutStored, editable, pages[{ pageNo, title, description, sortOrder, items[{ sectionType, sectionName, sortOrder, enabled, required, placed }] }], availableSections[{ sectionType, sectionName, enabled, required, placed, source }] }` | 관리자 |
 | 🟢 | POST | /admin/job-postings/{jobPostingId}/application-form-layout | `{ pages[{ pageNo, title, description?, sortOrder, items[{ sectionType, sortOrder }] }] }` — 전체 치환 | GET과 같은 형태(`layoutStored=true`, `editable=true`) | 관리자 |
@@ -94,19 +94,18 @@
 
 ### 엔드포인트 상세
 
-**GET /admin/application-forms** — 🔴 (옛 계약 🟢 2026-09-02, `excludeClosed` 🟢 2026-09-18). 코드와 계약이 다른 점(사용자 확인 필요):
-- 정렬: 계약 "`RELAYOUT_REQUIRED` 우선 → 접수 시작일 임박순". 코드는 `configState` 선언 순서(`MISSING → RELAYOUT_REQUIRED → DEFAULT → OK`) → `receptionStartDateTime` 오름차순 → `jobPostingId` 오름차순이다(`AdminApplicationFormSummaryService.summaryComparator`). `MISSING`이 맨 앞이다.
-- `editableOnly`: 계약 "접수 시작 전 & 미마감만". 코드는 응답 `editable`(= `ApplicationFormEditWindow`)로 거른다. 그래서 `DRAFT`는 접수 시작일이 지나도 남는다.
-- 옛 계약에 "마감 제외는 서버 조건이 아니라 화면 기본값(프론트가 응답에서 거름)"이라는 낡은 문장이 있다. 코드와 2026-09-18 문장은 서버 조건 `excludeClosed`다. 프론트는 기본값 `excludeClosed=true`를 보낸다.
-
-코드와 일치하는 규칙:
+**GET /admin/application-forms** — 🟢 확정(2026-09-19 코드 기준, `excludeClosed` 2026-09-18). 코드 기준 동작(옛 계약 문구와 달랐으나 2026-09-19 코드 기준으로 확정):
+- 정렬: `configState` 선언 순서(`MISSING → RELAYOUT_REQUIRED → DEFAULT → OK`) → `receptionStartDateTime` 오름차순 → `jobPostingId` 오름차순(`AdminApplicationFormSummaryService.summaryComparator`). `MISSING`이 맨 앞이다.
+- `editableOnly`: 응답 `editable`(= `ApplicationFormEditWindow.isEditable`)로 거른다. `CLOSED`는 항상 제외, `PUBLISHED`는 접수 시작 전만 포함 — `DRAFT`는 접수 시작일이 지나도 편집 가능해 그대로 남는다.
+- `excludeClosed`: 서버 조건(`status==CLOSED` 제외)이다. 프론트는 기본값 `excludeClosed=true`를 보낸다.
 - 공고 목록 API(`GET /admin/job-postings`)와 별개다.
-- 값: `status` `DRAFT|PUBLISHED|CLOSED`, `receptionStatus` `UPCOMING|ACCEPTING|CLOSED`, `configState` `OK|DEFAULT|RELAYOUT_REQUIRED|MISSING`. `excludeClosed=true`는 `status==CLOSED`를 뺀다.
+- 값: `status` `DRAFT|PUBLISHED|CLOSED`, `receptionStatus` `UPCOMING|ACCEPTING|CLOSED`, `configState` `OK|DEFAULT|RELAYOUT_REQUIRED|MISSING`.
 - SQL 조건은 `status`, `keyword`(제목, 대소문자 무시 부분일치, 공백 trim)뿐이다(`JobPostingRepository.findAllForApplicationFormSummary`, job-posting 카드 파일). 나머지 파생값 필터는 계산 후 **메모리에서 거르고 페이징**한다. 공고 테이블이 작다는 전제다. 커지면 파생값을 컬럼으로 승격해야 한다.
 - `configState` 판정은 서버 계산이 단일 출처다(규칙 12). `editable`은 `configState`와 직교하는 별도 필드이고, 화면은 🔒로 덧붙인다.
 - 성능: 질문 수 `countQuestionPolicyByJobPostingIds`, 첨부 요건 수 `countPolicyByJobPostingIds`, 레이아웃 `findLayoutItemsByJobPostingIds`로 한 번에 읽는다. 공고당 개별 조회는 금지.
 - `pageCount` = 서로 다른 `pageNo` 수. `layoutStored` = 항목 있는 페이지 존재.
 - `size`가 1~100 밖이거나 `page < 0`이면 400.
+- 행 클릭으로 이동하는 상세 화면은 탭 3개(양식·폼 구성·질문 설정)다.
 - 매핑: front `adminApplicationFormApi.getSummaries()` ↔ back `AdminApplicationFormController.getSummaries()`.
 
 **POST …/application-form-config** — 🟢 확정(2026-09-02)
@@ -165,7 +164,7 @@
     - 지원서의 모집분야가 그 공고 소속이어야 한다 (`{BE}/service/ApplicationFormPageService.java` — validateSelectedJobPosition).
     - `accepting` = `PUBLISHED`이고 `start ≤ now ≤ end`. `editable` = `WITHDRAWN` 아님 && `accepting`.
     - 섹션 목록은 페이지 `sortOrder` → 항목 `sortOrder` 순으로 평탄화하고 `sortOrder`를 0부터 다시 매긴다 (`{BE}/service/ApplicationFormPageService.java` — toSectionResponses).
-14. **공고유형(신입/경력)**: 섹션 정책·기본 레이아웃·검증·편집 구간은 `postingType`과 **무관**하다. 유형별 차이(신입만 학기별 성적)는 form-page 응답의 `postingType`으로 지원자 화면이 분기한다([application](application.md) 소관). 현황판은 `postingType`을 표시만 한다(`PUBLIC_RECRUITMENT`=신입, `EXPERIENCED_RECRUITMENT`=경력).
+14. **공고유형(신입/경력)**: 섹션 정책·기본 레이아웃·검증·편집 구간은 `postingType`과 **무관**하다. 유형별 차이(신입만 학기별 성적)는 form-page 응답의 `postingType`으로 지원자 화면이 분기한다([application-sections](application-sections.md) 소관). 현황판은 `postingType`을 표시만 한다(`PUBLIC_RECRUITMENT`=신입, `EXPERIENCED_RECRUITMENT`=경력).
 15. **ATTACHMENT 섹션**(독립 첨부 섹션은 프론트에서 폐지): 백엔드 정책 `enabled = useAttachment || 첨부 요건 행 존재`는 **바꾸지 않았다**. 요건 행의 `sectionType`과 무관하게 행이 하나라도 있으면(예: `CAREER` 경력기술서 요건) `ATTACHMENT`가 활성이다. 첨부 요건을 둘 수 있는 섹션(`BASIC_INFO`·`CAREER`, `acceptsApplicantAttachment()`)은 [job-posting](job-posting.md)·[attachment](attachment.md) 규칙이다.
     - 폼 구성 탭은 **비활성** 목록에서 `ATTACHMENT`를 감춘다(폐지된 섹션을 켜라는 안내가 되므로). 이미 **활성**이면 미배치 서랍에 그대로 보인다(배치하지 않으면 저장이 막히므로) (`ApplicationFormLayoutTab.vue` — disabledSections).
     - 양식 탭에는 `useAttachment` 체크박스가 없다. 불러온 값을 그대로 되돌려 보내고, 값이 없으면 false.
@@ -180,7 +179,7 @@
 3. DTO: `ApplicationFormConfigRequest`·`ApplicationFormConfigResponse`·`ApplicationFormConfigPublicResponse`·`ApplicationFormRequiredPolicyResponse`.
 4. `ApplicationFormConfigService`(`createFrom`·`merge`·`validateRequirement`), `ApplicationFormLayoutSectionPolicy`, `ApplicationFormLayoutDefaultFactory`, `ApplicationFormLayoutService`(`labelOf`·`sourceOf`).
 5. 프론트: `{FE}/types/admin/application.ts`(`sectionType`), `{FE}/types/jobPosting.ts`, `{FE}/common/applicationSection.ts`, `ApplicationFormConfigTab.vue`(`SECTIONS`).
-6. 지원자 쪽(섹션 화면·제출 검증·완성도)은 [application](application.md) 카드대로.
+6. 지원자 쪽 섹션 화면은 [application-sections](application-sections.md), 제출 검증·완성도는 [application](application.md) 카드대로.
 7. 레이아웃이 저장된 기존 공고는 새 섹션을 켜는 순간 `RELAYOUT_REQUIRED`가 된다. 운영 안내 필요.
 8. 테스트 → 카드 표·규칙 갱신 → `node tools/check-docs.mjs`.
 

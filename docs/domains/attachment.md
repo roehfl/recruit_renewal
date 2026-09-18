@@ -1,13 +1,13 @@
 # 첨부 저장소 (`attachment`)
 
 > 경로 표기 `{BE}` `{BT}` `{BR}` `{FE}` — 정의: [_index.md](_index.md). API 경로는 `/api` 접두 생략.
-> 관련 카드: [application](application.md)(첨부를 올리는 섹션 화면·제출 검증·완성도) · [job-posting](job-posting.md)(공고별 첨부 요건) · [application-form](application-form.md)(`ApplicationSectionType`·`useAttachment`) · [admin-application](admin-application.md)(관리자 첨부 목록·경력기술서 URL·PDF 사진) · [privacy-audit](privacy-audit.md)(파기 saga·감사 로그) · [auth-account](auth-account.md)(`SecurityConfig`·CORS)
+> 관련 카드: [application-sections](application-sections.md)(첨부를 올리는 섹션 화면) · [application](application.md)(제출 검증·완성도) · [job-posting](job-posting.md)(공고별 첨부 요건) · [application-form](application-form.md)(`ApplicationSectionType`·`useAttachment`) · [admin-application](admin-application.md)(관리자 첨부 목록·경력기술서 URL·PDF 사진) · [privacy-audit](privacy-audit.md)(파기 saga·감사 로그) · [auth-account](auth-account.md)(`SecurityConfig`·CORS)
 
 ## 요약
 
 - 첨부 **바이너리는 로컬 파일시스템**, **메타데이터·상태는 DB `application_attachment`**(`ApplicationAttachment`, 상태 `PhysicalFileStatus`). 저장소 구현은 `LocalAttachmentStorageService` 하나.
 - 지원자: 목록·업로드·다운로드·삭제. 관리자: 다운로드(감사 fail-close)·사유 필수 삭제·저장소 점검(dry-run).
-- **소유 화면 없음.** FE 사용처는 [application](application.md) 소유 섹션 두 곳이다.
+- **소유 화면 없음.** FE 사용처는 [application-sections](application-sections.md) 소유 섹션 두 곳이다.
   - 증명사진 = `BASIC_INFO` + `ETC` — `{FE}/views/applicant/application/sections/BasicInfoSection.vue`
   - 경력기술서 = `CAREER` + `CAREER_DESCRIPTION` — `{FE}/views/applicant/application/sections/CareerSection.vue`
 - 독립 첨부 섹션(`ATTACHMENT`)은 2026-09-01 **프론트에서 폐지(⛔)**. 백엔드 엔드포인트·enum·요건 테이블은 유지.
@@ -79,7 +79,7 @@
 |---|---|---|
 | api | `{FE}/api/application/sections/attachmentApi.ts` | 목록·업로드·삭제·blob 다운로드, 파일 타임아웃 120초 |
 | types | `{FE}/types/application/sections/attachment.ts` | `AttachmentDeleteResponse` + 재수출 |
-| types | `{FE}/types/application/sections/basicInfo.ts` | `attachmentType`·`sectionType` 유니언, `AttachmentFileRequest`, `AttachmentResponse` 원본(공유 — [application](application.md)) |
+| types | `{FE}/types/application/sections/basicInfo.ts` | `attachmentType`·`sectionType` 유니언, `AttachmentFileRequest`, `AttachmentResponse` 원본(공유 — [application-sections](application-sections.md)) |
 
 ## API 계약
 
@@ -215,7 +215,7 @@ JSON 응답은 `ApiResponse<T>`. 다운로드 성공은 바이너리, 실패는 
 4. `{BT}/service/ApplicationAttachmentFileServiceTest.java` 보강 → 검증 → 카드 갱신 → `node tools/check-docs.mjs`.
 
 ### 새 섹션에서 첨부 받기
-1. 업로드 UI는 [application](application.md) 소유 섹션 화면에 두고 `attachmentApi`를 재사용한다. (sectionType, attachmentType) 쌍을 정해 목록을 그 쌍으로 거르고, 교체는 "업로드 성공 → 기존 삭제" 순서로 한다.
+1. 업로드 UI는 [application-sections](application-sections.md) 소유 섹션 화면에 두고 `attachmentApi`를 재사용한다. (sectionType, attachmentType) 쌍을 정해 목록을 그 쌍으로 거르고, 교체는 "업로드 성공 → 기존 삭제" 순서로 한다.
 2. 필수 요건을 걸게 하려면 `{BE}/enumeration/ApplicationSectionType.java` `APPLICANT_ATTACHMENT_SECTION_TYPES`에 섹션 추가(요건 등록·제출 검증·완성도가 따라온다). 테스트 `JobPostingAttachmentRequirementServiceTest`·`ApplicationSubmitValidatorTest`·`ApplicationDashboardServiceTest`, [application-form](application-form.md)·[job-posting](job-posting.md) 카드 갱신.
 3. 새 `AttachmentType`이면 enum + FE 유니언 두 곳(`{FE}/types/application/sections/basicInfo.ts`, `{FE}/types/admin/applicationSections.ts`). DDL 불필요.
 4. 카드 요약의 사용처 쌍 갱신 → `npm run type-check` → `node tools/check-docs.mjs`.

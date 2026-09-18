@@ -1,7 +1,7 @@
 # 개인정보 보존·파기·감사 (`privacy-audit`)
 
 > 경로 표기 `{BE}` `{BT}` `{BR}` `{FE}` — 정의: [_index.md](_index.md). API 경로는 `/api` 접두 생략.
-> 관련 카드: [attachment](attachment.md)(첨부 저장소) · [role-menu](role-menu.md)(역할 매핑) · [auth-account](auth-account.md)(`SecurityConfig`·`Applicant` 익명화) · [application](application.md)(`JobApplication`·섹션 엔티티) · [job-posting](job-posting.md)(`hiringEndedAt`) · [stage-result](stage-result.md) · [interview](interview.md) · [admin-application](admin-application.md)(반출 감사)
+> 관련 카드: [attachment](attachment.md)(첨부 저장소) · [role-menu](role-menu.md)(역할 매핑) · [auth-account](auth-account.md)(`SecurityConfig`·`Applicant` 익명화) · [application](application.md)(`JobApplication`) · [application-sections](application-sections.md)(섹션 엔티티) · [job-posting](job-posting.md)(`hiringEndedAt`) · [stage-result](stage-result.md) · [interview](interview.md) · [admin-application](admin-application.md)(반출 감사)
 
 ## 요약
 

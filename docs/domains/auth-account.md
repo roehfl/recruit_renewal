@@ -1,7 +1,7 @@
 # 인증·지원자 계정 (`auth-account`)
 
 > 경로 표기 `{BE}` `{BT}` `{BR}` `{FE}` — 정의: [_index.md](_index.md). API 경로는 `/api` 접두 생략.
-> 관련 카드: [role-menu](role-menu.md)(역할 매핑·메뉴) · [application](application.md)(내 지원 현황, 기본정보 프리필) · [stage-result](stage-result.md)(마이페이지 전형결과) · [privacy-audit](privacy-audit.md)(PII 파기) · [interview](interview.md)(면접관 식별)
+> 관련 카드: [role-menu](role-menu.md)(역할 매핑·메뉴) · [application](application.md)(내 지원 현황) · [application-sections](application-sections.md)(기본정보 프리필) · [stage-result](stage-result.md)(마이페이지 전형결과) · [privacy-audit](privacy-audit.md)(PII 파기) · [interview](interview.md)(면접관 식별)
 
 ## 요약
 
@@ -118,8 +118,7 @@
 **POST /auth/login** 🔴
 - 성공 흐름: 새 SecurityContext 생성 → `request.getSession(true)` → `request.changeSessionId()` → `securityContextRepository.saveContext()`.
 - 실패(비밀번호 불일치, 계정 없음, LDAP 접속 실패): `AuthenticationException`이 필터 체인까지 올라가 `CustomAuthenticationEntryPoint`가 **401** `"Authentication is required."`를 반환한다. `GlobalExceptionHandler`에는 이 예외 핸들러가 없다. 전용 테스트는 없다. 프론트는 서버 메시지를 쓰지 않고 `'아이디 또는 비밀번호를 확인하세요.'`를 고정으로 보여준다. 빈 입력은 400.
-- 🔴 `phoneNumber`: `{FE}/types/auth.ts`의 `LoginUser.phoneNumber`가 BE `LoginUserResponse`에 없다. 그래서 `authStore.phoneNumber`는 항상 `''`이고, 지원서 기본정보의 휴대폰 프리필(`{FE}/views/applicant/application/sections/BasicInfoSection.vue`)이 빈다. BE에 필드를 추가할지 FE에서 제거할지 결정이 필요하다.
-- 🔴 `deptName`이 항상 `""`: 임직원의 최종 principal도 `CustomUserDetails.fromUser()`(`deptName=""` 고정)로 만들기 때문이다(`RoutingAuthenticationProvider.buildEmployeeAuthentication`). 관리자 사이드바(`{FE}/layouts/AdminSidebar.vue`)의 부서 표시가 빈다. 이를 잡는 테스트가 없다.
+- 🔴 FE-BE 코드 간 불일치 결함 — 코드 수정 필요(후속 슬라이스): ① `phoneNumber` — `{FE}/types/auth.ts`의 `LoginUser.phoneNumber`가 BE `LoginUserResponse`에 없다. 그래서 `authStore.phoneNumber`는 항상 `''`이고, 지원서 기본정보의 휴대폰 프리필(`{FE}/views/applicant/application/sections/BasicInfoSection.vue`)이 항상 빈 값이다. ② `deptName` — `CustomUserDetails.fromUser()`에서 항상 빈 문자열로 고정된다(`deptName=""`). 임직원의 최종 principal도 이 메서드로 만들기 때문이다(`RoutingAuthenticationProvider.buildEmployeeAuthentication`). 관리자 사이드바(`{FE}/layouts/AdminSidebar.vue`)의 부서 표시가 항상 빈 값이다. 이를 잡는 테스트가 없다.
 
 **POST /auth/logout**: SecurityContext를 비우고, 세션이 있으면 `invalidate()`한다. 호출 위치: `ApplicantProfile`, `{FE}/layouts/ApplicantHeader.vue`, `{FE}/layouts/AdminSidebar.vue`.
 
@@ -265,6 +264,7 @@ AES_SECRET_KEY='<로컬 예시 키>' ./gradlew test --tests "*ApplicantSignUp*" 
 
 ## 함정·결정
 
+- **로그인 응답 `phoneNumber`·`deptName`(🔴 확정 사유)**: FE-BE 코드 간 불일치 결함 — 코드 수정 필요(후속 슬라이스). ① FE `LoginUser.phoneNumber`가 BE `LoginUserResponse`에 없음 → 지원서 기본정보 휴대폰 프리필 항상 빈 값. ② `deptName`이 `CustomUserDetails.fromUser()`에서 항상 빈 문자열 → 관리자 사이드바 부서 표시 빈 값. 상세는 "엔드포인트 상세" `POST /auth/login`.
 - **`anyRequest().permitAll()`**: `/menu`·`/board` 아래 쓰기 API가 매처 누락으로 무인증 상태였던 적이 있다(6e7f6cc, 8d7485d). 새 경로는 반드시 레시피 1을 따른다.
 - **CORS 빈 이름**: `http.cors(cors -> corsConfigurationSource())`의 람다는 설정을 지정하지 않는다. 실제로는 이름이 `corsConfigurationSource`인 빈을 Spring Security가 찾아서 쓴다. 메서드 이름을 바꾸면 CORS가 조용히 빠진다.
 - **Employee.deptName unique 제거**: 같은 부서의 두 번째 임직원 JIT 생성이 unique 충돌로 막히던 문제를 고쳤다. 운영 DB는 ddl-auto update라 제약이 자동으로 지워지지 않으므로 `recruit_back/recruit_backend/docs/ops/fix-employee-dept-name-unique-drop.sql`을 수동 적용한다(aa4e2a7). `users.login_id` unique는 유지한다.

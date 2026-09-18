@@ -68,7 +68,7 @@
 | enum | `{BE}/enumeration/JobPostingStatus.java` | 공고 상태 |
 | enum | `{BE}/enumeration/JobPostingType.java` | 공고유형 |
 | enum | `{BE}/enumeration/JobPositionApplicationType.java` | 지원구분 |
-| enum | `{BE}/enumeration/EmploymentType.java` | 고용형태. 경력 섹션도 공유 — 값 변경 시 [application](application.md) 영향 |
+| enum | `{BE}/enumeration/EmploymentType.java` | 고용형태. 경력 섹션도 공유 — 값 변경 시 [application-sections](application-sections.md) 영향 |
 | enum | `{BE}/enumeration/ReceptionStatus.java` | 접수 상태 파생 |
 | exception | `{BE}/exception/InvalidJobPostingException.java` | 400 |
 | exception | `{BE}/exception/JobPostingNotFoundException.java` | 404 |
@@ -190,7 +190,7 @@
 - `INTERN_RECRUITMENT`·`ROLLING_RECRUITMENT`는 레거시다(enum에는 남음, 등록 선택지에서 제거). 관리자 목록·상세만 기존 데이터 식별용으로 '인턴채용'·'수시채용' 라벨을 유지하고, 지원자 화면은 매핑이 없으면 배지를 숨긴다. ({FE}/views/admin/jobPosting/AdminJobPostingListView.vue — postingTypeLabelMap)
 - 새 화면에서 '공개채용'·'수시채용' 라벨을 되살리지 않는다. 라벨은 신입/경력이다.
 - 서버는 `postingType` 값을 제한하지 않는다(API로는 레거시 값도 저장된다). ({BE}/service/JobPostingService.java — defaultPostingType)
-- 학기별 성적은 신입 공고만 받는다 → [application](application.md), [admin-application](admin-application.md).
+- 학기별 성적은 신입 공고만 받는다 → [application-sections](application-sections.md), [admin-application](admin-application.md).
 
 **이미지**
 - Content-Type 허용목록(`image/jpg`는 `image/jpeg`로 정규화해 저장), 확장자 허용목록, 앞 12바이트 매직바이트로 3중 검증한다. 장당 10MB, 공고당 10장, `altText` 필수(trim, ≤200), `sortOrder` ≥0. ({BE}/service/JobPostingImageService.java — validateFile, validateAltText, validateTotalCount / {BE}/service/ImageSignatureValidator.java — matches)
@@ -216,7 +216,7 @@
 ### 공고유형 라벨·필터 변경
 1. `JobPostingType` enum은 바꾸지 않는다.
 2. 이 카드: `AdminJobPostingFormView`(`postingTypeOptions`), `AdminJobPostingListView`·`AdminJobPostingDetailView`(`postingTypeLabelMap`), `ApplicantRecruit`(`postingTypeMap`·`divisionOptions`), `ApplicationDetailView`(`postingTypeMap`).
-3. 다른 카드의 분기도 확인한다: [application-form](application-form.md) 현황판 라벨, [application](application.md) 학력 섹션, [admin-application](admin-application.md) 상세·PDF의 학기별 성적.
+3. 다른 카드의 분기도 확인한다: [application-form](application-form.md) 현황판 라벨, [application-sections](application-sections.md) 학력 섹션, [admin-application](admin-application.md) 상세·PDF의 학기별 성적.
 4. `npm run type-check`, 카드 갱신, `node tools/check-docs.mjs`.
 
 ### 이미지 제한 변경

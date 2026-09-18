@@ -1,7 +1,7 @@
 # 관리자 대시보드·통계 (`statistics`)
 
 > 경로 표기 `{BE}` `{BT}` `{BR}` `{FE}` — 정의: [_index.md](_index.md). API 경로는 `/api` 접두 생략.
-> 관련 카드: [job-posting](job-posting.md) (공고 목록 `GET /admin/job-postings`·`getAllJobPostings`·접수 기간) · [stage-result](stage-result.md) (전형 `Stage`·전형결과 `StageResult`·결과 상태) · [application](application.md) (지원서 상태·제출·학력/자격 섹션과 그 리포지토리) · [admin-application](admin-application.md) (지원현황 검색·엑셀) · [privacy-audit](privacy-audit.md) (파기 치환값) · [master-data](master-data.md) (학교 코드)
+> 관련 카드: [job-posting](job-posting.md) (공고 목록 `GET /admin/job-postings`·`getAllJobPostings`·접수 기간) · [stage-result](stage-result.md) (전형 `Stage`·전형결과 `StageResult`·결과 상태) · [application](application.md) (지원서 상태·제출) · [application-sections](application-sections.md) (학력/자격 섹션과 그 리포지토리) · [admin-application](admin-application.md) (지원현황 검색·엑셀) · [privacy-audit](privacy-audit.md) (파기 치환값) · [master-data](master-data.md) (학교 코드)
 
 ## 요약
 
@@ -54,7 +54,7 @@
 | dto | `{BE}/dto/response/ApplicationDailyCountRow.java` | 집계 입력(JPQL `new`): 날짜별 건수 |
 | test | `{BT}/controller/AdminStatisticsControllerTest.java` | `@SpringBootTest` 29건(분포·비율·체류일·축 3종·파싱·추이·권한·404) |
 
-집계 입력 쿼리가 있는 리포지토리는 다른 카드 소유다: `JobApplicationRepository`(`findFunnelCohort`·`findDailySubmittedCounts`)·`ApplicationEducationRepository`(`findFunnelSchoolEducations`)·`ApplicationCertificateRepository`(`findFunnelCertificates`) → [application](application.md), `StageResultRepository`(`findFunnelStageResults`)·`StageRepository`(`findByJobPostingIdOrderByStageOrderAscIdAsc`) → [stage-result](stage-result.md). 모두 `{BE}/domain/repository/`에 있다.
+집계 입력 쿼리가 있는 리포지토리는 다른 카드 소유다: `JobApplicationRepository`(`findFunnelCohort`·`findDailySubmittedCounts`) → [application](application.md), `ApplicationEducationRepository`(`findFunnelSchoolEducations`)·`ApplicationCertificateRepository`(`findFunnelCertificates`) → [application-sections](application-sections.md), `StageResultRepository`(`findFunnelStageResults`)·`StageRepository`(`findByJobPostingIdOrderByStageOrderAscIdAsc`) → [stage-result](stage-result.md). 모두 `{BE}/domain/repository/`에 있다.
 
 ### 프론트
 
@@ -176,7 +176,7 @@
 ### 퍼널 dimension 축 추가 (예: 어학)
 
 1. `{BE}/enumeration/FunnelDimension.java`에 값을 추가한다. 그러면 `computeDimension` `switch`가 컴파일 오류를 낸다. `{BE}/service/FunnelStatisticsService.java`에 `computeXxxDimension`을 구현한다(분할인지 중복 가능인지, `topN`·'기타' 적용 여부를 정한다).
-2. 입력 projection record `{BE}/dto/response/Funnel*Row.java`를 새로 만들고, 해당 섹션 리포지토리에 JPQL `new` 쿼리를 추가한다(조건: `jobApplication.jobPosting.id = :jobPostingId and jobApplication.submittedAt is not null`). 리포지토리는 [application](application.md) 소유이므로 그 카드 규칙도 확인한다.
+2. 입력 projection record `{BE}/dto/response/Funnel*Row.java`를 새로 만들고, 해당 섹션 리포지토리에 JPQL `new` 쿼리를 추가한다(조건: `jobApplication.jobPosting.id = :jobPostingId and jobApplication.submittedAt is not null`). 리포지토리는 [application-sections](application-sections.md) 소유이므로 그 카드 규칙도 확인한다.
 3. `{BT}/controller/AdminStatisticsControllerTest.java`에 그룹 분할·정렬·'기타'·다중 축 케이스를 추가한다.
 4. FE: `{FE}/types/statistics.ts` `FunnelDimension` 유니온 → `{FE}/views/admin/AdminHomeView.vue` `DASHBOARD_DIMENSIONS`·위젯 배치 → 필요하면 `TopGroupCard.vue` 재사용.
 5. 이 카드 `## 용어`·`## API 계약`·규칙 12~19 갱신 → `node tools/check-docs.mjs`.
@@ -218,7 +218,7 @@ $env:AES_SECRET_KEY='<로컬 예시 키>'; .\gradlew.bat test --tests "com.shiny
 AES_SECRET_KEY='<로컬 예시 키>' ./gradlew test --tests "com.shinyoung.recruit.controller.AdminStatisticsControllerTest" --no-daemon
 ```
 
-집계 입력 쿼리(`findFunnelCohort`·`findFunnelStageResults`·`findFunnelSchoolEducations`·`findFunnelCertificates`·`findDailySubmittedCounts`)가 있는 리포지토리를 고쳤다면 그 리포지토리 소유 카드([application](application.md), [stage-result](stage-result.md))의 검증 절도 돌린다.
+집계 입력 쿼리(`findFunnelCohort`·`findFunnelStageResults`·`findFunnelSchoolEducations`·`findFunnelCertificates`·`findDailySubmittedCounts`)가 있는 리포지토리를 고쳤다면 그 리포지토리 소유 카드([application](application.md), [application-sections](application-sections.md), [stage-result](stage-result.md))의 검증 절도 돌린다.
 
 프론트(`recruit_front/`에서). 이 도메인의 vitest spec은 없다.
 

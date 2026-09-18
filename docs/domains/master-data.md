@@ -1,13 +1,13 @@
 # 공통코드·학교·주소 (`master-data`)
 
 > 경로 표기 `{BE}` `{BT}` `{BR}` `{FE}` — 정의: [_index.md](_index.md). API 경로는 `/api` 접두 생략.
-> 관련 카드: [application](application.md)(학력 섹션이 `SchoolModalBody` 사용, 기본정보 주소 검색·코드 검증) · [job-posting](job-posting.md)(`WORK_LOCATION`) · [admin-application](admin-application.md)(PDF·엑셀 표시명) · [statistics](statistics.md)(학교별 퍼널) · [auth-account](auth-account.md)(`SecurityConfig`) · [stage-result](stage-result.md)(`UploadProperties` 공유)
+> 관련 카드: [application-sections](application-sections.md)(학력 섹션이 `SchoolModalBody` 사용, 기본정보 주소 검색·코드 검증) · [job-posting](job-posting.md)(`WORK_LOCATION`) · [admin-application](admin-application.md)(PDF·엑셀 표시명) · [statistics](statistics.md)(학교별 퍼널) · [auth-account](auth-account.md)(`SecurityConfig`) · [stage-result](stage-result.md)(`UploadProperties` 공유)
 
 ## 요약
 
 - **공통코드**: 공개 `GET /codes`(활성만) = 드롭다운 소스. 관리자 CRUD·화면 `/admin/codes`. 삭제 없음(soft delete). **시드 없음** — 관리자 화면이 유일한 등록 경로.
 - **학교 검색** `GET /schools`: 외부 OpenAPI 프록시(고교=NEIS, 그 외=공공데이터포털 대학 표준데이터). 로컬 `school` 테이블은 검색에 안 쓴다. 모달 `SchoolModalBody.vue`를 지원서 학력 섹션이 연다.
-- **관리자 학교** `/admin/schools`(CRUD + xlsx import): 옛 계약은 폐기(2026-08-27)라 했지만 코드 잔존·FE 호출 없음 → 🔴.
+- **관리자 학교** `/admin/schools`(CRUD + xlsx import): 폐기 결정(2026-08-27) → ⛔. FE 미사용, 백엔드 코드·테스트만 잔존(제거 후보, 코드 제거는 별도 작업).
 - **주소 검색** `GET /addresses`: juso.go.kr 도로명주소 프록시. 지원서 기본정보 주소 모달이 쓴다.
 - 외부 API 3종은 DMZ 웹서버 경유 — 폐쇄망 주의(`## 함정·결정` 첫 항목).
 
@@ -35,11 +35,11 @@
 |---|---|---|
 | controller | `{BE}/controller/CommonCodeController.java` | `GET /codes` |
 | controller | `{BE}/controller/AdminCommonCodeController.java` | `/admin/codes` 조회·생성·수정 |
-| controller | `{BE}/controller/AdminSchoolController.java` | `/admin/schools` 목록·생성·수정·import(🔴 FE 미사용) |
+| controller | `{BE}/controller/AdminSchoolController.java` | `/admin/schools` 목록·생성·수정·import — 폐지(잔존, FE 미사용) |
 | controller | `{BE}/controller/SchoolSearchController.java` | `GET /schools` |
 | controller | `{BE}/controller/AddressSearchController.java` | `GET /addresses` |
 | service | `{BE}/service/CommonCodeService.java` `{BE}/service/CommonCodeNames.java` | 공통코드 조회·생성·수정 / 엑셀 export 표시명 캐시 |
-| service | `{BE}/service/SchoolService.java` `{BE}/service/SchoolImportService.java` `{BE}/service/SchoolImportParser.java` | 관리자 학교 CRUD, xlsx 파싱·upsert |
+| service | `{BE}/service/SchoolService.java` `{BE}/service/SchoolImportService.java` `{BE}/service/SchoolImportParser.java` | 관리자 학교 CRUD, xlsx 파싱·upsert — 폐지(잔존) |
 | service | `{BE}/service/SchoolSearchService.java` `{BE}/service/NeisSchoolClient.java` `{BE}/service/UnivInfoSchoolClient.java` `{BE}/service/PublicDataServiceKey.java` | 학교 검색 라우팅 / NEIS·대학 API 호출 / 서비스키 정규화 |
 | service | `{BE}/service/UnivDeptSchoolClient.java` | 학과 단위 데이터셋 클라이언트 — 호출처 없음 |
 | service | `{BE}/service/AddressSearchService.java` `{BE}/service/JusoAddressClient.java` `{BE}/service/JusoApiResponse.java` | 주소 검증·`maxPage` / juso 호출·오류 분류 / 원본 모델 |
@@ -70,7 +70,7 @@
 | api | `{FE}/api/adminCommonCodeApi.ts` `{FE}/api/commonApi.ts` `{FE}/api/application/addressApi.ts` | 관리자 코드 3종 / `getCommonCodes` / `getAddresses` |
 | types | `{FE}/types/commonCode.ts` `{FE}/types/application/address.ts` | 코드 타입(`CommonCodeResponse` 미사용) / 주소 타입(**`maxPage` 누락**) |
 
-학교 검색 호출 `educationApi.getSchools`와 타입 `schoolItem`·`schoolSource`는 [application](application.md) 소유 `{FE}/api/application/sections/educationApi.ts`·`{FE}/types/application/sections/education.ts`에 있다.
+학교 검색 호출 `educationApi.getSchools`와 타입 `schoolItem`·`schoolSource`는 [application-sections](application-sections.md) 소유 `{FE}/api/application/sections/educationApi.ts`·`{FE}/types/application/sections/education.ts`에 있다.
 
 ## API 계약
 
@@ -82,12 +82,12 @@
 | 🟢 | GET | /admin/codes | query `groupCode`(선택, 생략=전체) | `CommonCodeResponse[]` 비활성 포함 | ADMIN·RECRUIT_ADMIN |
 | 🟢 | POST | /admin/codes | `{ groupCode*, code*, displayName*, sortOrder?, active?, description? }` | `CommonCodeResponse` | ADMIN·RECRUIT_ADMIN |
 | 🟢 | POST | /admin/codes/{id} | `{ displayName*, sortOrder?, active?, description? }` | `CommonCodeResponse` | ADMIN·RECRUIT_ADMIN |
-| 🔴 | GET | /admin/schools | query `q?`, `schoolType?`, `page`(0), `size`(20) | `PageResponse<SchoolResponse>` | ADMIN·RECRUIT_ADMIN |
-| 🔴 | POST | /admin/schools | `{ schoolName*, schoolType?, schoolCategory?, educationMode?, region?, address?, countryCode?, active? }` | `SchoolResponse` | ADMIN·RECRUIT_ADMIN |
-| 🔴 | POST | /admin/schools/{id} | 생성과 같은 모양(전체 교체) | `SchoolResponse` | ADMIN·RECRUIT_ADMIN |
-| 🔴 | POST | /admin/schools/import | multipart `file`(.xlsx) | `{ totalRows, inserted, updated, skipped, errors:[{ rowNumber, reason }] }` | ADMIN·RECRUIT_ADMIN |
+| ⛔ | GET | /admin/schools | query `q?`, `schoolType?`, `page`(0), `size`(20) | `PageResponse<SchoolResponse>` | ADMIN·RECRUIT_ADMIN |
+| ⛔ | POST | /admin/schools | `{ schoolName*, schoolType?, schoolCategory?, educationMode?, region?, address?, countryCode?, active? }` | `SchoolResponse` | ADMIN·RECRUIT_ADMIN |
+| ⛔ | POST | /admin/schools/{id} | 생성과 같은 모양(전체 교체) | `SchoolResponse` | ADMIN·RECRUIT_ADMIN |
+| ⛔ | POST | /admin/schools/import | multipart `file`(.xlsx) | `{ totalRows, inserted, updated, skipped, errors:[{ rowNumber, reason }] }` | ADMIN·RECRUIT_ADMIN |
 | 🟢 | GET | /schools | query `q?`, `educationLevel`(필수 enum) | `[{ schoolCode, schoolName, schoolSource, region }]` ≤20건 | 공개 |
-| 🔴 | GET | /addresses | query `keyword`(필수), `currentPage`(1), `countPerPage`(10) | `{ totalCount, currentPage, countPerPage, maxPage, addresses:[{ roadAddr, jibunAddr, zipNo, siNm, sggNm, emdNm, bdNm, engAddr }] }` | 공개 |
+| 🟢 | GET | /addresses | query `keyword`(필수), `currentPage`(1), `countPerPage`(10) | `{ totalCount, currentPage, countPerPage, maxPage, addresses:[{ roadAddr, jibunAddr, zipNo, siNm, sggNm, emdNm, bdNm, engAddr }] }` | 공개 |
 
 ### 엔드포인트 상세
 
@@ -102,12 +102,12 @@
 
 | groupCode | 조회 FE | 백엔드 |
 |---|---|---|
-| `NATIONALITY` | [application](application.md) 기본정보, [admin-application](admin-application.md) 지원서 상세 | 외국인이면 필수+활성 검증, PDF·엑셀 국가명·해외 학교 소재지 |
+| `NATIONALITY` | [application-sections](application-sections.md) 기본정보, [admin-application](admin-application.md) 지원서 상세 | 외국인이면 필수+활성 검증, PDF·엑셀 국가명·해외 학교 소재지 |
 | `DISABILITY_GRADE` · `DISABILITY_TYPE` | 기본정보, 지원서 상세 | 장애 대상이면 필수+활성 검증, PDF·엑셀 |
 | `APPLICATION_ROUTE` | 기본정보 | 값 있을 때만 활성 검증, 엑셀 |
 | `WORK_LOCATION` | [job-posting](job-posting.md) 공고 폼 | 활성 코드만 허용 + `displayName` 공고 스냅샷 |
-| `MAJOR_TYPE` | [application](application.md) 학력 | 검증 없음, 엑셀 |
-| `LANGUAGE_TYPE` · `LANGUAGE_TEST_{languageCode}`(동적) | [application](application.md) 어학 | 없음 |
+| `MAJOR_TYPE` | [application-sections](application-sections.md) 학력 | 검증 없음, 엑셀 |
+| `LANGUAGE_TYPE` · `LANGUAGE_TEST_{languageCode}`(동적) | [application-sections](application-sections.md) 어학 | 없음 |
 | `CODE_GROUP` | 공통코드 관리 화면 | 없음 |
 
 옛 계약의 `LANGUAGE_CONVERSATION`·`LANGUAGE_LEVEL`은 현재 코드가 조회하지 않는다.
@@ -119,13 +119,13 @@
 - 대학 API(2026-08-31 운영 실호출 검증): 요청 대문자 스네이크(`SCHL_NM`, `UNIV_SE_NM`, `pageNo`, `numOfRows`≤1000, `type=json`). **`SCHL_NM`은 완전일치** — 부분어·와일드카드는 `resultCode=03`(NODATA). 대응: 모달에 "대학은 학교명을 전체 입력해야 검색됩니다" 안내(전량 조회 후 로컬 필터링은 후속 과제). 응답은 최상위 `header`/`body`, 목록 `body.items.item`(1건이면 객체), 항목 lowerCamel(`schlNm`·`univSeNm`·`ctpvNm`). 학교코드 없음 → `schoolCode`=학교명. 대학원은 별도 행.
 - NEIS(2026-08-28): `hub/schoolInfo`, `KEY`/`Type`/`pIndex`/`pSize`, `SCHUL_NM`(부분일치)/`SCHUL_KND_SC_NM`, 출력 `SD_SCHUL_CODE`/`SCHUL_NM`/`LCTN_SC_NM`.
 - 학과 단위 데이터셋 클라이언트는 전공 자동완성 후속용으로 보존, 호출하지 않는다.
-- 지원서 학력 식별자(🟢 2026-08-27, [application](application.md) 소유): `schoolId` → `schoolCode`(50자)+`schoolSource`. 학교별 퍼널은 `schoolCode` 그룹(`groupId` null, 직접 입력은 '기타'). 옛 `school_id` 컬럼은 운영 수동 DROP 필요(`ddl-auto: update`는 안 지움).
+- 지원서 학력 식별자(🟢 2026-08-27, [application-sections](application-sections.md) 소유): `schoolId` → `schoolCode`(50자)+`schoolSource`. 학교별 퍼널은 `schoolCode` 그룹(`groupId` null, 직접 입력은 '기타'). 옛 `school_id` 컬럼은 운영 수동 DROP 필요(`ddl-auto: update`는 안 지움).
 
-**`/admin/schools` 4종 — 🔴(계약 폐기 vs 코드 잔존)**: 옛 계약(2026-08-27)은 "`school` 테이블·관리자 학교 관리(xlsx import 포함) 폐기". 코드·테스트는 남아 있고 `{FE}/api`에서 호출하지 않는다. 제거(⛔)·유지는 사용자 확인 필요. 현재 동작: 목록 비활성 포함, `q` 학교명 대소문자 무시 contains(LIKE escape), `schoolType` 완전일치, 정렬 `schoolName`→`id`, `page<0`→0, `size` 1~200 보정. `PageResponse` = `{ content, page, size, totalElements, totalPages, first, last }`, `SchoolResponse` = 요청 필드 + `id`·`active`.
+**`/admin/schools` 4종 — ⛔ 폐지 결정(2026-08-27)된 관리자 학교 관리 — FE 미사용, 백엔드 코드·테스트만 잔존(제거 후보, 코드 제거는 별도 작업)**. 잔존 동작(참고용): 목록 비활성 포함, `q` 학교명 대소문자 무시 contains(LIKE escape), `schoolType` 완전일치, 정렬 `schoolName`→`id`, `page<0`→0, `size` 1~200 보정. `PageResponse` = `{ content, page, size, totalElements, totalPages, first, last }`, `SchoolResponse` = 요청 필드 + `id`·`active`.
 
-**`GET /addresses` — 🔴(옛 계약 🟢, 코드와 차이)**
-- 차이 1: 계약은 "프론트는 반드시 `maxPage`로 페이지네이션"인데 [application](application.md) `BasicInfoSection.vue`는 `totalCount`로 계산하고 FE 타입에 `maxPage`가 없다 → 결과가 9000건을 넘으면 뒤쪽 페이지에서 400.
-- 차이 2: 계약 오류표는 승인키 미설정도 `주소 검색에 실패했습니다…`라 했지만 코드는 `"주소 검색 서비스가 설정되지 않았습니다."`(502는 같음). 옛 계약의 "프론트 미반영"도 낡았다.
+**`GET /addresses` — 🟢 확정(2026-09-19 코드 기준)**
+- 페이지네이션은 `maxPage` 기준이다(코드가 계산해 내려줌). FE([application-sections](application-sections.md) `BasicInfoSection.vue`)는 현재 `totalCount`로 페이지 수를 계산하고 FE 타입에 `maxPage`가 없다 — 결과가 9000건을 넘으면 뒤쪽 페이지에서 400이 나는 FE 결함이다. 해소는 `## 변경 레시피`.
+- 승인키 미설정 오류 메시지는 코드 기준 `"주소 검색 서비스가 설정되지 않았습니다."`(502)다.
 - 외부 호출 `GET addrLinkApi.do?confmKey&currentPage&countPerPage&keyword&resultType=json`. 승인키는 서버 설정에만, 클라이언트는 보내지 않는다. 2026-07-31: `maxPage` 추가, 범위 초과 400 선차단, 오류코드 400/502 분류.
 - 보정: `currentPage`<1→1, `countPerPage` 1~`max-count-per-page`(100). `currentPage×countPerPage > max-search-range`(9000)면 외부 호출 전 400. 실측(2026-07-31, `중앙로`, totalCount 10,715): 900×10 정상 / 901×10 E0015 / 90×100 정상 / 91×100 E0015 → `countPerPage`와 무관한 offset 상한.
 - 응답: `totalCount`·`currentPage`·`countPerPage`는 juso 에코값(파싱 실패 0). **`totalCount`로 페이지 수를 계산하지 않는다.** `maxPage = min(ceil(totalCount/countPerPage), floor(maxSearchRange/countPerPage))`, 결과 없음이면 0. 결과 없음은 200 + 빈 배열.
@@ -147,7 +147,7 @@
 - 필수값은 trim 후 검사, `description` 공백→null. ({BE}/domain/entity/CommonCode.java — requireText/normalize)
 - `(groupCode, code)` 유일: 서비스 선검사 + DB unique `uk_common_code_group_code`. 동시 생성 race는 `saveAndFlush`의 `DataIntegrityViolationException`을 같은 400으로 변환. ({BE}/service/CommonCodeService.java — create)
 - `groupCode`·`code` 불변. 수정 시 `sortOrder`·`active`는 null이면 유지, **`description`은 항상 덮어씀**(빠뜨리면 지워짐). ({BE}/domain/entity/CommonCode.java — update)
-- 검증 결합: 지원서 4그룹은 `{BE}/service/ApplicationBasicInfoService.java`([application](application.md)), `WORK_LOCATION`은 `{BE}/service/JobPostingService.java`([job-posting](job-posting.md)). 검사 쿼리 ({BE}/domain/repository/CommonCodeRepository.java — existsByGroupCodeAndCodeAndActiveTrue)
+- 검증 결합: 지원서 4그룹은 `{BE}/service/ApplicationBasicInfoService.java`([application-sections](application-sections.md)), `WORK_LOCATION`은 `{BE}/service/JobPostingService.java`([job-posting](job-posting.md)). 검사 쿼리 ({BE}/domain/repository/CommonCodeRepository.java — existsByGroupCodeAndCodeAndActiveTrue)
 - 표시명: 미등록·비활성 코드는 **원문 코드 그대로**(누락을 감추지 않음), export는 그룹당 1회 조회. ({BE}/service/CommonCodeNames.java — name; PDF는 `{BE}/service/ApplicationPdfService.java` codeName)
 - 조회 실패(`86d12c9`): 관리자 지원서 상세는 실패를 삼키고 원문 코드 표시(`{FE}/views/admin/application/Application.vue` — loadCommonCode), 공고 폼은 오류 메시지, 지원서 섹션은 별도 처리 없음.
 - **enum 마이그레이션 금지**: CommonCode는 추가만 한다. 기존 enum을 CommonCode로 바꾸지 않는다. 전환은 "관리자가 런타임에 값을 추가해야 한다"는 구체 요구가 있는 그룹만 별도 결정(ADR 0003).
@@ -191,15 +191,15 @@
 
 ### 학교 검색 출처·매핑 변경
 1. 라우팅 `SchoolSearchService.univSchoolKind`, 파라미터·항목 상수 `NeisSchoolClient`·`UnivInfoSchoolClient`, 설정 Properties + `{BR}/application.yaml`(환경변수 이름 유지). 공공데이터 API는 `PublicDataServiceKey.toQueryValue` + URI 직접 조립 유지.
-2. `SchoolSource`·`schoolCode` 체계 변경은 지원서 저장값(`schoolSource` 20자, [application](application.md))과 학교별 통계([statistics](statistics.md))를 깬다 — 영향 확인.
+2. `SchoolSource`·`schoolCode` 체계 변경은 지원서 저장값(`schoolSource` 20자, [application-sections](application-sections.md))과 학교별 통계([statistics](statistics.md))를 깬다 — 영향 확인.
 3. 학교 검색 테스트 갱신(NEIS 클라이언트 단위 테스트는 없음) → 백엔드 검증.
-4. FE `educationApi.getSchools`·`schoolItem`([application](application.md) 소유) → `{FE}/views/common/SchoolModalBody.vue` 안내 문구(`isUniversitySearch`), `npm run type-check`, 카드 갱신, `node tools/check-docs.mjs`.
+4. FE `educationApi.getSchools`·`schoolItem`([application-sections](application-sections.md) 소유) → `{FE}/views/common/SchoolModalBody.vue` 안내 문구(`isUniversitySearch`), `npm run type-check`, 카드 갱신, `node tools/check-docs.mjs`.
 
 ### 주소 검색 오류코드·한도·페이지네이션
 1. 사용자 입력 오류 juso 코드는 서버 로그 `juso 오류코드=...`로 확인 후 `{BE}/service/JusoAddressClient.java` `USER_INPUT_ERROR_CODES`에 추가(모르는 코드는 502 유지). 한도는 설정 `JUSO_MAX_SEARCH_RANGE`·`JUSO_MAX_COUNT_PER_PAGE`로.
 2. `{BT}/service/JusoAddressClientTest.java`·`{BT}/service/AddressSearchServiceTest.java` 갱신 → 백엔드 검증.
-3. 🔴 해소: `{FE}/types/application/address.ts`에 `maxPage` 추가 → [application](application.md) `BasicInfoSection.vue`의 `pagination.total`을 `maxPage × pageSize`로. `npm run type-check`.
-4. 상태 변경은 사용자 확인 후, 카드 갱신, `node tools/check-docs.mjs`.
+3. FE 페이지네이션 결함 해소(후속 작업): `{FE}/types/application/address.ts`에 `maxPage` 추가 → [application-sections](application-sections.md) `BasicInfoSection.vue`의 `pagination.total`을 `maxPage × pageSize`로. `npm run type-check`.
+4. 카드 갱신, `node tools/check-docs.mjs`.
 
 ## 검증
 
