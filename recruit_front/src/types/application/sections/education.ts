@@ -9,7 +9,7 @@ export type educationLevelType =
 export type graduationStatus =
   | "GRADUATED"
   | "EXPECTED"
-  | "ENFOLLED"
+  | "ENROLLED"
   | "LEAVE_OF_ABSENCE"
   | "DROPPED_OUT"
   | "COMPLETED"

@@ -33,27 +33,47 @@ watch(() => props.initialValues, (newVal) => {
   editForm.value = newVal ? { ...newVal } : createEmptyForm()
 }, { immediate: true })
 
-const validation = (): boolean => {
-  if (editForm.value.maxLength! <= 0) {
-    alert("최대 글자 수는 0보다 크게 입력해주세요.")
-    return false
-  } if (editForm.value.maxLength! <= editForm.value.minLength!) {
-    alert("최대 글자 수는 최소 글자 수보다 크게 입력해주세요.")
+/* a-input type=number 는 문자열을 돌려준다. 비교·전송 전에 숫자로 바꾼다(빈 값은 null). */
+const toNumber = (value: unknown): number | null =>
+  value === null || value === undefined || value === '' ? null : Number(value)
+
+/* 백엔드 JobPostingQuestionService.validateLength 와 같은 유형별 상한. */
+const TYPE_MAX_LENGTH: Record<string, { label: string; max: number }> = {
+  SHORT_TEXT: { label: '단답형', max: 500 },
+  LONG_TEXT: { label: '서술형', max: 5000 },
+}
+
+const validation = (maxLength: number | null, minLength: number | null): boolean => {
+  if(!editForm.value?.questionText?.trim() || maxLength === null || !editForm.value.category?.trim() ||!(editForm.value.required !== null) || !editForm.value.answerType?.trim()) {
+    alert("필수 값을 모두 입력해주세요.")
     return false
   }
-  if(!editForm.value?.questionText?.trim() || !editForm.value.maxLength || !editForm.value.category?.trim() ||!(editForm.value.required !== null) || !editForm.value.answerType?.trim()) {
-    alert("필수 값을 모두 입력해주세요.")
+  if (!Number.isInteger(maxLength) || maxLength <= 0) {
+    alert("최대 글자 수는 0보다 큰 정수로 입력해주세요.")
+    return false
+  }
+  if (minLength !== null && (!Number.isInteger(minLength) || minLength < 0)) {
+    alert("최소 글자 수는 0 이상의 정수로 입력해주세요.")
+    return false
+  }
+  if (minLength !== null && minLength > maxLength) {
+    alert("최소 글자 수는 최대 글자 수보다 클 수 없습니다.")
+    return false
+  }
+  const typeLimit = TYPE_MAX_LENGTH[editForm.value.answerType ?? '']
+  if (typeLimit && maxLength > typeLimit.max) {
+    alert(`${typeLimit.label} 최대 글자 수는 ${typeLimit.max}자 이하로 입력해주세요.`)
     return false
   }
   return true
 }
 
+/* 저장 성공 전에는 폼을 비우지 않는다. 실패하면 입력을 고쳐 다시 저장할 수 있어야 한다(부모가 성공 시 새로 만든다). */
 const handleSubmit = (): void => {
-  if(validation()){
-    emit('submit', { ...editForm.value })
-    editForm.value = createEmptyForm()
-  } else {
-    return
+  const maxLength = toNumber(editForm.value.maxLength)
+  const minLength = toNumber(editForm.value.minLength)
+  if (validation(maxLength, minLength)) {
+    emit('submit', { ...editForm.value, maxLength, minLength })
   }
 }
 

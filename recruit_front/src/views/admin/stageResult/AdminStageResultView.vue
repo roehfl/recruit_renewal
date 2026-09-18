@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import axios from 'axios'
-import { adminJobPostingApi } from '@/api/adminJobPostingApi'
+import { adminJobPostingApi, getAllJobPostings } from '@/api/adminJobPostingApi'
 import { adminStageApi } from '@/api/admin/adminStageApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import { formatDate } from '@/common/dateUtil'
@@ -36,6 +36,8 @@ const route = useRoute()
 const router = useRouter()
 
 const initializing = ref(true)
+/* 공고 전환 중에는 셀렉트를 잠가 늦게 도착한 이전 공고 응답이 섞이지 않게 한다. */
+const switchingJobPosting = ref(false)
 const loadingResults = ref(false)
 const saving = ref(false)
 
@@ -246,17 +248,23 @@ const loadResults = async () => {
     resultsLoadFailed.value = false
     return
   }
+  // 응답이 오기 전에 단계가 바뀌었으면 늦게 온 응답은 버린다.
+  const stageId = selectedStageId.value
   loadingResults.value = true
   try {
-    const response = await adminStageApi.getResults(selectedStageId.value)
+    const response = await adminStageApi.getResults(stageId)
+    if (stageId !== selectedStageId.value) return
     results.value = response.data.data
     resultsLoadFailed.value = false
   } catch (error) {
+    if (stageId !== selectedStageId.value) return
     results.value = []
     resultsLoadFailed.value = true
     message.error(getApiErrorMessage(error, '전형 결과를 불러오지 못했습니다.'))
   } finally {
-    loadingResults.value = false
+    if (stageId === selectedStageId.value) {
+      loadingResults.value = false
+    }
   }
 }
 
@@ -284,12 +292,16 @@ const loadStages = async () => {
     stagesLoadFailed.value = false
     return
   }
+  // 응답이 오기 전에 공고가 바뀌었으면 늦게 온 응답은 버린다.
+  const jobPostingId = selectedJobPostingId.value
   try {
-    const response = await adminStageApi.getStages(selectedJobPostingId.value)
+    const response = await adminStageApi.getStages(jobPostingId)
+    if (jobPostingId !== selectedJobPostingId.value) return
     stages.value = response.data.data
     selectedStageId.value = pickDefaultStage(stages.value)?.id ?? null
     stagesLoadFailed.value = false
   } catch (error) {
+    if (jobPostingId !== selectedJobPostingId.value) return
     stages.value = []
     selectedStageId.value = null
     stagesLoadFailed.value = true
@@ -391,11 +403,36 @@ const changeJobPosting = async (jobPostingId: number) => {
   if (!(await confirmDiscardIfDirty())) {
     return
   }
-  selectedJobPostingId.value = jobPostingId
-  statusFilter.value = null
-  await loadStages()
-  syncQuery()
-  await Promise.all([loadResults(), loadSubmittedCount()])
+  switchingJobPosting.value = true
+  try {
+    selectedJobPostingId.value = jobPostingId
+    statusFilter.value = null
+    await loadStages()
+    syncQuery()
+    await Promise.all([loadResults(), loadSubmittedCount()])
+  } finally {
+    switchingJobPosting.value = false
+  }
+}
+
+/*
+ * 선택 목록은 전체 공고를 불러온다. 쿼리(링크)로 지정한 공고가 그 안에 없으면 따로 조회해 목록 앞에 넣는다.
+ * 없으면 다른 공고로 조용히 바뀌지 않도록 알린다.
+ */
+const includeQueryJobPosting = async (
+  postings: AdminJobPostingListItem[],
+): Promise<AdminJobPostingListItem[]> => {
+  const queryId = Number(route.query.jobPostingId)
+  if (!queryId || postings.some((posting) => posting.id === queryId)) {
+    return postings
+  }
+  try {
+    const response = await adminJobPostingApi.getJobPosting(queryId)
+    return [response.data.data, ...postings]
+  } catch {
+    message.warning('지정한 공고를 찾지 못해 다른 공고를 표시합니다.')
+    return postings
+  }
 }
 
 /*
@@ -427,9 +464,16 @@ const saveEdits = async () => {
       results: items,
     })
     results.value = response.data.data.results
-    pendingEdits.value = new Map()
+    // 결과가 대기인 행은 전송하지 않았으므로 입력한 점수·코멘트를 버퍼에 남긴다.
+    const savedIds = new Set(items.map((item) => item.stageResultId))
+    pendingEdits.value = new Map([...pendingEdits.value].filter(([id]) => !savedIds.has(id)))
     gridRef.value?.clearSelection()
     message.success(`${response.data.data.updatedCount}건을 저장했습니다.`)
+    if (pendingEdits.value.size > 0) {
+      message.warning(
+        `결과가 대기인 ${pendingEdits.value.size}건은 저장하지 않았습니다. 결과를 지정한 뒤 다시 저장하세요.`,
+      )
+    }
   } catch (error) {
     if (isConflict(error)) {
       // 다른 관리자가 먼저 저장했다. 최신 목록을 보여주되 입력값은 살려 재검토하게 한다.
@@ -531,8 +575,7 @@ const warnUnsavedOnUnload = (event: BeforeUnloadEvent) => {
 onMounted(async () => {
   window.addEventListener('beforeunload', warnUnsavedOnUnload)
   try {
-    const response = await adminJobPostingApi.getJobPostings()
-    jobPostings.value = response.data.data.content
+    jobPostings.value = await includeQueryJobPosting(await getAllJobPostings())
     const defaultPosting = pickDefaultJobPosting(jobPostings.value)
     if (defaultPosting) {
       await changeJobPosting(defaultPosting.id)
@@ -559,7 +602,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', warnUnsavedOnUn
         class="posting-select"
         placeholder="공고를 선택하세요"
         :options="jobPostingOptions"
-        :disabled="initializing || jobPostings.length === 0"
+        :disabled="initializing || switchingJobPosting || jobPostings.length === 0"
         show-search
         option-filter-prop="label"
         @change="changeJobPosting"
@@ -667,7 +710,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', warnUnsavedOnUn
             @toggle="(status) => (statusFilter = status)"
           />
 
+          <!-- 공고가 바뀌면 다시 마운트해 이전 공고의 지원분야·근무지·이름 필터를 비운다. -->
           <StageResultGrid
+            :key="selectedJobPostingId ?? 'none'"
             ref="gridRef"
             :results="results"
             :pending-edits="pendingEdits"

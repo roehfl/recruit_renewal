@@ -4,6 +4,7 @@ import { computed, onMounted, ref, h, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { adminJobPostingApi } from '@/api/admin/adminJobPostingApi'
+import { getAllJobPostings } from '@/api/adminJobPostingApi'
 import { adminApplicationApi } from '@/api/admin/adminApplicationApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import type { AdminJobPosition } from '@/types/admin/jobPosting'
@@ -83,6 +84,8 @@ const columns: TableColumnsType<TableRow> = [
     key: 'stageResult',
     customRender: ({ text }) => `${stageTypeMap[text.stageType] ?? ''} ${stageResultStatusMap[text.stageResultStatus] ?? ''}`,
   },
+  // 검색 조건이 없으면 임시저장·철회 지원서도 함께 조회되므로 상태를 보여 준다.
+  { title: '지원상태', dataIndex: 'status', key: 'status' },
   { title: '근무지', dataIndex: 'workLocation', key: 'workLocation' },
   {
     title: '수험번호', dataIndex: 'applicationId', key: 'applicationId',
@@ -101,6 +104,8 @@ const columns: TableColumnsType<TableRow> = [
 const initializing = ref(true)
 const refreshing = ref(false)
 const loadFailed = ref(false)
+
+const statusOptions = Object.entries(statusLabelMap).map(([value, label]) => ({ value, label }))
 
 const stageTypeOptions = computed(() => {
   const options = Object.entries(stageTypeMap).map(([value, label]) => ({ value, label }))
@@ -155,13 +160,20 @@ const changeJobPosting = async (jobPostingId: number): Promise<void> => {
   loadFailed.value = false
   try {
     const response = await adminJobPostingApi.getJobPosting(jobPostingId)
+    // 응답이 오기 전에 다른 공고를 골랐으면 늦게 온 응답은 버린다.
+    if (jobPostingId !== selectedJobPostingId.value) return
     const detail = response.data.data;
     jobPositions.value = detail.jobPositions;
   } catch (error) {
+    if (jobPostingId !== selectedJobPostingId.value) return
+    // 이전 공고의 지원분야·근무지 옵션이 남으면 그 값으로 검색해 항상 0건이 나온다.
+    jobPositions.value = []
     loadFailed.value = true
     message.error(getApiErrorMessage(error, '지원분야를 불러오지 못했습니다.'))
   } finally {
-    refreshing.value = false
+    if (jobPostingId === selectedJobPostingId.value) {
+      refreshing.value = false
+    }
   }
 }
 
@@ -183,6 +195,7 @@ const resetPaging = (): void => {
   pagination.current = 1
   pagination.total = 0
   saving.value = false
+  appliedSearch.value = null
 }
 
 // 지원서 상세는 메인 프레임을 벗어나 새 탭으로 연다. 상대경로 window.open 은 현재 URL 기준으로
@@ -196,8 +209,15 @@ const goApplication = (applicationId: number) => {
 const onlyNumber = (e: KeyboardEvent) => {
     const allowKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'];
 
+    // 복사·붙여넣기·전체선택 같은 Ctrl/Cmd 조합은 막지 않는다. 붙여넣은 값은 onPhoneNumberInput 이 숫자만 남긴다.
+    if (e.ctrlKey || e.metaKey) return;
     if (allowKeys.includes(e.key)) return;
     if (!/^\d$/.test(e.key)) e.preventDefault();
+}
+
+// '010-1234-5678' 처럼 붙여넣어도 숫자만 남긴다. maxlength 를 두면 하이픈 포함 값이 먼저 잘려 여기서 자른다.
+const onPhoneNumberInput = (value: string) => {
+  searchRequest.phoneNumber = value.replace(/\D/g, '').slice(0, 11)
 }
 
 const applications = ref<AdminApplicationSummaryResponse[]>([])
@@ -219,6 +239,9 @@ const initialSearchRequest: AdminApplicationSearchRequest = {
 const searchRequest = reactive<AdminApplicationSearchRequest>({
   ...initialSearchRequest,
 });
+
+/** 마지막으로 조회에 성공한 공고·검색 조건. 엑셀은 입력란의 현재 값이 아니라 이 조건으로 받는다. */
+const appliedSearch = ref<{ jobPostingId: number; request: AdminApplicationSearchRequest } | null>(null)
 
 // 서버 페이징. a-table 의 current 는 1-based, 백엔드 page 는 0-based 라 호출 시점에 변환한다.
 const pagination = reactive({
@@ -244,12 +267,15 @@ const loadApplications = async (page: number) => {
   loading.value = true
   saving.value = true
   selectRowKeys.value = [];
+  appliedSearch.value = null
 
   try {
     if (selectedJobPostingId.value) {
+      const jobPostingId = selectedJobPostingId.value
+      const request = { ...searchRequest }
       const response = await adminApplicationApi.getApplications(
-        selectedJobPostingId.value,
-        searchRequest,
+        jobPostingId,
+        request,
         page - 1,
         pagination.pageSize,
       );
@@ -258,6 +284,7 @@ const loadApplications = async (page: number) => {
       applications.value = pageResponse.content;
       pagination.current = pageResponse.page + 1;
       pagination.total = pageResponse.totalElements;
+      appliedSearch.value = { jobPostingId, request }
     }
   } catch (error) {
     message.error(getApiErrorMessage(error, '지원현황 조회에 실패했습니다.'))
@@ -286,16 +313,17 @@ const downloadSelectedPdf = async () => {
   }
 }
 
-// 엑셀 버튼은 항목 선택 모달을 연다. 모달에서 고른 컬럼으로, 화면에 걸어둔 검색 조건 그대로 받는다
-// (목록과 같은 조건이라 보이는 결과와 일치한다).
+// 엑셀 버튼은 항목 선택 모달을 연다. 모달에서 고른 컬럼으로, 마지막으로 조회한 조건 그대로 받는다
+// (검색 없이 입력란만 바꿔도 조건이 달라지지 않아 보이는 목록과 일치한다). 조회 전에는 버튼을 막는다.
 const excelModalOpen = ref(false)
 const downloadingExcel = ref(false)
 const downloadExcel = async (columns: string[]) => {
-  if (downloadingExcel.value || selectedJobPostingId.value === null) return
+  const applied = appliedSearch.value
+  if (downloadingExcel.value || applied === null) return
 
   downloadingExcel.value = true
   try {
-    const response = await adminApplicationApi.downloadApplicationsExcel(selectedJobPostingId.value, searchRequest, columns)
+    const response = await adminApplicationApi.downloadApplicationsExcel(applied.jobPostingId, applied.request, columns)
     saveBlobResponse(response, '지원현황.xlsx')
     excelModalOpen.value = false
   } catch (error) {
@@ -305,15 +333,15 @@ const downloadExcel = async (columns: string[]) => {
   }
 }
 
+const CAREER_DESCRIPTION_DOWNLOAD_TIMEOUT_MS = 60_000 // 기본 10초로는 큰 첨부가 느린 망에서 끊길 수 있다.
+
 const careerDescriptionDownload = async (url: string) => {
   try {
-    const response = await apiClient.get(url, {responseType: 'blob'});
-    
+    const response = await apiClient.get(url, {responseType: 'blob', timeout: CAREER_DESCRIPTION_DOWNLOAD_TIMEOUT_MS});
+
     saveBlobResponse(response, '경력기술서');
   } catch (error) {
-    message.error(getApiErrorMessage(error, '경력기술서 다운로드에 실패했습니다.'))
-  } finally {
-    loading.value = false
+    message.error(await getBlobErrorMessage(error, '경력기술서 다운로드에 실패했습니다.'))
   }
 }
 
@@ -324,8 +352,7 @@ const pickDefaultJobPosting = (postings: AdminJobPostingListItem[]): AdminJobPos
 
 onMounted(async () => {
   try {
-    const response = await adminJobPostingApi.getJobPostings()
-    jobPostings.value = response.data.data.content;
+    jobPostings.value = await getAllJobPostings()
     const defaultPosting = pickDefaultJobPosting(jobPostings.value)
 
     if (defaultPosting) {
@@ -427,8 +454,17 @@ onMounted(async () => {
               </td>
               <th>연락처</th>
               <td>
-                <a-input v-model:value="searchRequest.phoneNumber" style="width: 200px" 
-                  placeholder="예: 01012345678" :maxlength="11" @keydown="onlyNumber"
+                <a-input :value="searchRequest.phoneNumber" style="width: 200px"
+                  placeholder="예: 01012345678" @update:value="onPhoneNumberInput" @keydown="onlyNumber"
+                />
+              </td>
+            </tr>
+
+            <tr>
+              <th>지원상태</th>
+              <td colspan="3">
+                <a-select v-model:value="searchRequest.status" style="width: 200px" placeholder="전체"
+                  :options="statusOptions" allow-clear
                 />
               </td>
             </tr>
@@ -449,8 +485,11 @@ onMounted(async () => {
 
       <a-card :bordered="false" class="form-card">
         <div class="button-area">
-          <a-button><PrinterOutlined />인쇄</a-button>
-          <a-button :disabled="selectedJobPostingId === null" @click="excelModalOpen = true">
+          <!-- 인쇄 기능은 아직 없다. 눌러도 반응 없는 버튼으로 두지 않고 막아 둔다. -->
+          <a-tooltip title="준비 중입니다.">
+            <a-button disabled><PrinterOutlined />인쇄</a-button>
+          </a-tooltip>
+          <a-button :disabled="appliedSearch === null" @click="excelModalOpen = true">
             <FileExcelOutlined />엑셀 다운로드
           </a-button>
           <a-button :loading="downloadingPdf" :disabled="selectRowKeys.length === 0" @click="downloadSelectedPdf">
@@ -463,7 +502,7 @@ onMounted(async () => {
           <a-table :columns="columns" :data-source="applications" :pagination="pagination"
             :row-selection="rowSelection" row-key="applicationId" @change="handleTableChange">
             <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'stageType'">
+              <template v-if="column.key === 'status'">
                 {{ statusLabelMap[record.status] ?? record.status }}
               </template>
               <template v-else-if="column.key === 'finalEducationLevel'">

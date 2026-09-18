@@ -217,6 +217,7 @@
 import { message } from 'ant-design-vue'
 import { SearchOutlined } from '@ant-design/icons-vue'
 import { ref, reactive, onMounted, computed } from 'vue'
+import { useSectionDraftState } from '@/views/applicant/application/useSectionDraftState'
 import { useAuthStore } from '@/stores/authStore'
 import { basicInfoApi } from '@/api/application/sections/basicInfoApi'
 import { attachmentApi } from '@/api/application/sections/attachmentApi'
@@ -236,6 +237,7 @@ const loading = ref(false)
 const props = defineProps<SectionComponentProps>()
 const fileList = ref<UploadFile[]>([])
 const originAttachments = ref<AttachmentResponse[]>([])
+const draftState = useSectionDraftState(() => ({ form: { ...form }, photo: fileList.value.map((file) => file.uid) }))
 const nationalityTypeInputRef = ref();
 
 // 국가 코드  
@@ -406,20 +408,23 @@ function selectAddress(address: AddressItem) {
 }
 
 // 부모 임시저장 버튼 
+// 새 사진을 먼저 올리고 성공한 뒤에 기존 사진을 지운다. 업로드가 실패해도 기존 사진은 남는다.
 const saveDraft = () => {
+  draftState.assertLoaded()
   vaildation();
 
-  return deleteAttachmentFile().then(result => {
+  return postAttachmentFile().then(result => {
     if (!result.success) throw new Error(result.error);
-    return postAttachmentFile();
+    return deleteAttachmentFile();
   })
   .then(result => {
     if (!result.success) throw new Error(result.error);
     return postBasicInfo();
   })
   .then(result => {
-    if (result.success) return result.data;
-    else throw new Error(result.error);
+    if (!result.success) throw new Error(result.error);
+    draftState.markSynced()
+    return result.data;
   });
 }
 
@@ -500,7 +505,12 @@ async function loadAttachmentFile() {
 
     if (originAttachments.value.length === 0) return fileList.value = [];
     const photo = originAttachments.value[originAttachments.value.length - 1]!
-    await downloadAttachment(photo);
+    try {
+      await downloadAttachment(photo);
+    } catch {
+      // 미리보기만 실패한 것이다. uid 를 남겨 두지 않으면 다음 저장에서 기존 사진이 삭제 대상이 된다.
+      setFileList(photo)
+    }
 
   } finally {
     loading.value = false
@@ -531,7 +541,11 @@ async function postAttachmentFile() {
       attachmentType: "ETC",
       sectionType: 'BASIC_INFO',
     })
-    return {success: true, data: result.data.data}
+    const uploaded = result.data.data
+    // 다음 저장에서 같은 파일을 다시 올리지 않도록 업로드 완료 상태로 바꾼다(미리보기는 유지).
+    setFileList(uploaded, fileList.value[0]?.url ?? fileList.value[0]?.thumbUrl)
+    originAttachments.value = [...originAttachments.value, uploaded]
+    return {success: true, data: uploaded}
   } catch(error) {
     logClientEvent({
       eventType: 'APPLICATION_SUBMIT_FAILED',
@@ -541,7 +555,7 @@ async function postAttachmentFile() {
       applicationId: props.applicationId,
       message: 'APPLICATION_SUBMIT_CLICKED',
     })
-    return {success: false, error: getApiErrorMessage(error, 'fallback 메세지')};
+    return {success: false, error: getApiErrorMessage(error, '증명사진 업로드에 실패했습니다.')};
   } finally {
     loading.value = false
   }
@@ -561,7 +575,7 @@ async function deleteAttachmentFile() {
     for (const attachment of deleteTargets) {
       await attachmentApi.deleteApplicationAttachments(props.applicationId, attachment.attachmentId) 
     }
-    originAttachments.value = [];
+    originAttachments.value = originAttachments.value.filter(item => item.attachmentId === currentUid);
     return {success: true}
   } catch(error) {
     logClientEvent({
@@ -572,7 +586,7 @@ async function deleteAttachmentFile() {
       applicationId: props.applicationId,
       message: 'APPLICATION_SUBMIT_CLICKED',
     })
-    return {success: false, error: getApiErrorMessage(error, 'fallback 메세지')};
+    return {success: false, error: getApiErrorMessage(error, '기존 증명사진 삭제에 실패했습니다.')};
   } finally {
     loading.value = false
   }
@@ -607,23 +621,23 @@ async function postBasicInfo() {
       applicationId: props.applicationId,
       message: 'APPLICATION_SUBMIT_CLICKED',
     })
-    return {success: false, error: getApiErrorMessage(error, 'fallback 메세지')};
+    return {success: false, error: getApiErrorMessage(error, '기본정보 저장에 실패했습니다.')};
   }   finally {
     loading.value = false
   }
 }
 
-onMounted(() => {
-  loadAttachmentFile()
-  loadBasicInfo()
-
+onMounted(async () => {
   loadCommonCode('DISABILITY_TYPE')
   loadCommonCode('DISABILITY_GRADE')
   loadCommonCode('NATIONALITY')
   loadCommonCode('APPLICATION_ROUTE')
+
+  await Promise.all([loadAttachmentFile(), loadBasicInfo()])
+  draftState.markSynced()
 })
 
-defineExpose({ saveDraft, validateBeforeSubmit })
+defineExpose({ saveDraft, validateBeforeSubmit, isDirty: draftState.isDirty })
 </script>
 
 <style scoped>

@@ -70,11 +70,9 @@ const handleResetAdd = (): void => {
   selectedTemplate.value = null;
 }
 
+/* 저장 결과를 모르는 채 닫거나 비우지 않는다. 부모가 저장에 성공하면 닫고 새로 만든다. */
 const handleSubmit = (data: QuestionForm): void => {
   emit('success', data)
-  cilckTemplate.value = false
-  selectedTemplate.value = null
-  emit('update:opne', false)
 }
 
 const loadQuestionTemplates = async () => {

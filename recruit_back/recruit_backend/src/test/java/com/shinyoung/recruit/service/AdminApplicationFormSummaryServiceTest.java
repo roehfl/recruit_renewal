@@ -155,6 +155,29 @@ class AdminApplicationFormSummaryServiceTest {
         assertThat(ids).contains(editableId).doesNotContain(startedId);
     }
 
+    /*
+     * '마감 제외'는 화면 기본값이다. 예전에는 프론트가 페이지 응답을 다시 걸러 페이지가 비거나 건수가 어긋났다.
+     * 서버가 걸러야 페이징·총건수가 맞는다.
+     */
+    @Test
+    void 마감된_공고를_제외하면_페이징과_총건수도_제외된_기준이다() {
+        Long openId = createPosting("진행 공고", FUTURE_START, FUTURE_END);
+        Long closedId = createPosting("마감 공고", STARTED_START, STARTED_END);
+        jobPostingService.publish(closedId);
+        jobPostingService.close(closedId);
+
+        PageResponse<AdminApplicationFormSummaryResponse> all = summaryService.getSummaries(NO_FILTER, 0, 20);
+        PageResponse<AdminApplicationFormSummaryResponse> result = summaryService.getSummaries(
+                new AdminApplicationFormSummarySearchRequest(null, null, null, null, null, true),
+                0,
+                20
+        );
+
+        List<Long> ids = result.content().stream().map(AdminApplicationFormSummaryResponse::jobPostingId).toList();
+        assertThat(ids).contains(openId).doesNotContain(closedId);
+        assertThat(result.totalElements()).isEqualTo(all.totalElements() - 1);
+    }
+
     @Test
     void 제목으로_검색한다() {
         Long id = createPosting("2026 상반기 신입공채", FUTURE_START, FUTURE_END);

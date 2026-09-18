@@ -73,6 +73,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { useSectionDraftState } from '@/views/applicant/application/useSectionDraftState'
 import { message } from 'ant-design-vue'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import { gapPeriodApi } from '@/api/application/sections/gapPeriodApi'
@@ -89,6 +90,7 @@ import type {
 const props = defineProps<SectionComponentProps>()
 
 const loading = ref(false)
+const draftState = useSectionDraftState(() => buildPayload())
 const notApplicable = ref(false)
 const items = reactive<GapPeriodItem[]>([])
 
@@ -170,17 +172,20 @@ async function loadGapPeriods() {
   try {
     const result = await gapPeriodApi.getApplicationsGapPeriods(props.applicationId)
     setItems(result.data.data ?? [])
+    draftState.markSynced()
   } finally {
     loading.value = false
   }
 }
 
 async function saveDraft() {
+  draftState.assertLoaded()
   if (!validate()) throw new Error('입력값을 확인해주세요.')
   loading.value = true
   try {
     const result = await gapPeriodApi.replaceApplicationsGapPeriods(props.applicationId, buildPayload())
     setItems(result.data.data ?? [])
+    draftState.markSynced()
     return result.data.data
   } catch (error) {
     logClientEvent({
@@ -205,7 +210,7 @@ onMounted(() => {
   loadGapPeriods()
 })
 
-defineExpose({ saveDraft, validateBeforeSubmit })
+defineExpose({ saveDraft, validateBeforeSubmit, isDirty: draftState.isDirty })
 </script>
 
 <style scoped>

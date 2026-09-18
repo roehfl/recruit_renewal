@@ -1,5 +1,6 @@
 package com.shinyoung.recruit.dto.response;
 
+import com.shinyoung.recruit.common.util.HtmlTextUtils;
 import com.shinyoung.recruit.domain.entity.Notice;
 
 import java.time.LocalDateTime;
@@ -15,7 +16,7 @@ public record NoticeDetailResponse(
         return new NoticeDetailResponse(
                 notice.getId(),
                 notice.getTitle(),
-                notice.getContentHtml(),
+                HtmlTextUtils.sanitize(notice.getContentHtml()),
                 notice.isPinned(),
                 notice.getCreatedAt()
         );

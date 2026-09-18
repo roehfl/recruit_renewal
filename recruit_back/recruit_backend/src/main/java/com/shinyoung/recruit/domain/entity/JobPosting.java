@@ -195,6 +195,16 @@ public class JobPosting extends BaseEntity {
         }
     }
 
+    /** ids 에 없는 모집분야를 뺀다(orphanRemoval 로 삭제). 지원서 참조 여부는 호출 측이 먼저 확인한다. */
+    public void retainJobPositions(java.util.Set<Long> ids) {
+        this.jobPositions.removeIf(position -> !ids.contains(position.getId()));
+    }
+
+    public void addJobPosition(JobPosition position) {
+        position.assignJobPosting(this);
+        this.jobPositions.add(position);
+    }
+
     public void updateApplicationFormConfig(ApplicationFormConfig config) {
         if (this.applicationFormConfig != null) {
             this.applicationFormConfig.update(

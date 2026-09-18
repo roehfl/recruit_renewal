@@ -7,9 +7,9 @@ const emit = defineEmits<{
   (e: 'success', data: QuestionForm): void
 }>()
 
+/* 저장 결과를 모르는 채 닫지 않는다. 부모가 저장에 성공하면 닫는다. */
 const handleSubmit = (data: QuestionForm) => {
   emit('success', data)
-  emit('update:opne', false)
 }
 const handleCancel = () => {
   emit('update:opne', false)

@@ -377,6 +377,47 @@ class ApplicationSubmitValidatorTest {
                 .isInstanceOf(InvalidJobApplicationException.class);
     }
 
+    /*
+     * 최소 글자수는 프론트 섹션 검증에만 있어, 질문 섹션이 마운트되지 않은 페이지에서 제출하면 우회됐다.
+     * 제출 검증에서도 막는다. 공백만 있는 선택 답변은 미입력으로 보고 최소 글자수를 적용하지 않는다(프론트와 동일).
+     */
+    @Test
+    void answer_validation_fails_when_answer_is_shorter_than_question_min_length() {
+        JobPostingQuestion question = question(100L, false, QuestionAnswerType.LONG_TEXT, 1000, 10);
+        ApplicationAnswer answer = answer(question, "  " + "a".repeat(9) + "  ");
+        when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(question));
+        when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
+                .thenReturn(List.of(answer));
+
+        assertThatThrownBy(() -> validator.validate(application(config())))
+                .isInstanceOf(InvalidJobApplicationException.class)
+                .hasMessageContaining("최소 10자");
+    }
+
+    @Test
+    void answer_validation_passes_when_optional_answer_is_blank_even_with_min_length() {
+        JobPostingQuestion question = question(100L, false, QuestionAnswerType.LONG_TEXT, 1000, 10);
+        ApplicationAnswer answer = answer(question, "   ");
+        when(jobPostingQuestionRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(question));
+        when(applicationAnswerRepository.findByJobApplicationId(APPLICATION_ID))
+                .thenReturn(List.of(answer));
+
+        assertThatCode(() -> validator.validate(application(config()))).doesNotThrowAnyException();
+    }
+
+    @Test
+    void submit_failure_message_is_korean() {
+        ApplicationFormConfig config = config();
+        when(config.isUseEducation()).thenReturn(true);
+        when(educationRepository.existsByJobApplicationId(APPLICATION_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> validator.validate(application(config)))
+                .isInstanceOf(InvalidJobApplicationException.class)
+                .hasMessage("학력을 입력해야 제출할 수 있습니다.");
+    }
+
     @Test
     void answer_validation_fails_when_short_text_exceeds_type_limit() {
         JobPostingQuestion question = question(100L, false, QuestionAnswerType.SHORT_TEXT, 1000);
@@ -535,11 +576,22 @@ class ApplicationSubmitValidatorTest {
     }
 
     private JobPostingQuestion question(Long id, boolean required, QuestionAnswerType answerType, Integer maxLength) {
+        return question(id, required, answerType, maxLength, null);
+    }
+
+    private JobPostingQuestion question(
+            Long id,
+            boolean required,
+            QuestionAnswerType answerType,
+            Integer maxLength,
+            Integer minLength
+    ) {
         JobPostingQuestion question = mock(JobPostingQuestion.class);
         lenient().when(question.getId()).thenReturn(id);
         lenient().when(question.getRequired()).thenReturn(required);
         lenient().when(question.getAnswerType()).thenReturn(answerType);
         lenient().when(question.getMaxLength()).thenReturn(maxLength);
+        lenient().when(question.getMinLength()).thenReturn(minLength);
         return question;
     }
 

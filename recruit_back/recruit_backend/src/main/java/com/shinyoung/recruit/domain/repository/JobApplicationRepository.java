@@ -115,6 +115,8 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
 
     boolean existsByApplicantIdAndJobPostingId(Long applicantId, Long jobPostingId);
 
+    boolean existsByJobPositionId(Long jobPositionId);
+
     @EntityGraph(attributePaths = {
             "jobPosting",
             "jobPosting.applicationFormConfig",

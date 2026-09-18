@@ -146,6 +146,8 @@ export interface AdminApplicationFormSummarySearchRequest {
   configState?: ApplicationFormConfigState
   editableOnly?: boolean
   keyword?: string
+  /** 마감(CLOSED) 공고 제외. 서버가 걸러야 페이징·총건수가 맞는다. */
+  excludeClosed?: boolean
 }
 
 /** 지원서 설정 현황판의 한 행. */

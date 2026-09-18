@@ -89,6 +89,9 @@ public class SecurityConfig {
                 // 아래 broad /api/admin/** 매처에 걸리지 않는다. 명시하지 않으면 anyRequest().permitAll() 로 흘러
                 // 비인증 사용자가 메뉴를 생성/수정할 수 있다.
                 .requestMatchers(HttpMethod.POST, "/api/menu/admin/menu", "/api/menu/admin/menu/*").hasAnyAuthority(RoleNames.ADMIN, RoleNames.RECRUIT_ADMIN)
+                // 공지 등록 — BoardController 의 base path 가 /board 라 broad /api/admin/** 에 걸리지 않는다.
+                // 명시하지 않으면 비인증 사용자가 공지(HTML)를 등록할 수 있다. 조회(GET)는 공개 유지.
+                .requestMatchers(HttpMethod.POST, "/api/board/**").hasAnyAuthority(RoleNames.ADMIN, RoleNames.RECRUIT_ADMIN)
                 .requestMatchers(HttpMethod.GET, "/api/job-postings/{jobPostingId}/application").hasAuthority(RoleNames.APPLICANT)
                 .requestMatchers(HttpMethod.GET, "/api/job-postings/**").permitAll()
                 // client event 수집(Phase 09f) — 로그인 전/세션 만료 오류도 수집하므로 permitAll(설계 7장).

@@ -12,8 +12,12 @@ import type { CommonCodeItems } from '@/types/commonCode'
  */
 const GROUP_OF_GROUPS = 'CODE_GROUP'
 
-/* 백엔드 ApplicationBasicInfoService가 active=true를 검증하는 그룹. 비활성화하면 지원자 저장이 실패한다. */
-const VALIDATED_GROUPS = ['NATIONALITY', 'DISABILITY_TYPE', 'DISABILITY_GRADE']
+/*
+ * 백엔드가 active=true를 검증하는 그룹. 비활성화하면 그 코드를 쓰는 저장이 실패한다.
+ * NATIONALITY·DISABILITY_*는 ApplicationBasicInfoService(지원서), WORK_LOCATION은 JobPostingService(공고)가 검증한다.
+ */
+const VALIDATED_GROUPS = ['NATIONALITY', 'DISABILITY_TYPE', 'DISABILITY_GRADE', 'WORK_LOCATION']
+const JOB_POSTING_VALIDATED_GROUP = 'WORK_LOCATION'
 
 interface GroupOption {
   value: string
@@ -84,6 +88,12 @@ const currentGroup = computed<GroupOption | undefined>(() =>
 
 const isGroupOfGroups = computed(() => selectedGroup.value === GROUP_OF_GROUPS)
 const isValidatedGroup = computed(() => VALIDATED_GROUPS.includes(selectedGroup.value))
+/* 비활성화하면 저장이 막히는 대상. 근무지는 공고, 나머지는 지원서다. */
+const validatedGroupImpact = computed(() =>
+  selectedGroup.value === JOB_POSTING_VALIDATED_GROUP
+    ? '이 코드를 근무지로 쓰는 공고의 수정 저장'
+    : '해당 값을 가진 지원자의 지원서 저장',
+)
 
 const rows = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
@@ -237,7 +247,9 @@ const toggleActive = (record: CommonCodeItems): void => {
   const base =
     '지원자 화면 선택지에서 즉시 사라집니다. 이미 이 코드로 저장된 지원서는 값이 남지만 표시명이 비어 보일 수 있습니다. 다시 활성화하면 복구됩니다.'
   const extra = isValidatedGroup.value
-    ? ' 이 그룹은 백엔드 검증에 사용되므로, 이 코드를 가진 지원자가 지원서를 다시 저장하면 실패합니다.'
+    ? selectedGroup.value === JOB_POSTING_VALIDATED_GROUP
+      ? ' 이 그룹은 백엔드 검증에 사용되므로, 이 코드를 근무지로 쓰는 공고를 수정 저장하면 실패합니다.'
+      : ' 이 그룹은 백엔드 검증에 사용되므로, 이 코드를 가진 지원자가 지원서를 다시 저장하면 실패합니다.'
     : isGroupOfGroups.value
       ? ' 그룹 행이라 하위 코드는 계속 동작하며 이 화면의 그룹 목록에서만 가려집니다.'
       : ''
@@ -309,7 +321,7 @@ onMounted(loadCodes)
           v-else-if="isValidatedGroup"
           type="warning"
           show-icon
-          message="백엔드 검증 결합 그룹입니다. 코드를 비활성화하면 해당 값을 가진 지원자의 지원서 저장이 실패합니다."
+          :message="`백엔드 검증 결합 그룹입니다. 코드를 비활성화하면 ${validatedGroupImpact}이 실패합니다.`"
         />
 
         <p v-if="currentGroup && currentGroup.registered" class="usage-line">

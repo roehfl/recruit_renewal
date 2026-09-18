@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { message, Modal } from 'ant-design-vue'
 import { adminJobPostingApi } from '@/api/adminJobPostingApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import ApplicationFormConfigTab from './ApplicationFormConfigTab.vue'
@@ -52,6 +52,41 @@ const editable = computed(() => {
   return detail.value.status === 'DRAFT' || detail.value.receptionStatus === 'UPCOMING'
 })
 
+/* 질문 추가·삭제·순서 변경은 백엔드가 작성 중(DRAFT) 공고에서만 허용한다. 게시 후에는 문구 수정만 된다. */
+const structureEditable = computed(() => detail.value?.status === 'DRAFT')
+
+/* 현재 탭(한 번에 하나만 렌더된다)의 미저장 변경. 탭 전환·목록 이동 시 탭이 파기되므로 먼저 확인한다. */
+const tabRef = ref<{ isDirty?: () => boolean } | null>(null)
+const hasUnsavedChanges = () => tabRef.value?.isDirty?.() === true
+
+const confirmDiscardIfDirty = (): Promise<boolean> => {
+  if (!hasUnsavedChanges()) {
+    return Promise.resolve(true)
+  }
+  return new Promise((resolve) => {
+    Modal.confirm({
+      title: '저장하지 않은 변경이 있습니다',
+      content: '이동하면 저장하지 않은 변경이 사라집니다. 계속할까요?',
+      okText: '변경 버리고 계속',
+      cancelText: '취소',
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false),
+    })
+  })
+}
+
+onBeforeRouteLeave(() => confirmDiscardIfDirty())
+
+const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+  if (hasUnsavedChanges()) {
+    event.preventDefault()
+    event.returnValue = ''
+  }
+}
+
+onMounted(() => window.addEventListener('beforeunload', handleBeforeUnload))
+onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnload))
+
 const formatDateTime = (value: string | null) => (value ? value.replace('T', ' ').slice(0, 16) : '-')
 
 const loadDetail = async () => {
@@ -66,7 +101,10 @@ const loadDetail = async () => {
   }
 }
 
-const changeTab = (key: TabKey) => {
+const changeTab = async (key: TabKey) => {
+  if (!(await confirmDiscardIfDirty())) {
+    return
+  }
   activeTab.value = key
   tabGeneration.value += 1
 }
@@ -123,6 +161,7 @@ onMounted(loadDetail)
 
       <ApplicationFormConfigTab
         v-if="activeTab === 'config' && detail"
+        ref="tabRef"
         :key="`config-${tabGeneration}`"
         :job-posting-id="jobPostingId"
         :config="detail.applicationFormConfig"
@@ -131,12 +170,14 @@ onMounted(loadDetail)
       />
       <ApplicationFormLayoutTab
         v-if="activeTab === 'layout'"
+        ref="tabRef"
         :key="`layout-${tabGeneration}`"
         :job-posting-id="jobPostingId"
       />
       <ApplicationFormQuestionTab
         v-if="activeTab === 'question'"
         :editable="editable"
+        :structure-editable="structureEditable"
         :key="`layout-${tabGeneration}`"
         :job-posting-id="jobPostingId"
       />

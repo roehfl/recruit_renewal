@@ -5,10 +5,12 @@ import { message, Modal } from 'ant-design-vue'
 import { LeftOutlined, LinkOutlined, RightCircleOutlined } from '@ant-design/icons-vue'
 import { formatDate, getDDay, isDeadlineSoon } from '@/common/dateUtil'
 import { copyText } from '@/common/clipboardUtil'
+import axios from 'axios'
 
 import { apiClient } from '@/api/client'
+import { getApiErrorMessage } from '@/api/apiError'
 import type { ApiResponse } from '@/types/api'
-import type { JobPostingDetail, JobPostingImage, MyJobPostingListItem, MyJobPostingDetailListItem } from '@/types/jobPosting'
+import type { JobPostingDetail, JobPostingImage, MyJobPostingDetailListItem } from '@/types/jobPosting'
 import { boardApi } from '@/api/boardApi'
 import HtmlView from '@/views/common/htmlView.vue'
 import JobPostingImageStack from '@/components/jobPosting/JobPostingImageStack.vue'
@@ -69,14 +71,20 @@ function goApplicationFormPage(applicationId: number): void {
  * 이미 지원서가 있으면 상태별 안내 후 해당 지원서로, 없으면 지원서 작성 시작 화면으로 이동한다.
  */
 async function apply(): Promise<void> {
-  const myApplication = await isApplication()
+  let myApplication: MyPostingApplication | undefined
+  try {
+    myApplication = await isApplication()
+  } catch (error) {
+    message.error(getApiErrorMessage(error, '지원 여부를 확인하지 못했습니다.'))
+    return
+  }
 
   if (!myApplication) {
     await router.push(`/applicant/${jobPostingId}/apply`)
     return
   }
 
-  const notice = existingApplicationNotice(myApplication.applicationStatus)
+  const notice = existingApplicationNotice(myApplication.status)
   Modal.confirm({
     // 경고가 아닌 안내라 아이콘을 두지 않는다. 아이콘이 있으면 본문이 34px 들여써져 좌측이 비어 보인다.
     icon: null,
@@ -120,9 +128,30 @@ function existingApplicationNotice(
   }
 }
 
-async function isApplication(): Promise<MyJobPostingDetailListItem | undefined> {
-  const result = await apiClient.get<ApiResponse<MyJobPostingListItem>>(`/applications/me`)
-  return result.data.data.content.find((item) => item.jobPostingId === jobPostingId)
+// 백엔드 ApplicationDetailResponse 중 기지원 안내에 쓰는 필드만 선언한다.
+type MyPostingApplication = {
+  applicationId: number
+  status: MyJobPostingDetailListItem['applicationStatus']
+}
+
+/*
+ * 이 공고의 내 지원서를 단건 조회한다(GET /job-postings/{id}/application). 404면 아직 지원하지 않은 것이다.
+ * /applications/me 는 페이지 단위라 지원서가 많으면 기존 지원서를 놓친다.
+ * 404가 정상 응답이므로 오류 이벤트 수집에서 제외한다.
+ */
+async function isApplication(): Promise<MyPostingApplication | undefined> {
+  try {
+    const result = await apiClient.get<ApiResponse<MyPostingApplication>>(
+      `/job-postings/${jobPostingId}/application`,
+      { skipClientEventLog: true },
+    )
+    return result.data.data
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return undefined
+    }
+    throw error
+  }
 }
 
 onMounted(async () => {

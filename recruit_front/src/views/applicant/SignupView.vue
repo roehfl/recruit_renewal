@@ -38,7 +38,7 @@
             
             <div class="item-abreast">
               <a-form-item class="item" label="비밀번호" name="password">
-                <a-input-password v-model:value="form.password" size="large" placeholder="비밀번호를 입력해주세요."></a-input-password>
+                <a-input-password v-model:value="form.password" size="large" placeholder="비밀번호를 입력해주세요. (8자 이상)"></a-input-password>
               </a-form-item>
               <a-form-item class="item" label="비밀번호확인" name="passwordConfirm"
               :validate-status="isPasswordMismatch ? 'error' : ''">
@@ -86,7 +86,7 @@
 
       <div class="button-area">
         <a-button type="primary" size="large"
-          :disabled="!isEmailChecked || !isNiceAuthComplete || !form.name || isPasswordMismatch"
+          :disabled="!isEmailChecked || !isNiceAuthComplete || !form.name || !form.passwordConfirm || isPasswordMismatch"
           @click="clickToSignupButton">가입하기</a-button>
       </div>
     </div>
@@ -94,10 +94,11 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed } from 'vue'
+import { reactive, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { applicationApi } from '@/api/applicationApi'
+import { getApiErrorMessage } from '@/api/apiError'
 import type { checkEmailRequest } from '@/types/application'
 
 const loading = ref(false);
@@ -108,7 +109,8 @@ const isEmailCertificationDone = ref(false);
 const isNiceAuthPopupOpen = ref(false);
 const isNiceAuthComplete = ref(false);
 
-const regEmail = /^[0-9a-zA-Z]([-_.]?[0-9a-zA-Z])*@[0-9a-zA-Z]([-_.]?[0-9a-zA-Z])*\.[a-zA-Z]{2,3}$/i;
+// 백엔드 @Email 이 허용하는 '+' 태그와 4자 이상 최상위 도메인(.info 등)도 받는다.
+const regEmail = /^[0-9a-zA-Z]([-_.+]?[0-9a-zA-Z])*@[0-9a-zA-Z]([-_.]?[0-9a-zA-Z])*\.[a-zA-Z]{2,}$/i;
 
 interface SignupForm {
   loginId: string
@@ -166,8 +168,20 @@ const clickToEmailCheckButton = async () => {
   }
 }
 
+// 메일주소를 바꾸면 이전 중복확인 결과는 더 이상 유효하지 않다.
+watch(() => form.loginId, () => {
+  isAvailable.value = false;
+  isEmailChecked.value = false;
+  isEmailCertification.value = false;
+});
+
 const checkDuplicateEmailButton = async () => {
-  await checkAvailableEmail();
+  // 재확인이 실패하면 인증번호 입력칸이 이전 결과로 남지 않도록 먼저 되돌린다.
+  isEmailChecked.value = false;
+  isEmailCertification.value = false;
+  if (!(await checkAvailableEmail())) {
+    return;
+  }
   if(!isAvailable.value) {
     message.error('이미 가입된 메일주소 입니다.');
   }
@@ -178,7 +192,9 @@ const checkDuplicateEmailButton = async () => {
   }
 };
 
-const checkAvailableEmail = async () => {
+// 확인 요청이 완료되면 true, 통신 오류 등으로 확인하지 못하면 false 를 돌려준다.
+const checkAvailableEmail = async (): Promise<boolean> => {
+    isAvailable.value = false;
     try {
         const result = await applicationApi.checkEmail(
             form.loginId,
@@ -189,9 +205,12 @@ const checkAvailableEmail = async () => {
             message: result.data.message ?? '',
         }
         isAvailable.value = checkEmail.value.data.available;   
+        return true;
     }
     catch (error) {
         console.error(error);
+        message.error('메일주소 확인에 실패했습니다. 잠시 후 다시 시도해주세요.');
+        return false;
     }
 }
 
@@ -241,6 +260,15 @@ const isPasswordMismatch = computed(() => {
 });
 
 async function clickToSignupButton() {
+  // 백엔드 ApplicantSignUpRequest 는 비밀번호 8자 이상을 요구한다.
+  if (form.password.length < 8) {
+    message.warning('비밀번호는 8자 이상 입력해주세요.');
+    return;
+  }
+  if (form.password !== form.passwordConfirm) {
+    message.warning('비밀번호 확인이 일치하지 않습니다.');
+    return;
+  }
    loading.value = true;
     try {
     const request = {
@@ -257,7 +285,7 @@ async function clickToSignupButton() {
     router.replace('/applicant');
   }
   catch (error) {
-    message.error('회원가입 실패');
+    message.error(getApiErrorMessage(error, '회원가입에 실패했습니다.'));
     console.error(error);
   }
   finally{

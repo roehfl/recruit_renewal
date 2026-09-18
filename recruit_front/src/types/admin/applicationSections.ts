@@ -39,7 +39,7 @@ export type educationLevelType =
 export type graduationStatus =
   | "GRADUATED"
   | "EXPECTED"
-  | "ENFOLLED"
+  | "ENROLLED"
   | "LEAVE_OF_ABSENCE"
   | "DROPPED_OUT"
   | "COMPLETED"
@@ -244,7 +244,7 @@ export const SECTION_MAP: Record<
     graduationStatus: {
       GRADUATED: '졸업',
       EXPECTED: '졸업예정',
-      ENFOLLED: '재학',
+      ENROLLED: '재학',
       LEAVE_OF_ABSENCE: '휴학',
       DROPPED_OUT: '중퇴',
       COMPLETED: '수료',

@@ -87,6 +87,47 @@ public class SecurityConfigTest {
     }
 
     /*
+     * 공지 등록(/api/board/notices)도 BoardController base path 가 /board 라 broad /api/admin/** 에 걸리지 않는다.
+     * 전용 매처가 없으면 anyRequest().permitAll() 로 흘러 비인증 사용자가 공지(HTML)를 등록할 수 있다.
+     */
+    private static final String NOTICE_PATH = "/api/board/notices";
+    private static final String NOTICE_SAVE_BODY = """
+            {"title":"공지","content":"<p>본문</p>","isPinned":false}
+            """;
+
+    @Test
+    void 공지_목록_조회는_인증없이_허용() throws Exception {
+        mockMvc.perform(get(NOTICE_PATH))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void 공지_등록은_비인증이면_401() throws Exception {
+        mockMvc.perform(post(NOTICE_PATH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(NOTICE_SAVE_BODY))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 공지_등록은_지원자_권한이면_403() throws Exception {
+        mockMvc.perform(post(NOTICE_PATH)
+                        .with(user("applicant").authorities(() -> "ROLE_APPLICANT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(NOTICE_SAVE_BODY))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 공지_등록은_관리자_권한이면_인가를_통과() throws Exception {
+        mockMvc.perform(post(NOTICE_PATH)
+                        .with(user("admin").authorities(() -> "ROLE_RECRUIT_ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(NOTICE_SAVE_BODY))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
+
+    /*
      * 권한 관리 API(/api/admin/role-mappings/**)는 전용 매처 없이 broad /api/admin/**
      * (ROLE_ADMIN, ROLE_RECRUIT_ADMIN) 매처에 걸리는 것이 계약이다. 매처 순서가 바뀌거나
      * 경로가 broad 매처 밖으로 이동하면 아래 테스트가 깨진다.

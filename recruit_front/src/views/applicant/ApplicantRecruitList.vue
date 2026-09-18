@@ -35,7 +35,11 @@
         </button>
       </template>
 
-      <a-empty v-else class="empty-box" description="진행중인 채용공고가 없습니다." />
+      <a-empty
+        v-else
+        class="empty-box"
+        :description="loadFailed ? '채용공고를 불러오지 못했습니다.' : '진행중인 채용공고가 없습니다.'"
+      />
     </div>
 
     <button type="button" class="more-button" @click="goRecruitList">
@@ -55,7 +59,9 @@ import { formatDate, getDDay } from '@/common/dateUtil'
 
 const router = useRouter()
 const loading = ref(false)
-const pagination = reactive({ current: 1, pageSize: 10, total: 0 })
+const loadFailed = ref(false)
+// 공개 목록은 고정(pinned) 공고가 먼저 오므로, 접수중 공고가 첫 페이지 밖으로 밀리지 않게 최대 크기(100)로 받아 거른다.
+const pagination = reactive({ current: 1, pageSize: 100, total: 0 })
 
 const originJobPostings = ref<JobPostingListItem[]>([])
 const jobPostings = ref<JobPostingListItem[]>([])
@@ -75,6 +81,7 @@ const recruitStatusTypeMap: Record<string, string> = {
 
 async function loadJobPostings() {
   loading.value = true
+  loadFailed.value = false
   try {
     const result = await boardApi.fetchJobPostings({
       page: pagination.current - 1,
@@ -89,6 +96,9 @@ async function loadJobPostings() {
     jobPostings.value = originJobPostings.value.filter((item) => item.receptionStatus === 'ACCEPTING' )
     pagination.total = result.data.data.totalElements
 
+  } catch (error) {
+    console.error(error)
+    loadFailed.value = true
   } finally {
     loading.value = false
   }

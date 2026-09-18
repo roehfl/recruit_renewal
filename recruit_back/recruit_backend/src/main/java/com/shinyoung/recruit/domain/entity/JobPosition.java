@@ -93,6 +93,26 @@ public class JobPosition {
         this.jobPosting = jobPosting;
     }
 
+    /** 공고 수정 시 제자리 수정. 지원서가 이 모집분야를 FK 로 참조하므로 행을 지우고 새로 만들지 않는다. */
+    public void update(
+            String positionName,
+            JobPositionApplicationType applicationType,
+            String jobTitle,
+            List<JobPositionWorkLocation> workLocations,
+            EmploymentType employmentType,
+            Integer sortOrder
+    ) {
+        this.positionName = positionName;
+        this.applicationType = defaultApplicationType(applicationType);
+        this.jobTitle = jobTitle;
+        this.workLocations.clear();
+        if (workLocations != null) {
+            this.workLocations.addAll(workLocations);
+        }
+        this.employmentType = defaultEmploymentType(employmentType);
+        this.sortOrder = sortOrder;
+    }
+
     /** 후보 근무지 중 해당 코드가 있는지. 없으면 지원 시 선택할 수 없다. */
     public boolean hasWorkLocation(String code) {
         return workLocations.stream().anyMatch(it -> it.getCode().equals(code));

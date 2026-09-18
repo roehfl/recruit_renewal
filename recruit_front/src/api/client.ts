@@ -19,6 +19,9 @@ apiClient.interceptors.request.use(
     const uiStore = useUiStore()
     uiStore.showLoading()
 
+    // 오류 텔레메트리의 durationMs 계산 기준(httpErrorTelemetry.resolveDurationMs)
+    config.requestStartedAt = performance.now()
+
     return config
   },
   (error) => {
@@ -44,8 +47,9 @@ apiClient.interceptors.response.use(
     const skipAuthRedirect = error.config?.skipAuthRedirect === true
 
     if (status === 401 && !skipAuthRedirect && currentPath !== '/login') {
-      // 세션 만료 또는 미로그인
-      window.location.href = '/login'
+      // 세션 만료 또는 미로그인. 로그인 후 작업하던 화면으로 돌아오도록 라우트 가드와 같은 redirect 쿼리를 붙인다.
+      const redirect = encodeURIComponent(currentPath + window.location.search)
+      window.location.href = `/login?redirect=${redirect}`
     }
 
     /*

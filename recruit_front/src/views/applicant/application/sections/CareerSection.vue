@@ -50,7 +50,7 @@
                 </td>
                 <th>연봉</th>
                 <td class="last-position">
-                    <a-input class="last-position-salary-box" v-model:value="item.currentSalary" placeholder="예) 0000" />
+                    <a-input-number class="last-position-salary-box" v-model:value="item.currentSalary" :min="0" :precision="0" placeholder="예) 0000" />
                     <span>만원</span>
                 </td>
             </tr>
@@ -110,6 +110,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
+import { useSectionDraftState } from '@/views/applicant/application/useSectionDraftState'
 import { DeleteOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import type { CareerItem, CareerReplaceRequest } from '@/types/application/sections/career';
 import { applicationCareerApi } from '@/api/application/sections/careerApi';
@@ -130,6 +131,10 @@ const items = reactive<CareerItem[]>([])
 /** 경력기술서(경력 섹션당 1건). 저장된 파일은 attachmentId 를 uid 로 갖는다. */
 const careerDescriptionFiles = ref<UploadFile[]>([])
 const careerDescriptionAttachment = ref<AttachmentResponse | null>(null)
+const draftState = useSectionDraftState(() => ({
+  payload: buildPayload(),
+  files: careerDescriptionFiles.value.map((file) => file.uid),
+}))
 
 function createEmptyItem(): CareerItem {
   return {
@@ -142,7 +147,7 @@ function createEmptyItem(): CareerItem {
     endDate: '',
     currentlyEmployed: false,
     promotionDate: '',
-    currentSalary: 0,
+    currentSalary: null,
     resignationReason: '',
     sortOrder: 0
 }
@@ -162,7 +167,7 @@ function setItems(list: CareerItem[]) {
         endDate: row.endDate ?? '',
         currentlyEmployed: row.currentlyEmployed ?? false,
         promotionDate: row.promotionDate ?? '',
-        currentSalary: row.currentSalary as unknown as number,
+        currentSalary: row.currentSalary ?? null,
         resignationReason: row.resignationReason ?? '',
         sortOrder: row.sortOrder  as unknown as number,
         }),
@@ -184,12 +189,12 @@ function buildPayload(): CareerReplaceRequest {
         "companyName": item.companyName,
         "departmentName": item.departmentName,
         "positionTitle": item.positionTitle,
-        "employmentType": item.employmentType,
+        "employmentType": item.employmentType || null,
         "startDate": item.startDate,
-        "endDate": item.endDate,
+        "endDate": item.currentlyEmployed ? null : item.endDate,
         "currentlyEmployed": item.currentlyEmployed,
         "promotionDate": item.promotionDate,
-        "currentSalary": item.currentSalary,
+        "currentSalary": item.currentSalary ?? null,
         "resignationReason": item.resignationReason,
         "sortOrder": index
     })),
@@ -241,25 +246,28 @@ async function saveCareerDescription() {
   if (unchanged) return
   if (!file && !saved) return
 
+  // 새 파일을 먼저 올리고 성공한 뒤에 기존 파일을 지운다. 업로드가 실패해도 기존 경력기술서는 남는다.
+  let uploaded: AttachmentResponse | null = null
+  if (file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const result = await attachmentApi.postApplicationAttachmentsFile(formData, {
+      applicationId: props.applicationId,
+      attachmentType: 'CAREER_DESCRIPTION',
+      sectionType: 'CAREER',
+    })
+    uploaded = result.data.data
+    // 이후 삭제가 실패해 다시 저장해도 같은 파일을 또 올리지 않도록 업로드 완료 상태로 바꿔 둔다.
+    careerDescriptionFiles.value = [{
+      uid: String(uploaded.attachmentId),
+      name: uploaded.originalFileName,
+      status: 'done',
+    }]
+  }
   if (saved) {
     await attachmentApi.deleteApplicationAttachments(props.applicationId, saved.attachmentId)
-    careerDescriptionAttachment.value = null
   }
-  if (!file) return
-
-  const formData = new FormData()
-  formData.append('file', file)
-  const result = await attachmentApi.postApplicationAttachmentsFile(formData, {
-    applicationId: props.applicationId,
-    attachmentType: 'CAREER_DESCRIPTION',
-    sectionType: 'CAREER',
-  })
-  careerDescriptionAttachment.value = result.data.data
-  careerDescriptionFiles.value = [{
-    uid: String(result.data.data.attachmentId),
-    name: result.data.data.originalFileName,
-    status: 'done',
-  }]
+  careerDescriptionAttachment.value = uploaded
 }
 
 async function loadMyCareers() {
@@ -273,6 +281,7 @@ async function loadMyCareers() {
 }
 
 async function saveDraft() {
+  draftState.assertLoaded()
   if (!validate()) throw new Error('입력값을 확인해주세요.')
   loading.value = true
   try {
@@ -280,6 +289,7 @@ async function saveDraft() {
     const result = await applicationCareerApi.postApplicationCareer(props.applicationId, requestBody)
     setItems(result.data.data.careers ?? [])
     await saveCareerDescription()
+    draftState.markSynced()
     return result.data.data
   } catch (error) {
     console.error(error);
@@ -313,9 +323,10 @@ function validateBeforeSubmit(): boolean {
 onMounted(async () => {
   await loadMyCareers();
   await loadCareerDescription();
+  draftState.markSynced()
 });
 
-defineExpose({ saveDraft, validateBeforeSubmit })
+defineExpose({ saveDraft, validateBeforeSubmit, isDirty: draftState.isDirty })
 </script>
 
 <style scoped>

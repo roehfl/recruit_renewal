@@ -6,6 +6,9 @@ import type {
   AttachmentDeleteResponse,
 } from '@/types/application/sections/attachment'
 
+// 기본 10초로는 파일당 최대 20MB 업로드·다운로드가 끊길 수 있다(관리자 공고 이미지 업로드와 같은 값).
+const FILE_TIMEOUT_MS = 120000
+
 /**
  * 첨부파일 API.
  * basicInfoApi에도 같은 엔드포인트가 선언되어 있으나(증명사진 전용으로 먼저 만들어짐),
@@ -25,7 +28,7 @@ export const attachmentApi = {
     return apiClient.post<ApiResponse<AttachmentResponse>>(
       `applications/${params.applicationId}/attachments/files`,
       formData,
-      { params },
+      { params, timeout: FILE_TIMEOUT_MS },
     )
   },
 
@@ -39,6 +42,7 @@ export const attachmentApi = {
   downloadApplicationAttachment(applicationId: number, attachmentId: number) {
     return apiClient.get<Blob>(`applications/${applicationId}/attachments/${attachmentId}/download`, {
       responseType: 'blob',
+      timeout: FILE_TIMEOUT_MS,
     })
   },
 }

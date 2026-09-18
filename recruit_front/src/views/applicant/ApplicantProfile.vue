@@ -88,7 +88,8 @@
           <a-table
           :columns="columns"
           :data-source="applicationListItems"
-          :pagination="{ pageSize: 5 }"/>
+          :pagination="pagination"
+          @change="handleTableChange"/>
         </div>
       </div>
 
@@ -100,6 +101,24 @@
         @cancel="moreInfoModalClose()">
         <div>준비 중입니다.</div>
       </a-modal>
+
+      <a-modal
+        v-model:open="resultModalOpen"
+        title="전형 결과"
+        :footer="null">
+        <a-spin :spinning="resultLoading">
+          <p v-if="!resultLoading && stageResults.length === 0">발표된 전형 결과가 없습니다.</p>
+          <ul v-else class="stage-result-list">
+            <li v-for="result in stageResults" :key="result.stageOrder">
+              <strong>{{ result.stageName }}</strong>
+              <span>{{ resultStatusLabelMap[result.resultStatus] ?? result.resultStatus }}</span>
+              <span v-if="result.resultAnnouncementDateTime">
+                발표 {{ formatDate(result.resultAnnouncementDateTime, 'YYYY.MM.DD HH:mm') }}
+              </span>
+            </li>
+          </ul>
+        </a-spin>
+      </a-modal>
       
     </div>
   </section>
@@ -107,7 +126,8 @@
 
 <script setup lang="ts">
 import { onMounted, h, ref, reactive } from 'vue'
-import type { ChangePasswordRequest, MyApplicationList, MyApplicationListItem } from '@/types/application'
+import type { ApplicantStageResult, ChangePasswordRequest, MyApplicationList, MyApplicationListItem } from '@/types/application'
+import { formatDate } from '@/common/dateUtil'
 import { Button, message, type TableColumnsType } from 'ant-design-vue'
 import { LockOutlined } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
@@ -164,6 +184,34 @@ const applicationListItems = ref<MyApplicationListItem[]>([])
 const isSettingModalOpen = ref(false);
 const isMoreInfoModalOpen = ref(false);
 const pagination = reactive({ current: 1, pageSize: 5, total: 0 })
+const resultModalOpen = ref(false)
+const resultLoading = ref(false)
+const stageResults = ref<ApplicantStageResult[]>([])
+
+const resultStatusLabelMap: Record<string, string> = {
+  PENDING: '대기',
+  PASSED: '합격',
+  FAILED: '불합격',
+  ABSENT: '결시',
+  WITHDRAWN: '지원 철회',
+  HOLD: '보류',
+}
+
+/* 발표된 전형 결과만 보여 준다(백엔드가 미발표 결과를 내려주지 않는다). */
+const openStageResults = async (record: MyApplicationListItem) => {
+  resultModalOpen.value = true
+  resultLoading.value = true
+  stageResults.value = []
+  try {
+    const response = await applicationApi.getStageResults(Number(record.applicationId))
+    stageResults.value = [...response.data.data].sort((a, b) => a.stageOrder - b.stageOrder)
+  } catch (error) {
+    resultModalOpen.value = false
+    message.error(getApiErrorMessage(error, '전형 결과를 불러오지 못했습니다.'))
+  } finally {
+    resultLoading.value = false
+  }
+}
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -264,6 +312,11 @@ const loadMyApplications = async () => {
   }
 }
 
+const handleTableChange = (nextPagination: { current?: number }) => {
+  pagination.current = nextPagination.current ?? 1;
+  loadMyApplications();
+}
+
 const columns: TableColumnsType<MyApplicationListItem> = [
   {
     title: '공고명',
@@ -293,7 +346,11 @@ const columns: TableColumnsType<MyApplicationListItem> = [
     key: 'result',
     width: 180,
     align: 'center',
-    customRender: () => h(Button, null, () => '확인'),
+    // 임시저장 지원서는 결과가 없다(백엔드도 조회를 거부한다).
+    customRender: ({ record }) =>
+      record?.applicationStatus === 'DRAFT'
+        ? '-'
+        : h(Button, { onClick: () => openStageResults(record) }, () => '확인'),
   },
 ]
 
@@ -555,6 +612,19 @@ onMounted(() => {
 
 .more-info-button{
   margin-right: 15px;
+}
+
+.stage-result-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stage-result-list li {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 </style>

@@ -259,6 +259,22 @@ const validateForm = (level: EditLevel): string | null => {
   return null
 }
 
+/*
+ * 같은 사이트에서 경로가 겹치면 breadcrumb 조회(site + path 단건)가 실패한다.
+ * 서버 중복 검증이 꺼져 있어 화면에서 막는다. 편집 중인 메뉴 자신은 제외한다.
+ */
+const findDuplicatePathMenu = (path: string, menuId: number | null): MenuItem | null => {
+  for (const main of mainMenus.value) {
+    for (const menu of [main, ...(main.children ?? [])]) {
+      if (menu.id !== menuId && menu.path?.trim() === path) {
+        return menu
+      }
+    }
+  }
+
+  return null
+}
+
 const save = async (): Promise<void> => {
   const target = editTarget.value
 
@@ -274,6 +290,13 @@ const save = async (): Promise<void> => {
   }
 
   const path = form.value.path.trim()
+
+  const duplicatedMenu = path ? findDuplicatePathMenu(path, target.menuId) : null
+
+  if (duplicatedMenu) {
+    message.warning(`같은 경로를 쓰는 메뉴가 이미 있습니다: ${duplicatedMenu.name}`)
+    return
+  }
 
   const request: MenuSaveRequest = {
     site: activeSite.value,

@@ -5,6 +5,8 @@ import type { ClientEventContext, ClientEventMetadata, ClientEventType } from '@
 declare module 'axios' {
   export interface AxiosRequestConfig {
     skipClientEventLog?: boolean
+    // 401이 세션 만료가 아닌 요청(로그인 실패 등)에서 401 응답만 기록하지 않는다.
+    skipSessionExpiredLog?: boolean
     clientEventContext?: ClientEventContext
     requestStartedAt?: number
   }
@@ -18,6 +20,11 @@ export function logApiError(error: AxiosError): void {
   }
 
   const status = error.response?.status
+
+  if (status === 401 && config.skipSessionExpiredLog === true) {
+    return
+  }
+
   const eventType = resolveEventType(error)
   const durationMs = resolveDurationMs(config)
   const relatedCorrelationId = readHeader(error, 'x-request-id')

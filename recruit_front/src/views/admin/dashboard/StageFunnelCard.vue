@@ -41,7 +41,8 @@ const rows = computed<FunnelRow[]>(() => {
     key: 'population',
     label: '지원',
     count: total,
-    share: 1,
+    // 지원자가 0명이면 막대를 채우지 않는다(표의 비율은 '—').
+    share: total === 0 ? 0 : 1,
     color: ordinalColorAt(0, stageCount + 1),
     stepConversionRate: null,
     dropCount: null,
@@ -67,6 +68,9 @@ const rows = computed<FunnelRow[]>(() => {
 
   return [head, ...stageRows]
 })
+
+/* 모집단이 0이면 P 대비 비율이 정의되지 않으므로 표에서 '—'로 보인다. */
+const hasPopulation = computed<boolean>(() => props.population.p > 0)
 
 const overallPassRate = computed<number | null>(() => {
   const lastStage = props.stages[props.stages.length - 1]
@@ -148,7 +152,7 @@ const formatCount = (value: number): string => value.toLocaleString('ko-KR')
         <tr v-for="row in rows" :key="row.key">
           <th scope="row">{{ row.label }}</th>
           <td class="numeric">{{ formatCount(row.count) }}</td>
-          <td class="numeric">{{ formatPercent(row.share) }}</td>
+          <td class="numeric">{{ formatPercent(hasPopulation ? row.share : null) }}</td>
           <td class="numeric">{{ formatPercent(row.stepConversionRate) }}</td>
           <td class="numeric">{{ row.dropCount === null ? '—' : formatCount(row.dropCount) }}</td>
           <td class="numeric">{{ formatDays(row.averageDwellDays) }}</td>

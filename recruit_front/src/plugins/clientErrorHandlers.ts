@@ -1,4 +1,26 @@
+import type { App } from 'vue'
 import { logClientEvent } from '@/common/clientEventLogger'
+
+/*
+ * Vue는 setup·라이프사이클 훅·렌더·템플릿 이벤트 핸들러 예외를 내부에서 잡아 console.error로만 출력하므로
+ * window 'error'/'unhandledrejection'까지 오지 않는다. 앱 errorHandler로 같은 정제 경로를 거쳐 수집한다.
+ * errorHandler를 등록하면 Vue 기본 출력이 사라지므로 console.error는 직접 유지한다.
+ */
+export function installVueErrorHandler(app: App): void {
+  app.config.errorHandler = (err) => {
+    console.error(err)
+
+    const stackSummary = sanitizeStack((err as { stack?: string } | null | undefined)?.stack)
+
+    logClientEvent({
+      eventType: 'JS_ERROR',
+      severity: 'ERROR',
+      message: 'VUE_COMPONENT_ERROR',
+      stackSummary,
+      stackHash: hashString(stackSummary),
+    })
+  }
+}
 
 export function installClientErrorHandlers(): void {
   window.addEventListener('error', (event) => {

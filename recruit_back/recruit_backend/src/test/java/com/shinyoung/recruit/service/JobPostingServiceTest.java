@@ -1,7 +1,15 @@
 package com.shinyoung.recruit.service;
 
+import com.shinyoung.recruit.common.hash.HashUtil;
+import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.entity.CommonCode;
+import com.shinyoung.recruit.domain.entity.JobApplication;
+import com.shinyoung.recruit.domain.entity.JobPosition;
+import com.shinyoung.recruit.domain.entity.JobPosting;
+import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.CommonCodeRepository;
+import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormLayoutSaveRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
@@ -31,6 +39,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -63,6 +72,15 @@ class JobPostingServiceTest {
 
     @Autowired
     private CommonCodeRepository commonCodeRepository;
+
+    @Autowired
+    private JobPostingRepository jobPostingRepository;
+
+    @Autowired
+    private ApplicantRepository applicantRepository;
+
+    @Autowired
+    private JobApplicationRepository jobApplicationRepository;
 
     /** 근무지 후보는 CommonCode 그룹 WORK_LOCATION 의 활성 코드만 등록할 수 있다. */
     private void 근무지코드_등록(String code, String displayName) {
@@ -486,6 +504,61 @@ class JobPostingServiceTest {
         assertThat(detail.jobPositions().get(0).employmentType()).isEqualTo(EmploymentType.INTERN);
     }
 
+    /*
+     * 수정 시 모집분야를 전부 지우고 새로 만들면, 지원서가 달린 모집분야는 job_application FK 에 걸려 수정이 실패한다.
+     * id 를 보낸 모집분야는 제자리에서 고치고, 지원서가 있는 모집분야 삭제는 명확한 400 으로 막는다.
+     */
+    @Test
+    void 공고_수정시_id를_보낸_모집분야는_지원서가_있어도_제자리에서_수정된다() {
+        Long id = jobPostingService.create(createRequest());
+        Long positionId = jobPostingService.getJobPosting(id).jobPositions().get(0).id();
+        지원서_저장(id);
+
+        jobPostingService.update(id, updateRequest(List.of(
+                new JobPositionRequest("백엔드 수정", null, null, null, null, 0, positionId),
+                new JobPositionRequest("프론트엔드", 1)
+        )));
+        jobPostingRepository.flush();
+
+        JobPostingDetailResponse detail = jobPostingService.getJobPosting(id);
+        assertThat(detail.jobPositions()).hasSize(2);
+        assertThat(detail.jobPositions().get(0).id()).isEqualTo(positionId);
+        assertThat(detail.jobPositions().get(0).positionName()).isEqualTo("백엔드 수정");
+        assertThat(detail.jobPositions().get(1).positionName()).isEqualTo("프론트엔드");
+    }
+
+    @Test
+    void 지원서가_있는_모집분야를_빼고_수정하면_예외() {
+        Long id = jobPostingService.create(createRequest());
+        지원서_저장(id);
+
+        assertThatThrownBy(() -> jobPostingService.update(id, updateRequest(List.of(new JobPositionRequest("새 분야", 0)))))
+                .isInstanceOf(InvalidJobPostingException.class)
+                .hasMessageContaining("지원서가 있는 모집분야는 삭제할 수 없습니다");
+    }
+
+    @Test
+    void 지원서가_없는_모집분야는_빼고_수정하면_삭제된다() {
+        Long id = jobPostingService.create(createRequest());
+
+        jobPostingService.update(id, updateRequest(List.of(new JobPositionRequest("새 분야", 0))));
+        jobPostingRepository.flush();
+
+        JobPostingDetailResponse detail = jobPostingService.getJobPosting(id);
+        assertThat(detail.jobPositions()).extracting(it -> it.positionName()).containsExactly("새 분야");
+    }
+
+    @Test
+    void 다른_공고의_모집분야_id로_수정하면_예외() {
+        Long id = jobPostingService.create(createRequest());
+        Long otherPositionId = jobPostingService.getJobPosting(jobPostingService.create(createRequest()))
+                .jobPositions().get(0).id();
+
+        assertThatThrownBy(() -> jobPostingService.update(id, updateRequest(List.of(
+                new JobPositionRequest("백엔드", null, null, null, null, 0, otherPositionId)
+        )))).isInstanceOf(InvalidJobPostingException.class);
+    }
+
     @Test
     void 관리자_응답은_ReceptionStatus와_accepting을_계산한다() {
         Long acceptingId = jobPostingService.create(createRequest());
@@ -670,6 +743,44 @@ class JobPostingServiceTest {
                 List.of(new JobPositionRequest("백엔드", 1)),
                 applicationFormConfig
         );
+    }
+
+    private JobPostingUpdateRequest updateRequest(List<JobPositionRequest> jobPositions) {
+        return new JobPostingUpdateRequest(
+                "2026 상반기 채용",
+                JobPostingType.PUBLIC_RECRUITMENT,
+                null,
+                "<p>내용</p>",
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 6, 2, 18, 0),
+                null,
+                null,
+                true,
+                false,
+                0,
+                jobPositions
+        );
+    }
+
+    private void 지원서_저장(Long jobPostingId) {
+        JobPosting jobPosting = jobPostingRepository.findById(jobPostingId).orElseThrow();
+        JobPosition jobPosition = jobPosting.getJobPositions().get(0);
+        String ci = "test-ci-" + UUID.randomUUID();
+        Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
+        applicant.setLoginId("applicant-" + UUID.randomUUID());
+        applicant.setName("Applicant");
+        applicant.setEmail(UUID.randomUUID() + "@example.com");
+        applicant.setUserName("Applicant");
+        applicant.setPhoneNumber("01000000000");
+        applicantRepository.saveAndFlush(applicant);
+        jobApplicationRepository.saveAndFlush(JobApplication.create(
+                applicant,
+                jobPosting,
+                jobPosition,
+                applicant.getName(),
+                jobPosting.getTitle(),
+                jobPosition.getPositionName()
+        ));
     }
 
     private JobPostingCreateRequest createRequestWithPosition(JobPositionRequest jobPosition) {

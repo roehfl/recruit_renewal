@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, defineComponent, h, ref, watch } from 'vue'
+import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Component, ComponentPublicInstance } from 'vue'
 import type { ApplicationSectionType, ApplicationFormItem, ApplicationFormPage, ApplicationFormPageResponse, SectionActionHandle } from '@/types/application'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
   FormOutlined,
@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons-vue'
 
 import { apiClient } from '@/api/client'
+import { getApiErrorMessage } from '@/api/apiError'
 import type { ApiResponse } from '@/types/api'
 import type { JobPositionPublicOption } from '@/types/jobPosting'
 import { boardApi } from '@/api/boardApi'
@@ -214,7 +215,8 @@ const pageTitle = computed(() => {
 const canEdit = computed(() => formPage.value?.editable === true)
 
 /* 수정 가능하면 최종 제출도 가능하다. 제출 후 수정한 내용은 접수기간 중 다시 최종 제출한다(재제출). */
-const canSubmit = computed(() => canEdit.value)
+// 모집분야만 바꾸고 근무지를 고르지 않은 상태면 화면과 다른(저장된) 지원분야로 제출되므로 막는다.
+const canSubmit = computed(() => canEdit.value && !positionPending.value)
 
 /*
  * 지원분야(모집분야·근무지) 선택. 후보 목록은 공개 공고 상세(GET /job-postings/{id})를 재사용하며 별도 API를 두지 않는다.
@@ -242,16 +244,27 @@ const selectedWorkLocationCode = ref<string | undefined>()
 const positionSaving = ref(false)
 const creating = ref(false)
 
-const positionOptions = computed(() =>
-  postingPositions.value.map((position) => ({ label: position.positionName, value: position.id })),
-)
+// 후보 목록이 없으면(편집 불가라 조회하지 않았거나 조회 실패) 저장된 지원분야 이름으로 표시한다.
+const positionOptions = computed(() => {
+  const saved = formPage.value
+  if (postingPositions.value.length === 0 && saved?.jobPositionId) {
+    return [{ label: saved.jobPositionName ?? '', value: saved.jobPositionId }]
+  }
+  return postingPositions.value.map((position) => ({ label: position.positionName, value: position.id }))
+})
 
 function workLocationOptionsOf(positionId: number | undefined): { label: string; value: string }[] {
   const position = postingPositions.value.find((item) => item.id === positionId)
   return (position?.workLocations ?? []).map((it) => ({ label: it.name, value: it.code }))
 }
 
-const workLocationOptions = computed(() => workLocationOptionsOf(selectedPositionId.value))
+const workLocationOptions = computed(() => {
+  const saved = formPage.value
+  if (postingPositions.value.length === 0 && saved?.workLocationCode) {
+    return [{ label: saved.workLocationName ?? saved.workLocationCode, value: saved.workLocationCode }]
+  }
+  return workLocationOptionsOf(selectedPositionId.value)
+})
 
 const canChangePosition = computed(() => isStartMode.value || (canEdit.value && !positionSaving.value))
 
@@ -271,7 +284,7 @@ async function loadPostingPositions(jobPostingId: number): Promise<void> {
     postingPositions.value = response.data.data.jobPositions ?? []
     loadedPostingId.value = jobPostingId
   } catch (error) {
-    message.error(getErrorMessage(error, '모집분야 목록을 불러오지 못했습니다.'))
+    message.error(getApiErrorMessage(error, '모집분야 목록을 불러오지 못했습니다.'))
   }
 }
 
@@ -337,6 +350,11 @@ async function savePositionChange(): Promise<void> {
     return
   }
 
+  if (!(await saveCurrentPage({ onlyIfDirty: true }))) {
+    resetPositionSelection()
+    return
+  }
+
   positionSaving.value = true
   try {
     const response = await apiClient.post<ApiResponse<unknown>>(`/applications/${id}`, {
@@ -349,9 +367,9 @@ async function savePositionChange(): Promise<void> {
     }
 
     message.success('지원분야를 변경했습니다.')
-    await fetchFormPage(id)
+    await fetchFormPage(id, true)
   } catch (error) {
-    message.error(getErrorMessage(error, '지원분야 변경에 실패했습니다.'))
+    message.error(getApiErrorMessage(error, '지원분야 변경에 실패했습니다.'))
     resetPositionSelection()
   } finally {
     positionSaving.value = false
@@ -403,7 +421,7 @@ async function createApplication(): Promise<void> {
     // 작성 시작 화면은 히스토리에 남기지 않는다(뒤로가기 시 공고 상세로 돌아간다).
     await router.replace(`/applicant/${response.data.data}/form`)
   } catch (error) {
-    message.error(getErrorMessage(error, '지원서 작성에 실패했습니다.'))
+    message.error(getApiErrorMessage(error, '지원서 작성에 실패했습니다.'))
   } finally {
     creating.value = false
   }
@@ -567,7 +585,8 @@ function normalizePositiveNumber(value: number | null | undefined): number | nul
   return value
 }
 
-async function fetchFormPage(id = applicationId.value): Promise<void> {
+// keepPage: 제출·지원분야 변경 후 재조회는 보던 페이지를 유지한다(처음 조회만 첫 페이지로).
+async function fetchFormPage(id = applicationId.value, keepPage = false): Promise<void> {
   if (!id) {
     return
   }
@@ -585,11 +604,21 @@ async function fetchFormPage(id = applicationId.value): Promise<void> {
 
     formPage.value = response.data.data
     resetPositionSelection()
-    currentPageIndex.value = 0
-    sectionRefs.value.clear()
-    await Promise.all([fetchCompletion(id), loadPostingPositions(response.data.data.jobPostingId)])
+    if (!keepPage) {
+      currentPageIndex.value = 0
+      sectionRefs.value.clear()
+    }
+    // 편집 불가(게시 종료 등)면 공개 공고 상세가 404일 수 있고 지원분야도 바꿀 수 없으므로 후보 목록을 조회하지 않는다.
+    if (!canEdit.value) {
+      postingPositions.value = []
+      loadedPostingId.value = null
+    }
+    await Promise.all([
+      fetchCompletion(id),
+      canEdit.value ? loadPostingPositions(response.data.data.jobPostingId) : Promise.resolve(),
+    ])
   } catch (error) {
-    message.error(getErrorMessage(error, '지원서 구성 조회에 실패했습니다.'))
+    message.error(getApiErrorMessage(error, '지원서 구성 조회에 실패했습니다.'))
   } finally {
     loading.value = false
   }
@@ -616,68 +645,144 @@ async function fetchCompletion(id = applicationId.value): Promise<void> {
   }
 }
 
-function handleStepChange(nextIndex: number): void {
-  if (nextIndex < 0 || nextIndex > pages.value.length - 1) {
+// 섹션은 현재 페이지만 마운트되므로 페이지를 옮기면 저장하지 않은 입력이 사라진다. 이동 전에 변경분을 자동 임시저장한다.
+async function moveToPage(nextIndex: number): Promise<void> {
+  if (nextIndex < 0 || nextIndex > pages.value.length - 1 || nextIndex === currentPageIndex.value || saving.value) {
+    return
+  }
+
+  if (!(await saveCurrentPage({ onlyIfDirty: true }))) {
     return
   }
 
   currentPageIndex.value = nextIndex
 }
 
+function handleStepChange(nextIndex: number): void {
+  void moveToPage(nextIndex)
+}
+
 function goPrevious(): void {
   if (!isFirstPage.value) {
-    currentPageIndex.value -= 1
+    void moveToPage(currentPageIndex.value - 1)
   }
 }
 
 function goNext(): void {
   if (!isLastPage.value) {
-    currentPageIndex.value += 1
+    void moveToPage(currentPageIndex.value + 1)
   }
 }
 
-async function saveCurrentPage(): Promise<void> {
+function currentPageHandles(): SectionActionHandle[] {
   const page = currentPage.value
 
   if (!page) {
-    return
+    return []
   }
 
-  const handles = page.items
+  return page.items
     .map((item) => sectionRefs.value.get(sectionKey(page, item)))
     .filter((handle): handle is SectionActionHandle => !!handle)
+}
 
-  const savableHandles = handles.filter((handle) => typeof handle.saveDraft === 'function')
+function hasUnsavedChanges(): boolean {
+  return canEdit.value && currentPageHandles().some((handle) => handle.isDirty?.() === true)
+}
 
-  if (savableHandles.length === 0) {
-    message.info('현재 페이지에 연결된 임시저장 가능 섹션 컴포넌트가 없습니다.')
-    return
+/**
+ * 현재 페이지를 임시저장하고 성공 여부를 돌려준다.
+ * onlyIfDirty: 페이지 이동·제출·지원분야 변경 전 자동 저장용. 변경된 섹션만 저장하고, 변경이 없으면 저장하지 않는다.
+ */
+async function saveCurrentPage(options: { onlyIfDirty?: boolean } = {}): Promise<boolean> {
+  // 편집 불가(접수기간 밖 등)면 자동 저장하지 않는다. 저장이 거부돼 이동까지 막히기 때문이다.
+  if (options.onlyIfDirty && !canEdit.value) {
+    return true
   }
 
+  const savableHandles = currentPageHandles().filter((handle) => typeof handle.saveDraft === 'function')
+  const targets = options.onlyIfDirty
+    ? savableHandles.filter((handle) => handle.isDirty?.() === true)
+    : savableHandles
+
+  if (targets.length === 0) {
+    if (!options.onlyIfDirty) {
+      message.info('현재 페이지에 연결된 임시저장 가능 섹션 컴포넌트가 없습니다.')
+    }
+    return true
+  }
+
+  const submitted = formPage.value?.applicationStatus === 'SUBMITTED'
   saving.value = true
 
   try {
-    for (const handle of savableHandles) {
+    // 제출한 지원서는 저장 즉시 제출본에 반영되므로, 제출 검증을 통과한 내용만 저장한다.
+    if (submitted) {
+      for (const handle of targets) {
+        if (typeof handle.validateBeforeSubmit === 'function' && !(await handle.validateBeforeSubmit())) {
+          throw new Error('입력값을 확인해주세요.')
+        }
+      }
+    }
+
+    for (const handle of targets) {
       await handle.saveDraft?.()
     }
 
     // 저장된 데이터 기준으로 완성도를 다시 판정해 카운터를 갱신한다.
     await fetchCompletion()
 
-    message.success('현재 페이지를 임시저장했습니다.')
+    message.success(submitted
+      ? '현재 페이지를 저장했습니다. 제출한 지원서에 바로 반영됩니다.'
+      : '현재 페이지를 임시저장했습니다.')
+    return true
   } catch (error) {
-    message.error(getErrorMessage(error, '임시저장에 실패했습니다.'))
+    message.error(getApiErrorMessage(error, '임시저장에 실패했습니다.'))
+    return false
   } finally {
     saving.value = false
   }
 }
 
+onBeforeRouteLeave(() => {
+  if (!hasUnsavedChanges()) {
+    return true
+  }
+
+  return new Promise<boolean>((resolve) => {
+    Modal.confirm({
+      title: '저장하지 않은 내용이 있습니다',
+      content: '페이지를 나가면 저장하지 않은 입력이 사라집니다. 나가시겠습니까?',
+      okText: '나가기',
+      cancelText: '머무르기',
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false),
+    })
+  })
+})
+
+function handleBeforeUnload(event: BeforeUnloadEvent): void {
+  if (hasUnsavedChanges()) {
+    event.preventDefault()
+    event.returnValue = ''
+  }
+}
+
+onMounted(() => window.addEventListener('beforeunload', handleBeforeUnload))
+onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnload))
+
 function confirmSubmit(): void {
+  // 제출은 저장된 지원분야로 확정되므로 저장값을 보여준다.
+  const savedTarget = [formPage.value?.jobPositionName, formPage.value?.workLocationName].filter(Boolean).join(' / ')
+
   Modal.confirm({
     title: '최종 제출',
-    content: formPage.value?.applicationStatus === 'SUBMITTED'
-      ? '이미 제출한 지원서입니다. 현재 내용으로 다시 제출하시겠습니까?'
-      : '최종 제출 후에는 지원서 수정이 제한될 수 있습니다. 제출하시겠습니까?',
+    content: h('div', [
+      h('p', `지원분야: ${savedTarget || '-'}`),
+      h('p', formPage.value?.applicationStatus === 'SUBMITTED'
+        ? '이미 제출한 지원서입니다. 현재 내용으로 다시 제출하시겠습니까?'
+        : '최종 제출하시겠습니까? 접수기간 중에는 제출 후에도 수정할 수 있으며, 수정 내용은 저장 즉시 제출본에 반영됩니다.'),
+    ]),
     okText: '최종 제출',
     cancelText: '취소',
     async onOk() {
@@ -697,6 +802,10 @@ async function submitApplication(): Promise<void> {
   submitting.value = true
 
   try {
+    if (!(await saveCurrentPage({ onlyIfDirty: true }))) {
+      return
+    }
+
     const valid = await validateAllVisibleSections()
 
     if (!valid) {
@@ -710,9 +819,9 @@ async function submitApplication(): Promise<void> {
     }
 
     message.success('지원서가 최종 제출되었습니다.')
-    await fetchFormPage(id)
+    await fetchFormPage(id, true)
   } catch (error) {
-    message.error(getErrorMessage(error, '최종 제출에 실패했습니다.'))
+    message.error(getApiErrorMessage(error, '최종 제출에 실패했습니다.'))
   } finally {
     submitting.value = false
   }
@@ -782,18 +891,6 @@ function compareBySortOrder<T extends { sortOrder?: number; pageNo?: number }>(a
   return (a.pageNo ?? 0) - (b.pageNo ?? 0)
 }
 
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-
-  if (typeof error === 'object' && error !== null && 'response' in error) {
-    const responseError = error as { response?: { data?: { message?: string } } }
-    return responseError.response?.data?.message ?? fallback
-  }
-
-  return fallback
-}
 </script>
 
 <template>
@@ -924,7 +1021,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
             </a-space>
 
             <a-space wrap>
-              <a-button :disabled="!canEdit" :loading="saving" @click="saveCurrentPage">
+              <a-button :disabled="!canEdit" :loading="saving" @click="saveCurrentPage()">
                 <SaveOutlined />
                 임시저장
               </a-button>

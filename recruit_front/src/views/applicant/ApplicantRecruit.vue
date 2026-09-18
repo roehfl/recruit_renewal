@@ -39,7 +39,7 @@
         </aside>
 
         <div class="recruit-main">
-          <p class="recruit-count">
+          <p v-if="!loadFailed" class="recruit-count">
             현재 진행중인 채용은 <strong>{{ filteredJobPostings.length }}</strong>건 입니다.
           </p>
 
@@ -64,7 +64,12 @@
               </li>
             </ul>
 
-            <div v-if="!loading && filteredJobPostings.length === 0" class="empty-box">
+            <!-- 조회 실패를 '공고 없음'으로 보이지 않게 따로 안내한다. -->
+            <div v-if="!loading && loadFailed" class="empty-box">
+              <p>채용공고를 불러오지 못했습니다.</p>
+              <a-button @click="loadJobPostings">다시 시도</a-button>
+            </div>
+            <div v-else-if="!loading && filteredJobPostings.length === 0" class="empty-box">
               조건에 맞는 채용공고가 없습니다.
             </div>
           </a-spin>
@@ -96,6 +101,7 @@ const PAGE_SIZE = 100
 
 const router = useRouter()
 const loading = ref(false)
+const loadFailed = ref(false)
 const jobPostings = ref<JobPostingListItem[]>([])
 const keyword = ref('')
 const division = ref<DivisionFilter>('ALL')
@@ -114,16 +120,18 @@ const divisionOptions: { label: string; value: DivisionFilter }[] = [
 ]
 
 const filteredJobPostings = computed<JobPostingListItem[]>(() => {
-  const trimmedKeyword = keyword.value.trim()
+  // 영문 공고명(IT, WM 등)도 찾을 수 있게 대소문자를 구분하지 않는다.
+  const trimmedKeyword = keyword.value.trim().toLowerCase()
   return jobPostings.value.filter(
     (item) =>
-      (!trimmedKeyword || item.title.includes(trimmedKeyword)) &&
+      (!trimmedKeyword || item.title.toLowerCase().includes(trimmedKeyword)) &&
       (division.value === 'ALL' || item.postingType === division.value),
   )
 })
 
 async function loadJobPostings() {
   loading.value = true
+  loadFailed.value = false
   try {
     const result = await boardApi.fetchJobPostings({
       page: 0,
@@ -135,6 +143,10 @@ async function loadJobPostings() {
 
     // 접수중인 공고만 노출한다(접수 예정·마감 제외).
     jobPostings.value = result.data.data.content.filter((item) => item.receptionStatus === 'ACCEPTING')
+  } catch (error) {
+    console.error(error)
+    jobPostings.value = []
+    loadFailed.value = true
   } finally {
     loading.value = false
   }

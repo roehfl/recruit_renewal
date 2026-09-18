@@ -5,6 +5,10 @@ import { adminRoutes } from './adminRoutes'
 
 export const routes: RouteRecordRaw[] = [
   {
+    path: '/',
+    redirect: '/applicant',
+  },
+  {
     path: '/samples/antd',
     name: 'AntdSample',
     component: () => import('@/views/samples/AntdSampleView.vue'),

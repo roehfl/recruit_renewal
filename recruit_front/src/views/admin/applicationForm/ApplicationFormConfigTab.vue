@@ -42,13 +42,21 @@ const emptyConfig = (): AdminApplicationFormConfig => ({
 const form = ref<AdminApplicationFormConfig>(emptyConfig())
 const saving = ref(false)
 
+/* 마지막으로 불러온(저장한) 값. 부모가 탭 전환·이탈 전에 변경 여부를 확인한다. */
+let snapshot = ''
+
 watch(
   () => props.config,
   (config) => {
     form.value = config ? { ...config } : emptyConfig()
+    snapshot = JSON.stringify(form.value)
   },
   { immediate: true },
 )
+
+const isDirty = (): boolean => JSON.stringify(form.value) !== snapshot
+
+defineExpose({ isDirty })
 
 const toggleUse = (
   useKey: keyof AdminApplicationFormConfig,
@@ -66,6 +74,7 @@ const save = async () => {
   saving.value = true
   try {
     await adminApplicationFormApi.saveFormConfig(props.jobPostingId, form.value)
+    snapshot = JSON.stringify(form.value)
     message.success('지원서 양식을 저장했습니다.')
     emit('saved')
   } catch (error) {

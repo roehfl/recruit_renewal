@@ -19,4 +19,14 @@ public final class HtmlTextUtils {
 
         return text;
     }
+
+    // v-html 로 렌더링되는 본문용. script·이벤트 핸들러 속성·javascript: 링크를 제거하고 기본 서식은 유지한다.
+    public static String sanitize(String html) {
+        if(html == null) {
+            return null;
+        }
+
+        return org.jsoup.Jsoup.clean(html, "", org.jsoup.safety.Safelist.relaxed(),
+                new org.jsoup.nodes.Document.OutputSettings().prettyPrint(false));
+    }
 }

@@ -45,6 +45,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
+import { useSectionDraftState } from '@/views/applicant/application/useSectionDraftState'
 import { SearchOutlined } from '@ant-design/icons-vue'
 import type { SectionComponentProps } from '@/types/application'
 import { logClientEvent } from '@/common/clientEventLogger';
@@ -113,6 +114,7 @@ const MilitaryForm = reactive<MilitaryResponse>({
     serviceEndDate: null,
     nonServiceReason: null
 })
+const draftState = useSectionDraftState(() => ({ notApplicable: notApplicable.value, ...MilitaryForm }))
 
 async function setItem(item: MilitaryResponse) {
   MilitaryForm.militaryId =  item.militaryId,
@@ -181,18 +183,21 @@ async function loadMyMilitary() {
   try {
     const result = await applicationMilitaryApi.getApplicationMilitary(props.applicationId)
     if(result.data.data) setItem(result.data.data);
+    draftState.markSynced()
   } finally {
     loading.value = false
   }
 }
 
 async function saveDraft() {
+  draftState.assertLoaded()
   if (!validate()) throw new Error('입력값을 확인해주세요.')
   loading.value = true
   setRequestBody();
   try {
     const result = await applicationMilitaryApi.postApplicationvMilitary(props.applicationId, requestBody.value as MilitaryRepuest)
     setItem(result.data.data)
+    draftState.markSynced()
     return result.data.data
   } catch (error) {
     console.error(error);
@@ -210,15 +215,25 @@ async function saveDraft() {
   }
 }
 
+// 백엔드 제출 검증(ApplicationSubmitValidator)과 같은 조건. 필수 섹션일 때만 적용한다.
 function validateBeforeSubmit(): boolean {
-  return validate()
+  validate()
+  if (notApplicable.value || !props.section.required) return true
+  if (MilitaryForm.militarySubjectType === 'COMPLETED' && (!MilitaryForm.serviceStartDate || !MilitaryForm.serviceEndDate)) {
+    throw new Error('군필자는 복무기간을 입력해야 제출할 수 있습니다.')
+  }
+  if ((MilitaryForm.militarySubjectType === 'SUBJECT' || MilitaryForm.militarySubjectType === 'EXEMPTED')
+    && !MilitaryForm.nonServiceReason?.trim()) {
+    throw new Error('미필·면제 사유를 입력해야 제출할 수 있습니다.')
+  }
+  return true
 }
 
 onMounted(async () => {
   await loadMyMilitary();
 });
 
-defineExpose({ saveDraft, validateBeforeSubmit })
+defineExpose({ saveDraft, validateBeforeSubmit, isDirty: draftState.isDirty })
 </script>
 
 <style scoped>

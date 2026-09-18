@@ -189,18 +189,36 @@ const save = async () => {
     const id = editingId.value!
     await adminJobPostingApi.updateJobPosting(id, { ...buildSaveRequest(), contentHtml: contentHtmlLegacy.value })
     // 이미지 diff: 삭제 → 추가(id 확보) → altText 변경 → 전체 순서 재지정.
+    // 게시 중 공고는 마지막 이미지를 지울 수 없으므로(백엔드) 삭제 대상 1장은 새 이미지를 올린 뒤 지운다.
+    // 단, 올리다 장수 상한에 닿으면 그 전에 지운다(그때는 다른 이미지가 남아 있어 마지막 이미지가 아니다).
     // 성공한 삭제는 목록에서 즉시 제거해 중간 실패 후 재시도가 404로 막히지 않게 한다.
-    for (const removedId of [...removedImageIds.value]) {
+    const deleteRemovedImage = async (removedId: number) => {
       await adminJobPostingApi.deleteImage(id, removedId)
       removedImageIds.value = removedImageIds.value.filter((value) => value !== removedId)
     }
+    const pendingRemovals = [...removedImageIds.value]
+    let heldRemoval = pendingRemovals.pop()
+    for (const removedId of pendingRemovals) {
+      await deleteRemovedImage(removedId)
+    }
+    let serverImageCount =
+      images.value.filter((image) => image.id !== null).length + (heldRemoval === undefined ? 0 : 1)
     for (const image of images.value) {
       if (image.id === null) {
+        if (heldRemoval !== undefined && serverImageCount >= MAX_IMAGES) {
+          await deleteRemovedImage(heldRemoval)
+          heldRemoval = undefined
+          serverImageCount -= 1
+        }
         const response = await adminJobPostingApi.addImage(id, image.file!, image.altText.trim())
         image.id = response.data.data
+        serverImageCount += 1
       } else if (image.altText.trim() !== image.originalAltText) {
         await adminJobPostingApi.updateImageAltText(id, image.id, image.altText.trim())
       }
+    }
+    if (heldRemoval !== undefined) {
+      await deleteRemovedImage(heldRemoval)
     }
     if (images.value.length > 0) {
       await adminJobPostingApi.reorderImages(id, images.value.map((image) => image.id!))
@@ -246,7 +264,7 @@ const loadForEdit = async () => {
     pinned.value = detail.pinned
     displayOrder.value = detail.displayOrder
     contentHtmlLegacy.value = detail.contentHtml
-    jobPositions.value = detail.jobPositions.map(({ id: _id, workLocations, ...position }) => ({
+    jobPositions.value = detail.jobPositions.map(({ workLocations, ...position }) => ({
       ...position,
       workLocationCodes: workLocations.map((it) => it.code),
     }))
@@ -262,16 +280,29 @@ const loadForEdit = async () => {
         previewUrl: URL.createObjectURL(blob.data),
       }
     }))
-    const loaded = settled
-      .filter((result): result is PromiseFulfilledResult<EditableImage> => result.status === 'fulfilled')
-      .map((result) => result.value)
-    const rejected = settled.find((result) => result.status === 'rejected')
-    if (generation !== imageLoadGeneration || rejected) {
+    // 미리보기를 못 불러온 이미지도 id·대체 텍스트는 남긴다(미리보기 없음).
+    // 목록에서 빼 버리면 순서 저장이 공고의 전체 이미지 id 와 어긋나 계속 실패한다.
+    const loaded = settled.map((result, index): EditableImage => {
+      if (result.status === 'fulfilled') return result.value
+      const image = detail.images[index]!
+      return {
+        key: `existing-${image.id}`,
+        id: image.id,
+        file: null,
+        altText: image.altText,
+        originalAltText: image.altText,
+        previewUrl: '',
+      }
+    })
+    if (generation !== imageLoadGeneration) {
       loaded.forEach((image) => URL.revokeObjectURL(image.previewUrl))
-      if (rejected) throw (rejected as PromiseRejectedResult).reason
       return
     }
     images.value = loaded
+    const failedCount = settled.filter((result) => result.status === 'rejected').length
+    if (failedCount > 0) {
+      message.warning(`이미지 ${failedCount}장의 미리보기를 불러오지 못했습니다. 이미지는 그대로 유지됩니다.`)
+    }
   } catch (error) {
     message.error(getApiErrorMessage(error, '공고 정보를 불러오지 못했습니다.'))
   } finally {
@@ -359,7 +390,8 @@ onBeforeUnmount(() => {
           공고 본문으로 노출할 포스터 이미지를 추가해 주세요. (jpg/png/webp, 장당 10MB, 최대 10장)
         </p>
         <div v-for="(image, index) in images" :key="image.key" class="image-row">
-          <img :src="image.previewUrl" :alt="image.altText || '공고 이미지 미리보기'" class="image-thumb" />
+          <img v-if="image.previewUrl" :src="image.previewUrl" :alt="image.altText || '공고 이미지 미리보기'" class="image-thumb" />
+          <div v-else class="image-thumb image-thumb-empty">미리보기 없음</div>
           <div class="image-meta">
             <a-input v-model:value="image.altText" :maxlength="200" placeholder="대체 텍스트(필수) — 예: 2026 신입 공채 모집 부문 안내" />
           </div>
@@ -453,6 +485,13 @@ onBeforeUnmount(() => {
   object-fit: contain;
   background: #fafafa;
   border: 1px solid #eee;
+}
+.image-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 12px;
 }
 .image-meta {
   flex: 1;

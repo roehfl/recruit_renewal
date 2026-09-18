@@ -1,3 +1,4 @@
+import axios from 'axios'
 import { defineStore } from 'pinia'
 import { authApi } from '@/api/authApi'
 import type { LoginRequest, LoginUser } from '@/types/auth'
@@ -50,9 +51,17 @@ export const useAuthStore = defineStore('auth', {
         this.initialized = true
 
         return this.user !== null
-      } catch {
+      } catch (error) {
         this.user = null
-        this.initialized = true
+
+        /*
+         * 401만 미로그인으로 확정한다. 네트워크 오류·5xx(배포 중 재시작 등)는 세션 유무를 알 수 없으므로
+         * initialized를 그대로 두어 다음 내비게이션의 라우트 가드가 다시 확인하게 한다.
+         */
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+          this.initialized = true
+        }
+
         return false
       }
     },

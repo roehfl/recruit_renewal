@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { getApiErrorMessage } from '@/api/apiError'
 import { DeleteOutlined, ArrowDownOutlined, ArrowUpOutlined } from '@ant-design/icons-vue'
 import type { QuestionItem, QuestionReOrderItem, QuestionReOrderRequest, QuestionRequest, QuestionForm } from '@/types/question'
@@ -11,6 +11,8 @@ import QuestionTemplatesModalBody from '@/views/admin/applicationForm/questionMo
 const props = defineProps<{
   jobPostingId: number
   editable: boolean
+  /** 질문 추가·삭제·순서 변경 가능 여부. 백엔드는 작성 중(DRAFT) 공고에서만 허용한다. */
+  structureEditable: boolean
 }>()
 
 const questions = ref<QuestionItem[]>([]);
@@ -20,6 +22,8 @@ const loading = ref(false);
 const saving = ref(false);
 const addQuestionModalStatus = ref(false);
 const addTemplateQuestionModalStatus = ref(false);
+/* 저장에 성공하면 올려서 모달 입력 폼을 새로 만든다. */
+const questionFormKey = ref(0);
 
 const tableLocale = {
   emptyText: '등록된 질문이 없습니다.'
@@ -89,66 +93,28 @@ const handleExpand = (expanded: boolean, record: QuestionItem) => {
   }
 }
 
-const moveUp = async (record: QuestionItem): Promise<void> => {
+/* 이웃 질문과 자리를 바꾸고 순서를 저장한다. 저장이 실패하면 reOrder 가 서버 순서로 되돌린다. */
+const move = (record: QuestionItem, offset: -1 | 1): void => {
   const index = questions.value.findIndex(
     question => question.questionId === record.questionId
   )
+  const target = index + offset
+  const current = questions.value[index]
+  const neighbor = questions.value[target]
 
-  if(index <= 0) {
+  if (index < 0 || !current || !neighbor) {
     return
   }
 
-  const temp:QuestionItem = {
-    questionText: questions.value[index - 1]?.questionText!,
-    questionId: questions.value[index - 1]?.questionId!,
-    questionTemplateId: questions.value[index - 1]?.questionTemplateId ?? null,
-    helperText: questions.value[index - 1]?.helperText ?? null,
-    category: questions.value[index - 1]?.category!,
-    answerType: questions.value[index - 1]?.answerType!,
-    required: questions.value[index - 1]?.required!,
-    minLength: questions.value[index - 1]?.minLength ?? null,
-    maxLength: questions.value[index - 1]?.maxLength!,
-    sortOrder: questions.value[index - 1]?.sortOrder!,
-    createdAt: questions.value[index - 1]?.createdAt!,
-    updatedAt: questions.value[index - 1]?.updatedAt!
-  }
-
-  questions.value[index - 1] = record
-  questions.value[index] = temp
-
-  updateSortOrder()
-  reOrder(questions.value)
-}
-
-const moveDown = async (record: QuestionItem): Promise<void> => {
-  const index = questions.value.findIndex(
-    question => question.questionId === record.questionId
-  )
-
-  if(index >= questions.value.length -1) {
-    return
-  }
-
-  const temp:QuestionItem = {
-    questionText: questions.value[index + 1]?.questionText!,
-    questionId: questions.value[index + 1]?.questionId!,
-    questionTemplateId: questions.value[index + 1]?.questionTemplateId ?? null,
-    helperText: questions.value[index + 1]?.helperText ?? null,
-    category: questions.value[index + 1]?.category!,
-    answerType: questions.value[index + 1]?.answerType!,
-    required: questions.value[index + 1]?.required!,
-    minLength: questions.value[index + 1]?.minLength ?? null,
-    maxLength: questions.value[index + 1]?.maxLength!,
-    sortOrder: questions.value[index + 1]?.sortOrder!,
-    createdAt: questions.value[index + 1]?.createdAt!,
-    updatedAt: questions.value[index + 1]?.updatedAt!,
-  }
-
-  questions.value[index + 1] = record
-  questions.value[index] = temp
+  questions.value[target] = current
+  questions.value[index] = neighbor
 
   updateSortOrder()
 }
+
+const moveUp = (record: QuestionItem): void => move(record, -1)
+
+const moveDown = (record: QuestionItem): void => move(record, 1)
 
 const updateSortOrder = (): void => {
 
@@ -179,6 +145,8 @@ const reOrder = async(questions: QuestionItem[]) => {
     await adminJobPostingApi.reOrderQuestion(props.jobPostingId, requestBody);
   } catch (error) {
     message.error(getApiErrorMessage(error, '정렬순서를 변경하지 못했습니다.'))
+    // 화면 순서만 바뀐 채 남지 않도록 서버 순서를 다시 읽는다.
+    await loadQuestions()
   } finally {
     loading.value = false
   }
@@ -264,6 +232,12 @@ const updateQuestion = async () => {
     return
   }
 
+  // 펼친 뒤 순서를 옮겼을 수 있으므로 detailForm 복사본이 아니라 현재 목록의 순서를 보낸다.
+  const questionId = detailForm.value.questionId
+  const currentSortOrder = questions.value.find(
+    question => question.questionId === questionId
+  )?.sortOrder ?? detailForm.value.sortOrder
+
   saving.value = true;
   try {
     const request: QuestionRequest= {
@@ -274,7 +248,7 @@ const updateQuestion = async () => {
       required: detailForm.value.required!,
       minLength: detailForm.value.minLength ?? 0,
       maxLength: detailForm.value.maxLength!,
-      sortOrder: detailForm.value.sortOrder!,
+      sortOrder: currentSortOrder!,
     }
     await adminJobPostingApi.updateQuestion(props.jobPostingId, detailForm.value.questionId!, request);
   } catch (error) {
@@ -289,7 +263,6 @@ const saveQuestion = async (data: QuestionForm): Promise<void> => {
   if(!data) {
     return
   }
-  addQuestionModalStatus.value = false
   const index = questions.value.length + 1
 
   const requestQuestion: QuestionRequest = {
@@ -306,34 +279,57 @@ const saveQuestion = async (data: QuestionForm): Promise<void> => {
   saving.value = true;
   try {
     await adminJobPostingApi.saveQuestion(props.jobPostingId, requestQuestion);
+    // 성공했을 때만 모달을 닫고 입력 폼을 새로 만든다. 실패하면 입력을 그대로 두어 고쳐서 다시 저장하게 한다.
+    addQuestionModalStatus.value = false
+    addTemplateQuestionModalStatus.value = false
+    questionFormKey.value += 1
+    await loadQuestions();
   } catch (error) {
     message.error(getApiErrorMessage(error, '질문을 저장하지 못했습니다.'))
   } finally {
-    await loadQuestions();
     saving.value = false;
   }
 }
 
 const deleteQuetion = async(record: QuestionItem) => {
-  loading.value = true
   const questionID = record.questionId
 
   if(!questionID){
     return
   }
 
+  loading.value = true
+  let deleted = false
   try {
     await adminJobPostingApi.deleteQuestion(props.jobPostingId, questionID);
+    deleted = true
   } catch (error) {
     message.error(getApiErrorMessage(error, '질문을 삭제하지 못했습니다.'));
   } finally {
     await loadQuestions();
-    questions.value.filter(
-      (question) => question.questionId !== questionID
-    );
-    await updateSortOrder();
     loading.value = false
   }
+
+  // 빈 목록 정렬 요청은 백엔드가 거부하므로, 삭제에 성공하고 남은 질문이 있을 때만 순서를 다시 매긴다.
+  if (deleted && questions.value.length > 0) {
+    updateSortOrder()
+  }
+}
+
+const confirmDeleteQuestion = (record: QuestionItem): void => {
+  const text = record.questionText?.trim() ?? ''
+  const preview = text.length > 30 ? `${text.slice(0, 30)}…` : text
+
+  Modal.confirm({
+    title: '질문을 삭제할까요?',
+    content: preview
+      ? `"${preview}" 질문이 삭제되며 되돌릴 수 없습니다.`
+      : '삭제한 질문은 되돌릴 수 없습니다.',
+    okText: '삭제',
+    okType: 'danger',
+    cancelText: '취소',
+    onOk: () => deleteQuetion(record),
+  })
 }
 
 const addTemplateQuestionModalOpen = (): void => {
@@ -371,12 +367,20 @@ onMounted( async () => {
       message="읽기 전용"
       description="접수가 시작되었거나 마감된 공고입니다. 제출된 지원서와 어긋나지 않도록 지원서 양식은 수정할 수 없습니다."
     />
+    <a-alert
+      v-else-if="!props.structureEditable"
+      type="info"
+      show-icon
+      class="tab-alert"
+      message="문구만 수정 가능"
+      description="게시된 공고는 질문 문구와 설명만 수정할 수 있습니다. 질문 추가·삭제·순서 변경은 작성 중인 공고에서만 할 수 있습니다."
+    />
 
       <a-card title="질문 리스트" :bordered="false" class="form-card">
         <template #extra>
           <div class="header-actions">
-            <a-button @click="addTemplateQuestionModalOpen">질문 템플릿 불러오기</a-button>
-            <a-button @click="addQuestionModalOpen">질문 추가</a-button>
+            <a-button :disabled="!props.structureEditable" @click="addTemplateQuestionModalOpen">질문 템플릿 불러오기</a-button>
+            <a-button :disabled="!props.structureEditable" @click="addQuestionModalOpen">질문 추가</a-button>
           </div>
           
         </template>
@@ -428,7 +432,7 @@ onMounted( async () => {
                 <a-button
                   type="link"
                   size="small"
-                  :disabled="isFirst(record)"
+                  :disabled="!props.structureEditable || isFirst(record)"
                   @click.stop="moveUp(record)"
                 >
                 <ArrowUpOutlined />
@@ -436,7 +440,7 @@ onMounted( async () => {
                 <a-button
                   type="link"
                   size="small"
-                  :disabled="isLast(record)"
+                  :disabled="!props.structureEditable || isLast(record)"
                   @click.stop="moveDown(record)"
                 >
                 <ArrowDownOutlined />
@@ -445,7 +449,7 @@ onMounted( async () => {
             </template >
             
             <template v-else-if="column.key === 'delete'">
-               <button type="button" class="remove-btn" @click="deleteQuetion(record)">
+               <button type="button" class="remove-btn" :disabled="!props.structureEditable" @click="confirmDeleteQuestion(record)">
                 <DeleteOutlined /> 삭제
               </button>
             </template>
@@ -549,6 +553,7 @@ onMounted( async () => {
       @cancel="addQuestionModalClose()"
       >
         <QuestionModalBody
+          :key="questionFormKey"
           v-model:opne="addQuestionModalStatus"
           @success="saveQuestion"/>
     </a-modal>
@@ -562,6 +567,7 @@ onMounted( async () => {
       @cancel="addTemplateQuestionModalClose()"
       >
         <QuestionTemplatesModalBody
+          :key="questionFormKey"
           v-model:opne="addTemplateQuestionModalStatus"
           @success="saveQuestion"/>
     </a-modal>

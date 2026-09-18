@@ -117,3 +117,20 @@ export const adminJobPostingApi = {
     return apiClient.post<ApiResponse<QuestionReOrderRequest>>(`/admin/job-postings/${jobPostingId}/questions/reorder`, request)
   },
 }
+
+const ALL_JOB_POSTINGS_PAGE_SIZE = 100 // 백엔드 목록 조회의 size 상한(JobPostingService.validatePageRequest)
+
+/** 공고 선택 목록용. 첫 페이지(최근 N건)에서 잘리지 않도록 마지막 페이지까지 이어 받아 모두 돌려준다. */
+export const getAllJobPostings = async (): Promise<AdminJobPostingListItem[]> => {
+  const items: AdminJobPostingListItem[] = []
+  let page = 0
+  let last = false
+  while (!last) {
+    const response = await adminJobPostingApi.getJobPostings(page, ALL_JOB_POSTINGS_PAGE_SIZE)
+    const { content, last: isLastPage } = response.data.data
+    items.push(...content)
+    last = isLastPage || content.length === 0
+    page += 1
+  }
+  return items
+}

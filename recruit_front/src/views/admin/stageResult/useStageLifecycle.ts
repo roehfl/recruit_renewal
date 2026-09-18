@@ -18,7 +18,7 @@ export interface StageLifecycleDeps {
   results: Ref<AdminStageResult[]>
   loadStages: () => Promise<void>
   loadResults: () => Promise<void>
-  /** 미저장 판정이 있으면 확인을 받는다. 발표 전에만 쓴다. */
+  /** 미저장 판정이 있으면 확인을 받는다. 대상자 불러오기·발표 전에 쓴다. */
   confirmDiscardIfDirty: () => Promise<boolean>
   /** 공고·단계 선택을 주소창 쿼리에 반영한다. */
   syncQuery: () => void
@@ -94,8 +94,12 @@ export function useStageLifecycle(deps: StageLifecycleDeps) {
     })
   }
 
-  const initializeResults = () => {
+  const initializeResults = async () => {
     if (selectedStageId.value === null) {
+      return
+    }
+    // 불러오기가 대기 행을 정리(삭제)하면 그 행의 미저장 판정이 버퍼에 남아 이후 저장이 계속 실패한다.
+    if (!(await confirmDiscardIfDirty())) {
       return
     }
     const stageId = selectedStageId.value

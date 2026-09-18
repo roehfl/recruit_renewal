@@ -119,6 +119,7 @@ const load = async () => {
 
     const placed = new Set(pages.value.flatMap((page) => page.items))
     palette.value = [...enabled].filter((type) => !placed.has(type))
+    snapshot = JSON.stringify(buildRequest())
   } catch (error) {
     message.error(getApiErrorMessage(error, '폼 구성을 불러오지 못했습니다.'))
   } finally {
@@ -205,6 +206,13 @@ const dropOnPalette = () => {
   palette.value.push(source.sectionType)
   dragging.value = null
 }
+
+/* 마지막으로 불러온 배치. 부모가 탭 전환·이탈 전에 변경 여부를 확인한다. */
+let snapshot = ''
+
+const isDirty = (): boolean => editable.value && JSON.stringify(buildRequest()) !== snapshot
+
+defineExpose({ isDirty })
 
 const buildRequest = () => ({
   pages: pages.value.map((page, index) => ({

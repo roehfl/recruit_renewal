@@ -1,11 +1,15 @@
 import { apiClient } from './client'
 import type { ApiResponse } from '@/types/api'
-import type { ApplicationSearchParams, MyApplicationList, ChangePasswordParams, ChangePasswordRequest, SignupUser, checkEmailRequest } from '@/types/application'
+import type { ApplicantStageResult, ApplicationSearchParams, MyApplicationList, ChangePasswordParams, ChangePasswordRequest, SignupUser, checkEmailRequest } from '@/types/application'
 
 export const applicationApi = {
 
   getMyApplications(params: ApplicationSearchParams){
-    return apiClient.get<ApiResponse<MyApplicationList>>('/applications/me')
+    return apiClient.get<ApiResponse<MyApplicationList>>('/applications/me', { params })
+  },
+
+  getStageResults(applicationId: number) {
+    return apiClient.get<ApiResponse<ApplicantStageResult[]>>(`/applications/${applicationId}/stage-results`)
   },
 
   changePassword(params: ChangePasswordParams){

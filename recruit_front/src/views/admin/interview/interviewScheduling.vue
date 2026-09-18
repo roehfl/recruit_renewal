@@ -4,6 +4,7 @@ import { computed, h, onMounted, ref, reactive } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import axios from 'axios'
 import { adminJobPostingApi } from '@/api/admin/adminJobPostingApi'
+import { getAllJobPostings } from '@/api/adminJobPostingApi'
 import { adminInterviewApi } from '@/api/admin/adminInterviewApi'
 import { adminStageApi } from '@/api/admin/adminStageApi'
 import { getApiErrorMessage } from '@/api/apiError'
@@ -134,6 +135,13 @@ const changeJobPosting = async (jobPostingId: number): Promise<void> => {
   }
 }
 
+/* 면접단계를 바꾸면 이전 단계의 표·다운로드 기준을 비운다. 업로드는 현재 선택한 단계로 가므로 둘이 어긋나지 않게 한다. */
+const changeStage = (): void => {
+  interviews.value = []
+  lastSearchParams.value = null
+  hasSearched.value = false
+}
+
 const changeJobPosition = async (jobPositionId: number | null) => {
   searchRequest.jobPositionId = jobPositionId ?? undefined;
 }
@@ -152,7 +160,7 @@ const columns: TableColumnsType = [
 
 /* ---------------- 데이터 ---------------- */
 const interviews = ref<AdminInterviewScheduleRow[]>([])
-/** 표에 보이는 행을 만든 조건. 다운로드가 화면과 같은 행을 받도록 이 조건으로 요청한다. */
+/** 표에 보이는 행을 만든 조건. 다운로드는 이 조건의 면접단계(stageId)만 쓴다. */
 const lastSearchParams = ref<InterviewScheduleSearchParams | null>(null)
 
 /* 한 면접(조)에 지원자가 여럿이라 면접 id 만으로는 행이 겹친다. */
@@ -193,13 +201,18 @@ const refresh = (): void => {
 }
 
 /* ---------------- 엑셀 다운로드 ---------------- */
-/* 표에 행이 있으면 그 행을 채운 파일, 비어 있으면 헤더만 있는 양식을 받는다. */
+/*
+ * 검색한 면접단계가 있으면 필터와 관계없이 단계 전체를 받는다(0건이면 헤더만). 업로드가 단계 전체 교체라
+ * 필터 결과만 담은 파일을 다시 올리면 나머지 조가 삭제되기 때문이다. 검색 전이면 헤더만 있는 양식을 받는다.
+ */
 const downloadExcel = async () => {
   if (!selectedJobPostingId.value) return
   loading.value = true
   try {
-    if (interviews.value.length > 0 && lastSearchParams.value) {
-      const response = await adminInterviewApi.exportSchedules(selectedJobPostingId.value, lastSearchParams.value)
+    if (lastSearchParams.value) {
+      const response = await adminInterviewApi.exportSchedules(selectedJobPostingId.value, {
+        stageId: lastSearchParams.value.stageId,
+      })
       saveBlobResponse(response, '면접스케줄.xlsx')
     } else {
       const response = await adminInterviewApi.downloadScheduleTemplate(selectedJobPostingId.value)
@@ -286,8 +299,7 @@ const pickDefaultJobPosting = (postings: AdminJobPostingListItem[]): AdminJobPos
 
 onMounted(async () => {
   try {
-    const response = await adminJobPostingApi.getJobPostings()
-    jobPostings.value = response.data.data.content;
+    jobPostings.value = await getAllJobPostings()
     const defaultPosting = pickDefaultJobPosting(jobPostings.value)
 
     if (defaultPosting) {
@@ -327,7 +339,7 @@ onMounted(async () => {
                 </td>
                 <th>면접단계<em> *</em></th>
                 <td>
-                  <a-radio-group v-if="interviewStages.length > 0" v-model:value="searchRequest.stageId" button-style="solid">
+                  <a-radio-group v-if="interviewStages.length > 0" v-model:value="searchRequest.stageId" button-style="solid" @change="changeStage">
                     <a-radio-button v-for="stage in interviewStages" :key="stage.id" :value="stage.id">
                       {{ stage.stageName }}
                     </a-radio-button>
@@ -365,6 +377,7 @@ onMounted(async () => {
           <p class="guide-item-default">※ 면접 스케줄링 방법 : 채용구분, 면접 단계 선택 → 검색버튼으로 조회 → 엑셀 다운로드 후 내용 작성 → 엑셀 업로드</p>
           <p class="guide-item-default">※ 엑셀 업로드 방법 : 엑셀을 다운로드 → 암호화 해제 → 엑셀 업로드</p>
           <p class="guide-item-default">※ 업로드하면 선택한 면접단계의 기존 스케줄이 파일 내용으로 교체되고, 바로 지원자·면접관에게 공개됩니다.</p>
+          <p class="guide-item-default">※ 엑셀 다운로드는 검색 조건과 관계없이 검색한 면접단계의 전체 스케줄을 받습니다.</p>
           <p class="guide-item-default">※ 한 행에 지원자 1명. 같은 조는 일자·장소·도착시간·면접시간·면접관이 같아야 하고, 조·면접순서는 1부터 이어서 적습니다. 면접관은 이름(로그인ID)을 쉼표로 구분합니다.</p>
           <div>
             <b class="guide-item-required">※ 화면에서 편집 불가&nbsp;</b>

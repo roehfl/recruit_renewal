@@ -1,15 +1,34 @@
 <template>
-  <div class="">
-    <h1>This is not found view page</h1>
+  <div class="error-page">
+    <a-result
+      status="404"
+      title="페이지를 찾을 수 없습니다."
+      sub-title="주소가 잘못되었거나 더 이상 제공되지 않는 페이지입니다."
+    >
+      <template #extra>
+        <a-button type="primary" @click="goHome">홈으로</a-button>
+        <a-button @click="goBack">이전 페이지</a-button>
+      </template>
+    </a-result>
   </div>
 </template>
 
-<style>
-@media (min-width: 1024px) {
-  .about {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-  }
+<script setup lang="ts">
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+const goHome = () => router.push('/applicant')
+const goBack = () => router.back()
+</script>
+
+<style scoped>
+.error-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 40px 16px;
+  background: #ffffff;
 }
 </style>

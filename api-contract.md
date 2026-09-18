@@ -284,6 +284,12 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 유형→성적모드 매핑은 **프론트**에 위치(백엔드 학력 검증 무변경). 주의: 현재 학력 검증은 비고졸 평균평점 필수·학기별 선택이므로, 공개·인턴이라도 평균 입력란을 숨기면 저장이 400으로 막힌다(평균 유지 필요).
 - 매핑: front form-page 로드 ↔ back `ApplicationController.getFormPage()`.
 
+#### POST `/applications/{applicationId}/submit` — 제출 검증  🟢 확정 (2026-09-18, 백엔드 테스트 / 프론트 반영)
+
+- 제출 검증(`ApplicationSubmitValidator`) 실패는 400 `ApiResponse.fail(message)`이고, **메시지는 한글**이다(예: "학력을 입력해야 제출할 수 있습니다.", "군필자는 복무기간을 입력해야 제출할 수 있습니다."). 이전에는 영문이었다. 프론트는 이 메시지를 그대로 표시한다
+- 추가: 질문 **최소 글자수(`minLength`)** 도 제출 시 검증한다(앞뒤 공백 제외 길이). 공백만 있는 선택 답변은 미입력으로 보고 적용하지 않는다. 이전에는 프론트 섹션 검증에만 있어, 질문 섹션이 없는 페이지에서 제출하면 우회됐다
+- 프론트 흐름(2026-09-18): 페이지 이동·최종 제출·지원분야 변경 전에 현재 페이지에서 **변경된 섹션만 자동 임시저장**한다(실패하면 진행 중단). 폼을 벗어나거나 브라우저를 닫을 때 변경이 있으면 확인창을 띄운다. 제출 완료(`SUBMITTED`) 지원서를 수정 저장할 때는 해당 섹션의 제출 검증을 먼저 통과해야 한다(저장 즉시 제출본에 반영되므로)
+
 ### 화면: 주소 검색 (AddressSearch — juso.go.kr 프록시)
 
 - 프론트: (후속) 기본정보 주소 입력 보조 — 주소 검색 모달/자동완성, `src/api`의 address 관련
@@ -775,6 +781,14 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 요청(변경분): `jobPositions: [{ positionName, applicationType, jobTitle, workLocationCodes: ["HQ","BSN"], employmentType, sortOrder }]`
 - 검증: 미지정/빈 배열 허용(후보 0개), 배열 내 중복 코드 400, `WORK_LOCATION` 그룹의 **활성 코드가 아니면** 400
 
+#### POST `/admin/job-postings/{id}` — 모집분야 제자리 수정  🟢 확정 (2026-09-18, front-back 반영·테스트)
+
+- 배경: 수정 시 모집분야를 전부 지우고 새로 만들어, 지원서가 달린 모집분야는 `job_application.job_position_id` FK 에 걸려 공고 수정이 500 으로 실패했다
+- 요청(추가): `jobPositions[].id?: number` — 상세 응답의 `jobPositions[].id` 를 그대로 보낸다. 새로 추가한 모집분야는 생략(null)
+- 처리: `id` 있음 → 해당 모집분야를 제자리 수정 / `id` 없음 → 새로 추가 / 요청에 없는 기존 모집분야 → 삭제
+- 검증: 다른 공고의 id·존재하지 않는 id·요청 내 중복 id 400. **지원서가 있는 모집분야를 삭제하려 하면 400** "지원서가 있는 모집분야는 삭제할 수 없습니다. 모집분야=<이름>"
+- 공고 생성(`POST /admin/job-postings`)은 `id` 를 무시하고 전부 새로 만든다
+
 #### GET `/admin/job-postings/{id}`  🟢 확정(2026-08-31)
 
 - 변경: `jobPositions[].workLocation` → **`workLocations: [{ code, name }]`**. `name`은 CommonCode `displayName`
@@ -834,11 +848,12 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 #### GET `/admin/application-forms`  🟢 확정(2026-09-02, front-back 반영 완료)
 
 - 설명: 공고별 지원서 설정 요약 목록(페이지). 공고 목록 API와 별개다 — 기존 `GET /admin/job-postings` 는 필터 파라미터가 없고 설정 관련 필드도 없다
-- 요청(query): `{ status?, receptionStatus?, configState?, editableOnly?, keyword?, page=0, size=20 }`
+- 요청(query): `{ status?, receptionStatus?, configState?, editableOnly?, keyword?, excludeClosed?, page=0, size=20 }`
   - `status`: `DRAFT | PUBLISHED | CLOSED`
   - `receptionStatus`: `UPCOMING | ACCEPTING | CLOSED`
   - `configState`: `OK | DEFAULT | RELAYOUT_REQUIRED | MISSING`
   - `editableOnly`: boolean (접수 시작 전 & 미마감만)
+  - 🟢 `excludeClosed`: boolean (2026-09-18 추가) — 마감(CLOSED) 공고 제외. 화면의 '마감 제외' 기본값. 이전에는 프론트가 페이지 응답을 다시 걸러 페이지가 비거나 총건수가 어긋났다. 다른 파생값 필터처럼 메모리에서 거른 뒤 페이징한다
   - 기본 정렬: `RELAYOUT_REQUIRED` 우선 → 접수 시작일 임박순
 - 응답(200): `ApiResponse<PageResponse<{ jobPostingId, title, postingType, status, receptionStatus, receptionStartDateTime, receptionEndDateTime, sectionSummary: { enabledCount, requiredCount }, activeQuestionCount, requiredQuestionCount, layoutStored, pageCount, configState, editable, updatedAt }>>`
 - `configState` 판정(서버 계산, 단일 출처):
@@ -1058,7 +1073,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 
 - 쿼리는 조회와 같다. 조회 결과 행을 그대로 채운 xlsx(행 0건이면 헤더만). 다시 업로드하는 원본이라 값에 수식 방어 접두(`'`)를 붙이지 않는다(업로드가 수식 셀을 거부한다)
 - 개인정보(성명) 반출이라 export 감사 로그를 남긴다: datasetType `INTERVIEW_SCHEDULES`, 감사 행위 분류는 기존 면접 export 와 같은 `EXPORT_INTERVIEWS`
-- 프론트는 **마지막으로 검색한 조건**으로 호출한다(화면 표와 파일 일치). 표가 비어 있으면 아래 템플릿을 받는다
+- 🟢 (2026-09-18 변경, 프론트 반영) 프론트는 필터 없이 **`stageId` 만으로** 호출해 단계 전체를 받는다. 업로드가 단계 전체 교체라 재업로드 원본은 항상 전체여야 한다(필터 결과만 받은 파일을 올리면 나머지 조가 삭제되던 결함). 검색 전이면 아래 템플릿을 받는다. 백엔드는 필터 쿼리를 계속 지원한다(무변경)
 
 #### GET `/admin/job-postings/{jobPostingId}/interview-schedules/upload-template`  🟢
 
@@ -1076,3 +1091,45 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
   - 엑셀이 날짜·시각 셀로 바꾼 값(일자·도착시간·면접시간)도 읽는다. 파일 행 순서는 자유 — 저장·조회는 조 → 면접순서로 정렬된다
 - 성공(200) `data = { stageId, interviewCount, candidateCount, replacedInterviewCount, errors: [], rowErrors: [] }`
 - 프론트는 업로드 전 "기존 스케줄 교체 + 즉시 공개" 확인을 받고, 성공하면 현재 조건으로 자동 재조회한다
+
+---
+
+### 화면: 공지사항 (NoticeListView)
+
+- 프론트: `src/views/applicant/NoticeListView.vue`, `src/api/boardApi.ts`
+- 백엔드: `com.shinyoung.recruit.controller.BoardController`
+
+#### GET `/board/notices` · `/board/notices/{noticeId}`  🟢 확정 (2026-09-18, 백엔드 정제·테스트 / 프론트 무변경)
+
+- 공개(비인증 허용). 상세 응답 `ApiResponse<{ id, title, contentHtml, pinned, createdAt }>`
+- `contentHtml`은 응답 시 서버가 jsoup `Safelist.relaxed()`로 정제한다(script·이벤트 핸들러 속성·`javascript:` 링크 제거). 프론트는 이 값을 `v-html`로 렌더링한다
+
+#### POST `/board/notices`  🟢 확정 (2026-09-18, SecurityConfig 매처·테스트)
+
+- **관리자 전용**(`ROLE_ADMIN`·`ROLE_RECRUIT_ADMIN`). 비인증 401, 그 외 권한 403. 요청 `{ title, content, isPinned }`
+- 프론트 호출처 없음(관리자 공지 관리 화면 미구현)
+
+---
+
+### 화면: 마이페이지 지원 목록 — 전형결과 확인 (ApplicantProfile)
+
+- 프론트: `src/views/applicant/ApplicantProfile.vue`, `src/api/applicationApi.ts`(`getStageResults`), `src/types/application.ts`(`ApplicantStageResult`)
+- 백엔드: `com.shinyoung.recruit.controller.ApplicationStageResultController`
+
+#### GET `/applications/{applicationId}/stage-results`  🟢 확정 (2026-09-18, 백엔드 기존 구현 / 프론트 신규 반영)
+
+- 지원자 본인 지원서만(`ROLE_APPLICANT`). 응답 `ApiResponse<[{ stageName, stageType, stageOrder, resultStatus, resultAnnouncementDateTime, decidedAt }]>` — **발표된 결과만** 내려온다
+- 임시저장(`DRAFT`) 지원서는 400 "임시저장 지원서는 전형 결과를 조회할 수 없습니다." — 프론트는 DRAFT 행에 확인 버튼을 표시하지 않는다
+- 프론트: 지원 목록의 "확인" 버튼 → 모달에 단계명·결과·발표일시를 단계 순서로 표시. 결과가 없으면 "발표된 전형 결과가 없습니다."
+
+---
+
+### 화면: 공고 상세 — 기지원 여부 확인 (ApplicationDetailView)
+
+- 프론트: `src/views/applicant/ApplicationDetailView.vue`
+- 백엔드: `com.shinyoung.recruit.controller.ApplicationController.getMyApplicationByJobPosting()`
+
+#### GET `/job-postings/{jobPostingId}/application`  🟢 확정 (2026-09-18, 백엔드 기존 구현 / 프론트 신규 반영)
+
+- 지원자 전용(`ROLE_APPLICANT`). 해당 공고에 대한 본인 지원서를 `ApiResponse<ApplicationDetailResponse>`로 돌려준다(상태 필드 `status`). 지원서가 없으면 404
+- 프론트는 404를 "아직 지원하지 않음"으로 처리한다(이전에는 `/applications/me` 첫 페이지 20건에서만 찾아 기존 지원서를 놓칠 수 있었다). 404가 정상 흐름이라 이 호출은 오류 텔레메트리에서 제외한다(`skipClientEventLog`)

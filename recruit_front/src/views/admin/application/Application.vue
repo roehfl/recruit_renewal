@@ -515,7 +515,8 @@ onBeforeUnmount(() => {
                 <!-- 승진일 -->
                 <td> {{ formatDate(career.promotionDate, 'YYYY-MM') }} </td>
                 <!-- 연봉  -->
-                <td> {{ Number(career.currentSalary).toLocaleString() }} </td>
+                <!-- 미기재(null)는 0 이 아니라 빈칸으로 둔다(서버 PDF 와 같다). -->
+                <td> {{ career.currentSalary == null ? '' : Number(career.currentSalary).toLocaleString() }} </td>
                 <!-- 퇴직사유   -->
                 <td> {{ career.resignationReason }} </td>
               </tr>

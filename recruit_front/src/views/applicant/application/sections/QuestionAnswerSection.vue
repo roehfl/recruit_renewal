@@ -39,6 +39,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { useSectionDraftState } from '@/views/applicant/application/useSectionDraftState'
 import { message } from 'ant-design-vue'
 import { questionAnswerApi } from '@/api/application/sections/questionAnswerApi'
 import { getApiErrorMessage } from '@/api/apiError'
@@ -54,6 +55,7 @@ import type {
 const props = defineProps<SectionComponentProps>()
 
 const loading = ref(false)
+const draftState = useSectionDraftState(() => buildPayload())
 const items = reactive<ApplicationQuestionItem[]>([])
 
 const CATEGORY_LABELS: Record<QuestionCategory, string> = {
@@ -119,16 +121,19 @@ async function loadQuestions() {
   try {
     const result = await questionAnswerApi.getApplicationsQuestions(props.applicationId)
     setItems(result.data.data ?? [])
+    draftState.markSynced()
   } finally {
     loading.value = false
   }
 }
 
 async function saveDraft() {
+  draftState.assertLoaded()
   loading.value = true
   try {
     const result = await questionAnswerApi.replaceApplicationsAnswers(props.applicationId, buildPayload())
     setItems(result.data.data ?? [])
+    draftState.markSynced()
     return result.data.data
   } catch (error) {
     logClientEvent({
@@ -153,7 +158,7 @@ onMounted(() => {
   loadQuestions()
 })
 
-defineExpose({ saveDraft, validateBeforeSubmit })
+defineExpose({ saveDraft, validateBeforeSubmit, isDirty: draftState.isDirty })
 </script>
 
 <style scoped>

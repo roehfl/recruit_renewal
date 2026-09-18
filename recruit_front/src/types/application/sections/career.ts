@@ -8,7 +8,7 @@ export interface CareerItem {
     endDate: string,
     currentlyEmployed: boolean,
     promotionDate: string,
-    currentSalary: number,
+    currentSalary: number | null,
     resignationReason: string,
     sortOrder: number
 }
@@ -17,12 +17,12 @@ export interface CareerRepuestItme {
     companyName: string,
     departmentName: string,
     positionTitle: string,
-    employmentType: string,
+    employmentType: string | null,
     startDate: string,
-    endDate: string,
+    endDate: string | null,
     currentlyEmployed: boolean,
     promotionDate: string,
-    currentSalary: number,
+    currentSalary: number | null,
     resignationReason: string,
     sortOrder: number
 }

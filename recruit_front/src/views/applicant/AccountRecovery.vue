@@ -135,7 +135,8 @@ const checkEmail = ref<checkEmailRequest>({
   message: '',
 })
 
-const regEmail = /^[0-9a-zA-Z]([-_.]?[0-9a-zA-Z])*@[0-9a-zA-Z]([-_.]?[0-9a-zA-Z])*\.[a-zA-Z]{2,3}$/i;
+// 회원가입(SignupView)과 같은 규칙. 백엔드 @Email 이 허용하는 '+' 태그와 4자 이상 최상위 도메인도 받는다.
+const regEmail = /^[0-9a-zA-Z]([-_.+]?[0-9a-zA-Z])*@[0-9a-zA-Z]([-_.]?[0-9a-zA-Z])*\.[a-zA-Z]{2,}$/i;
 
 const openFindId = () => {
   if(findId.value) {

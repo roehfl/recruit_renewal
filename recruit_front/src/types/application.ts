@@ -62,6 +62,8 @@ export interface ApplicationFormPageResponse {
 export interface SectionActionHandle {
   saveDraft?: () => Promise<void> | void
   validateBeforeSubmit?: () => Promise<boolean> | boolean
+  /** 마지막 조회·저장 이후 입력이 바뀌었는지. 페이지 이동·제출 전 자동 임시저장 판단에 쓴다. */
+  isDirty?: () => boolean
 }
 
 export interface SectionComponentProps {
@@ -130,4 +132,14 @@ export interface checkEmailRequest {
   success: boolean,
   data: {available: boolean},
   message: string
+}
+
+/** GET /applications/{applicationId}/stage-results — 발표된 전형 결과만 내려온다(임시저장 지원서는 400). */
+export interface ApplicantStageResult {
+  stageName: string
+  stageType: string
+  stageOrder: number
+  resultStatus: 'PENDING' | 'PASSED' | 'FAILED' | 'ABSENT' | 'WITHDRAWN' | 'HOLD'
+  resultAnnouncementDateTime: string | null
+  decidedAt: string | null
 }

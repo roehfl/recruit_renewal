@@ -79,7 +79,7 @@ export const formatDate = (
   })
 }
 
-// 접수 마감까지 남은 일수. 지난 공고는 '마감', 당일은 'D-DAY'.
+// 접수 마감까지 남은 일수(달력 기준). 마감 시각이 지난 공고는 '마감', 당일은 'D-DAY'.
 export const getDDay = (endDateTime: DateInput): string => {
   const endDate = toDate(endDateTime)
 
@@ -87,10 +87,13 @@ export const getDDay = (endDateTime: DateInput): string => {
     return ''
   }
 
-  const diffTime = endDate.getTime() - new Date().getTime()
-  if (diffTime < 0) return '마감'
+  const now = new Date()
+  if (endDate.getTime() < now.getTime()) return '마감'
 
-  const diffDay = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+  // 경과 시간이 아니라 달력 날짜 차이로 센다(자정 기준). 마감 시각이 현재보다 이르면 하루 적게 나오던 문제 방지.
+  const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const diffDay = Math.round((endDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
   if (diffDay === 0) return 'D-DAY'
 
   return `D-${diffDay}`

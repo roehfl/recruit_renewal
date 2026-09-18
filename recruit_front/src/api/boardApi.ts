@@ -4,6 +4,8 @@ import type { PageResponse } from '@/types/page'
 import type { NoticeDetail, NoticeListItem, NoticeSearchParams } from '@/types/notice'
 import type { JobPostingListItem, JobPostingSearchParams, JobPostingDetail } from '@/types/jobPosting'
 
+const IMAGE_TIMEOUT_MS = 60000
+
 export const boardApi = {
   fetchNotices(params: NoticeSearchParams) {
     return apiClient.get<ApiResponse<PageResponse<NoticeListItem>>>('/board/notices', {
@@ -34,6 +36,10 @@ export const boardApi = {
   },
 
   fetchJobPostingImageBlob(jobPostingId: number, imageId: number) {
-    return apiClient.get<Blob>(`/job-postings/${jobPostingId}/images/${imageId}/file`, { responseType: 'blob' })
+    // 이미지는 장당 최대 10MB라 기본 10초로는 느린 회선에서 끊길 수 있다.
+    return apiClient.get<Blob>(`/job-postings/${jobPostingId}/images/${imageId}/file`, {
+      responseType: 'blob',
+      timeout: IMAGE_TIMEOUT_MS,
+    })
   },
 }

@@ -4,6 +4,7 @@ import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.JobPositionWorkLocation;
 import com.shinyoung.recruit.domain.repository.CommonCodeRepository;
+import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPositionCountProjection;
 import com.shinyoung.recruit.domain.repository.JobPositionRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
@@ -51,6 +52,7 @@ public class JobPostingService {
 
     private final JobPostingRepository jobPostingRepository;
     private final JobPositionRepository jobPositionRepository;
+    private final JobApplicationRepository jobApplicationRepository;
     private final CommonCodeRepository commonCodeRepository;
     private final ApplicationFormLayoutService applicationFormLayoutService;
     private final ApplicationFormConfigService applicationFormConfigService;
@@ -136,7 +138,7 @@ public class JobPostingService {
                 defaultPinned(request.pinned()),
                 defaultDisplayOrder(request.displayOrder())
         );
-        jobPosting.replaceJobPositions(toJobPositions(request.jobPositions()));
+        syncJobPositions(jobPosting, request.jobPositions());
         // 지원서 양식은 전용 API(ApplicationFormConfigService)가 단일 출처다. 공고 수정은 건드리지 않는다.
 
         return jobPosting.getId();
@@ -350,15 +352,60 @@ public class JobPostingService {
     private List<JobPosition> toJobPositions(List<JobPositionRequest> requests) {
         Map<String, String> workLocationNames = loadWorkLocationNames();
         return requests.stream()
-                .map(it -> JobPosition.create(
-                        it.positionName(),
-                        defaultApplicationType(it.applicationType()),
-                        it.jobTitle(),
-                        toWorkLocations(it.workLocationCodes(), workLocationNames),
-                        defaultEmploymentType(it.employmentType()),
-                        it.sortOrder()
-                ))
+                .map(it -> toJobPosition(it, workLocationNames))
                 .toList();
+    }
+
+    private JobPosition toJobPosition(JobPositionRequest request, Map<String, String> workLocationNames) {
+        return JobPosition.create(
+                request.positionName(),
+                defaultApplicationType(request.applicationType()),
+                request.jobTitle(),
+                toWorkLocations(request.workLocationCodes(), workLocationNames),
+                defaultEmploymentType(request.employmentType()),
+                request.sortOrder()
+        );
+    }
+
+    /**
+     * 수정 요청의 모집분야를 id 기준으로 맞춘다. id 가 있으면 제자리 수정, 없으면 추가, 요청에 없는 기존 모집분야는 삭제한다.
+     * 전부 지우고 새로 만들면 지원서가 달린 모집분야가 job_application FK 에 걸리므로, 지원서가 있는 모집분야 삭제는 400 으로 막는다.
+     */
+    private void syncJobPositions(JobPosting jobPosting, List<JobPositionRequest> requests) {
+        Map<String, String> workLocationNames = loadWorkLocationNames();
+        Map<Long, JobPosition> existing = jobPosting.getJobPositions().stream()
+                .collect(Collectors.toMap(JobPosition::getId, position -> position));
+        Set<Long> keptIds = new HashSet<>();
+        for (JobPositionRequest request : requests) {
+            if (request.id() == null) {
+                continue;
+            }
+            JobPosition position = existing.get(request.id());
+            if (position == null) {
+                throw new InvalidJobPostingException("공고에 없는 모집분야입니다. id=" + request.id());
+            }
+            if (!keptIds.add(request.id())) {
+                throw new InvalidJobPostingException("모집분야 id는 중복될 수 없습니다. id=" + request.id());
+            }
+            position.update(
+                    request.positionName(),
+                    request.applicationType(),
+                    request.jobTitle(),
+                    toWorkLocations(request.workLocationCodes(), workLocationNames),
+                    request.employmentType(),
+                    request.sortOrder()
+            );
+        }
+        for (JobPosition position : existing.values()) {
+            if (!keptIds.contains(position.getId()) && jobApplicationRepository.existsByJobPositionId(position.getId())) {
+                throw new InvalidJobPostingException(
+                        "지원서가 있는 모집분야는 삭제할 수 없습니다. 모집분야=" + position.getPositionName());
+            }
+        }
+        jobPosting.retainJobPositions(keptIds);
+        requests.stream()
+                .filter(request -> request.id() == null)
+                .forEach(request -> jobPosting.addJobPosition(toJobPosition(request, workLocationNames)));
     }
 
     /** 활성 근무지 코드 → 표시명. 공고 저장 1회당 한 번만 조회한다. */

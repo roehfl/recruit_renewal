@@ -30,6 +30,7 @@
                   <a-select
                     v-model:value="item.educationLevel" :options="educationLevelOptions(item)"
                     placeholder="선택" style="width: 110px"
+                    @change="handleEducationLevelChange(item)"
                   />
                 </td>
 
@@ -221,6 +222,7 @@ import {
 } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { ref, reactive, onMounted, computed } from 'vue'
+import { useSectionDraftState } from '@/views/applicant/application/useSectionDraftState'
 import { commonCodeApi } from '@/api/commonApi'
 import { educationApi } from '@/api/application/sections/educationApi'
 import { logClientEvent } from '@/common/clientEventLogger'
@@ -237,6 +239,7 @@ import SchoolModalBody from '@/views/common/SchoolModalBody.vue'
 
 const schoolModalBodyRef = ref<InstanceType<typeof SchoolModalBody>>()
 const loading = ref(false)
+const draftState = useSectionDraftState(() => buildPayload())
 const notApplicable = ref(false)
 const items = reactive<EducationItem[]>([])
 const props = defineProps<SectionComponentProps>()
@@ -327,11 +330,26 @@ function educationLevelOptions(current: EducationItem) {
   }))
 }
 
+// 고등학교는 편입·전공·평점 입력 UI가 숨겨지므로, 이전 학교 구분에서 입력한 값이 남아 저장이 거부되지 않게 비운다.
+function handleEducationLevelChange(item: EducationItem) {
+  if (item.educationLevel !== 'HIGH_SCHOOL') return
+  Object.assign(item, {
+    majorName: '',
+    additionalMajorType: undefined,
+    additionalMajorName: undefined,
+    thesisTitle: '',
+    transfer: false,
+    semesterGrades: [],
+    overallGradePoint: null,
+    overallMaxGradePoint: null,
+  })
+}
+
 // 졸업 구분
 const graduationStatus: { value: graduationStatus; label: string }[] = [
   { value: 'GRADUATED', label: '졸업' },
   { value: 'EXPECTED', label: '졸업예정' },
-  { value: 'ENFOLLED', label: '재학' },
+  { value: 'ENROLLED', label: '재학' },
   { value: 'LEAVE_OF_ABSENCE', label: '휴학' },
   { value: 'DROPPED_OUT', label: '중퇴' },
   { value: 'COMPLETED', label: '수료' },
@@ -489,7 +507,7 @@ const handleMajorConfirm = () => {
   if (!selecedEducation.value) return;
 
   // 학점이 모두 입력된 학기만 저장 
-  const enterdGrades = majorForm.semesterGrades.filter( item => item.gradePoint != null || item.maxGradePoint != null )
+  const enterdGrades = majorForm.semesterGrades.filter( item => item.gradePoint != null && item.maxGradePoint != null )
 
   Object.assign( selecedEducation.value, {
     majorName: majorForm.majorName,
@@ -514,10 +532,14 @@ const cancelMajorModal = () => {
 
 // 부모 임시저장 버튼
 const saveDraft = () => {
+  draftState.assertLoaded()
   vaildation()
 
     return postEducations().then(result => {
-      if (result.success) return result.data;
+      if (result.success) {
+        draftState.markSynced()
+        return result.data;
+      }
       else                throw new Error(result.error);
     });
 }
@@ -553,6 +575,7 @@ async function loadEducations() {
   try {
     const result = await educationApi.getApplicationsEducations(props.applicationId)
     setItems(result.data.data ?? [])
+    draftState.markSynced()
   } finally {
     loading.value = false
   }
@@ -576,7 +599,8 @@ function buildPayload(): EducationReplaceRequest {
       campusType: item.campusType,
       transfer: item.transfer,
       countryCode: item.countryCode || undefined,
-      semesterGrades: item.semesterGrades || [],
+      // 백엔드는 고등학교 학력에 학기별 성적이 있으면 저장을 거부한다.
+      semesterGrades: item.educationLevel === 'HIGH_SCHOOL' ? [] : item.semesterGrades || [],
       schoolCode: item.schoolCode || null,
       schoolSource: item.schoolSource || null,
       sortOrder: index,
@@ -601,7 +625,7 @@ async function postEducations() {
       applicationId: props.applicationId,
       message: 'APPLICATION_DRAFT_SAVE_FAILED',
     })
-    return { success: false, error: getApiErrorMessage(error, 'fallback 메세지') }
+    return { success: false, error: getApiErrorMessage(error, '학력 정보 저장에 실패했습니다.') }
   } finally {
     loading.value = false
   }
@@ -623,7 +647,7 @@ onMounted(() => {
   loadCommonCode('MAJOR_TYPE');
 })
 
-defineExpose({ saveDraft, validateBeforeSubmit })
+defineExpose({ saveDraft, validateBeforeSubmit, isDirty: draftState.isDirty })
 </script>
 
 <style scoped>

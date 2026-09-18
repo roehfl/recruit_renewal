@@ -3,7 +3,7 @@
     <div class="quick-link-grid">
       <a-card
         v-for="item in quickLinks"
-        :key="item.url"
+        :key="item.title"
         class="quick-link-card"
         :bordered="false"
         hoverable
@@ -39,16 +39,17 @@ interface QuickLinkItem {
 const router = useRouter()
 
 /*
- * TODO(route): '/applicant/company'(신영증권 소개), '/applicant/faq'(채용 FAQ),
- * '/apply'(지원서 작성/수정), '/my/result'(지원결과 조회) 는 아직 라우트가 없어
- * 클릭 시 NotFound로 빠진다. 화면이 준비되면 applicantRoutes.ts에 추가한다.
+ * '지원서 작성/수정'·'지원결과 조회'는 마이페이지(/applicant/profile)로 보낸다.
+ * 마이페이지에서 지원서 목록(수정 링크)과 전형 결과를 함께 확인한다.
+ * TODO(route): '/applicant/company'(신영증권 소개)는 화면이 없어 카드를 숨겼다.
+ * 화면이 준비되면 applicantRoutes.ts에 추가하고 아래 주석을 해제한다.
  */
 const quickLinks = ref<QuickLinkItem[]>([
-  {
-    title: '신영증권 소개',
-    description: '회사와 인재상을 먼저 만나보세요.',
-    url: '/applicant/company',
-  },
+  // {
+  //   title: '신영증권 소개',
+  //   description: '회사와 인재상을 먼저 만나보세요.',
+  //   url: '/applicant/company',
+  // },
   {
     title: '직무 소개',
     description: '어떤 업무를 원하시나요?<br> 다양한 직무를 확인하실 수 있습니다.',
@@ -62,12 +63,12 @@ const quickLinks = ref<QuickLinkItem[]>([
   {
     title: '지원서 작성/수정',
     description: '현재 진행중인 채용에 대한 입사지원 및 수정을 하실 수 있습니다.',
-    url: '/apply',
+    url: '/applicant/profile',
   },
   {
     title: '지원결과 조회',
     description: '지원에 대한 결과를 확인하실 수 있습니다.',
-    url: '/my/result',
+    url: '/applicant/profile',
   },
   {
     title: '채용 FAQ',

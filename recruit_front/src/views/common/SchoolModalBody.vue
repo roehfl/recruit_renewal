@@ -193,13 +193,15 @@ async function schoolSearchClick () {
   }
 }
 
+// 모달은 처음 열릴 때 이 컴포넌트를 open=true 로 마운트하므로, 첫 오픈에도 초기값(initial)이 반영되게 immediate 로 둔다.
 watch(
     () => props.open,
     (open) => {
         if (open) {
             resetSchoolModal();
         }
-    }
+    },
+    { immediate: true }
 )
 </script>
 

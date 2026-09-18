@@ -121,6 +121,9 @@ const buildSearchRequest = (): AdminApplicationFormSummarySearchRequest => {
   if (editableOnly.value) {
     request.editableOnly = true
   }
+  if (excludeClosed.value) {
+    request.excludeClosed = true
+  }
   if (keyword.value.trim().length > 0) {
     request.keyword = keyword.value.trim()
   }
@@ -132,8 +135,7 @@ const load = async () => {
   try {
     const response = await adminApplicationFormApi.getSummaries(buildSearchRequest(), page.value, pageSize)
     const data = response.data.data
-    // '마감 제외'는 서버 조건이 아니라 화면 기본값이라 응답을 걸러서 쓴다.
-    rows.value = excludeClosed.value ? data.content.filter((row) => row.status !== 'CLOSED') : data.content
+    rows.value = data.content
     totalElements.value = data.totalElements
   } catch (error) {
     message.error(getApiErrorMessage(error, '지원서 설정 현황을 불러오지 못했습니다.'))

@@ -129,6 +129,8 @@ const reset = () => {
   rejected.value = null
   fileError.value = null
   showAllRows.value = false
+  // 진행 중이던 미리보기 응답은 selectFile 가드가 버리므로, 로딩 표시도 여기서 함께 푼다.
+  previewing.value = false
 }
 
 const close = () => {
@@ -175,14 +177,19 @@ const selectFile = async (selected: File) => {
   reset()
   file.value = selected
   previewing.value = true
+  // 응답이 오기 전에 다른 파일을 골랐으면 늦게 온 응답은 버린다. 적용은 마지막으로 고른 파일을 보낸다.
   try {
     const response = await adminStageApi.previewUpload(props.stageId, selected)
+    if (file.value !== selected) return
     preview.value = response.data.data
   } catch (error) {
+    if (file.value !== selected) return
     // 파일 레벨 거부(구 영문 템플릿·확장자·크기)는 행 결과가 없다. 문구만 보여준다.
     fileError.value = getApiErrorMessage(error, '업로드 파일을 읽지 못했습니다.')
   } finally {
-    previewing.value = false
+    if (file.value === selected) {
+      previewing.value = false
+    }
   }
 }
 

@@ -15,11 +15,16 @@ type LogClientEventInput = Partial<ClientEventPayload> & {
 }
 
 export function logClientEvent(input: LogClientEventInput): void {
-  const payload = buildPayload(input)
+  // payload 생성 중 예외도 호출부(API 오류 인터셉터, 에러 리스너)로 전파되면 원래 오류 처리가 깨지므로 삼킨다.
+  try {
+    const payload = buildPayload(input)
 
-  void clientEventApi.record(payload).catch(() => {
-    // best-effort: 사용자 업무 흐름 방해 금지, telemetry 실패 재로깅 금지
-  })
+    void clientEventApi.record(payload).catch(() => {
+      // best-effort: 사용자 업무 흐름 방해 금지, telemetry 실패 재로깅 금지
+    })
+  } catch {
+    // best-effort: telemetry 실패는 절대 전파하지 않는다.
+  }
 }
 
 export function buildPayload(input: LogClientEventInput): ClientEventPayload {
@@ -45,7 +50,7 @@ function sanitizeInput(input: LogClientEventInput): Partial<ClientEventPayload> 
     relatedCorrelationId: safeText(input.relatedCorrelationId, 100),
     pageCode: safeText(input.pageCode, 80),
     componentCode: safeText(input.componentCode, 80),
-    routePath: stripQuery(input.routePath),
+    // routePath는 buildPayload에서 현재 경로 기본값과 함께 처리한다(여기서 넣으면 undefined로 덮어쓴다).
     operation: safeText(input.operation, 80),
     jobPostingId: input.jobPostingId,
     applicationId: input.applicationId,

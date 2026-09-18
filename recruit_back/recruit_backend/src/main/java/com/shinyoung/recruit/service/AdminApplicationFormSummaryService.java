@@ -14,6 +14,7 @@ import com.shinyoung.recruit.dto.response.AdminApplicationFormSummaryResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.enumeration.ApplicationFormConfigState;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
+import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.enumeration.ReceptionStatus;
 import com.shinyoung.recruit.exception.InvalidJobPostingException;
 import lombok.RequiredArgsConstructor;
@@ -170,6 +171,9 @@ public class AdminApplicationFormSummaryService {
             return false;
         }
         if (request.configState() != null && summary.configState() != request.configState()) {
+            return false;
+        }
+        if (request.isExcludeClosed() && summary.status() == JobPostingStatus.CLOSED) {
             return false;
         }
         return !request.isEditableOnly() || summary.editable();

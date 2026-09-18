@@ -62,15 +62,15 @@ public class ApplicationSubmitValidator {
 
         ApplicationFormConfig config = application.getJobPosting().getApplicationFormConfig();
         if (config == null) {
-            throw new InvalidJobApplicationException("Application form config is required before submit.");
+            throw new InvalidJobApplicationException("지원서 양식 설정이 없어 제출할 수 없습니다.");
         }
 
         validateEducation(config, applicationId);
         validateMilitary(config, applicationId);
-        validateSimpleRequiredSection(config.isUseCertificate(), config.isRequireCertificate(), () -> certificateRepository.existsByJobApplicationId(applicationId), "Certificate");
-        validateSimpleRequiredSection(config.isUseLanguage(), config.isRequireLanguage(), () -> languageRepository.existsByJobApplicationId(applicationId), "Language");
-        validateSimpleRequiredSection(config.isUseAward(), config.isRequireAward(), () -> awardRepository.existsByJobApplicationId(applicationId), "Award");
-        validateSimpleRequiredSection(config.isUseGapPeriod(), config.isRequireGapPeriod(), () -> gapPeriodRepository.existsByJobApplicationId(applicationId), "Gap period");
+        validateSimpleRequiredSection(config.isUseCertificate(), config.isRequireCertificate(), () -> certificateRepository.existsByJobApplicationId(applicationId), "자격증");
+        validateSimpleRequiredSection(config.isUseLanguage(), config.isRequireLanguage(), () -> languageRepository.existsByJobApplicationId(applicationId), "어학");
+        validateSimpleRequiredSection(config.isUseAward(), config.isRequireAward(), () -> awardRepository.existsByJobApplicationId(applicationId), "수상");
+        validateSimpleRequiredSection(config.isUseGapPeriod(), config.isRequireGapPeriod(), () -> gapPeriodRepository.existsByJobApplicationId(applicationId), "공백기간");
         validateAnswers(application);
         validateAttachmentRequirements(application);
     }
@@ -80,7 +80,7 @@ public class ApplicationSubmitValidator {
             return;
         }
         if (!educationRepository.existsByJobApplicationId(applicationId)) {
-            throw new InvalidJobApplicationException("Education section is required before submit.");
+            throw new InvalidJobApplicationException("학력을 입력해야 제출할 수 있습니다.");
         }
     }
 
@@ -90,19 +90,19 @@ public class ApplicationSubmitValidator {
         }
 
         ApplicationMilitary military = militaryRepository.findByJobApplicationId(applicationId)
-                .orElseThrow(() -> new InvalidJobApplicationException("Military section is required before submit."));
+                .orElseThrow(() -> new InvalidJobApplicationException("병역 사항을 입력해야 제출할 수 있습니다."));
         MilitarySubjectType subjectType = military.getMilitarySubjectType();
         if (subjectType == null) {
-            throw new InvalidJobApplicationException("Military subject type is required before submit.");
+            throw new InvalidJobApplicationException("병역 구분을 선택해야 제출할 수 있습니다.");
         }
 
         if (subjectType == MilitarySubjectType.COMPLETED
                 && (military.getServiceStartDate() == null || military.getServiceEndDate() == null)) {
-            throw new InvalidJobApplicationException("Military service period is required for completed applicants before submit.");
+            throw new InvalidJobApplicationException("군필자는 복무기간을 입력해야 제출할 수 있습니다.");
         }
         if ((subjectType == MilitarySubjectType.EXEMPTED || subjectType == MilitarySubjectType.SUBJECT)
                 && (military.getNonServiceReason() == null || military.getNonServiceReason().isBlank())) {
-            throw new InvalidJobApplicationException("Military non-service reason is required before submit.");
+            throw new InvalidJobApplicationException("미필·면제 사유를 입력해야 제출할 수 있습니다.");
         }
     }
 
@@ -132,15 +132,9 @@ public class ApplicationSubmitValidator {
         if (!Boolean.TRUE.equals(question.getRequired())) {
             return;
         }
-        if (answer == null) {
-            throw new InvalidJobApplicationException("Required question answer is missing.");
-        }
-        String answerText = answer.getAnswerText();
-        if (answerText == null) {
-            throw new InvalidJobApplicationException("Required question answer is missing.");
-        }
-        if (answerText.isBlank()) {
-            throw new InvalidJobApplicationException("Required question answer is blank.");
+        String answerText = answer == null ? null : answer.getAnswerText();
+        if (answerText == null || answerText.isBlank()) {
+            throw new InvalidJobApplicationException("필수 질문 '" + question.getQuestionText() + "'에 답변해야 제출할 수 있습니다.");
         }
     }
 
@@ -150,17 +144,27 @@ public class ApplicationSubmitValidator {
         }
 
         String answerText = answer.getAnswerText();
+        String questionText = question.getQuestionText();
+        // 공백만 있는 선택 답변은 미입력으로 보고 최소 글자수를 적용하지 않는다(프론트 섹션 검증과 동일).
+        int trimmedLength = answerText.strip().length();
+        if (question.getMinLength() != null && trimmedLength > 0 && trimmedLength < question.getMinLength()) {
+            throw new InvalidJobApplicationException(
+                    "'" + questionText + "' 답변은 최소 " + question.getMinLength() + "자 이상이어야 제출할 수 있습니다.");
+        }
         int questionMaxLength = question.getMaxLength() != null
                 ? question.getMaxLength()
                 : defaultMaxLength(question.getAnswerType());
         if (answerText.length() > questionMaxLength) {
-            throw new InvalidJobApplicationException("Answer exceeds max length.");
+            throw new InvalidJobApplicationException(
+                    "'" + questionText + "' 답변이 최대 " + questionMaxLength + "자를 넘었습니다.");
         }
         if (question.getAnswerType() == QuestionAnswerType.SHORT_TEXT && answerText.length() > SHORT_TEXT_MAX_LENGTH) {
-            throw new InvalidJobApplicationException("Answer exceeds SHORT_TEXT max length.");
+            throw new InvalidJobApplicationException(
+                    "'" + questionText + "' 답변이 단답형 최대 " + SHORT_TEXT_MAX_LENGTH + "자를 넘었습니다.");
         }
         if (question.getAnswerType() == QuestionAnswerType.LONG_TEXT && answerText.length() > LONG_TEXT_MAX_LENGTH) {
-            throw new InvalidJobApplicationException("Answer exceeds LONG_TEXT max length.");
+            throw new InvalidJobApplicationException(
+                    "'" + questionText + "' 답변이 서술형 최대 " + LONG_TEXT_MAX_LENGTH + "자를 넘었습니다.");
         }
     }
 
@@ -180,7 +184,7 @@ public class ApplicationSubmitValidator {
         if (!isRequired(useSection, requireSection) || exists.getAsBoolean()) {
             return;
         }
-        throw new InvalidJobApplicationException(sectionName + " section is required before submit.");
+        throw new InvalidJobApplicationException(sectionName + "을(를) 입력해야 제출할 수 있습니다.");
     }
 
     private boolean isRequired(boolean useSection, boolean requireSection) {
@@ -212,14 +216,14 @@ public class ApplicationSubmitValidator {
                     0L
             );
             if (storedCount < requirement.getMinCount()) {
-                throw new InvalidJobApplicationException(requirement.getDisplayName() + " attachment is required before submit.");
+                throw new InvalidJobApplicationException(requirement.getDisplayName() + " 첨부파일을 등록해야 제출할 수 있습니다.");
             }
         }
     }
 
     private void validateBasicInfo(Long applicationId) {
         ApplicationBasicInfo basicInfo = basicInfoRepository.findByJobApplicationId(applicationId)
-                .orElseThrow(() -> new InvalidJobApplicationException("Basic info is required before submit."));
+                .orElseThrow(() -> new InvalidJobApplicationException("기본정보를 입력해야 제출할 수 있습니다."));
 
         if (isBlank(basicInfo.getNameKorean())
                 || basicInfo.getBirthDate() == null
@@ -228,14 +232,14 @@ public class ApplicationSubmitValidator {
                 || isBlank(basicInfo.getEmail())
                 || basicInfo.getVeteranStatus() == null
                 || basicInfo.getDisabilityStatus() == null) {
-            throw new InvalidJobApplicationException("Basic info required fields are missing before submit.");
+            throw new InvalidJobApplicationException("기본정보 필수 항목(성명, 생년월일, 국적, 휴대전화, 이메일, 보훈·장애 여부)을 입력해야 제출할 수 있습니다.");
         }
         if (basicInfo.getNationalityType() == NationalityType.FOREIGN && isBlank(basicInfo.getCountryCode())) {
-            throw new InvalidJobApplicationException("Country code is required for a foreign applicant before submit.");
+            throw new InvalidJobApplicationException("외국 국적은 국가를 선택해야 제출할 수 있습니다.");
         }
         if (basicInfo.getDisabilityStatus() == DisabilityStatus.SUBJECT
                 && (isBlank(basicInfo.getDisabilityGradeCode()) || isBlank(basicInfo.getDisabilityTypeCode()))) {
-            throw new InvalidJobApplicationException("Disability grade/type are required for a disability subject before submit.");
+            throw new InvalidJobApplicationException("장애 대상자는 장애 등급과 유형을 선택해야 제출할 수 있습니다.");
         }
     }
 

@@ -87,6 +87,8 @@ export interface WorkLocationOption {
 }
 
 export interface AdminJobPositionForm {
+  /** 기존 모집분야 id. 수정 시 그대로 보내야 제자리 수정된다(지원서가 참조). 새로 추가한 행은 없음. */
+  id?: number
   positionName: string
   applicationType: 'NEW_GRADUATE' | 'EXPERIENCED' | 'NEW_GRADUATE_OR_EXPERIENCED'
   jobTitle: string | null

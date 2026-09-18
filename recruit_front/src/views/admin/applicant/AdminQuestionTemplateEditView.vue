@@ -76,6 +76,16 @@ const validateForm = () => {
     return '질문을 입력하세요.'
   }
 
+  // 백엔드 QuestionTemplateCreate/UpdateRequest 는 필수 여부 @NotNull, 최대 글자 수 @Min(1)이다.
+  if (form.value.defaultRequired === null) {
+    return '필수 여부를 선택하세요.'
+  }
+
+  const maxLength = Number(form.value.defaultMaxLength)
+  if (!Number.isInteger(maxLength) || maxLength < 1) {
+    return '최대 글자 수는 1 이상의 정수로 입력하세요.'
+  }
+
   return
 }
 
@@ -96,7 +106,8 @@ const save = async (): Promise<void> => {
         category: form.value.category as 'SELF_INTRODUCTION' | 'GENERAL' | 'JOB_SPECIFIC' | 'ETC',
         answerType: form.value.answerType as 'SHORT_TEXT' | 'LONG_TEXT',
         defaultRequired: form.value.defaultRequired!,
-        defaultMaxLength: form.value.defaultMaxLength
+        // a-input type=number 는 문자열을 돌려주므로 숫자로 바꿔 보낸다.
+        defaultMaxLength: Number(form.value.defaultMaxLength)
     }
 
     try {
@@ -105,10 +116,11 @@ const save = async (): Promise<void> => {
             : await adminJobPostingApi.createQuestionTemplate(request)
 
         message.success(editTarget.value? '템플릿을 저장했습니다.' : '템플릿을 등록했습니다.');
+        // 저장에 성공했을 때만 목록으로 간다. 실패하면 입력을 남겨 고쳐서 다시 저장하게 한다.
+        void router.push({ name: 'AdminQuestionTemplates' })
     } catch (error) {
         message.error(getApiErrorMessage(error, '템플릿을 저장하지 못했습니다.'));
     } finally {
-        void router.push({ name: 'AdminQuestionTemplates' })
         loading.value = false
     }
 }

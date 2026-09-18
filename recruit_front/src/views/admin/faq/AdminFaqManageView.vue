@@ -47,17 +47,24 @@ const loadCategories = async (): Promise<void> => {
 const loadFaqs = async (): Promise<void> => {
   if (selectedCategoryId.value === null) {
     faqs.value = []
+    faqLoading.value = false
     return
   }
 
+  // 응답이 오기 전에 다른 카테고리를 골랐으면 늦게 온 응답은 버린다(다른 카테고리 FAQ로 순서 변경이 나가지 않게).
+  const categoryId = selectedCategoryId.value
   faqLoading.value = true
   try {
-    const response = await adminFaqApi.fetchFaqs(selectedCategoryId.value)
+    const response = await adminFaqApi.fetchFaqs(categoryId)
+    if (categoryId !== selectedCategoryId.value) return
     faqs.value = response.data.data
   } catch (error) {
+    if (categoryId !== selectedCategoryId.value) return
     message.error(getApiErrorMessage(error, 'FAQ 목록을 불러오지 못했습니다.'))
   } finally {
-    faqLoading.value = false
+    if (categoryId === selectedCategoryId.value) {
+      faqLoading.value = false
+    }
   }
 }
 

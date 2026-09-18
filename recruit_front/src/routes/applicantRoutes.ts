@@ -77,7 +77,8 @@ export const applicantRoutes: RouteRecordRaw[] = [
         name: 'application',
         component: () => import('@/views/applicant/ApplicationFormView.vue'),
         meta: {
-          public: true,
+          requiresAuth: true,
+          roles: ['ROLE_APPLICANT'],
           activeMenuPath: '/applicant/recruits',
         },
       },
@@ -86,7 +87,8 @@ export const applicantRoutes: RouteRecordRaw[] = [
         name: 'ApplicationStart',
         component: () => import('@/views/applicant/ApplicationFormView.vue'),
         meta: {
-          public: true,
+          requiresAuth: true,
+          roles: ['ROLE_APPLICANT'],
           activeMenuPath: '/applicant/recruits',
         },
       },
@@ -120,7 +122,8 @@ export const applicantRoutes: RouteRecordRaw[] = [
         name: 'ApplicantProfile',
         component: () => import('@/views/applicant/ApplicantProfile.vue'),
         meta: {
-          public: true,
+          requiresAuth: true,
+          roles: ['ROLE_APPLICANT'],
         },
       },
       {

@@ -11,7 +11,7 @@ import TopGroupCard from './dashboard/TopGroupCard.vue'
 import DailyTrendCard from './dashboard/DailyTrendCard.vue'
 
 import { statisticsApi } from '@/api/statisticsApi'
-import { adminJobPostingApi } from '@/api/adminJobPostingApi'
+import { getAllJobPostings } from '@/api/adminJobPostingApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import type { AdminJobPostingListItem } from '@/types/jobPosting'
 import type { ApplicationDaily, DimensionFunnel, FunnelDimension, FunnelResult } from '@/types/statistics'
@@ -56,28 +56,45 @@ const certificateGroups = computed<DimensionFunnel[]>(() => groupsOf('CERTIFICAT
  * 축마다 따로 호출하면 서버가 같은 코호트를 축 개수만큼 다시 읽는다. 필요한 축을 한 번에 요청한다.
  * 추이는 시계열이라 집계 경로가 달라 별도 호출이며, 두 호출은 서로를 기다릴 이유가 없어 병렬로 보낸다.
  */
-const loadStatistics = async (jobPostingId: number): Promise<void> => {
+/* 공고를 빠르게 바꾸면 이전 요청이 늦게 도착할 수 있다. 가장 최근 요청의 응답만 반영한다. */
+let statisticsRequestSeq = 0
+
+const loadStatistics = async (jobPostingId: number, seq: number): Promise<void> => {
   const [funnelResponse, dailyResponse] = await Promise.all([
     statisticsApi.getFunnel(jobPostingId, DASHBOARD_DIMENSIONS, TOP_N),
     statisticsApi.getApplicationsDaily(jobPostingId),
   ])
 
+  if (seq !== statisticsRequestSeq) {
+    return
+  }
   funnel.value = funnelResponse.data.data
   daily.value = dailyResponse.data.data
 }
 
 const changeJobPosting = async (jobPostingId: number): Promise<void> => {
+  const seq = ++statisticsRequestSeq
+  // 다른 공고로 바꿀 때는 이전 공고 통계가 새 공고 것처럼 남지 않도록 먼저 비운다(같은 공고 새로고침은 유지).
+  if (jobPostingId !== selectedJobPostingId.value) {
+    funnel.value = null
+    daily.value = null
+  }
   selectedJobPostingId.value = jobPostingId
   refreshing.value = true
   loadFailed.value = false
 
   try {
-    await loadStatistics(jobPostingId)
+    await loadStatistics(jobPostingId, seq)
   } catch (error) {
+    if (seq !== statisticsRequestSeq) {
+      return
+    }
     loadFailed.value = true
     message.error(getApiErrorMessage(error, '통계를 불러오지 못했습니다.'))
   } finally {
-    refreshing.value = false
+    if (seq === statisticsRequestSeq) {
+      refreshing.value = false
+    }
   }
 }
 
@@ -96,8 +113,7 @@ const pickDefaultJobPosting = (postings: AdminJobPostingListItem[]): AdminJobPos
 
 onMounted(async () => {
   try {
-    const response = await adminJobPostingApi.getJobPostings()
-    jobPostings.value = response.data.data.content
+    jobPostings.value = await getAllJobPostings()
 
     const defaultPosting = pickDefaultJobPosting(jobPostings.value)
 
@@ -148,7 +164,7 @@ onMounted(async () => {
       <span class="filter-hint">퍼널 집계는 공고 단위입니다 — 전사 통합값은 별도 집계가 필요합니다.</span>
     </div>
 
-    <p v-if="initializing" class="state-message">불러오는 중입니다.</p>
+    <p v-if="initializing || (refreshing && !funnel)" class="state-message">불러오는 중입니다.</p>
 
     <p v-else-if="jobPostings.length === 0" class="state-message">
       등록된 공고가 없습니다. 공고를 먼저 등록하세요.

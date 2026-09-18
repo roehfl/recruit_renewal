@@ -107,7 +107,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
   }
 
   if (key === 'applications') {
-    router.push('/applicant/applications/my')
+    router.push('/applicant/profile')
     return
   }
 
@@ -231,7 +231,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
           <div class="mega-mobile-actions">
             <template v-if="!authStore.isLoggedIn">
               <RouterLink to="/login" class="mega-action-link" @click="closeMenu"> 로그인 </RouterLink>
-              <RouterLink to="/signup" class="mega-action-link primary" @click="closeMenu">
+              <RouterLink to="/applicant/signup" class="mega-action-link primary" @click="closeMenu">
                 회원가입
               </RouterLink>
             </template>
@@ -243,7 +243,7 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
               <button
                 type="button"
                 class="mega-action-link primary"
-                @click="router.push('/applicant/applications/my')"
+                @click="router.push('/applicant/profile')"
               >
                 지원 현황
               </button>
