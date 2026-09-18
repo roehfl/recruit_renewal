@@ -20,11 +20,6 @@ const QuestionTemplatesCategory: Record<string, string> = {
   ETC: '기타',
 }
 
-const QuestionTemplatesAnswerType: Record<string, string> = {
-  SHORT_TEXT: '단답형',
-  LONG_TEXT: '서술형'
-}
-
 const QuestionTemplatesRequired: Record<string, string> = {
   true: '필수',
   false: '선택'
@@ -33,12 +28,9 @@ const QuestionTemplatesRequired: Record<string, string> = {
 const columns = [
   { title: '템플릿명', dataIndex: 'title', key: 'title', width: 250 },
   { title: '질문', key: 'questionText', width: 300},
-  { title: '설명', key: 'helperText', width: 300 },
-  { title: '카테고리', key: 'category', width: 100 },
-  { title: '유형', key: 'answerType', width: 120 },
-  { title: '필수여부', key: 'defaultRequired', width: 100 },
-  { title: '글자수', key: 'defaultMaxLength', width: 100 },
-  { title: '사용여부', key: 'active', width: 100 },
+  { title: '카테고리', key: 'category', width: 100, align: 'center'},
+  { title: '필수여부', key: 'defaultRequired', width: 100, align: 'center'},
+  { title: '사용여부', key: 'active', width: 100, align: 'center'},
 ]
 
 const pagination = computed(() => ({
@@ -51,7 +43,6 @@ const pagination = computed(() => ({
 const loadQuestionTemplates = async () => {
   loading.value = true
   try {
-    // const response = await adminJobPostingApi.getQuestionTemplatesActive(page.value, pageSize, active) --> 상태 값을 같이 보냄
     const response = await adminJobPostingApi.getQuestionTemplates(page.value, pageSize)
     templates.value = response.data.data.content
     totalElements.value = response.data.data.totalElements
@@ -110,27 +101,18 @@ onMounted(loadQuestionTemplates)
       :data-source="templates"
       :loading="loading"
       :pagination="pagination"
-      row-key="id"
+      row-key="templateId"
       @change="handleTableChange"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'questionText'">
-          <span hlink="" @click="goToDetail(record)" class="questionId-link">{{ record.title }}</span>
-        </template>
-        <template v-if="column.key === 'helperText'">
-          {{ record.helperText }}
-        </template>
-        <template v-if="column.key === 'answerType'">
-          {{ QuestionTemplatesAnswerType[record.answerType] ?? record.answerType }}
+          <span @click="goToDetail(record)" class="questionId-link">{{ record.questionText }}</span>
         </template>
         <template v-if="column.key === 'category'">
           {{ QuestionTemplatesCategory[record.category] ?? record.category }}
         </template>
         <template v-if="column.key === 'defaultRequired'">
           {{ QuestionTemplatesRequired[record.defaultRequired] ?? record.defaultRequired }}
-        </template>
-        <template v-if="column.key === 'defaultMaxLength'">
-          {{ record.defaultMaxLength }}
         </template>
         <template v-else-if="column.key === 'active'">
           <a-switch class="switch-button" v-model:checked="record.active" @change="changeActive(record)"/>

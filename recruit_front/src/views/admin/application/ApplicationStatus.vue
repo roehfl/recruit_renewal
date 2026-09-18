@@ -12,13 +12,11 @@ import type {
   AdminApplicationSummaryResponse,
   AdminApplicationSearchRequest,
 } from '@/types/admin/application'
-import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import { ReloadOutlined, SearchOutlined, PrinterOutlined, FileExcelOutlined, FilePdfOutlined } from '@ant-design/icons-vue'
 import { formatDate } from '@/common/dateUtil'
 import { getBlobErrorMessage, saveBlobResponse } from '@/common/fileDownload'
-import type { CommonCodeItems } from '@/types/commonCode'
 import type { TableColumnsType } from 'ant-design-vue'
 import { apiClient } from '@/api/client'
-import { commonCodeApi } from '@/api/commonApi'
 
 interface TableRow {
   key: string
@@ -103,16 +101,13 @@ const initializing = ref(true)
 const refreshing = ref(false)
 const loadFailed = ref(false)
 
-const stageTypeList = ref<CommonCodeItems[]>([])
 const stageTypeOptions = computed(() => {
-  const options = stageTypeList.value.map((code) => ({ value: code.code, label: code.displayName }))
+  const options = Object.entries(stageTypeMap).map(([value, label]) => ({ value, label }))
   options.unshift({ value: '', label: '전체' })
   return options
 })
-
-const stageResultStatusList = ref<CommonCodeItems[]>([])
 const stageResultStatusOptions = computed(() => {
-  const options = stageResultStatusList.value.map((code) => ({ value: code.code, label: code.displayName }))
+  const options = Object.entries(stageResultStatusMap).map(([value, label]) => ({ value, label }))
   options.unshift({ value: '', label: '전체' })
   return options
 })
@@ -186,6 +181,7 @@ const resetPaging = (): void => {
   selectRowKeys.value = []
   pagination.current = 1
   pagination.total = 0
+  saving.value = false
 }
 
 // 지원서 상세는 메인 프레임을 벗어나 새 탭으로 연다. 상대경로 window.open 은 현재 URL 기준으로
@@ -206,19 +202,13 @@ const onlyNumber = (e: KeyboardEvent) => {
 const applications = ref<AdminApplicationSummaryResponse[]>([])
 
 const initialSearchRequest: AdminApplicationSearchRequest = {
-    graduationStatus:undefined,       // 졸업 여부
     jobPositionId:undefined,          // 지원 분야
-    certificateName: undefined,       // 자격증
-    languageName: undefined,          // 언어
     workLocation: undefined,          // 근무지
     birthDateTo: undefined,           // 생년월일 TO
     applicationType: undefined,       // 지원 구분 
     name: undefined,                  // 이름
     phoneNumber: undefined,           // 연락처
-    languageLevel: undefined,         // 외국어 수준
     stageResultStatus: undefined,     // 전형별 결과
-    finalSchoolCondition: undefined,  // 최종학교 조건
-    finalEducationLevel:undefined,    // 최종 학력
     status:undefined,                 // 지원서 상태
     birthDateFrom:undefined,          // 생년월일 FROM 
     stageType:undefined,              // 비상연락처
@@ -251,6 +241,7 @@ const handleTableChange = async (page: { current?: number }) => {
 const loadApplications = async (page: number) => {
   applications.value = [];
   loading.value = true
+  saving.value = true
   selectRowKeys.value = [];
 
   try {
@@ -327,20 +318,7 @@ const pickDefaultJobPosting = (postings: AdminJobPostingListItem[]): AdminJobPos
   return postings.find((posting) => posting.accepting) ?? postings[0] ?? null
 }
 
-async function loadStageTypeCodes() {
-  const result = await commonCodeApi.getCommonCodes('STAGE_TYPE')
-  stageTypeList.value = result.data.data ?? []
-}
-
-async function loadStageResultStatusCodes() {
-  const result = await commonCodeApi.getCommonCodes('STAGE_RESULT_STATUS')
-  stageResultStatusList.value = result.data.data ?? []
-}
-
 onMounted(async () => {
-  loadStageTypeCodes()
-  loadStageResultStatusCodes()
-
   try {
     const response = await adminJobPostingApi.getJobPostings()
     jobPostings.value = response.data.data.content;
@@ -425,7 +403,7 @@ onMounted(async () => {
               </td>
               <th>이름</th> 
               <td>
-                  <a-input v-model:value="searchRequest.name" style="width: 200px" placeholder="홍길동"/>
+                  <a-input v-model:value="searchRequest.name" style="width: 200px" placeholder="예: 홍길동"/>
               </td>
             </tr>
 
@@ -435,18 +413,18 @@ onMounted(async () => {
                 <div class="flex-div-area">
                   <a-select
                     v-model:value="searchRequest.stageType" style="width: 120px"
-                    :options="stageTypeOptions" placeholder="선택" allow-clear
+                    :options="stageTypeOptions" placeholder="전체" allow-clear
                   />
                   <a-select
                     v-model:value="searchRequest.stageResultStatus" style="width: 120px"
-                    :options="stageResultStatusOptions" placeholder="선택" allow-clear
+                    :options="stageResultStatusOptions" placeholder="전체" allow-clear
                   />
                 </div>
               </td>
               <th>연락처</th>
               <td>
                 <a-input v-model:value="searchRequest.phoneNumber" style="width: 200px" 
-                  placeholder="01012345678" :maxlength="11" @keydown="onlyNumber"
+                  placeholder="예: 01012345678" :maxlength="11" @keydown="onlyNumber"
                 />
               </td>
             </tr>
@@ -455,13 +433,11 @@ onMounted(async () => {
         </div>
         
       <div class="form-actions">
-        <a-button type="primary" :loading="saving" @click="save">
-          <SearchOutlined />
-          검색
+        <a-button type="primary" @click="save">
+          <SearchOutlined />검색
         </a-button>
         <a-button :disabled="selectedJobPostingId === null" @click="refresh">
-          <ReloadOutlined />
-          초기화
+          <ReloadOutlined />초기화
         </a-button>
       </div>
       </a-card>
@@ -469,13 +445,14 @@ onMounted(async () => {
 
       <a-card :bordered="false" class="form-card">
         <div class="button-area">
-          <a-button>인쇄</a-button>
-          <a-button :loading="downloadingPdf" :disabled="selectRowKeys.length === 0" @click="downloadSelectedPdf">
-            PDF 인쇄
-          </a-button>
+          <a-button><PrinterOutlined />인쇄</a-button>
           <a-button :loading="downloadingExcel" :disabled="selectedJobPostingId === null" @click="downloadExcel">
-            엑셀 다운로드
+            <FileExcelOutlined />엑셀 다운로드
           </a-button>
+          <a-button :loading="downloadingPdf" :disabled="selectRowKeys.length === 0" @click="downloadSelectedPdf">
+            <FilePdfOutlined />PDF 다운로드
+          </a-button>
+          
           <span v-if="selectRowKeys.length" class="selected-count">{{ selectRowKeys.length }}건 선택</span>
         </div>
         <div>
@@ -501,6 +478,10 @@ onMounted(async () => {
                   DOWNLOAD
                 </a-button>
               </template>
+            </template>
+            <template #emptyText>
+              <a-empty class="empty-box" v-if="!saving" description="검색 버튼을 클릭하세요."/>
+              <a-empty class="empty-box" v-else-if="!loading" description="조회 내역이 없습니다."/>
             </template>
           </a-table>
 
@@ -559,6 +540,7 @@ onMounted(async () => {
   justify-content: flex-end;
   gap: 8px;
   margin-bottom: 12px;
+  align-items: center;
 }
 .button-area * {
   font-size: 13px;
@@ -581,6 +563,9 @@ onMounted(async () => {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+.empty-box{
+  padding: 16px 12px 12px;
 }
 
 :deep(.ant-table-tbody >tr.ant-table-row-selected >td){

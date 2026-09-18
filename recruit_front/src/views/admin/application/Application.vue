@@ -131,7 +131,7 @@ const getSemesterGradeText = (education: AdminEducationResponse, semester: Semes
   const grade = education.semesterGrades?.find( (item) => item.schoolYear === semester.schoolYear && item.semester === semester.semester);
 
   // 해당 학기에 입력된 성적이 없으면 빈칸
-  if (!grade) return '';
+  if (!grade) return '\u00A0';
   return `${grade.gradePoint} / ${grade.maxGradePoint}`;
 }
 
@@ -643,7 +643,7 @@ onBeforeUnmount(() => {
     <a-card title="자기소개서" v-if="answers" :bordered="false" class="form-card">
       <div aria-label="자기소개서">
         <div v-for="item in answers" :key="item.questionId" class="item-card">
-          <p class="q-text">{{ Number(item.sortOrder) + 1 }}. {{ item.questionText }}</p>
+          <p class="q-text">{{item.sortOrder}}. {{ item.questionText }}</p>
           <a-input class="input-area" v-if="item.answerType === 'SHORT_TEXT'"
             v-model:value="item.answerText" :maxlength="item.maxLength ?? 5000" show-count readonly
           />

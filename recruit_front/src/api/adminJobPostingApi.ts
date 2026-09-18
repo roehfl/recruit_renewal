@@ -11,7 +11,8 @@ import type {
   QuestionTemplateItem,
   QuestionTemplateRequest,
   QuestionRequest,
-  QuestionItem
+  QuestionItem,
+  QuestionReOrderRequest
 } from '@/types/question'
 
 const UPLOAD_TIMEOUT_MS = 120000 // 기본 10초로는 다장 이미지 업로드가 끊길 수 있다.
@@ -68,8 +69,6 @@ export const adminJobPostingApi = {
   fetchImageBlob(id: number, imageId: number) {
     return apiClient.get<Blob>(`/admin/job-postings/${id}/images/${imageId}/file`, { responseType: 'blob' })
   },
-
-  // 질문 템플릿
   createQuestionTemplate(request: QuestionTemplateRequest) {
     return apiClient.post<ApiResponse<QuestionTemplateRequest>>(`/admin/question-templates`, request)
   },
@@ -102,5 +101,19 @@ export const adminJobPostingApi = {
   setQuestionDeactive(templateId: number) {
     return apiClient.post<ApiResponse<QuestionTemplateItem>>(`/admin/question-templates/${templateId}/deactivate`)
   },
-
+  getQuestionList(jobPostingId: number) {
+    return apiClient.get<ApiResponse<QuestionItem[]>>(`/admin/job-postings/${jobPostingId}/questions`)
+  },
+  saveQuestion(jobPostingId: number, request: QuestionRequest) {
+    return apiClient.post<ApiResponse<QuestionRequest>>(`/admin/job-postings/${jobPostingId}/questions`, request)
+  },
+  updateQuestion(jobPostingId: number, questionId:number, request: QuestionRequest) {
+    return apiClient.post<ApiResponse<QuestionRequest>>(`/admin/job-postings/${jobPostingId}/questions/${questionId}`, request)
+  },
+  deleteQuestion(jobPostingId: number, questionId: number) {
+    return apiClient.post<ApiResponse<QuestionItem>>(`/admin/job-postings/${jobPostingId}/questions/${questionId}/delete`)
+  },
+  reOrderQuestion(jobPostingId: number, request: QuestionReOrderRequest) {
+    return apiClient.post<ApiResponse<QuestionReOrderRequest>>(`/admin/job-postings/${jobPostingId}/questions/reorder`, request)
+  },
 }

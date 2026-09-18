@@ -6,14 +6,16 @@ import { adminJobPostingApi } from '@/api/adminJobPostingApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import ApplicationFormConfigTab from './ApplicationFormConfigTab.vue'
 import ApplicationFormLayoutTab from './ApplicationFormLayoutTab.vue'
+import ApplicationFormQuestionTab from './ApplicationFormQuestionTab.vue'
 import type { AdminJobPostingDetail } from '@/types/jobPosting'
 
-type TabKey = 'config' | 'layout'
+type TabKey = 'config' | 'layout' | 'question'
 
 /* 자기소개서 질문 탭은 후속 slice 에서 이 목록에 추가한다. */
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'config', label: '지원서 양식' },
   { key: 'layout', label: '폼 구성' },
+  { key: 'question', label: '질문 설정' }
 ]
 
 const route = useRoute()
@@ -128,7 +130,13 @@ onMounted(loadDetail)
         @saved="onConfigSaved"
       />
       <ApplicationFormLayoutTab
-        v-else-if="activeTab === 'layout'"
+        v-if="activeTab === 'layout'"
+        :key="`layout-${tabGeneration}`"
+        :job-posting-id="jobPostingId"
+      />
+      <ApplicationFormQuestionTab
+        v-if="activeTab === 'question'"
+        :editable="editable"
         :key="`layout-${tabGeneration}`"
         :job-posting-id="jobPostingId"
       />

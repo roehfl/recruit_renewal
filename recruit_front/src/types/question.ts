@@ -23,14 +23,13 @@ export interface QuestionTemplateItem {
 }
 
 export interface QuestionRequest {
-  questionTemplateId: number | null,
-  questionText: string | null,
+  questionText: string
   helperText: string | null,
-  category: "SELF_INTRODUCTION" | "GENERAL" | "JOB_SPECIFIC" | "ETC" | null,
-  answerType: "SHORT_TEXT" | "LONG_TEXT" | null,
-  required: boolean | null,
+  category: string,
+  answerType: string,
+  required: boolean,
   minLength: number | null,
-  maxLength: number | null,
+  maxLength: number,
   sortOrder: number,
 }
 
@@ -47,4 +46,27 @@ export interface QuestionItem {
     sortOrder: number | null,
     createdAt: string | null,
     updatedAt: string | null
+}
+
+export interface QuestionList {
+  questions: QuestionItem
+}
+
+export interface QuestionReOrderItem {
+  questionId: number,
+  sortOrder: number
+}
+
+export interface QuestionReOrderRequest {
+  questions: QuestionReOrderItem[]
+} 
+
+export interface QuestionForm {
+  category: string | null
+  required: boolean | null
+  answerType: string | null
+  maxLength: number | null
+  minLength: number | null
+  questionText: string | null
+  helperText: string | null
 }

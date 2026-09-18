@@ -4,13 +4,13 @@ import { message } from 'ant-design-vue'
 import { adminJobPostingApi } from '@/api/adminJobPostingApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import type { QuestionTemplateRequest } from '@/types/question'
-import { useRoute } from 'vue-router'
-import { router } from '@/routes'
+import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute();
+const router = useRouter();
 const loading = ref(false);
 
-const editTarget = computed(() => route.params.id as number | undefined);
+const editTarget = computed(() => Number(route.params.id!));
 
 interface QuestionForm {
   title: string,
@@ -18,17 +18,17 @@ interface QuestionForm {
   helperText: string | null,
   category: string,
   answerType: string,
-  defaultRequired: boolean,
+  defaultRequired: boolean | null,
   defaultMaxLength: number,
 }
 
 const createEmptyForm = (): QuestionForm => ({
   title: '',
   questionText: '',
-  helperText: '',
+  helperText: null,
   category: '',
   answerType: '',
-  defaultRequired: false,
+  defaultRequired: null,
   defaultMaxLength: 0
 })
 
@@ -47,7 +47,6 @@ const loadQuestionTemplate = async (templateId: number) => {
             form.value.defaultRequired = response.data.data.defaultRequired
             form.value.defaultMaxLength = response.data.data.defaultMaxLength
         }
-        console.log("##데이터 가져오고 폼 = ", form)
     } catch (error) {
         message.error(getApiErrorMessage(error, '질문 템플릿을 불러오지 못했습니다.'))
     } finally {
@@ -62,18 +61,18 @@ const resetEditing = (): void => {
 
 const validateForm = () => {
   if (!form.value.title.trim()) {
-    return '메뉴명을 입력하세요.'
+    return '템플릿명을 입력하세요.'
   }
 
   if (!form.value.category?.trim()) {
-    return '템플릿 유형을 선택하세요.'
+    return '질문 유형을 선택하세요.'
   }
 
   if (!form.value.answerType?.trim()) {
-    return '답변 길이를 선택하세요.'
+    return '답변 유형 선택하세요.'
   }
 
-  if (!form.value.answerType?.trim()) {
+  if (!form.value.questionText?.trim()) {
     return '질문을 입력하세요.'
   }
 
@@ -86,6 +85,7 @@ const save = async (): Promise<void> => {
 
     if (validationMessage) {
         message.warning(validationMessage)
+        loading.value = false
         return
     }
 
@@ -95,11 +95,9 @@ const save = async (): Promise<void> => {
         helperText: form.value.helperText,
         category: form.value.category as 'SELF_INTRODUCTION' | 'GENERAL' | 'JOB_SPECIFIC' | 'ETC',
         answerType: form.value.answerType as 'SHORT_TEXT' | 'LONG_TEXT',
-        defaultRequired: form.value.defaultRequired,
+        defaultRequired: form.value.defaultRequired!,
         defaultMaxLength: form.value.defaultMaxLength
     }
-
-    console.log('##api로 보내는 값 = ', request)
 
     try {
         editTarget.value ?
@@ -110,8 +108,8 @@ const save = async (): Promise<void> => {
     } catch (error) {
         message.error(getApiErrorMessage(error, '템플릿을 저장하지 못했습니다.'));
     } finally {
+        void router.push({ name: 'AdminQuestionTemplates' })
         loading.value = false
-        void router.push({ name: 'AdminJobPostingQuestionTemplates' })
     }
 }
 
@@ -135,10 +133,9 @@ onMounted(async () => {
 
         <a-card :bordered="false" class="form-card">
             <div>
-
                 <div class="option-area">
                     <div class="field-radio">
-                        <span class="field-label">템플릿 유형</span>
+                        <span class="field-label">질문 유형</span>
                         <a-radio-group v-model:value="form.category" button-style="solid">
                             <a-radio-button value='SELF_INTRODUCTION'>자기소개</a-radio-button>
                             <a-radio-button value='GENERAL'>기본질문</a-radio-button>
@@ -162,7 +159,7 @@ onMounted(async () => {
                     </div>
                     <div>
                         <span class="field-label">최대 글자 수</span>
-                        <a-input v-model:value="form.defaultMaxLength"></a-input>
+                        <a-input v-model:value="form.defaultMaxLength" type="number"></a-input>
                     </div>
             </div>
 

@@ -27,19 +27,13 @@ export interface AdminApplicationSummaryResponse {
 }
 
 export interface AdminApplicationSearchRequest {
-  graduationStatus: string | undefined
   jobPositionId: number | undefined
-  certificateName: string | undefined
-  languageName: string | undefined
   workLocation: string | undefined
   birthDateTo: string | undefined
   applicationType: string | undefined
   name: string | undefined
   phoneNumber: string | undefined
-  languageLevel: string | undefined
   stageResultStatus: string | undefined
-  finalSchoolCondition: string | undefined
-  finalEducationLevel: string | undefined
   status: string | undefined
   birthDateFrom: string | undefined
   stageType: string | undefined

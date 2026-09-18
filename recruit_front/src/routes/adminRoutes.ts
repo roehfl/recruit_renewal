@@ -76,9 +76,14 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/stageResult/AdminStageResultView.vue'),
       },
       {
+        path: 'question-templates',
+        name: 'AdminQuestionTemplates',
+        component: () => import('@/views/admin/applicant/AdminQuestionTemplatesView.vue')
+      },
+      {
         path: 'question-template/:id?/edit',
         name: 'AdminJobPostingQuestionTemplateEdit',
-        component: () => import('@/views/admin/jobPosting/AdminQuestionTemplateEditView.vue'),
+        component: () => import('@/views/admin/applicant/AdminQuestionTemplateEditView.vue'),
       },
       {
         path: 'application-forms',
@@ -95,10 +100,10 @@ export const adminRoutes: RouteRecordRaw[] = [
         },
       },
       {
-        path: 'question-templates',
-        name: 'AdminQuestionTemplates',
-        component: () => import('@/views/admin/jobPosting/AdminQuestionTemplatesView.vue')
-      }
+        path: 'interview',
+        name: 'InterviewSchedulingSetting',
+        component: () => import('@/views/admin/interview/interviewScheduling.vue')
+      },
     ],
   },
   {
