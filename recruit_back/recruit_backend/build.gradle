@@ -57,4 +57,6 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// 캐시된 Spring 테스트 컨텍스트(service 테스트만 약 29개, 개당 약 25MB)가 Gradle 기본 512m 힙을 넘겨 OOM이 난다.
+	maxHeapSize = '2g'
 }
