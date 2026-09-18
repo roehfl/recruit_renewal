@@ -7,7 +7,6 @@ import { message, Modal } from 'ant-design-vue'
 import {
   FormOutlined,
   LeftOutlined,
-  ReloadOutlined,
   RightOutlined,
   SaveOutlined,
   SendOutlined,
@@ -812,10 +811,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
             <a-tag v-else color="default">접수상태 확인 필요</a-tag>
             <a-tag v-if="canEdit" color="blue">수정 가능</a-tag>
             <a-tag v-else color="default">수정 제한</a-tag>
-            <a-button :loading="loading" @click="fetchFormPage()">
-              <ReloadOutlined />
-              새로고침
-            </a-button>
           </a-space>
         </div>
 
