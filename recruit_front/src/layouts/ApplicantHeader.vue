@@ -457,36 +457,6 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
   background: var(--app-border-dark-color);
 }
 
-.notice-button {
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  color: var(--app-text-color);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  &:hover,
-  &:focus,
-  &:active {
-    color: var(--app-primary-color);
-    background: var(--app-bg-btn-hover) !important;
-  }
-
-  :deep(.ant-badge) {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  :deep(.anticon) {
-    font-size: 19px;
-    color: var(--app-text-secondary);
-    line-height: 1;
-  }
-}
-
 .user-menu-button {
   height: 36px;
   padding: 0;

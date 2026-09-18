@@ -28,9 +28,8 @@ const refreshing = ref(false)
 
 const jobPostings = ref<AdminJobPostingListItem[]>([])
 const selectedJobPostingId = ref<number | null>(null)
-const jobPositions = ref<AdminJobPosition[]>([
-  { id: null, positionName: '', applicationType: 'NEW_GRADUATE_OR_EXPERIENCED', jobTitle: null, workLocations: [], employmentType: 'FULL_TIME', sortOrder: 0 },
-])
+// 자리표시자(id=null)를 두면 옵션 계산이 넣는 '전체'와 겹쳐 '전체'가 두 번 보인다.
+const jobPositions = ref<AdminJobPosition[]>([])
 
 const jobPostingOptions = computed(() => {
   return jobPostings.value.map((posting) => ({
@@ -112,7 +111,11 @@ const pickDefaultStage = (list: StageListItem[]): StageListItem | undefined =>
   ?? list.find((stage) => stage.status === 'READY')
   ?? list[0]
 
+/* 공고를 빠르게 바꾸면 이전 공고의 응답이 늦게 도착할 수 있다. 가장 최근 요청의 응답만 반영한다. */
+let jobPostingRequestSeq = 0
+
 const changeJobPosting = async (jobPostingId: number): Promise<void> => {
+  const seq = ++jobPostingRequestSeq
   selectedJobPostingId.value = jobPostingId;
   Object.assign(searchRequest, initialSearchRequest);
   interviews.value = []
@@ -124,13 +127,17 @@ const changeJobPosting = async (jobPostingId: number): Promise<void> => {
       adminJobPostingApi.getJobPosting(jobPostingId),
       adminStageApi.getStages(jobPostingId),
     ])
+    if (seq !== jobPostingRequestSeq) return
     jobPositions.value = postingResponse.data.data.jobPositions;
     stages.value = stageResponse.data.data
     searchRequest.stageId = pickDefaultStage(interviewStages.value)?.id
   } catch (error) {
+    if (seq !== jobPostingRequestSeq) return
     message.error(getApiErrorMessage(error, '지원분야·면접단계를 불러오지 못했습니다.'))
   } finally {
-    refreshing.value = false
+    if (seq === jobPostingRequestSeq) {
+      refreshing.value = false
+    }
   }
 }
 
@@ -384,7 +391,7 @@ onMounted(async () => {
           </div>
         </div>
           <div class="button-area">
-              <a-upload :before-upload="beforeUpload" :show-upload-list="false" accept=".xlsx,.xls">
+              <a-upload :before-upload="beforeUpload" :show-upload-list="false" accept=".xlsx">
                 <a-button danger><UploadOutlined />엑셀 업로드</a-button>
               </a-upload>
               <a-button @click="downloadExcel"><DownloadOutlined />엑셀 다운로드</a-button>

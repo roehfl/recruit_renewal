@@ -117,9 +117,7 @@ const stageResultStatusOptions = computed(() => {
   return options
 })
 
-const jobPositions = ref<AdminJobPosition[]>([
-  { id: null, positionName: '', applicationType: 'NEW_GRADUATE_OR_EXPERIENCED', jobTitle: null, workLocations: [], employmentType: 'FULL_TIME', sortOrder: 0 },
-])
+const jobPositions = ref<AdminJobPosition[]>([])
 
 const jobPostings = ref<AdminJobPostingListItem[]>([])
 const selectedJobPostingId = ref<number | null>(null)

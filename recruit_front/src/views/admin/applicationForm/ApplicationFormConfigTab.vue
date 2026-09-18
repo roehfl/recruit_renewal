@@ -70,12 +70,22 @@ const toggleUse = (
   }
 }
 
+/* 마지막으로 불러온(저장한) 값과 사용 섹션 집합이 다른지. 다르면 폼 구성의 섹션 배치도 다시 맞춰야 한다. */
+const enabledSectionsChanged = (): boolean => {
+  const previous = JSON.parse(snapshot) as AdminApplicationFormConfig
+  return SECTIONS.some((section) => Boolean(previous[section.useKey]) !== Boolean(form.value[section.useKey]))
+}
+
 const save = async () => {
   saving.value = true
+  const sectionsChanged = enabledSectionsChanged()
   try {
     await adminApplicationFormApi.saveFormConfig(props.jobPostingId, form.value)
     snapshot = JSON.stringify(form.value)
     message.success('지원서 양식을 저장했습니다.')
+    if (sectionsChanged) {
+      message.warning('사용 섹션이 바뀌었습니다. 폼 구성 탭에서 섹션 배치를 확인하고 저장하세요.')
+    }
     emit('saved')
   } catch (error) {
     message.error(getApiErrorMessage(error, '지원서 양식 저장에 실패했습니다.'))

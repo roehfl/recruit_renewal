@@ -34,6 +34,8 @@ const loadCatalog = async () => {
   try {
     const response = await adminApplicationApi.getApplicationExportColumns()
     groups.value = response.data.data
+    // 로딩 중에 닫았다 다시 열었어도 카탈로그가 도착한 시점에 기본 컬럼을 채운다.
+    selected.value = [...defaultKeys.value]
   } catch (error) {
     loadFailed.value = true
     message.error(getApiErrorMessage(error, '엑셀 항목을 불러오지 못했습니다.'))
@@ -43,10 +45,10 @@ const loadCatalog = async () => {
 }
 
 // 열 때마다 기본 컬럼만 체크된 상태로 시작한다(선택을 기억하지 않는다).
-watch(() => props.open, async (open) => {
+watch(() => props.open, (open) => {
   if (!open) return
-  await loadCatalog()
   selected.value = [...defaultKeys.value]
+  void loadCatalog()
 })
 
 const isSelected = (key: string) => selected.value.includes(key)

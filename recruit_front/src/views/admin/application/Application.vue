@@ -170,6 +170,8 @@ async function loadCommonCode(groupCode: string) {
     else if(groupCode === 'DISABILITY_TYPE')  disabilityStatusList.value = result.data.data;
     else if(groupCode === 'NATIONALITY')      nationalityList.value = result.data.data || undefined;
 
+  } catch {
+    // 코드 표시명만 못 가져온 것이라 화면은 원문 코드로 보인다. 오류는 API 텔레메트리에 남는다.
   } finally {
     loading.value = false
   }
@@ -191,6 +193,9 @@ async function loadAttachmentFile() {
     const photo = originAttachments.value[originAttachments.value.length - 1]!
     await downloadAttachment(photo);
 
+  } catch {
+    // 사진은 부가 정보라 지원서 조회를 막지 않는다. 기본 이미지(로고)로 두고 실패만 알린다.
+    message.warning('증명사진을 불러오지 못해 기본 이미지를 표시합니다.')
   } finally {
     isPhotoLoading.value = false
   }

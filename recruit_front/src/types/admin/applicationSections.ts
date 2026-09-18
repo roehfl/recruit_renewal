@@ -62,7 +62,7 @@ export interface semesterGradeItem {
   gradePoint: number | null
   maxGradePoint: number | null
   majorGradePoint?: number
-  majorMaxGraedPoint?: number
+  majorMaxGradePoint?: number
 }
 export interface AdminEducationResponse { 
   educationId: number
@@ -79,7 +79,9 @@ export interface AdminEducationResponse {
   campusType: campusType
   transfer: boolean
   countryCode: string
-  schoolId: number
+  /** 학교 검색 코드. schoolSource 에 따라 코드 체계가 다르다(직접 입력이면 null) */
+  schoolCode: string | null
+  schoolSource: 'NEIS' | 'UNIV_INFO' | 'UNIV_DEPT' | null
   sortOrder: number
   semesterGrades: semesterGradeItem[]
   overallGradePoint: number
@@ -159,7 +161,7 @@ export interface AdminApplicationAnswerResponse {
   sortOrder: number
   answerId?: number | null
   answerText?: string | null
-  updatedAt?: string | null
+  answerUpdatedAt?: string | null
 }
 
 export type attachmentType =

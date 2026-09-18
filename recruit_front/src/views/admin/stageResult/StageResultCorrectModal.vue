@@ -74,9 +74,14 @@ const historyChangeText = (history: StageResultCorrectionHistory): string => {
   return parts.length > 0 ? parts.join(' · ') : statusLabel(history.newStatus)
 }
 
+/* 대상을 빠르게 바꾸면 이전 대상의 이력 응답이 늦게 도착할 수 있다. 가장 최근 요청의 응답만 반영한다. */
+let historiesRequestSeq = 0
+
 const loadHistories = async () => {
+  const seq = ++historiesRequestSeq
   if (props.stageId === null || props.target === null) {
     histories.value = []
+    loadingHistories.value = false
     return
   }
   loadingHistories.value = true
@@ -85,14 +90,22 @@ const loadHistories = async () => {
       props.stageId,
       props.target.stageResultId,
     )
+    if (seq !== historiesRequestSeq) {
+      return
+    }
     histories.value = response.data.data
     historiesLoadFailed.value = false
   } catch {
+    if (seq !== historiesRequestSeq) {
+      return
+    }
     // 이력은 부가 정보라 실패해도 정정 자체를 막지 않는다. 대신 실패를 화면에 드러낸다.
     histories.value = []
     historiesLoadFailed.value = true
   } finally {
-    loadingHistories.value = false
+    if (seq === historiesRequestSeq) {
+      loadingHistories.value = false
+    }
   }
 }
 

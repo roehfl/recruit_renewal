@@ -142,13 +142,17 @@ export const useMenuStore = defineStore('menu', {
     async fetchMenuTree(site: MenuSite) {
       this.loadingMap[site] = true
       // this.errorMessageMap[site] = null
-      const response = await menuApi.getMenuTree(site)
-      this.menuTreeMap[site] = response.data.data
-      this.loadedMap[site] = true
-      if (!response.data.success) {
-        throw new Error(response.data.message || '메뉴 정보를 불러오지 못했습니다.')
+      try {
+        const response = await menuApi.getMenuTree(site)
+        this.menuTreeMap[site] = response.data.data
+        this.loadedMap[site] = true
+        if (!response.data.success) {
+          throw new Error(response.data.message || '메뉴 정보를 불러오지 못했습니다.')
+        }
+      } finally {
+        // 실패해도 로딩 상태가 남지 않게 한다.
+        this.loadingMap[site] = false
       }
-      this.loadingMap[site] = false
     },
 
     async fetchBreadcrumb(site: MenuSite, path: string) {

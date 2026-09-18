@@ -94,7 +94,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed, watch } from 'vue'
+import { reactive, ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { applicationApi } from '@/api/applicationApi'
@@ -220,17 +220,25 @@ const clickToEmailCertificationButton = async () => {
   isEmailCertificationDone.value = true;
 }
 
-window.phoneAuthCallback = (data: { name: string, phoneNumber: string, ci:string }) => {
+const phoneAuthCallback = (data: { name: string, phoneNumber: string, ci:string }) => {
   form.name = data.name;
   form.phoneNumber = data.phoneNumber;
   form.ci = data.ci
-  
+
   if(form.name && form.phoneNumber && form.ci) {
     message.success('본인인증이 완료되었습니다.');
     NiceAuthComplete(true);
     isNiceAuthPopupOpen.value = false;
   }
 };
+window.phoneAuthCallback = phoneAuthCallback;
+
+// 화면을 떠난 뒤 팝업이 콜백을 부르지 않도록 정리한다. 다른 화면이 새로 등록한 콜백은 지우지 않는다.
+onBeforeUnmount(() => {
+  if (window.phoneAuthCallback === phoneAuthCallback) {
+    window.phoneAuthCallback = undefined;
+  }
+});
 
 const clickToNiceAuthPopupOpen = async () => {
   if(!isEmailCertificationDone.value){

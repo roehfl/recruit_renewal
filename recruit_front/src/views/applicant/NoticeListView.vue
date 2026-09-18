@@ -11,6 +11,7 @@ const detailLoading = ref(false)
 const selectedNotice = ref<NoticeDetail | null>(null)
 // const router = useRouter()
 const loading = ref(false)
+const loadFailed = ref(false)
 const notices = ref<NoticeListItem[]>([])
 const searchForm = reactive({ searchType: 'ALL' as 'ALL' | 'TITLE' | 'CONTENT', keyword: '' })
 const pagination = reactive({ current: 1, pageSize: 8, total: 0 })
@@ -35,6 +36,7 @@ const columns: TableColumnsType<NoticeListItem> = [
 ]
 async function loadNotices() {
   loading.value = true
+  loadFailed.value = false
   try {
     const result = await boardApi.fetchNotices({
       page: pagination.current - 1,
@@ -45,6 +47,11 @@ async function loadNotices() {
 
     notices.value = result.data.data.content
     pagination.total = result.data.data.totalElements
+  } catch (error) {
+    console.error(error)
+    notices.value = []
+    pagination.total = 0
+    loadFailed.value = true
   } finally {
     loading.value = false
   }
@@ -98,7 +105,7 @@ onMounted(() => {
               <h2>등록된 공지사항</h2>
               <!-- <p>채용 관련 공지사항을 확인할 수 있습니다.</p> -->
             </div>
-            <span class="board-count">
+            <span v-if="!loadFailed" class="board-count">
               총 <strong>{{ pagination.total }}</strong
               >건
             </span>
@@ -138,6 +145,13 @@ onMounted(() => {
             row-key="id"
             @change="handleTableChange"
           >
+            <!-- 조회 실패를 '공지 없음'으로 보이지 않게 따로 안내한다. -->
+            <template v-if="loadFailed" #emptyText>
+              <div class="load-error">
+                <p>공지사항을 불러오지 못했습니다.</p>
+                <a-button @click="loadNotices">다시 시도</a-button>
+              </div>
+            </template>
             <template #bodyCell="{ column, record, index }">
               <template v-if="column.key === 'number'">
                 <span>
@@ -291,6 +305,13 @@ onMounted(() => {
 }
 :deep(.ant-table-tbody > tr > td) {
   height: 48px;
+}
+.load-error {
+  padding: 24px 0;
+  color: var(--app-text-secondary);
+}
+.load-error p {
+  margin: 0 0 12px;
 }
 :deep(.ant-pagination-item-active) {
   border-color: var(--theme-primary);

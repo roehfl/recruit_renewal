@@ -36,7 +36,7 @@
                 <td class="working-period" colspan="5">
                     <a-date-picker class="working-date" v-model:value="item.startDate" value-format="YYYY-MM-DD" placeholder="입사년월일"/>
                     <span class="working">~</span>
-                    <a-date-picker class="working-date" v-model:value="item.endDate" :disabled="item.currentlyEmployed" value-format="YYYY-MM-DD" placeholder="퇴사년월일"/>
+                    <a-date-picker class="working-date" v-model:value="item.endDate" :disabled="!editable || item.currentlyEmployed" value-format="YYYY-MM-DD" placeholder="퇴사년월일"/>
                     <span class="switch-text">재직중</span>
                     <a-switch class="switch-button" v-model:checked="item.currentlyEmployed"/>
                 </td> 
@@ -205,7 +205,7 @@ function validate(): boolean {
   if (notApplicable.value) return true
   if (items.length === 0) {
     if (props.section.required) {
-      throw new Error("경력을 추가하거나 '경력 없음'을 선택하세요.");
+      throw new Error('경력을 1건 이상 추가하세요.');
     }
     return true
   }

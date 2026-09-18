@@ -110,7 +110,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
 import { CloseOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue';
 import { applicationApi } from '@/api/applicationApi';
@@ -176,14 +176,22 @@ const clickToNiceAuthPopupOpen = async () => {
   );
 };
 
-window.phoneAuthCallback = (data: { name: string, phoneNumber: string, ci:string }) => {
-  
+const phoneAuthCallback = (data: { name: string, phoneNumber: string, ci:string }) => {
+
   if(data.name && data.phoneNumber && data.ci) {
     message.success('본인인증이 완료되었습니다.');
     NiceAuthComplete(true);
     isNiceAuthPopupOpen.value = false;
   }
 };
+window.phoneAuthCallback = phoneAuthCallback;
+
+// 화면을 떠난 뒤 팝업이 콜백을 부르지 않도록 정리한다. 다른 화면이 새로 등록한 콜백은 지우지 않는다.
+onBeforeUnmount(() => {
+  if (window.phoneAuthCallback === phoneAuthCallback) {
+    window.phoneAuthCallback = undefined;
+  }
+});
 
 const NiceAuthComplete = async (result:boolean) => {
   // 나이스 인증 후 로직

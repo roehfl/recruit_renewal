@@ -15,26 +15,26 @@
                 <td class="military-box">
                     <a-select class="militarySubject-select" v-model:value="MilitaryForm.militarySubjectType" :options="militarySubjectType" @change="format()" placeholder="선택">
                     <template #suffix> <SearchOutlined /></template></a-select>
-                    <a-input class="militarySubject-input" v-model:value="MilitaryForm.nonServiceReason" :disabled="MilitaryForm.militarySubjectType == 'COMPLETED' || MilitaryForm.militarySubjectType == 'NOT_SUBJECT'" placeholder="미필/면제 사유 작성" />
+                    <a-input class="militarySubject-input" v-model:value="MilitaryForm.nonServiceReason" :disabled="!editable || MilitaryForm.militarySubjectType == 'COMPLETED' || MilitaryForm.militarySubjectType == 'NOT_SUBJECT'" placeholder="미필/면제 사유 작성" />
                   </td>
                 <th>군벌</th>
                 <td class="military-box">
-                    <a-select class="militaryBranch-select" v-model:value="MilitaryForm.militaryBranch" :options="militaryBranchType" :disabled="MilitaryForm.militarySubjectType != 'COMPLETED'" placeholder="선택">
+                    <a-select class="militaryBranch-select" v-model:value="MilitaryForm.militaryBranch" :options="militaryBranchType" :disabled="!editable || MilitaryForm.militarySubjectType != 'COMPLETED'" placeholder="선택">
                     <template #suffix> <SearchOutlined /></template></a-select>
-                    <a-select v-model:value="MilitaryForm.serviceType" :options="militaryServiceType" :disabled="MilitaryForm.militarySubjectType != 'COMPLETED'" placeholder="선택">
+                    <a-select v-model:value="MilitaryForm.serviceType" :options="militaryServiceType" :disabled="!editable || MilitaryForm.militarySubjectType != 'COMPLETED'" placeholder="선택">
                     <template #suffix> <SearchOutlined /></template></a-select>
                   </td>
                 <th>계급</th>
-                <td><a-select v-model:value="MilitaryForm.rank" :options="militaryRankType" :disabled="MilitaryForm.militarySubjectType != 'COMPLETED'" placeholder="선택">
+                <td><a-select v-model:value="MilitaryForm.rank" :options="militaryRankType" :disabled="!editable || MilitaryForm.militarySubjectType != 'COMPLETED'" placeholder="선택">
                     <template #suffix> <SearchOutlined /></template>
                     </a-select></td>
               </tr>
               <tr>
                 <th>복무기간</th>
                 <td class="working-period" colspan="5">
-                    <a-date-picker class="working-date" v-model:value="MilitaryForm.serviceStartDate" :disabled="MilitaryForm.militarySubjectType != 'COMPLETED'" value-format="YYYY-MM-DD" placeholder="입대년월일"/>
+                    <a-date-picker class="working-date" v-model:value="MilitaryForm.serviceStartDate" :disabled="!editable || MilitaryForm.militarySubjectType != 'COMPLETED'" value-format="YYYY-MM-DD" placeholder="입대년월일"/>
                     <span class="working">~</span>
-                    <a-date-picker class="working-date" v-model:value="MilitaryForm.serviceEndDate" :disabled="MilitaryForm.militarySubjectType != 'COMPLETED'" value-format="YYYY-MM-DD" placeholder="전역년월일"/>
+                    <a-date-picker class="working-date" v-model:value="MilitaryForm.serviceEndDate" :disabled="!editable || MilitaryForm.militarySubjectType != 'COMPLETED'" value-format="YYYY-MM-DD" placeholder="전역년월일"/>
                 </td> 
             </tr>
           </tbody>

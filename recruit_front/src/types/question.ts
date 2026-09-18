@@ -23,6 +23,8 @@ export interface QuestionTemplateItem {
 }
 
 export interface QuestionRequest {
+  /** 생성 전용. 템플릿에서 불러온 질문이면 템플릿 id 를 보내 출처를 남긴다(수정 API 는 받지 않는다). */
+  questionTemplateId?: number | null
   questionText: string
   helperText: string | null,
   category: string,
@@ -62,6 +64,8 @@ export interface QuestionReOrderRequest {
 } 
 
 export interface QuestionForm {
+  /** 템플릿에서 불러온 질문일 때만 채운다. */
+  questionTemplateId?: number | null
   category: string | null
   required: boolean | null
   answerType: string | null

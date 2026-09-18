@@ -246,7 +246,8 @@ const updateQuestion = async () => {
       category: detailForm.value.category!,
       answerType: detailForm.value.answerType!,
       required: detailForm.value.required!,
-      minLength: detailForm.value.minLength ?? 0,
+      // 미설정(null)을 0 으로 바꿔 보내면 게시 후 수정에서 백엔드가 답변 정책 변경으로 보고 거부한다.
+      minLength: detailForm.value.minLength ?? null,
       maxLength: detailForm.value.maxLength!,
       sortOrder: currentSortOrder!,
     }
@@ -266,6 +267,7 @@ const saveQuestion = async (data: QuestionForm): Promise<void> => {
   const index = questions.value.length + 1
 
   const requestQuestion: QuestionRequest = {
+    questionTemplateId: data.questionTemplateId ?? null,
     category: data.category! ?? "ETC",
     required: data.required!,
     answerType: data.answerType! ?? "SHORT_TEXT",

@@ -980,33 +980,42 @@ function compareBySortOrder<T extends { sortOrder?: number; pageNo?: number }>(a
               <span class="page-count"> {{ currentPageIndex + 1 }} / {{ pages.length }} </span>
             </div>
 
-            <div class="section-stack">
-              <article
-                v-for="item in currentPage.items"
-                :key="sectionKey(currentPage, item)"
-                class="section-panel"
-              >
-                <header class="section-panel-header">
-                  <div>
-                    <h3>{{ sectionDisplayName(item) }}</h3>
-                    <p>{{ item.sectionType }}</p>
-                  </div>
+            <!--
+              수정 불가면 섹션 입력을 모두 막는다. antd 컴포넌트는 componentDisabled 로,
+              섹션 안의 일반 button/input(추가·삭제 버튼 등)은 fieldset disabled 로 막는다.
+              단계 이동·이전/다음 버튼은 이 영역 밖이라 그대로 쓸 수 있다.
+            -->
+            <a-config-provider :component-disabled="!canEdit">
+              <fieldset class="section-fieldset" :disabled="!canEdit">
+                <div class="section-stack">
+                  <article
+                    v-for="item in currentPage.items"
+                    :key="sectionKey(currentPage, item)"
+                    class="section-panel"
+                  >
+                    <header class="section-panel-header">
+                      <div>
+                        <h3>{{ sectionDisplayName(item) }}</h3>
+                        <p>{{ item.sectionType }}</p>
+                      </div>
 
-                  <a-tag v-if="item.required" color="red">필수</a-tag>
-                  <a-tag v-else>선택</a-tag>
-                </header>
+                      <a-tag v-if="item.required" color="red">필수</a-tag>
+                      <a-tag v-else>선택</a-tag>
+                    </header>
 
-                <component
-                  :is="resolveSectionComponent(item.sectionType)"
-                  :ref="createSectionRefSetter(currentPage, item)"
-                  :application-id="resolvedApplicationId"
-                  :section="item"
-                  :page="currentPage"
-                  :editable="canEdit"
-                  :form-page="formPage"
-                />
-              </article>
-            </div>
+                    <component
+                      :is="resolveSectionComponent(item.sectionType)"
+                      :ref="createSectionRefSetter(currentPage, item)"
+                      :application-id="resolvedApplicationId"
+                      :section="item"
+                      :page="currentPage"
+                      :editable="canEdit"
+                      :form-page="formPage"
+                    />
+                  </article>
+                </div>
+              </fieldset>
+            </a-config-provider>
           </a-card>
 
           <div class="bottom-actions">
@@ -1275,6 +1284,20 @@ function compareBySortOrder<T extends { sortOrder?: number; pageNo?: number }>(a
   font-size: 13px;
   font-weight: 800;
   text-align: center;
+}
+
+/* 비활성화 전용 래퍼라 기본 테두리·여백을 없앤다. min-width 0 이 없으면 fieldset 이 내용 너비로 늘어나 가로 스크롤이 깨진다. */
+.section-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* fieldset 이 막은 섹션 내 일반 버튼(항목 추가·삭제)도 눌리지 않는 것처럼 보이게 한다. antd 버튼은 자체 비활성 스타일을 쓴다. */
+.section-fieldset:disabled :deep(button:not(.ant-btn)) {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .section-stack {

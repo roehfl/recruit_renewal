@@ -127,7 +127,7 @@ function validate(): boolean {
   if (notApplicable.value) return true
   if (items.length === 0) {
     if (props.section.required) {
-      message.warning("수상 이력을 추가하거나 '수상 이력 없음'을 선택하세요.")
+      message.warning('수상 이력을 1건 이상 추가하세요.')
       return false
     }
     return true

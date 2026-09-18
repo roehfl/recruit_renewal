@@ -43,7 +43,7 @@
                   <a-select
                     v-model:value="item.testCode"
                     :options="testOptions(item)"
-                    :disabled="!item.languageCode"
+                    :disabled="!editable || !item.languageCode"
                     placeholder="선택"
                     @change="onTestChange(item)"
                   />
@@ -215,7 +215,7 @@ function validate(): boolean {
   if (notApplicable.value) return true
   if (items.length === 0) {
     if (props.section.required) {
-      message.warning("어학 성적을 추가하거나 '어학 성적 없음'을 선택하세요.")
+      message.warning('어학 성적을 1건 이상 추가하세요.')
       return false
     }
     return true

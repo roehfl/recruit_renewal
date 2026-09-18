@@ -93,6 +93,7 @@
       <a-modal
         v-model:open="schoolModalOpen"
         title="학교 찾기"
+        :cancel-button-props="{ disabled: false }"
         @ok="handleSchoolConfirm"
       >
         <SchoolModalBody
@@ -108,6 +109,7 @@
       <a-modal
         v-model:open="majorModalOpen"
         title="전공 및 평점 입력"  width="900px"
+        :cancel-button-props="{ disabled: false }"
         @ok="handleMajorConfirm"
         @cancel="cancelMajorModal"
       >
@@ -124,7 +126,7 @@
               </td>
               <th>
                 <a-select
-                  v-model:value="majorForm.additionalMajorType" :options="majorTypeOptions" :disabled="isGraduate"
+                  v-model:value="majorForm.additionalMajorType" :options="majorTypeOptions" :disabled="!editable || isGraduate"
                   placeholder="선택" style="width: 100px"
                 />
               </th>
@@ -183,7 +185,7 @@
                 </td>
                 <td>
                   <button
-                    v-if="gradeIndex >= DEFAULT_SEMESTER_COUNT" type="button" class="remove-btn"
+                    v-if="gradeIndex >= DEFAULT_SEMESTER_COUNT" type="button" class="remove-btn" :disabled="!editable"
                     @click="removeSemesterGrade(gradeIndex)"
                   >
                     <DeleteOutlined /> 삭제
@@ -194,7 +196,7 @@
           </table>
           <button
             type="button" class="add-btn"
-            :disabled="majorForm.semesterGrades.length >= MAX_SEMESTER_COUNT"
+            :disabled="!editable || majorForm.semesterGrades.length >= MAX_SEMESTER_COUNT"
             @click="addSemesterGrade"
           >
             <PlusOutlined /> 학기 추가 ({{ majorForm.semesterGrades.length }}/{{ MAX_SEMESTER_COUNT }})
@@ -255,7 +257,6 @@ function createEmptyItem(): EducationItem {
     additionalMajorType: undefined,
     additionalMajorName: undefined,
     thesisTitle: '',
-    degreeName: '',
     admissionDate: '',
     graduationDate: '',
     graduationStatus: undefined,
@@ -285,7 +286,6 @@ function setItems(list: EducationResponse[]) {
       additionalMajorType: row.additionalMajorType,
       additionalMajorName: row.additionalMajorName,
       thesisTitle: row.thesisTitle,
-      degreeName: row.degreeName,
       admissionDate: row.admissionDate ?? '',
       graduationDate: row.graduationDate ?? '',
       graduationStatus: row.graduationStatus,
@@ -563,7 +563,8 @@ const vaildation = () => {
       const item = items[i]
       if (!item) continue;
       if (!item.schoolName || !item.educationLevel || !item.graduationStatus)  throw new Error(`학력 ${i + 1} : 학교구분, 학교명, 졸업구분은 필수입니다.`);
-      if (item.educationLevel !== 'HIGH_SCHOOL' &&  (!item.majorName || !item.overallMaxGradePoint || !item.overallGradePoint) ) {
+      // 평점 0.0 은 유효한 값이다(null 만 미입력). 만점은 0 을 받을 수 없어(백엔드: 0 초과) 0 도 미입력으로 본다.
+      if (item.educationLevel !== 'HIGH_SCHOOL' &&  (!item.majorName || !item.overallMaxGradePoint || item.overallGradePoint == null) ) {
         throw new Error(`학력 ${i + 1} : 전공 및 평점은 필수입니다.`)
       }
     }
@@ -591,7 +592,6 @@ function buildPayload(): EducationReplaceRequest {
       additionalMajorType: item.additionalMajorType || undefined,
       additionalMajorName: item.additionalMajorName || undefined,
       thesisTitle: item.thesisTitle || undefined,
-      degreeName: item.degreeName || undefined,
       admissionDate: item.admissionDate || undefined,
       graduationDate: item.graduationDate || undefined,
       graduationStatus: item.graduationStatus,
@@ -604,8 +604,8 @@ function buildPayload(): EducationReplaceRequest {
       schoolCode: item.schoolCode || null,
       schoolSource: item.schoolSource || null,
       sortOrder: index,
-      overallGradePoint: item.overallGradePoint || null,
-      overallMaxGradePoint: item.overallMaxGradePoint || null,
+      overallGradePoint: item.overallGradePoint ?? null,
+      overallMaxGradePoint: item.overallMaxGradePoint ?? null,
     })),
   }
 }

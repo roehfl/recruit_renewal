@@ -37,7 +37,7 @@ export interface semesterGradeItem {
   gradePoint: number | null
   maxGradePoint: number | null
   majorGradePoint?: number
-  majorMaxGraedPoint?: number
+  majorMaxGradePoint?: number
 }
 
 export interface EducationItem {
@@ -48,7 +48,6 @@ export interface EducationItem {
   additionalMajorType?: string
   additionalMajorName?: string
   thesisTitle?: string | undefined
-  degreeName?: string
   admissionDate?: string
   graduationDate?: string
   graduationStatus: graduationStatus | undefined
@@ -72,7 +71,6 @@ export interface EducationRequestItem {
   additionalMajorType?: string
   additionalMajorName?: string
   thesisTitle?: string
-  degreeName?: string
   admissionDate?: string
   graduationDate?: string
   graduationStatus: graduationStatus | undefined
@@ -103,7 +101,6 @@ export interface EducationResponse {
   additionalMajorType: string
   additionalMajorName: string
   thesisTitle: string
-  degreeName: string
   admissionDate: string
   graduationDate: string
   graduationStatus: graduationStatus

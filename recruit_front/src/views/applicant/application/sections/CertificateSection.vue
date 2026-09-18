@@ -133,7 +133,7 @@ function validate(): boolean {
   if (notApplicable.value) return true
   if (items.length === 0) {
     if (props.section.required) {
-      message.warning("자격증을 추가하거나 '보유 자격증 없음'을 선택하세요.")
+      message.warning('자격증을 1건 이상 추가하세요.')
       return false
     }
     return true

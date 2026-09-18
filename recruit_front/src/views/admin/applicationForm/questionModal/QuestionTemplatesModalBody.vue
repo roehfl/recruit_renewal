@@ -55,6 +55,7 @@ const handleCancel = (): void => {
 const handleRowClick = (record: QuestionTemplateItem): void => {
   cilckTemplate.value = true;
   selectedTemplate.value = {
+    questionTemplateId: record.templateId,
     category: record.category,
     required: record.defaultRequired,
     answerType: record.answerType,

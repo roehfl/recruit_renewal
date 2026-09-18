@@ -151,7 +151,7 @@ function validate(): boolean {
   if (notApplicable.value) return true
   if (items.length === 0) {
     if (props.section.required) {
-      message.warning("공백기간을 추가하거나 '공백기간 없음'을 선택하세요.")
+      message.warning('공백기간을 1건 이상 추가하세요.')
       return false
     }
     return true

@@ -272,6 +272,7 @@ const checkPassword = async () => {
 
 const changePasswordButton = async() => {
   if(!PasswordForm.currentPassword) {
+    message.warning('현재 비밀번호를 입력하세요.');
     return;
   }
   else if(PasswordForm.newPassword !== PasswordForm.newPasswordCheck) {
@@ -283,8 +284,12 @@ const changePasswordButton = async() => {
 }
 
 const logout = async () => {
+  try {
     await authStore.logout();
     router.replace('/applicant');
+  } catch (error) {
+    message.error(getApiErrorMessage(error, '로그아웃에 실패했습니다.'));
+  }
 }
 
 const loadMyApplications = async () => {

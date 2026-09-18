@@ -64,6 +64,14 @@ const exporting = ref(false)
 
 const dirtyCount = computed(() => pendingEdits.value.size)
 
+/** 저장 전 판정을 덮어쓴 결과. 카운트 카드가 그리드(필터·표시)와 같은 값을 세게 한다. */
+const resultsWithPendingEdits = computed(() =>
+  results.value.map((result) => {
+    const edit = pendingEdits.value.get(result.stageResultId)
+    return edit ? { ...result, resultStatus: edit.resultStatus } : result
+  }),
+)
+
 const jobPostingOptions = computed(() =>
   jobPostings.value.map((posting) => ({ value: posting.id, label: posting.title })),
 )
@@ -705,7 +713,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', warnUnsavedOnUn
 
         <template v-if="results.length > 0">
           <StageResultCounts
-            :results="results"
+            :results="resultsWithPendingEdits"
             :active-status="statusFilter"
             @toggle="(status) => (statusFilter = status)"
           />

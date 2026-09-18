@@ -91,11 +91,11 @@
                   <div v-if="form.disabilityStatus ==='SUBJECT'" >
                     <label>(등급: </label>
                     <a-select v-model:value="form.disabilityGradeCode" style="width: 67px"  placeholder="선택"
-                      :options="disabilityGradeOptions"   :disabled="form.disabilityStatus !=='SUBJECT'"
+                      :options="disabilityGradeOptions"   :disabled="!editable || form.disabilityStatus !=='SUBJECT'"
                     />
                     <label> / 유형: </label>
                     <a-select v-model:value="form.disabilityTypeCode" style="width: 120px"  placeholder="선택"
-                      :options="disabilityStatusOptions"  :disabled="form.disabilityStatus !=='SUBJECT'"
+                      :options="disabilityStatusOptions"  :disabled="!editable || form.disabilityStatus !=='SUBJECT'"
                     />
                     <label>)</label>
                   </div>
@@ -111,7 +111,7 @@
                     <a-input v-model:value="form.mobilePhone" disabled/>
                   </a-form-item>
                   <a-form-item label="비상연락처">
-                    <a-input v-model:value="form.emergencyPhone" :maxlength="11" @keydown="onlyNumber"/>
+                    <a-input :value="form.emergencyPhone" @update:value="onEmergencyPhoneInput" @keydown="onlyNumber"/>
                   </a-form-item>
                 </div>
               </td>
@@ -321,8 +321,15 @@ const onDisabilityStatusChange = () => {
 const onlyNumber = (e: KeyboardEvent) => {
     const allowKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'];
 
+    // 복사·붙여넣기·전체선택 같은 Ctrl/Cmd 조합은 막지 않는다. 붙여넣은 값은 onEmergencyPhoneInput 이 숫자만 남긴다.
+    if (e.ctrlKey || e.metaKey) return;
     if (allowKeys.includes(e.key)) return;
     if (!/^\d$/.test(e.key)) e.preventDefault();
+}
+
+// '010-1234-5678' 처럼 붙여넣어도 숫자만 남긴다. maxlength 를 두면 하이픈 포함 값이 먼저 잘려 여기서 자른다.
+const onEmergencyPhoneInput = (value: string) => {
+  form.emergencyPhone = value.replace(/\D/g, '').slice(0, 11)
 }
 
 // 주소 찾기 클릭 시 
