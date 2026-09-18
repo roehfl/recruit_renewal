@@ -99,7 +99,7 @@ class InterviewAdminControllerTest {
                                   "stageId": %d,
                                   "groupName": "Group A",
                                   "startDateTime": "2026-06-01T10:00:00",
-                                  "endDateTime": "2026-06-01T11:00:00",
+                                  "arrivalDateTime": "2026-06-01T09:30:00",
                                   "method": "IN_PERSON",
                                   "locationName": "Head office",
                                   "roomName": "Room 1",
@@ -115,7 +115,9 @@ class InterviewAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].stageId").value(interviewStage.getId()))
-                .andExpect(jsonPath("$.data[0].status").value("DRAFT"));
+                .andExpect(jsonPath("$.data[0].status").value("DRAFT"))
+                .andExpect(jsonPath("$.data[0].arrivalDateTime").value("2026-06-01T09:30:00"))
+                .andExpect(jsonPath("$.data[0].endDateTime").doesNotExist());
     }
 
     @Test
@@ -233,7 +235,7 @@ class InterviewAdminControllerTest {
                 stageId,
                 "Group A",
                 startDateTime,
-                startDateTime.plusHours(1),
+                null,
                 InterviewMethod.IN_PERSON,
                 "Head office",
                 "Room 1",

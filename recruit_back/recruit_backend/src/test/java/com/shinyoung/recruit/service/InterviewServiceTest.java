@@ -166,20 +166,59 @@ class InterviewServiceTest {
         );
         interviewService.confirm(confirmedInterviewId);
 
-        Long overlappingInterviewId = interviewService.createDraft(
+        Long sameStartInterviewId = interviewService.createDraft(
                 jobPosting.getId(),
-                createRequest(interviewStage.getId(), start().plusMinutes(30))
+                createRequest(interviewStage.getId(), start())
         );
         interviewService.replaceParticipants(
-                overlappingInterviewId,
+                sameStartInterviewId,
                 new InterviewParticipantReplaceRequest(
                         List.of(new InterviewCandidateParticipantRequest(application.getId(), 1)),
                         List.of(new InterviewInterviewerParticipantRequest(secondEmployee.getId(), 1))
                 )
         );
 
-        assertThatThrownBy(() -> interviewService.confirm(overlappingInterviewId))
-                .isInstanceOf(InvalidInterviewException.class);
+        assertThatThrownBy(() -> interviewService.confirm(sameStartInterviewId))
+                .isInstanceOf(InvalidInterviewException.class)
+                .hasMessage("Candidate has another confirmed interview at the same start time.");
+    }
+
+    @Test
+    void confirm_allowsCandidateWithDifferentStartTime() {
+        JobPosting jobPosting = saveJobPosting();
+        Stage documentStage = saveStage(jobPosting, StageType.DOCUMENT, 1);
+        documentStage.announce();
+        Stage interviewStage = saveStage(jobPosting, StageType.FIRST_INTERVIEW, 2);
+        JobApplication application = saveSubmittedApplication(jobPosting);
+        saveStageResult(documentStage, application, StageResultStatus.PASSED);
+        Employee employee = saveEmployee();
+
+        Long confirmedInterviewId = interviewService.createDraft(jobPosting.getId(), createRequest(interviewStage.getId(), start()));
+        interviewService.replaceParticipants(
+                confirmedInterviewId,
+                new InterviewParticipantReplaceRequest(
+                        List.of(new InterviewCandidateParticipantRequest(application.getId(), 1)),
+                        List.of(new InterviewInterviewerParticipantRequest(employee.getId(), 1))
+                )
+        );
+        interviewService.confirm(confirmedInterviewId);
+
+        Long laterInterviewId = interviewService.createDraft(
+                jobPosting.getId(),
+                createRequest(interviewStage.getId(), start().plusMinutes(30))
+        );
+        interviewService.replaceParticipants(
+                laterInterviewId,
+                new InterviewParticipantReplaceRequest(
+                        List.of(new InterviewCandidateParticipantRequest(application.getId(), 1)),
+                        List.of(new InterviewInterviewerParticipantRequest(employee.getId(), 1))
+                )
+        );
+
+        interviewService.confirm(laterInterviewId);
+
+        assertThat(interviewRepository.findById(laterInterviewId).orElseThrow().getStatus())
+                .isEqualTo(InterviewStatus.CONFIRMED);
     }
 
     @Test
@@ -300,7 +339,7 @@ class InterviewServiceTest {
                 stageId,
                 "Group A",
                 startDateTime,
-                startDateTime.plusHours(1),
+                null,
                 InterviewMethod.IN_PERSON,
                 "Head office",
                 "Room 1",

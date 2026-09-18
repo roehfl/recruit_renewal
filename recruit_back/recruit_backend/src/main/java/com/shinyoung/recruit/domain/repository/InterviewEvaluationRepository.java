@@ -15,6 +15,9 @@ public interface InterviewEvaluationRepository extends JpaRepository<InterviewEv
     /** 면접 삭제 가드 — 평가가 하나라도 붙어 있으면 삭제하지 않는다(InterviewService.delete). */
     boolean existsByInterviewId(Long interviewId);
 
+    /** 면접 스케줄 업로드 가드 — 단계의 면접에 평가가 하나라도 있으면 스케줄을 교체하지 않는다. */
+    boolean existsByInterviewStageId(Long stageId);
+
     boolean existsByInterviewIdAndCandidateParticipantIdAndInterviewerParticipantId(
             Long interviewId,
             Long candidateParticipantId,

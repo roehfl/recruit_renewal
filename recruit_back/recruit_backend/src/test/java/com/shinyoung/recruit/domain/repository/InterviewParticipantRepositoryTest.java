@@ -140,7 +140,7 @@ class InterviewParticipantRepositoryTest {
     }
 
     @Test
-    void existsConfirmedTimeCollision_detects_candidate_and_interviewer_overlap() {
+    void existsConfirmedTimeCollision_detects_candidate_and_interviewer_same_start_time() {
         Interview confirmed = saveInterview();
         confirmed.confirm();
         JobApplication application = saveApplication(confirmed.getJobPosting());
@@ -148,31 +148,53 @@ class InterviewParticipantRepositoryTest {
         participantRepository.save(InterviewParticipant.candidate(confirmed, application, 1));
         participantRepository.saveAndFlush(InterviewParticipant.interviewer(confirmed, employee, 1));
 
-        Interview overlapping = interviewRepository.saveAndFlush(Interview.createDraft(
+        Interview sameStart = saveInterview(
+                confirmed.getJobPosting(),
+                confirmed.getStage(),
+                "2Group",
+                start(),
+                InterviewStatus.DRAFT
+        );
+
+        assertThat(participantRepository.existsCandidateConfirmedTimeCollision(
+                application.getId(),
+                sameStart.getId(),
+                sameStart.getStartDateTime()
+        )).isTrue();
+        assertThat(participantRepository.existsInterviewerConfirmedTimeCollision(
+                employee.getId(),
+                sameStart.getId(),
+                sameStart.getStartDateTime()
+        )).isTrue();
+    }
+
+    @Test
+    void existsConfirmedTimeCollision_ignores_different_start_time() {
+        Interview confirmed = saveInterview();
+        confirmed.confirm();
+        JobApplication application = saveApplication(confirmed.getJobPosting());
+        Employee employee = saveEmployee();
+        participantRepository.save(InterviewParticipant.candidate(confirmed, application, 1));
+        participantRepository.saveAndFlush(InterviewParticipant.interviewer(confirmed, employee, 1));
+
+        Interview differentStart = saveInterview(
                 confirmed.getJobPosting(),
                 confirmed.getStage(),
                 "2Group",
                 start().plusMinutes(30),
-                start().plusHours(1).plusMinutes(30),
-                InterviewMethod.IN_PERSON,
-                "Office",
-                null,
-                null,
-                null
-        ));
+                InterviewStatus.DRAFT
+        );
 
         assertThat(participantRepository.existsCandidateConfirmedTimeCollision(
                 application.getId(),
-                overlapping.getId(),
-                overlapping.getStartDateTime(),
-                overlapping.getEndDateTime()
-        )).isTrue();
+                differentStart.getId(),
+                differentStart.getStartDateTime()
+        )).isFalse();
         assertThat(participantRepository.existsInterviewerConfirmedTimeCollision(
                 employee.getId(),
-                overlapping.getId(),
-                overlapping.getStartDateTime(),
-                overlapping.getEndDateTime()
-        )).isTrue();
+                differentStart.getId(),
+                differentStart.getStartDateTime()
+        )).isFalse();
     }
 
     @Test
@@ -294,7 +316,7 @@ class InterviewParticipantRepositoryTest {
                 stage,
                 "1조",
                 start(),
-                start().plusHours(1),
+                null,
                 InterviewMethod.IN_PERSON,
                 "본사",
                 null,
@@ -315,7 +337,7 @@ class InterviewParticipantRepositoryTest {
                 stage,
                 groupName,
                 startDateTime,
-                startDateTime.plusHours(1),
+                null,
                 InterviewMethod.IN_PERSON,
                 "Office",
                 null,

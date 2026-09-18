@@ -184,7 +184,7 @@ class ApplicationPiiPurgeServiceTest {
         interviewer.setDeptName("인사팀");
         interviewer = employeeRepository.save(interviewer);
         Interview interview = interviewRepository.save(Interview.createDraft(
-                posting, stage, "Group A", LocalDateTime.now().plusDays(5), LocalDateTime.now().plusDays(5).plusHours(1),
+                posting, stage, "Group A", LocalDateTime.now().plusDays(5), null,
                 InterviewMethod.IN_PERSON, "본사", "회의실A", null, null));
         InterviewParticipant candidate = interviewParticipantRepository.save(
                 InterviewParticipant.candidate(interview, application, 1));

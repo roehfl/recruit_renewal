@@ -141,7 +141,7 @@ class InterviewEvaluationRepositoryTest {
                 stage,
                 "1조",
                 start(),
-                start().plusHours(1),
+                null,
                 InterviewMethod.IN_PERSON,
                 "본사",
                 null,

@@ -115,7 +115,7 @@ public class InterviewService {
                 stage,
                 request.groupName(),
                 request.startDateTime(),
-                request.endDateTime(),
+                request.arrivalDateTime(),
                 request.method(),
                 request.locationName(),
                 request.roomName(),
@@ -135,7 +135,7 @@ public class InterviewService {
         interview.updateDraft(
                 request.groupName(),
                 request.startDateTime(),
-                request.endDateTime(),
+                request.arrivalDateTime(),
                 request.method(),
                 request.locationName(),
                 request.roomName(),
@@ -426,11 +426,10 @@ public class InterviewService {
         boolean collision = interviewParticipantRepository.existsCandidateConfirmedTimeCollision(
                 application.getId(),
                 interview.getId(),
-                interview.getStartDateTime(),
-                interview.getEndDateTime()
+                interview.getStartDateTime()
         );
         if (collision) {
-            throw new InvalidInterviewException("Candidate has another confirmed interview in the same time range.");
+            throw new InvalidInterviewException("Candidate has another confirmed interview at the same start time.");
         }
     }
 
@@ -438,11 +437,10 @@ public class InterviewService {
         boolean collision = interviewParticipantRepository.existsInterviewerConfirmedTimeCollision(
                 employee.getId(),
                 interview.getId(),
-                interview.getStartDateTime(),
-                interview.getEndDateTime()
+                interview.getStartDateTime()
         );
         if (collision) {
-            throw new InvalidInterviewException("Interviewer has another confirmed interview in the same time range.");
+            throw new InvalidInterviewException("Interviewer has another confirmed interview at the same start time.");
         }
     }
 

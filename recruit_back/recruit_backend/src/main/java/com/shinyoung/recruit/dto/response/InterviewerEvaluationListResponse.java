@@ -12,7 +12,6 @@ public record InterviewerEvaluationListResponse(
         String interviewGroupName,
         InterviewStatus interviewStatus,
         LocalDateTime startDateTime,
-        LocalDateTime endDateTime,
         List<InterviewerEvaluationSummaryResponse> evaluations
 ) {
 
@@ -28,7 +27,6 @@ public record InterviewerEvaluationListResponse(
                 interview.getGroupName(),
                 interview.getStatus(),
                 interview.getStartDateTime(),
-                interview.getEndDateTime(),
                 items
         );
     }

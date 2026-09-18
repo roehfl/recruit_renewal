@@ -20,7 +20,6 @@ public record AdminInterviewEvaluationResponse(
         String stageName,
         InterviewStatus interviewStatus,
         LocalDateTime startDateTime,
-        LocalDateTime endDateTime,
         List<AdminEvaluationCandidateResponse> candidates
 ) {
 
@@ -41,7 +40,6 @@ public record AdminInterviewEvaluationResponse(
                 interview.getStage().getStageName(),
                 interview.getStatus(),
                 interview.getStartDateTime(),
-                interview.getEndDateTime(),
                 candidates
         );
     }

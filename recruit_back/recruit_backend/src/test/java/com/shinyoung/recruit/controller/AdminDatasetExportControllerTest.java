@@ -70,7 +70,7 @@ class AdminDatasetExportControllerTest {
 
     private static final List<String> INTERVIEW_HEADER = List.of(
             "interviewId", "jobPostingTitle", "stageName", "stageType", "groupName",
-            "startDateTime", "endDateTime", "method", "locationName", "roomName",
+            "startDateTime", "arrivalDateTime", "method", "locationName", "roomName",
             "onlineMeetingUrl", "status", "candidateCount", "interviewerCount"
     );
 
@@ -401,7 +401,7 @@ class AdminDatasetExportControllerTest {
                 stage,
                 groupName,
                 startDateTime,
-                startDateTime.plusHours(1),
+                null,
                 InterviewMethod.IN_PERSON,
                 "Head office",
                 "Room 1",

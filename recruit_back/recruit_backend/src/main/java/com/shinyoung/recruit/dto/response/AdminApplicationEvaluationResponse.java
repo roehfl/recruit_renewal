@@ -19,7 +19,6 @@ public record AdminApplicationEvaluationResponse(
         String stageName,
         InterviewStatus interviewStatus,
         LocalDateTime startDateTime,
-        LocalDateTime endDateTime,
         AdminEvaluationSummaryResponse summary,
         List<AdminEvaluationItemResponse> evaluations
 ) {
@@ -37,7 +36,6 @@ public record AdminApplicationEvaluationResponse(
                 interview.getStage().getStageName(),
                 interview.getStatus(),
                 interview.getStartDateTime(),
-                interview.getEndDateTime(),
                 AdminEvaluationSummaryResponse.from(interviewEvaluations),
                 items
         );

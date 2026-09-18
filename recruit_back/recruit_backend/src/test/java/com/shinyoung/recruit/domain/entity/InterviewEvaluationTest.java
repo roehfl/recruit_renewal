@@ -282,7 +282,7 @@ class InterviewEvaluationTest {
                 stage(jobPosting),
                 "1조",
                 start(),
-                end(),
+                null,
                 InterviewMethod.IN_PERSON,
                 "본사",
                 null,
@@ -312,7 +312,7 @@ class InterviewEvaluationTest {
     }
 
     private JobPosting jobPosting() {
-        return JobPosting.create("공고", "내용", start().minusDays(1), end().plusDays(1));
+        return JobPosting.create("공고", "내용", start().minusDays(1), start().plusDays(1));
     }
 
     private Stage stage(JobPosting jobPosting) {
@@ -321,9 +321,5 @@ class InterviewEvaluationTest {
 
     private LocalDateTime start() {
         return LocalDateTime.of(2026, 6, 1, 10, 0);
-    }
-
-    private LocalDateTime end() {
-        return LocalDateTime.of(2026, 6, 1, 11, 0);
     }
 }

@@ -215,7 +215,7 @@ class InterviewerInterviewServiceTest {
                 stage,
                 groupName,
                 startDateTime,
-                startDateTime.plusHours(1),
+                null,
                 InterviewMethod.IN_PERSON,
                 "Head office",
                 "Room 1",

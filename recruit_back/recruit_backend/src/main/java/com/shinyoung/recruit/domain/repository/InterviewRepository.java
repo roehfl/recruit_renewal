@@ -23,6 +23,9 @@ public interface InterviewRepository extends JpaRepository<Interview, Long> {
 
     List<Interview> findByStageIdAndStatus(Long stageId, InterviewStatus status);
 
+    /** 면접 스케줄 업로드의 단계 전체 교체 대상. */
+    List<Interview> findByStageId(Long stageId);
+
     @Query("""
             select interview
             from Interview interview
@@ -31,7 +34,7 @@ public interface InterviewRepository extends JpaRepository<Interview, Long> {
             where jobPosting.id = :jobPostingId
               and (:stageId is null or stage.id = :stageId)
               and (:status is null or interview.status = :status)
-              and (:from is null or interview.endDateTime > :from)
+              and (:from is null or interview.startDateTime >= :from)
               and (:to is null or interview.startDateTime < :to)
             order by interview.startDateTime asc, interview.id asc
             """)

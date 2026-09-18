@@ -864,7 +864,7 @@ class StageServiceTest {
                 stageId,
                 "Group A",
                 LocalDateTime.of(2026, 7, 10, 10, 0),
-                LocalDateTime.of(2026, 7, 10, 11, 0),
+                null,
                 InterviewMethod.IN_PERSON,
                 "Head office",
                 "Room 1",

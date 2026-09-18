@@ -1003,3 +1003,58 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 응답 `ApiResponse<{ stageId, createdCount, existingCount, skippedCount, removedCount, results[] }>` — `removedCount`(정리로 삭제된 행 수, 첫 단계는 항상 0) **추가**. 나머지 의미:
   - `createdCount` 새로 만든 행, `existingCount` 대상 지원서 중 이미 행이 있던 수, `skippedCount` 공고 지원서 중 대상이 아닌 수(미제출·철회 + 2단계 이후엔 직전 단계 비합격)
 - 프론트: 직전 단계가 발표 전이면 "대상자 불러오기" 버튼을 막고 사유를 보여준다. 확인 문구·빈 상태 문구를 단계 위치(첫 단계 / 2단계 이후)에 맞춘다. 토스트에 `정리 n건`(1건 이상일 때) 추가
+
+### 화면: 면접 스케줄링 (관리자 interviewScheduling.vue)  🟢 확정 (2026-09-18, front-back 반영 완료)
+
+- 프론트: `src/views/admin/interview/interviewScheduling.vue` + `src/api/admin/adminInterviewApi.ts` + `src/types/admin/interview.ts`
+- 백엔드: 신규 `InterviewScheduleController`·`InterviewScheduleService`·`InterviewScheduleUploadParser`, 기존 `Interview` 도메인 변경
+- **입력은 엑셀 업로드로만 한다.** 화면에서 행을 편집하지 않는다
+- 흐름: 공고·면접단계 선택 → 검색(행 조회) → 엑셀 다운로드(조회 행이 있으면 채워서, 없으면 헤더만) → 작성 → 업로드(단계 전체 교체 + 즉시 확정) → 자동 재조회
+
+#### 도메인 변경: 면접 종료시각 제거, 도착시각 추가  🟢
+
+- `Interview.endDateTime` **삭제**. 종료시각은 다루지 않는다. `arrivalDateTime`(도착시각, nullable) **추가** — 면접시각(`startDateTime`)보다 늦을 수 없다
+- 면접 관련 요청·응답에서 `endDateTime` 제거:
+  - 요청 `POST /admin/job-postings/{id}/interviews`, `POST /admin/interviews/{id}` — `endDateTime` 삭제, `arrivalDateTime?` 추가
+  - 응답에서 `endDateTime` 삭제: 관리자 면접 요약·상세, 지원자 면접 요약·상세, 면접관 면접 요약·상세, 면접 평가 응답(관리자·면접관·지원서별)
+  - 응답에 `arrivalDateTime` 추가: 관리자 면접 요약·상세, 지원자 면접 요약·상세
+- 기간 조회(`from`/`to`)는 면접시각 기준: `from ≤ startDateTime < to`
+- 시간 겹침 검사(확정 시 지원자·면접관)는 **같은 면접시각(`startDateTime` 동일)** 기준으로 바뀐다
+- 기존 면접 목록 export(`GET /admin/job-postings/{id}/interviews/export`)는 종료 열을 빼고 도착 열을 넣는다
+- ⚠️ 운영 DB 작업(코드 아님): `ddl-auto=update` 는 컬럼을 지우지 않는다. 배포 전 `interview.end_date_time`(NOT NULL) 과 인덱스 `idx_interview_time_range` 를 삭제해야 새 면접 저장이 실패하지 않는다
+
+#### 엑셀 양식 (조회 표 = 템플릿 = 다운로드)  🟢
+
+- 헤더 9열, 순서 고정(업로드 파서가 문자열 그대로 대조): `일자 | 장소 | 도착시간 | 면접시간 | 면접순서 | 조 | 면접관 | 수험번호 | 성명`
+- 헤더 행: **노란 음영 + 굵은 글씨**, 틀고정
+- 한 행 = 지원자 1명의 면접 정보. 값 형식: 일자 `yyyy-MM-dd`, 시간 `HH:mm`(시작 시각만), 면접순서·조 정수, 면접관 `이름(로그인ID)` 쉼표 구분, 수험번호 = 지원서 id
+- 행 정렬: 조 → 면접순서 오름차순
+
+#### GET `/admin/job-postings/{jobPostingId}/interview-schedules`  🟢
+
+- 쿼리: `stageId`(필수), `applicationType?`, `jobPositionId?`, `workLocation?`(근무지 코드), `groupName?`(조, 정확히 일치)
+- 응답 `ApiResponse<[{ interviewId, groupName, candidateOrder, interviewDateTime, arrivalDateTime, locationName, interviewers: [{ employeeId, name, loginId }], applicationId, applicantName }]>`
+- 대상: 해당 단계의 취소되지 않은 면접의 배정(ASSIGNED) 지원자 행. 정렬 조(숫자) → 면접순서 → 수험번호
+
+#### GET `/admin/job-postings/{jobPostingId}/interview-schedules/export`  🟢
+
+- 쿼리는 조회와 같다. 조회 결과 행을 그대로 채운 xlsx(행 0건이면 헤더만). 다시 업로드하는 원본이라 값에 수식 방어 접두(`'`)를 붙이지 않는다(업로드가 수식 셀을 거부한다)
+- 개인정보(성명) 반출이라 export 감사 로그를 남긴다: datasetType `INTERVIEW_SCHEDULES`, 감사 행위 분류는 기존 면접 export 와 같은 `EXPORT_INTERVIEWS`
+- 프론트는 **마지막으로 검색한 조건**으로 호출한다(화면 표와 파일 일치). 표가 비어 있으면 아래 템플릿을 받는다
+
+#### GET `/admin/job-postings/{jobPostingId}/interview-schedules/upload-template`  🟢
+
+- 헤더만 있는 xlsx(데이터 0행, 개인정보 없음)
+
+#### POST `/admin/job-postings/{jobPostingId}/interview-schedules/upload?stageId=`  🟢
+
+- multipart `file`(.xlsx, 업로드 공통 크기·행수 한도)
+- **all-or-nothing + 단계 전체 교체 + 즉시 확정**: 검증 통과 시 해당 단계의 기존 면접(상태 무관)을 모두 지우고, 파일의 조마다 면접 1건을 만들어 바로 `CONFIRMED` 로 저장한다(지원자·면접관에게 즉시 노출). 오류가 1건이라도 있으면 아무것도 바꾸지 않는다
+- 조 → 면접 매핑: `groupName` = 조 번호, `startDateTime` = 일자+면접시간, `arrivalDateTime` = 일자+도착시간, `locationName` = 장소, 방식 `IN_PERSON`, 지원자 `sortOrder` = 면접순서, 면접관 `sortOrder` = 칸 안 순서
+- 파일 전체 거부(400 `ApiResponse.fail(message)`, data 없음): 확장자·크기·헤더 불일치, 데이터 0행, 면접 유형 단계 아님, 단계가 준비·진행 중 아님, 직전 단계 없음·미발표, **평가가 시작된 면접이 있는 단계**
+- 행 검증 실패(400 `ApiResponse.fail("업로드 검증에 실패하여 반영하지 않았습니다.", data)`): `data = { stageId, interviewCount: 0, candidateCount: 0, replacedInterviewCount: 0, errors: [문자열], rowErrors: [{ rowNumber, messages: [] }] }`
+  - 행 단위: 필수값, 형식(일자 `yyyy-MM-dd`·시간 `H:mm`·1 이상 정수), 도착시간 > 면접시간, 장소 200자 초과, 면접관 형식·미존재(최초 로그인 전 임직원)·이름 불일치·칸 안 중복, 수험번호 미존재·다른 공고·미제출·파일 내 중복·직전 단계 비합격, 성명 불일치(지원 시점 성명 스냅샷과 대조), 같은 조 첫 행과 일자·장소·도착시간·면접시간·면접관 불일치, 같은 조 면접순서 중복, 수식 셀, 다른 단계·공고의 확정 면접과 같은 시각(지원자)
+  - 파일 단위(`errors`): 조 번호가 1부터 연속이 아님, 조별 면접순서가 1부터 연속이 아님, 같은 면접관이 같은 일자·면접시간에 두 조 배정, 다른 단계·공고의 확정 면접과 같은 시각(면접관)
+  - 엑셀이 날짜·시각 셀로 바꾼 값(일자·도착시간·면접시간)도 읽는다. 파일 행 순서는 자유 — 저장·조회는 조 → 면접순서로 정렬된다
+- 성공(200) `data = { stageId, interviewCount, candidateCount, replacedInterviewCount, errors: [], rowErrors: [] }`
+- 프론트는 업로드 전 "기존 스케줄 교체 + 즉시 공개" 확인을 받고, 성공하면 현재 조건으로 자동 재조회한다

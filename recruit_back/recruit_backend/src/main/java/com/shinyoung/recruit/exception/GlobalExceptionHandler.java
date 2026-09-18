@@ -383,6 +383,14 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler(InvalidInterviewScheduleUploadException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidInterviewScheduleUpload(
+            InvalidInterviewScheduleUploadException e
+    ) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     /**
      * 낙관적 잠금(@Version) 충돌. 모든 StageResult write 경로(수동 update / Excel upload commit) 간에
      * 다른 트랜잭션이 먼저 변경한 경우 flush에서 발생하며, 덮어쓰기를 막고 409로 응답한다.

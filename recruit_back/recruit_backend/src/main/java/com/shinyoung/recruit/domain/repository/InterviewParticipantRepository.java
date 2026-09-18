@@ -68,14 +68,12 @@ public interface InterviewParticipantRepository extends JpaRepository<InterviewP
               and participant.jobApplication.id = :jobApplicationId
               and interview.status = com.shinyoung.recruit.enumeration.InterviewStatus.CONFIRMED
               and interview.id <> :excludeInterviewId
-              and interview.startDateTime < :endDateTime
-              and :startDateTime < interview.endDateTime
+              and interview.startDateTime = :startDateTime
             """)
     boolean existsCandidateConfirmedTimeCollision(
             @Param("jobApplicationId") Long jobApplicationId,
             @Param("excludeInterviewId") Long excludeInterviewId,
-            @Param("startDateTime") LocalDateTime startDateTime,
-            @Param("endDateTime") LocalDateTime endDateTime
+            @Param("startDateTime") LocalDateTime startDateTime
     );
 
     @Query("""
@@ -87,14 +85,12 @@ public interface InterviewParticipantRepository extends JpaRepository<InterviewP
               and participant.employee.id = :employeeId
               and interview.status = com.shinyoung.recruit.enumeration.InterviewStatus.CONFIRMED
               and interview.id <> :excludeInterviewId
-              and interview.startDateTime < :endDateTime
-              and :startDateTime < interview.endDateTime
+              and interview.startDateTime = :startDateTime
             """)
     boolean existsInterviewerConfirmedTimeCollision(
             @Param("employeeId") Long employeeId,
             @Param("excludeInterviewId") Long excludeInterviewId,
-            @Param("startDateTime") LocalDateTime startDateTime,
-            @Param("endDateTime") LocalDateTime endDateTime
+            @Param("startDateTime") LocalDateTime startDateTime
     );
 
     @Query("""
@@ -112,7 +108,7 @@ public interface InterviewParticipantRepository extends JpaRepository<InterviewP
               and application.status <> com.shinyoung.recruit.enumeration.JobApplicationStatus.WITHDRAWN
               and interview.status in :visibleStatuses
               and (:status is null or interview.status = :status)
-              and (:from is null or interview.endDateTime > :from)
+              and (:from is null or interview.startDateTime >= :from)
               and (:to is null or interview.startDateTime < :to)
             order by interview.startDateTime asc, interview.id asc, participant.id asc
             """)
@@ -140,7 +136,7 @@ public interface InterviewParticipantRepository extends JpaRepository<InterviewP
               and application.status <> com.shinyoung.recruit.enumeration.JobApplicationStatus.WITHDRAWN
               and interview.status in :visibleStatuses
               and (:status is null or interview.status = :status)
-              and (:from is null or interview.endDateTime > :from)
+              and (:from is null or interview.startDateTime >= :from)
               and (:to is null or interview.startDateTime < :to)
             order by interview.startDateTime asc, interview.id asc, participant.id asc
             """)
@@ -186,7 +182,7 @@ public interface InterviewParticipantRepository extends JpaRepository<InterviewP
               and participant.employee.id = :employeeId
               and interview.status in :visibleStatuses
               and (:status is null or interview.status = :status)
-              and (:from is null or interview.endDateTime > :from)
+              and (:from is null or interview.startDateTime >= :from)
               and (:to is null or interview.startDateTime < :to)
             order by interview.startDateTime asc, interview.id asc, participant.id asc
             """)
@@ -237,4 +233,68 @@ public interface InterviewParticipantRepository extends JpaRepository<InterviewP
               and participant.participantStatus = com.shinyoung.recruit.enumeration.InterviewParticipantStatus.ASSIGNED
             """)
     long countAssignedCandidatesByInterviewId(@Param("interviewId") Long interviewId);
+
+    /** 면접 스케줄 조회 — 단계의 취소되지 않은 면접에 배정된 지원자(지원서·모집분야 함께). */
+    @Query("""
+            select participant
+            from InterviewParticipant participant
+            join fetch participant.interview interview
+            join fetch participant.jobApplication application
+            join fetch application.jobPosition jobPosition
+            where interview.stage.id = :stageId
+              and interview.status <> com.shinyoung.recruit.enumeration.InterviewStatus.CANCELLED
+              and participant.role = com.shinyoung.recruit.enumeration.InterviewParticipantRole.CANDIDATE
+              and participant.participantStatus = com.shinyoung.recruit.enumeration.InterviewParticipantStatus.ASSIGNED
+            """)
+    List<InterviewParticipant> findScheduleCandidatesByStageId(@Param("stageId") Long stageId);
+
+    /** 면접 스케줄 조회 — 단계의 취소되지 않은 면접에 배정된 면접관(칸 안 순서대로). */
+    @Query("""
+            select participant
+            from InterviewParticipant participant
+            join fetch participant.interview interview
+            join fetch participant.employee employee
+            where interview.stage.id = :stageId
+              and interview.status <> com.shinyoung.recruit.enumeration.InterviewStatus.CANCELLED
+              and participant.role = com.shinyoung.recruit.enumeration.InterviewParticipantRole.INTERVIEWER
+              and participant.participantStatus = com.shinyoung.recruit.enumeration.InterviewParticipantStatus.ASSIGNED
+            order by participant.sortOrder asc, participant.id asc
+            """)
+    List<InterviewParticipant> findScheduleInterviewersByStageId(@Param("stageId") Long stageId);
+
+    /** 면접 스케줄 업로드 — 교체 대상 단계 밖의 확정 면접에 같은 면접 시각으로 배정된 지원자인지. */
+    @Query("""
+            select count(participant) > 0
+            from InterviewParticipant participant
+            join participant.interview interview
+            where participant.role = com.shinyoung.recruit.enumeration.InterviewParticipantRole.CANDIDATE
+              and participant.participantStatus = com.shinyoung.recruit.enumeration.InterviewParticipantStatus.ASSIGNED
+              and participant.jobApplication.id = :jobApplicationId
+              and interview.status = com.shinyoung.recruit.enumeration.InterviewStatus.CONFIRMED
+              and interview.stage.id <> :stageId
+              and interview.startDateTime = :startDateTime
+            """)
+    boolean existsCandidateConfirmedAtStartOutsideStage(
+            @Param("jobApplicationId") Long jobApplicationId,
+            @Param("stageId") Long stageId,
+            @Param("startDateTime") LocalDateTime startDateTime
+    );
+
+    /** 면접 스케줄 업로드 — 교체 대상 단계 밖의 확정 면접에 같은 면접 시각으로 배정된 면접관인지. */
+    @Query("""
+            select count(participant) > 0
+            from InterviewParticipant participant
+            join participant.interview interview
+            where participant.role = com.shinyoung.recruit.enumeration.InterviewParticipantRole.INTERVIEWER
+              and participant.participantStatus = com.shinyoung.recruit.enumeration.InterviewParticipantStatus.ASSIGNED
+              and participant.employee.id = :employeeId
+              and interview.status = com.shinyoung.recruit.enumeration.InterviewStatus.CONFIRMED
+              and interview.stage.id <> :stageId
+              and interview.startDateTime = :startDateTime
+            """)
+    boolean existsInterviewerConfirmedAtStartOutsideStage(
+            @Param("employeeId") Long employeeId,
+            @Param("stageId") Long stageId,
+            @Param("startDateTime") LocalDateTime startDateTime
+    );
 }

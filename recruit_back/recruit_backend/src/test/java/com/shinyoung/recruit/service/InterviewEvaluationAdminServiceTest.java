@@ -338,7 +338,7 @@ class InterviewEvaluationAdminServiceTest {
                 stage,
                 "Group A",
                 start(),
-                start().plusHours(1),
+                null,
                 InterviewMethod.IN_PERSON,
                 "Head office",
                 "Room 1",

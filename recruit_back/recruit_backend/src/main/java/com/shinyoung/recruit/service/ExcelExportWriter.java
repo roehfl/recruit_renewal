@@ -4,6 +4,7 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -55,8 +56,9 @@ public class ExcelExportWriter {
             Sheet sheet = workbook.createSheet(spec.sheetName());
             List<ExportColumn<T>> columns = spec.columns();
             CellStyle readOnlyStyle = createReadOnlyStyle(workbook);
+            CellStyle emphasizedHeaderStyle = spec.emphasizeHeader() ? createEmphasizedHeaderStyle(workbook) : null;
 
-            writeHeader(sheet, columns, escapeFormulaPrefix, readOnlyStyle);
+            writeHeader(sheet, columns, escapeFormulaPrefix, readOnlyStyle, emphasizedHeaderStyle);
 
             int rowIndex = 1;
             int page = 0;
@@ -106,17 +108,32 @@ public class ExcelExportWriter {
         return style;
     }
 
+    /** 강조 헤더(노란 음영 + 굵게). 헤더 셀에만 쓰므로 workbook당 한 번 만든다. */
+    private CellStyle createEmphasizedHeaderStyle(SXSSFWorkbook workbook) {
+        Font font = workbook.createFont();
+        font.setBold(true);
+        CellStyle style = workbook.createCellStyle();
+        style.setFillForegroundColor(IndexedColors.YELLOW.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setFont(font);
+        return style;
+    }
+
+    /** @param emphasizedHeaderStyle null 이 아니면 읽기전용 음영보다 우선해 모든 헤더 셀에 쓴다 */
     private <T> void writeHeader(
             Sheet sheet,
             List<ExportColumn<T>> columns,
             boolean escapeFormulaPrefix,
-            CellStyle readOnlyStyle
+            CellStyle readOnlyStyle,
+            CellStyle emphasizedHeaderStyle
     ) {
         Row header = sheet.createRow(0);
         for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
             ExportColumn<T> column = columns.get(columnIndex);
-            writeStringCell(header, columnIndex, column.header(), escapeFormulaPrefix,
-                    column.readOnly() ? readOnlyStyle : null);
+            CellStyle style = emphasizedHeaderStyle != null
+                    ? emphasizedHeaderStyle
+                    : (column.readOnly() ? readOnlyStyle : null);
+            writeStringCell(header, columnIndex, column.header(), escapeFormulaPrefix, style);
         }
     }
 

@@ -107,6 +107,13 @@ class InterviewRepositoryTest {
         );
 
         assertThat(interviews).extracting(Interview::getId).containsExactly(draft.getId());
+        assertThat(interviewRepository.searchAdminInterviews(
+                jobPosting.getId(),
+                stage.getId(),
+                InterviewStatus.DRAFT,
+                start().plusMinutes(1),
+                null
+        )).isEmpty();
     }
 
     private JobPosting saveJobPosting() {
@@ -127,7 +134,7 @@ class InterviewRepositoryTest {
                 stage,
                 "1조",
                 startDateTime,
-                startDateTime.plusHours(1),
+                null,
                 InterviewMethod.IN_PERSON,
                 "본사",
                 null,

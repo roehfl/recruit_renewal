@@ -55,7 +55,7 @@ public class AdminDatasetExportService {
                     new ExportColumn<>("stageType", row -> text(row.stageType())),
                     new ExportColumn<>("groupName", row -> text(row.groupName())),
                     new ExportColumn<>("startDateTime", row -> text(row.startDateTime())),
-                    new ExportColumn<>("endDateTime", row -> text(row.endDateTime())),
+                    new ExportColumn<>("arrivalDateTime", row -> text(row.arrivalDateTime())),
                     new ExportColumn<>("method", row -> text(row.method())),
                     new ExportColumn<>("locationName", row -> text(row.locationName())),
                     new ExportColumn<>("roomName", row -> text(row.roomName())),

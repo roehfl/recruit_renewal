@@ -21,23 +21,41 @@ class InterviewTest {
     }
 
     @Test
-    void endDateTime이_startDateTime보다_이후가_아니면_실패한다() {
-        JobPosting jobPosting = jobPosting();
-        Stage stage = stage(jobPosting);
-        LocalDateTime start = LocalDateTime.of(2026, 6, 1, 10, 0);
+    void arrivalDateTime이_startDateTime보다_이후면_실패한다() {
+        assertThatThrownBy(() -> interviewWithArrival(start().plusMinutes(1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Interview arrivalDateTime must not be after startDateTime.");
+    }
 
-        assertThatThrownBy(() -> Interview.createDraft(
-                jobPosting,
-                stage,
+    @Test
+    void arrivalDateTime이_null이면_생성된다() {
+        Interview interview = interviewWithArrival(null);
+
+        assertThat(interview.getArrivalDateTime()).isNull();
+    }
+
+    @Test
+    void arrivalDateTime이_startDateTime과_같거나_이전이면_생성된다() {
+        assertThat(interviewWithArrival(start()).getArrivalDateTime()).isEqualTo(start());
+        assertThat(interviewWithArrival(start().minusMinutes(30)).getArrivalDateTime())
+                .isEqualTo(start().minusMinutes(30));
+    }
+
+    @Test
+    void updateDraft시_arrivalDateTime이_startDateTime보다_이후면_실패한다() {
+        Interview interview = interviewWithArrival(null);
+
+        assertThatThrownBy(() -> interview.updateDraft(
                 "1조",
-                start,
-                start,
+                start(),
+                start().plusMinutes(1),
                 InterviewMethod.IN_PERSON,
                 "본사",
                 null,
                 null,
                 null
-        )).isInstanceOf(IllegalArgumentException.class);
+        )).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Interview arrivalDateTime must not be after startDateTime.");
     }
 
     @Test
@@ -55,7 +73,7 @@ class InterviewTest {
                 stage,
                 "1조",
                 start(),
-                end(),
+                null,
                 InterviewMethod.IN_PERSON,
                 "본사",
                 null,
@@ -71,7 +89,7 @@ class InterviewTest {
                 null,
                 "1조",
                 start(),
-                end(),
+                null,
                 InterviewMethod.IN_PERSON,
                 "본사",
                 null,
@@ -89,7 +107,7 @@ class InterviewTest {
                 stage(jobPosting),
                 "1조",
                 start(),
-                end(),
+                null,
                 null,
                 "본사",
                 null,
@@ -146,7 +164,7 @@ class InterviewTest {
                 stage(jobPosting),
                 groupName,
                 start(),
-                end(),
+                null,
                 InterviewMethod.IN_PERSON,
                 "본사",
                 null,
@@ -162,7 +180,7 @@ class InterviewTest {
                 stage(jobPosting),
                 "1조",
                 start(),
-                end(),
+                null,
                 method,
                 locationName,
                 null,
@@ -171,8 +189,24 @@ class InterviewTest {
         );
     }
 
+    private Interview interviewWithArrival(LocalDateTime arrivalDateTime) {
+        JobPosting jobPosting = jobPosting();
+        return Interview.createDraft(
+                jobPosting,
+                stage(jobPosting),
+                "1조",
+                start(),
+                arrivalDateTime,
+                InterviewMethod.IN_PERSON,
+                "본사",
+                null,
+                null,
+                null
+        );
+    }
+
     private JobPosting jobPosting() {
-        return JobPosting.create("공고", "내용", start().minusDays(1), end().plusDays(1));
+        return JobPosting.create("공고", "내용", start().minusDays(1), start().plusDays(1));
     }
 
     private Stage stage(JobPosting jobPosting) {
@@ -181,9 +215,5 @@ class InterviewTest {
 
     private LocalDateTime start() {
         return LocalDateTime.of(2026, 6, 1, 10, 0);
-    }
-
-    private LocalDateTime end() {
-        return LocalDateTime.of(2026, 6, 1, 11, 0);
     }
 }

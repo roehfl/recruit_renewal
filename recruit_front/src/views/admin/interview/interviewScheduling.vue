@@ -1,21 +1,25 @@
 <!-- eslint-disable @typescript-eslint/no-unused-vars -->
 <script setup lang="ts">
-import { computed, onMounted, ref, reactive } from 'vue'
-import { message } from 'ant-design-vue'
+import { computed, h, onMounted, ref, reactive } from 'vue'
+import { message, Modal } from 'ant-design-vue'
+import axios from 'axios'
 import { adminJobPostingApi } from '@/api/admin/adminJobPostingApi'
 import { adminInterviewApi } from '@/api/admin/adminInterviewApi'
+import { adminStageApi } from '@/api/admin/adminStageApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import type { AdminJobPosition } from '@/types/admin/jobPosting'
 import type { AdminJobPostingListItem } from '@/types/jobPosting'
+import type { ApiFailurePayload, StageListItem, StageType } from '@/types/admin/stage'
 import type {
-    InterviewSearchParams,
-    AdminInterviewSummaryResponse,
+    AdminInterviewScheduleInterviewer,
+    AdminInterviewScheduleRow,
+    InterviewScheduleSearchParams,
+    InterviewScheduleUploadResponse,
 } from '@/types/admin/interview'
 import { ReloadOutlined, SearchOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons-vue'
 import { formatDate } from '@/common/dateUtil'
-import { saveBlobResponse } from '@/common/fileDownload'
+import { getBlobErrorMessage, saveBlobResponse } from '@/common/fileDownload'
 import type { TableColumnsType } from 'ant-design-vue'
-import { apiClient } from '@/api/client'
 
 const loading = ref(false)
 const hasSearched = ref(false)
@@ -61,32 +65,70 @@ const applicationTypeOptions = [
   { value: 'NEW_GRADUATE_OR_EXPERIENCED', label: '신입/경력' },
 ]
 
+/* 면접 단계: 면접 유형 단계만 스케줄을 가진다(백엔드 InterviewScheduleService 와 같은 기준) */
+const INTERVIEW_STAGE_TYPES: StageType[] = ['FIRST_INTERVIEW', 'SECOND_INTERVIEW', 'FINAL_INTERVIEW']
+const stages = ref<StageListItem[]>([])
+const interviewStages = computed(() =>
+  stages.value
+    .filter((stage) => INTERVIEW_STAGE_TYPES.includes(stage.stageType))
+    .sort((a, b) => a.stageOrder - b.stageOrder),
+)
+
 /* 공통 검색 조건 */
-const initialSearchRequest: InterviewSearchParams = {
+interface ScheduleSearchForm {
+  stageId: number | undefined
+  applicationType: string | undefined
+  jobPositionId: number | undefined
+  workLocation: string | undefined
+  groupName: string | undefined
+}
+const initialSearchRequest: ScheduleSearchForm = {
     stageId: undefined,
-    status: undefined,
-    from: undefined,
-    to: undefined,
     jobPositionId: undefined,
     workLocation: undefined,
     applicationType: undefined,
     groupName: undefined,
 };
-const searchRequest = reactive<InterviewSearchParams>({
+const searchRequest = reactive<ScheduleSearchForm>({
   ...initialSearchRequest,
 })
+
+/** 화면의 빈 선택('전체')은 조건 없음으로 보낸다. 면접단계가 없으면 조회할 수 없다. */
+const toSearchParams = (): InterviewScheduleSearchParams | null => {
+  if (searchRequest.stageId === undefined) return null
+  const groupName = searchRequest.groupName?.trim()
+  return {
+    stageId: searchRequest.stageId,
+    applicationType: searchRequest.applicationType || undefined,
+    jobPositionId: searchRequest.jobPositionId,
+    workLocation: searchRequest.workLocation || undefined,
+    groupName: groupName || undefined,
+  }
+}
+
+/** 기본 면접단계: 진행 중 → 준비 → 첫 면접 단계. */
+const pickDefaultStage = (list: StageListItem[]): StageListItem | undefined =>
+  list.find((stage) => stage.status === 'IN_PROGRESS')
+  ?? list.find((stage) => stage.status === 'READY')
+  ?? list[0]
 
 const changeJobPosting = async (jobPostingId: number): Promise<void> => {
   selectedJobPostingId.value = jobPostingId;
   Object.assign(searchRequest, initialSearchRequest);
+  interviews.value = []
+  lastSearchParams.value = null
   refreshing.value = true
   hasSearched.value = false
   try {
-    const response = await adminJobPostingApi.getJobPosting(jobPostingId)
-    const detail = response.data.data;
-    jobPositions.value = detail.jobPositions;
+    const [postingResponse, stageResponse] = await Promise.all([
+      adminJobPostingApi.getJobPosting(jobPostingId),
+      adminStageApi.getStages(jobPostingId),
+    ])
+    jobPositions.value = postingResponse.data.data.jobPositions;
+    stages.value = stageResponse.data.data
+    searchRequest.stageId = pickDefaultStage(interviewStages.value)?.id
   } catch (error) {
-    message.error(getApiErrorMessage(error, '지원분야를 불러오지 못했습니다.'))
+    message.error(getApiErrorMessage(error, '지원분야·면접단계를 불러오지 못했습니다.'))
   } finally {
     refreshing.value = false
   }
@@ -109,25 +151,30 @@ const columns: TableColumnsType = [
 ]
 
 /* ---------------- 데이터 ---------------- */
-const interviews = ref<AdminInterviewSummaryResponse[]>([])
+const interviews = ref<AdminInterviewScheduleRow[]>([])
+/** 표에 보이는 행을 만든 조건. 다운로드가 화면과 같은 행을 받도록 이 조건으로 요청한다. */
+const lastSearchParams = ref<InterviewScheduleSearchParams | null>(null)
 
-const rowKey = (record: AdminInterviewSummaryResponse): string | number => {
-  return (record as AdminInterviewSummaryResponse).interviewId
-}
+/* 한 면접(조)에 지원자가 여럿이라 면접 id 만으로는 행이 겹친다. */
+const rowKey = (record: AdminInterviewScheduleRow): string => `${record.interviewId}-${record.applicationId}`
+
+const interviewersText = (interviewers: AdminInterviewScheduleInterviewer[]): string =>
+  interviewers.map((interviewer) => `${interviewer.name}(${interviewer.loginId})`).join(', ')
 
 /* ---------------- 검색 ---------------- */
 const search = async () => {
-  // 면접 단계 화면 추가 후 주석 해제
-  // if (!searchRequest.stageId) return message.warning('면접단계 선택은 필수입니다.');
+  if (!selectedJobPostingId.value) return
+  const params = toSearchParams()
+  if (!params) {
+    message.warning('면접단계를 선택하세요.')
+    return
+  }
   loading.value = true
 
   try {
-    if (selectedJobPostingId.value) {
-      const response = await adminInterviewApi.getInterviews(selectedJobPostingId.value, searchRequest);
-      const data = response.data.data;
-
-      interviews.value = data;
-    }
+    const response = await adminInterviewApi.getSchedules(selectedJobPostingId.value, params);
+    interviews.value = response.data.data;
+    lastSearchParams.value = params
   } catch (error) {
     message.error(getApiErrorMessage(error, '면접 스케줄링 조회에 실패했습니다.'))
   } finally {
@@ -136,47 +183,99 @@ const search = async () => {
   }
 }
 
+/* 면접단계는 필수 선택이라 초기화해도 유지한다. */
 const refresh = (): void => {
   if (selectedJobPostingId.value === null || refreshing.value) return
-  Object.assign(searchRequest, initialSearchRequest)
+  Object.assign(searchRequest, { ...initialSearchRequest, stageId: searchRequest.stageId })
   interviews.value = [];
+  lastSearchParams.value = null
   hasSearched.value = false
 }
 
 /* ---------------- 엑셀 다운로드 ---------------- */
+/* 표에 행이 있으면 그 행을 채운 파일, 비어 있으면 헤더만 있는 양식을 받는다. */
 const downloadExcel = async () => {
   if (!selectedJobPostingId.value) return
   loading.value = true
   try {
-    const stageId = searchRequest.stageId;
-    const response = await apiClient.get(`/admin/job-postings/${selectedJobPostingId.value}/interviews/export`, {
-      params: { stageId },
-      responseType: 'blob',
-    })
-    saveBlobResponse(response, `${selectedJobPostingId.value}_${stageId}_면접스케줄링.xlsx`)
+    if (interviews.value.length > 0 && lastSearchParams.value) {
+      const response = await adminInterviewApi.exportSchedules(selectedJobPostingId.value, lastSearchParams.value)
+      saveBlobResponse(response, '면접스케줄.xlsx')
+    } else {
+      const response = await adminInterviewApi.downloadScheduleTemplate(selectedJobPostingId.value)
+      saveBlobResponse(response, '면접스케줄_양식.xlsx')
+    }
   } catch (error) {
-    message.error(getApiErrorMessage(error, '엑셀 다운로드에 실패했습니다.'))
+    message.error(await getBlobErrorMessage(error, '엑셀 다운로드에 실패했습니다.'))
   } finally {
     loading.value = false
   }
 }
 
-/* ---------------- 엑셀 업로드 (세팅) ---------------- */
-const uploadExcel = (file: File) => {
+/* ---------------- 엑셀 업로드 ---------------- */
+/** 400 본문에서 업로드 결과를 꺼낸다. 행 오류면 data 에 오류 목록이 있고, 파일 자체가 거부되면 null. */
+const extractUploadPayload = (error: unknown): InterviewScheduleUploadResponse | null => {
+  if (!axios.isAxiosError<ApiFailurePayload<InterviewScheduleUploadResponse>>(error)) {
+    return null
+  }
+  return error.response?.data?.data ?? null
+}
+
+const MAX_ERROR_LINES = 50
+
+const showUploadErrors = (payload: InterviewScheduleUploadResponse) => {
+  const lines = [
+    ...payload.errors,
+    ...payload.rowErrors.map((rowError) => `${rowError.rowNumber}행: ${rowError.messages.join(' / ')}`),
+  ]
+  const shown = lines.slice(0, MAX_ERROR_LINES)
+  Modal.error({
+    title: '업로드 검증에 실패하여 반영하지 않았습니다.',
+    width: 720,
+    content: h('div', [
+      h('p', '아래 오류를 고친 뒤 다시 업로드하세요. 오류가 하나라도 있으면 아무것도 반영되지 않습니다.'),
+      h('ul', shown.map((line) => h('li', line))),
+      lines.length > shown.length ? h('p', `외 ${lines.length - shown.length}건`) : null,
+    ]),
+  })
+}
+
+const uploadExcel = async (file: File) => {
+  if (!selectedJobPostingId.value || searchRequest.stageId === undefined) return
   loading.value = true
   try {
-    // TODO: 엑셀 업로드 API 연동 후 데이터 매핑
-    message.success('엑셀 업로드가 완료되었습니다.')
+    const response = await adminInterviewApi.uploadSchedules(selectedJobPostingId.value, searchRequest.stageId, file)
+    const result = response.data.data
+    message.success(`엑셀 업로드가 완료되었습니다. 면접 ${result.interviewCount}건 · 지원자 ${result.candidateCount}명`)
+    loading.value = false
+    await search()
   } catch (error) {
-    message.error(getApiErrorMessage(error, '엑셀 업로드에 실패했습니다.'))
+    const payload = extractUploadPayload(error)
+    if (payload) {
+      showUploadErrors(payload)
+    } else {
+      message.error(getApiErrorMessage(error, '엑셀 업로드에 실패했습니다.'))
+    }
   } finally {
     loading.value = false
   }
-  return false
 }
 
+/* 업로드는 단계 스케줄 전체 교체 + 즉시 공개라 되돌릴 수 없다. 확인을 받는다. */
 const beforeUpload = (file: File) => {
-  uploadExcel(file)
+  if (!selectedJobPostingId.value) return false
+  const stage = interviewStages.value.find((item) => item.id === searchRequest.stageId)
+  if (!stage) {
+    message.warning('면접단계를 선택하세요.')
+    return false
+  }
+  Modal.confirm({
+    title: '면접 스케줄을 업로드할까요?',
+    content: `${stage.stageName}의 기존 스케줄을 파일 내용으로 모두 교체하고, 바로 지원자·면접관에게 공개합니다.`,
+    okText: '업로드',
+    cancelText: '취소',
+    onOk: () => uploadExcel(file),
+  })
   return false
 }
 
@@ -228,11 +327,14 @@ onMounted(async () => {
                 </td>
                 <th>면접단계<em> *</em></th>
                 <td>
-                  <!-- 면접 단계 데이터 처리 확인 후 추가 예정 -->
-                  <!-- <a-radio-group v-model:value="searchRequest.stageId" button-style="solid">
-                    <a-radio-button :value="2">1차 면접</a-radio-button>
-                    <a-radio-button :value="3">최종 면접</a-radio-button>
-                  </a-radio-group> -->
+                  <a-radio-group v-if="interviewStages.length > 0" v-model:value="searchRequest.stageId" button-style="solid">
+                    <a-radio-button v-for="stage in interviewStages" :key="stage.id" :value="stage.id">
+                      {{ stage.stageName }}
+                    </a-radio-button>
+                  </a-radio-group>
+                  <span v-else-if="selectedJobPostingId !== null && !refreshing" class="guide-item-default">
+                    면접 단계가 없습니다. 전형결과 관리의 단계 설정에서 면접 단계를 추가하세요.
+                  </span>
                 </td>
               </tr>
               <tr>
@@ -262,6 +364,8 @@ onMounted(async () => {
           <div class="interviewer-setting-guide">
           <p class="guide-item-default">※ 면접 스케줄링 방법 : 채용구분, 면접 단계 선택 → 검색버튼으로 조회 → 엑셀 다운로드 후 내용 작성 → 엑셀 업로드</p>
           <p class="guide-item-default">※ 엑셀 업로드 방법 : 엑셀을 다운로드 → 암호화 해제 → 엑셀 업로드</p>
+          <p class="guide-item-default">※ 업로드하면 선택한 면접단계의 기존 스케줄이 파일 내용으로 교체되고, 바로 지원자·면접관에게 공개됩니다.</p>
+          <p class="guide-item-default">※ 한 행에 지원자 1명. 같은 조는 일자·장소·도착시간·면접시간·면접관이 같아야 하고, 조·면접순서는 1부터 이어서 적습니다. 면접관은 이름(로그인ID)을 쉼표로 구분합니다.</p>
           <div>
             <b class="guide-item-required">※ 화면에서 편집 불가&nbsp;</b>
             <b class="guide-item">엑셀 다운로드 후 수정한 엑셀을 업로드 하여 편집 가능</b>
@@ -278,13 +382,13 @@ onMounted(async () => {
         <div class="table-overflow">
           <a-table class="table-width" :columns="columns" :data-source="interviews" :pagination="{ pageSize: 10 }" :row-key="rowKey">
             <template #bodyCell="{ column, record }">
-                <template v-if="column.key === 'interviewDate'">{{ formatDate(record.startDateTime, 'YYYY-MM-DD') }}</template>
-                <template v-else-if="column.key === 'locationName'">{{ `${record.locationName ?? ''} ${record.roomName ?? ''}`.trim() }}</template>
-                <template v-else-if="column.key === 'arrivalTime'">{{ formatDate(record.startDateTime, 'HH:mm') }}</template>
-                <template v-else-if="column.key === 'interviewTime'">{{ formatDate(record.endDateTime, 'HH:mm') }}</template>
-                <template v-else-if="column.key === 'interviewOrder'">{{ record.candidateCount }}</template>
+                <template v-if="column.key === 'interviewDate'">{{ formatDate(record.interviewDateTime, 'YYYY-MM-DD') }}</template>
+                <template v-else-if="column.key === 'locationName'">{{ record.locationName ?? '' }}</template>
+                <template v-else-if="column.key === 'arrivalTime'">{{ record.arrivalDateTime ? formatDate(record.arrivalDateTime, 'HH:mm') : '' }}</template>
+                <template v-else-if="column.key === 'interviewTime'">{{ formatDate(record.interviewDateTime, 'HH:mm') }}</template>
+                <template v-else-if="column.key === 'interviewOrder'">{{ record.candidateOrder ?? '' }}</template>
                 <template v-else-if="column.key === 'groupName'">{{ record.groupName }}</template>
-                <template v-else-if="column.key === 'interviewerName'">{{ record.interviewerCount }}</template>
+                <template v-else-if="column.key === 'interviewerName'">{{ interviewersText(record.interviewers) }}</template>
                 <template v-else-if="column.key === 'applicationId'">{{ record.applicationId ?? '' }}</template>
                 <template v-else-if="column.key === 'applicantName'">{{ record.applicantName ?? '' }}</template>
               </template>

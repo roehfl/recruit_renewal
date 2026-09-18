@@ -30,7 +30,7 @@ import java.util.List;
         name = "interview",
         indexes = {
                 @Index(name = "idx_interview_job_posting_stage_status", columnList = "job_posting_id,stage_id,status"),
-                @Index(name = "idx_interview_time_range", columnList = "start_date_time,end_date_time")
+                @Index(name = "idx_interview_start_date_time", columnList = "start_date_time")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -54,8 +54,8 @@ public class Interview extends BaseEntity {
     @Column(nullable = false)
     private LocalDateTime startDateTime;
 
-    @Column(nullable = false)
-    private LocalDateTime endDateTime;
+    /** 지원자 도착 시각. 면접 시각보다 늦을 수 없다. 종료 시각은 다루지 않는다. */
+    private LocalDateTime arrivalDateTime;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
@@ -85,19 +85,19 @@ public class Interview extends BaseEntity {
             Stage stage,
             String groupName,
             LocalDateTime startDateTime,
-            LocalDateTime endDateTime,
+            LocalDateTime arrivalDateTime,
             InterviewMethod method,
             String locationName,
             String roomName,
             String onlineMeetingUrl,
             String memo
     ) {
-        validate(jobPosting, stage, groupName, startDateTime, endDateTime, method, locationName, onlineMeetingUrl);
+        validate(jobPosting, stage, groupName, startDateTime, arrivalDateTime, method, locationName, onlineMeetingUrl);
         this.jobPosting = jobPosting;
         this.stage = stage;
         this.groupName = groupName.trim();
         this.startDateTime = startDateTime;
-        this.endDateTime = endDateTime;
+        this.arrivalDateTime = arrivalDateTime;
         this.method = method;
         this.locationName = trimToNull(locationName);
         this.roomName = trimToNull(roomName);
@@ -111,7 +111,7 @@ public class Interview extends BaseEntity {
             Stage stage,
             String groupName,
             LocalDateTime startDateTime,
-            LocalDateTime endDateTime,
+            LocalDateTime arrivalDateTime,
             InterviewMethod method,
             String locationName,
             String roomName,
@@ -123,7 +123,7 @@ public class Interview extends BaseEntity {
                 stage,
                 groupName,
                 startDateTime,
-                endDateTime,
+                arrivalDateTime,
                 method,
                 locationName,
                 roomName,
@@ -135,7 +135,7 @@ public class Interview extends BaseEntity {
     public void updateDraft(
             String groupName,
             LocalDateTime startDateTime,
-            LocalDateTime endDateTime,
+            LocalDateTime arrivalDateTime,
             InterviewMethod method,
             String locationName,
             String roomName,
@@ -145,10 +145,10 @@ public class Interview extends BaseEntity {
         if (!isDraft()) {
             throw new IllegalStateException("Only DRAFT interview can be updated.");
         }
-        validate(this.jobPosting, this.stage, groupName, startDateTime, endDateTime, method, locationName, onlineMeetingUrl);
+        validate(this.jobPosting, this.stage, groupName, startDateTime, arrivalDateTime, method, locationName, onlineMeetingUrl);
         this.groupName = groupName.trim();
         this.startDateTime = startDateTime;
-        this.endDateTime = endDateTime;
+        this.arrivalDateTime = arrivalDateTime;
         this.method = method;
         this.locationName = trimToNull(locationName);
         this.roomName = trimToNull(roomName);
@@ -192,7 +192,7 @@ public class Interview extends BaseEntity {
             Stage stage,
             String groupName,
             LocalDateTime startDateTime,
-            LocalDateTime endDateTime,
+            LocalDateTime arrivalDateTime,
             InterviewMethod method,
             String locationName,
             String onlineMeetingUrl
@@ -212,11 +212,8 @@ public class Interview extends BaseEntity {
         if (startDateTime == null) {
             throw new IllegalArgumentException("Interview startDateTime is required.");
         }
-        if (endDateTime == null) {
-            throw new IllegalArgumentException("Interview endDateTime is required.");
-        }
-        if (!endDateTime.isAfter(startDateTime)) {
-            throw new IllegalArgumentException("Interview endDateTime must be after startDateTime.");
+        if (arrivalDateTime != null && arrivalDateTime.isAfter(startDateTime)) {
+            throw new IllegalArgumentException("Interview arrivalDateTime must not be after startDateTime.");
         }
         if (method == null) {
             throw new IllegalArgumentException("Interview method is required.");

@@ -15,8 +15,7 @@ public record InterviewUpdateRequest(
         @NotNull(message = "Interview startDateTime is required.")
         LocalDateTime startDateTime,
 
-        @NotNull(message = "Interview endDateTime is required.")
-        LocalDateTime endDateTime,
+        LocalDateTime arrivalDateTime,
 
         @NotNull(message = "Interview method is required.")
         InterviewMethod method,

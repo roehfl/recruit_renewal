@@ -112,6 +112,8 @@ public class ExportAuditLogger {
             case "APPLICATIONS" -> AuditActionType.EXPORT_APPLICATIONS;
             case "STAGE_RESULTS" -> AuditActionType.EXPORT_STAGE_RESULTS;
             case "INTERVIEWS" -> AuditActionType.EXPORT_INTERVIEWS;
+            // 면접 스케줄(조회 표 양식)도 면접 데이터 반출이다. datasetType 으로 두 양식을 가른다.
+            case "INTERVIEW_SCHEDULES" -> AuditActionType.EXPORT_INTERVIEWS;
             case "INTERVIEW_EVALUATIONS" -> AuditActionType.EXPORT_EVALUATIONS;
             case "STAGE_RESULT_UPLOAD_TEMPLATE" -> AuditActionType.EXPORT_STAGE_RESULT_TEMPLATE;
             default -> throw new IllegalArgumentException("Unknown export dataset type: " + datasetType);

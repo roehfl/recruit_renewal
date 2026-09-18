@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>관리자 면접 스케줄링 - 엑셀 입력 구현</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal (front + back)</div>
+  <h1>관리자 면접 스케줄링 - 엑셀 입력 구현</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge muted">작성일: 2026-09-18</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>관리자 면접 스케줄링 화면의 입력을 엑셀 업로드로만 받도록 구현했습니다. 조회 표, 업로드 양식, 다운로드 파일이 같은 한글 9열 양식을 씁니다.</p>
+      <p>업로드는 선택한 면접단계의 기존 스케줄을 파일 내용으로 통째로 교체하고 바로 확정(<code>CONFIRMED</code>)합니다. 오류가 1건이라도 있으면 아무것도 반영하지 않고 행별 오류를 돌려줍니다.</p>
+      <p>요청에 따라 면접 도메인에서 종료 시각(<code>endDateTime</code>)을 없애고 도착 시각(<code>arrivalDateTime</code>)을 추가했습니다. 시간 겹침 검사는 "같은 면접 시각" 기준으로 바뀌었습니다.</p>
+      <p>백엔드 36개 테스트 클래스(419건)와 프론트 type-check가 통과했습니다. 배포 전 운영 DB 컬럼 삭제 작업이 필요합니다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">백엔드 구현·테스트 완료</span></p>
+      <p><span class="badge done">프론트 화면 연결·type-check 통과</span></p>
+      <p><span class="badge done">api-contract.md 🟢 확정</span></p>
+      <p><span class="badge warn">운영 DB 컬럼 삭제 필요</span></p>
+      <p><span class="badge pending">브라우저 실화면 확인 대기</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>면접 도메인: 종료 시각 제거, 도착 시각 추가</li>
+          <li>스케줄 조회 API(지원자 행, 조 → 면접순서 정렬, 필터)</li>
+          <li>다운로드(조회 행 채움) · 템플릿(헤더만) xlsx</li>
+          <li>헤더 노란 음영 + 굵은 한글, 틀고정</li>
+          <li>업로드: 전체 교체 + 즉시 확정 + all-or-nothing 검증</li>
+          <li>화면: 면접단계 선택, 조회, 다운로드, 업로드 확인·오류 표시, 업로드 후 자동 재조회</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>운영 DB의 <code>end_date_time</code> 컬럼·인덱스 삭제(수동 작업)</li>
+          <li>로그인 상태에서의 브라우저 실화면 확인</li>
+          <li>업로드(쓰기) 감사 로그 — 기존 면접 쓰기 API도 감사 로그가 없어 맞춤</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>화면에서의 행 편집(엑셀 전용 입력)</li>
+          <li>온라인·혼합 면접 방식(업로드는 대면 <code>IN_PERSON</code> 고정)</li>
+          <li>지원자·면접관 화면(프론트 미구현, 백엔드 응답만 변경)</li>
+          <li>기존 면접 목록 export 양식 개편(종료 열만 도착 열로 교체)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>도메인 모델</h2>
+    <div class="two">
+      <div class="card">
+        <h3>Interview (변경)</h3>
+        <p><span class="badge info">엔티티</span></p>
+        <table>
+          <tr><th>필드</th><th>타입</th><th>규칙</th></tr>
+          <tr><td><code>groupName</code></td><td>String</td><td>조 번호("1", "2"…). 업로드가 저장</td></tr>
+          <tr><td><code>startDateTime</code></td><td>LocalDateTime</td><td>면접 시각 = 일자 + 면접시간</td></tr>
+          <tr><td><code>arrivalDateTime</code></td><td>LocalDateTime</td><td><span class="badge done">신규</span> nullable, 면접 시각보다 늦을 수 없음</td></tr>
+          <tr><td><s><code>endDateTime</code></s></td><td>-</td><td><span class="badge out">삭제</span> 종료 시각은 다루지 않음</td></tr>
+          <tr><td><code>locationName</code></td><td>String</td><td>장소, 최대 200자</td></tr>
+        </table>
+        <p class="small">인덱스 <code>idx_interview_time_range(start, end)</code> → <code>idx_interview_start_date_time(start)</code>.</p>
+      </div>
+      <div class="card">
+        <h3>엑셀 행 → 도메인 매핑</h3>
+        <p><span class="badge info">조 = 면접 1건</span></p>
+        <pre>
+엑셀 1행 = 지원자 1명
+  조(1..N)          ──► Interview.groupName
+  일자 + 면접시간    ──► Interview.startDateTime
+  일자 + 도착시간    ──► Interview.arrivalDateTime
+  장소              ──► Interview.locationName
+  면접관(이름(ID),…) ──► InterviewParticipant(INTERVIEWER)
+  면접순서           ──► InterviewParticipant(CANDIDATE).sortOrder
+  수험번호 / 성명     ──► JobApplication.id / 성명 스냅샷 대조</pre>
+        <ul class="list">
+          <li>같은 조의 행은 일자·장소·도착시간·면접시간·면접관이 같아야 합니다.</li>
+          <li>조와 면접순서는 1부터 빠짐없이 이어집니다.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>API 목록</h2>
+    <h3>면접 스케줄링 (신규)</h3>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/job-postings/{jobPostingId}/interview-schedules</code></td><td>지원자 행 조회. <code>stageId</code> 필수, <code>applicationType</code>·<code>jobPositionId</code>·<code>workLocation</code>·<code>groupName</code> 선택</td></tr>
+      <tr><td><code>GET</code></td><td><code>…/interview-schedules/export</code></td><td>조회 행을 채운 xlsx. export 감사 로그(<code>INTERVIEW_SCHEDULES</code>)</td></tr>
+      <tr><td><code>GET</code></td><td><code>…/interview-schedules/upload-template</code></td><td>헤더만 있는 양식</td></tr>
+      <tr><td><code>POST</code></td><td><code>…/interview-schedules/upload?stageId=</code></td><td>전체 교체 + 즉시 확정. 행 오류는 400 + <code>errors</code>·<code>rowErrors</code></td></tr>
+    </table>
+    <h3>기존 면접 API (형태 변경)</h3>
+    <table>
+      <tr><th>대상</th><th>변경</th></tr>
+      <tr><td>면접 생성·수정 요청</td><td><code>endDateTime</code> 삭제, <code>arrivalDateTime?</code> 추가</td></tr>
+      <tr><td>관리자·지원자 면접 요약·상세</td><td><code>endDateTime</code> → <code>arrivalDateTime</code></td></tr>
+      <tr><td>면접관 면접·평가 응답, 관리자 평가 응답</td><td><code>endDateTime</code> 삭제</td></tr>
+      <tr><td>기간 조회 <code>from</code>/<code>to</code></td><td>면접 시각 기준 <code>from ≤ startDateTime &lt; to</code></td></tr>
+    </table>
+    <h3>컨트롤러 배치</h3>
+    <table>
+      <tr><th>컨트롤러</th><th>담당</th></tr>
+      <tr><td><code>InterviewScheduleController</code></td><td>스케줄 조회·다운로드·템플릿·업로드 (신규)</td></tr>
+      <tr><td><code>InterviewAdminController</code> 외</td><td>경로 불변, DTO 필드만 변경</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>검증 및 비즈니스 규칙</h2>
+    <h3>파일·단계 가드 (400, 사유만)</h3>
+    <table>
+      <tr><th>규칙</th><th>설명</th></tr>
+      <tr><td>파일</td><td><code>.xlsx</code>만, 업로드 공통 크기·행 수 한도, 헤더 9열 정확 일치, 데이터 0행 거부</td></tr>
+      <tr><td>단계 유형·상태</td><td>면접 유형 단계, 준비·진행 중(<code>READY</code>/<code>IN_PROGRESS</code>)만</td></tr>
+      <tr><td>직전 단계</td><td>직전 단계가 있고 발표·마감 상태여야 함(면접 확정 기준과 동일)</td></tr>
+      <tr><td>평가 보호</td><td>단계의 면접에 평가가 하나라도 있으면 교체 거부</td></tr>
+    </table>
+    <h3>행·조 검증 (400, 오류 목록)</h3>
+    <table>
+      <tr><th>구분</th><th>규칙</th></tr>
+      <tr><td>행</td><td>필수값·형식(일자, 시각, 1 이상 정수), 도착시간 ≤ 면접시간, 면접관 형식·미존재·이름 불일치·중복, 수험번호 미존재·다른 공고·미제출·파일 내 중복·직전 단계 비합격, 성명 불일치, 수식 셀</td></tr>
+      <tr><td>조</td><td>첫 행과 일자·장소·도착시간·면접시간·면접관 불일치, 조 안 면접순서 중복</td></tr>
+      <tr><td>파일 전체</td><td>조·면접순서 번호 누락, 같은 면접관이 같은 시각에 두 조, 다른 단계 확정 면접과 같은 시각(면접관·지원자)</td></tr>
+    </table>
+    <h3>시나리오별 처리</h3>
+    <table>
+      <tr><th>시나리오</th><th>기존 스케줄</th><th>파일 내용</th></tr>
+      <tr><td>검증 통과</td><td><span class="badge out">전부 삭제</span></td><td><span class="badge done">확정으로 저장</span></td></tr>
+      <tr><td>오류 1건 이상</td><td><span class="badge done">보존</span></td><td><span class="badge out">반영 안 함</span></td></tr>
+      <tr><td>평가 시작된 단계</td><td><span class="badge done">보존</span></td><td><span class="badge out">차단</span></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>업로드 = 단계 전체 교체 + 즉시 확정</td><td>다운로드 → 수정 → 업로드 왕복이 자연스럽고, 화면에 확정 버튼이 없음(사용자 결정)</td></tr>
+      <tr><td>2</td><td>한 행 = 지원자, 조 = 면접 1건, 같은 조는 일자·장소·시각·면접관 동일</td><td>사용자 결정. 면접관은 면접(조) 단위로 저장되는 모델과 일치</td></tr>
+      <tr><td>3</td><td>도메인에서 종료 시각 삭제</td><td>사용자 결정. 엑셀에 종료 시각이 없음</td></tr>
+      <tr><td>4</td><td>시간 겹침 검사를 "같은 면접 시각"으로 변경</td><td>종료 시각이 없어 범위 겹침을 판단할 수 없음</td></tr>
+      <tr><td>5</td><td>면접관 칸은 <code>이름(로그인ID)</code></td><td>동명이인 방지, 다운로드 파일을 그대로 재업로드 가능(사용자 결정)</td></tr>
+      <tr><td>6</td><td>다운로드는 마지막 검색 조건으로, 표가 비면 템플릿</td><td>화면 표와 받은 파일이 일치해야 함</td></tr>
+      <tr><td>7</td><td>export 감사 행위 분류는 기존 <code>EXPORT_INTERVIEWS</code> 재사용</td><td>새 enum 없이 같은 "면접 데이터 반출"로 분류, datasetType으로 구분</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>변경 파일</h2>
+    <div class="two">
+      <div class="card">
+        <h3>백엔드 신규</h3>
+        <table>
+          <tr><th>파일</th><th>타입</th></tr>
+          <tr><td><code>controller/InterviewScheduleController</code></td><td>컨트롤러</td></tr>
+          <tr><td><code>service/InterviewScheduleService</code></td><td>서비스(조회·다운로드·업로드 검증·교체)</td></tr>
+          <tr><td><code>service/InterviewScheduleUploadParser</code></td><td>xlsx 파서</td></tr>
+          <tr><td><code>dto/request/InterviewScheduleSearchRequest</code>, <code>InterviewScheduleUploadRowRequest</code></td><td>요청 DTO</td></tr>
+          <tr><td><code>dto/response/AdminInterviewScheduleRowResponse</code> 외 3</td><td>응답 DTO</td></tr>
+          <tr><td><code>exception/InvalidInterviewScheduleUploadException</code></td><td>예외</td></tr>
+          <tr><td><code>InterviewScheduleServiceTest</code>, <code>InterviewScheduleControllerTest</code></td><td>테스트</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>백엔드 수정</h3>
+        <table>
+          <tr><th>파일</th><th>변경</th></tr>
+          <tr><td><code>Interview</code></td><td>종료 → 도착 시각, 인덱스</td></tr>
+          <tr><td>면접 요청·응답 DTO 12개</td><td>종료 시각 제거/도착 시각</td></tr>
+          <tr><td><code>InterviewService</code>, <code>InterviewParticipantRepository</code>, <code>InterviewRepository</code></td><td>겹침·기간 조건, 스케줄 조회 쿼리</td></tr>
+          <tr><td><code>ExcelExportSpec</code>, <code>ExcelExportWriter</code></td><td>강조 헤더 옵션</td></tr>
+          <tr><td><code>ExportAuditLogger</code>, <code>AdminDatasetExportService</code>, <code>GlobalExceptionHandler</code></td><td>감사 매핑, export 열, 예외 매핑</td></tr>
+          <tr><td>기존 테스트 21개</td><td>종료 시각 제거에 맞춘 픽스처·겹침 의미 변경</td></tr>
+        </table>
+        <h3>프론트</h3>
+        <table>
+          <tr><th>파일</th><th>변경</th></tr>
+          <tr><td><code>views/admin/interview/interviewScheduling.vue</code></td><td>면접단계 선택, 조회·다운로드·업로드 연결</td></tr>
+          <tr><td><code>api/admin/adminInterviewApi.ts</code>, <code>types/admin/interview.ts</code></td><td>스케줄 API·타입, 종료 시각 제거</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>테스트 결과</h2>
+    <div class="card">
+      <p>백엔드: 변경 영향 36개 테스트 클래스 실행(<code>gradlew test --tests …</code>, 예시 AES 키)</p>
+      <p>결과: <span class="badge done">419건 통과 · 실패 0</span></p>
+      <table>
+        <tr><th>신규 테스트</th><th>상태</th></tr>
+        <tr><td>업로드 → 조마다 확정 면접 생성, 조·면접순서 정렬 조회</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>재업로드 시 단계 기존 면접 교체</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>행 오류 시 미반영 + 행별 오류(면접관 미존재·비합격·도착 &gt; 면접·중복)</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>성명 불일치, 조 일관성, 번호 누락, 면접관 같은 시각 두 조</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>직전 단계 미발표·평가 시작 단계·헤더 불일치 거부</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>엑셀 날짜·시각 셀 읽기, 다운로드 파일 그대로 재업로드</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>다운로드·템플릿: 노란 음영 + 굵은 한글 헤더, 틀고정</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>컨트롤러: 200/400 응답 모양, xlsx 스트림, 지원자 403</td><td><span class="badge done">통과</span></td></tr>
+      </table>
+      <p>프론트: <code>npm run type-check</code> <span class="badge done">통과</span></p>
+      <p class="small">전체 리그레션과 로그인 상태 브라우저 확인은 실행하지 않았습니다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>운영 작업</h2>
+    <div class="card" style="border-left: 4px solid #7a4b00;">
+      <h3><span class="badge warn">배포 전 필수</span> DB 컬럼 정리</h3>
+      <ul class="list">
+        <li>스키마는 <code>ddl-auto=update</code>라 컬럼을 지우지 않습니다. 기존 DB에는 NOT NULL인 <code>interview.end_date_time</code>이 남아 새 면접 저장이 실패합니다.</li>
+        <li>배포 전 인덱스 <code>idx_interview_time_range</code>와 컬럼 <code>interview.end_date_time</code>을 삭제해야 합니다. 새 컬럼 <code>arrival_date_time</code>과 새 인덱스는 자동 생성됩니다.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>다음 Phase 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>배포 전 DB 정리 후 실화면 확인</strong></p>
+      <p>운영·개발 DB의 종료 시각 컬럼을 정리하고, 관리자 로그인 상태에서 다운로드 → 작성 → 업로드 → 자동 재조회 흐름을 확인합니다.</p>
+      <p class="small">향후: 지원자·면접관 면접 안내 화면(도착 시각 노출), 스케줄 업로드 감사 로그.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
