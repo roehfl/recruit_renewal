@@ -407,7 +407,7 @@ class ApplicationDashboardServiceTest {
     @Test
     void required_attachment_missing_is_blocking() {
         when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
-                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")));
+                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.CAREER, "Resume")));
 
         ApplicationDashboardResponse response = dashboardFor(config());
 
@@ -420,9 +420,9 @@ class ApplicationDashboardServiceTest {
     @Test
     void required_attachment_is_complete_only_with_matching_stored_row() {
         when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
-                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")));
+                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.CAREER, "Resume")));
         when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
-                .thenReturn(List.of(attachment(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, false)));
+                .thenReturn(List.of(attachment(AttachmentType.RESUME, ApplicationSectionType.CAREER, false)));
         when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
 
         ApplicationDashboardResponse response = dashboardFor(config());
@@ -438,11 +438,11 @@ class ApplicationDashboardServiceTest {
     void required_attachment_group_ignores_optional_missing_issue_when_required_requirement_exists() {
         when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(
-                        requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume"),
-                        requirement(false, 1, AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, "Portfolio")
+                        requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.CAREER, "Resume"),
+                        requirement(false, 1, AttachmentType.PORTFOLIO, ApplicationSectionType.CAREER, "Portfolio")
                 ));
         when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
-                .thenReturn(List.of(attachment(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, false)));
+                .thenReturn(List.of(attachment(AttachmentType.RESUME, ApplicationSectionType.CAREER, false)));
         when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
 
         ApplicationDashboardResponse response = dashboardFor(config());
@@ -460,12 +460,12 @@ class ApplicationDashboardServiceTest {
     @Test
     void wrong_or_deleted_attachment_does_not_satisfy_required_rule() {
         when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
-                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")));
+                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.CAREER, "Resume")));
         when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
                 .thenReturn(List.of(
-                        attachment(AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, false),
-                        attachment(AttachmentType.RESUME, ApplicationSectionType.CAREER, false),
-                        attachment(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, true)
+                        attachment(AttachmentType.PORTFOLIO, ApplicationSectionType.CAREER, false),
+                        attachment(AttachmentType.RESUME, ApplicationSectionType.BASIC_INFO, false),
+                        attachment(AttachmentType.RESUME, ApplicationSectionType.CAREER, true)
                 ));
 
         ApplicationDashboardResponse response = dashboardFor(config());
@@ -474,17 +474,18 @@ class ApplicationDashboardServiceTest {
     }
 
     @Test
-    void abolished_attachment_section_requirements_are_ignored_by_readiness() {
+    void requirements_of_sections_without_upload_path_are_ignored_by_readiness() {
         when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(
                         requirement(true, 1, AttachmentType.PORTFOLIO, ApplicationSectionType.ATTACHMENT, "Portfolio"),
-                        requirement(false, 1, AttachmentType.ETC, ApplicationSectionType.ATTACHMENT, "Etc")
+                        requirement(false, 1, AttachmentType.ETC, ApplicationSectionType.ATTACHMENT, "Etc"),
+                        requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")
                 ));
         when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
 
         ApplicationDashboardResponse response = dashboardFor(config());
 
-        // 제출 검증과 같은 기준: 폐지된 ATTACHMENT 섹션 요구사항은 필수/선택 그룹 어디에도 잡히지 않는다.
+        // 제출 검증과 같은 기준: 업로드 경로가 없는 섹션(ATTACHMENT·APPLICATION) 요구사항은 필수/선택 그룹 어디에도 잡히지 않는다.
         assertThat(response.submittable()).isTrue();
         assertThat(response.requiredMissingSections()).isEmpty();
         assertThat(response.optionalIncompleteSections()).isEmpty();
@@ -512,7 +513,7 @@ class ApplicationDashboardServiceTest {
     @Test
     void optional_attachment_min_count_zero_does_not_create_optional_issue() {
         when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
-                .thenReturn(List.of(requirement(false, 0, AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, "Portfolio")));
+                .thenReturn(List.of(requirement(false, 0, AttachmentType.PORTFOLIO, ApplicationSectionType.CAREER, "Portfolio")));
         when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
 
         ApplicationDashboardResponse response = dashboardFor(config());
@@ -525,7 +526,7 @@ class ApplicationDashboardServiceTest {
     @Test
     void optional_attachment_min_count_positive_creates_non_blocking_issue() {
         when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
-                .thenReturn(List.of(requirement(false, 1, AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, "Portfolio")));
+                .thenReturn(List.of(requirement(false, 1, AttachmentType.PORTFOLIO, ApplicationSectionType.CAREER, "Portfolio")));
         when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
 
         ApplicationDashboardResponse response = dashboardFor(config());

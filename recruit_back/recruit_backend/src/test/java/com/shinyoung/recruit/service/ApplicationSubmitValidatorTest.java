@@ -257,7 +257,7 @@ class ApplicationSubmitValidatorTest {
     @Test
     void required_attachment_missing_fails_submit() {
         when(attachmentRequirementRepository.findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
-                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")));
+                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.CAREER, "Resume")));
 
         assertThatThrownBy(() -> validator.validate(application(config())))
                 .isInstanceOf(InvalidJobApplicationException.class);
@@ -266,9 +266,9 @@ class ApplicationSubmitValidatorTest {
     @Test
     void matching_stored_attachment_allows_submit() {
         when(attachmentRequirementRepository.findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
-                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")));
+                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.CAREER, "Resume")));
         when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
-                .thenReturn(List.of(attachment(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, false)));
+                .thenReturn(List.of(attachment(AttachmentType.RESUME, ApplicationSectionType.CAREER, false)));
 
         assertThatCode(() -> validator.validate(application(config())))
                 .doesNotThrowAnyException();
@@ -277,12 +277,12 @@ class ApplicationSubmitValidatorTest {
     @Test
     void wrong_type_wrong_section_and_deleted_attachment_do_not_satisfy_requirement() {
         when(attachmentRequirementRepository.findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
-                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")));
+                .thenReturn(List.of(requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.CAREER, "Resume")));
         when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
                 .thenReturn(List.of(
-                        attachment(AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, false),
-                        attachment(AttachmentType.RESUME, ApplicationSectionType.CAREER, false),
-                        attachment(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, true)
+                        attachment(AttachmentType.PORTFOLIO, ApplicationSectionType.CAREER, false),
+                        attachment(AttachmentType.RESUME, ApplicationSectionType.BASIC_INFO, false),
+                        attachment(AttachmentType.RESUME, ApplicationSectionType.CAREER, true)
                 ));
 
         assertThatThrownBy(() -> validator.validate(application(config())))
@@ -292,18 +292,22 @@ class ApplicationSubmitValidatorTest {
     @Test
     void required_min_count_requires_enough_matching_stored_files() {
         when(attachmentRequirementRepository.findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
-                .thenReturn(List.of(requirement(true, 2, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "Resume")));
+                .thenReturn(List.of(requirement(true, 2, AttachmentType.RESUME, ApplicationSectionType.CAREER, "Resume")));
         when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
-                .thenReturn(List.of(attachment(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, false)));
+                .thenReturn(List.of(attachment(AttachmentType.RESUME, ApplicationSectionType.CAREER, false)));
 
         assertThatThrownBy(() -> validator.validate(application(config())))
                 .isInstanceOf(InvalidJobApplicationException.class);
     }
 
     @Test
-    void required_requirement_of_abolished_attachment_section_does_not_block_submit() {
+    void required_requirements_of_sections_without_upload_path_do_not_block_submit() {
+        // 지원자가 첨부를 올릴 수 있는 섹션은 BASIC_INFO·CAREER 뿐이다. 그 밖의 레거시 요구사항 행은 제출을 막지 않는다.
         when(attachmentRequirementRepository.findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
-                .thenReturn(List.of(requirement(true, 1, AttachmentType.PORTFOLIO, ApplicationSectionType.ATTACHMENT, "포트폴리오")));
+                .thenReturn(List.of(
+                        requirement(true, 1, AttachmentType.PORTFOLIO, ApplicationSectionType.ATTACHMENT, "포트폴리오"),
+                        requirement(true, 1, AttachmentType.RESUME, ApplicationSectionType.APPLICATION, "이력서")
+                ));
 
         assertThatCode(() -> validator.validate(application(config())))
                 .doesNotThrowAnyException();

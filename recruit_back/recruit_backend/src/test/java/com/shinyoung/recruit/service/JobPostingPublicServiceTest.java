@@ -462,7 +462,7 @@ class JobPostingPublicServiceTest {
                 1
         ));
         replaceAttachmentRequirements(id, List.of(
-                attachmentRequirement(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, true, 1)
+                attachmentRequirement(AttachmentType.RESUME, ApplicationSectionType.CAREER, true, 1)
         ));
         JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
@@ -488,7 +488,7 @@ class JobPostingPublicServiceTest {
                 1
         ));
         replaceAttachmentRequirements(requiredId, List.of(
-                attachmentRequirement(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, true, 1)
+                attachmentRequirement(AttachmentType.RESUME, ApplicationSectionType.CAREER, true, 1)
         ));
         JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, requiredId);
         jobPostingService.publish(requiredId);
@@ -513,7 +513,7 @@ class JobPostingPublicServiceTest {
                 1
         ));
         replaceAttachmentRequirements(optionalId, List.of(
-                attachmentRequirement(AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, false, 0)
+                attachmentRequirement(AttachmentType.PORTFOLIO, ApplicationSectionType.CAREER, false, 0)
         ));
         JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, optionalId);
         jobPostingService.publish(optionalId);

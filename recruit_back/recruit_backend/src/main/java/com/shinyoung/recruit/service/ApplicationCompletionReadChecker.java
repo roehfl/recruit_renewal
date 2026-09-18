@@ -353,11 +353,12 @@ public class ApplicationCompletionReadChecker {
     }
 
     private void checkAttachments(JobApplication application, ReadinessAccumulator accumulator) {
-        // 제출 검증(ApplicationSubmitValidator)과 같은 기준: 폐지된 ATTACHMENT 섹션의 레거시 요구사항 행은 완성도 판정에서 제외한다.
+        // 제출 검증(ApplicationSubmitValidator)과 같은 기준: 업로드 경로가 없는 섹션의 레거시 요구사항 행은 완성도 판정에서 제외한다.
         List<JobPostingAttachmentRequirement> requirements = attachmentRequirementRepository
                 .findByJobPostingIdOrderBySortOrderAscIdAsc(application.getJobPosting().getId())
                 .stream()
-                .filter(requirement -> requirement.getSectionType() != ApplicationSectionType.ATTACHMENT)
+                .filter(requirement -> requirement.getSectionType() != null
+                        && requirement.getSectionType().acceptsApplicantAttachment())
                 .toList();
         if (requirements.isEmpty()) {
             return;

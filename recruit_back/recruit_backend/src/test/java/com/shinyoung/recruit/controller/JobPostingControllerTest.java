@@ -173,7 +173,7 @@ class JobPostingControllerTest {
                                   "requirements": [
                                     {
                                       "attachmentType": "RESUME",
-                                      "sectionType": "APPLICATION",
+                                      "sectionType": "CAREER",
                                       "required": true,
                                       "minCount": 1,
                                       "sortOrder": 0,
@@ -186,7 +186,7 @@ class JobPostingControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].attachmentType").value("RESUME"))
-                .andExpect(jsonPath("$.data[0].sectionType").value("APPLICATION"))
+                .andExpect(jsonPath("$.data[0].sectionType").value("CAREER"))
                 .andExpect(jsonPath("$.data[0].required").value(true))
                 .andExpect(jsonPath("$.data[0].minCount").value(1))
                 .andExpect(jsonPath("$.data[0].storagePath").doesNotExist())
@@ -216,7 +216,7 @@ class JobPostingControllerTest {
                                   "requirements": [
                                     {
                                       "attachmentType": "RESUME",
-                                      "sectionType": "APPLICATION",
+                                      "sectionType": "CAREER",
                                       "required": true,
                                       "minCount": 0,
                                       "sortOrder": 0,
@@ -250,7 +250,7 @@ class JobPostingControllerTest {
                                   "requirements": [
                                     {
                                       "attachmentType": "RESUME",
-                                      "sectionType": "APPLICATION",
+                                      "sectionType": "CAREER",
                                       "required": true,
                                       "minCount": 1,
                                       "sortOrder": 0,

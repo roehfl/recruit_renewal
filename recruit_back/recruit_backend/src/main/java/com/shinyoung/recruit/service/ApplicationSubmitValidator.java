@@ -192,11 +192,12 @@ public class ApplicationSubmitValidator {
     }
 
     private void validateAttachmentRequirements(JobApplication application) {
-        // 독립 첨부(ATTACHMENT) 섹션은 지원서 화면에서 폐지되어 업로드 경로가 없다. 레거시 요구사항 행은 제출을 막지 않는다.
+        // 지원자가 업로드할 경로가 있는 섹션(BASIC_INFO·CAREER)의 요구사항만 본다. 그 밖의 레거시 요구사항 행은 제출을 막지 않는다.
         List<JobPostingAttachmentRequirement> requirements = attachmentRequirementRepository
                 .findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(application.getJobPosting().getId())
                 .stream()
-                .filter(requirement -> requirement.getSectionType() != ApplicationSectionType.ATTACHMENT)
+                .filter(requirement -> requirement.getSectionType() != null
+                        && requirement.getSectionType().acceptsApplicantAttachment())
                 .toList();
         if (requirements.isEmpty()) {
             return;

@@ -173,7 +173,7 @@ class JobPostingPublicControllerTest {
                 new AttachmentRequirementReplaceRequest(List.of(
                         new AttachmentRequirementRequest(
                                 AttachmentType.RESUME,
-                                ApplicationSectionType.APPLICATION,
+                                ApplicationSectionType.CAREER,
                                 true,
                                 1,
                                 0,
@@ -192,7 +192,7 @@ class JobPostingPublicControllerTest {
                 .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.sections[8].sectionCode").value("ATTACHMENT"))
                 .andExpect(jsonPath("$.data.applicationFormRequiredPolicy.sections[8].requirementType").value("REQUIRED"))
                 .andExpect(jsonPath("$.data.attachmentRequirements[0].attachmentType").value("RESUME"))
-                .andExpect(jsonPath("$.data.attachmentRequirements[0].sectionType").value("APPLICATION"))
+                .andExpect(jsonPath("$.data.attachmentRequirements[0].sectionType").value("CAREER"))
                 .andExpect(jsonPath("$.data.attachmentRequirements[0].required").value(true))
                 .andExpect(jsonPath("$.data.attachmentRequirements[0].minCount").value(1))
                 .andExpect(jsonPath("$.data.attachmentRequirements[0].displayName").value("Resume"))

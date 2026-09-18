@@ -55,7 +55,7 @@ class JobPostingAttachmentRequirementServiceTest {
                 new AttachmentRequirementReplaceRequest(List.of(
                         new AttachmentRequirementRequest(
                                 AttachmentType.PORTFOLIO,
-                                ApplicationSectionType.APPLICATION,
+                                ApplicationSectionType.CAREER,
                                 false,
                                 null,
                                 null,
@@ -64,7 +64,7 @@ class JobPostingAttachmentRequirementServiceTest {
                         ),
                         new AttachmentRequirementRequest(
                                 AttachmentType.RESUME,
-                                ApplicationSectionType.APPLICATION,
+                                ApplicationSectionType.CAREER,
                                 true,
                                 null,
                                 null,
@@ -124,7 +124,7 @@ class JobPostingAttachmentRequirementServiceTest {
         assertThatThrownBy(() -> requirementService.replaceRequirements(
                 postingId,
                 new AttachmentRequirementReplaceRequest(List.of(
-                        new AttachmentRequirementRequest(null, ApplicationSectionType.APPLICATION, true, 1, 0, "Resume", null)
+                        new AttachmentRequirementRequest(null, ApplicationSectionType.CAREER, true, 1, 0, "Resume", null)
                 ))
         )).isInstanceOf(InvalidJobPostingException.class);
 
@@ -138,27 +138,31 @@ class JobPostingAttachmentRequirementServiceTest {
         assertThatThrownBy(() -> requirementService.replaceRequirements(
                 postingId,
                 new AttachmentRequirementReplaceRequest(List.of(
-                        new AttachmentRequirementRequest(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, true, 0, 0, "Resume", null)
+                        new AttachmentRequirementRequest(AttachmentType.RESUME, ApplicationSectionType.CAREER, true, 0, 0, "Resume", null)
                 ))
         )).isInstanceOf(InvalidJobPostingException.class);
 
         assertThatThrownBy(() -> requirementService.replaceRequirements(
                 postingId,
                 new AttachmentRequirementReplaceRequest(List.of(
-                        new AttachmentRequirementRequest(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, false, -1, 0, "Resume", null)
+                        new AttachmentRequirementRequest(AttachmentType.RESUME, ApplicationSectionType.CAREER, false, -1, 0, "Resume", null)
                 ))
         )).isInstanceOf(InvalidJobPostingException.class);
 
         assertThatThrownBy(() -> requirementService.replaceRequirements(
                 postingId,
                 new AttachmentRequirementReplaceRequest(List.of(
-                        new AttachmentRequirementRequest(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, true, 1, 0, " ", null)
+                        new AttachmentRequirementRequest(AttachmentType.RESUME, ApplicationSectionType.CAREER, true, 1, 0, " ", null)
                 ))
         )).isInstanceOf(InvalidJobPostingException.class);
     }
 
+    /*
+     * 지원자가 첨부를 올릴 수 있는 섹션은 기본정보(증명사진)와 경력(경력기술서)뿐이다.
+     * 그 밖의 섹션(폐지된 ATTACHMENT, 화면이 없는 APPLICATION 등)에 요구사항을 두면 필수일 때 제출이 영구히 막힌다.
+     */
     @Test
-    void 폐지된_ATTACHMENT_섹션_요구사항은_필수_선택_모두_등록할_수_없다() {
+    void 업로드_경로가_없는_섹션의_요구사항은_필수_선택_모두_등록할_수_없다() {
         Long postingId = jobPostingService.create(request("draft"));
 
         assertThatThrownBy(() -> requirementService.replaceRequirements(
@@ -168,16 +172,16 @@ class JobPostingAttachmentRequirementServiceTest {
                                 AttachmentType.PORTFOLIO, ApplicationSectionType.ATTACHMENT, true, 1, 0, "포트폴리오", null)
                 ))
         )).isInstanceOf(InvalidJobPostingException.class)
-                .hasMessage("첨부파일(ATTACHMENT) 섹션은 폐지되어 첨부 요구사항을 등록할 수 없습니다. 첨부를 받을 섹션(예: 경력 CAREER)을 지정하세요.");
+                .hasMessage("첨부 요구사항은 지원자가 파일을 올릴 수 있는 섹션(기본정보 BASIC_INFO, 경력 CAREER)에만 등록할 수 있습니다. sectionType=ATTACHMENT");
 
         assertThatThrownBy(() -> requirementService.replaceRequirements(
                 postingId,
                 new AttachmentRequirementReplaceRequest(List.of(
                         new AttachmentRequirementRequest(
-                                AttachmentType.ETC, ApplicationSectionType.ATTACHMENT, false, 0, 0, "기타", null)
+                                AttachmentType.RESUME, ApplicationSectionType.APPLICATION, false, 0, 0, "이력서", null)
                 ))
         )).isInstanceOf(InvalidJobPostingException.class)
-                .hasMessageContaining("폐지");
+                .hasMessageContaining("sectionType=APPLICATION");
     }
 
     @Test
@@ -226,7 +230,7 @@ class JobPostingAttachmentRequirementServiceTest {
     private AttachmentRequirementRequest requirement(AttachmentType attachmentType, boolean required, int minCount) {
         return new AttachmentRequirementRequest(
                 attachmentType,
-                ApplicationSectionType.APPLICATION,
+                ApplicationSectionType.CAREER,
                 required,
                 minCount,
                 0,
