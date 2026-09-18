@@ -5,7 +5,6 @@ import {
   MenuOutlined,
   CloseOutlined,
   RightOutlined,
-  BellOutlined,
   UserOutlined,
   DownOutlined,
 } from '@ant-design/icons-vue'
@@ -43,7 +42,6 @@ const onBrandLogoError = (): void => {
     brandLogoIndex.value += 1
   }
 }
-const hasUnreadNotice = ref(false)
 
 const mainMenus = computed<MenuItem[]>(() => {
   return menuStore.getMenuTree('APPLICANT') ?? []
@@ -78,10 +76,6 @@ const goMenu = (menu: MenuItem) => {
   }
 
   router.push(menu.path)
-}
-
-const goNotice = () => {
-  router.push('/applicant/notifications')
 }
 
 /*

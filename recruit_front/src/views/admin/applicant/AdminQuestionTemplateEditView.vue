@@ -111,9 +111,11 @@ const save = async (): Promise<void> => {
     }
 
     try {
-        editTarget.value ?
+        if (editTarget.value) {
             await adminJobPostingApi.updateQuestionTemplate(editTarget.value, request)
-            : await adminJobPostingApi.createQuestionTemplate(request)
+        } else {
+            await adminJobPostingApi.createQuestionTemplate(request)
+        }
 
         message.success(editTarget.value? '템플릿을 저장했습니다.' : '템플릿을 등록했습니다.');
         // 저장에 성공했을 때만 목록으로 간다. 실패하면 입력을 남겨 고쳐서 다시 저장하게 한다.

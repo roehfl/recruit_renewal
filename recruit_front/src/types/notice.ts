@@ -15,8 +15,8 @@ export interface NoticeSearchParams {
 
 export interface NoticeDetail {
   id: number
-  title: String
-  contentHtml: String
+  title: string
+  contentHtml: string
   pinned: boolean
   createdAt: string
 }

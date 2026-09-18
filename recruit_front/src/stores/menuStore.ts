@@ -1,7 +1,6 @@
-import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { menuApi } from '@/api/menuApi'
-import type { MenuItem, MenuType, MenuSite } from '@/types/menu'
+import type { MenuItem, MenuSite } from '@/types/menu'
 
 interface MenuState {
   menuTreeMap: Record<MenuSite, MenuItem[]>

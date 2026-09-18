@@ -20,12 +20,6 @@ import type {
   AdminApplicationAnswerResponse,
   AdminAttachmentResponse,
 } from '@/types/admin/applicationSections'
-import type {
-  AdminJobPostingDetail,
-  AdminJobPostingListItem,
-  AdminJobPostingSaveRequest,
-  NewPostingImage,
-} from '@/types/jobPosting'
 
 /*
  * apiClient 기본 timeout(10초)으로는 PDF 렌더 시간을 감당하지 못한다.
@@ -33,8 +27,6 @@ import type {
  */
 const PDF_DOWNLOAD_TIMEOUT_MS = 30_000
 const PDF_BULK_DOWNLOAD_TIMEOUT_MS = 120_000
-
-const UPLOAD_TIMEOUT_MS = 120000 // 기본 10초로는 다장 이미지 업로드가 끊길 수 있다.
 
 export const adminApplicationApi = {
   getApplications(jobPostingId: number, searchRequest: AdminApplicationSearchRequest, page = 0, size = 20) {

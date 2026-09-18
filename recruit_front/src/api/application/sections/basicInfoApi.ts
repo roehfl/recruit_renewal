@@ -1,6 +1,6 @@
 import { apiClient } from '../../client'
 import type { ApiResponse } from '@/types/api'
-import type { BasicInfoParams, ApiResponseBasicInfoResponse, AttachmentFileRequest, AttachmentResponse } from '@/types/application/sections/basicInfo'
+import type { BasicInfoParams, ApiResponseBasicInfoResponse } from '@/types/application/sections/basicInfo'
 
 export const basicInfoApi = {
 

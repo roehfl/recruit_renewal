@@ -117,13 +117,13 @@ const MilitaryForm = reactive<MilitaryResponse>({
 const draftState = useSectionDraftState(() => ({ notApplicable: notApplicable.value, ...MilitaryForm }))
 
 async function setItem(item: MilitaryResponse) {
-  MilitaryForm.militaryId =  item.militaryId,
-  MilitaryForm.militarySubjectType = item.militarySubjectType ?? null,
-  MilitaryForm.serviceType = item.serviceType ?? null,
-  MilitaryForm.militaryBranch = item.militaryBranch ?? null,
-  MilitaryForm.rank = item.rank ?? null,
-  MilitaryForm.serviceStartDate = item.serviceStartDate ?? null,
-  MilitaryForm.serviceEndDate = item.serviceEndDate ?? null,
+  MilitaryForm.militaryId = item.militaryId
+  MilitaryForm.militarySubjectType = item.militarySubjectType ?? null
+  MilitaryForm.serviceType = item.serviceType ?? null
+  MilitaryForm.militaryBranch = item.militaryBranch ?? null
+  MilitaryForm.rank = item.rank ?? null
+  MilitaryForm.serviceStartDate = item.serviceStartDate ?? null
+  MilitaryForm.serviceEndDate = item.serviceEndDate ?? null
   MilitaryForm.nonServiceReason = item.nonServiceReason ?? null
 }
 

@@ -68,6 +68,8 @@ import type { DutyItem } from '@/types/duty'
 
 const router = useRouter()
 
+// 템플릿의 '입사지원 바로가기'(주석 처리됨)가 쓴다. 다시 켤 때를 위해 남긴다.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const goRecruits = async (): Promise<void> => {
   await router.push('/applicant/recruits')
 }

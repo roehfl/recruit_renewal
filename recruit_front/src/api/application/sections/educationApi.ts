@@ -1,6 +1,6 @@
 import { apiClient } from '../../client'
 import type { ApiResponse } from '@/types/api'
-import type { EducationResponse, schoolItem, EducationReplaceRequest, schoolResponse, shcoolSerachParams } from '@/types/application/sections/education'
+import type { EducationResponse, schoolItem, EducationReplaceRequest, shcoolSerachParams } from '@/types/application/sections/education'
 
 export const educationApi = {
 

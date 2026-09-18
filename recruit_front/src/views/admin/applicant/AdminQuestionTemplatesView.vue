@@ -56,8 +56,11 @@ const loadQuestionTemplates = async () => {
 const changeQuestionTemplateActive = async (template: QuestionTemplateItem) => {
   loading.value = true
   try {
-    template.active ? await adminJobPostingApi.setQuestionActive(template.templateId)
-    : await adminJobPostingApi.setQuestionDeactive(template.templateId)
+    if (template.active) {
+      await adminJobPostingApi.setQuestionActive(template.templateId)
+    } else {
+      await adminJobPostingApi.setQuestionDeactive(template.templateId)
+    }
   } catch (error) {
     message.error(getApiErrorMessage(error, '사용여부가 변경되지 않았습니다.'));
   } finally {

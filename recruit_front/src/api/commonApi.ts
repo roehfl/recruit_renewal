@@ -1,6 +1,6 @@
 import { apiClient } from './client'
 import type { ApiResponse } from '@/types/api'
-import type { CommonCodeItems, CommonCodeResponse } from '@/types/commonCode'
+import type { CommonCodeItems } from '@/types/commonCode'
 
 export const commonCodeApi = {
 

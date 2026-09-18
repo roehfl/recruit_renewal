@@ -1,6 +1,5 @@
 import { apiClient } from '../client'
 import type { ApiResponse } from '@/types/api'
-import type { PageResponse } from '@/types/page'
 import type { AddressSearchParams, AddressSearchResponse } from '@/types/application/address'
 
 export const addressApi = {

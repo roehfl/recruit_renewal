@@ -529,6 +529,8 @@ function resolvePageStepStatus(page: ApplicationFormPage, index: number): StepSt
   return 'wait'
 }
 
+// 단계 완료(체크) 표시를 끄면서 쓰지 않게 됐다(resolvePageStepStatus 의 주석 참고). 다시 켤 때를 위해 남긴다.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function isPageCompleted(page: ApplicationFormPage): boolean {
   const requiredItems = page.items.filter((item) => item.required)
 
