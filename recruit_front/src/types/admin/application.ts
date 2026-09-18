@@ -21,6 +21,8 @@ export interface AdminApplicationSummaryResponse {
   age: number
   finalEducationLevel: 'HIGH_SCHOOL' | 'COLLEGE' | 'UNIVERSITY' | 'MASTER' | 'DOCTOR'
   finalSchoolName: string
+  /** 최종학력 행의 졸업일(ISO date). 응답 전용 파생 값. 학력이 없으면 null. */
+  finalGraduationDate: string | null
   stageType: 'DOCUMENT' | 'FIRST_INTERVIEW' | 'SECOND_INTERVIEW' | 'FINAL_INTERVIEW' | 'ETC'
   stageResultStatus: 'PENDING' | 'PASSED' | 'FAILED' | 'ABSENT' | 'WITHDRAWN' | 'HOLD'
   careerDescriptionDownloadUrl: string
@@ -38,6 +40,19 @@ export interface AdminApplicationSearchRequest {
   birthDateFrom: string | undefined
   stageType: string | undefined
   schoolName: string | undefined
+}
+
+/** 지원현황 엑셀 컬럼 1개. key 는 백엔드 ApplicationExportColumn 이름이며 다운로드 요청에 그대로 쓴다. */
+export interface ApplicationExportColumnOption {
+  key: string
+  label: string
+  defaultSelected: boolean
+}
+
+/** 모달 체크박스 묶음. 그룹·컬럼 순서는 서버 카탈로그 순서 그대로. */
+export interface ApplicationExportColumnGroup {
+  group: string
+  columns: ApplicationExportColumnOption[]
 }
 
 export interface AdminApplicationDetailResponse {

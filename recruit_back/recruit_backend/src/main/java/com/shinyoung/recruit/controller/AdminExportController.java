@@ -1,9 +1,12 @@
 package com.shinyoung.recruit.controller;
 
 import com.shinyoung.recruit.dto.request.AdminApplicationSearchRequest;
+import com.shinyoung.recruit.dto.response.ApiResponse;
+import com.shinyoung.recruit.dto.response.ApplicationExportColumnGroupResponse;
 import com.shinyoung.recruit.enumeration.InterviewStatus;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.AdminDatasetExportService;
+import com.shinyoung.recruit.service.ApplicationExportColumn;
 import com.shinyoung.recruit.service.ApplicationExportService;
 import com.shinyoung.recruit.service.CurrentEmployeeService;
 import com.shinyoung.recruit.service.ExcelExportFile;
@@ -26,6 +29,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -34,7 +38,9 @@ import java.util.stream.Collectors;
  * 운영자 Excel export 엔드포인트(read-only, admin 전용). Phase 07a는 applications download를 담당한다.
  *
  * <p>대응 list 엔드포인트와 동일한 필터를 쓰되 page/size는 무시하고 전체 행을 내보낸다.
- * applications export는 연락처(phoneNumber/email) 평문을 포함하는 PII surface이므로 생성 시 audit 로그를 남긴다.
+ * applications export는 연락처(phoneNumber/email)만이 아니라 선택한 컬럼에 따라 생년월일/주소/보훈·장애/현재연봉 등
+ * 개인정보·민감정보까지 포함할 수 있는 PII surface이므로 생성 시 audit 로그를 남기고, 반출한 엑셀 컬럼 key 도
+ * 함께 기록한다.
  */
 @RestController
 @RequiredArgsConstructor
@@ -60,30 +66,38 @@ public class AdminExportController {
     public ResponseEntity<StreamingResponseBody> exportApplications(
             @RequestParam(required = false) Long jobPostingId,
             @ModelAttribute AdminApplicationSearchRequest searchRequest,
+            @RequestParam(required = false) List<String> columns,
             @AuthenticationPrincipal CustomUserDetails userDetails,
             HttpServletRequest request
     ) {
-        return export(jobPostingId, searchRequest, userDetails, request);
+        return export(jobPostingId, searchRequest, columns, userDetails, request);
     }
 
     @GetMapping("/admin/job-postings/{jobPostingId}/applications/export")
     public ResponseEntity<StreamingResponseBody> exportApplicationsByJobPosting(
             @PathVariable Long jobPostingId,
             @ModelAttribute AdminApplicationSearchRequest searchRequest,
+            @RequestParam(required = false) List<String> columns,
             @AuthenticationPrincipal CustomUserDetails userDetails,
             HttpServletRequest request
     ) {
-        return export(jobPostingId, searchRequest, userDetails, request);
+        return export(jobPostingId, searchRequest, columns, userDetails, request);
     }
 
+    /**
+     * {@code columns} 는 콤마로 이은 카탈로그 key(Spring 이 목록으로 나눈다). 검색 조건 DTO 에 넣지 않는다 —
+     * 목록 조회 요청과 공유하는 DTO 를 엑셀 전용 값으로 오염시키지 않기 위해서다.
+     */
     private ResponseEntity<StreamingResponseBody> export(
             Long jobPostingId,
             AdminApplicationSearchRequest searchRequest,
+            List<String> columnKeys,
             CustomUserDetails userDetails,
             HttpServletRequest request
     ) {
         String actor = currentEmployeeService.getCurrentEmployeeActor(userDetails);
-        ExcelExportFile file = applicationExportService.exportApplications(jobPostingId, searchRequest);
+        List<ApplicationExportColumn> columns = ApplicationExportColumn.parse(columnKeys);
+        ExcelExportFile file = applicationExportService.exportApplications(jobPostingId, searchRequest, columns);
         // egress fail-close(Phase 09b): 감사 기록 실패 시 응답 없이 전파 — temp xlsx 누수 방지(리뷰 2차 #3).
         try {
             exportAuditLogger.logApplicationsExport(
@@ -92,6 +106,7 @@ public class AdminExportController {
                     searchRequest.jobPositionId(),
                     // audit filter 에는 raw 입력이 아니라 canonical 값(enum name)을 남긴다(9b 리뷰 Medium 2).
                     canonicalStatus(searchRequest.status()),
+                    columns.stream().map(Enum::name).toList(),
                     file
             );
             return excelExportResponseFactory.toResponse(file);
@@ -99,6 +114,12 @@ public class AdminExportController {
             deleteQuietly(file);
             throw e;
         }
+    }
+
+    /** 엑셀 컬럼 카탈로그(모달 체크박스 원천). 항목 정의는 {@link ApplicationExportColumn} 이 단일 출처다. */
+    @GetMapping("/admin/applications/export/columns")
+    public ResponseEntity<ApiResponse<List<ApplicationExportColumnGroupResponse>>> exportApplicationColumns() {
+        return ResponseEntity.ok(ApiResponse.success(ApplicationExportColumn.catalog()));
     }
 
     private String canonicalStatus(String status) {

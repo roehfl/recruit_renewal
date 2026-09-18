@@ -28,6 +28,7 @@ public record AdminApplicationSummaryResponse(
         Integer age,
         EducationLevel finalEducationLevel,
         String finalSchoolName,
+        LocalDate finalGraduationDate,
         StageType stageType,
         StageResultStatus stageResultStatus,
         String careerDescriptionDownloadUrl
@@ -36,18 +37,20 @@ public record AdminApplicationSummaryResponse(
     /**
      * 목록 화면 파생 필드 묶음(서비스가 배치 조회로 채운다). {@code age} 는 조회 시점(오늘) 기준 만 나이,
      * {@code stageType}/{@code stageResultStatus} 는 검색 조건과 동일한 값 체계로 최신(stageOrder 최대) 전형 결과다.
+     * {@code finalGraduationDate} 는 최종학력 행의 졸업일(응답 전용 파생 값 — 엔티티 필드 아님).
      */
     public record Enrichment(
             LocalDate birthDate,
             Integer age,
             EducationLevel finalEducationLevel,
             String finalSchoolName,
+            LocalDate finalGraduationDate,
             StageType stageType,
             StageResultStatus stageResultStatus,
             String careerDescriptionDownloadUrl
     ) {
         public static Enrichment empty() {
-            return new Enrichment(null, null, null, null, null, null, null);
+            return new Enrichment(null, null, null, null, null, null, null, null);
         }
     }
 
@@ -71,6 +74,7 @@ public record AdminApplicationSummaryResponse(
                 enrichment.age(),
                 enrichment.finalEducationLevel(),
                 enrichment.finalSchoolName(),
+                enrichment.finalGraduationDate(),
                 enrichment.stageType(),
                 enrichment.stageResultStatus(),
                 enrichment.careerDescriptionDownloadUrl()

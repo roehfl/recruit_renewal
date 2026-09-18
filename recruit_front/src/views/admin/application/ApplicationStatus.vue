@@ -17,6 +17,7 @@ import { formatDate } from '@/common/dateUtil'
 import { getBlobErrorMessage, saveBlobResponse } from '@/common/fileDownload'
 import type { TableColumnsType } from 'ant-design-vue'
 import { apiClient } from '@/api/client'
+import ApplicationExcelColumnModal from './ApplicationExcelColumnModal.vue'
 
 interface TableRow {
   key: string
@@ -44,7 +45,7 @@ const rowSelection = {
 const statusLabelMap: Record<string, string> = {
   DRAFT: '임시저장',
   SUBMITTED: '제출 완료',
-  WITHDRAWN: '작성 완료',
+  WITHDRAWN: '지원 철회',
 }
 const educationLevelMap: Record<string, string> = {
   HIGH_SCHOOL: '고등학교', 
@@ -92,7 +93,7 @@ const columns: TableColumnsType<TableRow> = [
   { title: '나이', dataIndex: 'age', key: 'age' },
   { title: '최종대학교', dataIndex: 'finalSchoolName', key: 'finalSchoolName' },
   { title: '최종학력', dataIndex: 'finalEducationLevel', key: 'finalEducationLevel' },
-  { title: '졸업년월', dataIndex: 'withdrawnAt', key: 'withdrawnAt' },
+  { title: '졸업년월', dataIndex: 'finalGraduationDate', key: 'finalGraduationDate' },
   { title: '최종제출일시', dataIndex: 'submittedAt', key: 'submittedAt' },
   { title: '경력기술서', dataIndex: 'careerDescriptionDownloadUrl', key: 'careerDescriptionDownloadUrl' },
 ]
@@ -285,15 +286,18 @@ const downloadSelectedPdf = async () => {
   }
 }
 
-// 화면에 걸어둔 검색 조건 그대로 엑셀을 받는다(목록과 같은 조건이라 보이는 결과와 일치한다).
+// 엑셀 버튼은 항목 선택 모달을 연다. 모달에서 고른 컬럼으로, 화면에 걸어둔 검색 조건 그대로 받는다
+// (목록과 같은 조건이라 보이는 결과와 일치한다).
+const excelModalOpen = ref(false)
 const downloadingExcel = ref(false)
-const downloadExcel = async () => {
+const downloadExcel = async (columns: string[]) => {
   if (downloadingExcel.value || selectedJobPostingId.value === null) return
 
   downloadingExcel.value = true
   try {
-    const response = await adminApplicationApi.downloadApplicationsExcel(selectedJobPostingId.value, searchRequest)
+    const response = await adminApplicationApi.downloadApplicationsExcel(selectedJobPostingId.value, searchRequest, columns)
     saveBlobResponse(response, '지원현황.xlsx')
+    excelModalOpen.value = false
   } catch (error) {
     message.error(await getBlobErrorMessage(error, '지원현황 엑셀을 내려받지 못했습니다.'))
   } finally {
@@ -446,7 +450,7 @@ onMounted(async () => {
       <a-card :bordered="false" class="form-card">
         <div class="button-area">
           <a-button><PrinterOutlined />인쇄</a-button>
-          <a-button :loading="downloadingExcel" :disabled="selectedJobPostingId === null" @click="downloadExcel">
+          <a-button :disabled="selectedJobPostingId === null" @click="excelModalOpen = true">
             <FileExcelOutlined />엑셀 다운로드
           </a-button>
           <a-button :loading="downloadingPdf" :disabled="selectRowKeys.length === 0" @click="downloadSelectedPdf">
@@ -465,8 +469,8 @@ onMounted(async () => {
               <template v-else-if="column.key === 'finalEducationLevel'">
                 {{ educationLevelMap[record.finalEducationLevel] ?? record.finalEducationLevel }}
               </template>
-              <template v-else-if="column.key === 'withdrawnAt'">
-                {{ formatDate(record.withdrawnAt, 'YYYY-MM-DD HH:mm') }}
+              <template v-else-if="column.key === 'finalGraduationDate'">
+                {{ formatDate(record.finalGraduationDate, 'YYYY-MM') }}
               </template>
               <template v-else-if="column.key === 'submittedAt'">
                 {{ formatDate(record.submittedAt, 'YYYY-MM-DD HH:mm') }}
@@ -489,6 +493,11 @@ onMounted(async () => {
       </a-card>
 
     </a-spin>
+    <ApplicationExcelColumnModal
+      v-model:open="excelModalOpen"
+      :downloading="downloadingExcel"
+      @download="downloadExcel"
+    />
   </div>
 </template>
 

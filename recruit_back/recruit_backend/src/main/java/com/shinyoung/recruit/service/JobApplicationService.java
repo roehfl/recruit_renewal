@@ -305,6 +305,7 @@ public class JobApplicationService {
                     birthDate == null ? null : Period.between(birthDate, today).getYears(),
                     finalEducation == null ? null : finalEducation.getEducationLevel(),
                     finalEducation == null ? null : finalEducation.getSchoolName(),
+                    finalEducation == null ? null : finalEducation.getGraduationDate(),
                     latestResult == null ? null : latestResult.getStage().getStageType(),
                     latestResult == null ? null : latestResult.getResultStatus(),
                     careerAttachmentId == null ? null : "/admin/applications/%d/attachments/%d/download"

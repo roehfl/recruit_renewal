@@ -1,16 +1,21 @@
 package com.shinyoung.recruit.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
+import com.shinyoung.recruit.domain.entity.ActivityLog;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
+import com.shinyoung.recruit.domain.repository.ActivityLogRepository;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
+import com.shinyoung.recruit.enumeration.AuditActionType;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.ExcelExportFile;
 import com.shinyoung.recruit.service.JobPostingService;
@@ -22,6 +27,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -36,14 +43,18 @@ import java.io.ByteArrayInputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -52,9 +63,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AdminExportControllerTest {
 
     private static final List<String> EXPECTED_HEADER = List.of(
-            "applicationId", "applicantName", "phoneNumber", "email",
-            "jobPostingTitle", "jobPositionName", "status",
-            "submittedAt", "withdrawnAt", "createdAt", "updatedAt"
+            "수험번호", "지원분야", "근무지", "지원상태", "최종제출일시", "최신 전형결과",
+            "이름", "생년월일", "나이", "휴대폰", "이메일", "최종학력", "최종학교", "졸업년월"
     );
 
     @Autowired
@@ -71,6 +81,9 @@ class AdminExportControllerTest {
 
     @Autowired
     private JobApplicationRepository jobApplicationRepository;
+
+    @Autowired
+    private ActivityLogRepository activityLogRepository;
 
     private MockMvc mockMvc;
 
@@ -103,12 +116,12 @@ class AdminExportControllerTest {
         assertThat(header).isEqualTo(EXPECTED_HEADER);
         assertThat(header).doesNotContain("ci", "ciHash", "password");
 
-        List<List<String>> dataRows = sheet.subList(1, sheet.size());
+        List<Map<String, String>> dataRows = recordsOf(sheet);
         assertThat(dataRows).hasSize(2);
         assertThat(dataRows).anySatisfy(row -> {
-            assertThat(row.get(1)).isEqualTo("Applicant A");
-            assertThat(row.get(2)).isEqualTo("01011112222");
-            assertThat(row.get(3)).isEqualTo("a@example.com");
+            assertThat(row.get("이름")).isEqualTo("Applicant A");
+            assertThat(row.get("휴대폰")).isEqualTo("01011112222");
+            assertThat(row.get("이메일")).isEqualTo("a@example.com");
         });
     }
 
@@ -121,14 +134,14 @@ class AdminExportControllerTest {
 
         MvcResult all = performExport(get("/api/admin/applications/export")
                 .with(authentication(adminAuthentication())));
-        assertThat(dataRowsOf(all)).hasSize(3);
+        assertThat(dataRecordsOf(all)).hasSize(3);
 
         MvcResult submitted = performExport(get("/api/admin/applications/export")
                 .param("status", "SUBMITTED")
                 .with(authentication(adminAuthentication())));
-        List<List<String>> submittedRows = dataRowsOf(submitted);
+        List<Map<String, String>> submittedRows = dataRecordsOf(submitted);
         assertThat(submittedRows).hasSize(2);
-        assertThat(submittedRows).allSatisfy(row -> assertThat(row.get(6)).isEqualTo("SUBMITTED"));
+        assertThat(submittedRows).allSatisfy(row -> assertThat(row.get("지원상태")).isEqualTo("제출 완료"));
     }
 
     /*
@@ -144,14 +157,14 @@ class AdminExportControllerTest {
 
         MvcResult all = performExport(get("/api/admin/applications/export")
                 .with(authentication(adminAuthentication())));
-        assertThat(dataRowsOf(all)).hasSize(3);
+        assertThat(dataRecordsOf(all)).hasSize(3);
 
         MvcResult filtered = performExport(get("/api/admin/applications/export")
                 .param("name", "홍길")
                 .with(authentication(adminAuthentication())));
-        List<List<String>> rows = dataRowsOf(filtered);
+        List<Map<String, String>> rows = dataRecordsOf(filtered);
         assertThat(rows).hasSize(2);
-        assertThat(rows).allSatisfy(row -> assertThat(row.get(1)).startsWith("홍길"));
+        assertThat(rows).allSatisfy(row -> assertThat(row.get("이름")).startsWith("홍길"));
     }
 
     @Test
@@ -164,9 +177,9 @@ class AdminExportControllerTest {
                 .param("phoneNumber", "01012345678")
                 .with(authentication(adminAuthentication())));
 
-        List<List<String>> rows = dataRowsOf(filtered);
+        List<Map<String, String>> rows = dataRecordsOf(filtered);
         assertThat(rows).hasSize(1);
-        assertThat(rows.get(0).get(1)).isEqualTo("대상자");
+        assertThat(rows.get(0).get("이름")).isEqualTo("대상자");
     }
 
     @Test
@@ -192,9 +205,9 @@ class AdminExportControllerTest {
                 .param("jobPositionId", backendPositionId.toString())
                 .with(authentication(adminAuthentication())));
 
-        List<List<String>> dataRows = dataRowsOf(result);
+        List<Map<String, String>> dataRows = dataRecordsOf(result);
         assertThat(dataRows).hasSize(2);
-        assertThat(dataRows).allSatisfy(row -> assertThat(row.get(5)).isEqualTo("Backend"));
+        assertThat(dataRows).allSatisfy(row -> assertThat(row.get("지원분야")).isEqualTo("Backend"));
     }
 
     @Test
@@ -207,15 +220,15 @@ class AdminExportControllerTest {
 
         MvcResult global = performExport(get("/api/admin/applications/export")
                 .with(authentication(adminAuthentication())));
-        assertThat(dataRowsOf(global)).hasSize(3);
+        assertThat(dataRecordsOf(global)).hasSize(3);
 
         MvcResult perPostingA = performExport(get("/api/admin/job-postings/{id}/applications/export", postingA)
                 .with(authentication(adminAuthentication())));
-        assertThat(dataRowsOf(perPostingA)).hasSize(2);
+        assertThat(dataRecordsOf(perPostingA)).hasSize(2);
 
         MvcResult perPostingB = performExport(get("/api/admin/job-postings/{id}/applications/export", postingB)
                 .with(authentication(adminAuthentication())));
-        assertThat(dataRowsOf(perPostingB)).hasSize(1);
+        assertThat(dataRecordsOf(perPostingB)).hasSize(1);
     }
 
     @Test
@@ -233,9 +246,57 @@ class AdminExportControllerTest {
         MvcResult result = performExport(get("/api/admin/applications/export")
                 .with(authentication(adminAuthentication())));
 
-        List<List<String>> dataRows = dataRowsOf(result);
+        List<Map<String, String>> dataRows = dataRecordsOf(result);
         assertThat(dataRows).hasSize(1);
-        assertThat(dataRows.get(0).get(1)).isEqualTo("'=cmd()|calc");
+        assertThat(dataRows.get(0).get("이름")).isEqualTo("'=cmd()|calc");
+    }
+
+    @Test
+    void export_applications_writes_only_requested_columns_in_catalog_order() throws Exception {
+        Long jobPostingId = createJobPosting("columns-select");
+        persistApplication(jobPostingId, "col-1", "컬럼대상", "01012340000", "col@example.com", true, false);
+
+        // job-posting-scoped 엔드포인트를 써서 audit 조회도 이 jobPostingId 로 좁힌다(다른 테스트의 export 로그와 섞이지 않게).
+        // 대소문자/공백 섞인 입력도 trim+upper 로 정규화되고, 출력은 요청 순서가 아니라 카탈로그 선언 순서를 따른다.
+        MvcResult result = performExport(get("/api/admin/job-postings/{id}/applications/export", jobPostingId)
+                .param("columns", " email , APPLICATION_ID,name")
+                .with(authentication(adminAuthentication())));
+
+        List<List<String>> sheet = readSheet(result.getResponse().getContentAsByteArray());
+        assertThat(sheet.get(0)).containsExactly("수험번호", "이름", "이메일");
+        assertThat(sheet.get(1).get(1)).isEqualTo("컬럼대상");
+        assertThat(sheet.get(1).get(2)).isEqualTo("col@example.com");
+
+        // 감사 로그에도 정규화된 컬럼 key 가 카탈로그 순서로 정확히 남는지 end-to-end 로 확인한다.
+        // metadataJson 안에 filtersSafeJson 이 escape 된 JSON 문자열로 중첩되므로 파싱해서 꺼낸다 — 단순
+        // indexOf("NAME") 는 JOB_POSITION_NAME 에도 매치되어 14개 기본 컬럼이 감사된 회귀도 통과시킨다.
+        ActivityLog auditLog = latestExportApplicationsLog(jobPostingId);
+        JsonNode metadata = new ObjectMapper().readTree(auditLog.getMetadataJson());
+        String filtersSafeJson = metadata.get("filtersSafeJson").asText();
+        assertThat(filtersSafeJson).contains("\"columns\":[\"APPLICATION_ID\",\"NAME\",\"EMAIL\"]");
+    }
+
+    @Test
+    void export_applications_rejects_unknown_column() throws Exception {
+        mockMvc.perform(get("/api/admin/applications/export")
+                        .param("columns", "APPLICATION_ID,NOT_A_COLUMN")
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(containsString("NOT_A_COLUMN")));
+    }
+
+    @Test
+    void export_application_columns_returns_catalog_in_declaration_order() throws Exception {
+        mockMvc.perform(get("/api/admin/applications/export/columns")
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.length()").value(6))
+                .andExpect(jsonPath("$.data[0].group").value("지원사항"))
+                .andExpect(jsonPath("$.data[0].columns[0].key").value("APPLICATION_ID"))
+                .andExpect(jsonPath("$.data[0].columns[0].label").value("수험번호"))
+                .andExpect(jsonPath("$.data[0].columns[0].defaultSelected").value(true))
+                .andExpect(jsonPath("$.data[5].group").value("다건 요약"));
     }
 
     @Test
@@ -248,6 +309,10 @@ class AdminExportControllerTest {
 
         mockMvc.perform(get("/api/admin/applications/export").with(anonymous()))
                 .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/admin/applications/export/columns")
+                        .with(authentication(applicantAuthentication(applicant))))
+                .andExpect(status().isForbidden());
     }
 
     private MvcResult performExport(MockHttpServletRequestBuilder builder) throws Exception {
@@ -257,9 +322,42 @@ class AdminExportControllerTest {
         return mockMvc.perform(asyncDispatch(started)).andReturn();
     }
 
-    private List<List<String>> dataRowsOf(MvcResult result) throws Exception {
-        List<List<String>> sheet = readSheet(result.getResponse().getContentAsByteArray());
-        return sheet.subList(1, sheet.size());
+    private List<Map<String, String>> dataRecordsOf(MvcResult result) throws Exception {
+        return recordsOf(readSheet(result.getResponse().getContentAsByteArray()));
+    }
+
+    /** 헤더 라벨 → 셀 값. 컬럼 구성이 바뀌어도 헤더 이름으로 값을 찾게 한다. */
+    private List<Map<String, String>> recordsOf(List<List<String>> sheet) {
+        List<String> header = sheet.get(0);
+        List<Map<String, String>> records = new ArrayList<>();
+        for (List<String> row : sheet.subList(1, sheet.size())) {
+            Map<String, String> record = new LinkedHashMap<>();
+            for (int c = 0; c < header.size(); c++) {
+                record.put(header.get(c), row.get(c));
+            }
+            records.add(record);
+        }
+        return records;
+    }
+
+    /**
+     * 가장 최근 EXPORT_APPLICATIONS 감사 로그 1건. {@code recordRequiresNew} 는 별도 트랜잭션에서 커밋되므로
+     * 테스트 메서드 트랜잭션(rollback 대상)과 무관하게 조회된다. 다른 테스트가 남긴 로그와 섞이지 않도록
+     * actionType + jobPostingId 로 거르고 occurredAt/id 내림차순 1건만 가져온다(repository.search 는 이미
+     * 그 순서로 정렬).
+     */
+    private ActivityLog latestExportApplicationsLog(Long jobPostingId) {
+        Page<ActivityLog> page = activityLogRepository.search(
+                LocalDateTime.now().minusMinutes(5),
+                LocalDateTime.now().plusMinutes(5),
+                null,
+                AuditActionType.EXPORT_APPLICATIONS,
+                null,
+                null,
+                jobPostingId,
+                null,
+                PageRequest.of(0, 1));
+        return page.getContent().get(0);
     }
 
     private List<List<String>> readSheet(byte[] bytes) throws Exception {

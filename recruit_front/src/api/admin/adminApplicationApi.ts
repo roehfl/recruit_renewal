@@ -5,6 +5,7 @@ import type {
   AdminApplicationSummaryResponse,
   AdminApplicationSearchRequest,
   AdminApplicationDetailResponse,
+  ApplicationExportColumnGroup,
   ApplicationFormLayoutResponse,
 } from '@/types/admin/application'
 import type {
@@ -114,10 +115,16 @@ export const adminApplicationApi = {
     })
   },
 
+  // 엑셀 컬럼 카탈로그(모달 체크박스 원천). 항목 정의는 백엔드 enum 이 단일 출처다.
+  getApplicationExportColumns() {
+    return apiClient.get<ApiResponse<ApplicationExportColumnGroup[]>>('/admin/applications/export/columns')
+  },
+
   // 지원현황 엑셀. 목록 조회와 같은 검색 조건을 그대로 넘겨야 화면과 파일 내용이 일치한다.
-  downloadApplicationsExcel(jobPostingId: number, searchRequest: AdminApplicationSearchRequest) {
+  // columns 는 콤마로 이어 보낸다 — axios 기본 배열 직렬화(columns[]=a&columns[]=b)는 서버가 받지 못한다.
+  downloadApplicationsExcel(jobPostingId: number, searchRequest: AdminApplicationSearchRequest, columns: string[]) {
     return apiClient.get<Blob>(`/admin/job-postings/${jobPostingId}/applications/export`, {
-      params: { ...searchRequest },
+      params: { ...searchRequest, columns: columns.join(',') },
       responseType: 'blob',
       timeout: PDF_BULK_DOWNLOAD_TIMEOUT_MS,
     })

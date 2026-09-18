@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -92,17 +93,23 @@ public class ExportAuditLogger {
         );
     }
 
+    /**
+     * 지원현황 export audit. {@code columns} 는 반출한 엑셀 컬럼 key(카탈로그 순)로, 어떤 개인정보 항목까지
+     * 내보냈는지 추적하는 용도다. 값 자체는 남기지 않는다.
+     */
     public void logApplicationsExport(
             ExportAuditContext context,
             Long jobPostingId,
             Long jobPositionId,
             String status,
+            List<String> columns,
             ExcelExportFile file
     ) {
         Map<String, Object> filters = new LinkedHashMap<>();
         filters.put("jobPostingId", jobPostingId);
         filters.put("jobPositionId", jobPositionId);
         filters.put("status", status);
+        filters.put("columns", columns);
         logExport("APPLICATIONS", context, filters, file);
     }
 
@@ -143,6 +150,10 @@ public class ExportAuditLogger {
     private Object sanitizeValue(Object value) {
         if (value == null || value instanceof Number || value instanceof Boolean) {
             return value;
+        }
+        // List(예: columns)는 JSON 배열로 남겨야 한다 — toString()으로 뭉개면 배열 구조가 깨진다.
+        if (value instanceof List<?> list) {
+            return list.stream().map(this::sanitizeValue).toList();
         }
         return value.toString().replaceAll("\\p{Cntrl}", " ").trim();
     }

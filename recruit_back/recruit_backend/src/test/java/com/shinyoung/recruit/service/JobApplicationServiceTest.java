@@ -1291,6 +1291,29 @@ class JobApplicationServiceTest {
         assertThat(row.stageType()).isNull();
         assertThat(row.stageResultStatus()).isNull();
         assertThat(row.careerDescriptionDownloadUrl()).isNull();
+        assertThat(row.finalGraduationDate()).isNull();
+    }
+
+    @Test
+    void admin_search_response_includes_graduation_date_of_final_education() {
+        Applicant applicant = createApplicant("search-grad", "Grad Target");
+        Long jobPostingId = createPublishedJobPosting("Search Grad Posting");
+        Long applicationId = createApplication(applicant, jobPostingId);
+        JobApplication application = jobApplicationRepository.findById(applicationId).orElseThrow();
+        educationRepository.save(ApplicationEducation.create(
+                application, EducationLevel.HIGH_SCHOOL, "Grad High", null, null, null, null,
+                null, LocalDate.of(2014, 2, 10), GraduationStatus.GRADUATED, DayNightType.DAY, null, false, null, 0));
+        educationRepository.save(ApplicationEducation.create(
+                application, EducationLevel.UNIVERSITY, "Grad Univ", null, null, null, null,
+                null, LocalDate.of(2020, 2, 20), GraduationStatus.GRADUATED, DayNightType.DAY, null, false, null, 1));
+
+        AdminApplicationSummaryResponse row = jobApplicationService
+                .getApplicationsForAdmin(jobPostingId, emptySearchRequest(), 0, 20)
+                .content().get(0);
+
+        // 최종학력 행(최고 EducationLevel)의 졸업일 — finalSchoolName 과 같은 행이어야 한다.
+        assertThat(row.finalSchoolName()).isEqualTo("Grad Univ");
+        assertThat(row.finalGraduationDate()).isEqualTo(LocalDate.of(2020, 2, 20));
     }
 
     private List<Long> searchApplicationIds(Long jobPostingId, AdminApplicationSearchRequest request) {

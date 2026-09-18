@@ -8,6 +8,7 @@ import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.springframework.stereotype.Component;
 
@@ -56,6 +57,7 @@ public class ExcelExportWriter {
             Sheet sheet = workbook.createSheet(spec.sheetName());
             List<ExportColumn<T>> columns = spec.columns();
             CellStyle readOnlyStyle = createReadOnlyStyle(workbook);
+            CellStyle wrapTextStyle = createWrapTextStyle(workbook);
             CellStyle emphasizedHeaderStyle = spec.emphasizeHeader() ? createEmphasizedHeaderStyle(workbook) : null;
 
             writeHeader(sheet, columns, escapeFormulaPrefix, readOnlyStyle, emphasizedHeaderStyle);
@@ -72,7 +74,7 @@ public class ExcelExportWriter {
                     for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
                         ExportColumn<T> column = columns.get(columnIndex);
                         writeStringCell(excelRow, columnIndex, column.value(row), escapeFormulaPrefix,
-                                column.readOnly() ? readOnlyStyle : null);
+                                dataCellStyle(column, readOnlyStyle, wrapTextStyle));
                     }
                 }
                 if (batch.size() < PAGE_SIZE) {
@@ -117,6 +119,22 @@ public class ExcelExportWriter {
         style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
         style.setFont(font);
         return style;
+    }
+
+    /** 줄바꿈 셀(1:N 요약). 여러 줄이 위부터 보이도록 상단 정렬한다. workbook당 한 번만 만든다. */
+    private CellStyle createWrapTextStyle(SXSSFWorkbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setWrapText(true);
+        style.setVerticalAlignment(VerticalAlignment.TOP);
+        return style;
+    }
+
+    /** data 셀 스타일. 읽기전용 음영이 우선이다(두 플래그를 함께 쓰는 dataset 은 없다). */
+    private <T> CellStyle dataCellStyle(ExportColumn<T> column, CellStyle readOnlyStyle, CellStyle wrapTextStyle) {
+        if (column.readOnly()) {
+            return readOnlyStyle;
+        }
+        return column.wrapText() ? wrapTextStyle : null;
     }
 
     /** @param emphasizedHeaderStyle null 이 아니면 읽기전용 음영보다 우선해 모든 헤더 셀에 쓴다 */

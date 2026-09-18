@@ -15,6 +15,8 @@ public interface ApplicationEducationRepository extends JpaRepository<Applicatio
 
     List<ApplicationEducation> findByJobApplicationIdIn(Collection<Long> applicationIds);
 
+    List<ApplicationEducation> findByJobApplicationIdInOrderBySortOrderAscIdAsc(Collection<Long> applicationIds);
+
     List<ApplicationEducation> findByJobApplicationId(Long applicationId);
 
     boolean existsByJobApplicationId(Long applicationId);

@@ -6,11 +6,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface ApplicationCertificateRepository extends JpaRepository<ApplicationCertificate, Long> {
 
     List<ApplicationCertificate> findByJobApplicationIdOrderBySortOrderAscIdAsc(Long applicationId);
+
+    List<ApplicationCertificate> findByJobApplicationIdInOrderBySortOrderAscIdAsc(Collection<Long> applicationIds);
 
     List<ApplicationCertificate> findByJobApplicationId(Long applicationId);
 

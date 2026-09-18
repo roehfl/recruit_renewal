@@ -500,6 +500,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
   - `jobTitle`(직무) — `JobPosition` 속성. `workLocation`(근무지)은 지원자가 선택한 근무지 표시명 (`jobGroup`은 2026-08-31 제거)
   - `birthDate`, `age` — `ApplicationBasicInfo.birthDate` + 조회 시점(오늘, 서버 Clock) 기준 만 나이. basic info 없으면 null
   - `finalEducationLevel`(최종학력), `finalSchoolName`(최종대학교) — 최고 EducationLevel 학력 행(검색 필터와 동일 판정). 학력 없으면 null
+  - 🟢 `finalGraduationDate`(졸업년월, ISO date) — 같은 최종학력 행의 `graduationDate`. 학력 없으면 null. 응답 전용 파생 값(엔티티 필드 아님), 추가 조회 없음. 프론트 그리드 "졸업년월"이 `YYYY-MM`으로 표시 (2026-09-18 구현 — 그리드가 `withdrawnAt`을 표시하던 결함 수정, 하위호환 추가)
   - `stageType`, `stageResultStatus` — 최신(stageOrder 최대) 전형 결과, 검색 조건과 동일 값 체계. 발표 여부 무관(관리자 화면). 결과 없으면 null(서류지원 상태는 `status=SUBMITTED`로 판별)
   - `careerDescriptionDownloadUrl` — 경력기술서(`AttachmentType.CAREER_DESCRIPTION`, STORED·미삭제, 복수면 최신 1건) 다운로드 상대 URL `/admin/applications/{id}/attachments/{attachmentId}/download`. 없으면 null
   - 수험번호는 `applicationId`로 대체. 파생 필드는 페이지 단위 배치 조회 4회로 채움(N+1 없음)
@@ -536,7 +537,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 조회 성격이나 id 배열 전달을 위해 `POST` 사용(의도된 선택)
 - 매핑: front `adminApplicationApi.downloadApplicationPdfBulk()` ↔ back `ApplicationPdfController.applicationPdfBulk()`
 
-#### GET `/admin/applications/export`, GET `/admin/job-postings/{jobPostingId}/applications/export`  🟢 필터 확장 완료 (2026-09-09)
+#### GET `/admin/applications/export`, GET `/admin/job-postings/{jobPostingId}/applications/export`  🟢 필터 확장 완료 (2026-09-09) / 컬럼 선택 확장 완료 (2026-09-18)
 
 - 설명: 검색 조건에 맞는 지원현황 엑셀 다운로드.
 - 요청: 목록 조회와 **동일한** `AdminApplicationSearchRequest` 전체(query string). `page`/`size`는 받지 않고 전체 행을 내보낸다.
@@ -544,8 +545,25 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 조치: 조건 생성을 `AdminApplicationSearchConditionFactory`로, 조회 절을 `JobApplicationRepository.ADMIN_SEARCH_WHERE` 상수로 목록과 공유해 같은 불일치가 재발하지 않게 했다.
 - 감사: 적용된 `jobPostingId`/`jobPositionId`/canonical `status` 기록(기존과 동일).
 - 응답(200): `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` (스트리밍)
-- 오류: 400(enum 값 오류), 404(`jobPostingId` 미존재), 413 상당(`ExportRowLimitExceededException` — 행 수 상한 초과)
+- 오류: 400(enum 값 오류, 행 수 상한 초과 `ExportRowLimitExceededException`, `columns` 값 오류), 404(`jobPostingId` 미존재)
 - 매핑: front `adminApplicationApi.downloadApplicationsExcel()` ↔ back `AdminExportController.exportApplicationsByJobPosting()`
+- 🟢 컬럼 선택 (2026-09-18, 설계: `docs/superpowers/specs/2026-09-18-application-export-column-selection-design.md`)
+  - 요청 `columns`(query, 콤마 연결 `columns=APPLICATION_ID,NAME`) — `AdminApplicationSearchRequest`가 아니라 별도 `@RequestParam`. 대소문자·앞뒤 공백 무시, 중복 제거, 출력 순서는 카탈로그 순서(체크 순서 무관). 정의 밖 key → 400 `엑셀 컬럼 값이 올바르지 않습니다. columns=<key>`
+  - 미지정/빈값 → 기본 14컬럼: `APPLICATION_ID, JOB_POSITION_NAME, WORK_LOCATION, STATUS, SUBMITTED_AT, LATEST_STAGE_RESULT, NAME, BIRTH_DATE, AGE, MOBILE_PHONE, EMAIL, FINAL_EDUCATION_LEVEL, FINAL_SCHOOL_NAME, FINAL_GRADUATION_DATE`
+  - ⚠ **요청은 하위호환, 파일 형식은 비호환**: 헤더 영문 11개 → 한글 라벨, 지원상태 enum 원문 → 임시저장/제출 완료/지원 철회, 일시 ISO → `yyyy-MM-dd HH:mm`, 기존 기본 컬럼 중 공고명·철회일시·작성/수정일시는 선택 항목으로 이동
+  - 이름·휴대폰·이메일 원천은 PDF와 같은 규칙(기본정보 행 우선, 없으면 지원 당시 이름 snapshot/계정 연락처). 검색 조건 `name`(snapshot)·`phoneNumber`(계정)과 출처가 다를 수 있다
+  - 값 표기: enum·공통코드·국적·보훈·장애·주소·평점·날짜는 PDF와 같은 표기. 휴대폰은 저장값 그대로
+  - 1:N 섹션(학력·경력·현재연봉·자격·어학·수상·공백기간·전형별 결과)은 섹션당 한 셀 줄바꿈 요약(`sortOrder` 순, 필드 `" / "` 구분). 셀은 32,766자에서 잘라 `…(이하 생략)`(수식 escape 1자 여유)
+  - 반출 제외: 자기소개서, 면제·미필 사유·자격증번호(화면·PDF 마스킹 값), CI
+  - 감사: filters에 적용된 `columns`(정규화 key의 JSON 배열, 카탈로그 순) 추가
+
+#### GET `/admin/applications/export/columns`  🟢 구현 완료 (2026-09-18)
+
+- 설명: 지원현황 엑셀 컬럼 카탈로그(모달 체크박스 원천). 백엔드 `ApplicationExportColumn` enum이 단일 출처 — 항목 추가·삭제는 enum만 고치면 프론트 무변경
+- 요청: 없음
+- 응답(200): `ApiResponse<List<{ group, columns: [{ key, label, defaultSelected }] }>>` — 그룹·컬럼 순서 = 카탈로그 순서. 현재 6그룹 44컬럼(기본 14). `group`은 안정 키가 아니라 한글 표시 라벨
+- 권한: `/api/admin/**` (ADMIN, RECRUIT_ADMIN)
+- 매핑: front `adminApplicationApi.getApplicationExportColumns()` ↔ back `AdminExportController.exportApplicationColumns()`
 
 ### 화면: 관리자 질문 템플릿 (전역 질문 은행)
 

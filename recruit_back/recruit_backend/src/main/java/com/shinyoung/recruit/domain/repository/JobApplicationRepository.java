@@ -258,7 +258,10 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
                 applicant.phoneNumber,
                 applicant.email,
                 application.jobPostingTitleSnapshot,
+                exportPosition.applicationType,
                 application.jobPositionNameSnapshot,
+                exportPosition.jobTitle,
+                application.workLocationNameSnapshot,
                 application.status,
                 application.submittedAt,
                 application.withdrawnAt,
@@ -266,6 +269,7 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
                 application.updatedAt)
             from JobApplication application
             join application.applicant applicant
+            join application.jobPosition exportPosition
             """ + ADMIN_SEARCH_WHERE + """
             order by application.createdAt desc, application.id desc
             """)

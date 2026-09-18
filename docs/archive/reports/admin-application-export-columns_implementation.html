@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>지원현황 엑셀 컬럼 선택 - 구현</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal</div>
+  <h1>지원현황 엑셀 다운로드 컬럼 선택 - 구현 (S1 백엔드 + S2 프론트)</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge warn">수동 확인 대기</span>
+  <span class="badge muted">작성일: 2026-09-18</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>지원현황 조회의 "엑셀 다운로드" 버튼이 컬럼 선택 모달을 열고, 체크한 항목(6그룹 44개, 기본 14개)만 엑셀로 내려받도록 구현했습니다.</p>
+      <p>컬럼 카탈로그는 백엔드 <code>ApplicationExportColumn</code> enum이 단일 출처이며, 모달은 카탈로그 조회 API로 체크박스를 그립니다. 셀 값은 페이지(1,000행)마다 선택 컬럼이 요구하는 섹션만 배치 조회해 만들고, 표기는 PDF와 같습니다.</p>
+      <p>화면 결함 2건(철회 라벨, "졸업년월"이 철회일시를 표시)을 함께 고쳤습니다. 변경 테스트 99건 통과, 프론트 type-check·build 성공. 실제 Excel·브라우저 확인은 환경 제약으로 수동 확인 항목으로 남았습니다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">백엔드 테스트 99/99 통과</span></p>
+      <p><span class="badge done">type-check 0건 · build 성공</span></p>
+      <p><span class="badge done">api-contract.md 🟢 확정</span></p>
+      <p><span class="badge done">태스크별 스펙·품질 리뷰 + 최종 교차 리뷰 통과</span></p>
+      <p><span class="badge pending">Excel·브라우저 수동 확인</span></p>
+      <p><span class="badge muted">미커밋 (요청 시 커밋)</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>컬럼 카탈로그 enum·섹션 enum·카탈로그 API</li>
+          <li>export <code>columns</code> 파라미터(파싱·정규화·400)</li>
+          <li>페이지 단위 섹션 선택 배치 조회 + 셀 조립</li>
+          <li>writer 줄바꿈 셀(<code>wrapText</code>)</li>
+          <li>감사 로그에 반출 컬럼 key 기록</li>
+          <li>컬럼 선택 모달 + 화면 연동</li>
+          <li>결함 2건(철회 라벨, 졸업년월)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미완료 · 확인 필요</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>실제 Excel에서 줄바꿈 셀 행 높이·컬럼 폭 확인</li>
+          <li>브라우저 E2E(모달 동작·다운로드) 확인</li>
+          <li>커밋(사용자 요청 시)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>자기소개서·첨부 목록</li>
+          <li>선택 기억(브라우저/서버 프리셋)</li>
+          <li>다른 export(전형결과·면접·평가) 컬럼 선택</li>
+          <li>최종학력·최신 전형 비교 규칙 3곳 중복 통합</li>
+          <li>지원상태 템플릿 미사용 분기 정리</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>API 목록</h2>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>변경</th><th>Slice</th></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/applications/export/columns</code></td><td>신규 — 카탈로그 <code>[{ group, columns:[{ key, label, defaultSelected }] }]</code>, 관리자 전용</td><td><span class="badge info">S1</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/applications/export</code><br><code>/admin/job-postings/{jobPostingId}/applications/export</code></td><td><code>columns</code> 추가(콤마 연결). 미지정 → 기본 14컬럼, 정의 밖 key → 400. 요청은 하위호환, 파일 형식은 비호환(한글 헤더·라벨·일시 표기)</td><td><span class="badge info">S1</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/job-postings/{jobPostingId}/applications</code></td><td>응답에 파생 필드 <code>finalGraduationDate</code> 추가(하위호환)</td><td><span class="badge info">S1</span></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>변경 파일</h2>
+    <div class="two">
+      <div class="card">
+        <h3>백엔드 신규</h3>
+        <table>
+          <tr><th>파일</th><th>역할</th></tr>
+          <tr><td><code>service/ApplicationExportColumn.java</code></td><td>컬럼 카탈로그 enum(단일 출처), <code>parse</code>·<code>defaults</code>·<code>requiredSections</code>·<code>catalog</code></td></tr>
+          <tr><td><code>service/ApplicationExportSection.java</code></td><td>배치 로딩 단위 enum</td></tr>
+          <tr><td><code>service/ApplicationExportRowAssembler.java</code></td><td>페이지 배치 조회 + 셀 값 조립, 페이지마다 <code>EntityManager.clear()</code></td></tr>
+          <tr><td><code>service/CommonCodeNames.java</code></td><td>export 1회용 공통코드 표시명 캐시</td></tr>
+          <tr><td><code>dto/response/ApplicationExportColumnGroupResponse.java</code></td><td>카탈로그 응답 DTO</td></tr>
+        </table>
+        <h3>백엔드 수정</h3>
+        <table>
+          <tr><th>파일</th><th>변경</th></tr>
+          <tr><td><code>controller/AdminExportController.java</code></td><td>카탈로그 API, <code>columns</code> 파라미터, 감사 전달</td></tr>
+          <tr><td><code>service/ApplicationExportService.java</code></td><td>고정 11컬럼 제거, 동적 spec + assembler 연결</td></tr>
+          <tr><td><code>service/ExportAuditLogger.java</code></td><td><code>columns</code> 기록, <code>sanitizeValue</code> List 분기</td></tr>
+          <tr><td><code>service/ExportColumn.java</code>, <code>ExcelExportWriter.java</code></td><td><code>wrapText</code> 플래그·줄바꿈 스타일</td></tr>
+          <tr><td><code>dto/response/ApplicationExportRow.java</code>, <code>JobApplicationRepository.java</code></td><td>base projection 14필드(지원구분·직무·근무지 추가)</td></tr>
+          <tr><td>섹션 repository 7종</td><td>지원서 id 배치 finder</td></tr>
+          <tr><td><code>dto/response/AdminApplicationSummaryResponse.java</code>, <code>service/JobApplicationService.java</code></td><td><code>finalGraduationDate</code></td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>프론트</h3>
+        <table>
+          <tr><th>파일</th><th>변경</th></tr>
+          <tr><td><code>views/admin/application/ApplicationExcelColumnModal.vue</code></td><td>신규 — 그룹 체크박스(중간 상태), 전체 선택·해제·기본값, 열 때마다 기본값 초기화, 카탈로그 1회 조회·캐시, 다운로드 중 닫기 잠금</td></tr>
+          <tr><td><code>views/admin/application/ApplicationStatus.vue</code></td><td>엑셀 버튼 → 모달, 다운로드에 <code>columns</code>; 철회 라벨 <code>'지원 철회'</code>; "졸업년월" → <code>finalGraduationDate</code> <code>YYYY-MM</code></td></tr>
+          <tr><td><code>api/admin/adminApplicationApi.ts</code></td><td><code>getApplicationExportColumns()</code>, 다운로드 <code>columns.join(',')</code></td></tr>
+          <tr><td><code>types/admin/application.ts</code></td><td>카탈로그 타입, <code>finalGraduationDate</code></td></tr>
+        </table>
+        <h3>문서</h3>
+        <table>
+          <tr><th>파일</th><th>변경</th></tr>
+          <tr><td><code>api-contract.md</code></td><td>🟡 → 🟢, 파일 형식 비호환·기본 14컬럼·반출 제외 항목 명시, 행 수 상한 오류 코드 413 → 400 정정</td></tr>
+          <tr><td><code>docs/superpowers/specs/2026-09-18-application-export-column-selection-design.md</code></td><td>구현 중 확정된 표기 반영</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>테스트 결과</h2>
+    <div class="card">
+      <p>명령어(백엔드, 변경 테스트 클래스만): <code>gradlew.bat test --tests "…ApplicationExportColumnTest" --tests "…CommonCodeNamesTest" --tests "…ExcelExportWriterTest" --tests "…ApplicationExportRowAssembler*" --tests "…ApplicationExportServiceTest" --tests "…ExportAuditLoggerTest" --tests "…JobApplicationServiceTest" --tests "…AdminExportControllerTest" --tests "…AdminApplicationControllerTest"</code></p>
+      <p>결과: <span class="badge done">BUILD SUCCESSFUL · 99/99</span></p>
+      <table>
+        <tr><th>테스트</th><th>건수</th><th>상태</th></tr>
+        <tr><td><code>ApplicationExportColumnTest</code></td><td>6</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>CommonCodeNamesTest</code></td><td>2</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>ExcelExportWriterTest</code></td><td>4</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>ApplicationExportRowAssemblerSectionLoadingTest</code></td><td>5</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>ApplicationExportRowAssemblerTest</code></td><td>7</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>ApplicationExportServiceTest</code></td><td>3</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>ExportAuditLoggerTest</code></td><td>1</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>JobApplicationServiceTest</code></td><td>50</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>AdminExportControllerTest</code></td><td>13</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>AdminApplicationControllerTest</code></td><td>8</td><td><span class="badge done">통과</span></td></tr>
+      </table>
+      <p>프론트: <code>npm run type-check</code> <span class="badge done">오류 0건</span> · <code>npm run build</code> <span class="badge done">성공</span> (기존 청크 크기 경고만)</p>
+      <p class="small">참고: <code>service.*</code> 패키지 전체(91개 클래스)를 한 번에 돌리면 테스트 JVM(기본 힙 512MB)에 Spring 컨텍스트 20여 개가 쌓여 OOM이 발생해 중단했습니다. 이번 변경과 무관한 <code>ApplicationPdfServiceTest</code>도 같은 OOM으로 실패했으며, 기존부터 있던 문제인지는 확인하지 않았습니다. 변경 범위 테스트로 검증했습니다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>검증 및 비즈니스 규칙</h2>
+    <table>
+      <tr><th>규칙</th><th>구현</th></tr>
+      <tr><td><code>columns</code> 입력</td><td>대소문자·앞뒤 공백 무시, 중복 제거, 카탈로그 순 출력, 정의 밖 key 400(파일 생성 전 거부)</td></tr>
+      <tr><td>원천 규칙</td><td>이름·휴대폰·이메일: 기본정보 행 우선, 없으면 snapshot/계정 값(PDF와 동일)</td></tr>
+      <tr><td>판정 규칙</td><td>최종학력(최고 <code>EducationLevel</code>, 동률 id)·최신 전형(<code>stageOrder</code>, 동률 stage id) — 목록과 동일. 저장 순서를 뒤집은 테스트로 고정</td></tr>
+      <tr><td>반출 제외</td><td>자기소개서, 면제·미필 사유, 자격증번호(화면·PDF 마스킹 값), CI</td></tr>
+      <tr><td>셀 길이</td><td>32,766자에서 자르고 <code>…(이하 생략)</code>, surrogate pair 분리 방지</td></tr>
+      <tr><td>감사</td><td>filters <code>columns</code> = 정규화 key JSON 배열(카탈로그 순). 컨트롤러→감사 로그 끝단 테스트로 고정</td></tr>
+      <tr><td>메모리</td><td>페이지마다 영속성 컨텍스트 비움(5만 행 누적 방지). 호출 전 로드 entity 재사용 금지 전제를 javadoc에 명시(OSIV)</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>리뷰 반영</h2>
+    <table>
+      <tr><th>단계</th><th>주요 지적</th><th>조치</th></tr>
+      <tr><td>셀 조립 품질 리뷰</td><td>미매핑 상태 NPE, surrogate 분리, 판정 규칙을 구분 못 하는 테스트</td><td><span class="badge done">반영</span> <code>getOrDefault</code>, 절단 보정, 저장 순서 역전·지원서 간 그룹핑 테스트</td></tr>
+      <tr><td>서비스·감사·컨트롤러 품질 리뷰</td><td>감사 컬럼 끝단 미검증, <code>NAME</code> 부분문자열 오탐</td><td><span class="badge done">반영</span> <code>filtersSafeJson</code> 파싱 후 정확한 배열 비교</td></tr>
+      <tr><td>감사 로거 구현</td><td><code>sanitizeValue</code>가 List를 문자열로 뭉갬</td><td><span class="badge done">반영</span> List 분기(원소별 sanitize)</td></tr>
+      <tr><td>프론트 리뷰</td><td>다운로드 중 X·ESC 닫기 허용, 신규 하드코딩 색상</td><td><span class="badge done">반영</span> <code>:closable</code>·<code>:keyboard</code> 잠금, <code>var(--app-text-secondary)</code></td></tr>
+      <tr><td>최종 교차 리뷰</td><td>계약 문서 "하위호환" 표현 부정확, 413 표기 오류</td><td><span class="badge done">반영</span> 파일 형식 비호환 명시, 400으로 정정</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>미결 사항</h2>
+    <table>
+      <tr><th>#</th><th>질문</th><th>현재 입장</th></tr>
+      <tr><td>1</td><td>실제 Excel에서 줄바꿈 셀 행 높이·컬럼 폭이 읽기 좋은가?</td><td>SXSSF는 행 높이를 계산하지 않고 컬럼 폭은 기본값. 수동 확인 후 필요하면 줄바꿈 컬럼 폭 지정 검토.</td></tr>
+      <tr><td>2</td><td>엑셀 전형결과 표기(<code>stageName</code> + "철회")와 그리드 표기(단계 유형 + "지원 철회")가 다른데 괜찮은가?</td><td>설계 §3.2대로 구현. 의도 확인 필요. 엑셀 "전형별 결과"는 전 단계 나열, 그리드 "전형별결과"는 최신 1건.</td></tr>
+      <tr><td>3</td><td>브라우저 E2E 검증은?</td><td>8080 포트를 다른 앱이 사용 중이고 관리자 로그인이 LDAP라 미실시. 수동 확인 필요.</td></tr>
+      <tr><td>4</td><td><code>service.*</code> 전체 실행 OOM은 기존 문제인가?</td><td>미확인. 테스트 JVM 힙 설정 또는 컨텍스트 공유 정리 검토 대상.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>컬럼 파싱은 컨트롤러, 같은 목록을 서비스·감사에 전달</td><td>감사에 원문이 아닌 정규화 값이 남도록 하고 두 곳의 값이 어긋나지 않게 함</td></tr>
+      <tr><td>2</td><td>assembler 메서드를 package-private으로</td><td>package-private <code>CommonCodeNames</code>를 노출하지 않음. 호출자는 같은 패키지</td></tr>
+      <tr><td>3</td><td><code>EntityManager</code>는 <code>@PersistenceContext</code> 필드 주입</td><td>프로젝트 기존 관례(<code>StageResultUploadService</code>)</td></tr>
+      <tr><td>4</td><td>검증은 변경 테스트 클래스만 실행</td><td>프로젝트 검증 정책. 패키지 전체 실행은 OOM으로 비실용적</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>다음 단계 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>수동 확인 → 커밋</strong></p>
+      <p>관리자 화면에서 모달 동작과 다운로드를 확인하고, 받은 xlsx를 Excel로 열어 한글 헤더·카탈로그 순서·줄바꿈 셀 표시를 확인한 뒤 요청 시 커밋합니다.</p>
+      <p class="small">후속 후보: 최종학력·최신 전형 비교 규칙 공용화(목록·전형결과 그리드·엑셀 3곳), 테스트 JVM 힙/컨텍스트 정리, 줄바꿈 컬럼 폭 지정.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

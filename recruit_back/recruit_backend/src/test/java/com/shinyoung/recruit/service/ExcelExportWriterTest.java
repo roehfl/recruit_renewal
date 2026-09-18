@@ -66,6 +66,26 @@ class ExcelExportWriterTest {
     }
 
     @Test
+    void wrap_text_columns_get_wrap_style_on_data_cells_only() throws Exception {
+        ExcelExportSpec<String> spec = new ExcelExportSpec<>(
+                "sheet",
+                List.of(
+                        new ExportColumn<>("plain", value -> value),
+                        new ExportColumn<>("multi", value -> value + "\n" + value, false, true)));
+
+        Path file = writer.writeToTempFile(spec, ExportRowSource.ofList(List.of("a")), true);
+        try (XSSFWorkbook workbook = new XSSFWorkbook(Files.newInputStream(file))) {
+            Sheet sheet = workbook.getSheetAt(0);
+            assertThat(sheet.getRow(0).getCell(1).getCellStyle().getWrapText()).isFalse();
+            assertThat(sheet.getRow(1).getCell(0).getCellStyle().getWrapText()).isFalse();
+            assertThat(sheet.getRow(1).getCell(1).getCellStyle().getWrapText()).isTrue();
+            assertThat(sheet.getRow(1).getCell(1).getStringCellValue()).isEqualTo("a\na");
+        } finally {
+            Files.deleteIfExists(file);
+        }
+    }
+
+    @Test
     void decorator_receives_zero_data_rows_when_source_is_empty() throws Exception {
         AtomicInteger decoratedRows = new AtomicInteger(-1);
         ExcelExportSpec<String> spec = new ExcelExportSpec<>(
