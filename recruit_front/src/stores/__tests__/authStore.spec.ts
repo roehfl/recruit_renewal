@@ -20,7 +20,6 @@ const loginUser: LoginUser = {
   name: '채용관리자',
   deptName: '인사기획부',
   userType: 'Employee',
-  phoneNumber: '',
   roles: ['ROLE_RECRUIT_ADMIN'],
 }
 

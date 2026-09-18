@@ -21,7 +21,6 @@ export const useAuthStore = defineStore('auth', {
     name: (state) => state.user?.name ?? '',
     loginId: (state) => state.user?.loginId ?? '',
     deptName: (state) => state.user?.deptName ?? '',
-    phoneNumber: (state) => state.user?.phoneNumber ?? '',
   },
 
   actions: {

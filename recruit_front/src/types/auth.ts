@@ -8,6 +8,5 @@ export interface LoginUser {
   name: string
   deptName: string
   userType: 'Applicant' | 'Employee'
-  phoneNumber: string
   roles: string[]
 }

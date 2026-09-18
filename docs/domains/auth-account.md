@@ -69,7 +69,7 @@
 | test | `{BT}/service/ApplicantAccountServiceTest.java` | 비밀번호 불일치·동일값 거부 |
 | test | `{BT}/service/CurrentApplicantServiceTest.java` | 401/403 예외 |
 | test | `{BT}/service/CurrentEmployeeServiceTest.java` | 401/403·blank actor |
-| test | `{BT}/security/auth/RoutingAuthenticationProviderTest.java` | JIT·경합 복구 |
+| test | `{BT}/security/auth/RoutingAuthenticationProviderTest.java` | JIT·경합 복구·임직원 부서명(LDAP 최신값) |
 | test | `{BT}/security/auth/CustomLdapUserDetailsMapperTest.java` | 매핑 합집합 |
 | test | `{BT}/security/auth/CustomUserDetailsTest.java` | username·userType |
 | test | `{BT}/config/SecurityConfigTest.java` | 매처 401/403/통과 |
@@ -102,27 +102,28 @@
 
 | 상태 | 메서드 | 경로 | 요청 요약 | 응답 요약 | 권한 |
 |---|---|---|---|---|---|
-| 🔴 | POST | /auth/login | `{ loginId, password }` | `{ loginId, name, deptName, userType, roles[] }` + 세션 쿠키 | 공개 |
+| 🟢 | POST | /auth/login | `{ loginId, password }` | `{ loginId, name, deptName, userType, roles[] }` + 세션 쿠키 | 공개 |
 | 🟢 | POST | /auth/logout | 없음 | `Void` | 공개 |
-| 🔴 | GET | /auth/me | 없음 | login과 동일 / 미로그인 401 | 공개(컨트롤러가 401) |
+| 🟢 | GET | /auth/me | 없음 | login과 동일 / 미로그인 401 | 공개(컨트롤러가 401) |
 | 🟢 | POST | /auth/applicants/sign-up | `{ loginId, password, name, phoneNumber, email?, ci }` | `{ applicantId, loginId, name }` | 공개 |
 | 🟢 | GET | /auth/applicants/check-email | `?email=` | `{ available }` | 공개 |
 | 🟢 | POST | /applicant/account/password | `{ currentPassword, newPassword }` | `Void` | 지원자 |
 | 🟢 | POST | /applicant/account/phone-number | `{ currentPassword, phoneNumber }` | `Void` | 지원자 |
 
-- 응답은 모두 `ApiResponse<T>`(`{ success, data, message }`)로 감싼다. 이 표는 코드 기준으로 작성했다(이전 계약 문서에 섹션 없음). 🔴는 FE와 BE 코드가 서로 맞지 않는 항목이다.
+- 응답은 모두 `ApiResponse<T>`(`{ success, data, message }`)로 감싼다. 이 표는 코드 기준으로 작성했다(이전 계약 문서에 섹션 없음).
 - ApplicantProfile이 호출하는 다른 카드 API: `GET /applications/me`(내 지원 목록, pageSize 5) → [application](application.md), `GET /applications/{applicationId}/stage-results` → [stage-result](stage-result.md).
 
 ### 엔드포인트 상세
 
-**POST /auth/login** 🔴
+**POST /auth/login** 🟢(2026-09-19 deptName 결함 수정 후 확정)
 - 성공 흐름: 새 SecurityContext 생성 → `request.getSession(true)` → `request.changeSessionId()` → `securityContextRepository.saveContext()`.
 - 실패(비밀번호 불일치, 계정 없음, LDAP 접속 실패): `AuthenticationException`이 필터 체인까지 올라가 `CustomAuthenticationEntryPoint`가 **401** `"Authentication is required."`를 반환한다. `GlobalExceptionHandler`에는 이 예외 핸들러가 없다. 전용 테스트는 없다. 프론트는 서버 메시지를 쓰지 않고 `'아이디 또는 비밀번호를 확인하세요.'`를 고정으로 보여준다. 빈 입력은 400.
-- 🔴 FE-BE 코드 간 불일치 결함 — 코드 수정 필요(후속 슬라이스): ① `phoneNumber` — `{FE}/types/auth.ts`의 `LoginUser.phoneNumber`가 BE `LoginUserResponse`에 없다. 그래서 `authStore.phoneNumber`는 항상 `''`이고, 지원서 기본정보의 휴대폰 프리필(`{FE}/views/applicant/application/sections/BasicInfoSection.vue`)이 항상 빈 값이다. ② `deptName` — `CustomUserDetails.fromUser()`에서 항상 빈 문자열로 고정된다(`deptName=""`). 임직원의 최종 principal도 이 메서드로 만들기 때문이다(`RoutingAuthenticationProvider.buildEmployeeAuthentication`). 관리자 사이드바(`{FE}/layouts/AdminSidebar.vue`)의 부서 표시가 항상 빈 값이다. 이를 잡는 테스트가 없다.
+- `deptName`: 임직원은 LDAP 최신 부서명(매퍼 `resolveDeptName` 결과), 지원자는 빈 문자열. 임직원 최종 principal은 `buildEmployeeAuthentication`이 `CustomUserDetails.fromLdap`으로 만든다(`fromUser`는 부서명을 비우므로 임직원에 쓰지 않는다). 권한(`roles`)은 LDAP 매퍼 단계에서 계산한 값을 그대로 쓴다. ({BE}/security/auth/RoutingAuthenticationProvider.java — buildEmployeeAuthentication)
+- 응답에 휴대폰 번호는 없다. 지원서 기본정보의 휴대폰은 `GET /applications/{applicationId}/basic-info`의 prefill이 채운다([application-sections](application-sections.md)).
 
 **POST /auth/logout**: SecurityContext를 비우고, 세션이 있으면 `invalidate()`한다. 호출 위치: `ApplicantProfile`, `{FE}/layouts/ApplicantHeader.vue`, `{FE}/layouts/AdminSidebar.vue`.
 
-**GET /auth/me** 🔴: 미인증이면 컨트롤러가 직접 401 `"로그인이 필요합니다."`를 반환한다(`anyRequest().permitAll()`로 통과). 응답은 login과 같고 위 🔴 두 항목이 그대로 해당한다. `roles`에는 authority 문자열이 담긴다. FE는 `skipAuthRedirect`·`skipClientEventLog`를 붙여 호출한다.
+**GET /auth/me** 🟢: 미인증이면 컨트롤러가 직접 401 `"로그인이 필요합니다."`를 반환한다(`anyRequest().permitAll()`로 통과). 응답은 login과 같다. `roles`에는 authority 문자열이 담긴다. FE는 `skipAuthRedirect`·`skipClientEventLog`를 붙여 호출한다.
 
 **POST /auth/applicants/sign-up**
 - 검증: loginId ≤100, password 8~100, name ≤100, phoneNumber ≤30(모두 `@NotBlank`), email `@Email` ≤255(**선택**), ci `@NotBlank` ≤255.
@@ -153,7 +154,7 @@
 - DB에 없는 loginId는 모두 LDAP 경로로 간다. 지원자가 아이디를 오타 내도 LDAP bind를 시도한다.
 - `CustomUserDetailsService`는 `Applicant`가 아니면 `UsernameNotFoundException`을 던진다. DAO 경로로는 임직원을 인증할 수 없다.
 - JIT 저장이 경합으로 `DataIntegrityViolationException`을 내면 다시 조회한다. `Employee`가 있으면 **LDAP 재인증 없이** 토큰을 만든다. 없으면 예외를 전파하고 409가 된다. (`RoutingAuthenticationProvider` — processLdapAndJit)
-- 기존 `Employee`의 name·deptName은 다시 로그인해도 갱신하지 않는다(JIT 시점 값 유지).
+- 기존 `Employee`의 name·deptName은 다시 로그인해도 갱신하지 않는다(JIT 시점 값 유지). 단 세션 principal의 부서명은 로그인마다 LDAP 최신값이다.
 - 임직원 권한 = 부서 매핑 role ∪ 개인 매핑 role. 추가만 하고 회수(revoke)는 없다. 매핑이 없어도 권한 0개로 로그인은 성공한다. 부서 매핑은 AD 그룹 cn이 매핑 부서명을 **포함**하는지로 찾는다. 표시용 부서명은 매핑 부서명 → AD `department` 속성 → 첫 그룹 cn 순으로 정하고 JIT 때 `Employee.deptName`에 저장한다. (`{BE}/security/auth/CustomLdapUserDetailsMapper.java` — mapUserFromContext/resolveDeptName)
 - LDAP 그룹 조회는 접두어 `""`, 대문자 변환 off로 설정해 그룹 cn 원문을 받는다. (`{BE}/config/AuthenticationConfig.java` — ldapAuthenticationProvider)
 - loginId는 가입할 때만 trim하고, 로그인과 JIT에서는 입력값을 그대로 쓴다. 대소문자 구분은 DB collation을 따른다(정책 미결정).
@@ -233,12 +234,12 @@
 2. `SecurityConfig` 매처와, 필요하면 `{FE}/routes/adminRoutes.ts`의 `ADMIN_ROLES`나 라우트 `meta.roles`를 고친다.
 3. `SecurityConfigTest`를 돌리고, 이 카드의 역할 목록을 갱신한 뒤 `node tools/check-docs.mjs`를 실행한다.
 
-### 로그인 응답 필드 추가·수정 (🔴 phoneNumber·deptName 해소 포함)
+### 로그인 응답 필드 추가·수정
 1. `{BE}/dto/response/LoginUserResponse.java`와 `AuthController.toLoginUserResponse`를 고친다.
-2. 값이 principal에 없으면 `{BE}/security/auth/CustomUserDetails.java`의 `fromUser`/`fromLdap`에서 채운다. 임직원은 `buildEmployeeAuthentication`을 거친다는 점에 주의한다.
+2. 값이 principal에 없으면 `{BE}/security/auth/CustomUserDetails.java`의 `fromUser`/`fromLdap`에서 채운다. 임직원은 `buildEmployeeAuthentication`(`fromLdap`)을 거친다는 점에 주의한다.
 3. `CustomUserDetailsTest`와 `RoutingAuthenticationProviderTest`에 단정을 추가한다.
 4. `{FE}/types/auth.ts`, `authStore` getter, `authStore.spec.ts`를 고친다.
-5. API 표를 갱신한다(🔴→🟢은 사용자 확인 후). `node tools/check-docs.mjs`를 실행한다.
+5. API 표를 갱신한다. `node tools/check-docs.mjs`를 실행한다.
 
 ### 지원자 계정 API 추가 (이메일 변경, 비밀번호 재설정 등)
 1. 로그인 후 기능은 `ApplicantAccountController`(`/applicant/account/**`, 매처로 자동 보호)에 둔다. 로그인 전 기능은 `ApplicantSignUpController`(`/auth/applicants/**`)에 두고 `SecurityConfig`의 permitAll 목록에 **명시적으로** 추가한다.
@@ -264,7 +265,7 @@ AES_SECRET_KEY='<로컬 예시 키>' ./gradlew test --tests "*ApplicantSignUp*" 
 
 ## 함정·결정
 
-- **로그인 응답 `phoneNumber`·`deptName`(🔴 확정 사유)**: FE-BE 코드 간 불일치 결함 — 코드 수정 필요(후속 슬라이스). ① FE `LoginUser.phoneNumber`가 BE `LoginUserResponse`에 없음 → 지원서 기본정보 휴대폰 프리필 항상 빈 값. ② `deptName`이 `CustomUserDetails.fromUser()`에서 항상 빈 문자열 → 관리자 사이드바 부서 표시 빈 값. 상세는 "엔드포인트 상세" `POST /auth/login`.
+- **로그인 응답 `deptName` 공란 결함(2026-09-19 수정)**: 임직원 principal을 `fromUser`로 다시 감싸 부서명이 `""`로 덮이던 문제(권한은 원래 정상, 표시용 필드만 공란 → 관리자 사이드바 부서 빈 값). `buildEmployeeAuthentication`을 `fromLdap`으로 바꾸고 `RoutingAuthenticationProviderTest`에 신규·기존 임직원 부서명 단정을 추가했다. 함께 BE 응답에 없던 FE `LoginUser.phoneNumber`와 `authStore.phoneNumber` getter를 제거했다.
 - **`anyRequest().permitAll()`**: `/menu`·`/board` 아래 쓰기 API가 매처 누락으로 무인증 상태였던 적이 있다(6e7f6cc, 8d7485d). 새 경로는 반드시 레시피 1을 따른다.
 - **CORS 빈 이름**: `http.cors(cors -> corsConfigurationSource())`의 람다는 설정을 지정하지 않는다. 실제로는 이름이 `corsConfigurationSource`인 빈을 Spring Security가 찾아서 쓴다. 메서드 이름을 바꾸면 CORS가 조용히 빠진다.
 - **Employee.deptName unique 제거**: 같은 부서의 두 번째 임직원 JIT 생성이 unique 충돌로 막히던 문제를 고쳤다. 운영 DB는 ddl-auto update라 제약이 자동으로 지워지지 않으므로 `recruit_back/recruit_backend/docs/ops/fix-employee-dept-name-unique-drop.sql`을 수동 적용한다(aa4e2a7). `users.login_id` unique는 유지한다.

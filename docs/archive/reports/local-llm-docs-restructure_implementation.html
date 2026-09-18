@@ -189,11 +189,11 @@
         <tr><th>#</th><th>결정</th><th>반영</th></tr>
         <tr><td>1</td><td>병행 변경</td><td><span class="badge done">해결</span> <code>300e792</code>로 커밋됨, 카드 3개 표기를 해시로 갱신(커밋 <code>048d69e</code>)</td></tr>
         <tr><td>2</td><td>FE 구현 완료 엔드포인트 🟢 승격</td><td><span class="badge done">반영</span> question 템플릿 6개, admin-application PDF 단건, application 기본정보·학력·경력 GET/POST 6개 → 🟢 (코드 기준 계약으로 서술: 학력 응답 배열, 경력기술서 업로드 후 기존 삭제)</td></tr>
-        <tr><td>3</td><td>코드·계약 불일치 🔴 처리</td><td><span class="badge done">반영</span> application-form 목록 API·master-data <code>GET /addresses</code> → 코드 동작을 계약으로 🟢. master-data <code>/admin/schools</code> 4개 → ⛔ 폐지(코드 잔존, 제거 후보). auth-account <code>/auth/login</code>·<code>/auth/me</code> → 🔴 유지, "FE-BE 코드 간 불일치 결함 — 코드 수정 필요"로 명시</td></tr>
+        <tr><td>3</td><td>코드·계약 불일치 🔴 처리</td><td><span class="badge done">반영</span> application-form 목록 API·master-data <code>GET /addresses</code> → 코드 동작을 계약으로 🟢. master-data <code>/admin/schools</code> 4개 → ⛔ 폐지(코드 잔존, 제거 후보). auth-account <code>/auth/login</code>·<code>/auth/me</code> → deptName 결함을 코드로 수정(<code>buildEmployeeAuthentication</code>이 LDAP 부서명 사용, 테스트 2건 추가)하고 FE 잔존 필드 <code>phoneNumber</code> 제거 후 🟢</td></tr>
         <tr><td>4</td><td><code>application.md</code> 분할</td><td><span class="badge done">반영</span> <code>application.md</code>(핵심, 21.7KB, API 9) + <code>application-sections.md</code>(섹션 9종, 24.0KB, API 18). 카드 16개. <code>_index.md</code> 색인과 다른 카드의 섹션 관련 링크 37곳 재지정</td></tr>
         <tr><td>5</td><td>코드 주석·ADR 옛 경로</td><td><span class="badge muted">보류</span> 코드 수정 범위라 후속 슬라이스 후보로 유지</td></tr>
       </table>
-      <p class="small">남은 🔴는 auth-account 2건(코드 결함)뿐이고, ⛔는 attachment 교체 API 1건과 master-data 학교 관리 4건입니다.</p>
+      <p class="small">🔴는 모두 해소됐고, ⛔는 attachment 교체 API 1건과 master-data 학교 관리 4건입니다.</p>
     </div>
   </section>
 

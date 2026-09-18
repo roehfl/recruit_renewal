@@ -92,7 +92,9 @@ public class RoutingAuthenticationProvider implements AuthenticationProvider {
     }
 
     private Authentication buildEmployeeAuthentication(User user, CustomUserDetails ldapUser) {
-        CustomUserDetails finalUser = CustomUserDetails.fromUser(user, ldapUser.getAuthorities());
+        // 표시용 부서명은 LDAP의 최신값을 쓴다. fromUser는 부서명을 비워 둔다.
+        CustomUserDetails finalUser = CustomUserDetails.fromLdap(
+                user.getLoginId(), ldapUser.getDeptName(), user.getName(), ldapUser.getAuthorities());
         return new UsernamePasswordAuthenticationToken(finalUser, null, finalUser.getAuthorities());
     }
 }

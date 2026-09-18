@@ -82,6 +82,37 @@ class RoutingAuthenticationProviderTest {
     }
 
     @Test
+    void JIT_최초_로그인_시_principal_부서명은_LDAP_부서명이다() {
+        Authentication request = loginRequest("emp01");
+        given(userRepository.findUserByLoginId("emp01")).willReturn(Optional.empty());
+        given(ldapProvider.authenticate(request)).willReturn(ldapSuccess("emp01"));
+        given(employeeRepository.save(any(Employee.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        Authentication result = routingAuthenticationProvider.authenticate(request);
+
+        CustomUserDetails principal = (CustomUserDetails) result.getPrincipal();
+        assertThat(principal.getDeptName()).isEqualTo("IT센터");
+    }
+
+    @Test
+    void 기존_임직원_로그인_시_principal_부서명은_LDAP의_최신_부서명이다() {
+        Authentication request = loginRequest("emp01");
+        Employee employee = existingEmployee("emp01");
+        employee.setDeptName("이전부서");
+        given(userRepository.findUserByLoginId("emp01")).willReturn(Optional.of(employee));
+        given(ldapProvider.authenticate(request)).willReturn(ldapSuccess("emp01"));
+
+        Authentication result = routingAuthenticationProvider.authenticate(request);
+
+        CustomUserDetails principal = (CustomUserDetails) result.getPrincipal();
+        assertThat(principal.getDeptName()).isEqualTo("IT센터");
+        assertThat(principal.getName()).isEqualTo("임직원");
+        assertThat(result.getAuthorities())
+                .extracting("authority")
+                .containsExactly("ROLE_EMPLOYEE");
+    }
+
+    @Test
     void JIT_race_재조회가_Employee면_LDAP_재인증_없이_복구된다() {
         Authentication request = loginRequest("emp01");
         given(userRepository.findUserByLoginId("emp01"))

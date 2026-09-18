@@ -296,7 +296,7 @@ const form = reactive<BasicInfoParams>({
     addressBasic: undefined,            // 주소
     addressDetail:undefined,            // 상세주소
     email:authStore.loginId,            // 이메일
-    mobilePhone:authStore.phoneNumber,  // 전화번호 
+    mobilePhone:'',                     // 전화번호(서버 prefill로 채움)
     emergencyPhone:undefined,           // 비상연락처
     applicationRouteCode:undefined,     // 지원 경로
 })
