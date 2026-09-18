@@ -648,12 +648,12 @@ class StageServiceTest {
     @Test
     void delete_ready_stage_keeps_other_stage_results() {
         Long jobPostingId = createJobPosting();
-        Long deletedStageId = stageService.create(jobPostingId, createStageRequest(0, false));
-        Long keptStageId = stageService.create(jobPostingId, createStageRequest(1, false));
+        Long keptStageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        Long deletedStageId = stageService.create(jobPostingId, createStageRequest(1, false));
         jobPostingService.publish(jobPostingId);
-        createSubmittedApplication("delete-ready-other", jobPostingId);
+        // 다음 단계 대상자는 직전 단계 발표 후에만 불러온다: 앞 단계를 합격·발표한 뒤 뒤 단계(READY)에 대상자를 넣는다.
+        passDocumentStage(jobPostingId, "delete-ready-other");
         stageResultService.initialize(deletedStageId);
-        stageResultService.initialize(keptStageId);
 
         stageService.delete(jobPostingId, deletedStageId);
 

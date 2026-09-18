@@ -43,10 +43,14 @@ const workLocationFilter = ref<string | undefined>()
 const nameKeyword = ref('')
 const selectedRowKeys = ref<number[]>([])
 
+/** 필터 드롭다운 맨 위 "전체" 항목. 고르면 조건을 비워 placeholder("지원분야 전체" 등) 상태로 돌아간다. */
+const ALL = ''
+const ALL_OPTION = { value: ALL, label: '전체' }
+
 const jobPositionOptions = computed(() => {
   const options = new Map<number, string>()
   props.results.forEach((result) => options.set(result.jobPositionId, result.jobPositionName))
-  return [...options].map(([value, label]) => ({ value, label }))
+  return [ALL_OPTION, ...[...options].map(([value, label]) => ({ value, label }))]
 })
 
 const workLocationOptions = computed(() => {
@@ -56,13 +60,16 @@ const workLocationOptions = computed(() => {
       options.add(result.workLocation)
     }
   })
-  return [...options].map((value) => ({ value, label: value }))
+  return [ALL_OPTION, ...[...options].map((value) => ({ value, label: value }))]
 })
 
-const statusFilterOptions = DECIDABLE_RESULT_STATUSES.concat('PENDING').map((status) => ({
-  value: status,
-  label: STAGE_RESULT_STATUS_LABELS[status],
-}))
+const statusFilterOptions = [
+  ALL_OPTION,
+  ...DECIDABLE_RESULT_STATUSES.concat('PENDING').map((status) => ({
+    value: status,
+    label: STAGE_RESULT_STATUS_LABELS[status],
+  })),
+]
 
 const resultStatusOptions = DECIDABLE_RESULT_STATUSES.map((status) => ({
   value: status,
@@ -111,6 +118,15 @@ const isResultStatus = (value: unknown): value is StageResultStatus =>
 
 const handleStatusFilterChange = (value: unknown) => {
   emit('update:statusFilter', isResultStatus(value) ? value : null)
+}
+
+/* "전체"(ALL)·지우기(undefined)는 모두 조건 없음으로 본다. */
+const handleJobPositionFilterChange = (value: unknown) => {
+  jobPositionFilter.value = typeof value === 'number' ? value : undefined
+}
+
+const handleWorkLocationFilterChange = (value: unknown) => {
+  workLocationFilter.value = typeof value === 'string' && value !== ALL ? value : undefined
 }
 
 const handleResultStatusChange = (stageResultId: number, value: unknown) => {
@@ -231,18 +247,20 @@ defineExpose({ clearSelection })
   <div class="result-grid">
     <div class="toolbar">
       <a-select
-        v-model:value="jobPositionFilter"
+        :value="jobPositionFilter"
         class="filter"
         placeholder="지원분야 전체"
         allow-clear
         :options="jobPositionOptions"
+        @change="handleJobPositionFilterChange"
       />
       <a-select
-        v-model:value="workLocationFilter"
+        :value="workLocationFilter"
         class="filter"
         placeholder="근무지 전체"
         allow-clear
         :options="workLocationOptions"
+        @change="handleWorkLocationFilterChange"
       />
       <a-select
         :value="statusFilter ?? undefined"

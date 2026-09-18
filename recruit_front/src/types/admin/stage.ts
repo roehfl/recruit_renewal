@@ -81,6 +81,8 @@ export interface StageResultInitializeResponse {
   createdCount: number
   existingCount: number
   skippedCount: number
+  /** 직전 단계 합격자가 아니어서 지운 대기 행 수. 첫 단계는 항상 0 */
+  removedCount: number
   results: AdminStageResult[]
 }
 

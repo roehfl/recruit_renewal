@@ -121,6 +121,29 @@ const announceBlockedReason = computed(() => {
     : ''
 })
 
+/** 같은 공고에서 stageOrder 가 바로 앞인 단계. 첫 단계면 null(백엔드 StageResultService 와 같은 정의). */
+const previousStage = computed(() => {
+  const current = selectedStage.value
+  if (current === null) {
+    return null
+  }
+  return stages.value
+    .filter((stage) => stage.stageOrder < current.stageOrder)
+    .reduce<StageListItem | null>(
+      (latest, stage) => (latest === null || stage.stageOrder > latest.stageOrder ? stage : latest),
+      null,
+    )
+})
+
+/** 대상자 불러오기가 막힌 이유. 2단계부터는 직전 단계 발표 후 합격자만 불러온다(백엔드 initialize 가드). */
+const initializeBlockedReason = computed(() => {
+  const previous = previousStage.value
+  if (previous === null || previous.status === 'RESULT_ANNOUNCED' || previous.status === 'CLOSED') {
+    return ''
+  }
+  return `직전 단계(${previous.stageName}) 결과를 발표한 뒤 대상자를 불러올 수 있습니다.`
+})
+
 /** 전형 시작이 막힌 이유. 없으면 빈 문자열이고 버튼이 활성된다. */
 const startBlockedReason = computed(() => {
   if (!jobPostingPublished.value) {
@@ -146,7 +169,7 @@ const banner = computed<{ type: BannerType; message: string; description?: strin
         ? {
             type: 'info',
             message: `${stage.stageName} 준비 중`,
-            description: '대상자를 불러오면 전형을 시작할 수 있습니다.',
+            description: initializeBlockedReason.value || '대상자를 불러오면 전형을 시작할 수 있습니다.',
           }
         : {
             type: 'info',
@@ -572,14 +595,19 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', warnUnsavedOnUn
               <a-button v-if="correctable" size="small" :loading="exporting" @click="exportResults">
                 엑셀 다운로드
               </a-button>
-              <a-button
+              <a-tooltip
                 v-if="selectedStage?.status === 'READY' || selectedStage?.status === 'IN_PROGRESS'"
-                size="small"
-                :loading="commandRunning"
-                @click="initializeResults"
+                :title="initializeBlockedReason"
               >
-                {{ results.length === 0 ? '대상자 불러오기' : '대상자 다시 불러오기' }}
-              </a-button>
+                <a-button
+                  size="small"
+                  :disabled="initializeBlockedReason !== ''"
+                  :loading="commandRunning"
+                  @click="initializeResults"
+                >
+                  {{ results.length === 0 ? '대상자 불러오기' : '대상자 다시 불러오기' }}
+                </a-button>
+              </a-tooltip>
               <a-tooltip v-if="selectedStage?.status === 'READY'" :title="startBlockedReason">
                 <a-button
                   type="primary"
@@ -667,9 +695,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', warnUnsavedOnUn
           v-else-if="!loadingResults"
           class="empty-state"
           :description="
-            submittedCount !== null
-              ? `대상자를 아직 불러오지 않았습니다. 제출 완료 지원서 ${submittedCount}건.`
-              : '대상자를 아직 불러오지 않았습니다.'
+            previousStage !== null
+              ? '대상자를 아직 불러오지 않았습니다. 직전 단계 합격자를 대상자로 불러옵니다.'
+              : submittedCount !== null
+                ? `대상자를 아직 불러오지 않았습니다. 제출 완료 지원서 ${submittedCount}건.`
+                : '대상자를 아직 불러오지 않았습니다.'
           "
         />
       </template>

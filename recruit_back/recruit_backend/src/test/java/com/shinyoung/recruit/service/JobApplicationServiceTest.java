@@ -906,26 +906,27 @@ class JobApplicationServiceTest {
         Long applicationId = createApplication(applicant, jobPostingId);
         seedBasicInfo(applicationId, LocalDate.of(1995, 1, 1));
         jobApplicationService.submit(applicant.getId(), applicationId);
-        Long readyStageId = createStage(jobPostingId, 0, false);
-        Long inProgressStageId = createStage(jobPostingId, 1, false);
-        Long announcedStageId = createStage(jobPostingId, 2, false);
-        Long closedStageId = createStage(jobPostingId, 3, true);
+        // 다음 단계 대상자는 직전 단계 발표 후에만 불러오므로 앞 단계부터 차례로 진행한다.
+        Long closedStageId = createStage(jobPostingId, 0, false);
+        Long announcedStageId = createStage(jobPostingId, 1, false);
+        Long inProgressStageId = createStage(jobPostingId, 2, false);
+        createStage(jobPostingId, 3, true); // READY, 대상자 없음
 
-        stageResultService.initialize(readyStageId);
-        decideResult(jobPostingId, inProgressStageId, StageResultStatus.FAILED);
-        decideResult(jobPostingId, announcedStageId, StageResultStatus.FAILED);
-        stageService.announce(jobPostingId, announcedStageId);
         decideResult(jobPostingId, closedStageId, StageResultStatus.PASSED);
         stageService.announce(jobPostingId, closedStageId);
         stageService.close(jobPostingId, closedStageId);
+        decideResult(jobPostingId, announcedStageId, StageResultStatus.PASSED);
+        stageService.announce(jobPostingId, announcedStageId);
+        decideResult(jobPostingId, inProgressStageId, StageResultStatus.FAILED);
 
         MyApplicationResponse response = findMyApplication(
                 jobApplicationService.getMyApplications(applicant.getId(), 0, 20),
                 applicationId
         );
 
+        // 순서가 더 뒤인 진행 중 단계(FAILED)는 미발표라 세지도, 최신으로 잡히지도 않는다.
         assertThat(response.announcedResultCount()).isEqualTo(2);
-        assertThat(response.latestAnnouncedStageName()).isEqualTo("Stage 3");
+        assertThat(response.latestAnnouncedStageName()).isEqualTo("Stage 1");
         assertThat(response.latestResultStatus()).isEqualTo(StageResultStatus.PASSED);
     }
 

@@ -125,21 +125,30 @@ class ApplicationStageResultServiceTest {
 
     @Test
     void ready_and_in_progress_stage_results_are_not_exposed() {
-        Long jobPostingId = createJobPosting();
-        Applicant applicant = createApplicant("applicant-result-hidden", "Applicant Result Hidden");
-        Long applicationId = createSubmittedApplication(applicant, jobPostingId);
-        Long readyStageId = createStage(jobPostingId, 0, false, LocalDateTime.of(2026, 7, 1, 10, 0));
-        Long inProgressStageId = createStage(jobPostingId, 1, true, LocalDateTime.of(2026, 7, 2, 10, 0));
-
+        // 다음 단계 대상자는 직전 단계 발표 후에만 불러올 수 있어, 두 상태를 한 지원서에 동시에 만들 수 없다. 공고를 나눈다.
+        Long readyPostingId = createJobPosting();
+        Applicant readyApplicant = createApplicant("applicant-result-hidden", "Applicant Result Hidden");
+        Long readyApplicationId = createSubmittedApplication(readyApplicant, readyPostingId);
+        Long readyStageId = createStage(readyPostingId, 0, true, LocalDateTime.of(2026, 7, 1, 10, 0));
         stageResultService.initialize(readyStageId);
-        decideResult(jobPostingId, inProgressStageId, StageResultStatus.PASSED, null, null);
 
-        List<ApplicantStageResultResponse> responses = applicationStageResultService.getApplicantStageResults(
-                applicant.getId(),
-                applicationId
+        Long inProgressPostingId = createJobPosting();
+        Applicant inProgressApplicant = createApplicant("applicant-result-hidden-progress", "Applicant Result Hidden Progress");
+        Long inProgressApplicationId = createSubmittedApplication(inProgressApplicant, inProgressPostingId);
+        Long inProgressStageId = createStage(inProgressPostingId, 0, true, LocalDateTime.of(2026, 7, 2, 10, 0));
+        decideResult(inProgressPostingId, inProgressStageId, StageResultStatus.PASSED, null, null);
+
+        List<ApplicantStageResultResponse> readyResponses = applicationStageResultService.getApplicantStageResults(
+                readyApplicant.getId(),
+                readyApplicationId
+        );
+        List<ApplicantStageResultResponse> inProgressResponses = applicationStageResultService.getApplicantStageResults(
+                inProgressApplicant.getId(),
+                inProgressApplicationId
         );
 
-        assertThat(responses).isEmpty();
+        assertThat(readyResponses).isEmpty();
+        assertThat(inProgressResponses).isEmpty();
     }
 
     @Test

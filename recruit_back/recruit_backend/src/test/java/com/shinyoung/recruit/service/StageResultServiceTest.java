@@ -54,6 +54,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -183,6 +184,69 @@ class StageResultServiceTest {
     }
 
     @Test
+    void initialize_next_stage_fails_when_previous_stage_is_not_announced() {
+        Long jobPostingId = createJobPosting();
+        createSubmittedApplication("stage-result-prev-open", jobPostingId);
+        Long firstStageId = createStage(jobPostingId, 0, false);
+        Long secondStageId = createStage(jobPostingId, 1, true);
+        stageResultService.initialize(firstStageId);
+        stageService.start(jobPostingId, firstStageId);
+
+        assertThatThrownBy(() -> stageResultService.initialize(secondStageId))
+                .isInstanceOf(InvalidStageResultException.class)
+                .hasMessage("Previous stage results must be announced before initializing.");
+    }
+
+    @Test
+    void initialize_next_stage_targets_only_previous_stage_passed_applications() {
+        Long jobPostingId = createJobPosting();
+        Long passedId = createSubmittedApplication("stage-result-next-passed", jobPostingId);
+        Long failedId = createSubmittedApplication("stage-result-next-failed", jobPostingId);
+        Long firstStageId = createStage(jobPostingId, 0, false);
+        Long secondStageId = createStage(jobPostingId, 1, true);
+        decideAndAnnounce(jobPostingId, firstStageId,
+                Map.of(passedId, StageResultStatus.PASSED, failedId, StageResultStatus.FAILED));
+
+        StageResultInitializeResponse response = stageResultService.initialize(secondStageId);
+
+        assertThat(response.createdCount()).isEqualTo(1);
+        assertThat(response.skippedCount()).isEqualTo(1);
+        assertThat(response.removedCount()).isZero();
+        assertThat(response.results()).extracting(AdminStageResultResponse::applicationId)
+                .containsExactly(passedId);
+    }
+
+    @Test
+    void initialize_next_stage_removes_pending_rows_of_non_passed_applications_and_keeps_decided_rows() {
+        Long jobPostingId = createJobPosting();
+        Long passedId = createSubmittedApplication("stage-result-prune-passed", jobPostingId);
+        Long pendingFailedId = createSubmittedApplication("stage-result-prune-pending", jobPostingId);
+        Long decidedFailedId = createSubmittedApplication("stage-result-prune-decided", jobPostingId);
+        Long firstStageId = createStage(jobPostingId, 0, false);
+        Long secondStageId = createStage(jobPostingId, 1, true);
+        decideAndAnnounce(jobPostingId, firstStageId, Map.of(
+                passedId, StageResultStatus.PASSED,
+                pendingFailedId, StageResultStatus.FAILED,
+                decidedFailedId, StageResultStatus.FAILED));
+        // 규칙 도입 전처럼 비합격자까지 들어가 있던 다음 단계: 대기 행 1개, 판정된 행 1개
+        Stage secondStage = stageRepository.findById(secondStageId).orElseThrow();
+        stageResultRepository.save(StageResult.initialize(secondStage,
+                jobApplicationRepository.findById(pendingFailedId).orElseThrow()));
+        StageResult decided = StageResult.initialize(secondStage,
+                jobApplicationRepository.findById(decidedFailedId).orElseThrow());
+        decided.updateResult(StageResultStatus.FAILED, null, null, LocalDateTime.now(FIXED_CLOCK), ACTOR);
+        stageResultRepository.save(decided);
+
+        StageResultInitializeResponse response = stageResultService.initialize(secondStageId);
+
+        assertThat(response.removedCount()).isEqualTo(1);
+        assertThat(response.createdCount()).isEqualTo(1);
+        assertThat(stageResultRepository.existsByStageIdAndJobApplicationId(secondStageId, pendingFailedId)).isFalse();
+        assertThat(response.results()).extracting(AdminStageResultResponse::applicationId)
+                .containsExactlyInAnyOrder(passedId, decidedFailedId);
+    }
+
+    @Test
     void get_results_includes_grid_fields_and_previous_stage_result() {
         Long jobPostingId = createJobPosting();
         Long applicationId = createSubmittedApplication("stage-result-grid", jobPostingId);
@@ -195,6 +259,7 @@ class StageResultServiceTest {
         stageService.start(jobPostingId, documentStageId);
         stageResultService.updateResult(documentStageId, documentResultId,
                 new StageResultUpdateRequest(StageResultStatus.PASSED, new BigDecimal("80"), null), ACTOR);
+        stageService.announce(jobPostingId, documentStageId);
         stageResultService.initialize(interviewStageId);
 
         AdminStageResultResponse document = stageResultService.getResults(documentStageId).get(0);
@@ -233,7 +298,9 @@ class StageResultServiceTest {
         Long secondApplicationId = createSubmittedApplication("stage-result-list-2", jobPostingId);
         Long firstStageId = createStage(jobPostingId);
         Long secondStageId = createStage(jobPostingId, 1, false);
-        stageResultService.initialize(firstStageId);
+        decideAndAnnounce(jobPostingId, firstStageId, Map.of(
+                firstApplicationId, StageResultStatus.PASSED,
+                secondApplicationId, StageResultStatus.PASSED));
         stageResultService.initialize(secondStageId);
 
         List<AdminStageResultResponse> responses = stageResultService.getResults(firstStageId);
@@ -554,6 +621,21 @@ class StageResultServiceTest {
         return stageResultRepository.findByStageIdForAdminList(stageId).stream()
                 .map(StageResult::getId)
                 .toList();
+    }
+
+    /** 대상자 초기화 → 시작 → 지원서별 판정 → 발표. 다음 단계 대상자를 불러올 수 있는 상태로 만든다. */
+    private void decideAndAnnounce(Long jobPostingId, Long stageId, Map<Long, StageResultStatus> statusByApplicationId) {
+        stageResultService.initialize(stageId);
+        stageService.start(jobPostingId, stageId);
+        List<StageResultBulkUpdateItemRequest> items = stageResultRepository.findByStageId(stageId).stream()
+                .map(result -> new StageResultBulkUpdateItemRequest(
+                        result.getId(),
+                        statusByApplicationId.get(result.getJobApplication().getId()),
+                        null,
+                        null))
+                .toList();
+        stageResultService.bulkUpdateResults(stageId, new StageResultBulkUpdateRequest(items), ACTOR);
+        stageService.announce(jobPostingId, stageId);
     }
 
     private void setStageStatus(Long stageId, StageStatus stageStatus) {

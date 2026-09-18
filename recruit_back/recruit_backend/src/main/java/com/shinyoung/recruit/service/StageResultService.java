@@ -30,6 +30,7 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -53,20 +54,29 @@ public class StageResultService {
         validateInitializable(stage);
 
         Long jobPostingId = stage.getJobPosting().getId();
+        // 첫 단계면 empty(제출 완료 전원이 대상), 2단계부터는 직전 단계 합격자만 대상이다.
+        Optional<Set<Long>> previousPassedIds = findPreviousStagePassedApplicationIds(stage);
         List<JobApplication> applications = jobApplicationRepository.findByJobPostingId(jobPostingId);
-        List<JobApplication> submittedApplications = applications.stream()
+        List<JobApplication> targetApplications = applications.stream()
                 .filter(application -> application.getStatus() == JobApplicationStatus.SUBMITTED)
+                .filter(application -> previousPassedIds.map(ids -> ids.contains(application.getId())).orElse(true))
                 .toList();
-        int skippedCount = applications.size() - submittedApplications.size();
+        int skippedCount = applications.size() - targetApplications.size();
 
-        List<Long> submittedApplicationIds = submittedApplications.stream()
-                .map(JobApplication::getId)
-                .toList();
-        Set<Long> existingApplicationIds = submittedApplicationIds.isEmpty()
-                ? Set.of()
-                : findExistingApplicationIds(stageId, submittedApplicationIds);
+        // 직전 단계 합격자가 아닌데 아직 대기인 행은 정리한다. 판정된 행은 이력 보존을 위해 둔다.
+        List<StageResult> existingResults = stageResultRepository.findByStageId(stageId);
+        List<StageResult> removedResults = previousPassedIds
+                .map(ids -> existingResults.stream()
+                        .filter(result -> result.getResultStatus() == StageResultStatus.PENDING)
+                        .filter(result -> !ids.contains(result.getJobApplication().getId()))
+                        .toList())
+                .orElse(List.of());
+        stageResultRepository.deleteAll(removedResults);
 
-        List<StageResult> newResults = submittedApplications.stream()
+        Set<Long> existingApplicationIds = existingResults.stream()
+                .map(result -> result.getJobApplication().getId())
+                .collect(Collectors.toSet());
+        List<StageResult> newResults = targetApplications.stream()
                 .filter(application -> !existingApplicationIds.contains(application.getId()))
                 .map(application -> StageResult.initialize(stage, application))
                 .toList();
@@ -75,10 +85,34 @@ public class StageResultService {
         return new StageResultInitializeResponse(
                 stageId,
                 newResults.size(),
-                existingApplicationIds.size(),
+                targetApplications.size() - newResults.size(),
                 skippedCount,
+                removedResults.size(),
                 getResults(stageId)
         );
+    }
+
+    /**
+     * 직전 단계(같은 공고에서 stageOrder 가 바로 앞)의 합격 지원서 id. 첫 단계면 empty.
+     * 발표 전에는 합격자 명단이 확정되지 않으므로 직전 단계가 발표·마감 상태가 아니면 거부한다(면접 확정 검증과 같은 기준).
+     */
+    private Optional<Set<Long>> findPreviousStagePassedApplicationIds(Stage stage) {
+        Optional<Stage> previousStage = stageRepository.findByJobPostingIdOrderByStageOrderAscIdAsc(
+                        stage.getJobPosting().getId()
+                ).stream()
+                .filter(candidate -> candidate.getStageOrder() < stage.getStageOrder())
+                .reduce((first, second) -> second);
+        if (previousStage.isEmpty()) {
+            return Optional.empty();
+        }
+        StageStatus previousStatus = previousStage.get().getStatus();
+        if (previousStatus != StageStatus.RESULT_ANNOUNCED && previousStatus != StageStatus.CLOSED) {
+            throw new InvalidStageResultException("Previous stage results must be announced before initializing.");
+        }
+        return Optional.of(stageResultRepository.findByStageId(previousStage.get().getId()).stream()
+                .filter(result -> result.getResultStatus() == StageResultStatus.PASSED)
+                .map(result -> result.getJobApplication().getId())
+                .collect(Collectors.toSet()));
     }
 
     public List<AdminStageResultResponse> getResults(Long stageId) {
@@ -261,14 +295,5 @@ public class StageResultService {
         if (actor == null || actor.isBlank()) {
             throw new InvalidStageResultException("StageResult actor is required.");
         }
-    }
-
-    private Set<Long> findExistingApplicationIds(Long stageId, List<Long> applicationIds) {
-        List<StageResult> existingResults = stageResultRepository.findByStageIdAndJobApplicationIdIn(stageId, applicationIds);
-        Set<Long> existingApplicationIds = new HashSet<>();
-        for (StageResult existingResult : existingResults) {
-            existingApplicationIds.add(existingResult.getJobApplication().getId());
-        }
-        return existingApplicationIds;
     }
 }

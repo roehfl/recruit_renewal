@@ -7,6 +7,7 @@ public record StageResultInitializeResponse(
         int createdCount,
         int existingCount,
         int skippedCount,
+        int removedCount,
         List<AdminStageResultResponse> results
 ) {
 }

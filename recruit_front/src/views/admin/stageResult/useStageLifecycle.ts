@@ -99,15 +99,21 @@ export function useStageLifecycle(deps: StageLifecycleDeps) {
       return
     }
     const stageId = selectedStageId.value
+    const stageOrder = stages.value.find((stage) => stage.id === stageId)?.stageOrder
+    // 2단계부터는 직전 단계 합격자만 대상이다(백엔드 StageResultService.initialize).
+    const hasPreviousStage =
+      stageOrder !== undefined && stages.value.some((stage) => stage.stageOrder < stageOrder)
     confirmThenRun({
       title: '대상자를 불러올까요?',
-      content:
-        '제출 완료 지원서를 이 단계의 대상자로 등록합니다. 이미 등록된 대상자는 그대로 두고 새로 제출된 지원서만 추가합니다.',
+      content: hasPreviousStage
+        ? '직전 단계 합격자를 이 단계의 대상자로 등록합니다. 이미 등록된 대상자는 그대로 두고, 직전 단계 합격자가 아닌 대기 대상자는 목록에서 뺍니다.'
+        : '제출 완료 지원서를 이 단계의 대상자로 등록합니다. 이미 등록된 대상자는 그대로 두고 새로 제출된 지원서만 추가합니다.',
       okText: '불러오기',
       action: () => adminStageApi.initializeResults(stageId),
       success: (response) => {
-        const { createdCount, existingCount, skippedCount } = response.data.data
-        return `신규 ${createdCount}건 · 기존 ${existingCount}건 · 제외 ${skippedCount}건`
+        const { createdCount, existingCount, skippedCount, removedCount } = response.data.data
+        const removed = removedCount > 0 ? ` · 정리 ${removedCount}건` : ''
+        return `신규 ${createdCount}건 · 기존 ${existingCount}건 · 제외 ${skippedCount}건${removed}`
       },
       fail: '대상자를 불러오지 못했습니다.',
     })

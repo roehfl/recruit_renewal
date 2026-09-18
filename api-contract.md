@@ -924,7 +924,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 백엔드: `StageController`, `StageResultController`, `StageResultUploadController`, `AdminExportController`
 - 설계: `docs/superpowers/specs/2026-09-04-admin-stage-result-management-design.md` (§5)
 - 그대로 사용(형태 변경 없음): `GET /admin/job-postings/{id}/stages`, `POST …/stages`, `POST …/stages/{stageId}/delete`, `POST …/stages/reorder`, `POST …/stages/{stageId}/start|announce|close`, `GET /admin/stages/{stageId}/results`, `POST …/results/initialize`, `POST …/results/{resultId}`, `POST …/results/bulk`, `POST …/results/{resultId}/correct`, `GET …/results/{resultId}/histories`, `GET …/results/upload-template`, `POST …/results/upload/preview`, `POST …/results/upload/commit`, `GET …/results/export`
-  - 이 중 결과를 돌려주는 5개는 **응답 DTO 필드가 늘었다**(변경 1), `POST …/stages/{stageId}`(단계 수정)는 **가드가 완화됐다**(변경 2), `upload-template`/`upload/*`는 **엑셀 시트 내용과 행 오류 문구가 바뀌었다**(변경 3). 경로·HTTP 메서드·요청 형태는 전부 그대로다
+  - 이 중 결과를 돌려주는 5개는 **응답 DTO 필드가 늘었다**(변경 1), `POST …/stages/{stageId}`(단계 수정)는 **가드가 완화됐다**(변경 2), `upload-template`/`upload/*`는 **엑셀 시트 내용과 행 오류 문구가 바뀌었다**(변경 3). 경로·HTTP 메서드·요청 형태는 전부 그대로다. `initialize` 는 **대상 선정 규칙이 바뀌고 응답에 `removedCount` 가 늘었다**(변경 4)
 
 #### 변경 1: `AdminStageResultResponse` 그리드 열 추가  🟢 확정
 
@@ -990,3 +990,16 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 파일 자체가 거부되는 경우는 기존과 같이 400(`ApiResponse.fail(message)`, 행 결과 없음)이다. **이전 영문 헤더로 받아 둔 템플릿 파일은 헤더 불일치로 거부된다** — 호환은 유지하지 않고 `업로드 템플릿 헤더가 올바르지 않습니다. 엑셀 템플릿 다운로드 파일을 사용하세요.` 로 재다운로드를 유도한다
 - **응답 DTO 형태는 불변**이다: preview 는 `StageResultUploadPreviewResponse`, commit 은 `StageResultUploadCommitResponse`(`outcome`: `APPLIED`(200) / `REJECTED_VALIDATION`(400) / `REJECTED_STALE`(409)), 행 상태는 `CHANGED | UNCHANGED | ERROR | STALE` 그대로다. all-or-nothing(오류·STALE 1건이라도 있으면 0건 반영)도 그대로
 - `GET …/results/export`(결과 목록 다운로드)는 이번 변경 대상이 아니다. 열 목록(영문 필드명 12열)이 그대로라 **변경 1로 늘어난 6개 필드는 export 시트에 나오지 않는다.** 업로드 소스로도 쓸 수 없다(헤더가 업로드 템플릿과 다르다)
+
+#### 변경 4: 2단계 이후 대상자는 직전 단계 합격자만  🟢 확정 (2026-09-18, front-back 반영 완료)
+
+- `POST /admin/stages/{stageId}/results/initialize` — 경로·요청(본문 없음) 불변. **대상 선정 규칙과 응답 필드 1개가 바뀐다**
+- 직전 단계 = 같은 공고에서 `stageOrder` 가 현재 단계보다 작은 단계 중 가장 큰 것(면접 확정 검증 `InterviewService` 와 같은 정의)
+- 첫 단계(직전 단계 없음): 기존과 같다 — 공고의 제출 완료(`SUBMITTED`) 지원서 전부
+- 2단계 이후:
+  - 직전 단계가 `RESULT_ANNOUNCED` 또는 `CLOSED` 가 아니면 **400** `Previous stage results must be announced before initializing.`(발표 전에는 합격자 명단이 확정되지 않는다)
+  - 대상 = `SUBMITTED` 이면서 직전 단계 결과가 `PASSED` 인 지원서
+  - **이미 있는 행 정리**: 직전 단계 `PASSED` 가 아닌 지원서의 행 중 **`PENDING` 인 행은 삭제**한다. 판정된 행(PENDING 아님)은 이력 보존을 위해 그대로 둔다. 기존에 전원이 들어간 단계도 "다시 불러오기" 한 번으로 정리된다
+- 응답 `ApiResponse<{ stageId, createdCount, existingCount, skippedCount, removedCount, results[] }>` — `removedCount`(정리로 삭제된 행 수, 첫 단계는 항상 0) **추가**. 나머지 의미:
+  - `createdCount` 새로 만든 행, `existingCount` 대상 지원서 중 이미 행이 있던 수, `skippedCount` 공고 지원서 중 대상이 아닌 수(미제출·철회 + 2단계 이후엔 직전 단계 비합격)
+- 프론트: 직전 단계가 발표 전이면 "대상자 불러오기" 버튼을 막고 사유를 보여준다. 확인 문구·빈 상태 문구를 단계 위치(첫 단계 / 2단계 이후)에 맞춘다. 토스트에 `정리 n건`(1건 이상일 때) 추가
