@@ -12,7 +12,6 @@ import { getApiErrorMessage } from '@/api/apiError'
 import type { ApiResponse } from '@/types/api'
 import type { JobPostingDetail, JobPostingImage, MyJobPostingDetailListItem } from '@/types/jobPosting'
 import { boardApi } from '@/api/boardApi'
-import HtmlView from '@/views/common/htmlView.vue'
 import JobPostingImageStack from '@/components/jobPosting/JobPostingImageStack.vue'
 
 const route = useRoute()
@@ -202,7 +201,6 @@ onMounted(async () => {
 
         <div class="posting-content">
           <JobPostingImageStack v-if="jobPostImages.length > 0" :images="jobPostImages" :fetch-image="fetchPostingImage" />
-          <HtmlView v-else-if="jobPostDetail?.contentHtml" :content="jobPostDetail.contentHtml" />
           <a-empty v-else-if="!loading" class="empty-box" description="지원서 상세 정보가 없습니다." />
         </div>
 

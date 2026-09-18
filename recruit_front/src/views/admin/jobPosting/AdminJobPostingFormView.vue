@@ -44,7 +44,6 @@ const displayEnd = ref<string | null>(null)
 const visible = ref(true)
 const pinned = ref(false)
 const displayOrder = ref(0)
-const contentHtmlLegacy = ref<string | null>(null) // 수정 시 기존 값 보존용(화면 미노출)
 
 const jobPositions = ref<AdminJobPositionForm[]>([
   { positionName: '', applicationType: 'NEW_GRADUATE_OR_EXPERIENCED', jobTitle: null, workLocationCodes: [], employmentType: 'FULL_TIME', sortOrder: 0 },
@@ -187,7 +186,7 @@ const save = async () => {
     }
 
     const id = editingId.value!
-    await adminJobPostingApi.updateJobPosting(id, { ...buildSaveRequest(), contentHtml: contentHtmlLegacy.value })
+    await adminJobPostingApi.updateJobPosting(id, buildSaveRequest())
     // 이미지 diff: 삭제 → 추가(id 확보) → altText 변경 → 전체 순서 재지정.
     // 게시 중 공고는 마지막 이미지를 지울 수 없으므로(백엔드) 삭제 대상 1장은 새 이미지를 올린 뒤 지운다.
     // 단, 올리다 장수 상한에 닿으면 그 전에 지운다(그때는 다른 이미지가 남아 있어 마지막 이미지가 아니다).
@@ -263,7 +262,6 @@ const loadForEdit = async () => {
     visible.value = detail.visible
     pinned.value = detail.pinned
     displayOrder.value = detail.displayOrder
-    contentHtmlLegacy.value = detail.contentHtml
     jobPositions.value = detail.jobPositions.map(({ workLocations, ...position }) => ({
       ...position,
       workLocationCodes: workLocations.map((it) => it.code),

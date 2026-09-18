@@ -408,6 +408,8 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 ### 화면: 관리자 공고 등록/수정 + 공고 이미지 (JobPostingImage)  🟢 확정 (2026-08-12, front-back 반영 완료)
 
 설계: `docs/superpowers/specs/2026-08-12-job-posting-image-input-design.md`. 공고 본문은 WYSIWYG 대신 이미지 목록. `contentHtml`은 공고에서 deprecated — 생성/수정 요청(`JobPostingCreateRequest`/`JobPostingUpdateRequest`)에서 optional이며, **null 입력은 빈 문자열 `""`로 저장**된다(ddl-auto:update가 기존 스키마의 NOT NULL을 완화하지 못하므로 마이그레이션 없이 호환 — `JobPosting.defaultContentHtml`). 신규 화면은 읽고 쓰지 않음(공지사항 Notice는 무관). **발행 조건: 이미지 ≥1장 또는 (레거시) contentHtml 존재(blank 제외)** — 위반 시 400 "공고 본문 이미지가 최소 1장 필요합니다."
+- 🟢 (2026-09-18) 프론트 레거시 경로 제거: 지원자·관리자 공고 상세는 이미지가 없을 때 `contentHtml`로 대신 보여 주지 않는다(정제 없는 `v-html` 렌더링 제거). 관리자 공고 수정은 `contentHtml`을 보내지 않으므로 수정 저장 시 백엔드가 빈 문자열로 저장한다. 운영 DB에 이미지 없이 contentHtml만 있는 옛 공고가 없다는 전제다
+- 🟡 (보류) 백엔드의 레거시 발행 조건(contentHtml로 발행)과 마지막 이미지 삭제 예외는 그대로다. 테스트 57개 파일이 "contentHtml만 넣고 발행"하는 픽스처에 의존해 별도 작업으로 뺐다
 
 - 백엔드: `JobPostingImage` 엔티티(+`JobPostingImageRepository`), `JobPostingImageService`, `JobPostingImageStorageService`(전용 root, 첨부 헬스스캔과 분리), `ImageSignatureValidator`, `JobPostingImageController`.
 - 프론트: `src/views/admin/jobPosting/`(List/Form/Detail 3종), `src/components/jobPosting/JobPostingImageStack.vue`(지원자 상세·관리자 미리보기 공용), `src/api/adminJobPostingApi.ts`·`boardApi.ts` 확장, 라우트 `/admin/job-postings`, `/new`, `/:id`, `/:id/edit`. 이미지는 `<img src>` 직접 참조 대신 **blob 응답 + objectURL**(세션 쿠키 이슈 회피).

@@ -39,7 +39,7 @@ export const adminJobPostingApi = {
     }
     return apiClient.post<ApiResponse<number>>('/admin/job-postings', formData, { timeout: UPLOAD_TIMEOUT_MS })
   },
-  updateJobPosting(id: number, request: AdminJobPostingSaveRequest & { contentHtml: string | null }) {
+  updateJobPosting(id: number, request: AdminJobPostingSaveRequest) {
     return apiClient.post<ApiResponse<number>>(`/admin/job-postings/${id}`, request)
   },
   publishJobPosting(id: number) {
