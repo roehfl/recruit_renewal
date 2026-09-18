@@ -183,11 +183,9 @@ public class JobPostingService {
         }
     }
 
-    /** 발행 조건: 이미지 ≥1장 또는 (레거시 데이터 호환) contentHtml 존재. */
+    /** 발행 조건: 본문 이미지 ≥1장. 레거시 contentHtml은 발행 조건으로 인정하지 않는다. */
     private void validateContentForPublish(JobPosting jobPosting) {
-        boolean hasImages = jobPostingImageService.countImages(jobPosting.getId()) > 0;
-        boolean hasLegacyContent = jobPosting.getContentHtml() != null && !jobPosting.getContentHtml().isBlank();
-        if (!hasImages && !hasLegacyContent) {
+        if (jobPostingImageService.countImages(jobPosting.getId()) == 0) {
             throw new InvalidJobPostingException("공고 본문 이미지가 최소 1장 필요합니다.");
         }
     }

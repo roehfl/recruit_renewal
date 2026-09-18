@@ -28,6 +28,8 @@ import com.shinyoung.recruit.enumeration.AuditActionType;
 import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.enumeration.PurgeResult;
 import com.shinyoung.recruit.exception.InvalidRetentionRequestException;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +54,7 @@ class PurgeReconciliationServiceTest {
 
     @Autowired private PurgeReconciliationService purgeReconciliationService;
     @Autowired private JobPostingService jobPostingService;
+    @Autowired private JobPostingImageRepository jobPostingImageRepository;
     @Autowired private JobApplicationService jobApplicationService;
     @Autowired private ApplicantRepository applicantRepository;
     @Autowired private JobPostingRepository jobPostingRepository;
@@ -67,7 +70,7 @@ class PurgeReconciliationServiceTest {
         List<String> tables = List.of(
                 "activity_log", "purge_job_item", "purge_batch",
                 "application_attachment", "job_application",
-                "application_form_config", "job_position", "job_posting",
+                "application_form_config", "job_position", "job_posting_image", "job_posting",
                 "applicant", "employee", "users");
         for (String table : tables) {
             jdbcTemplate.execute("DELETE FROM " + table);
@@ -77,6 +80,7 @@ class PurgeReconciliationServiceTest {
     @Test
     void reconcile는_PURGE_PENDING_잔여건의_바이너리를_삭제하고_최종_PURGED로_승격한다() {
         Long jobPostingId = createPosting();
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
 
         // 9d-2 saga 가 바이너리 삭제에 실패해 PURGE_PENDING + BINARY_DELETE_FAILED 로 멈춘 상태를 재현.
@@ -123,6 +127,7 @@ class PurgeReconciliationServiceTest {
     @Test
     void reconcile는_빈_storagePath_등_재처리_불가건은_PENDING으로_유지하고_FAILURE감사를_남긴다() {
         Long jobPostingId = createPosting();
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
 
         // storagePath 가 비어 있어 소멸 확인이 불가능한 BINARY_DELETE_FAILED — 재처리해도 승격 금지(Major 1).
@@ -162,6 +167,7 @@ class PurgeReconciliationServiceTest {
     @Test
     void reconcile는_limit으로_처리량을_chunk_단위로_제한한다() {
         Long jobPostingId = createPosting();
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         createPurgePendingWithFailedAttachment("recon-c1", jobPostingId, "attachments/recon-c1.pdf");
         createPurgePendingWithFailedAttachment("recon-c2", jobPostingId, "attachments/recon-c2.pdf");

@@ -248,14 +248,12 @@ public class JobPostingImageService {
                 .orElse(-1) + 1;
     }
 
-    /** 발행 조건(이미지 ≥1장 또는 레거시 contentHtml)이 삭제로 깨지지 않게 막는다. */
+    /** 발행 조건(본문 이미지 ≥1장)이 삭제로 깨지지 않게 막는다. 레거시 contentHtml 유무와 무관하다. */
     private void rejectDeletingLastPublishedContent(JobPosting jobPosting) {
         if (jobPosting.getStatus() != JobPostingStatus.PUBLISHED) {
             return;
         }
-        boolean lastImage = jobPostingImageRepository.countByJobPostingId(jobPosting.getId()) == 1;
-        boolean hasLegacyContent = jobPosting.getContentHtml() != null && !jobPosting.getContentHtml().isBlank();
-        if (lastImage && !hasLegacyContent) {
+        if (jobPostingImageRepository.countByJobPostingId(jobPosting.getId()) == 1) {
             throw new InvalidJobPostingException("게시 중인 공고의 마지막 본문 이미지는 삭제할 수 없습니다.");
         }
     }

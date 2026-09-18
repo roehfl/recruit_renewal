@@ -13,6 +13,9 @@ import com.shinyoung.recruit.enumeration.EmploymentType;
 import com.shinyoung.recruit.enumeration.JobPositionApplicationType;
 import com.shinyoung.recruit.enumeration.JobPostingType;
 import com.shinyoung.recruit.exception.InvalidJobPostingException;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -30,6 +33,12 @@ class JobPostingAttachmentRequirementServiceTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingRepository jobPostingRepository;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     @Autowired
     private JobPostingAttachmentRequirementService requirementService;
@@ -149,8 +158,49 @@ class JobPostingAttachmentRequirementServiceTest {
     }
 
     @Test
+    void 폐지된_ATTACHMENT_섹션_요구사항은_필수_선택_모두_등록할_수_없다() {
+        Long postingId = jobPostingService.create(request("draft"));
+
+        assertThatThrownBy(() -> requirementService.replaceRequirements(
+                postingId,
+                new AttachmentRequirementReplaceRequest(List.of(
+                        new AttachmentRequirementRequest(
+                                AttachmentType.PORTFOLIO, ApplicationSectionType.ATTACHMENT, true, 1, 0, "포트폴리오", null)
+                ))
+        )).isInstanceOf(InvalidJobPostingException.class)
+                .hasMessage("첨부파일(ATTACHMENT) 섹션은 폐지되어 첨부 요구사항을 등록할 수 없습니다. 첨부를 받을 섹션(예: 경력 CAREER)을 지정하세요.");
+
+        assertThatThrownBy(() -> requirementService.replaceRequirements(
+                postingId,
+                new AttachmentRequirementReplaceRequest(List.of(
+                        new AttachmentRequirementRequest(
+                                AttachmentType.ETC, ApplicationSectionType.ATTACHMENT, false, 0, 0, "기타", null)
+                ))
+        )).isInstanceOf(InvalidJobPostingException.class)
+                .hasMessageContaining("폐지");
+    }
+
+    @Test
+    void 경력_섹션의_경력기술서_요구사항은_등록할_수_있다() {
+        Long postingId = jobPostingService.create(request("draft"));
+
+        List<JobPostingAttachmentRequirementResponse> response = requirementService.replaceRequirements(
+                postingId,
+                new AttachmentRequirementReplaceRequest(List.of(
+                        new AttachmentRequirementRequest(
+                                AttachmentType.CAREER_DESCRIPTION, ApplicationSectionType.CAREER, true, 1, 0, "경력기술서", null)
+                ))
+        );
+
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).sectionType()).isEqualTo(ApplicationSectionType.CAREER);
+        assertThat(response.get(0).required()).isTrue();
+    }
+
+    @Test
     void replace_fails_when_posting_is_published() {
         Long postingId = jobPostingService.create(request("published"));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, postingId);
         jobPostingService.publish(postingId);
 
         assertThatThrownBy(() -> requirementService.replaceRequirements(

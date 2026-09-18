@@ -7,6 +7,9 @@ import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
 import com.shinyoung.recruit.service.JobPostingService;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +50,12 @@ class AdminApplicationFormLayoutControllerTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingRepository jobPostingRepository;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -264,6 +273,7 @@ class AdminApplicationFormLayoutControllerTest {
                 List.of(new JobPositionRequest("Backend", 0)),
                 new ApplicationFormConfigRequest(false, false, false, false, false, false, false)
         ));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
         jobPostingService.close(id);
         return id;
@@ -278,6 +288,7 @@ class AdminApplicationFormLayoutControllerTest {
                 List.of(new JobPositionRequest("Backend", 0)),
                 new ApplicationFormConfigRequest(false, false, false, false, false, false, false)
         ));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
         return id;
     }

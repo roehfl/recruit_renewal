@@ -25,6 +25,8 @@ import com.shinyoung.recruit.enumeration.JobPostingType;
 import com.shinyoung.recruit.enumeration.ReceptionStatus;
 import com.shinyoung.recruit.exception.InvalidJobPostingException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -60,6 +62,9 @@ class JobPostingServiceTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     @Autowired
     private ApplicationFormLayoutService applicationFormLayoutService;
@@ -337,6 +342,7 @@ class JobPostingServiceTest {
     void DRAFT에서_PUBLISHED_전환_성공() {
         Long id = jobPostingService.create(createRequest());
 
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
 
         assertThat(jobPostingService.getJobPosting(id).status()).isEqualTo(JobPostingStatus.PUBLISHED);
@@ -345,6 +351,7 @@ class JobPostingServiceTest {
     @Test
     void CLOSED_상태에서_PUBLISHED_재전환_불가() {
         Long id = jobPostingService.create(createRequest());
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
         jobPostingService.close(id);
 
@@ -354,6 +361,7 @@ class JobPostingServiceTest {
     @Test
     void PUBLISHED에서_CLOSED_전환_성공() {
         Long id = jobPostingService.create(createRequest());
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
 
         jobPostingService.close(id);
@@ -365,6 +373,7 @@ class JobPostingServiceTest {
     void 게시와_마감_시간은_Clock_기준으로_저장된다() {
         Long id = jobPostingService.create(createRequest());
 
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
         JobPostingDetailResponse published = jobPostingService.getJobPosting(id);
 
@@ -562,6 +571,7 @@ class JobPostingServiceTest {
     @Test
     void 관리자_응답은_ReceptionStatus와_accepting을_계산한다() {
         Long acceptingId = jobPostingService.create(createRequest());
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, acceptingId);
         jobPostingService.publish(acceptingId);
         Long upcomingId = jobPostingService.create(new JobPostingCreateRequest(
                 "예정",
@@ -612,6 +622,7 @@ class JobPostingServiceTest {
                 ApplicationSectionType.GAP_PERIOD
         ));
 
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
 
         assertThat(jobPostingService.getJobPosting(id).status()).isEqualTo(JobPostingStatus.PUBLISHED);
@@ -645,6 +656,7 @@ class JobPostingServiceTest {
                 new ApplicationFormConfigRequest(true, false, true, false, false, false, false)
         ));
 
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
 
         assertThat(jobPostingService.getJobPosting(id).status()).isEqualTo(JobPostingStatus.PUBLISHED);
@@ -687,7 +699,18 @@ class JobPostingServiceTest {
 
         assertThatThrownBy(() -> jobPostingService.publish(id))
                 .isInstanceOf(InvalidJobPostingException.class)
-                .hasMessageContaining("이미지");
+                .hasMessage("공고 본문 이미지가 최소 1장 필요합니다.");
+    }
+
+    @Test
+    void 레거시_contentHtml만_있고_이미지가_없으면_발행할_수_없다() {
+        Long id = jobPostingService.create(createRequest());
+        assertThat(jobPostingService.getJobPosting(id).contentHtml()).isNotBlank();
+
+        assertThatThrownBy(() -> jobPostingService.publish(id))
+                .isInstanceOf(InvalidJobPostingException.class)
+                .hasMessage("공고 본문 이미지가 최소 1장 필요합니다.");
+        assertThat(jobPostingService.getJobPosting(id).status()).isEqualTo(JobPostingStatus.DRAFT);
     }
 
     @Test

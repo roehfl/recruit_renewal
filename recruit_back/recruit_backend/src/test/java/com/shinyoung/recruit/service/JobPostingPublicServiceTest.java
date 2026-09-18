@@ -25,6 +25,9 @@ import com.shinyoung.recruit.enumeration.QuestionCategory;
 import com.shinyoung.recruit.enumeration.ReceptionStatus;
 import com.shinyoung.recruit.exception.InvalidJobPostingException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +62,12 @@ class JobPostingPublicServiceTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingRepository jobPostingRepository;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     @Autowired
     private JobPostingPublicService jobPostingPublicService;
@@ -417,6 +426,7 @@ class JobPostingPublicServiceTest {
                         false
                 )
         ));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
 
         ApplicationFormRequiredPolicyResponse detailPolicy =
@@ -454,6 +464,7 @@ class JobPostingPublicServiceTest {
         replaceAttachmentRequirements(id, List.of(
                 attachmentRequirement(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, true, 1)
         ));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
 
         JobPostingPublicListResponse response = findById(jobPostingPublicService.getJobPostings(0, 10), id);
@@ -479,6 +490,7 @@ class JobPostingPublicServiceTest {
         replaceAttachmentRequirements(requiredId, List.of(
                 attachmentRequirement(AttachmentType.RESUME, ApplicationSectionType.APPLICATION, true, 1)
         ));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, requiredId);
         jobPostingService.publish(requiredId);
 
         JobPostingPublicDetailResponse required = jobPostingPublicService.getJobPosting(requiredId);
@@ -503,6 +515,7 @@ class JobPostingPublicServiceTest {
         replaceAttachmentRequirements(optionalId, List.of(
                 attachmentRequirement(AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, false, 0)
         ));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, optionalId);
         jobPostingService.publish(optionalId);
 
         JobPostingPublicDetailResponse optional = jobPostingPublicService.getJobPosting(optionalId);
@@ -554,7 +567,7 @@ class JobPostingPublicServiceTest {
 
     @Test
     void 공개_상세조회에_이미지_목록이_포함된다() {
-        Long id = createPublishedPosting(request(
+        Long id = jobPostingService.create(request(
                 "이미지 공개 상세",
                 false,
                 receptionStart(),
@@ -565,6 +578,7 @@ class JobPostingPublicServiceTest {
         ));
         jobPostingImageService.addImage(id,
                 new org.springframework.mock.web.MockMultipartFile("file", "a.png", "image/png", PNG_HEAD), "채용 포스터", 0);
+        jobPostingService.publish(id);
 
         JobPostingPublicDetailResponse detail = jobPostingPublicService.getJobPosting(id);
 
@@ -588,6 +602,7 @@ class JobPostingPublicServiceTest {
         ));
         createQuestion(id, 0, true);
         createQuestion(id, 1, false);
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
 
         ApplicationFormRequiredPolicyResponse detailPolicy =
@@ -670,6 +685,7 @@ class JobPostingPublicServiceTest {
 
     private Long createPublishedPosting(JobPostingCreateRequest request) {
         Long id = jobPostingService.create(request);
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
         return id;
     }

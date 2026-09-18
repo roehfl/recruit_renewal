@@ -29,6 +29,8 @@ import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -69,6 +71,9 @@ class ApplicationEducationServiceTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     @Autowired
     private ApplicantRepository applicantRepository;
@@ -612,6 +617,7 @@ class ApplicationEducationServiceTest {
                 ),
                 new ApplicationFormConfigRequest(useEducation, false, false, false, false, false, false)
         ));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         return jobPostingId;
     }

@@ -15,6 +15,8 @@ import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import com.shinyoung.recruit.support.BasicInfoTestSupport;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -42,6 +44,7 @@ class ApplicationSubmitValidatorBasicInfoTest {
     @Autowired private ApplicationSubmitValidator submitValidator;
     @Autowired private JobApplicationService jobApplicationService;
     @Autowired private JobPostingService jobPostingService;
+    @Autowired private JobPostingImageRepository jobPostingImageRepository;
     @Autowired private ApplicantRepository applicantRepository;
     @Autowired private JobPostingRepository jobPostingRepository;
     @Autowired private JobApplicationRepository jobApplicationRepository;
@@ -75,6 +78,7 @@ class ApplicationSubmitValidatorBasicInfoTest {
                 LocalDateTime.of(2026, 6, 1, 9, 0), LocalDateTime.of(2026, 6, 30, 18, 0),
                 List.of(new JobPositionRequest("Backend", 0)),
                 new ApplicationFormConfigRequest(false, false, false, false, false, false, false)));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         JobPosting posting = jobPostingRepository.findDetailById(jobPostingId).orElseThrow();
         Long positionId = posting.getJobPositions().stream()

@@ -13,6 +13,8 @@ import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.JobApplicationService;
 import com.shinyoung.recruit.service.JobPostingService;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +53,9 @@ class AdminRetentionControllerTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     @Autowired
     private JobApplicationService jobApplicationService;
@@ -279,6 +284,7 @@ class AdminRetentionControllerTest {
 
     private Long createDraftApplication(String loginId) {
         Long jobPostingId = createPosting();
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         String ci = loginId + "-ci";
         Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));

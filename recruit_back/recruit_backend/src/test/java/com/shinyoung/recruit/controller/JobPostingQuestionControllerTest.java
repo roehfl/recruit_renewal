@@ -12,6 +12,9 @@ import com.shinyoung.recruit.enumeration.QuestionCategory;
 import com.shinyoung.recruit.service.JobPostingQuestionService;
 import com.shinyoung.recruit.service.JobPostingService;
 import com.shinyoung.recruit.service.QuestionTemplateService;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +44,12 @@ class JobPostingQuestionControllerTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingRepository jobPostingRepository;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     @Autowired
     private QuestionTemplateService questionTemplateService;
@@ -197,6 +206,7 @@ class JobPostingQuestionControllerTest {
     @Test
     void published_job_posting_command_returns_bad_request() throws Exception {
         Long jobPostingId = createJobPosting();
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
 
         mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/questions", jobPostingId)

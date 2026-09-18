@@ -17,6 +17,9 @@ import com.shinyoung.recruit.enumeration.QuestionCategory;
 import com.shinyoung.recruit.exception.InvalidJobPostingQuestionException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
 import com.shinyoung.recruit.exception.JobPostingQuestionNotFoundException;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -40,6 +43,12 @@ class JobPostingQuestionServiceTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingRepository jobPostingRepository;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     @Autowired
     private JobPostingQuestionRepository jobPostingQuestionRepository;
@@ -130,6 +139,7 @@ class JobPostingQuestionServiceTest {
     @Test
     void create_question_fails_when_job_posting_is_not_draft() {
         Long jobPostingId = createJobPosting();
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
 
         assertThatThrownBy(() -> jobPostingQuestionService.createQuestion(jobPostingId, directRequest(0)))
@@ -181,6 +191,7 @@ class JobPostingQuestionServiceTest {
     void update_question_policy_fails_after_publish() {
         Long jobPostingId = createJobPosting();
         JobPostingQuestionResponse created = jobPostingQuestionService.createQuestion(jobPostingId, directRequest(0));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
 
         // updateRequest 는 answerType/required/maxLength 까지 바꾼다. 이미 작성된 답변이
@@ -193,6 +204,7 @@ class JobPostingQuestionServiceTest {
     void update_question_text_is_allowed_after_publish() {
         Long jobPostingId = createJobPosting();
         JobPostingQuestionResponse created = jobPostingQuestionService.createQuestion(jobPostingId, directRequest(0));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
 
         // 오타 수정 목적. 문구 외 필드는 기존 값 그대로 보낸다.
@@ -221,6 +233,7 @@ class JobPostingQuestionServiceTest {
     void delete_question_fails_after_publish() {
         Long jobPostingId = createJobPosting();
         JobPostingQuestionResponse created = jobPostingQuestionService.createQuestion(jobPostingId, directRequest(0));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
 
         // 발행 후 삭제는 막는다. 답변이 달린 질문이 사라지면 ApplicationAnswer FK 가 깨진다.

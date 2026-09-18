@@ -24,6 +24,8 @@ import com.shinyoung.recruit.service.JobApplicationService;
 import com.shinyoung.recruit.service.JobPostingService;
 import com.shinyoung.recruit.service.StageResultService;
 import com.shinyoung.recruit.service.StageService;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +63,9 @@ class StageControllerTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     @Autowired
     private JobApplicationService jobApplicationService;
@@ -183,6 +188,7 @@ class StageControllerTest {
     void start_stage_returns_api_response() throws Exception {
         Long jobPostingId = createJobPosting();
         Long stageId = createStage(jobPostingId, 0, false);
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
 
         mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/stages/{stageId}/start", jobPostingId, stageId))
@@ -196,6 +202,7 @@ class StageControllerTest {
     void announce_stage_returns_api_response() throws Exception {
         Long jobPostingId = createJobPosting();
         Long stageId = createStage(jobPostingId, 0, false);
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
         prepareDecidedStageResult(jobPostingId, stageId, "controller-announce");
@@ -211,6 +218,7 @@ class StageControllerTest {
     void close_stage_returns_api_response() throws Exception {
         Long jobPostingId = createJobPosting();
         Long stageId = createStage(jobPostingId, 0, false);
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
         prepareDecidedStageResult(jobPostingId, stageId, "controller-close");
@@ -286,6 +294,7 @@ class StageControllerTest {
     void invalid_status_command_returns_api_response() throws Exception {
         Long jobPostingId = createJobPosting();
         Long stageId = createStage(jobPostingId, 0, false);
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
 
         mockMvc.perform(post("/api/admin/job-postings/{jobPostingId}/stages/{stageId}/announce", jobPostingId, stageId))

@@ -17,6 +17,8 @@ import org.springframework.web.context.WebApplicationContext;
 import java.util.List;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -201,6 +203,8 @@ class ClientEventLogControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body("APPLICANT_WEB", UUID.randomUUID().toString(), UUID.randomUUID().toString(), "")))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Access-Control-Expose-Headers", "X-Request-Id"));
+                // 다운로드 파일명용 Content-Disposition 도 함께 노출한다(SecurityConfig).
+                .andExpect(header().string("Access-Control-Expose-Headers",
+                        allOf(containsString("X-Request-Id"), containsString("Content-Disposition"))));
     }
 }

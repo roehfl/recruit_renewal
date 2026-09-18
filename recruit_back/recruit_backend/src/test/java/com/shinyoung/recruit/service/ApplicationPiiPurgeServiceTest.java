@@ -70,6 +70,8 @@ import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.service.JobApplicationService;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.Test;
@@ -97,6 +99,7 @@ class ApplicationPiiPurgeServiceTest {
 
     @Autowired private ApplicationPiiPurgeService applicationPiiPurgeService;
     @Autowired private JobPostingService jobPostingService;
+    @Autowired private JobPostingImageRepository jobPostingImageRepository;
     @Autowired private JobApplicationService jobApplicationService;
     @Autowired private ApplicantRepository applicantRepository;
     @Autowired private JobPostingRepository jobPostingRepository;
@@ -131,6 +134,7 @@ class ApplicationPiiPurgeServiceTest {
                 LocalDateTime.now().minusDays(1), LocalDateTime.now().plusDays(30),
                 List.of(new JobPositionRequest("Backend", 1)),
                 new ApplicationFormConfigRequest(true, true, true, true, true, true, true)));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         JobPosting posting = jobPostingRepository.findDetailById(jobPostingId).orElseThrow();
         Long positionId = posting.getJobPositions().stream()

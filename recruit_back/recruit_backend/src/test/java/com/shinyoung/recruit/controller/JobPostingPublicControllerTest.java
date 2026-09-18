@@ -16,6 +16,9 @@ import com.shinyoung.recruit.enumeration.QuestionCategory;
 import com.shinyoung.recruit.service.JobPostingAttachmentRequirementService;
 import com.shinyoung.recruit.service.JobPostingQuestionService;
 import com.shinyoung.recruit.service.JobPostingService;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +55,12 @@ class JobPostingPublicControllerTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingRepository jobPostingRepository;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     @Autowired
     private JobPostingQuestionService jobPostingQuestionService;
@@ -141,6 +150,7 @@ class JobPostingPublicControllerTest {
         Long id = jobPostingService.create(publicRequest("question policy", true, displayStart(), displayEnd(), false));
         createQuestion(id, 0, true);
         createQuestion(id, 1, false);
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
 
         mockMvc.perform(get("/api/job-postings/{id}", id))
@@ -172,6 +182,7 @@ class JobPostingPublicControllerTest {
                         )
                 ))
         );
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
 
         mockMvc.perform(get("/api/job-postings/{id}", id))
@@ -210,6 +221,7 @@ class JobPostingPublicControllerTest {
 
     private Long createPublishedPosting(JobPostingCreateRequest request) {
         Long id = jobPostingService.create(request);
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
         return id;
     }

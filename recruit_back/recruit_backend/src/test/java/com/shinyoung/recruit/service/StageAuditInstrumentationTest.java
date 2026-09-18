@@ -24,6 +24,8 @@ import com.shinyoung.recruit.enumeration.AuditActionType;
 import com.shinyoung.recruit.enumeration.AuditTargetType;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -48,6 +50,9 @@ class StageAuditInstrumentationTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     @Autowired
     private JobApplicationService jobApplicationService;
@@ -78,6 +83,7 @@ class StageAuditInstrumentationTest {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, new StageCreateRequest(
                 "Document screening", StageType.DOCUMENT, 0, LocalDateTime.now().plusDays(40), false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
 

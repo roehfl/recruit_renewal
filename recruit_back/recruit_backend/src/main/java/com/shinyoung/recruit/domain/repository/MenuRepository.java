@@ -12,4 +12,8 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
     List<Menu> findAllBySiteOrderBySortOrderAscIdAsc(MenuSite site);
 
     Optional<Menu> findBySiteAndPath(MenuSite site, String path);
+
+    boolean existsBySiteAndPath(MenuSite site, String path);
+
+    boolean existsBySiteAndPathAndIdNot(MenuSite site, String path, Long id);
 }

@@ -7,6 +7,7 @@ import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.dto.request.AttachmentRequirementReplaceRequest;
 import com.shinyoung.recruit.dto.request.AttachmentRequirementRequest;
 import com.shinyoung.recruit.dto.response.JobPostingAttachmentRequirementResponse;
+import com.shinyoung.recruit.enumeration.ApplicationSectionType;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.exception.InvalidJobPostingException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
@@ -93,6 +94,11 @@ public class JobPostingAttachmentRequirementService {
         }
         if (request.sectionType() == null) {
             throw new InvalidJobPostingException("Attachment section type is required.");
+        }
+        // 독립 첨부(ATTACHMENT) 섹션은 지원서 화면에서 폐지되어 지원자가 업로드할 경로가 없다.
+        if (request.sectionType() == ApplicationSectionType.ATTACHMENT) {
+            throw new InvalidJobPostingException(
+                    "첨부파일(ATTACHMENT) 섹션은 폐지되어 첨부 요구사항을 등록할 수 없습니다. 첨부를 받을 섹션(예: 경력 CAREER)을 지정하세요.");
         }
 
         boolean required = Boolean.TRUE.equals(request.required());

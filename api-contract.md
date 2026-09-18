@@ -249,6 +249,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 - 화면에서 제외(2026-08-11 결정): 시안 1c의 **"사용 여부" 토글** — `Menu` 엔티티/`MenuResponse`에 해당 필드가 없다. 필요해지면 별도 슬라이스에서 엔티티·DDL·트리 필터링 규칙과 함께 추가한다.
 - 클라이언트 검증은 `MenuService`의 서버 검증을 그대로 미러링한다(소메뉴 `path` 필수, `ROUTE`는 `/` 시작, `URL`은 `http(s)://` 시작). 서버가 단일 출처이며 클라이언트 검증은 왕복을 줄이기 위한 것이다.
 - 보안(2026-08-11, 🟢 확정): `POST /menu/admin/menu*`는 컨트롤러 경로가 `/api/menu/admin/menu`라 `SecurityConfig`의 broad `/api/admin/**` 매처에 걸리지 않았고 `anyRequest().permitAll()`로 흘러 **비인증 생성/수정이 가능한 상태**였다. 명시 매처 `POST /api/menu/admin/menu`, `POST /api/menu/admin/menu/*` → `hasAnyAuthority("ROLE_ADMIN","ROLE_RECRUIT_ADMIN")`를 추가해 막았고 `SecurityConfigTest` 6건으로 고정했다(비인증 401 / 타권한 403 / 관리자 통과 / `GET /menu/tree` permitAll 회귀). 경로 자체(`/menu/admin/menu`)는 계약 안정성을 위해 유지한다 — 정리하려면 별도 슬라이스에서 프론트와 함께 옮긴다.
+- 🟢 (2026-09-19) 경로 중복 검증: `POST /menu/admin/menu*` 저장 시 **같은 site + 같은 path**를 쓰는 다른 메뉴가 있으면 400 "같은 사이트에 동일한 경로를 사용하는 메뉴가 이미 있습니다. path={path}"(수정 시 자기 자신 제외, 빈 path(그룹 메뉴)는 검사 안 함, ADMIN·APPLICANT 간 같은 path는 허용). `/menu/breadcrumb`이 site+path 단건 조회라 중복이면 깨지므로 막는다. 이미 중복된 메뉴는 path를 고쳐야 저장된다
 - 부트스트랩 주의: 메뉴 데이터는 DB에만 있으므로 사이드바에 "메뉴 관리" 항목이 없는 상태에서는 `/admin/menus`로 직접 접속해 이 화면에서 자기 자신의 메뉴(대메뉴 "메뉴 관리" + 소메뉴 "메뉴 관리")를 등록한다.
 
 ### 화면: 지원서 작성 완성도 (ApplicationFormView — 상단 스텝 카운터)
@@ -339,6 +340,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 
 - 배경: `ATTACHMENT`는 이미 `ApplicationSectionType`의 layout section이나, 노출 스위치가 **`job_posting_attachment_requirement` 행 존재 여부뿐**이었다. 요구사항 행 없이 "사용자가 자유롭게 첨부하는 선택 섹션"을 만들 수 없어 `useAttachment`를 추가한다.
 - 규칙: `enabled = useAttachment || hasAttachmentRequirements`, `required = hasRequiredAttachmentRequirements`(**무변경**).
+- 🟢 (2026-09-19) 폐지된 ATTACHMENT 섹션의 첨부 요구사항: 업로드 경로가 없어 필수 지정 시 제출이 영구히 막히던 문제를 막는다. `POST /admin/job-postings/{id}/attachment-requirements`는 `sectionType=ATTACHMENT` 행을 400 "첨부파일(ATTACHMENT) 섹션은 폐지되어 첨부 요구사항을 등록할 수 없습니다. 첨부를 받을 섹션(예: 경력 CAREER)을 지정하세요."로 거부하고, 제출 검증(`POST /applications/{id}/submit`)과 지원서 대시보드 완성도는 기존 ATTACHMENT 섹션 요구사항을 필수 판정에서 뺀다(응답 모양 무변경). CAREER 등 다른 섹션 요구사항은 그대로다
   - `requireAttachment` 컬럼은 **추가하지 않는다.** required는 requirement 행이 단일 출처이며 `ApplicationCompletionReadChecker`·`ApplicationSubmitValidator`에 이미 배선되어 있다. 컬럼을 추가하면 진실 공급원이 갈라진다.
   - 위 OR 규칙으로 "필수면 반드시 노출" 불변식이 자동 성립한다.
 - ⚠️ 운영 주의: 섹션을 켜면 **저장된 레이아웃(`application_form_page`)이 있는 기존 공고는 form-page 조회가 예외**로 막힌다(`ApplicationFormLayoutValidator` — enabled ⊆ placed ⊆ enabled 강제). 관리자 레이아웃 API로 ATTACHMENT를 포함해 재저장해야 한다. 저장 레이아웃이 없는 공고는 default factory가 자동 처리. `useAttachment` 기본값 `false`가 안전장치.
@@ -409,7 +411,7 @@ front-back 동기화의 **단일 기준**. 화면 슬라이스 작업 시 구현
 
 설계: `docs/superpowers/specs/2026-08-12-job-posting-image-input-design.md`. 공고 본문은 WYSIWYG 대신 이미지 목록. `contentHtml`은 공고에서 deprecated — 생성/수정 요청(`JobPostingCreateRequest`/`JobPostingUpdateRequest`)에서 optional이며, **null 입력은 빈 문자열 `""`로 저장**된다(ddl-auto:update가 기존 스키마의 NOT NULL을 완화하지 못하므로 마이그레이션 없이 호환 — `JobPosting.defaultContentHtml`). 신규 화면은 읽고 쓰지 않음(공지사항 Notice는 무관). **발행 조건: 이미지 ≥1장 또는 (레거시) contentHtml 존재(blank 제외)** — 위반 시 400 "공고 본문 이미지가 최소 1장 필요합니다."
 - 🟢 (2026-09-18) 프론트 레거시 경로 제거: 지원자·관리자 공고 상세는 이미지가 없을 때 `contentHtml`로 대신 보여 주지 않는다(정제 없는 `v-html` 렌더링 제거). 관리자 공고 수정은 `contentHtml`을 보내지 않으므로 수정 저장 시 백엔드가 빈 문자열로 저장한다. 운영 DB에 이미지 없이 contentHtml만 있는 옛 공고가 없다는 전제다
-- 🟡 (보류) 백엔드의 레거시 발행 조건(contentHtml로 발행)과 마지막 이미지 삭제 예외는 그대로다. 테스트 57개 파일이 "contentHtml만 넣고 발행"하는 픽스처에 의존해 별도 작업으로 뺐다
+- 🟢 (2026-09-19) 백엔드 레거시 경로 제거: **발행은 이미지 ≥1장만 허용**한다(contentHtml만 있으면 400 "공고 본문 이미지가 최소 1장 필요합니다."). 게시 중 공고의 마지막 이미지는 contentHtml이 있어도 삭제할 수 없다(400 "게시 중인 공고의 마지막 본문 이미지는 삭제할 수 없습니다."). contentHtml 컬럼·DTO 필드는 스키마 호환을 위해 유지(요청 optional, null→"")
 
 - 백엔드: `JobPostingImage` 엔티티(+`JobPostingImageRepository`), `JobPostingImageService`, `JobPostingImageStorageService`(전용 root, 첨부 헬스스캔과 분리), `ImageSignatureValidator`, `JobPostingImageController`.
 - 프론트: `src/views/admin/jobPosting/`(List/Form/Detail 3종), `src/components/jobPosting/JobPostingImageStack.vue`(지원자 상세·관리자 미리보기 공용), `src/api/adminJobPostingApi.ts`·`boardApi.ts` 확장, 라우트 `/admin/job-postings`, `/new`, `/:id`, `/:id/edit`. 이미지는 `<img src>` 직접 참조 대신 **blob 응답 + objectURL**(세션 쿠키 이슈 회피).

@@ -6,6 +6,7 @@ import com.shinyoung.recruit.dto.request.MenuSaveRequest;
 import com.shinyoung.recruit.dto.response.MenuResponse;
 import com.shinyoung.recruit.enumeration.MenuSite;
 import com.shinyoung.recruit.enumeration.MenuType;
+import com.shinyoung.recruit.exception.InvalidMenuException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +27,7 @@ public class MenuService {
         validateParentSite(request.site(), parent);
         validateTwoLevelMenu(parent);
         validatePathRule(parent, request.type(), request.path());
-//        validateDuplicatedPath(request.site(), request.path(), null);
+        validateDuplicatedPath(request.site(), request.path(), null);
 
         Menu menu = Menu.create(
                 request.site(),
@@ -52,7 +53,7 @@ public class MenuService {
         validateParentSite(request.site(), parent);
         validateTwoLevelMenu(parent);
         validatePathRule(parent, request.type(), request.path());
-//        validateDuplicatedPath(request.site(), request.path(), menuId);
+        validateDuplicatedPath(request.site(), request.path(), menuId);
 
         menu.update(
                 request.site(),
@@ -183,6 +184,25 @@ public class MenuService {
 
         if (type == MenuType.URL && !(path.startsWith("http://") || path.startsWith("https://"))) {
             throw new IllegalArgumentException("URL 타입의 path는 http:// 또는 https:// 로 시작해야 합니다.");
+        }
+    }
+
+    private void validateDuplicatedPath(MenuSite site, String path, Long menuId) {
+        /*
+         * breadcrumb 조회(site + path 단건)가 모호해지지 않도록 같은 사이트 안에서 path는 유일해야 한다.
+         * path 없는 그룹 메뉴는 비교하지 않고, 사이트(ADMIN/APPLICANT)가 다르면 같은 path를 허용한다.
+         * 수정 시에는 자기 자신을 제외한다.
+         */
+        if (!StringUtils.hasText(path)) {
+            return;
+        }
+
+        boolean duplicated = menuId == null
+                ? menuRepository.existsBySiteAndPath(site, path)
+                : menuRepository.existsBySiteAndPathAndIdNot(site, path, menuId);
+
+        if (duplicated) {
+            throw new InvalidMenuException("같은 사이트에 동일한 경로를 사용하는 메뉴가 이미 있습니다. path=" + path);
         }
     }
 

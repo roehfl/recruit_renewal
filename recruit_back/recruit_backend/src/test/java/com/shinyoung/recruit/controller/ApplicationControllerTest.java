@@ -28,6 +28,8 @@ import com.shinyoung.recruit.service.JobPostingService;
 import com.shinyoung.recruit.service.JobPostingQuestionService;
 import com.shinyoung.recruit.service.StageResultService;
 import com.shinyoung.recruit.service.StageService;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -85,6 +87,9 @@ class ApplicationControllerTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     @Autowired
     private JobPostingQuestionService jobPostingQuestionService;
@@ -358,6 +363,7 @@ class ApplicationControllerTest {
                 false
         ));
         createQuestion(jobPostingId, true, QuestionAnswerType.LONG_TEXT, 1000);
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         Long applicationId = createApplication(applicant, jobPostingId);
         BasicInfoTestSupport.seedValidBasicInfo(basicInfoRepository, jobApplicationRepository.findById(applicationId).orElseThrow());
@@ -917,6 +923,7 @@ class ApplicationControllerTest {
 
     private Long createPublishedJobPosting(ApplicationFormConfigRequest formConfig) {
         Long jobPostingId = createDraftJobPosting(formConfig);
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         return jobPostingId;
     }

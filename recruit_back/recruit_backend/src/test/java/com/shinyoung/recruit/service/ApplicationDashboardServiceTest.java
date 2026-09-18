@@ -474,6 +474,42 @@ class ApplicationDashboardServiceTest {
     }
 
     @Test
+    void abolished_attachment_section_requirements_are_ignored_by_readiness() {
+        when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(
+                        requirement(true, 1, AttachmentType.PORTFOLIO, ApplicationSectionType.ATTACHMENT, "Portfolio"),
+                        requirement(false, 1, AttachmentType.ETC, ApplicationSectionType.ATTACHMENT, "Etc")
+                ));
+        when(basicInfoRepository.findByJobApplicationId(APPLICATION_ID)).thenReturn(Optional.of(validBasicInfo()));
+
+        ApplicationDashboardResponse response = dashboardFor(config());
+
+        // 제출 검증과 같은 기준: 폐지된 ATTACHMENT 섹션 요구사항은 필수/선택 그룹 어디에도 잡히지 않는다.
+        assertThat(response.submittable()).isTrue();
+        assertThat(response.requiredMissingSections()).isEmpty();
+        assertThat(response.optionalIncompleteSections()).isEmpty();
+        assertThat(response.completionSummary().requiredSectionCount()).isEqualTo(1);
+        assertThat(response.completionSummary().optionalSectionCount()).isZero();
+    }
+
+    @Test
+    void career_section_requirement_is_still_blocking_in_readiness() {
+        when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(
+                        requirement(true, 1, AttachmentType.PORTFOLIO, ApplicationSectionType.ATTACHMENT, "Portfolio"),
+                        requirement(true, 1, AttachmentType.CAREER_DESCRIPTION, ApplicationSectionType.CAREER, "Career description")
+                ));
+
+        ApplicationDashboardResponse response = dashboardFor(config());
+
+        assertRequiredIssue(response, "ATTACHMENT", "REQUIRED_ATTACHMENT_MISSING");
+        assertThat(response.requiredMissingSections())
+                .filteredOn(section -> "REQUIRED_ATTACHMENT_MISSING".equals(section.reasonCode()))
+                .extracting(ApplicationSectionReadinessResponse::message)
+                .containsExactly("Career description attachment is required before submit.");
+    }
+
+    @Test
     void optional_attachment_min_count_zero_does_not_create_optional_issue() {
         when(attachmentRequirementRepository.findByJobPostingIdOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
                 .thenReturn(List.of(requirement(false, 0, AttachmentType.PORTFOLIO, ApplicationSectionType.APPLICATION, "Portfolio")));

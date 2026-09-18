@@ -2,6 +2,9 @@ package com.shinyoung.recruit.controller;
 
 import com.shinyoung.recruit.domain.entity.CommonCode;
 import com.shinyoung.recruit.domain.repository.CommonCodeRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +29,12 @@ class JobPostingControllerTest {
 
     @Autowired
     private CommonCodeRepository commonCodeRepository;
+
+    @Autowired
+    private JobPostingRepository jobPostingRepository;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     private MockMvc mockMvc;
 
@@ -230,6 +239,7 @@ class JobPostingControllerTest {
                 .getResponse()
                 .getContentAsString();
         long id = Long.parseLong(response.replaceAll(".*\"data\":(\\d+).*", "$1"));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         mockMvc.perform(post("/api/admin/job-postings/{id}/publish", id))
                 .andExpect(status().isOk());
 

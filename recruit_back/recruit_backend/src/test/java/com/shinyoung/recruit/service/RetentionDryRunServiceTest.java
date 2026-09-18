@@ -32,6 +32,8 @@ import com.shinyoung.recruit.enumeration.PurgeItemStatus;
 import com.shinyoung.recruit.enumeration.RetentionBaselineType;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -57,6 +59,9 @@ class RetentionDryRunServiceTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     @Autowired
     private JobApplicationService jobApplicationService;
@@ -107,6 +112,7 @@ class RetentionDryRunServiceTest {
         Long posting1 = createPosting();
         Long finalStageId = stageService.create(posting1, new StageCreateRequest(
                 "final", StageType.DOCUMENT, 0, LocalDateTime.now().plusDays(40), true));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, posting1);
         jobPostingService.publish(posting1);
         stageService.start(posting1, finalStageId);
 
@@ -132,6 +138,7 @@ class RetentionDryRunServiceTest {
 
         // posting2: anchor 미확정 → ANCHOR_NOT_FIXED.
         Long posting2 = createPosting();
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, posting2);
         jobPostingService.publish(posting2);
         Long anchorlessAppId = createSubmittedApplication("dryrun-anchorless", posting2);
 

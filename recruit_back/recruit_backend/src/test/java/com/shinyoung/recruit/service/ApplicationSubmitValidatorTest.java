@@ -301,6 +301,42 @@ class ApplicationSubmitValidatorTest {
     }
 
     @Test
+    void required_requirement_of_abolished_attachment_section_does_not_block_submit() {
+        when(attachmentRequirementRepository.findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(requirement(true, 1, AttachmentType.PORTFOLIO, ApplicationSectionType.ATTACHMENT, "포트폴리오")));
+
+        assertThatCode(() -> validator.validate(application(config())))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void career_section_requirement_is_still_enforced_next_to_abolished_attachment_requirement() {
+        when(attachmentRequirementRepository.findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(
+                        requirement(true, 1, AttachmentType.PORTFOLIO, ApplicationSectionType.ATTACHMENT, "포트폴리오"),
+                        requirement(true, 1, AttachmentType.CAREER_DESCRIPTION, ApplicationSectionType.CAREER, "경력기술서")
+                ));
+
+        assertThatThrownBy(() -> validator.validate(application(config())))
+                .isInstanceOf(InvalidJobApplicationException.class)
+                .hasMessage("경력기술서 첨부파일을 등록해야 제출할 수 있습니다.");
+    }
+
+    @Test
+    void career_section_requirement_passes_when_career_description_is_stored() {
+        when(attachmentRequirementRepository.findByJobPostingIdAndRequiredTrueOrderBySortOrderAscIdAsc(JOB_POSTING_ID))
+                .thenReturn(List.of(
+                        requirement(true, 1, AttachmentType.PORTFOLIO, ApplicationSectionType.ATTACHMENT, "포트폴리오"),
+                        requirement(true, 1, AttachmentType.CAREER_DESCRIPTION, ApplicationSectionType.CAREER, "경력기술서")
+                ));
+        when(attachmentRepository.findByJobApplicationIdAndPhysicalFileStatus(APPLICATION_ID, PhysicalFileStatus.STORED))
+                .thenReturn(List.of(attachment(AttachmentType.CAREER_DESCRIPTION, ApplicationSectionType.CAREER, false)));
+
+        assertThatCode(() -> validator.validate(application(config())))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void optional_attachment_missing_does_not_fail_submit() {
         assertThatCode(() -> validator.validate(application(config())))
                 .doesNotThrowAnyException();

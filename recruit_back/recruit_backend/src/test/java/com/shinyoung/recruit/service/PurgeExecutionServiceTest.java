@@ -43,6 +43,8 @@ import com.shinyoung.recruit.enumeration.RetentionBaselineType;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.exception.InvalidRetentionRequestException;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,6 +78,7 @@ class PurgeExecutionServiceTest {
     @Autowired private RetentionAnchorService retentionAnchorService;
     @Autowired private RetentionHoldService retentionHoldService;
     @Autowired private JobPostingService jobPostingService;
+    @Autowired private JobPostingImageRepository jobPostingImageRepository;
     @Autowired private JobApplicationService jobApplicationService;
     @Autowired private StageService stageService;
     @Autowired private StageResultService stageResultService;
@@ -104,7 +107,7 @@ class PurgeExecutionServiceTest {
                 "application_career", "application_certificate",
                 "application_language", "application_military", "application_award", "application_gap_period",
                 "job_application", "job_posting_question", "job_posting_attachment_requirement",
-                "application_form_config", "job_position", "job_posting",
+                "application_form_config", "job_position", "job_posting_image", "job_posting",
                 "applicant", "employee", "users");
         for (String table : tables) {
             jdbcTemplate.execute("DELETE FROM " + table);
@@ -117,6 +120,7 @@ class PurgeExecutionServiceTest {
         Long jobPostingId = createPosting();
         Long finalStageId = stageService.create(jobPostingId, new StageCreateRequest(
                 "final", StageType.DOCUMENT, 0, LocalDateTime.now().plusDays(40), true));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, finalStageId);
 
@@ -306,6 +310,7 @@ class PurgeExecutionServiceTest {
 
         // 단건(applicationId) — 적격이면 batch 1건으로 실행된다.
         Long jobPostingId = createPosting();
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         Long applicationId = createSubmittedApplication("purge-exec-single", jobPostingId);
         JobApplication single = jobApplicationRepository.findById(applicationId).orElseThrow();

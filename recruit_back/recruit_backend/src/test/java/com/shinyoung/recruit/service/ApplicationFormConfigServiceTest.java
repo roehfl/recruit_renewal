@@ -7,6 +7,9 @@ import com.shinyoung.recruit.dto.response.ApplicationFormConfigResponse;
 import com.shinyoung.recruit.dto.response.JobPostingDetailResponse;
 import com.shinyoung.recruit.exception.InvalidJobPostingException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -49,6 +52,12 @@ class ApplicationFormConfigServiceTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingRepository jobPostingRepository;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     @Test
     void 공고_등록시_양식을_생략하면_기본설정이_만들어진다() {
@@ -170,6 +179,7 @@ class ApplicationFormConfigServiceTest {
     @Test
     void 게시된_공고는_접수가_시작되면_양식을_수정할_수_없다() {
         Long id = jobPostingService.create(createRequest(STARTED_RECEPTION_START, STARTED_RECEPTION_END, null));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
 
         ApplicationFormConfigRequest request =
@@ -183,6 +193,7 @@ class ApplicationFormConfigServiceTest {
     @Test
     void 마감된_공고의_양식은_수정할_수_없다() {
         Long id = jobPostingService.create(createRequest(STARTED_RECEPTION_START, STARTED_RECEPTION_END, null));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, id);
         jobPostingService.publish(id);
         jobPostingService.close(id);
 

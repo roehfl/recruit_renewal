@@ -14,6 +14,9 @@ import com.shinyoung.recruit.enumeration.QuestionAnswerType;
 import com.shinyoung.recruit.enumeration.QuestionCategory;
 import com.shinyoung.recruit.enumeration.ReceptionStatus;
 import com.shinyoung.recruit.exception.InvalidJobPostingException;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -60,6 +63,12 @@ class AdminApplicationFormSummaryServiceTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingRepository jobPostingRepository;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     @Autowired
     private ApplicationFormLayoutService applicationFormLayoutService;
@@ -143,6 +152,7 @@ class AdminApplicationFormSummaryServiceTest {
         Long editableId = createPosting("접수 전 공고", FUTURE_START, FUTURE_END);
         Long startedId = createPosting("접수 중 공고", STARTED_START, STARTED_END);
         // DRAFT 는 접수일과 무관하게 편집 가능하므로, 잠기려면 게시되어 있어야 한다.
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, startedId);
         jobPostingService.publish(startedId);
 
         PageResponse<AdminApplicationFormSummaryResponse> result = summaryService.getSummaries(
@@ -163,6 +173,7 @@ class AdminApplicationFormSummaryServiceTest {
     void 마감된_공고를_제외하면_페이징과_총건수도_제외된_기준이다() {
         Long openId = createPosting("진행 공고", FUTURE_START, FUTURE_END);
         Long closedId = createPosting("마감 공고", STARTED_START, STARTED_END);
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, closedId);
         jobPostingService.publish(closedId);
         jobPostingService.close(closedId);
 

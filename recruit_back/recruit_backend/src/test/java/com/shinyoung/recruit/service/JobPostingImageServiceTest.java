@@ -183,14 +183,15 @@ class JobPostingImageServiceTest {
     }
 
     @Test
-    void 게시중이라도_레거시_contentHtml이_있으면_마지막_이미지를_삭제할_수_있다() {
+    void 게시중_공고는_레거시_contentHtml이_있어도_마지막_이미지를_삭제할_수_없다() {
         Long postingId = createPosting();
         Long imageId = jobPostingImageService.addImage(postingId, png("a.png"), "포스터", 0);
         jobPostingService.publish(postingId);
 
-        jobPostingImageService.deleteImage(postingId, imageId);
-
-        assertThat(jobPostingImageService.getImages(postingId)).isEmpty();
+        assertThatThrownBy(() -> jobPostingImageService.deleteImage(postingId, imageId))
+                .isInstanceOf(InvalidJobPostingException.class)
+                .hasMessageContaining("마지막 본문 이미지");
+        assertThat(jobPostingImageService.getImages(postingId)).hasSize(1);
     }
 
     @Test

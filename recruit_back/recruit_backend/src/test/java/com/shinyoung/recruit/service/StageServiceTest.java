@@ -39,6 +39,8 @@ import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.exception.InvalidStageException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
 import com.shinyoung.recruit.exception.StageNotFoundException;
+import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -61,6 +63,9 @@ class StageServiceTest {
 
     @Autowired
     private JobPostingService jobPostingService;
+
+    @Autowired
+    private JobPostingImageRepository jobPostingImageRepository;
 
     @Autowired
     private JobApplicationService jobApplicationService;
@@ -129,6 +134,7 @@ class StageServiceTest {
     @Test
     void create_stage_fails_when_job_posting_is_closed() {
         Long jobPostingId = createJobPosting();
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         jobPostingService.close(jobPostingId);
 
@@ -283,6 +289,7 @@ class StageServiceTest {
     void update_stage_fails_when_job_posting_is_closed() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         jobPostingService.close(jobPostingId);
 
@@ -455,6 +462,7 @@ class StageServiceTest {
     void reorder_fails_when_job_posting_is_closed() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         jobPostingService.close(jobPostingId);
 
@@ -479,6 +487,7 @@ class StageServiceTest {
     void start_success_when_job_posting_is_published_and_stage_is_ready() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
 
         stageService.start(jobPostingId, stageId);
@@ -499,6 +508,7 @@ class StageServiceTest {
     void start_fails_when_job_posting_is_closed() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         jobPostingService.close(jobPostingId);
 
@@ -510,6 +520,7 @@ class StageServiceTest {
     void start_fails_when_stage_is_not_ready() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
 
@@ -521,6 +532,7 @@ class StageServiceTest {
     void announce_success_when_stage_is_in_progress() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
         prepareDecidedStageResult(jobPostingId, stageId, "announce-success");
@@ -536,6 +548,7 @@ class StageServiceTest {
     void announce_fails_when_stage_result_is_missing() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
 
@@ -547,6 +560,7 @@ class StageServiceTest {
     void announce_fails_when_stage_result_has_pending() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
         createSubmittedApplication("announce-pending", jobPostingId);
@@ -560,6 +574,7 @@ class StageServiceTest {
     void announce_fails_when_stage_is_not_in_progress() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
 
         assertThatThrownBy(() -> stageService.announce(jobPostingId, stageId))
@@ -570,6 +585,7 @@ class StageServiceTest {
     void close_success_when_stage_is_result_announced() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
         prepareDecidedStageResult(jobPostingId, stageId, "close-success");
@@ -584,6 +600,7 @@ class StageServiceTest {
     void close_fails_when_stage_is_not_result_announced() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
 
@@ -595,6 +612,7 @@ class StageServiceTest {
     void closed_stage_cannot_transition_again() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
         prepareDecidedStageResult(jobPostingId, stageId, "closed-transition");
@@ -621,6 +639,7 @@ class StageServiceTest {
     void delete_ready_stage_success_when_job_posting_is_published() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
 
         stageService.delete(jobPostingId, stageId);
@@ -633,6 +652,7 @@ class StageServiceTest {
     void delete_ready_stage_removes_initialized_stage_results() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         createSubmittedApplication("delete-ready-results", jobPostingId);
         stageResultService.initialize(stageId);
@@ -650,6 +670,7 @@ class StageServiceTest {
         Long jobPostingId = createJobPosting();
         Long keptStageId = stageService.create(jobPostingId, createStageRequest(0, false));
         Long deletedStageId = stageService.create(jobPostingId, createStageRequest(1, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         // 다음 단계 대상자는 직전 단계 발표 후에만 불러온다: 앞 단계를 합격·발표한 뒤 뒤 단계(READY)에 대상자를 넣는다.
         passDocumentStage(jobPostingId, "delete-ready-other");
@@ -664,6 +685,7 @@ class StageServiceTest {
     void delete_ready_stage_removes_draft_interviews() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, interviewStageRequest(0));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         Long applicationId = createSubmittedApplication("stage-delete-draft-interview", jobPostingId);
         Long interviewId = createDraftInterviewWithParticipants(
@@ -724,6 +746,7 @@ class StageServiceTest {
     void delete_fails_when_job_posting_is_closed() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         jobPostingService.close(jobPostingId);
 
@@ -735,6 +758,7 @@ class StageServiceTest {
     void delete_fails_when_stage_is_in_progress() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
 
@@ -746,6 +770,7 @@ class StageServiceTest {
     void delete_fails_when_stage_is_result_announced() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
         prepareDecidedStageResult(jobPostingId, stageId, "delete-announced");
@@ -759,6 +784,7 @@ class StageServiceTest {
     void delete_fails_when_stage_is_closed() {
         Long jobPostingId = createJobPosting();
         Long stageId = stageService.create(jobPostingId, createStageRequest(0, false));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         stageService.start(jobPostingId, stageId);
         prepareDecidedStageResult(jobPostingId, stageId, "delete-closed");
@@ -827,6 +853,7 @@ class StageServiceTest {
     private Long createConfirmableInterviewStage(Long jobPostingId) {
         stageService.create(jobPostingId, createStageRequest(0, false));
         Long interviewStageId = stageService.create(jobPostingId, interviewStageRequest(1));
+        JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         return interviewStageId;
     }
