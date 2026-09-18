@@ -2,33 +2,53 @@
 
 ## Project Overview
 
-This repository is a Vue.js frontend project.
+This repository is the Vue.js frontend for 신영증권's recruiting website (채용 Renewal). It is an operating, in-production application, not a project under initial setup.
 
-The primary goal is to set up, normalize, and stabilize the project so that it can be installed, built, and executed reliably.
+It serves two apps from one codebase:
 
-This project should be treated as an existing application source, not as a greenfield rewrite. Preserve the uploaded source code, UI structure, routing structure, component behavior, and business logic as much as possible.
+- Applicant-facing site at `/applicant` (job browsing, application forms, application status, FAQ/notice, profile).
+- Admin console at `/admin` (job posting management, application review, stage results, interviews, statistics, role/menu management).
 
-## Current Project State
+Treat this as an existing production codebase. Preserve existing UI structure, routing structure, component behavior, and business logic. Make focused, minimal changes for the requested task rather than broad rewrites.
 
-- The repository contains the project files except `node_modules`.
-- The first major task is project setup and normalization.
-- Use the existing uploaded files as the source of truth.
-- Do not recreate the entire project from scratch unless the existing structure is unusable.
-- Before making changes, inspect the current project structure, `package.json`, router files, store files, component files, configuration files, assets, and environment files.
-- Prefer fixing and completing the existing project over replacing it.
-- The initial success target is that dependencies can be installed and the project can pass the build command.
+## 읽기 순서와 디렉터리 구조
+
+읽기 순서: 루트 `AGENTS.md` → `docs/domains/_index.md` → 대상 도메인 카드 → 이 문서(`recruit_front/AGENTS.md`).
+
+주요 디렉터리(경로는 `recruit_front/src/` 기준):
+
+- `views/admin/<도메인>/` — 관리자 화면. 도메인별 하위 폴더(`jobPosting/`, `stageResult/`, `interview/`, `applicationForm/`, `application/`, `faq/`, `dashboard/` 등)로 구성된다.
+- `views/applicant/` — 지원자 화면(홈·공고·지원서·마이페이지 등). `application/` 하위에 지원서 작성 섹션 컴포넌트가 있다.
+- `views/auth/` — 로그인·본인인증(NICE) 팝업 화면.
+- `api/` — Axios 호출 모듈. 루트에 공통/화면별 API, `admin/`에 관리자 전용 API, `application/sections/`에 지원서 섹션별(학력·경력·자격증·어학·병역·수상·공백기간 등) API가 있다.
+- `types/` — API 요청·응답 타입. `api/`와 같은 하위 구조(`admin/`, `application/`)를 따른다.
+- `stores/` — Pinia 스토어(`authStore`, `menuStore`, `uiStore`).
+- `routes/` — 라우트 정의. `adminRoutes.ts`·`applicantRoutes.ts`·`authRoutes.ts`를 모아 `index.ts`가 라우터를 만들고 인증/권한 가드를 붙인다.
+- `layouts/` — 관리자/지원자 화면의 공통 레이아웃 뼈대.
+- `common/` — 화면에 종속되지 않는 유틸(날짜, 파일 다운로드, 클라이언트 이벤트 로깅 등).
+- `components/` — 여러 화면이 공유하는 컴포넌트.
+
+공통 기반 파일:
+
+- `api/client.ts` — Axios 인스턴스(`baseURL`=`VITE_API_BASE_URL`, `withCredentials: true`, 타임아웃 10초). 요청/응답 인터셉터로 `uiStore` 로딩 카운트를 관리하고, 401/403 응답 시 각각 `/login`·`/403`으로 리다이렉트한다(`skipAuthRedirect` 옵션으로 예외 처리 가능).
+- `api/apiError.ts` — Axios 에러를 사용자용 한글 메시지로 변환하는 `getApiErrorMessage`.
+- `routes/index.ts` — 라우터 생성과 `beforeEach` 가드(로그인 상태 복원, `meta.requiresAuth`, `meta.roles` 검사).
+- `layouts/AdminLayout.vue` — 관리자 레이아웃(좌측 `AdminSidebar` + 우측 `RouterView`).
+- `layouts/ApplicantLayout.vue` — 지원자 레이아웃(헤더/본문/푸터를 감싸는 고정폭 프레임).
+- `stores/uiStore.ts` — 전역 로딩 카운트(`loadingCount`)만 관리하는 Pinia 스토어.
+- `plugins/clientErrorHandlers.ts` — Vue `errorHandler`·`window` `error`·`unhandledrejection`을 잡아 스택을 정제한 뒤 클라이언트 이벤트 로그로 전송한다.
 
 ## Confirmed Tech Stack
 
 Use the following stack as the project standard:
 
-- Vue 3
-- Vite
-- TypeScript
-- Vue Router
-- Pinia
-- Axios
-- ant-design-vue
+- Vue 3 (currently 3.5.x)
+- Vite (currently 8.x)
+- TypeScript (currently 6.x)
+- Vue Router (currently 5.x)
+- Pinia (currently 3.x)
+- Axios (currently 1.x)
+- ant-design-vue (currently 4.x)
 - @ant-design/icons-vue
 - CSS / SCSS / Less depending on existing files
 
@@ -70,96 +90,24 @@ Rules:
 - Use scoped styles where possible.
 - Use `:deep()` only when overriding internal styles of third-party components is necessary.
 
-## Main Objectives
-
-When working on this repository, prioritize the following:
-
-1. Make the project installable.
-2. Make the project buildable.
-3. Make the project runnable in local development mode.
-4. Preserve existing UI and business behavior.
-5. Resolve missing imports, dependency issues, path alias issues, asset path issues, and build errors.
-6. Normalize TypeScript, Vite, router, store, and Ant Design Vue configuration.
-7. Improve structure only when it is clearly necessary.
-8. Keep changes small, reviewable, and focused.
-
 ## Package Manager Rules
 
-Detect the package manager from the repository:
-
-- If `package-lock.json` exists, use `npm`.
-- If `pnpm-lock.yaml` exists, use `pnpm`.
-- If `yarn.lock` exists, use `yarn`.
-
-Do not switch package managers without a strong reason.
-
-If no lock file exists, prefer `npm` unless the repository clearly indicates another package manager.
-
-Use the package manager that matches the existing lock file.
+Use npm (`package-lock.json` is the lockfile).
 
 ## Common Commands
 
-Before running commands, inspect `package.json` and use the actual scripts defined there.
-
-Typical commands may include:
-
 ```bash
-npm install
-npm run dev
-npm run build
-npm run preview
-npm run lint
-npm run type-check
+npm run dev          # start local dev server
+npm run build         # type-check + vite build (npm-run-all2, parallel)
+npm run type-check    # vue-tsc --build
+npm run test:unit     # vitest
+npm run lint          # oxlint --fix, then eslint --fix --cache
+npm run format        # prettier --write --experimental-cli src/
 ```
 
-If the package manager is not npm, use the equivalent command.
+## Validation
 
-If a script does not exist, do not assume it exists. Either use the available equivalent script or update `package.json` only when necessary.
-
-## Setup and Validation Flow
-
-For the first setup task, follow this sequence:
-
-1. Inspect project structure.
-2. Inspect `package.json`.
-3. Identify package manager.
-4. Inspect Vite configuration.
-5. Inspect TypeScript configuration.
-6. Inspect router configuration.
-7. Inspect Pinia/store configuration.
-8. Inspect Ant Design Vue registration.
-9. Inspect Axios/API configuration.
-10. Install dependencies.
-11. Run the build command.
-12. Fix build errors one by one.
-13. Re-run the build command.
-14. Document remaining issues, if any.
-
-Minimum validation:
-
-```bash
-npm run build
-```
-
-If TypeScript checking exists:
-
-```bash
-npm run type-check
-```
-
-If lint exists:
-
-```bash
-npm run lint
-```
-
-If tests exist:
-
-```bash
-npm run test
-```
-
-A task is not complete until the build succeeds or the remaining failure is clearly explained.
+Run `npm run type-check` by default before finishing a task. Run `npm run build` and/or `npm run test:unit` additionally when the change warrants a broader check.
 
 ## Dependency Rules
 
@@ -475,34 +423,11 @@ coverage
 
 ## Documentation Rules
 
-If you add or change project setup behavior, update documentation.
-
-Important documentation files:
-
-- `README.md`
-- `.env.example`
-- `AGENTS.md`
-
-Document:
-
-- install command
-- dev command
-- build command
-- required Node version
-- required environment variables
-- known limitations
+When code changes require a domain card update, follow root `AGENTS.md` §6 (문서 갱신 의무).
 
 ## Node Version
 
-Use the Node version specified by the repository if available.
-
-Check for:
-
-- `.nvmrc`
-- `.node-version`
-- `package.json` engines field
-
-If no version is specified, prefer a current LTS version compatible with Vue 3, Vite, TypeScript, and ant-design-vue.
+`package.json` declares `engines.node: "^20.19.0 || >=22.12.0"`. Use a Node version that satisfies this range.
 
 Do not introduce dependency versions that require a newer Node version unless explicitly requested.
 
@@ -510,12 +435,7 @@ Do not introduce dependency versions that require a newer Node version unless ex
 
 A task is complete when all applicable items are satisfied:
 
-- Dependencies install successfully.
-- The project builds successfully.
-- TypeScript configuration is valid.
-- Vite configuration is valid.
-- No unresolved imports remain.
-- No missing asset errors remain.
+- `npm run type-check` passes.
 - Existing routes are preserved.
 - Existing stores are preserved.
 - ant-design-vue is preserved and correctly registered.
@@ -523,13 +443,8 @@ A task is complete when all applicable items are satisfied:
 - Environment variables are documented.
 - No secrets are committed.
 - No unnecessary rewrites are made.
+- The relevant domain card is updated per root `AGENTS.md` §6, when applicable.
 - Remaining limitations, if any, are clearly documented.
-
-## Recommended First Task
-
-For the first Codex task, the recommended instruction is:
-
-> Set up and normalize this Vue 3 + Vite + TypeScript project. Install dependencies, inspect configuration, fix missing dependencies/imports/aliases/assets, ensure ant-design-vue is correctly configured, and make `npm run build` pass. Preserve existing source behavior and do not rewrite the application from scratch.
 
 ## Prohibited Actions
 

@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>로컬 LLM 유지보수용 문서 재편 설계</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal (recruit 모노레포)</div>
+  <h1>로컬 LLM 유지보수용 문서 재편 설계</h1>
+  <span class="badge done">설계 완료</span>
+  <span class="badge muted">작성일: 2026-09-18</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>폐쇄망 반입 뒤 로컬 LLM 에이전트(컨텍스트 최대 180K)가 유지보수할 수 있도록 프론트·백엔드 문서를 <strong>도메인별 통합 카드</strong> 체계로 재편하는 설계입니다.</p>
+      <p>레이어별 패키지 구조에 맞춘 문서는 기능 하나를 고칠 때 여러 문서를 오가야 해서 채택하지 않았습니다. 카드 1개에 API 계약, 백엔드 파일 지도, 프론트 파일 지도, 규칙, 변경 레시피를 함께 담습니다.</p>
+      <p><code>AGENTS.md</code>를 정본 진입점으로 삼고, 이력성 문서는 <code>docs/archive/</code>로 격리하며, 문서와 코드의 불일치는 점검 스크립트로 잡아냅니다.</p>
+      <p>작업 순서는 공통 골격 → 카드 15개 → archive 이동과 링크 정리 → 전체 점검입니다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">설계 문서 추가됨</span></p>
+      <p><span class="badge done">HTML 리포트 추가됨</span></p>
+      <p><span class="badge info">문서 + 점검 스크립트만 변경</span></p>
+      <p><span class="badge pending">구현 계획 작성 대기</span></p>
+      <p><span class="badge warn">선행: 진행 중 변경분 정리</span></p>
+      <p><span class="badge out">코드 구조 변경 없음</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>설계 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>문서 계층: 루트 <code>AGENTS.md</code> → 레포 <code>AGENTS.md</code> → <code>docs/domains/</code> 카드</li>
+          <li>도메인 카드 15개 분할과 소유 경계 규칙</li>
+          <li>카드 템플릿, <code>_index.md</code> 라우터 형식</li>
+          <li>경로 표기 규약 <code>{BE}</code> <code>{BT}</code> <code>{BR}</code> <code>{FE}</code></li>
+          <li>기존 문서 이관·archive 매핑</li>
+          <li>점검 스크립트 <code>tools/check-docs.mjs</code> 사양</li>
+          <li>크기 예산과 문서 갱신 의무(DoD)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>카드 15개 본문 (코드 기준 작성)</li>
+          <li>루트·백엔드·프론트 <code>AGENTS.md</code> 재작성</li>
+          <li><code>api-contract.md</code> 섹션 분할 이관</li>
+          <li>archive <code>git mv</code>, <code>.ignore</code></li>
+          <li>점검 스크립트 구현</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>백엔드 패키지를 도메인별로 재편하는 등 코드 구조 변경</li>
+          <li>파일 지도·엔드포인트 목록 자동 생성</li>
+          <li>에이전트 도구별 설정 파일 (도구 확정 후)</li>
+          <li>archive 내부 문서 수정</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>목표 구조</h2>
+    <div class="two">
+      <div class="card">
+        <h3>디렉터리</h3>
+        <pre>
+recruit/
+├── AGENTS.md                 정본 진입점 (≤12KB)
+├── CLAUDE.md                 @AGENTS.md + Claude 전용 규칙
+├── .ignore                   docs/archive/ 검색 제외
+├── tools/check-docs.mjs      문서 점검
+├── docs/
+│   ├── domains/
+│   │   ├── _index.md         라우터 (역색인)
+│   │   └── &lt;domain&gt;.md       카드 15개
+│   └── archive/              이력·옛 설계·보고서
+├── recruit_back/recruit_backend/
+│   ├── AGENTS.md             백엔드 규칙 (≤15KB)
+│   ├── CLAUDE.md             @AGENTS.md
+│   └── docs/adr/, docs/ops/  유지
+└── recruit_front/AGENTS.md   프론트 규칙 (≤15KB)</pre>
+      </div>
+      <div class="card">
+        <h3>크기 예산 (UTF-8 바이트)</h3>
+        <table>
+          <tr><th>문서</th><th>권장</th><th>상한</th></tr>
+          <tr><td>루트 <code>AGENTS.md</code></td><td>12KB</td><td>16KB</td></tr>
+          <tr><td>레포 <code>AGENTS.md</code></td><td>15KB</td><td>20KB</td></tr>
+          <tr><td>도메인 카드</td><td>30KB</td><td>40KB</td></tr>
+          <tr><td><code>_index.md</code></td><td>8KB</td><td>12KB</td></tr>
+        </table>
+        <p class="small">작업 1건의 전형적인 읽기량은 약 100KB, 대략 30K 토큰으로 컨텍스트의 25% 목표 이내입니다. 한·영 혼합 문서에서 3.5바이트를 1토큰으로 추정했습니다.</p>
+        <h3 style="margin-top:14px;">경로 표기</h3>
+        <table>
+          <tr><th>표기</th><th>실제 경로</th></tr>
+          <tr><td><code>{BE}</code></td><td><code>recruit_back/recruit_backend/src/main/java/com/shinyoung/recruit</code></td></tr>
+          <tr><td><code>{BT}</code></td><td><code>recruit_back/recruit_backend/src/test/java/com/shinyoung/recruit</code></td></tr>
+          <tr><td><code>{BR}</code></td><td><code>recruit_back/recruit_backend/src/main/resources</code></td></tr>
+          <tr><td><code>{FE}</code></td><td><code>recruit_front/src</code></td></tr>
+        </table>
+        <p class="small">그 밖의 경로는 레포별 <code>AGENTS.md</code>를 포함해 모두 레포 루트 기준으로 씁니다(예: <code>recruit_back/recruit_backend/docs/adr/...</code>). 점검 스크립트가 <code>docs/</code>로 시작하는 경로를 루트 기준으로 해석하기 때문입니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>도메인 카드 (15개)</h2>
+    <table>
+      <tr><th>카드</th><th>도메인</th><th>주요 백엔드</th><th>주요 프론트</th></tr>
+      <tr><td><code>auth-account</code></td><td>인증·지원자 계정</td><td><code>AuthController</code>, <code>ApplicantSignUpController</code>, <code>ApplicantAccountController</code>, <code>security/auth</code></td><td>Login, <code>SignupView</code>, <code>AccountRecovery</code>, <code>ApplicantProfile</code></td></tr>
+      <tr><td><code>role-menu</code></td><td>권한·메뉴</td><td><code>AdminRoleMappingController</code>, <code>MenuController</code></td><td><code>RoleMappingView</code>, <code>MenuManageView</code></td></tr>
+      <tr><td><code>job-posting</code></td><td>공고·직무·근무지·이미지·첨부 요건</td><td><code>JobPosting*Controller</code></td><td><code>views/admin/jobPosting</code>, <code>ApplicantRecruit*</code>, <code>ApplicationDetailView</code></td></tr>
+      <tr><td><code>question</code></td><td>질문 템플릿·공고별 질문</td><td><code>QuestionTemplateController</code>, <code>JobPostingQuestionController</code></td><td><code>views/admin/applicant</code>, <code>ApplicationFormQuestionTab</code></td></tr>
+      <tr><td><code>application-form</code></td><td>지원서 양식 설정</td><td><code>AdminApplicationForm*Controller</code></td><td><code>views/admin/applicationForm</code></td></tr>
+      <tr><td><code>application</code></td><td>지원서 작성·제출</td><td><code>ApplicationController</code> + 섹션 컨트롤러 9개</td><td><code>ApplicationFormView</code>, <code>sections/*</code></td></tr>
+      <tr><td><code>attachment</code></td><td>첨부 저장소</td><td><code>ApplicationAttachment*</code>, <code>AttachmentStorage*</code></td><td>(지원서 화면 내부)</td></tr>
+      <tr><td><code>admin-application</code></td><td>지원현황·상세·엑셀/PDF</td><td><code>AdminApplication*Controller</code>, <code>AdminExportController</code>, <code>ApplicationPdfController</code></td><td><code>views/admin/application</code></td></tr>
+      <tr><td><code>stage-result</code></td><td>전형·전형결과</td><td><code>StageController</code>, <code>StageResult*Controller</code></td><td><code>views/admin/stageResult</code></td></tr>
+      <tr><td><code>interview</code></td><td>면접 일정·평가</td><td><code>Interview*Controller</code>, <code>ApplicantInterviewController</code></td><td><code>views/admin/interview</code></td></tr>
+      <tr><td><code>master-data</code></td><td>공통코드·학교·주소</td><td><code>*CommonCodeController</code>, <code>*SchoolController</code>, <code>AddressSearchController</code></td><td><code>AdminCommonCodeManageView</code></td></tr>
+      <tr><td><code>board</code></td><td>FAQ·공지</td><td><code>FaqController</code>, <code>AdminFaqController</code>, <code>BoardController</code></td><td><code>FaqView</code>, <code>AdminFaqManageView</code>, <code>NoticeListView</code></td></tr>
+      <tr><td><code>statistics</code></td><td>대시보드·통계</td><td><code>AdminStatisticsController</code></td><td><code>AdminHomeView</code>, <code>views/admin/dashboard</code></td></tr>
+      <tr><td><code>privacy-audit</code></td><td>보존·파기·감사 로그</td><td><code>AdminRetentionController</code>, <code>AdminAuditController</code></td><td>-</td></tr>
+      <tr><td><code>client-event-log</code></td><td>클라이언트 이벤트 로그</td><td><code>ClientEventLogController</code>, <code>AdminClientEventLogController</code></td><td><code>telemetryClient</code>, <code>clientEventLogger</code></td></tr>
+    </table>
+    <div class="card">
+      <h3>카드 템플릿</h3>
+      <p>요약 → 용어(한/영) → <strong>파일 지도</strong>(백엔드 레이어별, 프론트 구분별) → <strong>API 계약</strong>(🟢/🟡/🔴/⛔ 상태) → <strong>규칙·불변식</strong>(강제하는 코드 위치 포함) → <strong>변경 레시피</strong> → 검증 → 함정·결정(ADR 링크)</p>
+      <p class="small">지원자 정적 페이지(홈, 인사제도, 직무소개, 채용절차, 개인정보처리방침)는 카드 없이 <code>_index.md</code>에 경로만 적습니다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>기존 문서 처리</h2>
+    <table>
+      <tr><th>원래 위치</th><th>처리</th><th>결과</th></tr>
+      <tr><td><code>api-contract.md</code> (124KB)</td><td>섹션별로 카드 API 계약 절에 이관. 상태와 날짜 보존</td><td><span class="badge muted">archive</span></td></tr>
+      <tr><td>백엔드 <code>docs/codex/01~07</code> 및 하위 design·implementation·reports·plans·templates</td><td>현행 유효 내용만 AGENTS와 카드에 반영. <code>02-domain-design</code>은 구현 전 설계라 참고만 함</td><td><span class="badge muted">archive</span></td></tr>
+      <tr><td>백엔드 <code>docs/codex/ops/*.sql</code></td><td>운영 DDL</td><td><span class="badge done">유지 → <code>docs/ops/</code></span></td></tr>
+      <tr><td>백엔드 <code>docs/adr/</code></td><td>카드에서 링크</td><td><span class="badge done">유지</span></td></tr>
+      <tr><td>백엔드 <code>CONTEXT.md</code>, <code>instruction.md</code>, <code>README-codex-docs.md</code>, <code>HELP.md</code>, <code>docs/instructions</code>, <code>docs/superpowers</code></td><td>용어는 카드 용어 절로 이관</td><td><span class="badge muted">archive</span></td></tr>
+      <tr><td>루트 <code>docs/superpowers/</code>, <code>docs/design/</code></td><td>이번 작업 spec/plan은 완료 시 이동</td><td><span class="badge muted">archive</span></td></tr>
+      <tr><td>Claude memory "공고유형 신입/경력" 규칙</td><td>코드로 사실 확인 후 <code>job-posting</code> 카드 규칙 절에 기재</td><td><span class="badge info">레포로 이관</span></td></tr>
+      <tr><td>홈 <code>CLAUDE.md</code> 언어·엔지니어링 규칙</td><td>요지를 루트 <code>AGENTS.md</code>에 반영</td><td><span class="badge info">레포로 이관</span></td></tr>
+      <tr><td>루트 <code>design/</code> (미추적, 진행 중 작업물)</td><td>건드리지 않음</td><td><span class="badge out">제외</span></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>검증 및 정합성 규칙</h2>
+    <h3>점검 스크립트 <code>node tools/check-docs.mjs</code></h3>
+    <table>
+      <tr><th>검사</th><th>설명</th><th>실패 조건</th></tr>
+      <tr><td>경로 존재</td><td>백틱 안의 <code>{BE}</code>·<code>{BT}</code>·<code>{BR}</code>·<code>{FE}</code>·<code>recruit_back/</code>·<code>recruit_front/</code>·<code>docs/</code> 토큰을 확장해 존재 확인. 글롭은 매칭 1개 이상</td><td><span class="badge out">없는 경로</span></td></tr>
+      <tr><td>소유 커버리지</td><td>모든 <code>*Controller.java</code>와 <code>views/**/*.vue</code>가 카드 <code>## 파일 지도</code> 절에 정확히 1회 매칭. <code>_index.md</code>의 "카드 없는 파일"은 예외</td><td><span class="badge out">누락·중복</span></td></tr>
+      <tr><td>크기</td><td>크기 예산 표 기준</td><td><span class="badge out">상한 초과</span> <span class="badge warn">권장 초과는 경고</span></td></tr>
+    </table>
+    <h3>문서 갱신 의무 (DoD)</h3>
+    <table>
+      <tr><th>규칙</th><th>설명</th></tr>
+      <tr><td>코드와 카드 동시 갱신</td><td>코드를 바꾸면 같은 변경에서 해당 카드의 파일 지도·API 계약·규칙을 갱신</td></tr>
+      <tr><td>점검 통과</td><td>완료 전에 <code>node tools/check-docs.mjs</code> 통과</td></tr>
+      <tr><td>계약 기준 이동</td><td>화면 슬라이스 워크플로우의 계약 기준을 <code>api-contract.md</code>에서 카드 API 계약 절로 변경</td></tr>
+      <tr><td>archive 비근거</td><td><code>docs/archive/</code>는 작업 근거로 쓰지 않고, 과거 경위 조사에만 참고</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>작업 순서</h2>
+    <table>
+      <tr><th>단계</th><th>범위</th><th>상태</th></tr>
+      <tr><td><strong>0</strong><br>선행</td><td>진행 중 변경분(<code>api-contract.md</code> 등) 커밋 또는 정리 (사용자 결정)</td><td><span class="badge warn">선행 필요</span></td></tr>
+      <tr><td><strong>1</strong><br>공통 골격</td><td>루트·레포 <code>AGENTS.md</code>, <code>CLAUDE.md</code> 축소, <code>_index.md</code> 골격, <code>tools/check-docs.mjs</code></td><td><span class="badge pending">대기</span></td></tr>
+      <tr><td><strong>2</strong><br>도메인 카드</td><td>카드 15개를 코드 기준으로 병렬 작성, <code>api-contract.md</code> 섹션 이관, memory 규칙 이관</td><td><span class="badge pending">대기</span></td></tr>
+      <tr><td><strong>3</strong><br>archive</td><td><code>git mv</code> 일괄 이동, <code>.ignore</code>, ops 이동, 링크 정리</td><td><span class="badge pending">대기</span></td></tr>
+      <tr><td><strong>4</strong><br>전체 점검</td><td>점검 스크립트 통과, 카드별 교차 검토 (파일 지도 누락, API↔컨트롤러 매핑, 규칙의 코드 근거)</td><td><span class="badge pending">대기</span></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>패키지(레이어)별이 아닌 도메인별 문서</td><td>백엔드가 레이어별 평면 구조라서 기능 하나가 모든 레이어를 가로지름</td></tr>
+      <tr><td>2</td><td>프론트·백엔드 분리 대신 도메인 통합 카드</td><td>약한 모델이 문서 3개 동기화에서 누락하기 쉬움. 화면 슬라이스 워크플로우와 같은 모양</td></tr>
+      <tr><td>3</td><td><code>AGENTS.md</code>를 정본으로, <code>CLAUDE.md</code>는 <code>@AGENTS.md</code> import</td><td>로컬 에이전트 도구의 사실상 표준. 백엔드의 AGENTS/CLAUDE 중복 해소</td></tr>
+      <tr><td>4</td><td>카드는 현재 코드 기준으로 작성</td><td><code>02-domain-design</code> 등 옛 설계가 현재 코드와 다름</td></tr>
+      <tr><td>5</td><td>이력 문서는 삭제하지 않고 <code>git mv</code>로 archive</td><td>이력 보존과 검색 잡음 제거를 함께 달성</td></tr>
+      <tr><td>6</td><td>경로 접두 표기 <code>{BE}</code> 등 도입</td><td>긴 백엔드 경로를 반복하는 토큰 비용 절감. 점검 스크립트가 확장</td></tr>
+      <tr><td>7</td><td>점검 스크립트에 소유 커버리지 검사 포함</td><td>새 컨트롤러·화면을 추가하고 카드를 갱신하지 않는 누락을 기계적으로 검출</td></tr>
+      <tr><td>8</td><td>문서 읽기 총량은 컨텍스트의 25% 이하</td><td>로컬 모델은 긴 컨텍스트에서 성능이 떨어지므로 코드와 추론 여유를 확보</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>미결 사항 및 리스크</h2>
+    <table>
+      <tr><th>#</th><th>질문</th><th>현재 입장</th></tr>
+      <tr><td>1</td><td>진행 중 변경분을 커밋한 뒤 시작할 것인가?</td><td>커밋 여부는 사용자가 결정. 커밋 전에는 <code>api-contract.md</code> 이동 불가</td></tr>
+      <tr><td>2</td><td>카드 경계를 실제 코드에 맞게 조정할 필요가 있는가?</td><td>구현 계획 단계에서 코드를 보고 조정. 카드 수가 바뀌면 설계서 6.1 갱신</td></tr>
+      <tr><td>3</td><td>ripgrep 기반이 아닌 에이전트 도구라면 archive를 어떻게 제외하나?</td><td>반입 후 도구가 확정되면 도구 설정으로 처리 (범위 외)</td></tr>
+      <tr><td>4</td><td>점검 스크립트가 의미 불일치도 잡을 수 있나?</td><td>잡지 못함. 경로와 커버리지만 검사. 의미는 DoD 규율과 교차 검토에 의존</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>다음 단계 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>구현 계획 작성</strong></p>
+      <p>4단계(공통 골격 → 카드 → archive → 전체 점검)를 작업 단위 계획으로 분해합니다. 카드별 입력 자료(대상 컨트롤러·서비스·뷰, 이관할 <code>api-contract.md</code> 섹션, 참고 ADR·설계 문서)를 명시합니다.</p>
+      <p class="small">원본 설계서: <code>docs/superpowers/specs/2026-09-18-local-llm-docs-design.md</code></p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

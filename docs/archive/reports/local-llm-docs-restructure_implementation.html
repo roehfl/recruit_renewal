@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>로컬 LLM 유지보수용 문서 재편 구현</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal (recruit 모노레포)</div>
+  <h1>로컬 LLM 유지보수용 문서 재편 구현</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge warn">사용자 결정 필요 항목 있음</span>
+  <span class="badge muted">작성일: 2026-09-19</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>폐쇄망 로컬 LLM 에이전트가 <code>AGENTS.md</code> → <code>docs/domains/_index.md</code> → 도메인 카드 1~2개만 읽고 유지보수할 수 있도록 문서를 재편했습니다. 설계서(<code>local-llm-docs-restructure_design.html</code>)의 구조를 그대로 구현했습니다.</p>
+      <p>도메인 카드 15개를 현재 코드 기준으로 작성하고, 카드마다 독립 리뷰어가 코드와 대조 검증했습니다. 컨트롤러 매핑 201개와 카드 API 표 행 수가 전 카드에서 일치합니다.</p>
+      <p>이력 문서 약 240개는 <code>docs/archive/</code>로 옮겼고(<code>git mv</code>, 이력 보존), 점검 스크립트 <code>tools/check-docs.mjs</code>가 경로·소유·크기를 검사합니다. 코드는 한 줄도 수정하지 않았습니다.</p>
+      <p>카드 작성 중 코드 결함 후보, 계약·코드 불일치, 폐쇄망 운영 위험을 다수 발견해 아래에 정리했습니다. 문서 재편분은 main에 커밋·푸시했습니다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">카드 15개 작성·리뷰 통과</span></p>
+      <p><span class="badge done">점검 스크립트 테스트 13/13</span></p>
+      <p><span class="badge done">문서 점검 통과 (경고 5)</span></p>
+      <p><span class="badge done">매핑 201 = API 표 201</span></p>
+      <p><span class="badge info">코드 무수정</span></p>
+      <p><span class="badge done">병행 변경 300e792 커밋 확인</span></p>
+      <p><span class="badge done">main 커밋·푸시</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>루트 <code>AGENTS.md</code> 신규(정본 진입점), 루트 <code>CLAUDE.md</code>를 <code>@AGENTS.md</code> + Claude 전용 규칙으로 축소</li>
+          <li>백엔드 <code>AGENTS.md</code> 재작성(AGENTS+CLAUDE 병합, 옛 규칙 14건 코드 기준 정정), 백엔드 <code>CLAUDE.md</code> = <code>@AGENTS.md</code></li>
+          <li>프론트 <code>AGENTS.md</code> 정리(셋업 시절 절 삭제, 읽기 순서·공통 기반 절 추가)</li>
+          <li><code>docs/domains/_index.md</code> + 도메인 카드 15개</li>
+          <li><code>tools/check-docs.mjs</code> + 테스트, <code>.ignore</code></li>
+          <li>운영 DDL <code>docs/codex/ops</code> → <code>recruit_back/recruit_backend/docs/ops</code></li>
+          <li>이력 문서 archive 이동, <code>api-contract.md</code> 섹션을 카드로 이관 후 archive</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미완료</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>(완료) 커밋·푸시</li>
+          <li>🔴·🟡 계약 상태 확정 (사용자 결정)</li>
+          <li><code>application</code> 카드 분할 여부 결정 (40KB 상한 직전)</li>
+          <li>(완료) 병행 변경 커밋(300e792) 후 카드 해시 갱신</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>코드 결함 수정 (발견만 보고)</li>
+          <li>코드 주석·ADR의 옛 문서 경로 수정</li>
+          <li>에이전트 도구별 설정 파일</li>
+          <li>파일 지도 자동 생성</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>변경 파일</h2>
+    <div class="two">
+      <div class="card">
+        <h3>신규</h3>
+        <table>
+          <tr><th>파일</th><th>내용</th></tr>
+          <tr><td><code>AGENTS.md</code></td><td>정본 진입점 (6.4KB)</td></tr>
+          <tr><td><code>docs/domains/_index.md</code></td><td>경로 표기·카드 목록·역색인·카드 없는 파일·템플릿 (9.7KB)</td></tr>
+          <tr><td><code>docs/domains/*.md</code> ×15</td><td>도메인 카드 (합계 약 494KB)</td></tr>
+          <tr><td><code>tools/check-docs.mjs</code>, <code>tools/check-docs.test.mjs</code></td><td>점검 스크립트·테스트</td></tr>
+          <tr><td><code>.ignore</code></td><td><code>docs/archive/</code> 검색 제외</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>수정·이동</h3>
+        <table>
+          <tr><th>파일</th><th>내용</th></tr>
+          <tr><td><code>CLAUDE.md</code></td><td><code>@AGENTS.md</code> + Claude 전용 규칙</td></tr>
+          <tr><td><code>recruit_back/recruit_backend/AGENTS.md</code></td><td>전체 재작성 (19.9KB)</td></tr>
+          <tr><td><code>recruit_back/recruit_backend/CLAUDE.md</code></td><td><code>@AGENTS.md</code></td></tr>
+          <tr><td><code>recruit_front/AGENTS.md</code></td><td>정리 (14.6KB)</td></tr>
+          <tr><td><code>recruit_back/recruit_backend/docs/ops/*.sql</code> ×8</td><td><code>docs/codex/ops</code>에서 이동</td></tr>
+          <tr><td><code>docs/archive/**</code></td><td><code>api-contract.md</code>, 백엔드 <code>docs/codex</code>(226), <code>docs/instructions</code>, <code>docs/superpowers</code>, <code>CONTEXT.md</code>, <code>instruction.md</code>, <code>README-codex-docs.md</code>, <code>HELP.md</code>, 루트 <code>docs/design</code>, 루트 <code>docs/superpowers</code></td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>테스트 및 검증 결과</h2>
+    <div class="two">
+      <div class="card">
+        <p>명령: <code>node --test tools/check-docs.test.mjs</code> → <span class="badge done">13 pass / 0 fail</span></p>
+        <p>명령: <code>node tools/check-docs.mjs</code> → <span class="badge done">통과 (exit 0)</span> 경고 5건(권장 크기 초과만)</p>
+        <p class="small">점검 스크립트 독립 리뷰에서 Important 1건(펜스 안 <code>## </code>에서 절 조기 종료)을 발견해 테스트 추가 후 수정했습니다.</p>
+        <table>
+          <tr><th>경고 대상</th><th>크기</th><th>기준</th></tr>
+          <tr><td>백엔드 <code>AGENTS.md</code></td><td>19.4KB</td><td>권장 15 / 상한 20</td></tr>
+          <tr><td><code>_index.md</code></td><td>9.5KB</td><td>권장 8 / 상한 12</td></tr>
+          <tr><td><code>application.md</code></td><td>39.5KB</td><td>권장 30 / 상한 40</td></tr>
+          <tr><td><code>interview.md</code></td><td>30.4KB</td><td>권장 30 / 상한 40</td></tr>
+          <tr><td><code>stage-result.md</code></td><td>30.0KB</td><td>권장 30 / 상한 40</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>카드별 리뷰·API 대조</h3>
+        <table>
+          <tr><th>카드</th><th>매핑=표</th><th>리뷰</th></tr>
+          <tr><td>auth-account</td><td>7</td><td><span class="badge done">수정 후 통과</span></td></tr>
+          <tr><td>role-menu</td><td>14</td><td><span class="badge done">통과</span></td></tr>
+          <tr><td>job-posting</td><td>17</td><td><span class="badge done">통과</span></td></tr>
+          <tr><td>question</td><td>11</td><td><span class="badge done">통과</span></td></tr>
+          <tr><td>application-form</td><td>5</td><td><span class="badge done">통과</span></td></tr>
+          <tr><td>application</td><td>27</td><td><span class="badge done">수정 후 통과</span></td></tr>
+          <tr><td>attachment</td><td>8</td><td><span class="badge done">수정 후 통과</span></td></tr>
+          <tr><td>admin-application</td><td>22</td><td><span class="badge done">통과</span></td></tr>
+          <tr><td>stage-result</td><td>19</td><td><span class="badge done">수정 후 통과</span></td></tr>
+          <tr><td>interview</td><td>26</td><td><span class="badge done">수정 후 통과</span></td></tr>
+          <tr><td>master-data</td><td>10</td><td><span class="badge done">통과</span></td></tr>
+          <tr><td>board</td><td>14</td><td><span class="badge done">통과</span></td></tr>
+          <tr><td>statistics</td><td>2</td><td><span class="badge done">통과</span></td></tr>
+          <tr><td>privacy-audit</td><td>15</td><td><span class="badge done">통과</span></td></tr>
+          <tr><td>client-event-log</td><td>4</td><td><span class="badge done">통과</span></td></tr>
+        </table>
+        <p class="small">백엔드·프론트 <code>AGENTS.md</code>도 독립 리뷰 통과. 카드 작성 시 백엔드 테스트는 auth-account 카드에서만 실행(84개 통과), 나머지는 테스트 클래스 존재 대조만 했습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>사용자 결정 필요</h2>
+    <table>
+      <tr><th>#</th><th>질문</th><th>현재 입장</th></tr>
+      <tr><td>1</td><td>[해결 — 300e792로 커밋됨, 카드 표기를 해시로 갱신, 계약 2줄은 archive에 포함] 작업트리의 미커밋 코드 변경(첨부 요구사항 <code>BASIC_INFO</code>·<code>CAREER</code> 한정: <code>ApplicationSectionType</code> 외 4개 + 테스트 6개 + 계약 2줄)은 본인 작업인가?</td><td>이 작업 전(00:07~00:12)에 발생, 손대지 않음. job-posting·application·attachment 카드는 이 코드 기준이며 "미커밋 작업트리 변경(커밋 후 해시 갱신)"으로 표기함.</td></tr>
+      <tr><td>2</td><td>옛 계약에서 🔴/🟡인데 실제로 FE 구현이 끝난 엔드포인트를 🟢로 올릴까?</td><td>상태 보존. 대상: question 템플릿 API 5개 🔴 + activate 🟡, application 기본정보·학력·경력 GET/POST 🔴, admin-application PDF 단건 🟡.</td></tr>
+      <tr><td>3</td><td>코드와 계약이 다른 🔴 항목을 어느 쪽으로 맞출까?</td><td>auth-account <code>POST /auth/login</code>·<code>GET /auth/me</code>(FE <code>phoneNumber</code> 미존재, <code>deptName</code> 항상 빈 값), application-form <code>GET /admin/application-forms</code>(정렬·editableOnly), master-data <code>/admin/schools</code> 4개(폐기 결정인데 코드 잔존)·<code>GET /addresses</code>(<code>maxPage</code> 미사용).</td></tr>
+      <tr><td>4</td><td><code>application.md</code>(39.5KB)를 <code>application</code> / <code>application-sections</code>로 분할할까?</td><td>상한 40KB 직전이라 다음 수정에서 초과 가능. 분할 권장.</td></tr>
+      <tr><td>5</td><td>코드 주석·ADR의 옛 문서 경로를 고칠까?</td><td>코드 무수정 원칙으로 보고만 함. 아래 목록 참고.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>폐쇄망·보안 관련 주의</h2>
+    <div class="card" style="border-left: 4px solid #842029;">
+      <ul class="list">
+        <li><span class="badge out">폐쇄망</span> 주소 입력칸(우편번호·기본주소)이 읽기 전용이라, 외부 주소 API(juso.go.kr)가 막히면 지원자가 주소를 입력할 수 없음. 학교 검색도 외부 API(NEIS·대학 OpenAPI) 단일 출처, 대체 없음.</li>
+        <li><span class="badge out">운영 DDL</span> 면접 종료시각 제거(9baaeef)에 따른 <code>interview.end_date_time</code> 컬럼·<code>idx_interview_time_range</code> 인덱스 삭제 SQL이 <code>recruit_back/recruit_backend/docs/ops/</code>에 없음.</li>
+        <li><span class="badge warn">보안</span> <code>/api/admin/role-mappings/**</code> 전용 매처가 없어 <code>ROLE_RECRUIT_ADMIN</code>이 자신에게 <code>ROLE_PRIVACY_ADMIN</code>을 매핑할 수 있음(ADR 0007 직무 분리 우회 가능, 설계 승인 사항이었음).</li>
+        <li><span class="badge warn">보안</span> 메뉴 관리 매처 <code>/api/menu/admin/menu/*</code>가 경로 한 단계만 보호 — 하위 쓰기 경로 추가 시 비인증 노출 위험.</li>
+        <li><span class="badge warn">보안</span> NICE 목업이 매번 임의 CI를 생성해 CI 해시 기반 중복 가입 차단이 사실상 동작하지 않음.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>코드 결함 후보 (수정하지 않음)</h2>
+    <table>
+      <tr><th>영역</th><th>내용</th><th>확인 수준</th></tr>
+      <tr><td>job-posting</td><td><code>GET /admin/job-postings/{id}</code>: 양식 설정이 없는 공고면 <code>ApplicationFormConfigResponse.from(null)</code> NPE → 500</td><td><span class="badge done">리뷰어 코드 확인</span></td></tr>
+      <tr><td>공통</td><td><code>IllegalArgumentException</code> 전역 핸들러 없음 → 500: 메뉴 검증 10곳, 면접 엔티티 검증(도착>면접 시각, 방식별 장소·URL)</td><td><span class="badge done">코드 확인</span></td></tr>
+      <tr><td>공통</td><td><code>NoticeNotFoundException</code>·<code>InvalidActivityLogException</code> 핸들러 없음 → 500</td><td><span class="badge done">코드 확인</span></td></tr>
+      <tr><td>board</td><td>공지 목록 <code>page</code>·<code>size</code> 범위 미검증(음수·0 → 500), 공지 상세 모달 catch 없음, 지원자 FAQ 조회 실패를 "등록된 FAQ 없음"으로 표시</td><td><span class="badge done">코드 확인</span></td></tr>
+      <tr><td>client-event-log</td><td><code>CareerSection</code>·<code>MilitarySection</code>이 자격증 이벤트 코드 사용, <code>BasicInfoSection</code> 실패 이벤트 message 오기, <code>VITE_APP_VERSION</code> 미정의로 <code>frontendVersion</code> 항상 빈 값</td><td><span class="badge done">리뷰어 확인</span></td></tr>
+      <tr><td>master-data</td><td><code>AdminCommonCodeManageView</code> <code>VALIDATED_GROUPS</code>에 <code>APPLICATION_ROUTE</code> 누락 → 비활성화 경고 없이 지원서 재저장 400</td><td><span class="badge done">리뷰어 확인</span></td></tr>
+      <tr><td>statistics</td><td>파기 후 학교명·자격명 <code>__PURGED__</code>가 퍼널 그룹으로 집계될 수 있음</td><td><span class="badge warn">코드 판독, 테스트 없음</span></td></tr>
+      <tr><td>statistics·attachment</td><td><code>ApplicationTrendStatisticsService</code>·<code>LocalAttachmentStorageService</code>가 Clock 없이 <code>LocalDate.now()</code> 사용(JVM 시간대 의존)</td><td><span class="badge done">코드 확인</span></td></tr>
+      <tr><td>stage-result</td><td>요청에 버전 값이 없어 화면을 연 뒤 다른 관리자가 저장한 내용을 조용히 덮어씀</td><td><span class="badge done">코드 확인</span></td></tr>
+      <tr><td>application-form</td><td>첨부 요건이 어느 섹션이든 1행 있으면 폐지된 <code>ATTACHMENT</code> 레이아웃 섹션이 활성화</td><td><span class="badge warn">작성자 보고</span></td></tr>
+      <tr><td>auth-account</td><td><code>AuthenticationConfigTest</code> 단정 7개가 모두 주석 — LDAP 미설정 기동 검증 없음</td><td><span class="badge done">리뷰어 확인</span></td></tr>
+      <tr><td>공통</td><td><code>BaseEntity.createdBy/updatedBy</code> 항상 null(AuditorAware 없음), <code>{BE}/exception/UsernameNotFoundException</code> 죽은 코드, <code>Applicant.email</code>·<code>phoneNumber</code> 평문</td><td><span class="badge done">코드 확인</span></td></tr>
+    </table>
+    <p class="small">카드별 미사용 추정 코드(리포지토리 메서드, enum 값, FE 타입 등)는 각 카드의 <code>## 함정·결정</code> 절에 기록되어 있습니다.</p>
+  </section>
+
+  <section>
+    <h2>오래된 참조 (보고만)</h2>
+    <div class="two">
+      <div class="card">
+        <h3>코드 주석 — 옛 문서 경로</h3>
+        <ul class="list">
+          <li><code>{BE}/config/AuthenticationConfig.java:39-40</code>, <code>LdapProperties.java:11</code>, <code>application.yaml:52</code> — "CLAUDE.md 3장", <code>docs/codex/01</code> (내용은 백엔드 <code>AGENTS.md</code> 8절로 이관됨)</li>
+          <li><code>{BE}/domain/entity/StageResult.java:77</code> — <code>docs/codex/ops</code> (현재 <code>recruit_back/recruit_backend/docs/ops</code>)</li>
+          <li><code>{FE}/types/admin/stage.ts:3</code>, <code>{FE}/types/roleMapping.ts:1</code>, <code>menuApi.ts:28</code>, <code>RoleMappingView.vue:13</code> — <code>api-contract.md</code> 섹션</li>
+          <li><code>ApplicationPiiPurgeRepository</code> — <code>docs/codex</code> PII 인벤토리를 "유일한 계약"으로 참조</li>
+          <li>다수 서비스의 "설계 §x", "리뷰 n차 #", "Phase 09x" 주석</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>ADR·기타</h3>
+        <ul class="list">
+          <li>ADR 0002, 0005 — <code>CONTEXT.md</code>·<code>docs/codex</code> 참조 (archive에서 열람 가능)</li>
+          <li>ADR 0003 "백엔드 검증에 결합하지 않음" — 실제로는 5개 공통코드 그룹을 검증</li>
+          <li>ADR 0004·<code>FunnelDimension</code> javadoc — <code>schoolId</code> (실제 <code>schoolCode</code>+<code>schoolSource</code>)</li>
+          <li>코드와 달라 카드에서 뺀 옛 설계 규칙은 카드 작성 보고에 카드별로 정리됨(예: 첨부 업로드 DRAFT만 → 실제 접수기간 내 SUBMITTED 허용, 면접 충돌 구간 겹침 → 같은 시작시각만)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>카드는 코드 기준, 옛 계약 상태는 보존하고 불일치는 🔴로 표기</td><td>상태 승격은 사용자 결정 사항 — 문서 재편이 계약을 임의로 확정하지 않음</td></tr>
+      <tr><td>2</td><td>병행 미커밋 변경은 그대로 두고 카드에 "미커밋" 표기 → 이후 300e792 커밋으로 해시 표기 전환</td><td>이 작업의 산출물이 아니며, 되돌려질 경우를 대비</td></tr>
+      <tr><td>3</td><td>카드 15개를 병렬 작성 + 카드별 독립 리뷰</td><td>도메인 간 파일 충돌이 없고, 리뷰가 규칙 인용 오류 6건을 잡음</td></tr>
+      <tr><td>4</td><td><code>AdminStageResultEnricher</code>는 admin-application 소유 유지</td><td>호출자는 stage-result지만 최종학력 판정 3곳 복제를 함께 관리해야 해서 두 카드가 상호 참조</td></tr>
+      <tr><td>5</td><td>문서 안 경로는 레포 루트 기준</td><td>점검 스크립트가 <code>docs/</code>를 루트 기준으로 해석 — 계획 단계 실측으로 발견</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>다음 단계 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>사용자 결정 5건 처리 → 커밋</strong></p>
+      <p>결정 1(병행 변경) 확인 후 문서 재편분만 커밋하고, 병행 변경이 커밋되면 세 카드의 "미커밋" 표기를 해시로 바꿉니다. 결정 2~4는 카드 수정만으로 반영됩니다.</p>
+      <p class="small">후속 후보: 코드 결함 수정 슬라이스(NPE, 500 매핑, 이벤트 코드 오기), 폐쇄망 주소 수기 입력 대안, 면접 컬럼 삭제 DDL 작성, 코드 주석 경로 정리.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
