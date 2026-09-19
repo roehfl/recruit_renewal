@@ -26,6 +26,15 @@ import { RouterView } from 'vue-router'
         colorSuccess: '#2f855a',
         colorWarning: '#d97706',
         colorError: '#ff4d4f',
+        /* 성공 배너·태그 배경. 기본값은 진한 colorSuccess 에서 파생돼 회녹색으로 칙칙하다. */
+        colorSuccessBg: '#eaf7ee',
+        colorSuccessBgHover: '#dcf1e4',
+        colorSuccessBorder: '#a8dcbd',
+        colorSuccessBorderHover: '#8ccfa8',
+        /* 선택·hover 배경. 기본값은 진한 colorPrimary 에서 파생돼 칙칙하다(셀렉트 목록·표 선택 행 공통). */
+        controlItemBgActive: '#f4f8f0',
+        controlItemBgActiveHover: '#e8f0de',
+        controlItemBgHover: '#f8faf6',
         fontFamily: 'Noto Sans KR, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif',
       },
     }"

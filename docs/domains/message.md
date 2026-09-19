@@ -175,5 +175,8 @@ npx vitest run src/views/admin/message
 - 프론트: 테스트 발송 중 작성 내용이나 종류가 바뀌면 `testVersion`을 올려 늦게 도착한 응답을 버린다.
 - 프론트: 미리보기(`MessagePreview`)는 스크롤 고정(sticky)을 쓰지 않는다. 고정하면 아래 테스트 발송 카드를 가리기 때문이다.
 - 프론트: 테스트 수신자는 브라우저 `localStorage`(`recruit.message.testers`)에만 기억한다. 불러올 때도 추가할 때와 같은 규칙으로 다시 검사하고, 같은 연락처는 중복으로 추가할 수 없다.
-- 프론트: 메시지 화면의 `a-select`(`AdminMessageTemplateView`·`MessageComposer`·`MessageTargetBar`, 이력 화면 `AdminMessageHistoryView` 포함)는 `popup-class-name="message-select-dropdown"`을 준다(드롭다운은 `body` 아래에 그려져 클래스가 있어야 전역 스타일이 걸린다). 선택·hover 색은 카드 소유가 아닌 공통 파일 `{FE}/styles/global.scss`(`.ant-select-dropdown.message-select-dropdown`)에서 연한 색으로 덮는다(진한 주색 파생이 칙칙해서).
+- 프론트: 셀렉트 목록·표 선택 행의 선택·hover 색은 카드 소유가 아닌 `{FE}/App.vue`의 ant-design-vue 테마 토큰(`controlItemBgActive`·`controlItemBgActiveHover`·`controlItemBgHover`)에서 앱 전체 공통으로 정한다. 성공 배너(합격 확인 배너 등)의 배경·테두리도 같은 이유로 `colorSuccessBg`·`colorSuccessBorder` 계열 토큰을 밝게 지정한다. 기본값이 진한 `colorPrimary`에서 파생돼 칙칙하기 때문이며, 메시지 화면 전용 오버라이드는 두지 않는다(2026-09-20 사용자 결정).
+- 프론트: 전형이 필요한 종류(결과 발표·면접 안내 2종, `requiresStage`)는 종류를 바꿀 때 고를 수 있는 전형이 있는 공고를 기본값으로 고른다. 앞에서부터 최대 5개 공고의 전형을 조회해 `defaultStageId`가 나오는 첫 공고를 쓰고, 없으면 첫 공고를 그대로 둔다(`AdminMessageSendView.pickPostingWithStage`). 최신 공고가 접수 중이라 발표된 전형이 없어 0명으로 시작하던 문제를 막는다.
+- 프론트: 결과(합격·불합격 등)는 조건 바·수신자 드로어·미리보기·하단 발송 바·발송 확인 모달에서 같은 색 배지로 보여 준다(색·라벨은 `{FE}/types/admin/stage.ts`의 `STAGE_RESULT_STATUS_COLORS`·`STAGE_RESULT_STATUS_LABELS`, 전형결과 화면과 동일). 판정은 `messageCondition.ts`의 `resultConditionTag`·`recipientResultTag`가 한다. 결과 조건이 실제로 걸리는 경우에만 배지를 보여 준다(면접 2종·마감 임박은 없음, 직접 입력은 전형을 골랐을 때만).
+- 프론트: 발송 확인 모달은 결과가 합격이면 초록, 불합격이면 빨간 배너로 "<결과> 안내를 N명에게 보냅니다"를 띄운다(`isFinalResult`). 보류·결시는 배지만 보여 준다. 합격·불합격을 잘못 골라 보내는 것을 막기 위한 장치다(2026-09-20 사용자 요청).
 - 프론트: `MessageRecipientDrawer`는 좌우 24px 패딩, 선택 행 연한 색 오버라이드(`.ant-table-row-selected`)를 다른 목록 화면과 통일해 쓴다.

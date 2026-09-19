@@ -150,7 +150,6 @@ const submitSave = async (): Promise<void> => {
     <div class="composer-head">
       <FileTextOutlined class="head-icon" />
       <a-select
-        popup-class-name="message-select-dropdown"
         class="template-select"
         :value="content.templateId ?? NEW_TEMPLATE"
         :options="templateOptions"

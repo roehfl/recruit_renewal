@@ -195,7 +195,6 @@ onMounted(async () => {
       <a-select
         v-model:value="typeFilter"
         class="type-select"
-        popup-class-name="message-select-dropdown"
         :options="TYPE_OPTIONS"
         placeholder="종류 전체"
         aria-label="종류"
@@ -204,7 +203,6 @@ onMounted(async () => {
       <a-select
         v-model:value="jobPostingId"
         class="posting-select"
-        popup-class-name="message-select-dropdown"
         :options="postingOptions"
         placeholder="공고 전체"
         aria-label="공고"

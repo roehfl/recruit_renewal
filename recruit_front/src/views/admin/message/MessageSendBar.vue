@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { MailOutlined, MessageOutlined, SendOutlined, WarningOutlined } from '@ant-design/icons-vue'
 
+import type { ResultTag } from './messageCondition'
 import type { SendSummary } from './messageSendSummary'
 
 defineProps<{
@@ -10,6 +11,7 @@ defineProps<{
   smsEnabled: boolean
   tested: boolean
   sending: boolean
+  resultTag: ResultTag | null
 }>()
 
 const emit = defineEmits<{
@@ -21,6 +23,7 @@ const emit = defineEmits<{
   <div class="send-bar">
     <div class="bar-summary">
       <a-tag color="green">{{ typeName }}</a-tag>
+      <a-tag v-if="resultTag" :color="resultTag.color">{{ resultTag.label }}</a-tag>
       <span>수신 대상 <strong>{{ summary.recipientCount }}명</strong></span>
       <span class="divider" />
       <span>

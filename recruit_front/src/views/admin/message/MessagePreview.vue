@@ -4,7 +4,7 @@ import { LeftOutlined, RightOutlined } from '@ant-design/icons-vue'
 
 import { formatDate } from '@/common/dateUtil'
 import type { MessageContent, MessageSender, MessageTargetRecipient, MessageType } from '@/types/admin/message'
-import { RESULT_LABEL, interviewGroupLabel, isInterviewType } from './messageCondition'
+import { interviewGroupLabel, isInterviewType, recipientResultTag, type ResultTag } from './messageCondition'
 import { renderMessage, renderParts, smsByteLength, smsKindOf } from './messageRender'
 
 type Channel = 'mail' | 'sms'
@@ -31,9 +31,6 @@ const smsKind = computed(() => smsKindOf(smsByteLength(renderMessage(props.conte
 const subInfo = computed(() => {
   const recipient = current.value
   if (!recipient) return ''
-  if (props.type === 'RESULT_ANNOUNCEMENT') {
-    return recipient.resultStatus ? RESULT_LABEL[recipient.resultStatus] : ''
-  }
   if (isInterviewType(props.type)) {
     return `${interviewGroupLabel(recipient.interviewGroup)} ${formatDate(recipient.interviewDateTime, 'HH:mm')}`
   }
@@ -42,6 +39,11 @@ const subInfo = computed(() => {
   }
   return ''
 })
+
+/** 결과 발표의 수신자 정보는 텍스트 대신 색 배지로 보여준다. */
+const subResultTag = computed<ResultTag | null>(() =>
+  props.type === 'RESULT_ANNOUNCEMENT' ? recipientResultTag(current.value?.resultStatus ?? null) : null,
+)
 
 /* 미리보기를 그릴 수 없는 이유. 빈 문자열이면 그린다. */
 const blockedReason = computed(() => {
@@ -81,7 +83,10 @@ const move = (step: number): void => {
         <LeftOutlined />
       </a-button>
       <span class="who-name">{{ current?.name ?? '-' }}</span>
-      <span class="who-sub">{{ subInfo }}</span>
+      <span class="who-sub">
+        <a-tag v-if="subResultTag" :color="subResultTag.color" class="sub-tag">{{ subResultTag.label }}</a-tag>
+        <template v-else>{{ subInfo }}</template>
+      </span>
       <span class="who-pos">{{ recipients.length ? index + 1 : 0 }} / {{ recipients.length }}</span>
       <a-button size="small" :disabled="recipients.length < 2" aria-label="다음 수신자" @click="move(1)">
         <RightOutlined />
@@ -175,6 +180,11 @@ const move = (step: number): void => {
 
 .who-sub {
   color: var(--app-text-secondary);
+}
+
+.sub-tag {
+  margin: 0;
+  line-height: 1.5;
 }
 
 .who-pos {

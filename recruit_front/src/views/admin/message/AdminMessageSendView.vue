@@ -30,7 +30,15 @@ import MessageSendConfirmModal from './MessageSendConfirmModal.vue'
 import MessageTargetBar from './MessageTargetBar.vue'
 import MessageTestSendCard from './MessageTestSendCard.vue'
 import MessageTypePicker from './MessageTypePicker.vue'
-import { defaultStageId, selectablePostings, toTargetQuery, type MessageCondition } from './messageCondition'
+import {
+  defaultStageId,
+  isFinalResult,
+  requiresStage,
+  resultConditionTag,
+  selectablePostings,
+  toTargetQuery,
+  type MessageCondition,
+} from './messageCondition'
 import { hasRequested, toTestResults } from './messageHistory'
 import { renderMessage, smsByteLength, smsKindOf, type SmsStats } from './messageRender'
 import { buildSendSummary, describeCondition } from './messageSendSummary'
@@ -118,6 +126,12 @@ const postingTitle = computed(
   () => postings.value.find((posting) => posting.id === condition.value.jobPostingId)?.title ?? '',
 )
 const conditionText = computed(() => describeCondition(type.value, condition.value, stages.value))
+const resultTag = computed(() => resultConditionTag(type.value, condition.value))
+/** 최종 처리(합격·불합격) 발송일 때만 값이 있다. 발송 확인 모달의 배너 조건. */
+const finalResultStatus = computed<'PASSED' | 'FAILED' | null>(() => {
+  const status = condition.value.resultStatus
+  return isFinalResult(status) ? status : null
+})
 const templateName = computed(
   () => templates.value.find((template) => template.id === content.value.templateId)?.name ?? null,
 )
@@ -370,6 +384,37 @@ const onChangePosting = async (jobPostingId: number): Promise<void> => {
   await refreshStages()
 }
 
+/* 전형이 필요한 종류는 고를 수 있는 전형이 있는 공고를 기본값으로 삼는다(최신 공고는 접수 중이라 발표된 전형이 없는 경우가 많다). */
+const MAX_POSTING_PROBE = 5
+
+const pickPostingWithStage = async (candidates: AdminJobPostingListItem[]): Promise<void> => {
+  const request = ++stageRequest
+  stages.value = []
+  let fallback: { jobPostingId: number; stages: StageListItem[] } | null = null
+  for (const posting of candidates) {
+    let loaded: StageListItem[]
+    try {
+      const response = await adminStageApi.getStages(posting.id)
+      loaded = response.data.data
+    } catch (error) {
+      if (request !== stageRequest) return
+      message.error(getApiErrorMessage(error, '전형 목록을 불러오지 못했습니다.'))
+      return
+    }
+    if (request !== stageRequest) return
+    const stageId = defaultStageId(type.value, loaded)
+    if (stageId !== null) {
+      stages.value = loaded
+      condition.value = { ...condition.value, jobPostingId: posting.id, stageId, interviewGroup: 'ALL' }
+      return
+    }
+    fallback ??= { jobPostingId: posting.id, stages: loaded }
+  }
+  if (fallback === null) return
+  stages.value = fallback.stages
+  condition.value = { ...condition.value, jobPostingId: fallback.jobPostingId, stageId: null, interviewGroup: 'ALL' }
+}
+
 const resetForType = async (): Promise<void> => {
   const selectable = selectablePostings(type.value, postings.value)
   const keep = selectable.some((posting) => posting.id === condition.value.jobPostingId)
@@ -377,7 +422,11 @@ const resetForType = async (): Promise<void> => {
   condition.value = initialCondition(type.value, jobPostingId)
   channel.value = 'mail'
   applyDefaultTemplate()
-  await refreshStages()
+  if (keep || jobPostingId === null || !requiresStage(type.value)) {
+    await refreshStages()
+    return
+  }
+  await pickPostingWithStage(selectable.slice(0, MAX_POSTING_PROBE))
 }
 
 watch(type, () => {
@@ -542,6 +591,7 @@ onBeforeUnmount(() => {
       :sms-enabled="content.smsEnabled"
       :tested="tested"
       :sending="sending"
+      :result-tag="resultTag"
       @send="confirmOpen = true"
     />
 
@@ -557,6 +607,8 @@ onBeforeUnmount(() => {
       :sms-enabled="content.smsEnabled"
       :tested="tested"
       :sending="sending"
+      :result-tag="resultTag"
+      :final-result-status="finalResultStatus"
       @confirm="confirmSend"
     />
 

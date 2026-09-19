@@ -13,6 +13,7 @@ import {
   isAnnouncedStage,
   isInterviewStage,
   isInterviewType,
+  resultConditionTag,
   selectablePostings,
   type ApplicationFilter,
   type MessageCondition,
@@ -71,6 +72,7 @@ const showStage = computed(() => props.type !== 'DEADLINE_REMINDER')
 const showResult = computed(
   () => props.type === 'RESULT_ANNOUNCEMENT' || (props.type === 'FREE' && condition.value.stageId !== null),
 )
+const resultTag = computed(() => resultConditionTag(props.type, condition.value))
 
 const groupOptions = computed(() => [
   { value: 'ALL', label: '전체 조' },
@@ -107,7 +109,6 @@ const changePosting = (value: unknown): void => {
         <div class="field wide">
           <span class="field-label">{{ type === 'DEADLINE_REMINDER' ? '공고 (접수 중인 공고만)' : '공고' }}</span>
           <a-select
-            popup-class-name="message-select-dropdown"
             :value="condition.jobPostingId ?? undefined"
             :options="postingOptions"
             placeholder="공고를 선택하세요"
@@ -120,7 +121,6 @@ const changePosting = (value: unknown): void => {
         <div v-if="showStage" class="field">
           <span class="field-label">{{ stageLabel }}</span>
           <a-select
-            popup-class-name="message-select-dropdown"
             :value="condition.stageId ?? undefined"
             :options="stageOptions"
             :placeholder="type === 'FREE' ? '조건 없음' : '전형을 선택하세요'"
@@ -130,17 +130,19 @@ const changePosting = (value: unknown): void => {
           />
         </div>
         <div v-if="showResult" class="field">
-          <span class="field-label">결과</span>
-          <a-select popup-class-name="message-select-dropdown" :value="condition.resultStatus" :options="RESULT_FILTER_OPTIONS" @change="changeResult" />
+          <span class="field-label">
+            결과
+            <a-tag v-if="resultTag" :color="resultTag.color" class="result-tag">{{ resultTag.label }}</a-tag>
+          </span>
+          <a-select :value="condition.resultStatus" :options="RESULT_FILTER_OPTIONS" @change="changeResult" />
         </div>
         <div v-if="isInterview" class="field">
           <span class="field-label">조</span>
-          <a-select popup-class-name="message-select-dropdown" :value="condition.interviewGroup" :options="groupOptions" @change="changeGroup" />
+          <a-select :value="condition.interviewGroup" :options="groupOptions" @change="changeGroup" />
         </div>
         <div v-if="type === 'FREE'" class="field">
           <span class="field-label">지원 상태</span>
           <a-select
-            popup-class-name="message-select-dropdown"
             :value="condition.applicationStatus"
             :options="APPLICATION_FILTER_OPTIONS"
             @change="changeApplicationStatus"
@@ -195,9 +197,17 @@ const changePosting = (value: unknown): void => {
 }
 
 .field-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12px;
   font-weight: 500;
   color: var(--app-text-secondary);
+}
+
+.result-tag {
+  margin: 0;
+  line-height: 1.5;
 }
 
 .recipient-summary {

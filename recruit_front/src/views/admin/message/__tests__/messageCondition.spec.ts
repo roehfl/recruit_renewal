@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest'
 
 import type { StageListItem } from '@/types/admin/stage'
 import type { AdminJobPostingListItem } from '@/types/jobPosting'
-import { defaultStageId, selectablePostings, toTargetQuery, type MessageCondition } from '../messageCondition'
+import {
+  defaultStageId,
+  isFinalResult,
+  recipientResultTag,
+  requiresStage,
+  resultConditionTag,
+  selectablePostings,
+  toTargetQuery,
+  type MessageCondition,
+} from '../messageCondition'
 
 const stage = (id: number, stageType: StageListItem['stageType'], status: StageListItem['status']): StageListItem => ({
   id,
@@ -109,5 +118,66 @@ describe('toTargetQuery', () => {
       stageId: 3,
       resultStatus: 'PASSED',
     })
+  })
+})
+
+describe('requiresStage', () => {
+  it('결과 발표와 면접 안내만 전형이 필요하다', () => {
+    expect(requiresStage('RESULT_ANNOUNCEMENT')).toBe(true)
+    expect(requiresStage('INTERVIEW_SCHEDULE')).toBe(true)
+    expect(requiresStage('INTERVIEW_NOTICE')).toBe(true)
+    expect(requiresStage('DEADLINE_REMINDER')).toBe(false)
+    expect(requiresStage('FREE')).toBe(false)
+  })
+})
+
+describe('resultConditionTag', () => {
+  it('결과 전체는 배지 없음', () => {
+    expect(resultConditionTag('RESULT_ANNOUNCEMENT', base)).toBeNull()
+  })
+
+  it('결과 발표는 선택한 결과의 라벨·색', () => {
+    expect(resultConditionTag('RESULT_ANNOUNCEMENT', { ...base, resultStatus: 'PASSED' })).toEqual({
+      label: '합격',
+      color: 'green',
+    })
+    expect(resultConditionTag('RESULT_ANNOUNCEMENT', { ...base, resultStatus: 'FAILED' })).toEqual({
+      label: '불합격',
+      color: 'red',
+    })
+  })
+
+  it('면접·마감 임박은 결과 조건이 없다', () => {
+    expect(resultConditionTag('INTERVIEW_NOTICE', { ...base, resultStatus: 'PASSED' })).toBeNull()
+    expect(resultConditionTag('INTERVIEW_SCHEDULE', { ...base, resultStatus: 'PASSED' })).toBeNull()
+    expect(resultConditionTag('DEADLINE_REMINDER', { ...base, resultStatus: 'PASSED' })).toBeNull()
+  })
+
+  it('직접 입력은 전형을 골랐을 때만 결과 배지', () => {
+    expect(resultConditionTag('FREE', { ...base, stageId: null, resultStatus: 'PASSED' })).toBeNull()
+    expect(resultConditionTag('FREE', { ...base, resultStatus: 'PASSED' })).toEqual({ label: '합격', color: 'green' })
+  })
+})
+
+describe('recipientResultTag', () => {
+  it('결과가 없으면 null', () => {
+    expect(recipientResultTag(null)).toBeNull()
+  })
+
+  it('결과별 라벨·색', () => {
+    expect(recipientResultTag('PASSED')).toEqual({ label: '합격', color: 'green' })
+    expect(recipientResultTag('FAILED')).toEqual({ label: '불합격', color: 'red' })
+    expect(recipientResultTag('HOLD')).toEqual({ label: '보류', color: 'blue' })
+    expect(recipientResultTag('ABSENT')).toEqual({ label: '결시', color: 'default' })
+  })
+})
+
+describe('isFinalResult', () => {
+  it('합격·불합격만 최종 처리로 본다', () => {
+    expect(isFinalResult('PASSED')).toBe(true)
+    expect(isFinalResult('FAILED')).toBe(true)
+    expect(isFinalResult('HOLD')).toBe(false)
+    expect(isFinalResult('ABSENT')).toBe(false)
+    expect(isFinalResult('ALL')).toBe(false)
   })
 })

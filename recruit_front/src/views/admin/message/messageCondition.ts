@@ -1,5 +1,5 @@
 import type { MessageTargetQuery, MessageType } from '@/types/admin/message'
-import { STAGE_RESULT_STATUS_LABELS, STAGE_STATUS_LABELS } from '@/types/admin/stage'
+import { STAGE_RESULT_STATUS_COLORS, STAGE_RESULT_STATUS_LABELS, STAGE_STATUS_LABELS } from '@/types/admin/stage'
 import type { StageListItem, StageResultStatus, StageStatus } from '@/types/admin/stage'
 import type { AdminJobPostingListItem } from '@/types/jobPosting'
 
@@ -18,6 +18,14 @@ export interface MessageCondition {
 /** `@/types/admin/stage`의 라벨과 같다(백엔드 기준 단일 출처). */
 export const RESULT_LABEL: Record<StageResultStatus, string> = STAGE_RESULT_STATUS_LABELS
 export const STAGE_STATUS_LABEL: Record<StageStatus, string> = STAGE_STATUS_LABELS
+/** `@/types/admin/stage`의 배지 색과 같다(백엔드 기준 단일 출처). */
+export const RESULT_COLOR: Record<StageResultStatus, string> = STAGE_RESULT_STATUS_COLORS
+
+/** 결과 배지. 합격·불합격을 잘못 보내지 않도록 조건 바·수신자 목록·미리보기·발송 확인에서 같은 색으로 보여준다. */
+export interface ResultTag {
+  label: string
+  color: string
+}
 
 export const RESULT_FILTER_OPTIONS: { value: ResultFilter; label: string }[] = [
   { value: 'ALL', label: '전체' },
@@ -52,6 +60,10 @@ export const isInterviewStage = (stage: StageListItem): boolean => INTERVIEW_STA
 /** 서류 마감 임박은 게시 중이면서 접수 중인 공고만 고를 수 있다. */
 export const selectablePostings = (type: MessageType, postings: AdminJobPostingListItem[]): AdminJobPostingListItem[] =>
   type === 'DEADLINE_REMINDER' ? postings.filter((posting) => posting.status === 'PUBLISHED' && posting.accepting) : postings
+
+/** 전형을 골라야 대상자를 조회할 수 있는 종류. 기본 공고를 고를 때 쓴다. */
+export const requiresStage = (type: MessageType): boolean =>
+  type === 'RESULT_ANNOUNCEMENT' || isInterviewType(type)
 
 /** 종류·공고를 바꿨을 때의 기본 전형. 전형 목록은 stageOrder 오름차순이다. */
 export const defaultStageId = (type: MessageType, stages: StageListItem[]): number | null => {
@@ -96,3 +108,22 @@ export const toTargetQuery = (type: MessageType, condition: MessageCondition): M
   }
   return query
 }
+
+/**
+ * 조건 바의 결과 선택이 실제로 대상을 결과로 좁히는지 판정해 배지로 보여준다.
+ * 면접 2종·마감 임박은 결과 조건이 없고, 직접 입력은 전형을 골랐을 때만 결과 조건이 걸린다.
+ */
+export const resultConditionTag = (type: MessageType, condition: MessageCondition): ResultTag | null => {
+  if (type === 'DEADLINE_REMINDER' || isInterviewType(type)) return null
+  if (type === 'FREE' && condition.stageId === null) return null
+  if (condition.resultStatus === 'ALL') return null
+  return { label: RESULT_LABEL[condition.resultStatus], color: RESULT_COLOR[condition.resultStatus] }
+}
+
+/** 수신자 1명의 결과 배지. 결과 발표 대상이 아니면(면접·마감 임박 등) null. */
+export const recipientResultTag = (status: StageResultStatus | null): ResultTag | null =>
+  status ? { label: RESULT_LABEL[status], color: RESULT_COLOR[status] } : null
+
+/** 최종 처리(합격·불합격)인지. 보류·결시는 배지만 보여주고 발송 확인 배너는 최종 처리에만 띄운다. */
+export const isFinalResult = (resultStatus: ResultFilter): resultStatus is 'PASSED' | 'FAILED' =>
+  resultStatus === 'PASSED' || resultStatus === 'FAILED'

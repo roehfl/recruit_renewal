@@ -225,7 +225,7 @@ onMounted(async () => {
       <section class="panel list-panel">
         <div class="list-filter">
           <a-input v-model:value="keyword" placeholder="템플릿 이름 검색" allow-clear />
-          <a-select popup-class-name="message-select-dropdown" v-model:value="typeFilter" class="type-filter" :options="typeFilterOptions" />
+          <a-select v-model:value="typeFilter" class="type-filter" :options="typeFilterOptions" />
         </div>
 
         <a-spin :spinning="loading">
@@ -277,7 +277,7 @@ onMounted(async () => {
             </div>
             <div class="field">
               <span class="field-label">메시지 종류</span>
-              <a-select popup-class-name="message-select-dropdown" v-model:value="form.type" :options="typeOptions" />
+              <a-select v-model:value="form.type" :options="typeOptions" />
             </div>
           </div>
           <a-checkbox v-model:checked="form.defaultTemplate">

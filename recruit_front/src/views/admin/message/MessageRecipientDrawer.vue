@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 
 import { formatDate } from '@/common/dateUtil'
 import type { MessageTargetRecipient, MessageType } from '@/types/admin/message'
-import { RESULT_LABEL, interviewGroupLabel, isInterviewType } from './messageCondition'
+import { RESULT_LABEL, interviewGroupLabel, isInterviewType, recipientResultTag } from './messageCondition'
 
 const props = defineProps<{
   type: MessageType
@@ -44,14 +44,16 @@ const columns = computed(() => [
 ])
 
 const detailText = (recipient: MessageTargetRecipient): string => {
-  if (props.type === 'RESULT_ANNOUNCEMENT') {
-    return recipient.resultStatus ? RESULT_LABEL[recipient.resultStatus] : ''
-  }
   if (isInterviewType(props.type)) {
     return `${interviewGroupLabel(recipient.interviewGroup)} · ${formatDate(recipient.interviewDateTime, 'YYYY-MM-DD HH:mm')}`
   }
-  return formatDate(recipient.draftStartedAt, 'YYYY-MM-DD HH:mm')
+  if (props.type === 'DEADLINE_REMINDER') {
+    return formatDate(recipient.draftStartedAt, 'YYYY-MM-DD HH:mm')
+  }
+  return recipient.resultStatus ? RESULT_LABEL[recipient.resultStatus] : ''
 }
+
+const resultTag = (recipient: MessageTargetRecipient) => recipientResultTag(recipient.resultStatus)
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedIds.value,
@@ -98,7 +100,15 @@ const clearAll = (): void => {
       :pagination="{ pageSize: 50, showSizeChanger: false }"
     >
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'detail'">{{ detailText(record as MessageTargetRecipient) }}</template>
+        <template v-if="column.key === 'detail'">
+          <a-tag
+            v-if="type === 'RESULT_ANNOUNCEMENT' && resultTag(record as MessageTargetRecipient)"
+            :color="resultTag(record as MessageTargetRecipient)?.color"
+          >
+            {{ resultTag(record as MessageTargetRecipient)?.label }}
+          </a-tag>
+          <template v-else-if="type !== 'RESULT_ANNOUNCEMENT'">{{ detailText(record as MessageTargetRecipient) }}</template>
+        </template>
         <template v-else-if="column.key === 'phone'">{{ (record as MessageTargetRecipient).phone ?? '-' }}</template>
         <template v-else-if="column.key === 'email'">{{ (record as MessageTargetRecipient).email ?? '-' }}</template>
         <template v-else-if="column.key === 'channels'">
