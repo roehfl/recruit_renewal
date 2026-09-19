@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>메시지 발송 S1 템플릿 - 구현</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal</div>
+  <h1>메시지 발송 S1 - 템플릿 구현</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge pending">미커밋</span>
+  <span class="badge muted">작성일: 2026-09-19</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>메일·SMS 메시지 발송 기능의 첫 slice(S1)로, 관리자가 메시지 종류별 템플릿을 등록·수정·삭제하고 종류당 기본 템플릿 1개를 지정하는 기능을 구현했습니다.</p>
+      <p>본문의 <code>#{변수}</code>는 서버 enum <code>MessageVariable</code>이 종류별 허용 목록의 단일 출처이며, 허용되지 않은 변수는 저장 단계에서 400으로 막습니다. 화면은 <code>/admin/messages/templates</code>입니다.</p>
+      <p>작업은 6개 묶음으로 나눠 구현했고, 묶음마다 스펙 리뷰와 품질 리뷰를 거쳤습니다. 최종 리뷰에서 Critical·Important 이슈는 없었습니다. 변경은 사용자 요청에 따라 main 작업 트리에 커밋 없이 남아 있습니다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">백엔드 API 6개 🟢</span></p>
+      <p><span class="badge done">템플릿 관리 화면</span></p>
+      <p><span class="badge done">도메인 카드 <code>message</code> 신설</span></p>
+      <p><span class="badge done">대상 테스트 통과</span></p>
+      <p><span class="badge warn">화면 수동 확인 못 함</span></p>
+      <p><span class="badge pending">커밋·메뉴 등록 대기</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li><code>MessageType</code>(5종)·<code>MessageVariable</code>(12개) enum</li>
+          <li>변수 허용 검사 <code>MessageRenderer.validateVariables</code></li>
+          <li><code>MessageTemplate</code> 엔티티·리포지토리(컬럼 <code>message_type</code>)</li>
+          <li>템플릿 서비스: 검증, 기본 템플릿 단일화, CRUD, 변수 목록</li>
+          <li>관리자 API 6개 + 예외 핸들러 2개 + 보안 테스트 3개</li>
+          <li>프론트 타입·API·SMS byte 유틸·템플릿 관리 화면·라우트</li>
+          <li>도메인 카드 <code>message</code>, 색인 4행</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>S2 대상자 조회·치환·서버 SMS byte 판정·발송 화면</li>
+          <li>S3 테스트 발송·실제 발송(게이트웨이 목업·발송 단위 묶기)</li>
+          <li>S4 발송 이력·파기 연동</li>
+          <li>관리자 메뉴 등록(<code>/admin/menus</code>에서 수동)</li>
+          <li>운영 DB 생성 SQL(미결)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>편집 중 이탈 확인 모달(설계에 없음)</li>
+          <li>기본 템플릿 동시 저장 방지 락·유니크 제약(저트래픽, 카드에 기록)</li>
+          <li>커밋·브랜치(사용자 지시로 보류)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>API 목록</h2>
+    <h3>관리자 API (<code>/api</code> 생략, 권한 <code>ADMIN</code>·<code>RECRUIT_ADMIN</code>)</h3>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>상태</th></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/messages/variables</code></td><td>변수 카탈로그(12개, 종류별 허용)</td><td><span class="badge done">🟢</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/message-templates</code></td><td>템플릿 목록(종류 → 기본 우선 → 이름순, <code>type</code> 필터)</td><td><span class="badge done">🟢</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/message-templates/{id}</code></td><td>템플릿 상세(프론트 미사용)</td><td><span class="badge done">🟢</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/message-templates</code></td><td>템플릿 등록</td><td><span class="badge done">🟢</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/message-templates/{id}</code></td><td>템플릿 수정</td><td><span class="badge done">🟢</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/message-templates/{id}/delete</code></td><td>템플릿 삭제</td><td><span class="badge done">🟢</span></td></tr>
+    </table>
+    <h3>컨트롤러 배치</h3>
+    <table>
+      <tr><th>컨트롤러</th><th>담당 API</th></tr>
+      <tr><td><code>MessageTemplateAdminController</code></td><td>템플릿 CRUD 5개</td></tr>
+      <tr><td><code>MessageSendAdminController</code></td><td>변수 카탈로그(S2·S3에서 대상자·테스트·발송 추가)</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>검증 및 비즈니스 규칙</h2>
+    <table>
+      <tr><th>규칙</th><th>설명</th></tr>
+      <tr><td>채널 조합</td><td>메일은 제목·본문을 함께 채우거나 함께 비움. 메일·SMS 중 하나 이상 필수. 공백만 있는 값은 null</td></tr>
+      <tr><td>변수 허용</td><td>없는 키·다른 종류의 변수는 400 "사용할 수 없는 변수: #{…}"</td></tr>
+      <tr><td>기본 템플릿</td><td>기본으로 저장(등록·수정)하면 같은 종류의 다른 기본 해제. 종류를 바꾸면 새 종류 기준</td></tr>
+      <tr><td>글자 수</td><td>이름 100, 메일 제목 200, 본문 10,000, SMS 2,000(요청 DTO <code>@Size</code>). 화면의 변수 칩·복제도 한도를 넘지 않음</td></tr>
+      <tr><td>SMS byte</td><td>S1은 프론트에서 표시용으로만 계산(127 이하 1byte, 그 밖 2byte). 서버 강제는 S2</td></tr>
+      <tr><td>예외</td><td><code>InvalidMessageException</code> 400, <code>MessageTemplateNotFoundException</code> 404</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>변경 파일</h2>
+    <div class="two">
+      <div class="card">
+        <h3>신규 파일</h3>
+        <table>
+          <tr><th>파일</th><th>타입</th></tr>
+          <tr><td><code>enumeration/MessageType.java</code> · <code>MessageVariable.java</code></td><td>enum</td></tr>
+          <tr><td><code>exception/InvalidMessageException.java</code> · <code>MessageTemplateNotFoundException.java</code></td><td>예외</td></tr>
+          <tr><td><code>service/MessageRenderer.java</code> · <code>MessageTemplateService.java</code></td><td>서비스</td></tr>
+          <tr><td><code>domain/entity/MessageTemplate.java</code> · <code>domain/repository/MessageTemplateRepository.java</code></td><td>엔티티·리포지토리</td></tr>
+          <tr><td><code>dto/request/MessageTemplateSaveRequest.java</code> · <code>dto/response/MessageTemplateResponse.java</code> · <code>MessageVariableResponse.java</code></td><td>DTO</td></tr>
+          <tr><td><code>controller/MessageTemplateAdminController.java</code> · <code>MessageSendAdminController.java</code></td><td>컨트롤러</td></tr>
+          <tr><td><code>MessageRendererTest</code> · <code>MessageTemplateServiceTest</code> · <code>MessageTemplateAdminControllerTest</code></td><td>테스트</td></tr>
+          <tr><td><code>api/admin/messageApi.ts</code> · <code>types/admin/message.ts</code></td><td>프론트 API·타입</td></tr>
+          <tr><td><code>views/admin/message/AdminMessageTemplateView.vue</code> · <code>messageTypes.ts</code> · <code>messageRender.ts</code> · <code>__tests__/messageRender.spec.ts</code></td><td>프론트 화면·유틸·테스트</td></tr>
+          <tr><td><code>docs/domains/message.md</code></td><td>도메인 카드</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>수정 파일</h3>
+        <table>
+          <tr><th>파일</th><th>변경 내용</th></tr>
+          <tr><td><code>exception/GlobalExceptionHandler.java</code></td><td>핸들러 2개 추가(+12)</td></tr>
+          <tr><td><code>config/SecurityConfigTest.java</code></td><td>401·403·통과 테스트 3개(+20)</td></tr>
+          <tr><td><code>routes/adminRoutes.ts</code></td><td>라우트 <code>AdminMessageTemplates</code>(+5)</td></tr>
+          <tr><td><code>docs/domains/_index.md</code></td><td>카드 목록·라우트·API 접두·키워드 4행(+4)</td></tr>
+        </table>
+        <p class="small">백엔드 경로는 <code>recruit_back/recruit_backend/src/(main|test)/java/com/shinyoung/recruit/</code>, 프론트 경로는 <code>recruit_front/src/</code> 기준.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>리뷰 반영 (결정 로그)</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td><code>MessageVariable.getTypes()</code>가 수정 불가 Set 반환</td><td>JVM 전역 enum 상태 오염 방지(<code>ApplicationSectionType</code> 선례)</td></tr>
+      <tr><td>2</td><td>저장 응답이 늦게 와도 그사이 다른 템플릿을 골랐으면 선택을 바꾸지 않음</td><td>저장 중 다른 템플릿 클릭 시 폼이 조용히 되돌아가는 문제</td></tr>
+      <tr><td>3</td><td>변수 칩·복제가 글자 수 한도를 넘지 않게 막음</td><td>코드로 넣은 값에는 <code>maxlength</code>가 적용되지 않아 저장 시 400</td></tr>
+      <tr><td>4</td><td>삭제 후·첫 진입 시 필터된 목록의 첫 항목 선택, 템플릿 전환 시 변수 삽입 위치 초기화</td><td>필터에 가려진 템플릿이 편집기에 뜨는 불일치</td></tr>
+      <tr><td>5</td><td>수정 응답 전에 <code>flush()</code></td><td><code>@LastModifiedDate</code>가 응답에 반영되도록(S2 "템플릿으로 저장" 대비)</td></tr>
+      <tr><td>6</td><td>기본 템플릿 동시 저장 방지는 두지 않음</td><td>저트래픽 관리자 화면. 필요하면 스키마 변경으로 대응(카드 기록)</td></tr>
+      <tr><td>7</td><td>카드의 SMS byte 규칙을 "S1은 프론트 표시용"으로 정정</td><td>코드가 기준. 서버 byte 판정은 S2에서 추가</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>테스트 결과</h2>
+    <div class="card">
+      <p>명령어(백엔드): <code>.\gradlew.bat test --tests "com.shinyoung.recruit.service.Message*" --tests "com.shinyoung.recruit.controller.MessageTemplateAdminControllerTest" --tests "com.shinyoung.recruit.config.SecurityConfigTest" --no-daemon</code></p>
+      <p>결과: <span class="badge done">BUILD SUCCESSFUL</span></p>
+      <table>
+        <tr><th>테스트</th><th>건수</th><th>상태</th></tr>
+        <tr><td><code>MessageRendererTest</code></td><td>4</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>MessageTemplateServiceTest</code></td><td>10</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>MessageTemplateAdminControllerTest</code></td><td>7</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>SecurityConfigTest</code>(기존 16 + 신규 3)</td><td>19</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>프론트 <code>npm run type-check</code></td><td>-</td><td><span class="badge done">오류 없음</span></td></tr>
+        <tr><td>프론트 Vitest <code>messageRender.spec.ts</code></td><td>3</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>ESLint(신규 프론트 파일)</td><td>-</td><td><span class="badge done">0건</span></td></tr>
+        <tr><td>문서 점검 <code>node tools/check-docs.mjs</code></td><td>-</td><td><span class="badge done">오류 0</span> <span class="badge muted">기존 크기 경고 10</span></td></tr>
+        <tr><td>화면 수동 확인</td><td>-</td><td><span class="badge warn">못 함</span> 로컬 관리자 로그인(LDAP) 환경 없음</td></tr>
+      </table>
+      <p class="small">전체 리그레션은 실행하지 않았습니다(요청 시에만). 변경 범위 테스트만 실행했습니다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>미결 사항</h2>
+    <table>
+      <tr><th>#</th><th>질문</th><th>현재 입장</th></tr>
+      <tr><td>1</td><td>운영 DB에 <code>message_template</code> 생성 SQL을 <code>docs/ops/</code>에 둘 것인가?</td><td>기존 관례(새 테이블마다 DDL 파일)로는 두는 쪽이 맞음. 결정 대기.</td></tr>
+      <tr><td>2</td><td>목업의 기본 문구 9개를 초기 데이터로 넣을 것인가?</td><td>결정 대기.</td></tr>
+      <tr><td>3</td><td>발신 이메일·SMS 발신번호·채용 사이트 주소 실제 값은?</td><td>S2~S3에서 설정값으로 주입.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>다음 Phase 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>S2 - 대상자 조회·작성 화면</strong></p>
+      <p><code>MessageTargetService</code>(종류별 대상자·연락처·변수 값), <code>MessageRenderer</code> 치환·SMS byte 판정, <code>GET /admin/messages/targets</code>, 발송 화면(종류 카드·조건 바·작성·미리보기·수신자 드로어)을 구현합니다.</p>
+      <p class="small">S2 주의: 서버 byte 계산은 <code>codePoints()</code> 기준(프론트 <code>for...of</code>와 일치), 줄바꿈 CRLF/LF 처리를 서버·프론트 동일하게. 이후: S3 발송(발송 단위 = 내용 1개 + 최대 10명), S4 이력·파기 연동.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

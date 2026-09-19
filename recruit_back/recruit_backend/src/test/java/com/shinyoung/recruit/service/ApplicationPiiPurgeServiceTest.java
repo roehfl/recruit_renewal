@@ -20,6 +20,8 @@ import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.JobPostingQuestion;
 import com.shinyoung.recruit.domain.entity.JobPosition;
+import com.shinyoung.recruit.domain.entity.MessageRecipient;
+import com.shinyoung.recruit.domain.entity.MessageSend;
 import com.shinyoung.recruit.domain.entity.Stage;
 import com.shinyoung.recruit.domain.entity.StageResult;
 import com.shinyoung.recruit.domain.entity.StageResultCorrectionHistory;
@@ -40,6 +42,8 @@ import com.shinyoung.recruit.domain.repository.InterviewRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingQuestionRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.domain.repository.MessageRecipientRepository;
+import com.shinyoung.recruit.domain.repository.MessageSendRepository;
 import com.shinyoung.recruit.domain.repository.StageRepository;
 import com.shinyoung.recruit.domain.repository.StageResultCorrectionHistoryRepository;
 import com.shinyoung.recruit.domain.repository.StageResultRepository;
@@ -57,6 +61,9 @@ import com.shinyoung.recruit.enumeration.EvaluationRecommendation;
 import com.shinyoung.recruit.enumeration.GapType;
 import com.shinyoung.recruit.enumeration.GraduationStatus;
 import com.shinyoung.recruit.enumeration.InterviewMethod;
+import com.shinyoung.recruit.enumeration.MessageChannel;
+import com.shinyoung.recruit.enumeration.MessageDeliveryStatus;
+import com.shinyoung.recruit.enumeration.MessageType;
 import com.shinyoung.recruit.enumeration.MilitaryBranch;
 import com.shinyoung.recruit.enumeration.MilitaryRank;
 import com.shinyoung.recruit.enumeration.MilitaryServiceType;
@@ -66,6 +73,7 @@ import com.shinyoung.recruit.enumeration.NationalityType;
 import com.shinyoung.recruit.enumeration.QuestionAnswerType;
 import com.shinyoung.recruit.enumeration.VeteranStatus;
 import com.shinyoung.recruit.enumeration.QuestionCategory;
+import com.shinyoung.recruit.enumeration.SmsKind;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
 import com.shinyoung.recruit.service.JobApplicationService;
@@ -122,6 +130,8 @@ class ApplicationPiiPurgeServiceTest {
     @Autowired private InterviewParticipantRepository interviewParticipantRepository;
     @Autowired private InterviewEvaluationRepository interviewEvaluationRepository;
     @Autowired private AuditHmac auditHmac;
+    @Autowired private MessageSendRepository messageSendRepository;
+    @Autowired private MessageRecipientRepository messageRecipientRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -332,5 +342,55 @@ class ApplicationPiiPurgeServiceTest {
         assertThat(purgedBasicInfo.getZipCode()).isNull();
         assertThat(purgedBasicInfo.getAddressBasic()).isNull();
         assertThat(purgedBasicInfo.getAddressDetail()).isNull();
+    }
+
+    @Test
+    void 메시지_수신자의_이름과_연락처가_파기되고_발송_결과는_남는다() {
+        JobPosting posting = JobPosting.create("메시지 파기 공고", "Content",
+                LocalDateTime.of(2026, 9, 1, 9, 0), LocalDateTime.of(2026, 9, 22, 18, 0));
+        posting.replaceJobPositions(List.of(JobPosition.create("Sales", 1)));
+        posting = jobPostingRepository.saveAndFlush(posting);
+        Applicant applicant = new Applicant("message-pii-ci", HashUtil.sha256("message-pii-ci"));
+        applicant.setLoginId("message-pii-applicant");
+        applicant.setName("김지원");
+        applicant.setUserName("김지원");
+        applicant.setPhoneNumber("01000000000");
+        applicant = applicantRepository.save(applicant);
+        JobPosition position = posting.getJobPositions().get(0);
+        JobApplication application = jobApplicationRepository.save(JobApplication.create(
+                applicant, posting, position, "김지원", posting.getTitle(), position.getPositionName()));
+
+        MessageSend send = messageSendRepository.save(MessageSend.create(
+                MessageType.FREE, false, posting, null, "제출 완료", null, null,
+                true, true, "제목", "본문", "문자", "hr.kim", "김인사", 2, LocalDateTime.of(2026, 9, 19, 10, 0)));
+        MessageRecipient applicantRecipient = MessageRecipient.create(
+                send, application, "김지원", "applicant@example.com", "01000000000",
+                MessageDeliveryStatus.PENDING, null, MessageDeliveryStatus.PENDING, null, SmsKind.SMS);
+        applicantRecipient.recordRequested(MessageChannel.MAIL, "TX-PURGE-MAIL", LocalDateTime.of(2026, 9, 19, 10, 1));
+        applicantRecipient.recordResult(MessageChannel.SMS, MessageDeliveryStatus.FAILED, "9999",
+                LocalDateTime.of(2026, 9, 19, 10, 2));
+        applicantRecipient = messageRecipientRepository.save(applicantRecipient);
+        MessageRecipient tester = messageRecipientRepository.save(MessageRecipient.create(
+                send, null, "김인사", "hr.kim@example.com", "01000001234",
+                MessageDeliveryStatus.PENDING, null, MessageDeliveryStatus.PENDING, null, SmsKind.SMS));
+        entityManager.flush();
+
+        applicationPiiPurgeService.purgeRelationalPii(application.getId());
+        entityManager.flush();
+        entityManager.clear();
+
+        MessageRecipient purged = messageRecipientRepository.findById(applicantRecipient.getId()).orElseThrow();
+        assertThat(purged.getRecipientName()).isNull();
+        assertThat(purged.getEmail()).isNull();
+        assertThat(purged.getPhone()).isNull();
+        assertThat(purged.getCreatedBy()).isNull();
+        assertThat(purged.getUpdatedBy()).isNull();
+        assertThat(purged.getMailStatus()).isEqualTo(MessageDeliveryStatus.REQUESTED); // KEEP
+        assertThat(purged.getMailTransactionId()).isEqualTo("TX-PURGE-MAIL"); // KEEP
+        assertThat(purged.getSmsStatus()).isEqualTo(MessageDeliveryStatus.FAILED); // KEEP
+        assertThat(purged.getSmsFailureReason()).isEqualTo("9999"); // KEEP(결과코드)
+        MessageRecipient keptTester = messageRecipientRepository.findById(tester.getId()).orElseThrow();
+        assertThat(keptTester.getRecipientName()).isEqualTo("김인사"); // 테스트 수신자는 대상 아님
+        assertThat(keptTester.getEmail()).isEqualTo("hr.kim@example.com");
     }
 }

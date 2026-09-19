@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>메시지 발송 S4 결과 수신·이력 - 구현</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal</div>
+  <h1>메시지 발송 S4 - 결과 수신·발송 이력 구현</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge pending">미커밋</span>
+  <span class="badge muted">작성일: 2026-09-19</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>발송 솔루션이 호출 때 거래 ID만 주고 실제 결과는 나중에 메시지큐로 보내는 구조에 맞춰, 수신자·채널 상태에 "결과 수신 중"(<code>REQUESTED</code>)을 두고 거래 ID로 결과를 매칭해 성공·실패로 바꾸도록 했습니다.</p>
+      <p>발송 상태(발송 중·결과 수신 중·완료)와 건수는 저장하지 않고 조회할 때 계산합니다. 1시간이 지나도 완료되지 않으면 화면에만 "결과 미수신"·"발송 중단"으로 표시하고 실패로 처리하지 않습니다.</p>
+      <p>발송 이력 화면·상세 드로어, 테스트 발송 결과 자동 갱신, 지원서 파기 연동을 붙였고, 커진 도메인 카드를 <code>message</code>·<code>message-delivery</code>로 나눴습니다. 배치별 리뷰와 S4 전체 최종 리뷰(판정: 병합 가능)를 거쳤습니다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">history API 2개 🟢</span></p>
+      <p><span class="badge done">결과 수신 처리부 + 목업 결과</span></p>
+      <p><span class="badge done">백엔드 테스트 160개 통과</span></p>
+      <p><span class="badge done">프론트 Vitest 36개 통과</span></p>
+      <p><span class="badge done">목업 브라우저 확인</span></p>
+      <p><span class="badge pending">실제 소켓 수신부 미정</span></p>
+      <p><span class="badge warn">거래 ID 유일성 미확인</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>접수 결과 <code>GatewayResult(accepted, transactionId, failureReason)</code>, 수신자 채널별 거래 ID</li>
+          <li>결과 반영 <code>DeliveryReportHandler</code>·<code>DeliveryReportBuffer</code>(먼저 온 결과 보관, 1분 재시도, 10분 폐기)</li>
+          <li>목업 결과 <code>MockDeliveryReportScheduler</code>(3초 뒤, 연락처에 <code>fail</code>이면 <code>9999</code>)</li>
+          <li>S3 저장 집계 제거, 상태·건수 조회 시 계산</li>
+          <li><code>GET /admin/messages/history</code>·<code>/{sendId}</code> + 보안 테스트</li>
+          <li>이력 화면·상세 드로어, 발송 화면 "발송 이력" 버튼·발송 후 "이력 보기" 알림, 테스트 결과 3초 폴링</li>
+          <li>지원서 파기 시 수신자 이름·연락처 파기</li>
+          <li>카드 분할(<code>message</code>, <code>message-delivery</code>), 색인·privacy-audit 갱신</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>실제 메일·문자 게이트웨이, 결과 수신 소켓 클라이언트(스펙 확정 후 <code>DeliveryReportHandler.handle</code>만 호출)</li>
+          <li>성공 결과코드 목록·코드별 설명(현재 <code>0000</code>만 성공)</li>
+          <li>운영 DDL(<code>message_template</code>·<code>message_send</code>·<code>message_recipient</code>)</li>
+          <li>메일 HTML 디자인 변경(사용자 결정: 나중에)</li>
+          <li>메뉴 등록(<code>/admin/menus</code>)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>시간 초과를 실패로 처리(발송·결과는 반드시 옴)</li>
+          <li>멈춘 발송 자동 재개, 발송 요청 멱등키</li>
+          <li>이력 엑셀·통계 카드, 결과 막대 그래프</li>
+          <li>커밋·브랜치(사용자 지시로 보류)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>상태 전이</h2>
+    <div class="card">
+      <h3>수신자 채널</h3>
+      <div class="transition">
+        <span class="state">PENDING</span><span class="arrow">&rarr;</span>
+        <span class="action">솔루션 접수(거래 ID)</span><span class="arrow">&rarr;</span>
+        <span class="state">REQUESTED</span><span class="arrow">&rarr;</span>
+        <span class="action">메시지큐 결과(거래 ID + 결과코드)</span><span class="arrow">&rarr;</span>
+        <span class="state">SENT</span> / <span class="state">FAILED</span>
+      </div>
+      <div class="transition">
+        <span class="state">PENDING</span><span class="arrow">&rarr;</span>
+        <span class="action">접수 실패·거래 ID 없음</span><span class="arrow">&rarr;</span>
+        <span class="state">FAILED</span>
+        <span class="small">(<code>GATEWAY_ERROR</code>)</span>
+      </div>
+      <h3 style="margin-top:14px;">발송 1건 (계산값)</h3>
+      <table>
+        <tr><th>상태</th><th>조건</th><th>화면</th></tr>
+        <tr><td><code>SENDING</code></td><td><code>PENDING</code> 수신자 있음</td><td>발송 중 → 60분 뒤 "발송 중단"</td></tr>
+        <tr><td><code>RESULT_PENDING</code></td><td><code>PENDING</code> 없고 <code>REQUESTED</code> 있음</td><td>결과 수신 중 → 60분 뒤 "결과 미수신"</td></tr>
+        <tr><td><code>COMPLETED</code></td><td>둘 다 없음</td><td>완료</td></tr>
+      </table>
+      <p class="small">지연 표시는 화면만 바꾸고 DB 값은 그대로입니다. 결과가 오면 정상 표시로 돌아갑니다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>API 목록</h2>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>상태</th></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/messages/history</code></td><td>기간(기본 최근 30일)·종류·공고·<code>test</code>(Boolean) 필터, 최신순 페이지</td><td><span class="badge done">🟢</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/messages/history/{sendId}</code></td><td>원문·수신자별 채널 결과(연락처 원문), 없으면 404</td><td><span class="badge done">🟢</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/messages/test</code></td><td>응답 status가 접수 결과(<code>REQUESTED</code>·<code>FAILED</code>·<code>SKIPPED</code>)로 바뀜</td><td><span class="badge done">🟢</span></td></tr>
+    </table>
+    <p class="small">목록 행: <code>{ id, requestedAt, type, test, jobPostingTitle, stageName, conditionSummary, title, mailEnabled, smsEnabled, recipientCount, mail{pending, requested, sent, failed, skipped}, sms{…}, status, delayed, senderName }</code>. title은 메일 제목, 메일을 끈 발송은 SMS 앞 40자(코드포인트 기준).</p>
+  </section>
+
+  <section>
+    <h2>도메인 모델 변경</h2>
+    <div class="two">
+      <div class="card">
+        <h3><code>MessageRecipient</code></h3>
+        <table>
+          <tr><th>변경</th><th>내용</th></tr>
+          <tr><td><code>mailTransactionId</code> · <code>smsTransactionId</code></td><td>String(100), 인덱스. 결과 매칭 키</td></tr>
+          <tr><td><code>@DynamicUpdate</code></td><td>SMS 접수 기록이 먼저 커밋된 메일 결과를 옛 값으로 덮어쓰지 않게 바뀐 컬럼만 update(회귀 테스트 있음)</td></tr>
+          <tr><td>결과 반영</td><td>JPQL bulk update, <code>REQUESTED</code>인 행만(멱등)</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3><code>MessageSend</code></h3>
+        <table>
+          <tr><th>변경</th><th>내용</th></tr>
+          <tr><td>제거</td><td><code>status</code>, 채널별 집계 6개, <code>completedAt</code>, <code>complete()</code></td></tr>
+          <tr><td>유지</td><td>조건·원문·발송자·<code>recipientCount</code>·<code>requestedAt</code></td></tr>
+        </table>
+        <p class="small">로컬 H2 파일 DB는 S3 스키마가 남아 있으면 두 테이블을 지우고 다시 만들어야 합니다(테스트 DB는 영향 없음).</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>리뷰 반영 (결정 로그)</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>결과 반영 전에 거래 ID 존재부터 확인</td><td>update와 확인 사이에 접수가 커밋되면 결과가 반영 없이 버퍼에서 빠져 영구 유실(Important)</td></tr>
+      <tr><td>2</td><td><code>MessageRecipient</code>에 <code>@DynamicUpdate</code> + 회귀 테스트</td><td>채널 간 덮어쓰기로 메일 결과가 사라지는 경쟁</td></tr>
+      <tr><td>3</td><td>단위 기록이 실패해도 다음 단위 계속 처리</td><td>결과 반영이 같은 행을 동시에 잠그게 되어 락 타임아웃이 발송 전체를 멈출 수 있음</td></tr>
+      <tr><td>4</td><td>상세 드로어는 요청 실패 후에도 5초 폴링 유지</td><td>일시 오류 한 번에 갱신이 영구히 멈추던 문제</td></tr>
+      <tr><td>5</td><td><code>?sendId=</code>를 watch로 처리, 드로어 닫으면 쿼리 제거</td><td>이력 화면에 있는 상태에서 "이력 보기" 알림을 눌러도 열리도록</td></tr>
+      <tr><td>6</td><td>테스트 결과 폴링의 늦은 응답은 조용히 버림</td><td>화면 이탈·발송 후 엉뚱한 토스트·경고 방지</td></tr>
+      <tr><td>7</td><td>SMS 제목 자르기를 코드포인트 기준으로</td><td>이모지가 반쪽으로 잘리는 문제</td></tr>
+      <tr><td>8</td><td>화면에서 이메일·휴대폰을 가리지 않음, 로그만 마스킹</td><td>사용자 결정(2026-09-19)</td></tr>
+      <tr><td>9</td><td>도메인 카드를 <code>message</code>(24.0KB)·<code>message-delivery</code>(23.8KB)로 분할</td><td>39.8KB로 40KB 상한에 닿음(카드 규칙)</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>변경 파일</h2>
+    <div class="two">
+      <div class="card">
+        <h3>신규 파일</h3>
+        <table>
+          <tr><th>파일</th><th>타입</th></tr>
+          <tr><td><code>service/DeliveryReport</code>, <code>DeliveryReportBuffer</code>, <code>DeliveryReportHandler</code>, <code>MockDeliveryReportScheduler</code>, <code>MessageHistoryService</code></td><td>서비스</td></tr>
+          <tr><td><code>controller/MessageHistoryAdminController</code></td><td>컨트롤러</td></tr>
+          <tr><td><code>MessageRecipientStatusCount</code>, <code>MessageHistoryCondition</code>, 이력 응답 DTO 4개</td><td>리포지토리·DTO</td></tr>
+          <tr><td><code>DeliveryReportHandlerTest</code>, <code>MockDeliveryReportSchedulerTest</code>, <code>MessageRecipientDynamicUpdateTest</code>, <code>MessageHistoryServiceTest</code>, <code>MessageHistoryAdminControllerTest</code></td><td>테스트</td></tr>
+          <tr><td><code>AdminMessageHistoryView.vue</code>, <code>MessageHistoryDrawer.vue</code>, <code>messageHistory.ts</code> + spec</td><td>프론트</td></tr>
+          <tr><td><code>docs/domains/message-delivery.md</code></td><td>도메인 카드</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>수정 파일</h3>
+        <table>
+          <tr><th>파일</th><th>변경 내용</th></tr>
+          <tr><td><code>MessageDeliveryStatus</code>, <code>MessageSendStatus</code>, <code>GatewayResult</code></td><td><code>REQUESTED</code>, 계산 상태, 접수 결과</td></tr>
+          <tr><td><code>MessageRecipient</code>, <code>MessageSend</code> + 리포지토리 2개</td><td>거래 ID·<code>@DynamicUpdate</code>, 집계 제거, 반영·건수·검색 쿼리</td></tr>
+          <tr><td><code>MessageDeliveryService</code>, <code>MessageDispatchRecorder</code>, <code>MessageDispatcher</code>, <code>MessageSendService</code>, 로그 게이트웨이 2개</td><td>접수 정규화·기록, 결과 반영, 단위별 계속 처리</td></tr>
+          <tr><td><code>MessageProperties</code>, <code>application.yaml</code>, <code>SchedulingConfig</code></td><td><code>result-wait-minutes</code>·<code>success-result-codes</code>, 주석</td></tr>
+          <tr><td><code>ApplicationPiiPurgeRepository</code>·<code>Service</code> + 테스트, <code>SecurityConfigTest</code></td><td>파기 연동, 이력 401·403</td></tr>
+          <tr><td><code>types/admin/message.ts</code>, <code>messageApi.ts</code>, <code>adminRoutes.ts</code>, <code>AdminMessageSendView.vue</code>, <code>MessageTestSendCard.vue</code></td><td>이력 타입·API·라우트, 알림·폴링</td></tr>
+          <tr><td>메시지 화면 셀렉트 8개, <code>global.scss</code>, <code>MessageRecipientDrawer.vue</code></td><td>드롭다운 색 연하게, 드로어 여백 24px</td></tr>
+          <tr><td><code>message.md</code>, <code>_index.md</code>, <code>privacy-audit.md</code>, 설계서</td><td>카드 분할·계약 🟢·파기 행·문구 정정</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>테스트 결과</h2>
+    <div class="card">
+      <p>결과: <span class="badge done">BUILD SUCCESSFUL</span> <span class="badge done">type-check 통과</span> <span class="badge done">build 통과</span> <span class="badge done">check-docs 오류 0</span></p>
+      <table>
+        <tr><th>테스트</th><th>건수</th><th>상태</th></tr>
+        <tr><td><code>MessageHistoryServiceTest</code> · <code>MessageHistoryAdminControllerTest</code></td><td>9 · 4</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>DeliveryReportHandlerTest</code> · <code>MockDeliveryReportSchedulerTest</code> · <code>MessageRecipientDynamicUpdateTest</code></td><td>7 · 2 · 1</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>MessageDispatchRecorderTest</code> · <code>MessageDispatcherTest</code> · <code>MessageDeliveryServiceTest</code></td><td>6 · 3 · 7</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>MessageSendServiceTest</code> · <code>MessageSendAsyncFlowTest</code>(커밋 → 접수 → 목업 결과 → 완료)</td><td>15 · 1</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>ApplicationPiiPurgeServiceTest</code> · <code>PurgeExecutionServiceTest</code> · <code>PurgeReconciliationServiceTest</code></td><td>2 · 2 · 4</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>SecurityConfigTest</code> · <code>SchedulingConfigTest</code> · <code>AsyncConfigTest</code> · <code>ApplicationYamlTest</code></td><td>27 · 2 · 2 · 3</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>S1~S3 회귀(템플릿·대상·렌더러·변수·연락처·발송 단위·메일 레이아웃·컨트롤러)</td><td>63</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>백엔드 합계(27개 클래스)</td><td>160</td><td><span class="badge done">실패 0</span></td></tr>
+        <tr><td>프론트 Vitest(<code>messageRender</code> · <code>messageCondition</code> · <code>messageSendSummary</code> · <code>messageHistory</code>)</td><td>36</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>ESLint</td><td>-</td><td><span class="badge done">0건</span></td></tr>
+        <tr><td>브라우저(로컬 목업)</td><td>-</td><td><span class="badge done">확인</span> 이력 목록·상세, 테스트 발송 결과 수신 중 → 성공</td></tr>
+        <tr><td>실제 로그인 환경 화면 확인</td><td>-</td><td><span class="badge warn">못 함</span> 관리자 로그인(LDAP) 환경 없음</td></tr>
+      </table>
+      <p class="small">전체 회귀는 요청이 없어 실행하지 않았습니다(변경 범위만 검증).</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>미결 사항</h2>
+    <table>
+      <tr><th>#</th><th>질문</th><th>현재 입장</th></tr>
+      <tr><td>1</td><td>거래 ID가 메일·SMS 통틀어 유일하고 재사용되지 않는가?</td><td>유일하다고 가정. 겹치거나 재사용되면 결과에 채널을 넣어 채널별로 반영하도록 바꿔야 함(설계서 17절 8번).</td></tr>
+      <tr><td>2</td><td>솔루션의 성공 결과코드 목록과 코드별 설명은?</td><td>우선 <code>0000</code>만 성공, 설정값으로 교체.</td></tr>
+      <tr><td>3</td><td>거래 1건 안에 수신자별 ID·결과가 따로 있는가?</td><td>우선 거래 단위 결과를 수신자 전원에 적용.</td></tr>
+      <tr><td>4</td><td>운영 DDL, 초기 템플릿, 발신 정보 실제 값, 메뉴 등록</td><td>S1부터 이어진 미결.</td></tr>
+    </table>
+    <p class="small">수용한 위험: 테스트 발송 중 먼저 온 결과를 반영하다 DB 오류가 나면 요청 트랜잭션이 롤백되어 500이 남(매우 드묾). 대량 발송이 60분을 넘으면 진행 중에도 잠시 "발송 중단"으로 보일 수 있음.</p>
+  </section>
+
+  <section>
+    <h2>다음 Phase 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>메일 HTML 디자인 → 실제 연동 스펙 반영</strong></p>
+      <p>메일 디자인은 미리보기가 서버의 실제 HTML을 그대로 보여 주는 방식으로 바꾸는 것을 권장합니다. 솔루션 스펙이 오면 게이트웨이 구현체·결과 수신 소켓 클라이언트를 붙이고 미결 1~3을 확정합니다.</p>
+      <p class="small">운영 반영 전: 새 테이블 DDL 여부 결정, 메뉴 등록, 로컬 H2의 <code>message_send</code>·<code>message_recipient</code> 재생성.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

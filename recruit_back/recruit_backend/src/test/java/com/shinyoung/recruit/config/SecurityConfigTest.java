@@ -180,4 +180,80 @@ public class SecurityConfigTest {
                         .content(ROLE_MAPPING_DEPT_BODY))
                 .andExpect(status().is(allOf(not(401), not(403))));
     }
+
+    @Test
+    void 메시지_템플릿_조회는_비인증이면_401() throws Exception {
+        mockMvc.perform(get("/api/admin/message-templates"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 메시지_템플릿은_지원자_권한이면_403() throws Exception {
+        mockMvc.perform(get("/api/admin/message-templates")
+                        .with(user("applicant").authorities(() -> "ROLE_APPLICANT")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 메시지_변수_조회는_운영관리자_권한이면_인가를_통과() throws Exception {
+        mockMvc.perform(get("/api/admin/messages/variables")
+                        .with(user("recruitAdmin").authorities(() -> "ROLE_RECRUIT_ADMIN")))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
+
+    @Test
+    void 메시지_대상자_조회는_비인증이면_401() throws Exception {
+        mockMvc.perform(get("/api/admin/messages/targets").param("type", "FREE").param("jobPostingId", "1"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 메시지_대상자_조회는_지원자_권한이면_403() throws Exception {
+        mockMvc.perform(get("/api/admin/messages/targets").param("type", "FREE").param("jobPostingId", "1")
+                        .with(user("applicant").authorities(() -> "ROLE_APPLICANT")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 메시지_발송은_비인증이면_401() throws Exception {
+        mockMvc.perform(post("/api/admin/messages/send")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 메시지_발송은_지원자_권한이면_403() throws Exception {
+        mockMvc.perform(post("/api/admin/messages/send")
+                        .with(user("applicant").authorities(() -> "ROLE_APPLICANT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 메시지_발송_이력은_비인증이면_401() throws Exception {
+        mockMvc.perform(get("/api/admin/messages/history"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 메시지_발송_이력은_지원자_권한이면_403() throws Exception {
+        mockMvc.perform(get("/api/admin/messages/history")
+                        .with(user("applicant").authorities(() -> "ROLE_APPLICANT")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 메시지_발송_이력_상세는_비인증이면_401() throws Exception {
+        mockMvc.perform(get("/api/admin/messages/history/1"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 메시지_발송_이력_상세는_지원자_권한이면_403() throws Exception {
+        mockMvc.perform(get("/api/admin/messages/history/1")
+                        .with(user("applicant").authorities(() -> "ROLE_APPLICANT")))
+                .andExpect(status().isForbidden());
+    }
 }

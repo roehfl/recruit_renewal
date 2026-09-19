@@ -62,3 +62,19 @@ select {
   border: 1px solid var(--app-border-color);
   border-radius: var(--app-border-radius);
 }
+
+/*
+ * 메시지 화면 드롭다운. 기본 선택·hover 색은 진한 주색에서 파생돼 칙칙해서 연한 색으로 덮는다.
+ * 드롭다운은 body 아래에 그려지므로 popup-class-name="message-select-dropdown"을 준 셀렉트에만 적용된다.
+ */
+.ant-select-dropdown.message-select-dropdown {
+  .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+    background-color: var(--app-bg-selected);
+    color: var(--app-color-primary-emerald);
+    font-weight: 600;
+  }
+
+  .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+    background-color: #f8faf6;
+  }
+}

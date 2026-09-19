@@ -12,7 +12,8 @@ import java.util.List;
 /**
  * 관계형 PII tombstone 실행(Phase 09d-1). 호출자(item 트랜잭션)에 join 한다(REQUIRED — application 1건
  * all-or-nothing 의 일부, 설계 §5.4). 처리 범위는 PII 인벤토리 §3~§7 의 분류표 그대로:
- * answers/학력(+semesterGrade 감사필드)/경력(+profile)/자격(번호는 HMAC HASH_ONLY)/어학/병역/수상/공백/평가 comment.
+ * answers/학력(+semesterGrade 감사필드)/경력(+profile)/자격(번호는 HMAC HASH_ONLY)/어학/병역/수상/공백/평가 comment,
+ * 메시지 수신자 이름·연락처(message 카드).
  * 첨부(§6)는 9d-2 saga, Applicant 공통 PII(§2)는 ref-count 게이트(호출자 책임).
  */
 @Service
@@ -47,6 +48,8 @@ public class ApplicationPiiPurgeService {
         // StageResult 자유서술 + 정정 이력 comment 계열(9d-1 리뷰 Major 1) — PURGED marker 전 필수 소거.
         purgeRepository.purgeStageResultComments(applicationId);
         purgeRepository.purgeStageResultCorrectionHistories(applicationId);
+        // 메시지 수신자 이름·연락처(message 카드) — 발송 결과·거래 ID 는 유지.
+        purgeRepository.purgeMessageRecipients(applicationId);
         purgeRepository.purgeJobApplicationAuditFields(applicationId);
     }
 }

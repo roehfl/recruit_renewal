@@ -202,4 +202,16 @@ public interface ApplicationPiiPurgeRepository extends Repository<JobApplication
                 h.createdBy = null, h.updatedBy = null
             where h.stageResult.jobApplication.id = :applicationId""")
     int purgeStageResultCorrectionHistories(@Param("applicationId") Long applicationId);
+
+    /**
+     * 메시지 수신자(message 카드) — 발송 시점 이름·연락처(AES 암호화 컬럼이라 placeholder 불가, NULLIFY)와 감사 필드.
+     * 채널 상태·거래 ID·실패 사유(결과코드)는 개인정보가 아니라 KEEP_TOMBSTONE. 테스트 수신자(jobApplication null)는 대상 아님.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update MessageRecipient r
+            set r.recipientName = null, r.email = null, r.phone = null,
+                r.createdBy = null, r.updatedBy = null
+            where r.jobApplication.id = :applicationId""")
+    int purgeMessageRecipients(@Param("applicationId") Long applicationId);
 }

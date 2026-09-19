@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>메시지 발송 S3 테스트 발송·발송 - 구현</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal</div>
+  <h1>메시지 발송 S3 - 테스트 발송·발송 구현</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge pending">미커밋</span>
+  <span class="badge muted">작성일: 2026-09-19</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>발송 화면에서 인사팀 담당자에게 테스트 발송(동기, 제목·문자 앞 <code>[테스트]</code>)을 하고, 확인 모달을 거쳐 최대 3,000명에게 실제 발송을 접수할 수 있게 했습니다.</p>
+      <p>접수는 커밋 후 비동기로 처리하며, 같은 내용의 수신자를 최대 10명씩 묶어 게이트웨이를 1회 호출합니다(변수로 내용이 달라지면 1명당 1회). 치환은 요청 시점에 하고 결과는 이벤트로 넘기며, DB에는 원문과 AES 암호화한 연락처만 남깁니다.</p>
+      <p>게이트웨이는 사내 스펙 미정이라 인터페이스 + 로그 목업(마스킹)입니다. 작업 묶음별 스펙·품질 리뷰와 S3 전체 최종 리뷰(판정: 병합 가능)를 거쳤고, 지적 사항은 반영했습니다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">test·send API 🟢</span></p>
+      <p><span class="badge done">테스트 카드·발송 바·확인 모달</span></p>
+      <p><span class="badge done">백엔드 테스트 115개 통과</span></p>
+      <p><span class="badge done">커밋→비동기→완료 흐름 테스트</span></p>
+      <p><span class="badge done">프론트 Vitest 26개 통과</span></p>
+      <p><span class="badge warn">화면 수동 확인 못 함</span></p>
+      <p><span class="badge pending">실제 게이트웨이 미정(목업)</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>발송 기록 <code>MessageSend</code>·<code>MessageRecipient</code>(연락처 AES)</li>
+          <li>게이트웨이 인터페이스 + <code>LoggingMailGateway</code>·<code>LoggingSmsGateway</code></li>
+          <li>메일 레이아웃(Thymeleaf <code>message-mail.html</code>)</li>
+          <li>발송 단위 묶기 <code>DeliveryUnit</code>, 비동기 <code>MessageDispatcher</code>, 결과 기록 <code>MessageDispatchRecorder</code></li>
+          <li><code>POST /admin/messages/test</code>·<code>/send</code> + 보안 테스트</li>
+          <li>프론트 테스트 발송 카드·하단 발송 바·확인 모달, 발송 요약·차단 사유 계산</li>
+          <li>허용되지 않은 변수 경고, 도메인 카드 <code>message</code> 갱신</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>S4 발송 이력 API·화면(<code>GET /admin/messages/history</code> 🟡)</li>
+          <li>S4 수신자 연락처 파기 연동</li>
+          <li>실제 SMTP·문자 솔루션 구현체(스펙·의존성 승인 필요)</li>
+          <li>운영 DDL(<code>message_template</code>·<code>message_send</code>·<code>message_recipient</code>)</li>
+          <li>메뉴 등록(<code>/admin/menus</code>에서 수동)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>예약 발송·재발송·첨부</li>
+          <li>서버 재시작 시 미완료 발송 자동 재개</li>
+          <li>발송 요청 멱등키</li>
+          <li>커밋·브랜치(사용자 지시로 보류)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>API 목록</h2>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>상태</th></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/messages/test</code></td><td>미리보기 수신자 값으로 치환해 테스트 수신자(1~5명)에게 즉시 발송, 채널별 결과 반환</td><td><span class="badge done">🟢</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/messages/send</code></td><td>대상 재조회 ∩ 선택 수신자로 발송 접수, 비동기 처리</td><td><span class="badge done">🟢</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/messages/history</code></td><td>발송 이력(S4)</td><td><span class="badge pending">🟡</span></td></tr>
+    </table>
+    <p class="small">공통 <code>content { templateId?, mailEnabled, smsEnabled, mailSubject?, mailBody?, smsBody? }</code> + 대상 조건 필드. test 응답 <code>{ sendId, results[{ name, channel, status, failureReason }] }</code>, send 응답 <code>{ sendId, status, recipientCount, excludedCount }</code>. 권한은 <code>ROLE_ADMIN</code>·<code>ROLE_RECRUIT_ADMIN</code>, 서비스에서 임직원 재확인.</p>
+  </section>
+
+  <section>
+    <h2>도메인 모델</h2>
+    <div class="two">
+      <div class="card">
+        <h3><code>MessageSend</code> (발송 1건)</h3>
+        <table>
+          <tr><th>필드</th><th>규칙</th></tr>
+          <tr><td><code>type</code>, <code>test</code></td><td>컬럼 <code>message_type</code>·<code>test_send</code></td></tr>
+          <tr><td><code>jobPosting</code>, <code>stage</code>, <code>conditionSummary</code></td><td>조건 요약 문구(200)</td></tr>
+          <tr><td><code>templateId</code>, <code>templateName</code></td><td>템플릿 삭제 후에도 이름 보존</td></tr>
+          <tr><td><code>mailSubject</code>, <code>mailBody</code>, <code>smsBody</code></td><td>치환 전 원문</td></tr>
+          <tr><td><code>senderLoginId</code>, <code>senderName</code></td><td>발송한 임직원</td></tr>
+          <tr><td><code>status</code></td><td><code>SENDING</code> → <code>COMPLETED</code></td></tr>
+          <tr><td><code>recipientCount</code>, 채널별 <code>*Sent</code>·<code>*Failed</code>·<code>*Skipped</code></td><td>완료 시 집계</td></tr>
+          <tr><td><code>requestedAt</code>, <code>completedAt</code></td><td></td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3><code>MessageRecipient</code> (수신자 1명)</h3>
+        <table>
+          <tr><th>필드</th><th>규칙</th></tr>
+          <tr><td><code>messageSend</code>, <code>jobApplication</code></td><td>테스트 발송은 지원서 없음</td></tr>
+          <tr><td><code>recipientName</code>, <code>email</code>, <code>phone</code></td><td><strong>AES 암호화</strong>(500)</td></tr>
+          <tr><td><code>mailStatus</code>, <code>smsStatus</code></td><td><code>PENDING</code>·<code>SENT</code>·<code>FAILED</code>·<code>SKIPPED</code></td></tr>
+          <tr><td><code>mailFailureReason</code>, <code>smsFailureReason</code></td><td>사유 코드(200), 주소·번호 금지</td></tr>
+          <tr><td><code>smsKind</code>, <code>processedAt</code></td><td>SMS/LMS, 처리 시각</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>상태 전이</h2>
+    <div class="card">
+      <h3>발송 접수</h3>
+      <div class="transition">
+        <span class="action">검증·재조회·교집합·치환</span><span class="arrow">→</span>
+        <span class="state">SENDING</span><span class="arrow">→</span>
+        <span class="action">커밋 후 @Async, 발송 단위별 호출·기록</span><span class="arrow">→</span>
+        <span class="state">COMPLETED</span>
+      </div>
+      <h3>수신자 채널</h3>
+      <div class="transition">
+        <span class="state">PENDING</span><span class="arrow">→</span>
+        <span class="action">게이트웨이 결과</span><span class="arrow">→</span>
+        <span class="state">SENT</span> / <span class="state">FAILED</span>
+      </div>
+      <div class="transition">
+        <span class="action">접수 시 판정</span><span class="arrow">→</span>
+        <span class="state">SKIPPED</span>
+        <span class="small"><code>CHANNEL_OFF</code> · <code>NO_CONTACT</code> · <code>INVALID_CONTACT</code></span>
+      </div>
+      <p class="small">실패 사유는 게이트웨이가 준 코드를 저장하고, 호출 예외·<code>null</code> 결과·빈 사유는 <code>GATEWAY_ERROR</code>. 접수 직후 서버가 내려가면 <code>SENDING</code>/<code>PENDING</code>으로 남고 자동 재개하지 않습니다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>검증 및 비즈니스 규칙</h2>
+    <table>
+      <tr><th>규칙</th><th>설명</th></tr>
+      <tr><td>대상 확정</td><td>발송 시 조건으로 재조회해 요청한 <code>applicationIds</code>와 교집합. 빠진 인원은 <code>excludedCount</code>로 알림</td></tr>
+      <tr><td>인원 상한</td><td>최대 3,000명(<code>recruit.message.max-recipients</code>), 넘으면 400</td></tr>
+      <tr><td>SMS 길이</td><td>치환 결과 2,000byte 초과 수신자가 있으면 400(수험번호로 표시, 이름 미노출)</td></tr>
+      <tr><td>발송 단위</td><td>채널·제목·본문·SMS 구분이 같은 수신자 최대 10명, 메일 먼저. 단위 결과를 전원에게 적용</td></tr>
+      <tr><td>메일 개별 발송</td><td>메일 구현체는 단위 안에서도 수신자마다 따로 보냄(To 개별 또는 BCC)</td></tr>
+      <tr><td>테스트 발송</td><td>미리보기 수신자가 현재 대상이어야 함, 수신자 1~5명, 동기 처리 후 결과 즉시 반환</td></tr>
+      <tr><td>개인정보</td><td>연락처 AES 저장, 게이트웨이 로그는 마스킹·본문 미기록, 예외 메시지 미기록</td></tr>
+      <tr><td>화면 차단</td><td>조회 중·조회 실패·대상 0명·채널 전부 제외·허용 안 된 변수·SMS 초과 시 발송·테스트 버튼 비활성, 사유 표시</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>리뷰 반영 (결정 로그)</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>치환을 요청 시점에 하고 결과를 이벤트(메모리)로 디스패처에 전달</td><td>디스패치 때 대상 재해석·조건 재검증이 필요 없음(S2 최종 리뷰 선행 과제 해소)</td></tr>
+      <tr><td>2</td><td><code>@EnableAsync</code>만 두고 부트 기본 실행기 사용</td><td>새 <code>Executor</code> 빈이 기본 실행기를 대체해 다른 비동기 작업에 영향 주는 것 방지</td></tr>
+      <tr><td>3</td><td><code>MessageDispatchRecorder</code>는 <code>REQUIRED</code> 전파</td><td>비동기에선 호출마다 새 트랜잭션, 테스트 발송은 요청 트랜잭션 합류</td></tr>
+      <tr><td>4</td><td>발송 요청이 응답 없이 끝나면 모달을 닫고 "발송 이력 확인" 안내</td><td>멱등키가 없어 재시도가 중복 발송이 될 수 있음</td></tr>
+      <tr><td>5</td><td>테스트 발송 중 내용이 바뀌면 늦은 응답 무시(<code>testVersion</code>)</td><td>테스트 안 한 내용이 테스트 완료로 표시되던 문제(리뷰 Important)</td></tr>
+      <tr><td>6</td><td>미리보기 스크롤 고정 제거</td><td>아래 테스트 발송 카드를 가림(리뷰 Important)</td></tr>
+      <tr><td>7</td><td>테스트 수신자 저장값 재검사·중복 연락처 차단</td><td>옛 형식·손댄 저장값으로 400, 같은 사람에게 두 번 발송 방지</td></tr>
+      <tr><td>8</td><td>메일 게이트웨이 계약에 수신자별 개별 발송, 실패 사유에 주소·번호 금지 명시</td><td>실제 SMTP 연동 시 지원자 간 주소 노출·평문 사유 저장 방지(최종 리뷰 Important)</td></tr>
+      <tr><td>9</td><td>빈 실패 사유를 <code>GATEWAY_ERROR</code>로 채움</td><td>사유 없는 <code>FAILED</code> 방지</td></tr>
+      <tr><td>10</td><td>트랜잭션 없는 흐름 테스트 <code>MessageSendAsyncFlowTest</code> 추가</td><td>기존 테스트는 롤백되어 커밋 후 비동기 경로를 증명하지 못함(최종 리뷰 Important)</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>변경 파일</h2>
+    <div class="two">
+      <div class="card">
+        <h3>신규 파일</h3>
+        <table>
+          <tr><th>파일</th><th>타입</th></tr>
+          <tr><td><code>enumeration/MessageChannel</code>, <code>MessageSendStatus</code>, <code>MessageDeliveryStatus</code></td><td>enum</td></tr>
+          <tr><td><code>domain/entity/MessageSend</code>, <code>MessageRecipient</code> + 리포지토리 2개</td><td>엔티티·리포지토리</td></tr>
+          <tr><td><code>service/MessageContacts</code>, <code>GatewayResult</code>, <code>MailMessage</code>, <code>SmsMessage</code>, <code>MailGateway</code>, <code>SmsGateway</code>, <code>LoggingMailGateway</code>, <code>LoggingSmsGateway</code>, <code>MessageMailLayout</code></td><td>연락처·게이트웨이·레이아웃</td></tr>
+          <tr><td><code>service/DeliveryItem</code>, <code>DeliveryUnit</code>, <code>MessageDeliveryService</code>, <code>MessageDispatchRecorder</code>, <code>MessageSendRequestedEvent</code>, <code>MessageDispatcher</code>, <code>MessageSendService</code></td><td>발송 처리</td></tr>
+          <tr><td><code>config/AsyncConfig</code>, <code>exception/MessageSendNotFoundException</code>, <code>templates/message-mail.html</code></td><td>설정·예외·템플릿</td></tr>
+          <tr><td>요청 DTO 4개, 응답 DTO 3개</td><td>DTO</td></tr>
+          <tr><td><code>MessageContactsTest</code>, <code>DeliveryUnitTest</code>, <code>MessageMailLayoutTest</code>, <code>MessageDeliveryServiceTest</code>, <code>MessageDispatcherTest</code>, <code>MessageDispatchRecorderTest</code>, <code>MessageSendServiceTest</code>, <code>MessageSendAsyncFlowTest</code>, <code>AsyncConfigTest</code>, <code>MessageSendCommandControllerTest</code></td><td>테스트</td></tr>
+          <tr><td><code>MessageTestSendCard.vue</code>, <code>MessageSendBar.vue</code>, <code>MessageSendConfirmModal.vue</code>, <code>messageSendSummary.ts</code> + spec</td><td>프론트</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>수정 파일</h3>
+        <table>
+          <tr><th>파일</th><th>변경 내용</th></tr>
+          <tr><td><code>config/MessageProperties.java</code>, <code>application.yaml</code></td><td><code>maxRecipients</code>(3,000)·<code>gateway</code>(logging)</td></tr>
+          <tr><td><code>MessageTargetService.java</code></td><td>연락처 판정을 <code>MessageContacts</code>로 공용화</td></tr>
+          <tr><td><code>controller/MessageSendAdminController.java</code></td><td><code>/test</code>·<code>/send</code> 추가</td></tr>
+          <tr><td><code>GlobalExceptionHandler.java</code></td><td><code>MessageSendNotFoundException</code> 404</td></tr>
+          <tr><td><code>config/SecurityConfigTest.java</code></td><td>test·send 401·403</td></tr>
+          <tr><td><code>types/admin/message.ts</code>, <code>api/admin/messageApi.ts</code></td><td>발송 타입, <code>testSend</code>·<code>send</code>(60초 타임아웃)</td></tr>
+          <tr><td><code>messageRender.ts</code> + spec, <code>MessageComposer.vue</code></td><td>변수 추출, 허용 안 된 변수 경고</td></tr>
+          <tr><td><code>AdminMessageSendView.vue</code>, <code>MessagePreview.vue</code></td><td>테스트·발송 연결, 미리보기 sticky 제거</td></tr>
+          <tr><td><code>docs/domains/message.md</code>, <code>_index.md</code>, 설계서</td><td>카드·색인·설계서 문구 코드 기준 정정</td></tr>
+        </table>
+        <p class="small">S1~S3 모두 main 작업 트리에 커밋 없이 있습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>테스트 결과</h2>
+    <div class="card">
+      <p>결과: <span class="badge done">BUILD SUCCESSFUL</span> <span class="badge done">type-check 통과</span> <span class="badge done">build 통과</span></p>
+      <table>
+        <tr><th>테스트</th><th>건수</th><th>상태</th></tr>
+        <tr><td><code>MessageSendServiceTest</code></td><td>14</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>MessageSendAsyncFlowTest</code>(커밋 → 비동기 → <code>COMPLETED</code>, 3회 반복)</td><td>1</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>MessageDeliveryServiceTest</code> · <code>MessageDispatcherTest</code> · <code>MessageDispatchRecorderTest</code></td><td>5 · 2 · 2</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>MessageContactsTest</code> · <code>DeliveryUnitTest</code> · <code>MessageMailLayoutTest</code> · <code>AsyncConfigTest</code></td><td>4 · 3 · 1 · 2</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>MessageSendCommandControllerTest</code> · <code>MessageSendAdminControllerTest</code></td><td>3 · 3</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>S1·S2 회귀(<code>MessageRenderer</code> · <code>MessageTargetService</code> · <code>MessageTemplateService</code> · <code>MessageVariableFormatter</code> · <code>MessageTemplateAdminController</code>)</td><td>9 · 17 · 10 · 6 · 7</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>SecurityConfigTest</code> · <code>ApplicationYamlTest</code></td><td>23 · 3</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>백엔드 합계(18개 클래스)</td><td>115</td><td><span class="badge done">실패 0</span></td></tr>
+        <tr><td>프론트 Vitest(<code>messageRender</code> · <code>messageCondition</code> · <code>messageSendSummary</code>)</td><td>26</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>ESLint · <code>check-docs</code></td><td>-</td><td><span class="badge done">0건</span></td></tr>
+        <tr><td>화면 수동 확인</td><td>-</td><td><span class="badge warn">못 함</span> 관리자 로그인(LDAP) 환경 없음</td></tr>
+      </table>
+      <p class="small">전체 회귀는 요청이 없어 실행하지 않았습니다(변경 범위만 검증).</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>미결 사항</h2>
+    <table>
+      <tr><th>#</th><th>질문</th><th>현재 입장</th></tr>
+      <tr><td>1</td><td>실제 메일·문자 연동 방식(SMTP, 문자 에이전트 테이블 등)은?</td><td>사내 스펙 확정 후 <code>recruit.message.gateway</code>로 교체. 연결·응답 타임아웃 필수, 새 의존성은 승인 후 추가.</td></tr>
+      <tr><td>2</td><td>대량 접수 성능(재조회 + 수신자 건별 insert 최대 3,000)과 치환 결과 메모리는 괜찮은가?</td><td>현재 수용. 운영 규모 확인 후 배치 insert 등 검토.</td></tr>
+      <tr><td>3</td><td>운영 DDL, 초기 템플릿, 발신 정보 실제 값, 메뉴 등록</td><td>S1부터 이어진 미결.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>다음 Phase 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>S4 - 발송 이력·파기 연동</strong></p>
+      <p>발송 이력 목록·상세 API와 화면, 수신자 연락처(<code>MessageRecipient</code>) 파기 연동, 카드 계약 확정(<code>history</code> 🟢)을 진행합니다.</p>
+      <p class="small">S4 참고(최종 리뷰): 메일을 끈 발송은 <code>mailSkipped = recipientCount</code>가 되므로 이력 화면은 <code>mailEnabled</code>·<code>smsEnabled</code> 기준으로 "제외"를 표시합니다. 성공 토스트·응답 없음 안내가 가리키는 "발송 이력"이 S4에서 생깁니다.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

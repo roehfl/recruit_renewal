@@ -121,6 +121,17 @@ recruit:
     max-images-per-posting: ${RECRUIT_POSTING_IMAGE_MAX_IMAGES_PER_POSTING:10}
     allowed-extensions: ${RECRUIT_POSTING_IMAGE_ALLOWED_EXTENSIONS:jpg,jpeg,png,webp}
     allowed-content-types: ${RECRUIT_POSTING_IMAGE_ALLOWED_CONTENT_TYPES:image/jpeg,image/png,image/webp}
+  message:
+    # 메일·SMS 발신 정보와 #{채용사이트} 값. 실제 값은 운영 환경변수로 주입한다(코드·문서에는 예시 값만).
+    sender-name: ${RECRUIT_MESSAGE_SENDER_NAME:신영증권 채용담당}
+    sender-email: ${RECRUIT_MESSAGE_SENDER_EMAIL:recruit@example.co.kr}
+    sms-callback-number: ${RECRUIT_MESSAGE_SMS_CALLBACK:02-0000-0000}
+    site-url: ${RECRUIT_MESSAGE_SITE_URL:https://recruit.example.co.kr}
+    max-recipients: ${RECRUIT_MESSAGE_MAX_RECIPIENTS:3000}
+    gateway: ${RECRUIT_MESSAGE_GATEWAY:logging}
+    # 결과 대기 시간(분)이 지나도 완료가 아니면 이력에 지연 표시. 성공 결과코드는 쉼표로 여러 개(솔루션 스펙 확정 후 운영 값).
+    result-wait-minutes: ${RECRUIT_MESSAGE_RESULT_WAIT_MINUTES:60}
+    success-result-codes: ${RECRUIT_MESSAGE_SUCCESS_RESULT_CODES:0000}
 client-event-log:
   # 지원자 화면 진단 로그(Phase 09f). 감사 로그(activity_log)와 분리된 단기 운영 데이터.
   enabled: ${CLIENT_EVENT_LOG_ENABLED:true}

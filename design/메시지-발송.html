@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>메시지 발송 디자인</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+:root{
+  --primary:#0f4726;--primary-hover:#146135;--primary-dark:#0a321b;--emerald:#2f6f55;
+  --text:#1f2937;--text-2:#6b7280;--text-3:#9ca3af;
+  --bg:#f5f7fa;--surface:#fff;--muted:#f9fafb;--soft:#f8faf6;--selected:#f4f8f0;
+  --border:#e5e7eb;--border-strong:#d1d5db;
+  --danger:#e5484d;--danger-bg:#fff1f0;--warning:#d97706;--warning-bg:#fff7e6;--success:#2f855a;--success-bg:#edf7f0;--info:#1677ff;--info-bg:#eef5ff;
+  --r:8px;--r-sm:4px;--r-lg:12px;
+  --shadow:0 1px 3px rgb(0 0 0/6%);--shadow-panel:0 8px 24px rgba(31,41,55,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Noto Sans KR','Apple SD Gothic Neo',sans-serif;font-size:14px;color:var(--text);background:var(--bg);line-height:1.5}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+.app{display:flex;min-height:100vh}
+/* sidebar */
+.sidebar{width:240px;flex:none;display:flex;flex-direction:column;background:linear-gradient(180deg,var(--primary) 0%,#0a3a1e 100%);color:#fff;position:sticky;top:0;height:100vh}
+.brand{height:56px;display:flex;align-items:center;gap:9px;padding:0 18px;border-bottom:1px solid rgb(255 255 255/10%)}
+.brand-logo{width:28px;height:28px;border-radius:7px;background:#fff;color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+.brand-name{font-weight:700;font-size:14px;display:block;line-height:1.15}
+.brand-sub{font-size:10px;letter-spacing:.08em;opacity:.6}
+.nav{flex:1;overflow:auto;padding:14px 10px}
+.nav-label{font-size:11px;opacity:.5;padding:12px 10px 6px}
+.nav-item{width:100%;display:flex;align-items:center;gap:10px;padding:8px 10px;border:0;background:none;color:rgb(255 255 255/78%);border-radius:var(--r);text-align:left;font-size:13.5px}
+.nav-item i{font-size:17px}
+.nav-item:hover{background:rgb(255 255 255/8%);color:#fff}
+.nav-item.active{background:rgb(255 255 255/14%);color:#fff;font-weight:500}
+.nav-item .new{margin-left:auto;font-size:10px;background:#9fe870;color:var(--primary-dark);border-radius:10px;padding:0 6px;font-weight:700}
+.user{display:flex;align-items:center;gap:10px;padding:14px 18px;border-top:1px solid rgb(255 255 255/10%)}
+.avatar{width:30px;height:30px;border-radius:50%;background:rgb(255 255 255/16%);display:flex;align-items:center;justify-content:center;font-size:13px}
+.user small{display:block;opacity:.6;font-size:11px}
+/* main */
+.main{flex:1;min-width:0;padding:24px 28px 110px}
+.screen{display:none}.screen.on{display:block}
+.page-header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:18px}
+.page-title{font-size:20px;font-weight:700}
+.page-desc{color:var(--text-2);font-size:13px;margin-top:2px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;border:1px solid var(--border-strong);background:#fff;border-radius:var(--r);color:var(--text);font-size:13.5px;white-space:nowrap}
+.btn:hover{border-color:var(--primary);color:var(--primary)}
+.btn i{font-size:16px}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-hover);color:#fff}
+.btn-lg{height:40px;padding:0 20px;font-size:14.5px;font-weight:500}
+.btn-sm{height:26px;padding:0 10px;font-size:12.5px}
+.btn-text{border-color:transparent;background:none;color:var(--text-2)}
+.btn-text:hover{background:var(--muted);border-color:transparent}
+.btn-danger{color:var(--danger)}.btn-danger:hover{border-color:var(--danger);color:var(--danger)}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field>label{font-size:12px;color:var(--text-2);font-weight:500}
+.input,.select{height:32px;border:1px solid var(--border-strong);border-radius:var(--r);padding:0 10px;background:#fff;min-width:0;width:100%}
+.select{appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;padding-right:28px}
+.input:focus,.select:focus,.textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgb(15 71 38/12%)}
+.textarea{border:1px solid var(--border-strong);border-radius:var(--r);padding:10px 12px;width:100%;resize:vertical;line-height:1.7;background:#fff}
+.tag{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:var(--r-sm);font-size:12px;border:1px solid var(--border);background:var(--muted);color:var(--text-2);white-space:nowrap}
+.tag.green{background:var(--success-bg);border-color:#b7dfc4;color:var(--success)}
+.tag.red{background:var(--danger-bg);border-color:#ffccc7;color:var(--danger)}
+.tag.amber{background:var(--warning-bg);border-color:#ffd591;color:#b45309}
+.tag.blue{background:var(--info-bg);border-color:#bcd6ff;color:#0958d9}
+.tag.brand{background:var(--selected);border-color:#cfe0c6;color:var(--primary)}
+.muted{color:var(--text-2)}.small{font-size:12px}
+/* type picker */
+.types{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 0.9fr;gap:10px;margin-bottom:14px}
+.type-group-label{grid-column:span 2;font-size:11.5px;color:var(--text-3);font-weight:500;display:flex;align-items:center;gap:8px}
+.type-group-label::after{content:"";flex:1;height:1px;background:var(--border)}
+.type-group-label.single{grid-column:span 1}
+.type{position:relative;text-align:left;border:1px solid var(--border);background:#fff;border-radius:var(--r-lg);padding:13px 14px;display:flex;gap:11px;align-items:flex-start;transition:border-color .15s,box-shadow .15s}
+.type:hover{border-color:var(--border-strong)}
+.type .ico{width:34px;height:34px;flex:none;border-radius:9px;background:var(--muted);color:var(--text-2);display:flex;align-items:center;justify-content:center;font-size:19px}
+.type b{display:block;font-size:14px;font-weight:500}
+.type span{display:block;font-size:12px;color:var(--text-2);margin-top:1px;line-height:1.4}
+.type.on{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary),var(--shadow-panel);background:linear-gradient(0deg,var(--soft),#fff)}
+.type.on .ico{background:var(--primary);color:#fff}
+.type.on::after{content:"\ea5e";font-family:tabler-icons;position:absolute;top:10px;right:11px;color:var(--primary);font-size:16px}
+/* context bar */
+.context{display:flex;align-items:flex-end;gap:12px;padding:14px 16px;margin-bottom:14px}
+.context .field{flex:1}
+.context .field.w-lg{flex:1.7}
+.recip{flex:none;display:flex;align-items:center;gap:12px;padding-left:14px;margin-left:2px;border-left:1px solid var(--border);height:52px}
+.recip-count{line-height:1.2}
+.recip-count b{font-size:22px;font-weight:700;color:var(--primary)}
+.recip-count span{font-size:12px;color:var(--text-2);display:block}
+.recip-faces{display:flex}
+.recip-faces span{width:26px;height:26px;border-radius:50%;border:2px solid #fff;margin-left:-7px;background:#dfe9da;color:var(--primary);font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:500}
+.recip-faces span:first-child{margin-left:0}
+.hint{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);margin:-6px 2px 14px}
+.hint i{font-size:15px;color:var(--emerald)}
+/* workspace */
+.work{display:grid;grid-template-columns:minmax(0,1fr) 404px;gap:14px;align-items:start}
+.composer-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)}
+.composer-head .select{width:auto;flex:1;max-width:340px}
+.dirty{font-size:12px;color:#b45309;display:none;align-items:center;gap:4px}
+.dirty.on{display:inline-flex}
+.channel-tabs{display:flex;gap:0;padding:0 16px;border-bottom:1px solid var(--border)}
+.ctab{display:flex;align-items:center;gap:8px;padding:12px 4px;margin-right:22px;border:0;background:none;color:var(--text-2);border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500}
+.ctab.on{color:var(--primary);border-bottom-color:var(--primary)}
+.ctab .sw{width:28px;height:16px;border-radius:9px;background:var(--border-strong);position:relative;transition:.15s}
+.ctab .sw::after{content:"";position:absolute;width:12px;height:12px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.15s}
+.ctab .sw.on{background:var(--primary)}
+.ctab .sw.on::after{left:14px}
+.ctab.off-ch{opacity:.55}
+.pane{padding:16px;display:none}.pane.on{display:block}
+.pane .field+.field{margin-top:12px}
+.vars{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;padding:10px 12px;background:var(--muted);border-radius:var(--r);border:1px dashed var(--border-strong)}
+.vars>span{font-size:12px;color:var(--text-2);margin-right:2px}
+.var{border:1px solid #cfe0c6;background:#fff;color:var(--primary);border-radius:14px;height:24px;padding:0 10px;font-size:12px}
+.var:hover{background:var(--selected)}
+.counter{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px;color:var(--text-2)}
+.counter b{font-weight:500;color:var(--text)}
+.meter{height:4px;border-radius:2px;background:var(--border);margin-top:6px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--emerald);width:0;transition:width .2s}
+.off-note{display:none;padding:28px 16px;text-align:center;color:var(--text-2);font-size:13px}
+.composer-foot{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-top:1px solid var(--border);background:var(--muted);border-radius:0 0 var(--r-lg) var(--r-lg)}
+/* preview */
+.preview{position:sticky;top:16px;display:flex;flex-direction:column;gap:14px}
+.pv-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border)}
+.pv-head b{font-size:14px;font-weight:500}
+.seg{display:inline-flex;background:var(--muted);border:1px solid var(--border);border-radius:var(--r);padding:2px}
+.seg button{border:0;background:none;height:24px;padding:0 10px;border-radius:6px;font-size:12.5px;color:var(--text-2)}
+.seg button.on{background:#fff;color:var(--primary);box-shadow:var(--shadow);font-weight:500}
+.who{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--soft);border-bottom:1px solid var(--border);font-size:12.5px}
+.who .nm{font-weight:500}
+.who .nav-btn{width:24px;height:24px;border:1px solid var(--border);background:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--text-2)}
+.who .pos{margin-left:auto;color:var(--text-2)}
+.stage{padding:18px;background:repeating-linear-gradient(45deg,#f3f5f7,#f3f5f7 10px,#eff2f4 10px,#eff2f4 20px);border-radius:0 0 var(--r-lg) var(--r-lg);display:flex;justify-content:center;min-height:470px}
+.phone{width:264px;background:#111;border-radius:34px;padding:9px;box-shadow:0 12px 30px rgba(0,0,0,.18)}
+.phone-in{background:#fff;border-radius:26px;height:452px;display:flex;flex-direction:column;overflow:hidden}
+.ph-top{padding:10px 14px 8px;text-align:center;border-bottom:1px solid #eee}
+.ph-top .notch{width:70px;height:6px;border-radius:3px;background:#e5e5e5;margin:0 auto 8px}
+.ph-top b{font-size:12.5px;font-weight:500;display:block}
+.ph-top span{font-size:10.5px;color:var(--text-3)}
+.ph-body{flex:1;overflow:auto;padding:12px 10px;background:#f7f7f8}
+.ph-date{text-align:center;font-size:10.5px;color:var(--text-3);margin-bottom:8px}
+.bubble{background:#fff;border:1px solid #ececec;border-radius:14px 14px 14px 4px;padding:9px 11px;font-size:12px;line-height:1.55;white-space:pre-wrap;word-break:break-all;max-width:92%}
+.ph-meta{display:flex;justify-content:space-between;font-size:10.5px;color:var(--text-3);margin-top:6px;padding:0 2px}
+.mail{width:100%;background:#fff;border-radius:10px;border:1px solid var(--border);overflow:hidden;align-self:flex-start;box-shadow:0 6px 18px rgba(0,0,0,.06)}
+.mail-meta{padding:10px 12px;border-bottom:1px solid var(--border);font-size:11.5px;color:var(--text-2);line-height:1.7}
+.mail-meta b{color:var(--text);font-weight:500}
+.mail-subj{font-size:13.5px;font-weight:500;color:var(--text);margin-bottom:2px}
+.mail-brand{background:var(--primary);color:#fff;padding:11px 16px;font-size:12.5px;font-weight:500;display:flex;align-items:center;gap:7px}
+.mail-brand i{width:18px;height:18px;border-radius:4px;background:#fff;color:var(--primary);font-style:normal;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.mail-body{padding:16px;font-size:12px;line-height:1.75;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow:auto}
+.mail-foot{padding:10px 16px;background:var(--muted);font-size:10.5px;color:var(--text-3);border-top:1px solid var(--border)}
+mark.v{background:#e7f3df;color:var(--primary-dark);border-radius:3px;padding:0 2px}
+mark.miss{background:var(--danger-bg);color:var(--danger);border-radius:3px;padding:0 2px}
+/* test send */
+.test{padding:14px}
+.test-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.test-title b{font-size:14px;font-weight:500;display:flex;align-items:center;gap:6px}
+.test-row{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 10px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--muted);border-radius:16px;padding:3px 6px 3px 10px;font-size:12px}
+.chip button{border:0;background:none;color:var(--text-3);display:flex}
+.test-log{font-size:12px;color:var(--success);display:none;align-items:center;gap:5px;margin-top:8px}
+.test-log.on{display:flex}
+/* sticky action bar */
+.actionbar{position:fixed;left:240px;right:0;bottom:0;background:#fff;border-top:1px solid var(--border);box-shadow:0 -6px 18px rgba(0,0,0,.05);padding:12px 28px;display:flex;align-items:center;gap:18px;z-index:20}
+.actionbar .sum{display:flex;align-items:center;gap:18px;font-size:13px;color:var(--text-2)}
+.actionbar .sum b{color:var(--text);font-weight:500}
+.actionbar .sum .sep{width:1px;height:18px;background:var(--border)}
+.actionbar .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.warn-inline{display:flex;align-items:center;gap:5px;color:#b45309;font-size:12.5px}
+/* drawer & modal */
+.dim{position:fixed;inset:0;background:rgba(17,24,39,.42);z-index:40;display:none}
+.dim.on{display:block}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:900px;max-width:92vw;background:#fff;z-index:41;transform:translateX(100%);transition:transform .22s ease;display:flex;flex-direction:column;box-shadow:-10px 0 30px rgba(0,0,0,.12)}
+.drawer.on{transform:none}
+.dr-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.dr-head b{font-size:16px;font-weight:500}
+.dr-tools{display:flex;gap:8px;align-items:center;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--muted)}
+.dr-body{flex:1;overflow:auto}
+.dr-foot{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.x{width:30px;height:30px;border:0;background:none;border-radius:6px;color:var(--text-2);font-size:18px;display:flex;align-items:center;justify-content:center}
+.x:hover{background:var(--muted)}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{background:var(--muted);color:var(--text-2);font-weight:500;font-size:12px;text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1}
+.tbl td{padding:9px 12px;border-bottom:1px solid #f0f1f3;vertical-align:middle}
+#drawer .tbl td,#drawer .tbl th{white-space:nowrap}
+.tbl tr.dis td{color:var(--text-3)}
+.tbl tr.row-link{cursor:pointer}.tbl tr.row-link:hover td{background:var(--soft)}
+.cb{width:15px;height:15px;accent-color:var(--primary)}
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-48%);width:520px;max-width:92vw;background:#fff;border-radius:var(--r-lg);z-index:41;display:none;box-shadow:0 20px 50px rgba(0,0,0,.2)}
+.modal.on{display:block;animation:pop .18s ease forwards}
+@keyframes pop{to{transform:translate(-50%,-50%)}}
+.md-body{padding:22px 24px}
+.md-title{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:500;margin-bottom:6px}
+.md-title .ic{width:34px;height:34px;border-radius:50%;background:var(--selected);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:18px}
+.sumtbl{width:100%;margin:16px 0;border:1px solid var(--border);border-radius:var(--r);border-collapse:separate;border-spacing:0;font-size:13px;overflow:hidden}
+.sumtbl th{width:96px;background:var(--muted);text-align:left;color:var(--text-2);font-weight:500;padding:8px 12px;border-bottom:1px solid var(--border)}
+.sumtbl td{padding:8px 12px;border-bottom:1px solid var(--border)}
+.sumtbl tr:last-child th,.sumtbl tr:last-child td{border-bottom:0}
+.alert{display:flex;gap:8px;padding:10px 12px;border-radius:var(--r);font-size:12.5px;line-height:1.55}
+.alert i{font-size:16px;margin-top:1px}
+.alert.warn{background:var(--warning-bg);border:1px solid #ffd591;color:#92400e}
+.alert.info{background:var(--info-bg);border:1px solid #bcd6ff;color:#1e40af}
+.confirm-check{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px}
+.md-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 24px;border-top:1px solid var(--border);background:var(--muted);border-radius:0 0 var(--r-lg) var(--r-lg)}
+.toast{position:fixed;top:20px;left:50%;transform:translate(-50%,-20px);background:#fff;border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow-panel);padding:10px 16px;display:flex;align-items:center;gap:8px;font-size:13.5px;opacity:0;pointer-events:none;transition:.2s;z-index:60}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast i{color:var(--success);font-size:18px}
+/* templates screen */
+.tpl-wrap{display:grid;grid-template-columns:320px minmax(0,1fr);gap:14px;align-items:start}
+.tpl-list{overflow:hidden}
+.tpl-search{padding:12px;border-bottom:1px solid var(--border);display:flex;gap:8px}
+.tpl-group{padding:10px 14px 4px;font-size:11.5px;color:var(--text-3);font-weight:500;display:flex;justify-content:space-between}
+.tpl-item{display:block;width:100%;text-align:left;border:0;background:none;padding:10px 14px;border-left:3px solid transparent}
+.tpl-item:hover{background:var(--muted)}
+.tpl-item.on{background:var(--selected);border-left-color:var(--primary)}
+.tpl-item b{font-weight:500;font-size:13.5px;display:flex;align-items:center;gap:6px}
+.tpl-item span{display:block;font-size:12px;color:var(--text-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.star{color:#d4a017;font-size:14px}
+.tpl-edit-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border)}
+.tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;padding:16px 18px}
+.tpl-grid .full{grid-column:1/-1}
+.sec-title{font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.sec-title i{color:var(--emerald);font-size:16px}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px}
+/* history */
+.filters{display:flex;gap:10px;align-items:flex-end;padding:14px 16px;margin-bottom:14px}
+.filters .field{width:170px}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+.stat{padding:14px 16px}
+.stat span{font-size:12px;color:var(--text-2)}
+.stat b{display:block;font-size:22px;font-weight:700;margin-top:2px}
+.bar2{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--border);width:90px}
+.bar2 i{background:var(--success)}.bar2 u{background:var(--danger)}
+.kv{display:grid;grid-template-columns:90px 1fr;gap:6px 12px;font-size:13px;padding:16px 20px}
+.kv dt{color:var(--text-2)}
+.snap{margin:0 20px 16px;border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;font-size:12.5px;white-space:pre-wrap;line-height:1.7;background:var(--muted)}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><span class="brand-logo">SY</span><span><span class="brand-name">신영증권</span><span class="brand-sub">RECRUIT ADMIN</span></span></div>
+  <nav class="nav">
+    <button class="nav-item"><i class="ti ti-layout-dashboard"></i>대시보드</button>
+    <p class="nav-label">채용 운영</p>
+    <button class="nav-item"><i class="ti ti-speakerphone"></i>채용공고 관리</button>
+    <button class="nav-item"><i class="ti ti-users"></i>지원현황</button>
+    <button class="nav-item"><i class="ti ti-list-check"></i>전형결과 관리</button>
+    <button class="nav-item"><i class="ti ti-calendar-event"></i>면접 스케줄링</button>
+    <p class="nav-label">메시지</p>
+    <button class="nav-item active" data-go="send"><i class="ti ti-send"></i>메시지 발송<span class="new">NEW</span></button>
+    <button class="nav-item" data-go="history"><i class="ti ti-history"></i>발송 이력<span class="new">NEW</span></button>
+    <button class="nav-item" data-go="templates"><i class="ti ti-template"></i>메시지 템플릿<span class="new">NEW</span></button>
+    <p class="nav-label">설정</p>
+    <button class="nav-item"><i class="ti ti-forms"></i>지원서 양식</button>
+    <button class="nav-item"><i class="ti ti-help-circle"></i>FAQ 관리</button>
+  </nav>
+  <div class="user"><span class="avatar">김</span><span>김인사<small>인사팀</small></span></div>
+</aside>
+
+<main class="main">
+<!-- ============ 발송 ============ -->
+<section class="screen on" id="scr-send">
+  <header class="page-header">
+    <div><h2 class="page-title">메시지 발송</h2><p class="page-desc">보낼 메시지 종류를 고르면 대상자와 내용이 자동으로 채워집니다. 확인 후 테스트 발송, 실제 발송 순서로 진행하세요.</p></div>
+    <div style="display:flex;gap:8px"><button class="btn" data-go="templates"><i class="ti ti-template"></i>템플릿 관리</button><button class="btn" data-go="history"><i class="ti ti-history"></i>발송 이력</button></div>
+  </header>
+
+  <div class="types" id="types">
+    <div class="type-group-label">공고 관련</div><div class="type-group-label">면접 안내</div><div class="type-group-label single">기타</div>
+  </div>
+
+  <div class="card context" id="context"></div>
+  <p class="hint" id="hint"></p>
+
+  <div class="work">
+    <div class="card composer">
+      <div class="composer-head">
+        <i class="ti ti-template muted" style="font-size:18px"></i>
+        <select class="select" id="tplSelect"></select>
+        <span class="dirty" id="dirty"><i class="ti ti-pencil"></i>템플릿에서 수정됨</span>
+        <span style="margin-left:auto;display:flex;gap:6px">
+          <button class="btn btn-sm btn-text" id="btnRevert"><i class="ti ti-arrow-back-up"></i>되돌리기</button>
+          <button class="btn btn-sm" id="btnSaveTpl"><i class="ti ti-device-floppy"></i>템플릿으로 저장</button>
+        </span>
+      </div>
+      <div class="channel-tabs">
+        <button class="ctab on" data-ch="mail"><i class="ti ti-mail"></i>메일<span class="sw on" data-sw="mail" title="메일 발송 켜기/끄기"></span></button>
+        <button class="ctab" data-ch="sms"><i class="ti ti-message-2"></i>SMS<span class="sw on" data-sw="sms" title="SMS 발송 켜기/끄기"></span></button>
+      </div>
+      <div class="pane on" id="pane-mail">
+        <div class="mail-fields">
+          <div class="field"><label>제목</label><input class="input" id="mailSubject"></div>
+          <div class="field"><label>본문</label><textarea class="textarea" id="mailBody" rows="15"></textarea></div>
+        </div>
+        <div class="off-note" id="off-mail"><i class="ti ti-mail-off" style="font-size:26px;display:block;margin-bottom:6px"></i>메일은 이번 발송에서 제외됩니다. 탭의 스위치로 다시 켤 수 있습니다.</div>
+      </div>
+      <div class="pane" id="pane-sms">
+        <div class="sms-fields">
+          <div class="field"><label>문자 내용 <span class="muted" style="font-weight:400">· 발신번호 02-0000-0000 (고정)</span></label><textarea class="textarea" id="smsBody" rows="9"></textarea></div>
+          <div class="counter"><span id="smsKind"></span><span><b id="smsBytes">0</b> / <span id="smsMax">90</span> byte <span class="muted">(미리보기 대상 기준)</span></span></div>
+          <div class="meter"><i id="smsMeter"></i></div>
+        </div>
+        <div class="off-note" id="off-sms"><i class="ti ti-message-off" style="font-size:26px;display:block;margin-bottom:6px"></i>SMS는 이번 발송에서 제외됩니다. 탭의 스위치로 다시 켤 수 있습니다.</div>
+      </div>
+      <div style="padding:0 16px 16px"><div class="vars" id="vars"></div></div>
+      <div class="composer-foot"><span class="small muted"><i class="ti ti-info-circle"></i> 변수는 수신자마다 실제 값으로 바뀝니다. 여기서 고친 내용은 이번 발송에만 적용됩니다.</span></div>
+    </div>
+
+    <div class="preview">
+      <div class="card">
+        <div class="pv-head"><b>미리보기</b><div class="seg" id="pvSeg"><button class="on" data-pv="mail">메일</button><button data-pv="sms">SMS</button></div></div>
+        <div class="who"><button class="nav-btn" id="prevR"><i class="ti ti-chevron-left"></i></button><span class="nm" id="whoName"></span><span class="muted" id="whoSub"></span><span class="pos" id="whoPos"></span><button class="nav-btn" id="nextR"><i class="ti ti-chevron-right"></i></button></div>
+        <div class="stage" id="stage"></div>
+      </div>
+      <div class="card test">
+        <div class="test-title"><b><i class="ti ti-flask" style="color:var(--emerald)"></i>테스트 발송</b><span class="small muted">인사팀 담당자에게 먼저 보내 확인</span></div>
+        <div class="test-row"><input class="input" id="tName" placeholder="이름" value=""><input class="input" id="tContact" placeholder="이메일 또는 휴대폰"><button class="btn" id="tAdd"><i class="ti ti-plus"></i></button></div>
+        <div class="chips" id="tChips"></div>
+        <button class="btn" style="width:100%;justify-content:center" id="btnTest"><i class="ti ti-send"></i>현재 미리보기 내용으로 테스트 발송</button>
+        <div class="test-log" id="testLog"><i class="ti ti-circle-check"></i><span></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar" id="actionbar">
+    <div class="sum" id="sum"></div>
+    <div class="right"><span class="warn-inline" id="notTested"><i class="ti ti-alert-triangle"></i>아직 테스트 발송 안 함</span><button class="btn btn-primary btn-lg" id="btnSend"><i class="ti ti-send"></i>발송하기</button></div>
+  </div>
+</section>
+<!-- ============ 템플릿 관리 ============ -->
+<section class="screen" id="scr-templates">
+  <header class="page-header">
+    <div><h2 class="page-title">메시지 템플릿</h2><p class="page-desc">종류별로 메일·SMS 문구를 미리 만들어 둡니다. 종류마다 기본 템플릿 1개는 발송 화면에서 자동으로 불러옵니다.</p></div>
+    <button class="btn btn-primary" id="btnNewTpl"><i class="ti ti-plus"></i>새 템플릿</button>
+  </header>
+  <div class="tpl-wrap">
+    <div class="card tpl-list">
+      <div class="tpl-search"><input class="input" placeholder="템플릿 이름 검색"><select class="select" style="width:130px;flex:none"><option>전체 종류</option></select></div>
+      <div id="tplList" style="padding-bottom:8px"></div>
+    </div>
+    <div class="card" id="tplEditor">
+      <div class="tpl-edit-head"><div><b style="font-size:15px;font-weight:500" id="teTitle"></b><div class="small muted" id="teMeta"></div></div><div style="display:flex;gap:6px"><button class="btn btn-danger"><i class="ti ti-trash"></i>삭제</button><button class="btn"><i class="ti ti-copy"></i>복제</button><button class="btn btn-primary" id="btnTplSave"><i class="ti ti-device-floppy"></i>저장</button></div></div>
+      <div class="tpl-grid">
+        <div class="field"><label>템플릿 이름</label><input class="input" id="teName"></div>
+        <div class="field"><label>메시지 종류</label><select class="select" id="teType"></select></div>
+        <div class="full"><label class="toggle"><input type="checkbox" class="cb" id="teDefault"> 이 종류의 기본 템플릿으로 사용 <span class="small muted">(기존 기본 템플릿은 해제됨)</span></label></div>
+        <div class="full" style="border-top:1px solid var(--border);padding-top:14px"><div class="sec-title"><i class="ti ti-mail"></i>메일</div></div>
+        <div class="field full"><label>제목</label><input class="input" id="teSubject"></div>
+        <div class="field full"><label>본문</label><textarea class="textarea" rows="10" id="teMail"></textarea></div>
+        <div class="full" style="border-top:1px solid var(--border);padding-top:14px"><div class="sec-title"><i class="ti ti-message-2"></i>SMS <span class="small muted" style="font-weight:400" id="teSmsBytes"></span></div></div>
+        <div class="field full"><textarea class="textarea" rows="5" id="teSms"></textarea></div>
+        <div class="full"><div class="vars" id="teVars"></div></div>
+      </div>
+      <div class="composer-foot"><span class="small muted">마지막 수정 2026-09-12 14:20 · 김인사</span><span class="small muted">메일·SMS 중 하나만 채워도 저장 가능</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 발송 이력 ============ -->
+<section class="screen" id="scr-history">
+  <header class="page-header">
+    <div><h2 class="page-title">발송 이력</h2><p class="page-desc">누가, 언제, 누구에게, 어떤 내용을 보냈는지 확인합니다. 행을 누르면 수신자별 결과를 볼 수 있습니다.</p></div>
+  </header>
+  <div class="stat-row">
+    <div class="card stat"><span>이번 달 발송</span><b>14건</b></div>
+    <div class="card stat"><span>메일 수신</span><b>1,284</b></div>
+    <div class="card stat"><span>SMS 수신</span><b>936</b></div>
+    <div class="card stat"><span>실패</span><b style="color:var(--danger)">7</b></div>
+  </div>
+  <div class="card filters">
+    <div class="field" style="width:240px"><label>기간</label><input class="input" value="2026-09-01 ~ 2026-09-19"></div>
+    <div class="field"><label>종류</label><select class="select"><option>전체</option><option>결과 발표</option><option>서류 마감 임박</option><option>면접 일정·장소</option><option>면접 공지</option><option>직접 입력</option></select></div>
+    <div class="field" style="width:260px"><label>공고</label><select class="select"><option>전체 공고</option></select></div>
+    <div class="field"><label>구분</label><select class="select"><option>실발송 + 테스트</option><option>실발송만</option><option>테스트만</option></select></div>
+    <button class="btn btn-primary"><i class="ti ti-search"></i>조회</button>
+  </div>
+  <div class="card" style="overflow:hidden">
+    <table class="tbl"><thead><tr><th>발송일시</th><th>종류</th><th>공고 · 전형</th><th>제목</th><th>채널</th><th style="text-align:right">대상</th><th>결과</th><th>발송자</th></tr></thead><tbody id="histBody"></tbody></table>
+  </div>
+</section>
+</main>
+</div>
+
+<!-- 수신자 드로어 -->
+<div class="dim" id="dim"></div>
+<aside class="drawer" id="drawer">
+  <div class="dr-head"><div><b>수신자 선택</b><div class="small muted" id="drSub"></div></div><button class="x" data-close><i class="ti ti-x"></i></button></div>
+  <div class="dr-tools"><input class="input" style="width:220px" placeholder="이름·수험번호 검색"><label class="toggle small"><input type="checkbox" class="cb" id="onlyMissing"> 연락처 누락만 보기</label><span style="margin-left:auto" class="small muted" id="drCount"></span></div>
+  <div class="dr-body"><table class="tbl"><thead id="drHead"></thead><tbody id="drBody"></tbody></table></div>
+  <div class="dr-foot"><span class="small muted"><i class="ti ti-info-circle"></i> 연락처가 없는 채널은 자동 제외됩니다. 연락처는 지원서 기본정보 기준입니다.</span><button class="btn btn-primary" data-close>선택 완료</button></div>
+</aside>
+
+<!-- 이력 상세 드로어 -->
+<aside class="drawer" id="hDrawer">
+  <div class="dr-head"><div><b id="hdTitle"></b><div class="small muted" id="hdSub"></div></div><button class="x" data-close><i class="ti ti-x"></i></button></div>
+  <div class="dr-body" id="hdBody"></div>
+  <div class="dr-foot"><span class="small muted">발송 당시 내용 그대로 보관됩니다.</span><div style="display:flex;gap:8px"><button class="btn"><i class="ti ti-download"></i>엑셀 다운로드</button><button class="btn" data-close>닫기</button></div></div>
+</aside>
+
+<!-- 발송 확인 모달 -->
+<div class="modal" id="confirm">
+  <div class="md-body">
+    <div class="md-title"><span class="ic"><i class="ti ti-send"></i></span>메시지를 발송할까요?</div>
+    <p class="small muted">발송 후에는 취소할 수 없습니다. 아래 내용을 확인하세요.</p>
+    <table class="sumtbl" id="cfTable"></table>
+    <div class="alert warn" id="cfWarn"><i class="ti ti-alert-triangle"></i><span>아직 테스트 발송을 하지 않았습니다. 실제 수신 화면을 먼저 확인하는 것을 권장합니다.</span></div>
+    <label class="confirm-check"><input type="checkbox" class="cb" id="cfCheck"> 대상자와 내용을 확인했습니다</label>
+  </div>
+  <div class="md-foot"><button class="btn" data-close>취소</button><button class="btn btn-primary" id="cfGo"><i class="ti ti-send"></i><span id="cfGoLabel">발송</span></button></div>
+</div>
+<div class="toast" id="toast"><i class="ti ti-circle-check"></i><span></span></div>
+<script>
+const SITE='https://recruit.example.co.kr';
+const TYPES=[
+  {key:'RESULT',group:'공고 관련',name:'결과 발표',desc:'전형 결과 발표 후 안내',icon:'ti-trophy'},
+  {key:'DEADLINE',group:'공고 관련',name:'서류 마감 임박',desc:'미제출 지원자에게 리마인드',icon:'ti-hourglass-high'},
+  {key:'IV_SCHEDULE',group:'면접 안내',name:'면접 일정·장소',desc:'배정된 일시·장소 개별 안내',icon:'ti-calendar-time'},
+  {key:'IV_NOTICE',group:'면접 안내',name:'면접 공지',desc:'준비물·유의사항·변경 공지',icon:'ti-speakerphone'},
+  {key:'FREE',group:'기타',name:'직접 입력',desc:'내용을 자유롭게 작성',icon:'ti-pencil'}
+];
+const VARS={
+  common:['이름','공고명'],
+  RESULT:['전형명','채용사이트'],
+  DEADLINE:['마감일시','남은기간','채용사이트'],
+  IV_SCHEDULE:['전형명','면접일시','도착시각','면접장소','면접방식','조'],
+  IV_NOTICE:['전형명','면접일시','면접장소'],
+  FREE:['채용사이트']
+};
+const P1='2026 하반기 신입사원 공개채용', P2='2026 IT 부문 경력 수시채용';
+const people=[
+ ['김민준','010-2481-3307','minjun.kim@example.com','PASSED','1조','2026-10-14(수) 09:30','09:10'],
+ ['이서연','010-5520-1184','seoyeon.lee@example.com','PASSED','1조','2026-10-14(수) 10:10','09:50'],
+ ['박지호','010-7733-0921','jiho.park@example.com','PASSED','1조','2026-10-14(수) 10:50','10:30'],
+ ['최유진','010-3190-6645','yujin.choi@example.com','PASSED','1조','2026-10-14(수) 11:30','11:10'],
+ ['정하은','010-8402-5518','haeun.jung@example.com','PASSED','2조','2026-10-14(수) 14:00','13:40'],
+ ['강도윤','010-6621-7730','doyun.kang@example.com','PASSED','2조','2026-10-14(수) 14:40','14:20'],
+ ['윤서아',null,'seoa.yoon@example.com','PASSED','2조','2026-10-14(수) 15:20','15:00'],
+ ['임시우','010-9014-2276','siwoo.lim@example.com','PASSED','2조','2026-10-14(수) 16:00','15:40'],
+ ['한지민','010-4418-9052','jimin.han@example.com','FAILED'],
+ ['오준서','010-2275-3316',null,'FAILED'],
+ ['서예린','010-6690-1123','yerin.seo@example.com','FAILED'],
+ ['신우진','010-3357-8841','woojin.shin@example.com','HOLD']
+].map((p,i)=>({id:26100+i*7+3,name:p[0],phone:p[1],email:p[2],result:p[3],group:p[4],dt:p[5],arr:p[6]}));
+const drafts=[
+ ['배수아','010-7120-4431','sua.bae@example.com',72],['문태현','010-3308-9920','taehyun.moon@example.com',35],
+ ['조은비','010-5541-2087',null,90],['홍재원','010-8861-3342','jaewon.hong@example.com',18],['권나연','010-2209-7753','nayeon.kwon@example.com',55]
+].map((p,i)=>({id:31200+i*11,name:p[0],phone:p[1],email:p[2],progress:p[3]}));
+const RESULT_LABEL={PASSED:'합격',FAILED:'불합격',HOLD:'보류',ABSENT:'결시'};
+const RESULT_TAG={PASSED:'green',FAILED:'red',HOLD:'amber',ABSENT:''};
+
+let TEMPLATES=[
+ {id:1,type:'RESULT',name:'전형 결과 안내 (중립)',def:true,subject:'[신영증권] #{공고명} #{전형명} 결과 안내',
+  mail:'#{이름}님, 안녕하세요.\n신영증권 채용 담당자입니다.\n\n#{공고명} #{전형명} 결과가 발표되었습니다.\n채용 홈페이지 > 마이페이지 > 지원 현황에서 결과를 확인해 주시기 바랍니다.\n\n▶ 결과 확인: #{채용사이트}\n\n신영증권에 관심을 가지고 지원해 주셔서 감사합니다.\n\n신영증권 인사팀 드림',
+  sms:'[신영증권] #{이름}님, #{전형명} 결과가 발표되었습니다. 홈페이지에서 확인해 주세요.'},
+ {id:2,type:'RESULT',name:'합격 안내',def:false,subject:'[신영증권] #{전형명} 합격을 축하드립니다',
+  mail:'#{이름}님, 안녕하세요.\n신영증권 채용 담당자입니다.\n\n#{공고명} #{전형명}에 합격하셨음을 알려드립니다.\n진심으로 축하드립니다.\n\n다음 전형 일정은 확정되는 대로 별도로 안내드리겠습니다.\n자세한 내용은 채용 홈페이지에서 확인해 주세요.\n\n▶ #{채용사이트}\n\n신영증권 인사팀 드림',
+  sms:'[신영증권] #{이름}님, #{전형명} 합격을 축하드립니다. 다음 전형 일정은 별도 안내 예정입니다.'},
+ {id:3,type:'RESULT',name:'불합격 안내',def:false,subject:'[신영증권] #{공고명} #{전형명} 결과 안내',
+  mail:'#{이름}님, 안녕하세요.\n신영증권 채용 담당자입니다.\n\n#{공고명}에 보여주신 관심과 노력에 깊이 감사드립니다.\n아쉽게도 이번 #{전형명}에서는 좋은 소식을 전해드리지 못하게 되었습니다.\n\n#{이름}님의 앞날에 좋은 일이 가득하기를 바랍니다.\n\n신영증권 인사팀 드림',
+  sms:'[신영증권] #{이름}님, #{전형명} 결과가 발표되었습니다. 채용 홈페이지에서 확인 부탁드립니다.'},
+ {id:4,type:'DEADLINE',name:'서류 마감 임박 안내',def:true,subject:'[신영증권] #{공고명} 지원서 접수 마감 안내 (#{남은기간})',
+  mail:'#{이름}님, 안녕하세요.\n작성 중인 지원서가 아직 제출되지 않았습니다.\n\n#{공고명} 서류 접수가 #{마감일시}에 마감됩니다.\n마감 이후에는 제출할 수 없으니 기한 내 최종 제출을 완료해 주시기 바랍니다.\n\n▶ 지원서 이어서 작성: #{채용사이트}\n\n※ 이미 제출하셨다면 이 메일은 무시하셔도 됩니다.\n\n신영증권 인사팀 드림',
+  sms:'[신영증권] #{이름}님, 지원서가 미제출 상태입니다. #{마감일시} 마감 전 제출해 주세요.'},
+ {id:5,type:'IV_SCHEDULE',name:'면접 일정·장소 안내',def:true,subject:'[신영증권] #{전형명} 일정 안내',
+  mail:'#{이름}님, 안녕하세요.\n#{공고명} #{전형명} 일정을 아래와 같이 안내드립니다.\n\n■ 면접 일시: #{면접일시}\n■ 도착 시각: #{도착시각}까지 대기실 입실\n■ 면접 장소: #{면접장소}\n■ 면접 방식: #{면접방식}\n■ 면접 조: #{조}\n\n신분증을 반드시 지참해 주시고, 참석이 어려운 경우 인사팀(02-0000-0000)으로 미리 연락 바랍니다.\n\n신영증권 인사팀 드림',
+  sms:'[신영증권] #{이름}님 #{전형명} 안내\n일시: #{면접일시}\n도착: #{도착시각}까지\n장소: #{면접장소}\n신분증을 지참해 주세요.'},
+ {id:6,type:'IV_SCHEDULE',name:'온라인 면접 안내',def:false,subject:'[신영증권] #{전형명} 온라인 접속 안내',
+  mail:'#{이름}님, 안녕하세요.\n#{전형명}은 온라인으로 진행됩니다.\n\n■ 면접 일시: #{면접일시}\n■ 접속 안내: 면접 10분 전 입장해 주세요.\n\n신영증권 인사팀 드림',
+  sms:'[신영증권] #{이름}님, #{전형명}은 #{면접일시} 온라인으로 진행됩니다. 접속 링크는 메일을 확인해 주세요.'},
+ {id:7,type:'IV_NOTICE',name:'면접 준비물·유의사항',def:true,subject:'[신영증권] #{전형명} 유의사항 안내',
+  mail:'#{이름}님, 안녕하세요.\n#{면접일시}에 예정된 #{전형명} 관련 유의사항을 안내드립니다.\n\n1. 신분증(주민등록증, 운전면허증, 여권 중 1개)을 지참해 주세요.\n2. 복장은 자유입니다.\n3. 1층 안내데스크에서 방문증을 받은 뒤 #{면접장소}로 이동해 주세요.\n4. 주차 지원이 되지 않으니 대중교통을 이용해 주세요.\n\n신영증권 인사팀 드림',
+  sms:'[신영증권] #{이름}님, #{전형명} 유의사항을 메일로 보내드렸습니다. 신분증 지참, 대중교통 이용 부탁드립니다.'},
+ {id:8,type:'IV_NOTICE',name:'면접 일정 변경 공지',def:false,subject:'[신영증권] #{전형명} 일정 변경 안내',
+  mail:'#{이름}님, 안녕하세요.\n#{전형명} 일정이 아래와 같이 변경되었습니다.\n\n■ 변경 일시: #{면접일시}\n■ 장소: #{면접장소}\n\n불편을 드려 죄송합니다.\n\n신영증권 인사팀 드림',
+  sms:'[신영증권] #{이름}님, #{전형명} 일정이 #{면접일시}로 변경되었습니다. 자세한 내용은 메일을 확인해 주세요.'},
+ {id:9,type:'FREE',name:'채용 설명회 초대',def:false,subject:'[신영증권] 채용 설명회에 초대합니다',
+  mail:'#{이름}님, 안녕하세요.\n신영증권 채용 설명회에 초대합니다.\n\n(일시·장소를 입력하세요)\n\n신영증권 인사팀 드림',sms:'[신영증권] #{이름}님, 채용 설명회에 초대합니다. 자세한 내용은 메일을 확인해 주세요.'}
+];
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const S={type:'RESULT',posting:P1,stage:'서류전형',result:'PASSED',group:'ALL',status:'SUBMITTED',ch:{mail:true,sms:true},tab:'mail',pv:'mail',idx:0,
+  pool:[],sel:new Set(),tplId:null,tested:false,testers:[{name:'김인사',contact:'hr.kim@example.co.kr'},{name:'김인사',contact:'010-0000-1234'}],focus:'mailBody'};
+
+function stageName(){return S.type.startsWith('IV')?'1차 면접':S.stage}
+function valuesFor(r){
+  const v={이름:r.name,공고명:S.posting,전형명:stageName(),채용사이트:SITE};
+  if(S.type==='DEADLINE'){v.마감일시='9월 22일(화) 18:00';v.남은기간='D-3';}
+  if(S.type.startsWith('IV')){v.면접일시=r.dt;v.도착시각=r.arr;v.면접장소='본사 12층 대회의실 A';v.면접방식='대면';v.조=r.group;}
+  return v;
+}
+function fill(text,r,hl){
+  const v=valuesFor(r);
+  return esc(text).replace(/#\{([^}]+)\}/g,(m,k)=>v[k]!=null?(hl?`<mark class="v">${esc(v[k])}</mark>`:esc(v[k])):(hl?`<mark class="miss">${m}</mark>`:m));
+}
+const plain=(t,r)=>fill(t,r,false).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"');
+const bytes=t=>[...t].reduce((n,c)=>n+(c.charCodeAt(0)>127?2:1),0);
+
+function computePool(){
+  let list;
+  if(S.type==='DEADLINE') list=drafts;
+  else if(S.type.startsWith('IV')) list=people.filter(p=>p.result==='PASSED'&&(S.group==='ALL'||p.group===S.group));
+  else if(S.type==='RESULT') list=people.filter(p=>S.result==='ALL'||p.result===S.result);
+  else list=people;
+  S.pool=list; S.sel=new Set(list.filter(p=>p.phone||p.email).map(p=>p.id)); S.idx=0;
+}
+const selected=()=>S.pool.filter(p=>S.sel.has(p.id));
+
+function renderTypes(){
+  $$('#types .type').forEach(e=>e.remove());
+  TYPES.forEach(t=>{
+    const b=document.createElement('button');b.className='type'+(S.type===t.key?' on':'');
+    b.innerHTML=`<span class="ico"><i class="ti ${t.icon}"></i></span><span><b>${t.name}</b><span>${t.desc}</span></span>`;
+    b.onclick=()=>{S.type=t.key;S.group='ALL';S.result='PASSED';S.posting=t.key==='DEADLINE'?P2:P1;computePool();loadDefaultTpl();renderAll();};
+    $('#types').appendChild(b);
+  });
+}
+function sel(id,label,opts,val,extra=''){
+  return `<div class="field ${extra}"><label>${label}</label><select class="select" id="${id}">${opts.map(o=>{const [v,l,dis]=Array.isArray(o)?o:[o,o];return `<option value="${esc(v)}" ${v===val?'selected':''} ${dis?'disabled':''}>${esc(l)}</option>`}).join('')}</select></div>`;
+}
+function renderContext(){
+  let h='';
+  if(S.type==='DEADLINE'){
+    h+=sel('cPosting','공고 (접수 중인 공고만)',[[P2,P2+'  ·  마감 9/22(화) 18:00 · D-3']],S.posting,'w-lg');
+    h+=sel('cTarget','대상',[['d','작성 중(미제출) 지원서 보유자']],'d');
+  }else{
+    h+=sel('cPosting','공고',[[P1,P1+'  ·  1차 면접 진행중'],[P2,P2+'  ·  접수중']],S.posting,'w-lg');
+    if(S.type==='RESULT'){
+      h+=sel('cStage','전형 (발표 완료만 선택 가능)',[['서류전형','서류전형 · 발표완료 9/18'],['1차 면접','1차 면접 · 진행중',1],['2차 면접','2차 면접 · 대기',1]],S.stage);
+      h+=sel('cResult','결과',[['ALL','전체'],['PASSED','합격'],['FAILED','불합격'],['HOLD','보류']],S.result);
+    }else if(S.type.startsWith('IV')){
+      h+=sel('cStage','면접 전형',[['1차 면접','1차 면접 · 10/14 · 확정 8명'],['2차 면접','2차 면접 · 일정 없음',1]],'1차 면접');
+      h+=sel('cGroup','조',[['ALL','전체 조'],['1조','1조 (09:30~)'],['2조','2조 (14:00~)']],S.group);
+    }else{
+      h+=sel('cStatus','지원 상태',[['SUBMITTED','제출 완료'],['DRAFT','작성 중'],['ANY','전체']],S.status);
+      h+=sel('cStage2','전형 결과 (선택)',[['-','조건 없음'],['서류전형','서류전형 합격자']],'-');
+    }
+  }
+  const s=selected(), faces=s.slice(0,4).map(p=>`<span>${p.name[0]}</span>`).join('');
+  h+=`<div class="recip"><div class="recip-faces">${faces}</div><div class="recip-count"><b>${s.length}</b><span style="display:inline;font-size:13px;color:var(--text-2)"> / ${S.pool.length}명</span><span>수신 대상</span></div><button class="btn" id="openDrawer"><i class="ti ti-users"></i>대상자 보기·편집</button></div>`;
+  $('#context').innerHTML=h;
+  const hint={RESULT:'발표 완료된 전형만 고를 수 있습니다. 결과로 대상을 좁힌 뒤 중립·합격·불합격 템플릿 중 맞는 것을 쓰세요.',
+    DEADLINE:'접수 중인 공고에서 지원서를 작성만 하고 제출하지 않은 지원자에게 보냅니다.',
+    IV_SCHEDULE:'확정된 면접에 배정된 지원자만 대상입니다. 면접 일시·도착 시각·장소는 면접 스케줄링 데이터로 사람마다 자동으로 채워집니다.',
+    IV_NOTICE:'확정된 면접에 배정된 지원자에게 준비물·유의사항·변경 사항을 공지합니다.',
+    FREE:'공고 지원자 중 조건에 맞는 사람에게 직접 작성한 내용을 보냅니다.'}[S.type];
+  $('#hint').innerHTML=`<i class="ti ti-bulb"></i>${hint}`;
+  const on=(id,fn)=>{const e=$(id);if(e)e.onchange=ev=>{fn(ev.target.value);computePool();renderAll();}};
+  on('#cResult',v=>S.result=v); on('#cGroup',v=>S.group=v); on('#cStatus',v=>S.status=v); on('#cPosting',v=>S.posting=v);
+  $('#openDrawer').onclick=openRecipDrawer;
+}
+let base={subject:'',mail:'',sms:''};
+function loadDefaultTpl(){
+  const t=TEMPLATES.find(t=>t.type===S.type&&t.def);
+  applyTpl(t?t.id:null);
+}
+function applyTpl(id){
+  S.tplId=id; const t=TEMPLATES.find(t=>t.id===id);
+  base=t?{subject:t.subject,mail:t.mail,sms:t.sms}:{subject:'[신영증권] ',mail:'#{이름}님, 안녕하세요.\n신영증권 채용 담당자입니다.\n\n\n\n신영증권 인사팀 드림',sms:'[신영증권] #{이름}님, '};
+  $('#mailSubject').value=base.subject;$('#mailBody').value=base.mail;$('#smsBody').value=base.sms;S.tested=false;
+}
+function renderTplSelect(){
+  const list=TEMPLATES.filter(t=>t.type===S.type);
+  let o=list.map(t=>`<option value="${t.id}" ${t.id===S.tplId?'selected':''}>${t.def?'★ ':''}${esc(t.name)}${t.def?' (기본)':''}</option>`).join('');
+  o+=`<option value="" ${S.tplId==null?'selected':''}>새로 작성 (빈 양식)</option>`;
+  $('#tplSelect').innerHTML=o;
+}
+function renderVars(){
+  const vs=[...VARS.common,...VARS[S.type]];
+  $('#vars').innerHTML='<span><i class="ti ti-braces"></i> 변수 넣기</span>'+vs.map(v=>`<button class="var" data-var="${v}">${v}</button>`).join('');
+  $$('#vars .var').forEach(b=>b.onmousedown=e=>{e.preventDefault();insertVar(b.dataset.var)});
+}
+function insertVar(v){
+  const el=$('#'+S.focus); const tok='#{'+v+'}';
+  const s=el.selectionStart??el.value.length, e=el.selectionEnd??s;
+  el.value=el.value.slice(0,s)+tok+el.value.slice(e); el.focus(); el.selectionStart=el.selectionEnd=s+tok.length; onEdit();
+}
+function renderChannels(){
+  $$('.ctab').forEach(b=>{const c=b.dataset.ch;b.classList.toggle('on',S.tab===c);b.classList.toggle('off-ch',!S.ch[c]);b.querySelector('.sw').classList.toggle('on',S.ch[c]);});
+  $('#pane-mail').classList.toggle('on',S.tab==='mail');$('#pane-sms').classList.toggle('on',S.tab==='sms');
+  $('.mail-fields').style.display=S.ch.mail?'':'none';$('#off-mail').style.display=S.ch.mail?'none':'block';
+  $('.sms-fields').style.display=S.ch.sms?'':'none';$('#off-sms').style.display=S.ch.sms?'none':'block';
+}
+function smsInfo(){
+  const s=selected(); const r=s[S.idx]||S.pool[0]; const txt=$('#smsBody').value;
+  const cur=r?bytes(plain(txt,r)):bytes(txt); const max=Math.max(0,...s.map(p=>bytes(plain(txt,p))));
+  return {cur,max,kind:max>90?'LMS':'SMS'};
+}
+function renderCounter(){
+  const i=smsInfo(), lim=i.kind==='LMS'?2000:90;
+  $('#smsBytes').textContent=i.cur.toLocaleString();$('#smsMax').textContent=lim.toLocaleString();
+  $('#smsKind').innerHTML=i.kind==='LMS'?`<span class="tag amber">LMS 장문</span> <span class="muted">90byte를 넘는 수신자가 있어 LMS로 발송 (최대 ${i.max}byte)</span>`:`<span class="tag green">SMS 단문</span> <span class="muted">모든 수신자 90byte 이내</span>`;
+  $('#smsMeter').style.width=Math.min(100,i.cur/lim*100)+'%';
+}
+function renderPreview(){
+  const s=selected(); if(S.idx>=s.length)S.idx=0; const r=s[S.idx];
+  $$('#pvSeg button').forEach(b=>b.classList.toggle('on',b.dataset.pv===S.pv));
+  if(!r){$('#whoName').textContent='선택된 수신자 없음';$('#whoSub').textContent='';$('#whoPos').textContent='';$('#stage').innerHTML='';return;}
+  $('#whoName').textContent=r.name;
+  $('#whoSub').textContent=S.type==='RESULT'?`· ${RESULT_LABEL[r.result]}`:S.type.startsWith('IV')?`· ${r.group} ${r.dt.slice(-5)}`:S.type==='DEADLINE'?`· 작성 ${r.progress}%`:'';
+  $('#whoPos').textContent=`${S.idx+1} / ${s.length}`;
+  const ch=S.pv;
+  if(!S.ch[ch]){$('#stage').innerHTML=`<div style="align-self:center;text-align:center;color:var(--text-2);font-size:13px"><i class="ti ti-${ch==='mail'?'mail':'message'}-off" style="font-size:28px"></i><br>이번 발송에서 ${ch==='mail'?'메일':'SMS'}은 제외됩니다</div>`;return;}
+  if(ch==='sms'&&!r.phone){$('#stage').innerHTML=`<div style="align-self:center;text-align:center;color:var(--danger);font-size:13px"><i class="ti ti-phone-off" style="font-size:28px"></i><br>${r.name}님은 휴대폰 번호가 없어 SMS 제외</div>`;return;}
+  if(ch==='mail'&&!r.email){$('#stage').innerHTML=`<div style="align-self:center;text-align:center;color:var(--danger);font-size:13px"><i class="ti ti-mail-off" style="font-size:28px"></i><br>${r.name}님은 이메일이 없어 메일 제외</div>`;return;}
+  if(ch==='sms'){
+    const kind=smsInfo().kind;
+    $('#stage').innerHTML=`<div class="phone"><div class="phone-in"><div class="ph-top"><div class="notch"></div><b>02-0000-0000</b><span>문자 메시지</span></div><div class="ph-body"><div class="ph-date">오늘 오전 10:00</div><div class="bubble">[Web발신]\n${fill($('#smsBody').value,r,true)}</div><div class="ph-meta"><span>${kind}</span><span>${r.phone}</span></div></div></div></div>`;
+  }else{
+    $('#stage').innerHTML=`<div class="mail"><div class="mail-meta"><div class="mail-subj">${fill($('#mailSubject').value,r,true)}</div>보낸사람 <b>신영증권 채용담당</b> &lt;recruit@example.co.kr&gt;<br>받는사람 ${esc(r.name)} &lt;${esc(r.email)}&gt;</div><div class="mail-brand"><i>SY</i>신영증권 채용</div><div class="mail-body">${fill($('#mailBody').value,r,true)}</div><div class="mail-foot">본 메일은 발신 전용입니다. 문의: 인사팀 02-0000-0000</div></div>`;
+  }
+}
+function renderSum(){
+  const s=selected(), m=S.ch.mail?s.filter(p=>p.email).length:0, sm=S.ch.sms?s.filter(p=>p.phone).length:0;
+  const noM=S.ch.mail?s.length-m:0, noS=S.ch.sms?s.length-sm:0;
+  const t=TYPES.find(t=>t.key===S.type);
+  $('#sum').innerHTML=`<span><span class="tag brand">${t.name}</span></span><span>수신 대상 <b>${s.length}명</b></span><span class="sep"></span>
+   <span><i class="ti ti-mail"></i> 메일 <b>${S.ch.mail?m+'건':'제외'}</b>${noM?` <span class="small" style="color:var(--danger)">(이메일 없음 ${noM})</span>`:''}</span>
+   <span><i class="ti ti-message-2"></i> ${S.ch.sms?smsInfo().kind:'SMS'} <b>${S.ch.sms?sm+'건':'제외'}</b>${noS?` <span class="small" style="color:var(--danger)">(휴대폰 없음 ${noS})</span>`:''}</span>`;
+  $('#notTested').style.display=S.tested?'none':'flex';
+}
+function renderDirty(){
+  const d=$('#mailSubject').value!==base.subject||$('#mailBody').value!==base.mail||$('#smsBody').value!==base.sms;
+  $('#dirty').classList.toggle('on',d&&S.tplId!=null);
+}
+function onEdit(){renderDirty();renderCounter();renderPreview();renderSum();}
+function renderAll(){renderTypes();renderContext();renderTplSelect();renderVars();renderChannels();onEdit();renderTesters();}
+function renderTesters(){
+  $('#tChips').innerHTML=S.testers.map((t,i)=>`<span class="chip"><i class="ti ti-${t.contact.includes('@')?'mail':'device-mobile'}" style="color:var(--text-3)"></i>${esc(t.name)} · ${esc(t.contact)}<button data-rm="${i}"><i class="ti ti-x"></i></button></span>`).join('')||'<span class="small muted">받을 담당자를 추가하세요</span>';
+  $$('#tChips [data-rm]').forEach(b=>b.onclick=()=>{S.testers.splice(+b.dataset.rm,1);renderTesters();});
+}
+function toast(msg){const t=$('#toast');t.querySelector('span').textContent=msg;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),2600);}
+function openDim(el){$('#dim').classList.add('on');el.classList.add('on');}
+function closeAll(){$$('.drawer.on,.modal.on,#dim').forEach(e=>e.classList.remove('on'));}
+
+function openRecipDrawer(){
+  const iv=S.type.startsWith('IV'), dl=S.type==='DEADLINE';
+  $('#drSub').textContent=`${S.posting} · ${TYPES.find(t=>t.key===S.type).name}`;
+  $('#drHead').innerHTML=`<tr><th style="width:36px"><input type="checkbox" class="cb" id="drAll"></th><th>수험번호</th><th>이름</th><th>${iv?'조 · 면접 일시':dl?'작성 진행':'결과'}</th><th>휴대폰</th><th>이메일</th><th>발송 채널</th></tr>`;
+  const draw=()=>{
+    const only=$('#onlyMissing').checked;
+    $('#drBody').innerHTML=S.pool.filter(p=>!only||!p.phone||!p.email).map(p=>{
+      const none=!p.phone&&!p.email, on=S.sel.has(p.id);
+      const col=iv?`${p.group} · ${p.dt}`:dl?`<div class="bar2" style="display:inline-flex;vertical-align:middle"><i style="width:${p.progress}%"></i></div> ${p.progress}%`:`<span class="tag ${RESULT_TAG[p.result]}">${RESULT_LABEL[p.result]}</span>`;
+      const chs=[p.email?'<span class="tag">메일</span>':'<span class="tag red">이메일 없음</span>',p.phone?'<span class="tag">SMS</span>':'<span class="tag red">휴대폰 없음</span>'].join(' ');
+      return `<tr class="${on?'':'dis'}"><td><input type="checkbox" class="cb" data-id="${p.id}" ${on?'checked':''} ${none?'disabled':''}></td><td>${p.id}</td><td>${p.name}</td><td>${col}</td><td>${p.phone||'-'}</td><td>${p.email||'-'}</td><td>${chs}</td></tr>`;}).join('');
+    $$('#drBody [data-id]').forEach(c=>c.onchange=()=>{c.checked?S.sel.add(+c.dataset.id):S.sel.delete(+c.dataset.id);draw();renderContext();onEdit();});
+    $('#drCount').textContent=`${S.sel.size} / ${S.pool.length}명 선택`;
+    $('#drAll').checked=S.sel.size===S.pool.filter(p=>p.phone||p.email).length;
+  };
+  $('#onlyMissing').onchange=draw; draw();
+  $('#drAll').onchange=e=>{S.sel=new Set(e.target.checked?S.pool.filter(p=>p.phone||p.email).map(p=>p.id):[]);draw();renderContext();onEdit();};
+  openDim($('#drawer'));
+}
+function openConfirm(){
+  const s=selected(), t=TYPES.find(t=>t.key===S.type), tpl=TEMPLATES.find(x=>x.id===S.tplId);
+  if(!s.length){toast('수신 대상이 없습니다');return;}
+  const m=s.filter(p=>p.email).length, sm=s.filter(p=>p.phone).length;
+  $('#cfTable').innerHTML=`<tr><th>종류</th><td>${t.name}</td></tr><tr><th>공고 · 전형</th><td>${esc(S.posting)}${S.type==='DEADLINE'||S.type==='FREE'?'':' · '+stageName()}${S.type==='RESULT'?' · '+(S.result==='ALL'?'전체':RESULT_LABEL[S.result]):''}</td></tr>
+   <tr><th>수신 대상</th><td><b>${s.length}명</b></td></tr>
+   <tr><th>채널</th><td>${S.ch.mail?`메일 ${m}건`:'메일 제외'} · ${S.ch.sms?`${smsInfo().kind} ${sm}건`:'SMS 제외'}</td></tr>
+   <tr><th>템플릿</th><td>${tpl?esc(tpl.name):'새로 작성'}${$('#dirty').classList.contains('on')?' <span class="tag amber">수정됨</span>':''}</td></tr>`;
+  $('#cfWarn').style.display=S.tested?'none':'flex'; $('#cfCheck').checked=false;
+  $('#cfGoLabel').textContent=`${s.length}명에게 발송`;
+  openDim($('#confirm'));
+}
+$('#cfGo').onclick=()=>{
+  if(!$('#cfCheck').checked){$('.confirm-check').style.color='var(--danger)';setTimeout(()=>$('.confirm-check').style.color='',900);return;}
+  const s=selected(); closeAll();
+  HISTORY.unshift({at:'2026-09-19 10:02',type:S.type,posting:S.posting,stage:S.type==='DEADLINE'||S.type==='FREE'?'':stageName(),subject:plain($('#mailSubject').value,{name:'OOO'}).replace('OOO님',''),mail:S.ch.mail?s.filter(p=>p.email).length:0,sms:S.ch.sms?s.filter(p=>p.phone).length:0,total:s.length,fail:0,by:'김인사',test:false});
+  renderHistory(); toast(`발송 요청 완료 · ${s.length}명. 결과는 발송 이력에서 확인하세요`);
+};
+$('#btnTest').onclick=()=>{
+  if(!S.testers.length){toast('테스트 받을 담당자를 추가하세요');return;}
+  const r=selected()[S.idx]; S.tested=true; renderSum();
+  const l=$('#testLog'); l.classList.add('on');
+  l.querySelector('span').textContent=`10:00 테스트 발송 완료 · ${S.testers.length}건 · 제목 앞에 [테스트] 표시 · ${r?r.name+'님 데이터로 채움':''}`;
+  toast('테스트 발송 완료');
+};
+$('#tAdd').onclick=()=>{const n=$('#tName').value.trim()||'담당자',c=$('#tContact').value.trim();if(!c){$('#tContact').focus();return;}S.testers.push({name:n,contact:c});$('#tName').value=$('#tContact').value='';renderTesters();};
+$('#btnSend').onclick=openConfirm;
+$('#tplSelect').onchange=e=>{applyTpl(e.target.value?+e.target.value:null);renderVars();onEdit();};
+$('#btnRevert').onclick=()=>{applyTpl(S.tplId);onEdit();};
+$('#btnSaveTpl').onclick=()=>toast('템플릿 저장: 기존 템플릿 덮어쓰기 또는 새 이름으로 저장 (목업)');
+$$('.ctab').forEach(b=>b.onclick=e=>{const c=b.dataset.ch;if(e.target.classList.contains('sw')){S.ch[c]=!S.ch[c];}S.tab=c;S.pv=c;renderChannels();onEdit();});
+$$('#pvSeg button').forEach(b=>b.onclick=()=>{S.pv=b.dataset.pv;renderPreview();});
+$('#prevR').onclick=()=>{const n=selected().length;if(n){S.idx=(S.idx-1+n)%n;onEdit();}};
+$('#nextR').onclick=()=>{const n=selected().length;if(n){S.idx=(S.idx+1)%n;onEdit();}};
+['mailSubject','mailBody','smsBody'].forEach(id=>{const e=$('#'+id);e.oninput=onEdit;e.onfocus=()=>{S.focus=id;if(id==='smsBody'&&S.pv!=='sms'){S.pv='sms';renderPreview();}if(id!=='smsBody'&&S.pv!=='mail'){S.pv='mail';renderPreview();}};});
+$('#dim').onclick=closeAll; $$('[data-close]').forEach(b=>b.onclick=closeAll);
+$$('[data-go]').forEach(b=>b.onclick=()=>{const g=b.dataset.go;$$('.screen').forEach(s=>s.classList.toggle('on',s.id==='scr-'+g));$$('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.go===g));window.scrollTo(0,0);});
+/* 템플릿 관리 */
+let teId=1;
+function renderTplList(){
+  $('#tplList').innerHTML=TYPES.map(t=>{
+    const items=TEMPLATES.filter(x=>x.type===t.key);
+    return `<div class="tpl-group"><span>${t.group} · ${t.name}</span><span>${items.length}</span></div>`+items.map(x=>`<button class="tpl-item ${x.id===teId?'on':''}" data-tpl="${x.id}"><b>${x.def?'<i class="ti ti-star star"></i>':''}${esc(x.name)}${x.def?'<span class="tag brand" style="height:18px;font-size:11px">기본</span>':''}</b><span>${esc(x.subject)}</span></button>`).join('');
+  }).join('');
+  $$('[data-tpl]').forEach(b=>b.onclick=()=>{teId=+b.dataset.tpl;renderTplList();renderTplEditor();});
+}
+function renderTplEditor(){
+  const x=TEMPLATES.find(t=>t.id===teId), t=TYPES.find(t=>t.key===x.type);
+  $('#teTitle').textContent=x.name; $('#teMeta').textContent=`${t.group} · ${t.name}${x.def?' · 기본 템플릿':''}`;
+  $('#teName').value=x.name; $('#teType').innerHTML=TYPES.map(y=>`<option ${y.key===x.type?'selected':''}>${y.group} · ${y.name}</option>`).join('');
+  $('#teDefault').checked=x.def; $('#teSubject').value=x.subject; $('#teMail').value=x.mail; $('#teSms').value=x.sms;
+  const upd=()=>{const b=bytes($('#teSms').value);$('#teSmsBytes').textContent=`· 변수 제외 ${b}byte ${b>90?'(LMS 예상)':'(SMS)'}`;}; upd(); $('#teSms').oninput=upd;
+  $('#teVars').innerHTML='<span><i class="ti ti-braces"></i> 이 종류에서 쓸 수 있는 변수</span>'+[...VARS.common,...VARS[x.type]].map(v=>`<button class="var" data-tv="${v}">${v}</button>`).join('');
+  let f='teMail'; ['teSubject','teMail','teSms'].forEach(id=>$('#'+id).onfocus=()=>f=id);
+  $$('[data-tv]').forEach(b=>b.onmousedown=e=>{e.preventDefault();const el=$('#'+f),tok='#{'+b.dataset.tv+'}',s=el.selectionStart??el.value.length;el.value=el.value.slice(0,s)+tok+el.value.slice(el.selectionEnd??s);el.focus();el.selectionStart=el.selectionEnd=s+tok.length;upd();});
+}
+$('#btnTplSave').onclick=()=>toast('템플릿 저장됨 (목업)');
+$('#btnNewTpl').onclick=()=>toast('새 템플릿: 종류 선택 후 빈 양식으로 시작 (목업)');
+
+/* 발송 이력 */
+const HISTORY=[
+ {at:'2026-09-18 17:05',type:'RESULT',posting:P1,stage:'서류전형',subject:'[신영증권] 서류전형 합격을 축하드립니다',mail:48,sms:47,total:48,fail:1,by:'김인사',test:false},
+ {at:'2026-09-18 17:02',type:'RESULT',posting:P1,stage:'서류전형',subject:'[신영증권] 서류전형 합격을 축하드립니다',mail:2,sms:2,total:2,fail:0,by:'김인사',test:true},
+ {at:'2026-09-18 17:10',type:'RESULT',posting:P1,stage:'서류전형',subject:'[신영증권] 2026 하반기 신입사원 공개채용 서류전형 결과 안내',mail:212,sms:0,total:212,fail:3,by:'김인사',test:false},
+ {at:'2026-09-16 10:00',type:'DEADLINE',posting:P1,stage:'',subject:'[신영증권] 지원서 접수 마감 안내 (D-1)',mail:131,sms:128,total:131,fail:2,by:'박채용',test:false},
+ {at:'2026-09-10 14:30',type:'FREE',posting:P1,stage:'',subject:'[신영증권] 채용 설명회에 초대합니다',mail:540,sms:0,total:540,fail:1,by:'박채용',test:false}
+].sort((a,b)=>b.at.localeCompare(a.at));
+function renderHistory(){
+  $('#histBody').innerHTML=HISTORY.map((h,i)=>{
+    const t=TYPES.find(t=>t.key===h.type), ok=h.total-h.fail;
+    return `<tr class="row-link" data-h="${i}"><td>${h.at}</td><td><span class="tag brand">${t.name}</span>${h.test?' <span class="tag blue">테스트</span>':''}</td><td>${esc(h.posting)}${h.stage?'<br><span class="small muted">'+h.stage+'</span>':''}</td><td style="max-width:280px">${esc(h.subject)}</td>
+     <td class="small">${h.mail?'메일 '+h.mail:''}${h.mail&&h.sms?'<br>':''}${h.sms?'SMS '+h.sms:''}</td><td style="text-align:right">${h.total}명</td>
+     <td><div class="bar2"><i style="width:${ok/h.total*100}%"></i><u style="width:${h.fail/h.total*100}%"></u></div><span class="small ${h.fail?'':'muted'}" style="${h.fail?'color:var(--danger)':''}">${h.fail?'실패 '+h.fail:'전체 성공'}</span></td><td>${h.by}</td></tr>`;}).join('');
+  $$('[data-h]').forEach(r=>r.onclick=()=>openHist(HISTORY[+r.dataset.h]));
+}
+function openHist(h){
+  const t=TYPES.find(t=>t.key===h.type);
+  $('#hdTitle').textContent=h.subject; $('#hdSub').textContent=`${h.at} · ${h.by}${h.test?' · 테스트 발송':''}`;
+  const rows=people.slice(0,8).map((p,i)=>{const f=h.fail&&i===3;return `<tr><td>${p.name}</td><td>${p.email||'-'}</td><td>${p.email?'<span class="tag green">성공</span>':'<span class="tag">대상 아님</span>'}</td><td>${p.phone||'-'}</td><td>${!h.sms?'<span class="tag">대상 아님</span>':!p.phone?'<span class="tag">제외 · 번호 없음</span>':f?'<span class="tag red">실패 · 결번</span>':'<span class="tag green">성공</span>'}</td></tr>`}).join('');
+  $('#hdBody').innerHTML=`<dl class="kv"><dt>종류</dt><dd>${t.name}</dd><dt>공고 · 전형</dt><dd>${esc(h.posting)} ${h.stage}</dd><dt>대상</dt><dd>${h.total}명 · 메일 ${h.mail} · SMS ${h.sms}</dd><dt>결과</dt><dd>성공 ${h.total-h.fail} · <span style="color:var(--danger)">실패 ${h.fail}</span></dd></dl>
+   <div class="snap"><b>메일 제목</b>\n${esc(h.subject)}\n\n<b>메일 본문 (발송 원문)</b>\n#{이름}님, 안녕하세요.\n신영증권 채용 담당자입니다. …</div>
+   <table class="tbl"><thead><tr><th>이름</th><th>이메일</th><th>메일 결과</th><th>휴대폰</th><th>SMS 결과</th></tr></thead><tbody>${rows}</tbody></table>`;
+  openDim($('#hDrawer'));
+}
+
+computePool(); loadDefaultTpl(); renderAll(); renderTplList(); renderTplEditor(); renderHistory();
+</script>
+</body>
+</html>

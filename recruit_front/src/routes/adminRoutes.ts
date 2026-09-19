@@ -104,6 +104,21 @@ export const adminRoutes: RouteRecordRaw[] = [
         name: 'InterviewSchedulingSetting',
         component: () => import('@/views/admin/interview/interviewScheduling.vue')
       },
+      {
+        path: 'messages',
+        name: 'AdminMessageSend',
+        component: () => import('@/views/admin/message/AdminMessageSendView.vue'),
+      },
+      {
+        path: 'messages/history',
+        name: 'AdminMessageHistory',
+        component: () => import('@/views/admin/message/AdminMessageHistoryView.vue'),
+      },
+      {
+        path: 'messages/templates',
+        name: 'AdminMessageTemplates',
+        component: () => import('@/views/admin/message/AdminMessageTemplateView.vue'),
+      },
     ],
   },
   {

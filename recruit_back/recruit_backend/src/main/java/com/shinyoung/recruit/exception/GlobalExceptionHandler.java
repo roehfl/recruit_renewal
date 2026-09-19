@@ -112,6 +112,24 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler(MessageTemplateNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMessageTemplateNotFound(MessageTemplateNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidMessageException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidMessage(InvalidMessageException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
+    @ExceptionHandler(MessageSendNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMessageSendNotFound(MessageSendNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(JobPostingQuestionNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleJobPostingQuestionNotFound(JobPostingQuestionNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
