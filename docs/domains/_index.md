@@ -118,7 +118,7 @@
 소유 카드가 없는 화면(주로 지원자 정적 페이지)이다. 새로 추가하면 여기에 적거나 카드에 등록한다.
 
 - `{FE}/views/applicant/ApplicantHomeView.vue` — 지원자 홈
-- `{FE}/views/applicant/ApplicantQuickLinkCards.vue` — 홈 바로가기 카드
+- `{FE}/views/applicant/ApplicantQuickLinkCards.vue` — 홈 바로가기 카드 6종(신영증권 소개는 회사 홈페이지 새 탭, 나머지는 직무소개·인사제도·채용공고 목록·마이페이지·FAQ 라우트)
 - `{FE}/views/applicant/banners/*` — 홈 배너
 - `{FE}/views/applicant/ApplicantBenefits.vue` — 인사제도(보상·교육·복리후생 탭)
 - `{FE}/views/applicant/ApplicantInfoTabPanel.vue` — 인사제도 탭 패널

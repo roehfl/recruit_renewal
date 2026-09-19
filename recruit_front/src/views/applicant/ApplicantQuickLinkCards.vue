@@ -39,17 +39,16 @@ interface QuickLinkItem {
 const router = useRouter()
 
 /*
- * '지원서 작성/수정'·'지원결과 조회'는 마이페이지(/applicant/profile)로 보낸다.
- * 마이페이지에서 지원서 목록(수정 링크)과 전형 결과를 함께 확인한다.
- * TODO(route): '/applicant/company'(신영증권 소개)는 화면이 없어 카드를 숨겼다.
- * 화면이 준비되면 applicantRoutes.ts에 추가하고 아래 주석을 해제한다.
+ * '신영증권 소개'는 회사 홈페이지로 보낸다(채용 사이트에는 해당 화면이 없다).
+ * '지원서 작성/수정'은 채용공고 목록으로 보낸다. 지원서는 공고에서 시작하고,
+ * 작성 중인 지원서 수정과 결과 확인은 마이페이지('지원결과 조회')에서 한다.
  */
 const quickLinks = ref<QuickLinkItem[]>([
-  // {
-  //   title: '신영증권 소개',
-  //   description: '회사와 인재상을 먼저 만나보세요.',
-  //   url: '/applicant/company',
-  // },
+  {
+    title: '신영증권 소개',
+    description: '회사와 인재상을 먼저 만나보세요.',
+    url: 'https://www.shinyoung.com/?page=10001',
+  },
   {
     title: '직무 소개',
     description: '어떤 업무를 원하시나요?<br> 다양한 직무를 확인하실 수 있습니다.',
@@ -63,7 +62,7 @@ const quickLinks = ref<QuickLinkItem[]>([
   {
     title: '지원서 작성/수정',
     description: '현재 진행중인 채용에 대한 입사지원 및 수정을 하실 수 있습니다.',
-    url: '/applicant/profile',
+    url: '/applicant/recruits',
   },
   {
     title: '지원결과 조회',
@@ -77,7 +76,12 @@ const quickLinks = ref<QuickLinkItem[]>([
   },
 ])
 
+/* 외부 주소는 새 탭으로 연다(opener 차단). 그 밖은 앱 안에서 이동한다. */
 const goPage = async (url: string): Promise<void> => {
+  if (/^https?:\/\//.test(url)) {
+    window.open(url, '_blank', 'noopener,noreferrer')
+    return
+  }
   await router.push(url)
 }
 </script>
