@@ -209,7 +209,10 @@
 - ci는 클라이언트가 보낸 값을 그대로 쓰는 임시 방식이다(`ApplicantSignUpRequest` javadoc). FE NICE 목업이 매번 임의 UUID를 만들기 때문에 ciHash 중복 차단이 사실상 동작하지 않는다.
 - 파기: `Applicant.purgePersonalData`가 PII를 null로 만들고 ciHash를 `PURGED:`+UUID로 덮어쓴다. 이후 그 계정은 로그인할 수 없고 같은 CI로 재가입할 수 있다. 호출은 [privacy-audit](privacy-audit.md). (`{BE}/domain/entity/Applicant.java`)
 - 비밀번호·전화번호 변경에는 `currentPassword` 재확인이 필수다(세션 탈취만으로 통지 채널을 바꾸지 못하게). 변경은 setter 대신 `Applicant.changePassword`/`changePhoneNumber`로 한다. (`{BE}/service/ApplicantAccountService.java` — verifyCurrentPassword)
-- 이메일 변경, 아이디 찾기, 로그인 전 비밀번호 재설정 API는 없다(loginId 정책 미결정).
+- 이메일 변경, 아이디(이메일) 찾기, 로그인 전 비밀번호 재설정 API는 아직 없다. **loginId 정책은 확정됐고**(아래 "함정·결정" — 이메일 = loginId) 남은 선행 조건은 NICE 실연동이다.
+  - **이메일 변경: 불허**(2026-09-20 결정). 이메일이 곧 로그인 아이디라 변경 = 아이디 변경이다. API를 만들지 않는다.
+  - **이메일 찾기**: NICE 본인인증으로 CI를 확보한 뒤 그 CI의 계정 이메일을 **마스킹해서** 표시한다(원문 노출 금지 — 이름·휴대폰만으로 남의 이메일을 수집하는 경로가 된다).
+  - **비밀번호 재설정**: 이메일 토큰 링크 방식.
 
 ### 프론트
 - `authStore.fetchMe`: `success && data`일 때만 로그인으로 복구하고 나머지는 `user=null`로 둔다. **401일 때만** `initialized=true`로 확정하고, 네트워크 오류·5xx는 다음 이동 때 다시 확인한다. (`{FE}/stores/authStore.ts`)
@@ -274,6 +277,12 @@ AES_SECRET_KEY='<로컬 예시 키>' ./gradlew test --tests "*ApplicantSignUp*" 
 - **로그인 후 이동은 역할 기준**(5082861): 관리자 역할이 없는 임직원(면접관 전용 등)은 `/applicant`로 간다.
 - **전역 본인인증 콜백**: 화면을 떠날 때 자기가 등록한 콜백만 해제한다(86d12c9). 무조건 지우면 다른 화면의 콜백이 사라진다.
 - **목업 보류**(8d7485d 결정): 이메일 인증, NICE(CI 임의 UUID, 검사 `!name && !phoneNumber`는 둘 다 비어야 걸림), 아이디 찾기(결과 `abc12345@gmail.com` 하드코딩), 비밀번호 재발급. 연동 시 함께 교체.
-- **loginId 정책 미결정**(이메일=loginId 안 vs 별도 ID 안): BE는 두 안 모두 허용(email 선택). check-login-id, 이메일 변경, email 필수화, 아이디 찾기는 결정 후 진행.
+- **NICE 연동 방식 확인분**(2026-09-20): **체크플러스(CheckPlus) 본인확인 표준창**이다(팝업 `nice.checkplus.co.kr` → 통신사 PASS 인증 → 리턴 URL 콜백). 인증 키는 **사이트코드 + 사이트패스워드**, 암복호화는 **NICE가 제공한 모듈/라이브러리**를 쓴다(직접 구현 아님). 미확인: 리턴 URL 2종(성공·실패) 등록값, 요청번호(`REQ_SEQ`) 저장·대조 방식, 팝업↔부모창 결과 전달 방식, 폐쇄망 아웃바운드·인바운드 경로.
+  - **모듈이 제약의 핵심이다.** 공개 저장소에 없으므로 Gradle이 받아올 수 없다 — 저장소에 두고 `flatDir`로 잡거나 사내 저장소에 올려야 한다. **새 의존성이라 승인이 필요하다.** 네이티브(.dll/.so)를 끼고 있으면 개발(Windows)·운영(Linux) 이진이 따로 필요하고 복호화 경로는 이식 가능한 테스트가 어렵다. Java 17·Spring Boot 4에서 동작하는지도 확인 대상이다.
+  - 복호화는 모듈이 로컬에서 하므로 **암복호화 자체에는 외부 통신이 필요 없다**. 네트워크가 필요한 곳은 팝업(사용자 브라우저 → NICE)과 콜백(NICE → 우리 서버 공인 URL)뿐이다.
+- **NICE 실연동이 세 흐름의 공통 기반이다**(2026-09-20 정리). ① 가입 ② 이메일 찾기 ③ (간접) 이메일 찾기를 거친 비밀번호 재설정. 지금은 클라이언트가 만든 `ci`를 서버가 그대로 믿기 때문에 **가입 시 본인 확인이 사실상 없고 CI 중복 차단도 동작하지 않는다**. 실연동은 "서버가 NICE 결과를 복호화·검증해 CI를 확보하는 지점"을 한 곳 만들고 세 흐름이 그것만 쓰게 하는 작업이다. **가입 쪽이 먼저다** — CI 중복 차단이 살아야 한 사람에 계정 1개가 보장되고, 그래야 이메일 찾기 결과가 1건으로 확정된다(지금 구조로는 복수 계정이 나올 수 있다).
+- **loginId 정책 확정: 이메일 = loginId**(2026-09-20). 지원자 가입 화면은 **이미 이렇게 동작한다** — `{FE}/views/applicant/SignupView.vue`가 입력 라벨을 "이메일"로 두고 이메일 정규식으로 검증한 뒤 `loginId`·`email` 두 필드에 **같은 값**을 보낸다. `Applicant.email`·`User.loginId` 모두 unique다. 따라서 이메일 필수화·기존 데이터 이관은 할 일이 없다(오픈 전 시스템이라 기존 데이터도 없다).
+  - 후속: `check-login-id`는 만들지 않는다(이메일 중복 확인으로 갈음). 이메일 변경은 불허. 남은 작업은 이메일 찾기·비밀번호 재설정 둘뿐이다.
+  - BE가 아직 느슨한 부분: `ApplicantSignUpRequest.email`에 `@NotBlank`가 없고 `loginId`에 이메일 형식 검증이 없다. FE는 항상 채우지만 API 직접 호출로는 우회된다. 실연동 때 함께 조인다.
 - **계정 열거 감수**: check-email·가입 실패 메시지로 가입 여부가 드러난다. rate limit·시도 제한 없음.
 - **ADR**: `recruit_back/recruit_backend/docs/adr/0007-privacy-admin-role-separation.md`. 파기·민감 감사 권한은 `ROLE_PRIVACY_ADMIN`으로 분리한다. 매처 순서와 HTTP 메서드 구분이 보안 요구사항이다.
