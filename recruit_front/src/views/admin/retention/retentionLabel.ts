@@ -12,8 +12,9 @@ export interface RetentionTag {
   color: string
 }
 
+/* 라벨("다음 파기 대상 발생일")이 문맥을 주므로 값은 "없음" 한 단어로 충분하다. */
 export const formatNextPurgeDate = (date: string): string =>
-  date === NO_SCHEDULE_DATE ? '예정 없음(파기 대상 없음)' : date
+  date === NO_SCHEDULE_DATE ? '없음' : date
 
 /**
  * 지원서별 판정 태그. 실제로 파기를 막는 것은 보류(RETENTION_HOLD)와 이미 파기된 건(ALREADY_PURGED)뿐이다.

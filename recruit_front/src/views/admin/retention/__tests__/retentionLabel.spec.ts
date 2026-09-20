@@ -4,7 +4,7 @@ import { NO_SCHEDULE_DATE, eligibilityTag, formatNextPurgeDate, forcedPurgeReaso
 
 describe('retentionLabel', () => {
   it('파기 예정이 없으면 날짜 대신 안내 문구를 준다', () => {
-    expect(formatNextPurgeDate(NO_SCHEDULE_DATE)).toBe('예정 없음(파기 대상 없음)')
+    expect(formatNextPurgeDate(NO_SCHEDULE_DATE)).toBe('없음')
   })
 
   it('예정일이 있으면 날짜를 그대로 보여 준다', () => {

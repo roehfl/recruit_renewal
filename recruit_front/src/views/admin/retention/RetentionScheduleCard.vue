@@ -6,7 +6,7 @@ import { retentionApi } from '@/api/admin/retentionApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import { formatDate } from '@/common/dateUtil'
 import type { RetentionSchedule } from '@/types/admin/retention'
-import { formatNextPurgeDate, NO_SCHEDULE_DATE, runResultLabel } from './retentionLabel'
+import { formatNextPurgeDate, runResultLabel } from './retentionLabel'
 
 /*
  * 자동 파기 on/off·다음 예정일·마지막 실행 결과 카드.
@@ -42,9 +42,6 @@ const switchTooltip = computed(() =>
 
 const nextPurgeDateText = computed(() =>
   schedule.value ? formatNextPurgeDate(schedule.value.nextPurgeDate) : '',
-)
-const showNextPurgeHint = computed(
-  () => schedule.value !== null && schedule.value.nextPurgeDate !== NO_SCHEDULE_DATE,
 )
 
 const lastRunAtText = computed(() =>
@@ -93,8 +90,10 @@ const onToggle = (checked: boolean | string | number): void => {
 
 <template>
   <section class="schedule-card">
+    <!-- 실행 주기는 상태가 아니라 설명이라 제목 옆 부제로 뺀다(본문 줄 수를 줄인다). -->
     <header class="card-head">
       <h3 class="card-title">자동 파기</h3>
+      <span class="card-subtitle">매일 03:00 확인</span>
     </header>
 
     <div class="card-body">
@@ -112,25 +111,24 @@ const onToggle = (checked: boolean | string | number): void => {
         </div>
 
         <template v-if="schedule">
+          <!-- 라벨이 "이 날짜부터 대상이 생긴다"는 뜻을 담고 있어 별도 설명 줄을 두지 않는다. -->
           <p class="field-line">
-            <span class="field-label">다음 파기 예정일</span>
+            <span class="field-label">다음 파기 대상 발생일</span>
             <span>{{ nextPurgeDateText }}</span>
           </p>
-          <p v-if="showNextPurgeHint" class="field-hint">이 날짜부터 파기 대상이 생길 수 있습니다.</p>
 
           <p class="field-line">
             <span class="field-label">마지막 실행</span>
             <span :class="{ 'last-run-error': isLastRunError }">
               {{ lastRunAtText }} · {{ runResultLabel(schedule.lastRunResult) }}
             </span>
+            <!-- 이력 링크는 별도 줄 대신 값 뒤에 붙인다. -->
+            <a-button v-if="showBatchLink" type="link" size="small" class="batch-link" @click="onOpenBatch">
+              이력 보기 ›
+            </a-button>
           </p>
           <p v-if="isLastRunError" class="field-hint last-run-error">서버 로그를 확인하세요.</p>
-          <a-button v-if="showBatchLink" type="link" size="small" class="batch-link" @click="onOpenBatch">
-            파기 이력 보기
-          </a-button>
         </template>
-
-        <p class="field-hint">매일 03:00에 확인합니다. 예정일 전에는 스캔하지 않습니다.</p>
       </a-spin>
     </div>
   </section>
@@ -149,6 +147,9 @@ const onToggle = (checked: boolean | string | number): void => {
 }
 
 .card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   margin-bottom: 12px;
 }
 
@@ -157,6 +158,11 @@ const onToggle = (checked: boolean | string | number): void => {
   font-size: 14px;
   font-weight: 700;
   color: var(--app-text-primary);
+}
+
+.card-subtitle {
+  font-size: 12px;
+  color: var(--app-text-muted);
 }
 
 .switch-row {
@@ -197,6 +203,6 @@ const onToggle = (checked: boolean | string | number): void => {
 .batch-link {
   padding: 0;
   height: auto;
-  margin-top: 4px;
+  font-size: 13px;
 }
 </style>
