@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>관리자 공지사항 관리 - 구현 보고서</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal · board 카드</div>
+  <h1>관리자 공지사항 관리 - 구현 보고서</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge done">백엔드 20건 테스트 통과</span>
+  <span class="badge done">프론트 6건 테스트 통과</span>
+  <span class="badge muted">작성일: 2026-09-20</span>
+</header>
+
+<main>
+
+  <!-- ===== 요약 + 현황 ===== -->
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>관리자가 지원자 공지사항을 직접 등록·수정·삭제할 수 있는 화면(<code>/admin/notices</code>)을 디자인 목업부터 백엔드·프론트 구현까지 완료했다.</p>
+      <p>핵심 결정은 <strong>노출 여부와 삭제를 하나의 상태로 합친 것</strong>이다. 별도 <code>visible</code> 필드 없이 <code>deleted</code> 하나만 두고, 삭제(soft delete)하면 지원자 화면에서만 사라지고 관리자 목록에는 "삭제됨"으로 남아 복구할 수 있다.</p>
+      <p>관리자 조회는 <code>/admin/notices</code>, 쓰기는 <code>/board/notices</code>로 나눴다. <code>/board</code> 아래 GET은 공개라 조회만 <code>/admin</code>으로 뺐고, 쓰기는 기존 <code>POST /api/board/**</code> 매처가 이미 관리자 전용으로 막고 있어 보안 설정을 건드리지 않았다.</p>
+      <p>본문 편집기는 새 의존성 없이 <code>contenteditable</code> + <code>document.execCommand</code>로 만들었고, 서버 정제(jsoup <code>Safelist.relaxed()</code>)가 남기는 태그만 생성한다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">디자인 목업 완료</span></p>
+      <p><span class="badge done">백엔드 구현·테스트 완료</span></p>
+      <p><span class="badge done">프론트 구현·테스트 완료</span></p>
+      <p><span class="badge done">도메인 카드 갱신</span></p>
+      <p><span class="badge warn">운영 DDL 수동 반영 필요</span></p>
+      <p><span class="badge pending">관리자 메뉴 등록 대기</span></p>
+      <p><span class="badge out">작성자 표시 범위 외</span></p>
+    </div>
+  </section>
+
+  <!-- ===== 범위 ===== -->
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>디자인 목업 <code>design/공지-관리.html</code></li>
+          <li><code>Notice.deleted</code> soft delete 필드와 상태 전환 메서드</li>
+          <li>관리자 조회 API 2건, 쓰기 API 6건</li>
+          <li>지원자 공개 조회에서 삭제 공지 제외</li>
+          <li><code>NoticeNotFoundException</code> 404 매핑(기존 500)</li>
+          <li>관리자 목록 화면(검색·상태 필터·일괄 처리·페이징)</li>
+          <li>등록·수정 드로어(리치 에디터 + 지원자 화면 미리보기)</li>
+          <li>운영 반영용 수동 DDL</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>관리자 메뉴 등록(<code>/admin/menus</code>에서 배포 후 등록)</li>
+          <li>운영 DB에 <code>notice.deleted</code> 컬럼 반영</li>
+          <li>브라우저 실사용 확인(관리자 로그인이 LDAP 의존)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>공지 첨부파일</li>
+          <li>예약 공개(게시 시작·종료 일시)</li>
+          <li>작성자 표시(<code>AuditorAware</code> 도입 필요)</li>
+          <li>공지 조회수</li>
+          <li>행 물리 삭제 API</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 도메인 모델 ===== -->
+  <section>
+    <h2>도메인 모델</h2>
+    <div class="two">
+      <div class="card">
+        <h3>Notice</h3>
+        <p><span class="badge info">엔티티</span> <span class="badge done">필드 1개 추가</span></p>
+        <p>공지 1건. 테이블 <code>notice</code>. <code>BaseEntity</code>를 상속한다.</p>
+        <table>
+          <tr><th>필드</th><th>타입</th><th>규칙</th></tr>
+          <tr><td><code>id</code></td><td>Long</td><td>PK, identity 생성</td></tr>
+          <tr><td><code>title</code></td><td>String</td><td>필수(<code>@NotBlank</code>), 길이 제한 없음(DB 기본 varchar 255)</td></tr>
+          <tr><td><code>contentHtml</code></td><td>String</td><td>원본 HTML, <code>LONGTEXT</code>, nullable = false</td></tr>
+          <tr><td><code>contentText</code></td><td>String</td><td>검색용 텍스트, 1000자에서 절삭. 생성·수정 시 재계산</td></tr>
+          <tr><td><code>pinned</code></td><td>boolean</td><td>상단 고정. 목록 정렬 1순위, 기본값 false</td></tr>
+          <tr><td><code>deleted</code></td><td>boolean</td><td><strong>신규.</strong> nullable = false, 기본값 false</td></tr>
+        </table>
+        <p class="small">변경 메서드: <code>update(title, contentHtml, pinned)</code>, <code>delete()</code>, <code>restore()</code>, <code>changePinned(pinned)</code>.</p>
+      </div>
+      <div class="card">
+        <h3>왜 필드를 하나로 합쳤는가</h3>
+        <p><span class="badge info">설계 결정</span></p>
+        <p>초기 설계에는 "지원자 화면 노출(<code>visible</code>)"과 "삭제(<code>deleted</code>)"가 따로 있었다. 두 필드를 두면 상태 조합이 4가지가 되고, 관리자 입장에서 "내려두기"와 "삭제"의 차이를 설명하기 어렵다.</p>
+        <p>실제로 필요한 동작은 <strong>지원자 화면에서 내리기</strong> 하나뿐이고, 그게 곧 soft delete다. 그래서 필드를 하나로 합치고 화면 라벨도 "삭제(Soft delete)"로 통일했다.</p>
+        <p class="small">FAQ 도메인은 같은 개념을 <code>active</code>(반대 방향)로 쓴다. 이름이 다른 이유는 FAQ 화면 라벨이 "노출/비노출"이기 때문이며, 의미는 동일하다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 상태 전이 ===== -->
+  <section>
+    <h2>상태 전이</h2>
+    <div class="card">
+      <h3>정상 흐름</h3>
+      <div class="transition">
+        <span class="state">없음</span>
+        <span class="arrow">→</span>
+        <span class="action">POST /board/notices</span>
+        <span class="arrow">→</span>
+        <span class="state">정상 (deleted=false)</span>
+        <span class="arrow">→</span>
+        <span class="action">POST /board/notices/{id}/delete</span>
+        <span class="arrow">→</span>
+        <span class="state">삭제됨 (deleted=true)</span>
+      </div>
+      <h3>복구 흐름</h3>
+      <div class="transition">
+        <span class="state">삭제됨</span>
+        <span class="arrow">→</span>
+        <span class="action">POST /board/notices/{id}/restore</span>
+        <span class="arrow">→</span>
+        <span class="state">정상</span>
+      </div>
+      <p class="small">
+        두 전환 모두 멱등이다. 이미 같은 상태면 그대로 200을 돌려준다. 없는 id는 404다.
+        <code>pinned</code>는 이 전이와 독립이며 <code>/pin</code>·<code>/unpin</code>으로 따로 바꾼다.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== API ===== -->
+  <section>
+    <h2>API 목록</h2>
+    <p class="small">모든 경로에 <code>/api</code> 접두가 붙는다. 응답은 <code>ApiResponse&lt;T&gt;</code> = <code>{ success, data, message }</code>.</p>
+
+    <h3>관리자 조회 — <code>AdminNoticeController</code></h3>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>상태</th></tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/admin/notices</code></td>
+        <td>삭제 포함 목록. <code>searchType</code>·<code>keyword</code>·<code>deleted</code>·<code>pinnedOnly</code>·<code>page</code>·<code>size</code></td>
+        <td><span class="badge done">신규</span></td>
+      </tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/admin/notices/{noticeId}</code></td>
+        <td>편집용 상세. 삭제된 공지도 조회된다</td>
+        <td><span class="badge done">신규</span></td>
+      </tr>
+    </table>
+
+    <h3>관리자 쓰기 — <code>BoardController</code></h3>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>상태</th></tr>
+      <tr><td><code>POST</code></td><td><code>/board/notices</code></td><td>등록. 응답 <code>data</code>는 새 공지 id</td><td><span class="badge muted">기존</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/board/notices/{noticeId}</code></td><td>수정. <code>contentText</code> 재계산</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/board/notices/{noticeId}/delete</code></td><td>soft delete</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/board/notices/{noticeId}/restore</code></td><td>복구</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/board/notices/{noticeId}/pin</code></td><td>상단 고정</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/board/notices/{noticeId}/unpin</code></td><td>고정 해제</td><td><span class="badge done">신규</span></td></tr>
+    </table>
+
+    <h3>지원자 공개 조회 — <code>BoardController</code></h3>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>상태</th></tr>
+      <tr><td><code>GET</code></td><td><code>/board/notices</code></td><td>목록. <strong>삭제된 공지 제외</strong></td><td><span class="badge info">동작 변경</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/board/notices/{noticeId}</code></td><td>상세. <strong>삭제된 공지는 404</strong></td><td><span class="badge info">동작 변경</span></td></tr>
+    </table>
+
+    <h3>권한</h3>
+    <table>
+      <tr><th>대상</th><th>매처</th><th>권한</th></tr>
+      <tr><td><code>/admin/notices…</code></td><td>기존 broad <code>/api/admin/**</code></td><td><code>ROLE_ADMIN</code>, <code>ROLE_RECRUIT_ADMIN</code></td></tr>
+      <tr><td><code>POST /board/notices…</code></td><td>기존 <code>POST /api/board/**</code></td><td><code>ROLE_ADMIN</code>, <code>ROLE_RECRUIT_ADMIN</code></td></tr>
+      <tr><td><code>GET /board/notices…</code></td><td><code>anyRequest().permitAll()</code></td><td>공개</td></tr>
+    </table>
+    <p class="small"><strong><code>SecurityConfig</code>를 수정하지 않았다.</strong> 새 엔드포인트가 모두 기존 매처 범위 안에 들어가도록 경로를 골랐기 때문이다.</p>
+  </section>
+
+  <!-- ===== 검증 및 비즈니스 규칙 ===== -->
+  <section>
+    <h2>검증 및 비즈니스 규칙</h2>
+
+    <h3>본문 HTML 처리</h3>
+    <table>
+      <tr><th>규칙</th><th>설명</th></tr>
+      <tr><td>저장은 원본</td><td><code>contentHtml</code>에는 관리자가 보낸 HTML을 그대로 저장한다</td></tr>
+      <tr><td>정제는 응답 시점</td><td>지원자 상세와 <strong>관리자 편집용 상세 모두</strong> <code>HtmlTextUtils.sanitize</code>를 거친다</td></tr>
+      <tr><td>관리자 상세도 정제하는 이유</td><td>관리자 에디터도 받은 HTML을 그대로 렌더하므로 정제하지 않으면 저장형 XSS 경로가 된다. 정제는 멱등이라 다시 저장해도 내용이 더 깎이지 않는다</td></tr>
+      <tr><td>제거 대상</td><td><code>style</code>·<code>class</code>·<code>target</code>·<code>on*</code> 속성, <code>script</code>·<code>iframe</code>·<code>hr</code>·<code>s</code>·<code>mark</code> 태그, <code>javascript:</code> 링크, 상대경로와 <code>data:</code> 이미지</td></tr>
+      <tr><td>에디터 제약</td><td>툴바는 허용 태그만 만들고, 붙여넣기는 평문으로 받는다. 저장 시 제거되는 항목을 화면에 안내한다</td></tr>
+    </table>
+
+    <h3>상태·조회 가드</h3>
+    <table>
+      <tr><th>규칙</th><th>설명</th><th>처리</th></tr>
+      <tr><td>공개 목록</td><td><code>deleted=false</code>만 조회</td><td><span class="badge done">차단</span></td></tr>
+      <tr><td>공개 상세</td><td>삭제된 공지 요청</td><td><span class="badge out">404</span></td></tr>
+      <tr><td>관리자 목록·상세</td><td>삭제 포함 조회</td><td><span class="badge done">허용</span></td></tr>
+      <tr><td>삭제 멱등</td><td>이미 삭제된 공지 재삭제</td><td><span class="badge done">200</span></td></tr>
+      <tr><td>없는 id</td><td>수정·삭제·복구·고정</td><td><span class="badge out">404</span></td></tr>
+      <tr><td>제목 공백</td><td>등록·수정 요청</td><td><span class="badge out">400</span></td></tr>
+    </table>
+
+    <h3>프론트 저장 분기</h3>
+    <table>
+      <tr><th>상황</th><th>호출 순서</th></tr>
+      <tr><td>등록(정상 상태)</td><td><code>createNotice</code></td></tr>
+      <tr><td>등록(삭제 상태)</td><td><code>createNotice</code> → 반환된 새 id로 <code>deleteNotice</code></td></tr>
+      <tr><td>수정(삭제 상태 그대로)</td><td><code>updateNotice</code>만</td></tr>
+      <tr><td>수정 + 삭제 토글 ON</td><td><code>updateNotice</code> → <code>deleteNotice</code></td></tr>
+      <tr><td>수정 + 삭제 토글 OFF</td><td><code>updateNotice</code> → <code>restoreNotice</code></td></tr>
+    </table>
+    <p class="small">삭제 상태는 수정 API로 바뀌지 않으므로 <strong>바뀐 경우에만 한 번</strong> 추가 호출한다. 잘못 호출하면 멀쩡한 공지가 내려가거나 내려둔 공지가 지원자 화면에 다시 뜬다. 이 분기를 vitest spec으로 고정했다.</p>
+  </section>
+
+  <!-- ===== 화면 구성 ===== -->
+  <section>
+    <h2>화면 구성</h2>
+    <div class="two">
+      <div class="card">
+        <h3>목록 (<code>AdminNoticeManageView</code>)</h3>
+        <ul class="list">
+          <li>검색: 검색 대상(제목+내용·제목·내용) + 검색어 + 상태(전체·정상·삭제됨) + 고정만 보기</li>
+          <li>표: 번호(고정 시 "고정" 태그) / 제목 / 상태 / 등록일 / 관리</li>
+          <li>번호는 <code>총건수 - (page × size + index)</code> — 지원자 목록과 같은 계산</li>
+          <li>행 관리: 고정·고정 해제 / 삭제·복구</li>
+          <li>일괄 처리: 상단 고정, 고정 해제, 복구, 삭제</li>
+          <li>조회 실패와 빈 목록을 구분하고 "다시 시도" 버튼 제공</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>드로어 (<code>NoticeEditorDrawer</code>)</h3>
+        <ul class="list">
+          <li>제목 입력(최대 200자)</li>
+          <li>토글 2개: "삭제(Soft delete)", "상단 고정"</li>
+          <li>탭: 본문 편집 / 지원자 화면 미리보기</li>
+          <li>에디터 툴바: H2·H3·본문, 굵게·기울임·밑줄, 목록·번호·인용, 링크·이미지·표, 서식 지우기</li>
+          <li>링크는 <code>http</code>·<code>https</code>·<code>mailto</code>, 이미지는 절대 주소만 허용</li>
+          <li>저장 시 제거되는 항목을 경고 영역에 명시</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 결정 로그 ===== -->
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr>
+        <td>1</td>
+        <td>노출 필드를 두지 않고 <code>deleted</code> 하나로 합친다</td>
+        <td>실제 필요한 동작은 "지원자 화면에서 내리기" 하나뿐이다. 두 필드는 상태 조합만 늘리고 운영자에게 설명하기 어렵다</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>관리자 조회는 <code>/admin/notices</code>, 쓰기는 <code>/board/notices</code></td>
+        <td><code>/board</code> 아래 GET은 <code>permitAll()</code>이라 관리자 조회를 두면 공개된다. 쓰기는 기존 <code>POST /api/board/**</code> 매처가 이미 막고 있어 <code>SecurityConfig</code> 변경이 필요 없다</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>관리자 편집용 상세도 <code>sanitize</code>해서 내려준다</td>
+        <td>관리자 에디터도 HTML을 그대로 렌더한다. 정제가 멱등이라 원본 손실 없이 저장형 XSS만 막는다</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>고정 전환을 수정 API에서 분리해 <code>/pin</code>·<code>/unpin</code>으로 만든다</td>
+        <td>수정 API는 <code>title</code>·<code>content</code>가 필수라 목록에서 고정만 바꾸려면 상세를 먼저 받아야 한다. 건당 2회 호출이 되고 일괄 처리에서는 그 2배가 된다</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>본문 에디터를 외부 라이브러리 없이 만든다</td>
+        <td>프론트 AGENTS.md가 불필요한 의존성 추가를 금지한다. 서버가 허용 태그를 좁게 제한하므로 필요한 기능이 적고, <code>contenteditable</code>로 충분하다</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>일괄 처리는 FE가 건별로 호출하고 <code>Promise.allSettled</code>로 집계한다</td>
+        <td>일괄 API를 새로 만들 만큼 건수가 많지 않다. 부분 실패해도 나머지는 반영되고 실패 건수를 알린다</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td>관리자 목록에 작성자 열을 넣지 않는다</td>
+        <td><code>AuditorAware</code> 빈이 없어 <code>createdBy</code>가 항상 null이다. 지금 도입하면 모든 엔티티의 감사 컬럼이 동시에 채워지기 시작하므로 별도 결정 사항이다</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- ===== 변경 파일 ===== -->
+  <section>
+    <h2>변경 파일</h2>
+
+    <h3>백엔드</h3>
+    <table>
+      <tr><th>파일</th><th>변경</th><th>구분</th></tr>
+      <tr><td><code>domain/entity/Notice.java</code></td><td><code>deleted</code> 필드, <code>update</code>·<code>delete</code>·<code>restore</code>·<code>changePinned</code></td><td><span class="badge info">수정</span></td></tr>
+      <tr><td><code>domain/repository/NoticeSpecification.java</code></td><td>공개 <code>search</code>(삭제 제외) / 관리자 <code>adminSearch</code>(필터)</td><td><span class="badge info">수정</span></td></tr>
+      <tr><td><code>service/NoticeService.java</code></td><td>관리자 목록·상세, 수정·삭제·복구·고정 전환</td><td><span class="badge info">수정</span></td></tr>
+      <tr><td><code>controller/BoardController.java</code></td><td>쓰기 엔드포인트 5개 추가</td><td><span class="badge info">수정</span></td></tr>
+      <tr><td><code>controller/AdminNoticeController.java</code></td><td>관리자 조회 2개</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>dto/response/AdminNoticeListResponse.java</code></td><td>관리자 목록 행</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>dto/response/AdminNoticeDetailResponse.java</code></td><td>관리자 편집용 상세</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>exception/GlobalExceptionHandler.java</code></td><td><code>NoticeNotFoundException</code> → 404</td><td><span class="badge info">수정</span></td></tr>
+      <tr><td><code>docs/ops/notice-deleted-column.sql</code></td><td>운영 반영 수동 DDL</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>src/test/.../controller/NoticeControllerTest.java</code></td><td>통합 테스트 20건</td><td><span class="badge done">신규</span></td></tr>
+    </table>
+
+    <h3>프론트</h3>
+    <table>
+      <tr><th>파일</th><th>변경</th><th>구분</th></tr>
+      <tr><td><code>src/types/notice.ts</code></td><td>관리자 타입 4종 추가</td><td><span class="badge info">수정</span></td></tr>
+      <tr><td><code>src/api/admin/adminNoticeApi.ts</code></td><td>관리자 호출 8개</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>src/views/admin/notice/AdminNoticeManageView.vue</code></td><td>목록 화면</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>src/views/admin/notice/NoticeEditorDrawer.vue</code></td><td>등록·수정 드로어</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>src/views/admin/notice/NoticeContentEditor.vue</code></td><td>본문 리치 에디터</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>src/views/admin/notice/__tests__/NoticeEditorDrawer.spec.ts</code></td><td>저장 분기 spec 6건</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>src/routes/adminRoutes.ts</code></td><td><code>AdminNoticeManage</code>(<code>/admin/notices</code>) 추가</td><td><span class="badge info">수정</span></td></tr>
+    </table>
+
+    <h3>문서·디자인</h3>
+    <table>
+      <tr><th>파일</th><th>변경</th><th>구분</th></tr>
+      <tr><td><code>design/공지-관리.html</code></td><td>디자인 목업(단독 실행 HTML)</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>docs/domains/board.md</code></td><td>요약·용어·파일 지도·API 계약·규칙·레시피·검증 갱신</td><td><span class="badge info">수정</span></td></tr>
+      <tr><td><code>docs/domains/_index.md</code></td><td>라우트·API 접두 역색인 갱신</td><td><span class="badge info">수정</span></td></tr>
+    </table>
+  </section>
+
+  <!-- ===== 테스트 결과 ===== -->
+  <section>
+    <h2>테스트 결과</h2>
+    <table>
+      <tr><th>대상</th><th>내용</th><th>결과</th></tr>
+      <tr><td><code>NoticeControllerTest</code></td><td>공개 조회의 삭제 제외·고정 정렬, 공개 상세 404, 관리자 목록 삭제 포함·필터·고정만 보기, 등록·수정·삭제·복구·고정, 멱등, 401/403/404, 제목 검증</td><td><span class="badge done">20건 통과</span></td></tr>
+      <tr><td><code>NoticeDetailResponseTest</code></td><td>기존 정제 테스트 회귀 확인</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><code>SecurityConfigTest</code></td><td><code>/board</code> 권한 회귀 확인</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><code>NoticeEditorDrawer.spec.ts</code></td><td>삭제 상태 변화 시에만 delete/restore 호출, 등록 후 새 id 삭제, 제목·본문 필수</td><td><span class="badge done">6건 통과</span></td></tr>
+      <tr><td><code>npm run type-check</code></td><td>vue-tsc 전체 빌드</td><td><span class="badge done">오류 없음</span></td></tr>
+      <tr><td>eslint</td><td>신규 프론트 파일</td><td><span class="badge done">오류 없음</span></td></tr>
+      <tr><td><code>node tools/check-docs.mjs</code></td><td>카드 경로·소유·크기 점검</td><td><span class="badge done">오류 0건</span></td></tr>
+      <tr><td>브라우저 실사용</td><td>관리자 화면은 <code>meta.roles</code> 가드로 LDAP 로그인이 필요해 로컬에서 열 수 없음</td><td><span class="badge warn">미실시</span></td></tr>
+    </table>
+    <p class="small">목업(<code>design/공지-관리.html</code>)은 브라우저에서 직접 실행해 검색·필터·일괄 처리·에디터·정제 미리보기 동작을 확인했다.</p>
+  </section>
+
+  <!-- ===== 미결 사항 ===== -->
+  <section>
+    <h2>미결 사항</h2>
+    <table>
+      <tr><th>#</th><th>질문</th><th>현재 입장</th></tr>
+      <tr>
+        <td>1</td>
+        <td>작성자를 화면에 표시할 것인가?</td>
+        <td>표시하려면 <code>AuditorAware</code> 도입이 먼저다. 모든 엔티티에 영향이 가므로 별도 결정 사항으로 남긴다. API는 필드를 이미 내려주고 있다</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>운영 DB의 <code>ddl-auto</code> 설정은?</td>
+        <td><code>validate</code>/<code>none</code>이면 <code>docs/ops/notice-deleted-column.sql</code>을 수동 반영해야 한다. 적용 전 백업을 권장한다</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>공지 첨부파일이 필요한가?</td>
+        <td>이번 범위에서 제외했다. 필요하면 별도 도메인 설계가 필요하다</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><code>document.execCommand</code> 대체가 필요한가?</td>
+        <td>표준에서 deprecated지만 대체 표준이 없고 주요 브라우저가 모두 지원한다. 지원이 끊기면 에디터 컴포넌트만 교체하면 된다</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- ===== 다음 단계 ===== -->
+  <section>
+    <h2>다음 단계 권장</h2>
+    <div class="card">
+      <h3>배포 전</h3>
+      <ol class="list">
+        <li>운영 DB에 <code>notice.deleted</code> 컬럼 DDL 반영(<code>docs/ops/notice-deleted-column.sql</code>). 엔티티 정의와 컬럼 타입을 사람이 대조한다.</li>
+        <li>기존 공지는 전부 <code>deleted=0</code>으로 backfill된다. 내려둘 공지가 있으면 배포 후 화면에서 삭제 처리한다.</li>
+      </ol>
+      <h3>배포 후</h3>
+      <ol class="list">
+        <li><code>/admin/menus</code>에서 공지사항 관리(<code>/admin/notices</code>) 메뉴를 등록한다(role-menu 카드).</li>
+        <li>관리자 계정으로 등록·수정·삭제·복구·고정을 한 번씩 확인한다. 특히 삭제 후 지원자 공지 목록에서 사라지는지 확인한다.</li>
+        <li>본문에 표·링크·이미지를 넣어 저장한 뒤, 지원자 상세에서 서식이 유지되는지 확인한다.</li>
+      </ol>
+      <h3>향후 후보</h3>
+      <ul class="list">
+        <li>예약 공개(게시 시작·종료 일시) — 상태 전환을 <code>/publish</code>·<code>/close</code>로 추가하는 형태</li>
+        <li>공지 첨부파일</li>
+        <li><code>AuditorAware</code> 도입과 작성자 표시</li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

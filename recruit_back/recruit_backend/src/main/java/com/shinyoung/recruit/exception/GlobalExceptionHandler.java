@@ -328,6 +328,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler(NoticeNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoticeNotFound(NoticeNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(FaqNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleFaqNotFound(FaqNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

@@ -57,7 +57,7 @@
 | `AdminStageResult` | `/admin/stage-results` | stage-result |
 | `InterviewSchedulingSetting` | `/admin/interview` | interview |
 | `AdminCommonCodeManage` | `/admin/codes` | master-data |
-| `AdminFaqManage` · `ApplicantFaq` · `NoticeList` | `/admin/faqs` · `/applicant/faq` · `/applicant/noticeList` | board |
+| `AdminFaqManage` · `AdminNoticeManage` · `ApplicantFaq` · `NoticeList` | `/admin/faqs` · `/admin/notices` · `/applicant/faq` · `/applicant/noticeList` | board |
 | `AdminHome` | `/admin` | statistics |
 | `AdminMessageSend` · `AdminMessageTemplates` | `/admin/messages` · `/admin/messages/templates` | message |
 | `AdminMessageHistory` | `/admin/messages/history` | message-delivery |
@@ -80,7 +80,7 @@
 | `/admin/job-postings/{id}/stages` · `/admin/stages/{id}/results`(단, `/export`는 admin-application) · `/applications/{id}/stage-results` | stage-result |
 | `/admin/job-postings/{id}/interviews`(단, `/export`는 admin-application) · `/admin/interviews` · `/admin/job-postings/{id}/interview-schedules` · `/admin/applications/{id}/interview-evaluations` · `/interviewer` · `/applicant/interviews` · `/applicant/applications/{id}/interviews` | interview |
 | `/codes` · `/admin/codes` · `/schools` · `/admin/schools` · `/addresses` | master-data |
-| `/faqs` · `/admin/faq-categories` · `/board/notices` | board |
+| `/faqs` · `/admin/faq-categories` · `/admin/faqs` · `/board/notices` · `/admin/notices` | board |
 | `/admin/job-postings/{id}/statistics` | statistics |
 | `/admin/retention` | privacy-audit |
 | `/admin/audit` | privacy-audit-audit |

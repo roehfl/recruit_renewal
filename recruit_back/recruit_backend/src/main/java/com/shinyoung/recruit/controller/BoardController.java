@@ -42,7 +42,37 @@ public class BoardController {
         return ResponseEntity.ok(ApiResponse.success(noticeService.create(request)));
     }
 
+    @PostMapping("/notices/{noticeId}")
+    public ResponseEntity<ApiResponse<Long>> updateNotice(
+            @PathVariable Long noticeId,
+            @Valid @RequestBody NoticeSaveRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(noticeService.update(noticeId, request)));
+    }
 
+    @PostMapping("/notices/{noticeId}/delete")
+    public ResponseEntity<ApiResponse<Void>> deleteNotice(@PathVariable Long noticeId) {
+        noticeService.delete(noticeId);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PostMapping("/notices/{noticeId}/restore")
+    public ResponseEntity<ApiResponse<Void>> restoreNotice(@PathVariable Long noticeId) {
+        noticeService.restore(noticeId);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PostMapping("/notices/{noticeId}/pin")
+    public ResponseEntity<ApiResponse<Void>> pinNotice(@PathVariable Long noticeId) {
+        noticeService.changePinned(noticeId, true);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PostMapping("/notices/{noticeId}/unpin")
+    public ResponseEntity<ApiResponse<Void>> unpinNotice(@PathVariable Long noticeId) {
+        noticeService.changePinned(noticeId, false);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
 
 }
 

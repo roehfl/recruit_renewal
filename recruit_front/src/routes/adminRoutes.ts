@@ -41,6 +41,11 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/faq/AdminFaqManageView.vue'),
       },
       {
+        path: 'notices',
+        name: 'AdminNoticeManage',
+        component: () => import('@/views/admin/notice/AdminNoticeManageView.vue'),
+      },
+      {
         path: 'codes',
         name: 'AdminCommonCodeManage',
         component: () => import('@/views/admin/AdminCommonCodeManageView.vue'),

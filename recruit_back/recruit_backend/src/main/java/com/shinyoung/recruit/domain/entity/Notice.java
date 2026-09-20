@@ -23,6 +23,9 @@ public class Notice extends BaseEntity {
     private String contentText;
     private boolean pinned = false;
 
+    @Column(nullable = false)
+    private boolean deleted = false;
+
 
     private Notice(
             String title,
@@ -44,5 +47,28 @@ public class Notice extends BaseEntity {
         return new Notice(title, contentHtml, pinned);
     }
 
+    public void update(
+            String title,
+            String contentHtml,
+            boolean pinned
+    ) {
+        this.title = title;
+        this.contentHtml = contentHtml;
+        this.contentText = HtmlTextUtils.extractText(contentHtml);
+        this.pinned = pinned;
+    }
+
+    /** soft delete. 지원자 화면에서만 빠지고 관리자 목록에는 삭제됨으로 남는다. */
+    public void delete() {
+        this.deleted = true;
+    }
+
+    public void restore() {
+        this.deleted = false;
+    }
+
+    public void changePinned(boolean pinned) {
+        this.pinned = pinned;
+    }
 
 }
