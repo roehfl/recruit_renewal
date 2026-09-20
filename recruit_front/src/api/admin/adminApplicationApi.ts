@@ -41,6 +41,17 @@ export const adminApplicationApi = {
     })
   },
 
+  /**
+   * 이름·휴대폰으로 지원서를 찾는다(공고 무관). 로그 조회 화면의 "지원자 찾기" 전용.
+   * name 부분일치, phoneNumber 는 하이픈·공백을 뺀 숫자 부분일치.
+   * 응답에 휴대폰 필드는 없다(검색 조건으로만 쓴다).
+   */
+  searchApplicants(name: string | undefined, phoneNumber: string | undefined, size = 50) {
+    return apiClient.get<ApiResponse<PageResponse<AdminApplicationSummaryResponse>>>('/admin/applications', {
+      params: { name, phoneNumber, page: 0, size },
+    })
+  },
+
   getApplication(applicationId: number) {
     return apiClient.get<ApiResponse<AdminApplicationDetailResponse>>(`/admin/applications/${applicationId}`)
   },
