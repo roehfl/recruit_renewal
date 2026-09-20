@@ -7,7 +7,7 @@
 
 - **감사 로그**: `ActivityLog`(append-only). 여러 도메인이 `ActivityLogService` 2경로로 기록, 관리자는 `/admin/audit/**`로 조회.
 - 감사 이벤트 = 정보 반출(엑셀·PDF·첨부 다운로드), 핵심 관리자 변경, 보존·파기(발행처는 [privacy-audit](privacy-audit.md)). 반출은 fail-close(감사 커밋 후에만 반환).
-- 프론트 화면 없음. 관리자 API만 있다.
+- 조회 화면은 **로그 조회**(`/admin/logs`)의 `감사 로그` 탭이다. 탭 본문·상세만 이 카드 소유고 페이지 껍데기는 [client-event-log](client-event-log.md) 소유다. 기록용 API는 없다.
 - 권한(ADR 0007): 조회 = `ROLE_RECRUIT_ADMIN`·`ROLE_PRIVACY_ADMIN`(ip·ua 원문은 PRIVACY만). 기록 자체는 별도 쓰기 API 없이 각 도메인 서비스 내부에서 호출한다.
 
 ## 용어
@@ -32,7 +32,7 @@
 | entity | `{BE}/domain/entity/ActivityLog.java` | 감사 행(BaseEntity 미상속) |
 | repository | `{BE}/domain/repository/ActivityLogRepository.java` | save·조회·검색만 |
 | dto | `{BE}/dto/response/AuditActivityResponse.java` | 감사 행 + 마스킹 |
-| enum | `{BE}/enumeration/Audit*` | `AuditActionType`(20)·`AuditActionResult`(5)·`AuditTargetType`(10)·`AuditReasonCode`(13) |
+| enum | `{BE}/enumeration/Audit*` | `AuditActionType`(21)·`AuditActionResult`(5)·`AuditTargetType`(11)·`AuditReasonCode`(13) |
 | enum | `{BE}/enumeration/ActorType.java` | `EMPLOYEE`·`SYSTEM`·`APPLICANT`·`ANONYMOUS`. `ActivityLog.actorType` 필드값 |
 | exception | `{BE}/exception/InvalidAuditQueryException.java` | 400 |
 | exception | `{BE}/exception/ActivityLogNotFoundException.java` | 404 |
@@ -49,7 +49,14 @@
 
 ### 프론트
 
-없음(`recruit_front/src/api` grep 0건). `ROLE_PRIVACY_ADMIN`만 가진 사용자는 `/admin` 라우트 가드(`ADMIN_ROLES`)에 막힌다. 화면을 만들면 여기에 등록한다.
+| 구분 | 파일 | 역할 |
+|---|---|---|
+| view | `{FE}/views/admin/log/AuditLogPanel.vue` | 로그 조회 `감사 로그` 탭 본문(필터·목록·페이저·크로스 점프) |
+| view | `{FE}/views/admin/log/AuditLogDrawer.vue` | 감사 로그 상세 drawer |
+| api | `{FE}/api/admin/adminAuditApi.ts` | `getActivities`·`getActivity` |
+| types | `{FE}/types/admin/auditLog.ts` | 감사 조회 쿼리·응답 타입, enum 유니언 |
+
+페이지 껍데기(`AdminLogView.vue`)와 두 탭 공용 유틸(`logLabel.ts`·`logQuery.ts`, 감사 enum 한글 라벨 포함)은 [client-event-log](client-event-log.md) 소유다. 라우트 `AdminLogInquiry`(`/admin/logs`)도 그 카드에 등록되어 있다.
 
 ## API 계약
 
@@ -62,7 +69,7 @@
 
 ### 엔드포인트 상세
 
-- 전 엔드포인트 **FE 미사용**(`recruit_front/src/api` grep 0건). 코드 기준 🟢.
+- 매핑: FE `adminAuditApi.getActivities()` ↔ 목록, `adminAuditApi.getActivity()` ↔ 단건(`{FE}/api/admin/adminAuditApi.ts`). 코드 기준 🟢.
 - enum query 값 오류는 400 `"Invalid request."`. 목록은 공통 `PageResponse`(`content`·`page`·`totalElements` 등).
 - **감사 조회**: query `actorId`(완전일치·trim), `actionType`·`actionResult`·`targetType`(enum 이름), `jobPostingId`, `applicationId`, `from`·`to`(ISO `yyyy-MM-ddTHH:mm:ss`). 응답 = `ActivityLog` 컬럼(`traceId` 제외, `metadataJson`은 문자열). `ipAddress`·`userAgent`는 PRIVACY만 원문, 그 외 `"***"`(null은 null). 단건 없음 404.
 
@@ -122,11 +129,13 @@ AES_SECRET_KEY='<로컬 예시 키>' ./gradlew test --tests "com.shinyoung.recru
 
 `ActivityLogService`·`AuditMetadata` 변경 시 호출부 테스트 `StageAuditInstrumentationTest`([stage-result](stage-result.md)), `ExportAuditLoggerTest`([admin-application](admin-application.md))도 돌린다. [privacy-audit](privacy-audit.md)의 `PURGE_SCAN`·`PURGE_EXECUTE`·`PURGE_RECONCILE`·`PURGE_FORCED`·`RETENTION_*` 감사 호출도 영향을 받으므로 그 카드의 검증도 함께 돌린다.
 
-프론트 코드는 없다.
+프론트(`recruit_front/`에서): `npm run type-check`.
 
 ## 함정·결정
 
 - 소유 컨트롤러 fix 커밋 없음(`c3d93ab` 통합 이전은 아카이브).
+- **`ROLE_PRIVACY_ADMIN`만 가진 계정은 감사 로그 화면에 도달하지 못한다.** `/admin` 라우트 가드 `ADMIN_ROLES`(`{FE}/routes/adminRoutes.ts` — `['ROLE_ADMIN','ROLE_RECRUIT_ADMIN']`)에 막힌다. 정작 ip·ua 원문을 볼 수 있는 권한이 화면을 못 본다. 미해결 — `ADMIN_ROLES`는 로그인 직후 이동 분기([auth-account](auth-account.md))와 공유하는 값이라 바꾸면 영향 범위가 넓다.
+- 반대로 `ROLE_ADMIN`만 가진 계정은 라우트는 통과하지만 두 조회 API가 403이다. 조회를 쏘면 공통 인터셉터가 `/403`으로 튕기므로, 화면은 탭 본문을 렌더링하지 않고 안내만 띄운다.
 - `recruit_back/recruit_backend/docs/adr/0006-audit-transaction-policy.md` — 커밋변경 in-tx / 실패계열 REQUIRES_NEW / 반출 fail-close. 감사 장애가 업무를 막는 것은 의도된 것, afterCommit 전환은 ADR 재검토 필요.
 - `InvalidActivityLogException`은 핸들러가 없어 500(ApiResponse 형식 아님).
 - `AUDIT_HMAC_SECRET`를 바꾸면 이후 해시가 이전 값과 연결되지 않는다. `ActivityLog`는 파기되지 않는다.

@@ -119,7 +119,7 @@ JSON 응답은 `ApiResponse<T>`, 파일 응답은 래핑 없음(오류만 JSON).
   - `stageType`+`stageResultStatus`: 둘 다 만족하는 결과 행이 하나라도 있으면 매칭(최신 결과만 보지 않음)
 - 응답 파생값(없으면 null, 페이지 배치 조회 4회): `jobTitle`, `workLocation`(선택 근무지명), `birthDate`·`age`(서버 Clock 만 나이), 최종학력 행의 `finalEducationLevel`·`finalSchoolName`·`finalGraduationDate`, 최신 결과의 `stageType`·`stageResultStatus`, `careerDescriptionDownloadUrl`(STORED·미삭제 경력기술서 중 id 최대의 다운로드 경로).
 - 제외 확정: 성별, 채용구분 연도, `jobGroup`(2026-08-31 제거).
-- FE는 공고 경로만 쓰고 학력·자격·어학 조건은 화면에 없다(API 전용). `/admin/applications`는 [stage-result](stage-result.md) 화면이 제출 건수용으로 호출(`{FE}/api/admin/adminStageApi.ts`).
+- 지원현황 화면은 공고 경로만 쓰고 학력·자격·어학 조건은 화면에 없다(API 전용). `/admin/applications`는 다른 화면 2곳이 쓴다: [stage-result](stage-result.md) 화면의 제출 건수(`countSubmittedApplications` — `{FE}/api/admin/adminStageApi.ts`), 로그 조회 화면의 지원자 찾기(`searchApplicants` — 이름·휴대폰 부분일치로 지원번호를 찾는다, `{FE}/api/admin/adminApplicationApi.ts`, [client-event-log](client-event-log.md) 소유 화면).
 
 **상세·섹션** — 🟢(상세 2026-08-31)
 - 상세: 지원서 스냅샷 + `workLocationNameSnapshot`(실제 고른 근무지). 없으면 404 `"지원서를 찾을 수 없습니다. id=..."`.

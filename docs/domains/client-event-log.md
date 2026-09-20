@@ -9,8 +9,9 @@
 - 수집은 **공개·best-effort·fire-and-forget**. FE는 응답을 안 쓰고, 수집 실패를 다시 로깅하지 않는다.
 - 원문 PII 미저장: `message`는 safe code만, `metadata`는 eventType별 allowlist, 사용자는 HMAC만, IP·UA는 서버 추출.
 - 3단 in-memory rate limit(1분 고정 윈도우) 초과 429. 보존 90일(매일 04:00 스케줄러 + 수동 트리거).
-- 관리자 조회·cleanup API는 **FE 화면 없음**(운영자 직접 호출).
-- **소유 화면 없음.** FE 송신 지점 3종: ① 전역 오류 핸들러 ② `apiClient` 응답 인터셉터(HTTP 오류) ③ 지원서 섹션 화면의 수동 `logClientEvent`([application-sections](application-sections.md) 소유).
+- 관리자 조회 API는 **로그 조회** 화면(`/admin/logs` `지원자 이벤트` 탭)이 쓴다. cleanup API만 **FE 화면 없음** — 매일 04:00 스케줄러가 같은 일을 하고 감사 로그도 남지 않아 버튼을 두지 않기로 했다.
+- 소유 화면 = 로그 조회(`AdminLogInquiry`). 탭 2개 중 `지원자 이벤트` 탭과 페이지 껍데기·공용 유틸이 이 카드 소유고, `감사 로그` 탭 본문(`AuditLogPanel.vue`·`AuditLogDrawer.vue`)은 [privacy-audit-audit](privacy-audit-audit.md) 소유다.
+- FE 송신 지점 3종: ① 전역 오류 핸들러 ② `apiClient` 응답 인터셉터(HTTP 오류) ③ 지원서 섹션 화면의 수동 `logClientEvent`([application-sections](application-sections.md) 소유).
 
 ## 용어
 
@@ -77,6 +78,17 @@
 | api | `{FE}/plugins/clientErrorHandlers.ts` | `installClientErrorHandlers`·`installVueErrorHandler`, stack 정제·해시 |
 | types | `{FE}/types/clientEvent.ts` | payload·유니언 타입·`ClientEventContext` |
 | test | `{FE}/common/__tests__/clientEventLogger.spec.ts` | routePath 기본값, sessionStorage 차단, 예외 비전파 |
+| route | `{FE}/routes/adminRoutes.ts` | (공유) `AdminLogInquiry`(`/admin/logs`) — 부모 `meta.roles = ADMIN_ROLES` 상속 |
+| view | `{FE}/views/admin/log/AdminLogView.vue` | 로그 조회 페이지 껍데기: 탭 2개·권한 가드·마스킹 안내·딥링크(`?tab=`·`?applicationId=`) 파싱 |
+| view | `{FE}/views/admin/log/ApplicantEventPanel.vue` | 지원자 이벤트 탭 본문(필터·목록·페이저·크로스 점프) |
+| view | `{FE}/views/admin/log/ApplicantFinderPanel.vue` | 지원자 찾기 — 이름·휴대폰 → 지원번호([admin-application](admin-application.md) 엔드포인트 호출) |
+| view | `{FE}/views/admin/log/ApplicantEventDrawer.vue` | 지원자 이벤트 상세 drawer |
+| util | `{FE}/views/admin/log/logLabel.ts` | 두 탭 공용 한글 라벨·태그 색(감사 enum 라벨 포함) |
+| util | `{FE}/views/admin/log/logQuery.ts` | 두 탭 공용 기간 프리셋·상한 검증·ISO 변환·페이지 크기 |
+| api | `{FE}/api/admin/adminClientEventApi.ts` | `getClientEvents`·`getClientEvent` |
+| types | `{FE}/types/admin/clientEventLog.ts` | 조회 쿼리·응답 타입 |
+| test | `{FE}/views/admin/log/__tests__/logQuery.spec.ts` | 프리셋 일수·기간 상한·ISO 변환 |
+| test | `{FE}/views/admin/log/__tests__/logLabel.spec.ts` | 라벨 맵·select 옵션 개수 |
 
 ## API 계약
 
@@ -100,15 +112,17 @@
 - 오류: 400 Bean Validation, 400 "Invalid request."(enum 밖 값·JSON 파싱 실패), 400 `InvalidClientEventLogException`(source·message·metadata 위반, 한글 메시지), 429 "client event 수집 요청이 너무 많습니다.". unique 충돌은 409로 새지 않고 duplicate 200.
 - 매핑: FE `clientEventApi.record()` ↔ `ClientEventLogController.record()`.
 
-**GET /admin/client-events — 🟢, FE 미사용**
+**GET /admin/client-events — 🟢**
 - `from`/`to`는 ISO date-time(`receivedAt` 기준, 양끝 포함). `to` 없으면 now, `from` 없으면 `to - 7일`.
 - `from > to` 400, 기간 90일 초과 400, `page < 0` 400, `size` 1~100 밖 400.
 - `clientSessionId`·`relatedCorrelationId`는 trim 후 정확 일치(빈 값이면 조건 없음). 정렬 `receivedAt DESC, id DESC` 고정.
 - `ClientEventLogResponse`: 엔티티 전 필드 — `id, receivedAt, clientOccurredAt, eventType, severity, source, clientSessionId, clientEventId, ingestCorrelationId, relatedCorrelationId, pageCode, componentCode, routePath, operation, jobPostingId, applicationId, httpMethod, apiPath, httpStatus, errorCode, message, stackHash, stackSummary, frontendVersion, browserName, browserVersion, osName, viewport, timezone, ipAddress, userAgent, principalHash, principalType, metadataJson`(JSON 문자열 그대로).
 - `ROLE_PRIVACY_ADMIN`이 아니면 민감 4필드가 `***`(원래 null이면 null). `message`·`metadataJson`·`stackHash`는 양쪽 다 원문.
+- 매핑: FE `adminClientEventApi.getClientEvents()` ↔ `AdminClientEventLogController` 목록.
 
-**GET /admin/client-events/{id} — 🟢, FE 미사용**
+**GET /admin/client-events/{id} — 🟢**
 - 없으면 404 "Client event log was not found.". 마스킹은 목록과 같다.
+- 매핑: FE `adminClientEventApi.getClientEvent()` ↔ `AdminClientEventLogController` 단건. 화면은 목록 행 데이터로 drawer를 채우지 않고 단건을 다시 부른다(404로 이미 지워진 이벤트를 구분).
 
 **POST /admin/client-events/cleanup — 🟢, FE 미사용**
 - 스케줄러와 같은 `cleanup()`을 즉시 실행하고 삭제 건수를 돌려준다. `ROLE_RECRUIT_ADMIN`은 403. 감사 로그를 남기지 않는다.
