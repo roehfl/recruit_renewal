@@ -24,16 +24,24 @@ const emit = defineEmits<{
 const event = ref<ClientEventLogResponse | null>(null)
 const loading = ref(false)
 
+/* 닫거나 다른 행을 연 뒤 늦게 도착한 응답은 요청 번호로 버린다. */
+let request = 0
+
 const load = async (id: number): Promise<void> => {
+  const current = ++request
   loading.value = true
   try {
     const response = await adminClientEventApi.getClientEvent(id)
+    if (current !== request) return
     event.value = response.data.data
   } catch (error) {
+    if (current !== request) return
     message.error(getApiErrorMessage(error, '이벤트를 불러오지 못했습니다.'))
     emit('update:open', false)
   } finally {
-    loading.value = false
+    if (current === request) {
+      loading.value = false
+    }
   }
 }
 

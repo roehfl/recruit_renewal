@@ -22,16 +22,24 @@ const emit = defineEmits<{
 const activity = ref<AuditActivityResponse | null>(null)
 const loading = ref(false)
 
+/* 닫거나 다른 행을 연 뒤 늦게 도착한 응답은 요청 번호로 버린다. */
+let request = 0
+
 const load = async (id: number): Promise<void> => {
+  const current = ++request
   loading.value = true
   try {
     const response = await adminAuditApi.getActivity(id)
+    if (current !== request) return
     activity.value = response.data.data
   } catch (error) {
+    if (current !== request) return
     message.error(getApiErrorMessage(error, '감사 로그를 불러오지 못했습니다.'))
     emit('update:open', false)
   } finally {
-    loading.value = false
+    if (current === request) {
+      loading.value = false
+    }
   }
 }
 
@@ -113,7 +121,7 @@ const goApplicantEvents = (): void => {
         <a-button v-if="activity?.applicationId != null" @click="goApplicantEvents">
           이 지원서의 지원자 이벤트 보기
         </a-button>
-        <span v-else class="empty-text">이 행위는 특정 지원서에 연결되어 있지 않습니다</span>
+        <span v-else class="empty-text">이 행위는 특정 지원서에 연결되어 있지 않습니다.</span>
         <a-button @click="close">닫기</a-button>
       </div>
     </template>

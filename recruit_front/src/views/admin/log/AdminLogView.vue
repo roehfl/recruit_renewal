@@ -91,7 +91,7 @@ onMounted(() => {
         type="warning"
         show-icon
         class="mask-notice"
-        message="IP 주소·브라우저 정보(User-Agent)는 ***로 가려져 있습니다"
+        message="IP 주소·브라우저 정보(User-Agent)와 지원자 이벤트의 사용자 가명키·사용자 유형은 ***로 가려져 있습니다"
         description="원문 확인에는 개인정보 관리자 권한(ROLE_PRIVACY_ADMIN)이 필요합니다."
       />
 

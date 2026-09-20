@@ -15,7 +15,7 @@ import type {
 } from '@/types/admin/auditLog'
 import AuditLogDrawer from './AuditLogDrawer.vue'
 import { ACTION_RESULT_OPTIONS, ACTION_TYPE_OPTIONS, TARGET_TYPE_OPTIONS, actionResultTag, actionTypeLabel, actorTypeLabel, targetTypeLabel } from './logLabel'
-import { RANGE_PRESETS, type DateRange, presetRange, rangeError, toDateTimeRange } from './logQuery'
+import { LOG_PAGE_SIZE, MAX_RANGE_DAYS, RANGE_PRESETS, type DateRange, presetRange, rangeError, toDateTimeRange } from './logQuery'
 
 /*
  * 감사 로그 탭. 관리자·시스템의 서버 행위 증적이라 지원자 스코프가 아니다.
@@ -23,7 +23,6 @@ import { RANGE_PRESETS, type DateRange, presetRange, rangeError, toDateTimeRange
  * 진입 시 자동 조회하지 않는다(조회 버튼을 눌러야 첫 조회).
  */
 
-const PAGE_SIZE = 20
 const DEFAULT_RANGE_DAYS = 30
 
 const emit = defineEmits<{ (e: 'open-applicant-events', applicationId: number): void }>()
@@ -56,7 +55,7 @@ const columns = [
 
 const pagination = computed(() => ({
   current: page.value + 1,
-  pageSize: PAGE_SIZE,
+  pageSize: LOG_PAGE_SIZE,
   total: totalElements.value,
   showSizeChanger: false,
 }))
@@ -65,9 +64,7 @@ const asRow = (record: unknown): AuditActivityResponse => record as AuditActivit
 
 const toNumber = (value: string): number | undefined => {
   const trimmed = value.trim()
-  if (!trimmed) return undefined
-  const parsed = Number(trimmed)
-  return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined
+  return /^[0-9]+$/.test(trimmed) ? Number(trimmed) : undefined
 }
 
 const buildQuery = (): Omit<AuditActivityQuery, 'page' | 'size'> => ({
@@ -89,7 +86,7 @@ const loadList = async (): Promise<void> => {
     const response = await adminAuditApi.getActivities({
       ...appliedQuery.value,
       page: page.value,
-      size: PAGE_SIZE,
+      size: LOG_PAGE_SIZE,
     })
     if (request !== listRequest) return
     rows.value = response.data.data.content
@@ -105,7 +102,16 @@ const loadList = async (): Promise<void> => {
   }
 }
 
+const isValidIdInput = (value: string): boolean => {
+  const trimmed = value.trim()
+  return trimmed === '' || /^[0-9]+$/.test(trimmed)
+}
+
 const search = (): void => {
+  if (!isValidIdInput(jobPostingId.value) || !isValidIdInput(applicationId.value)) {
+    message.warning('공고 ID와 지원번호는 숫자로 입력하세요.')
+    return
+  }
   const error = rangeError(range.value[0], range.value[1])
   if (error !== null) {
     message.warning(error)
@@ -155,9 +161,13 @@ const openDetail = (row: AuditActivityResponse): void => {
 
 const onRow = (record: unknown) => ({ onClick: () => openDetail(asRow(record)) })
 
-/** 지원자 이벤트 탭에서 넘어올 때: 다른 조건을 비우고 지원번호만 걸어 바로 조회한다. */
+/**
+ * 지원자 이벤트 탭에서 넘어올 때: 다른 조건을 비우고 지원번호만 걸어 바로 조회한다.
+ * 넘어온 지원번호의 이력을 놓치지 않기 위해 기간을 최대(90일)로 연다.
+ */
 const applyApplicationId = async (targetApplicationId: number): Promise<void> => {
   reset()
+  range.value = presetRange(MAX_RANGE_DAYS, new Date())
   applicationId.value = String(targetApplicationId)
   await nextTick()
   search()

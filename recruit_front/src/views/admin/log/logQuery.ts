@@ -16,6 +16,9 @@ export type DateRange = [string, string]
 /** 프리셋 버튼(포함 일수). */
 export const RANGE_PRESETS = [1, 7, 30, MAX_RANGE_DAYS] as const
 
+/** 두 탭 목록의 페이지 크기. 서버 상한은 100 이다. */
+export const LOG_PAGE_SIZE = 20
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 const toDateOnly = (value: string): Date => {
@@ -30,7 +33,7 @@ export const presetRange = (days: number, today: Date): DateRange => {
 }
 
 /** 시작일·종료일을 포함한 일수. 같은 날이면 1이다. */
-export const rangeDays = (from: string, to: string): number =>
+const rangeDays = (from: string, to: string): number =>
   Math.round((toDateOnly(to).getTime() - toDateOnly(from).getTime()) / MS_PER_DAY) + 1
 
 /** 조회 전에 부르는 검증. 통과하면 null, 아니면 화면에 띄울 한글 메시지. */

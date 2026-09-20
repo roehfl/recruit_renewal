@@ -11,7 +11,7 @@ import type { ClientEventSeverity, ClientEventType } from '@/types/clientEvent'
 import ApplicantEventDrawer from './ApplicantEventDrawer.vue'
 import ApplicantFinderPanel from './ApplicantFinderPanel.vue'
 import { EVENT_TYPE_OPTIONS, SEVERITY_OPTIONS, eventTypeLabel, severityColor } from './logLabel'
-import { RANGE_PRESETS, type DateRange, presetRange, rangeError, toDateTimeRange } from './logQuery'
+import { LOG_PAGE_SIZE, MAX_RANGE_DAYS, RANGE_PRESETS, type DateRange, presetRange, rangeError, toDateTimeRange } from './logQuery'
 
 /*
  * 지원자 이벤트 탭. 지원자 찾기로 지원번호를 고정한 뒤 그 지원자의 브라우저 오류를 본다.
@@ -19,7 +19,6 @@ import { RANGE_PRESETS, type DateRange, presetRange, rangeError, toDateTimeRange
  * 진입 시 자동 조회하지 않는다.
  */
 
-const PAGE_SIZE = 20
 const DEFAULT_RANGE_DAYS = 7
 
 const emit = defineEmits<{ (e: 'open-audit', applicationId: number): void }>()
@@ -54,7 +53,7 @@ const columns = [
 
 const pagination = computed(() => ({
   current: page.value + 1,
-  pageSize: PAGE_SIZE,
+  pageSize: LOG_PAGE_SIZE,
   total: totalElements.value,
   showSizeChanger: false,
 }))
@@ -82,7 +81,7 @@ const loadList = async (): Promise<void> => {
     const response = await adminClientEventApi.getClientEvents({
       ...appliedQuery.value,
       page: page.value,
-      size: PAGE_SIZE,
+      size: LOG_PAGE_SIZE,
     })
     if (request !== listRequest) return
     rows.value = response.data.data.content
@@ -182,9 +181,13 @@ const filterBySession = async (sessionId: string): Promise<void> => {
   search()
 }
 
-/** 감사 로그 탭에서 넘어올 때: 지원번호만 걸고 바로 조회한다. */
+/**
+ * 감사 로그 탭에서 넘어올 때: 지원번호만 걸고 바로 조회한다.
+ * 넘어온 지원번호의 이력을 놓치지 않기 위해 기간을 최대(90일)로 연다.
+ */
 const applyApplicationId = async (applicationId: number): Promise<void> => {
   reset()
+  range.value = presetRange(MAX_RANGE_DAYS, new Date())
   await nextTick()
   await onSelectApplicant(applicationId, null)
 }
