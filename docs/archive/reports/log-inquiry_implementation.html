@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>로그 조회 화면 - 설계·구현 완료</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal</div>
+  <h1>로그 조회 화면 — 설계·구현 완료</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge info">프론트 전용</span>
+  <span class="badge pending">화면 수동 확인 대기</span>
+  <span class="badge muted">작성일: 2026-09-20</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>관리자 콘솔에 <strong>로그 조회</strong> 화면(<code>/admin/logs</code>)을 추가했다. 탭 2개로 지원자 브라우저 오류(<code>ClientEventLog</code>)와 관리자·시스템 서버 행위 증적(<code>ActivityLog</code>)을 조회한다.</p>
+      <p>두 조회 API는 이미 있던 것이라 <strong>백엔드 변경은 0건</strong>이다. 계약 변경도 없다.</p>
+      <p>주 용도는 CS·사고 추적이다. 두 로그 모두 지원자 이름·연락처를 저장하지 않으므로, 이름·휴대폰으로 지원번호를 찾아 주는 <strong>지원자 찾기</strong>를 지원자 이벤트 탭 안에 두었다.</p>
+      <p>구현은 12개 태스크로 나눠 진행했고 커밋 12건(<code>2f190b4</code>~<code>4295e81</code>)으로 끝냈다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">설계 문서 추가됨</span></p>
+      <p><span class="badge done">구현 계획 추가됨</span></p>
+      <p><span class="badge done">프론트 구현 완료</span></p>
+      <p><span class="badge done">도메인 카드 갱신 완료</span></p>
+      <p><span class="badge done">단위 테스트 통과</span></p>
+      <p><span class="badge info">백엔드 변경 없음</span></p>
+      <p><span class="badge pending">실제 화면 수동 확인</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>라우트 <code>/admin/logs</code>(<code>AdminLogInquiry</code>) 신설</li>
+          <li>탭 2개 — <code>지원자 이벤트</code>(기본) / <code>감사 로그</code></li>
+          <li>지원자 찾기(이름·휴대폰 → 지원번호) + 지원번호 직접 입력</li>
+          <li>탭별 필터·목록·페이저·상세 drawer</li>
+          <li>탭 간 크로스 점프(지원번호 축)</li>
+          <li>권한별 화면 가드와 마스킹 안내</li>
+          <li>딥링크 <code>?tab=</code>·<code>?applicationId=</code> 진입 파싱</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>사이드바 메뉴 등록 — 관리자 메뉴는 DB <code>menu</code> 테이블에서 렌더링한다. 배포 후 <code>/admin/menus</code>에서 소메뉴를 만들어야 사이드바에 뜬다(URL 직접 입력은 동작).</li>
+          <li><code>ROLE_PRIVACY_ADMIN</code> 전용 계정의 <code>/admin</code> 진입 — 라우트 가드 <code>ADMIN_ROLES</code> 변경이 필요해 별도 판단으로 남겼다.</li>
+          <li>지원현황 화면의 "로그 보기" 링크 — 받는 쪽(딥링크 파싱)은 구현됐고, 링크를 거는 쪽만 남았다.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>감사 검색에 <code>correlationId</code> 필터 추가(백엔드 변경 필요)</li>
+          <li>로그 검색 API에 <code>name</code>·<code>phoneNumber</code> 추가(감사 로그 PII-free 원칙 위배)</li>
+          <li><code>POST /admin/client-events/cleanup</code> 수동 삭제 버튼</li>
+          <li>로그 엑셀 반출(반출 자체가 감사 대상이라 별도 설계 필요)</li>
+          <li>필터 상태를 URL에 되쓰기</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>화면 구조</h2>
+    <div class="card">
+      <pre>/admin/logs?tab=client|audit&amp;applicationId=...
+└ AdminLogView.vue            페이지 헤더 · 권한 가드 · 마스킹 안내 · 탭 · 딥링크 파싱
+  ├ [탭1] ApplicantEventPanel.vue      기본 탭
+  │    ├ ApplicantFinderPanel.vue      지원자 찾기(접이식) + 지원번호 직접 입력
+  │    ├ 조회 대상 배너                 선택된 지원번호 · 해제
+  │    ├ 필터 + 목록 + 페이저
+  │    └ ApplicantEventDrawer.vue      상세
+  └ [탭2] AuditLogPanel.vue
+       ├ 필터(공고 ID·지원번호 포함) + 목록 + 페이저
+       └ AuditLogDrawer.vue            상세</pre>
+      <p class="small">감사 로그는 관리자·시스템의 행위 증적이라 지원자 스코프가 아니다. 지원자 찾기와 조회 대상 배너는 <code>지원자 이벤트</code> 탭 안에만 있고, 감사 탭은 지원번호를 필터 입력칸으로 직접 받는다.</p>
+      <p class="small">두 탭 모두 <strong>진입 시 자동 조회하지 않는다</strong>. 탭 버튼에 건수 배지를 두지 않고 목록 헤더의 <code>총 N건</code> 한 곳에서만 건수를 보여 준다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>사용 API</h2>
+    <p class="small">전부 기존 🟢 엔드포인트다. 신규·변경 엔드포인트는 없다.</p>
+    <table>
+      <tr><th>화면 동작</th><th>메서드</th><th>경로</th><th>소유 카드</th></tr>
+      <tr><td>지원자 찾기</td><td><code>GET</code></td><td><code>/admin/applications</code></td><td>admin-application</td></tr>
+      <tr><td>지원자 이벤트 목록</td><td><code>GET</code></td><td><code>/admin/client-events</code></td><td>client-event-log</td></tr>
+      <tr><td>지원자 이벤트 상세</td><td><code>GET</code></td><td><code>/admin/client-events/{id}</code></td><td>client-event-log</td></tr>
+      <tr><td>감사 로그 목록</td><td><code>GET</code></td><td><code>/admin/audit/activities</code></td><td>privacy-audit-audit</td></tr>
+      <tr><td>감사 로그 상세</td><td><code>GET</code></td><td><code>/admin/audit/activities/{id}</code></td><td>privacy-audit-audit</td></tr>
+    </table>
+    <p class="small">상세는 목록 행 데이터를 재사용하지 않고 단건 API를 다시 부른다. 404로 없는 행을 구분할 수 있고, 목록 페이지가 바뀌어도 drawer 내용이 흔들리지 않는다.</p>
+  </section>
+
+  <section>
+    <h2>검증 및 비즈니스 규칙</h2>
+
+    <h3>기간 상한</h3>
+    <div class="card">
+      <p>두 백엔드 서비스(<code>AuditActivityReadService</code>·<code>ClientEventLogReadService</code>)는 <code>Duration.between(from, to)</code>이 90일을 넘으면 400을 낸다. 날짜 개수가 아니라 <code>Duration</code> 판정이다.</p>
+      <p>화면은 날짜만 고르고 <code>시작일T00:00:00</code> ~ <code>종료일T23:59:59</code>를 보내므로, <strong>시작일·종료일 차이가 89일까지만 통과</strong>한다. 그래서 표기·프리셋·검증을 모두 "시작일·종료일 포함 일수" 기준으로 맞췄다.</p>
+      <table>
+        <tr><th>프리셋</th><th>시작일</th><th>차이</th><th>비고</th></tr>
+        <tr><td>1일</td><td>종료일</td><td>0일</td><td>당일만</td></tr>
+        <tr><td>7일</td><td>종료일 − 6일</td><td>6일</td><td>지원자 이벤트 기본값</td></tr>
+        <tr><td>30일</td><td>종료일 − 29일</td><td>29일</td><td>감사 로그 기본값</td></tr>
+        <tr><td>90일</td><td>종료일 − 89일</td><td>89일</td><td>상한</td></tr>
+      </table>
+      <p class="small">조회 전에 <code>rangeError</code>로 먼저 막는다. 서버 400을 그대로 띄우지 않는다.</p>
+    </div>
+
+    <h3>권한</h3>
+    <table>
+      <tr><th>권한</th><th>화면 진입</th><th>조회</th><th>민감 필드</th><th>화면 처리</th></tr>
+      <tr><td><code>ROLE_RECRUIT_ADMIN</code></td><td><span class="badge done">가능</span></td><td><span class="badge done">가능</span></td><td><code>***</code></td><td>마스킹 안내 배너 표시</td></tr>
+      <tr><td><code>ROLE_PRIVACY_ADMIN</code></td><td><span class="badge out">불가</span></td><td>—</td><td>—</td><td><code>ADMIN_ROLES</code> 가드에 막힘(미해결)</td></tr>
+      <tr><td><code>ROLE_ADMIN</code> 단독</td><td><span class="badge warn">통과</span></td><td><span class="badge out">403</span></td><td>—</td><td>탭을 렌더링하지 않고 안내만 표시</td></tr>
+    </table>
+    <p class="small"><code>ROLE_ADMIN</code> 단독 계정이 조회를 보내면 공통 인터셉터가 403을 받아 <code>/403</code>으로 튕긴다. 그래서 탭 본문 자체를 렌더링하지 않는다(<code>AdminRetentionView</code>와 같은 방식).</p>
+
+    <h3>마스킹</h3>
+    <div class="card">
+      <p>마스킹 판정은 <strong>서버가 한다</strong>. 화면은 판정하지 않고 받은 값을 그대로 출력한다.</p>
+      <table>
+        <tr><th>로그</th><th>마스킹 대상</th><th>원문 조건</th></tr>
+        <tr><td>감사 로그</td><td><code>ipAddress</code> · <code>userAgent</code></td><td><code>ROLE_PRIVACY_ADMIN</code></td></tr>
+        <tr><td>지원자 이벤트</td><td><code>ipAddress</code> · <code>userAgent</code> · <code>principalHash</code> · <code>principalType</code></td><td><code>ROLE_PRIVACY_ADMIN</code></td></tr>
+      </table>
+      <p class="small">관리자 화면 규칙에 따라 지원자 찾기 결과의 이름·생년월일은 마스킹하지 않는다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>탭 간 이동</h2>
+    <div class="card">
+      <h3>감사 로그 → 지원자 이벤트</h3>
+      <div class="transition">
+        <span class="state">감사 상세</span>
+        <span class="arrow">→</span>
+        <span class="action">이 지원서의 지원자 이벤트 보기</span>
+        <span class="arrow">→</span>
+        <span class="state">지원자 이벤트 탭</span>
+        <span class="arrow">→</span>
+        <span class="action">조회 대상 배너 설정 · 기간 90일 · 즉시 조회</span>
+      </div>
+      <p class="small"><code>applicationId</code>가 없는 행(엑셀 반출·파기 배치·전형결과 발표 등)은 버튼 대신 "특정 지원서에 연결되어 있지 않습니다." 문구를 보여 준다.</p>
+
+      <h3>지원자 이벤트 → 감사 로그</h3>
+      <div class="transition">
+        <span class="state">이벤트 상세</span>
+        <span class="arrow">→</span>
+        <span class="action">이 지원서 관련 감사 로그 보기</span>
+        <span class="arrow">→</span>
+        <span class="state">감사 로그 탭</span>
+        <span class="arrow">→</span>
+        <span class="action">지원번호 필터 설정 · 기간 90일 · 즉시 조회</span>
+      </div>
+
+      <h3>세션 단위 조회</h3>
+      <div class="transition">
+        <span class="state">이벤트 상세</span>
+        <span class="arrow">→</span>
+        <span class="action">같은 세션 이벤트 모두 보기</span>
+        <span class="arrow">→</span>
+        <span class="state">조회 대상 해제</span>
+        <span class="arrow">→</span>
+        <span class="action">clientSessionId 로만 조회</span>
+      </div>
+      <p class="small">조회 대상(지원번호)을 일부러 푼다. 한 세션에는 지원서 필드가 빈 행(전역 JS 오류·네트워크 오류 등)도 섞여 있어, 지원번호를 함께 걸면 그 행들이 빠지기 때문이다.</p>
+      <p class="small"><code>a-tab-pane</code>은 처음 활성화되기 전까지 렌더링하지 않으므로(lazy), 탭을 바꾼 뒤 <code>nextTick</code>으로 패널 마운트를 기다린 다음 노출 메서드를 부른다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>변경 파일</h2>
+    <p class="small">20개 파일, 1946줄 추가 / 13줄 삭제. 전부 <code>recruit_front/</code> 와 <code>docs/domains/</code> 이다.</p>
+    <table>
+      <tr><th>구분</th><th>파일</th><th>소유 카드</th></tr>
+      <tr><td>view</td><td><code>{FE}/views/admin/log/AdminLogView.vue</code></td><td>client-event-log</td></tr>
+      <tr><td>view</td><td><code>{FE}/views/admin/log/ApplicantEventPanel.vue</code></td><td>client-event-log</td></tr>
+      <tr><td>view</td><td><code>{FE}/views/admin/log/ApplicantFinderPanel.vue</code></td><td>client-event-log</td></tr>
+      <tr><td>view</td><td><code>{FE}/views/admin/log/ApplicantEventDrawer.vue</code></td><td>client-event-log</td></tr>
+      <tr><td>view</td><td><code>{FE}/views/admin/log/AuditLogPanel.vue</code></td><td>privacy-audit-audit</td></tr>
+      <tr><td>view</td><td><code>{FE}/views/admin/log/AuditLogDrawer.vue</code></td><td>privacy-audit-audit</td></tr>
+      <tr><td>util</td><td><code>{FE}/views/admin/log/logLabel.ts</code></td><td>client-event-log</td></tr>
+      <tr><td>util</td><td><code>{FE}/views/admin/log/logQuery.ts</code></td><td>client-event-log</td></tr>
+      <tr><td>api</td><td><code>{FE}/api/admin/adminClientEventApi.ts</code></td><td>client-event-log</td></tr>
+      <tr><td>api</td><td><code>{FE}/api/admin/adminAuditApi.ts</code></td><td>privacy-audit-audit</td></tr>
+      <tr><td>api(수정)</td><td><code>{FE}/api/admin/adminApplicationApi.ts</code> — <code>searchApplicants</code> 추가</td><td>admin-application</td></tr>
+      <tr><td>types</td><td><code>{FE}/types/admin/clientEventLog.ts</code></td><td>client-event-log</td></tr>
+      <tr><td>types</td><td><code>{FE}/types/admin/auditLog.ts</code></td><td>privacy-audit-audit</td></tr>
+      <tr><td>route(수정)</td><td><code>{FE}/routes/adminRoutes.ts</code> — <code>AdminLogInquiry</code> 추가</td><td>client-event-log</td></tr>
+      <tr><td>test</td><td><code>{FE}/views/admin/log/__tests__/logQuery.spec.ts</code></td><td>client-event-log</td></tr>
+      <tr><td>test</td><td><code>{FE}/views/admin/log/__tests__/logLabel.spec.ts</code></td><td>client-event-log</td></tr>
+      <tr><td>docs</td><td><code>docs/domains/client-event-log.md</code>, <code>privacy-audit-audit.md</code>, <code>_index.md</code>, <code>admin-application.md</code></td><td>—</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>테스트 결과</h2>
+    <table>
+      <tr><th>검증</th><th>명령</th><th>결과</th></tr>
+      <tr><td>타입 검사</td><td><code>npm run type-check</code></td><td><span class="badge done">오류 0건</span></td></tr>
+      <tr><td>단위 테스트(전체)</td><td><code>npx vitest run</code></td><td><span class="badge done">17 파일 / 112건 통과</span></td></tr>
+      <tr><td>신규 단위 테스트</td><td><code>npx vitest run src/views/admin/log</code></td><td><span class="badge done">2 파일 / 18건 통과</span></td></tr>
+      <tr><td>프로덕션 빌드</td><td><code>npm run build</code></td><td><span class="badge done">성공 (<code>AdminLogView</code> 청크 30.19 kB)</span></td></tr>
+      <tr><td>문서 점검</td><td><code>node tools/check-docs.mjs</code></td><td><span class="badge done">오류 0건 / 경고 11건(기존 크기 경고)</span></td></tr>
+      <tr><td>백엔드 테스트</td><td>—</td><td><span class="badge info">미실행(백엔드 변경 0건, 계약 영향 없음)</span></td></tr>
+      <tr><td>화면 수동 확인</td><td>—</td><td><span class="badge pending">미실행(관리자 로그인 필요)</span></td></tr>
+    </table>
+    <p class="small">신규 단위 테스트는 기간 프리셋 일수·상한 검증·ISO 변환(10건)과 라벨 맵·select 옵션 개수(8건)를 덮는다. 화면 컴포넌트는 타입 검사와 프로덕션 빌드(템플릿 컴파일 포함)로만 검증했다.</p>
+  </section>
+
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>한 화면 안에 탭 2개로 둔다</td><td>사용자·권한이 같고, 사고 조사 때 두 로그를 오간다. 사이드바 항목도 1개로 끝난다.</td></tr>
+      <tr><td>2</td><td>지원자 찾기를 지원자 이벤트 탭 안에만 둔다</td><td>감사 로그는 관리자·시스템 행위 증적이라 지원자 스코프가 아니다.</td></tr>
+      <tr><td>3</td><td>이름·휴대폰 검색은 기존 <code>GET /admin/applications</code>로 푼다</td><td>백엔드 신규 0건. 두 로그 테이블에 이름·휴대폰이 없어 지원번호 변환 단계만 있으면 된다.</td></tr>
+      <tr><td>4</td><td>지원자 찾기 결과에 휴대폰 컬럼을 두지 않는다</td><td><code>AdminApplicationSummaryResponse</code>에 휴대폰 필드가 없다(검색 조건으로만 쓰인다). 동명이인은 생년월일로 가린다.</td></tr>
+      <tr><td>5</td><td>지원번호 직접 입력칸을 항상 노출한다</td><td>파기된 지원자는 이름 스냅샷이 익명화돼 검색되지 않는다. 이 경로만 남는다.</td></tr>
+      <tr><td>6</td><td>감사 검색에 <code>correlationId</code> 필터를 넣지 않는다</td><td>백엔드 변경이 필요하다. 추적은 <code>applicationId</code> 축으로 대체한다.</td></tr>
+      <tr><td>7</td><td>진입 시 자동 조회하지 않는다</td><td>주 용도가 CS 추적이라 검색키를 먼저 받는 편이 맞다. 감사 탭도 조건을 지정한 뒤 조회한다.</td></tr>
+      <tr><td>8</td><td>탭 버튼에 건수 배지를 두지 않는다</td><td>두 탭 필터가 독립이라 반대쪽 건수는 지금 보는 조건과 무관하고, 목록 헤더에 <code>총 N건</code>이 이미 있다.</td></tr>
+      <tr><td>9</td><td>기간을 "포함 일수" 기준으로 표기·계산한다</td><td>백엔드가 <code>Duration</code>으로 판정해 <code>23:59:59</code>를 붙이면 차이 89일이 실질 상한이다.</td></tr>
+      <tr><td>10</td><td>크로스 점프 도착 시 기간을 90일로 연다</td><td>도착 탭의 기본 기간(7일·30일)에 걸려 빈 목록이 나오는 것을 막는다.</td></tr>
+      <tr><td>11</td><td>cleanup 버튼을 만들지 않는다</td><td>매일 04:00 스케줄러가 같은 일을 하고, 감사 로그도 남지 않는 파괴 동작이다.</td></tr>
+      <tr><td>12</td><td>URL 쿼리는 진입 시 읽기만 한다</td><td>다른 화면에서 넘어오는 입구만 있으면 된다. 필터 전체를 직렬화해 되쓰는 것은 얻는 것보다 비싸다.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>리뷰 반영</h2>
+    <p class="small">구현 후 전체 리뷰에서 나온 지적을 커밋 <code>1b3280f</code>로 반영했다.</p>
+    <table>
+      <tr><th>심각도</th><th>지적</th><th>조치</th></tr>
+      <tr><td><span class="badge warn">Important</span></td><td>두 drawer의 단건 조회에 요청 경쟁 가드가 없다. 늦게 온 실패 응답이 이미 열려 있는 다른 drawer를 닫는다.</td><td>기존 <code>MessageHistoryDrawer</code> 방식의 요청 번호 가드를 성공·실패·<code>finally</code>에 모두 적용</td></tr>
+      <tr><td><span class="badge warn">Important</span></td><td>감사 탭 숫자 필터에 문자를 넣으면 조용히 버려져 필터 없이 전체가 조회된다.</td><td>숫자 검증 후 경고를 띄우고 조회를 보내지 않도록 변경</td></tr>
+      <tr><td><span class="badge info">설계 준수</span></td><td>마스킹 안내 배너가 <code>principalHash</code>·<code>principalType</code>를 언급하지 않는다.</td><td>배너 문구에 반영</td></tr>
+      <tr><td><span class="badge info">Minor</span></td><td>크로스 점프 도착 시 기간이 기본값으로 초기화돼 빈 목록이 나올 수 있다.</td><td>도착 시 기간을 최대(90일)로 열도록 변경</td></tr>
+      <tr><td><span class="badge info">Minor</span></td><td>쓰지 않는 <code>export</code>, 두 패널에 중복된 페이지 크기 상수</td><td><code>export</code> 제거, <code>LOG_PAGE_SIZE</code>로 통합</td></tr>
+      <tr><td><span class="badge muted">보류</span></td><td>두 drawer가 <code>defineModel</code> 대신 <code>props</code> + <code>emit</code>을 쓴다(레포 관례는 <code>defineModel</code>).</td><td>동작은 같아 이번 범위에서 제외</td></tr>
+      <tr><td><span class="badge muted">보류</span></td><td>지원자 찾기 결과 50건 절단이 화면에 드러나지 않는다.</td><td>이번 범위에서 제외</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>미결 사항</h2>
+    <table>
+      <tr><th>#</th><th>질문</th><th>현재 입장</th></tr>
+      <tr><td>1</td><td><code>ROLE_PRIVACY_ADMIN</code> 전용 계정이 <code>/admin</code>에 못 들어오는 것을 고칠 것인가?</td><td>미해결. <code>ADMIN_ROLES</code>는 로그인 직후 이동 분기와 공유하는 값이라 영향 범위가 넓다. 별도 결정 필요.</td></tr>
+      <tr><td>2</td><td>지원현황 화면에 "로그 보기" 링크를 달 것인가?</td><td>받는 쪽은 구현됐다. 링크를 거는 것은 admin-application 화면 변경이라 별도 슬라이스.</td></tr>
+      <tr><td>3</td><td><code>client-event-log</code> 카드가 32.1KB로 권장 30KB를 넘었다. 분리할 것인가?</td><td>상한 40KB까지 여유가 있다. 더 쌓이면 하위 도메인 분리 검토.</td></tr>
+      <tr><td>4</td><td>두 drawer를 <code>defineModel</code>로 맞출 것인가?</td><td>동작 차이는 없다. 관례 정렬이 필요하면 별도 작업.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>다음 단계 권장</h2>
+    <div class="card">
+      <ol class="list">
+        <li><strong>화면 수동 확인</strong> — 관리자 계정으로 로그인해 조회 전 상태, 기간 상한 경고, 지원자 찾기, 크로스 점프 양방향, 마스킹 표시, 탭 전환 후 상태 유지를 확인한다. 자동 테스트가 덮지 못하는 구간이다.</li>
+        <li><strong>사이드바 메뉴 등록</strong> — <code>/admin/menus</code>에서 <code>ADMIN</code> 사이트에 <code>path=/admin/logs</code> 소메뉴를 만든다. 운영 작업이며 코드로는 추가되지 않는다.</li>
+        <li><strong>지원현황 → 로그 보기 링크</strong> — 별도 슬라이스로 진행한다. 딥링크 규격은 이미 준비돼 있다.</li>
+        <li><strong><code>ROLE_PRIVACY_ADMIN</code> 진입 문제</strong> — 고칠지 말지 먼저 정한다. 고친다면 로그인 직후 이동 분기까지 함께 본다.</li>
+      </ol>
+    </div>
+  </section>
+
+</main>
+
+</body>
+</html>
