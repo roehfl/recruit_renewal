@@ -22,6 +22,13 @@ import java.util.stream.Collectors;
 @Component
 public class AuditRequestContextResolver {
 
+    /**
+     * 스케줄러 등 사람이 아닌 실행의 예약 actorId(Phase 10). 임직원 loginId 는 LDAP 사번 체계라
+     * 이 값과 충돌하지 않는다. 이 값이면 감사에 {@code ActorType.SYSTEM} 으로 남는다 —
+     * 자동 실행이 임직원 행위로 기록되면 감사 로그가 거짓이 된다.
+     */
+    public static final String SYSTEM_ACTOR_ID = "SYSTEM";
+
     public AuditActorContext resolve() {
         return resolve(null);
     }
@@ -45,7 +52,14 @@ public class AuditRequestContextResolver {
             actorId = knownEmployeeActor;
         }
 
-        ActorType actorType = (actorId == null || actorId.isBlank()) ? ActorType.ANONYMOUS : ActorType.EMPLOYEE;
+        ActorType actorType;
+        if (actorId == null || actorId.isBlank()) {
+            actorType = ActorType.ANONYMOUS;
+        } else if (SYSTEM_ACTOR_ID.equals(actorId)) {
+            actorType = ActorType.SYSTEM;
+        } else {
+            actorType = ActorType.EMPLOYEE;
+        }
 
         String ipAddress = null;
         String userAgent = null;

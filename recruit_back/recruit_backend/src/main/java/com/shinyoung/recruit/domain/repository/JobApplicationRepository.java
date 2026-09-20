@@ -18,6 +18,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -110,6 +111,18 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
     List<Long> findIdsByIdInAndPurgeResult(
             @Param("ids") List<Long> ids,
             @Param("purgeResult") PurgeResult purgeResult);
+
+    /**
+     * 아직 파기되지 않은 지원서를 가진 마감 공고 중 가장 이른 마감 시각(Phase 10 스케줄 게이트).
+     * 결과가 없으면 파기 예정이 없다는 뜻이다.
+     */
+    @Query("""
+            select min(application.jobPosting.closedAt)
+              from JobApplication application
+             where application.purgeResult is null
+               and application.jobPosting.closedAt is not null
+            """)
+    Optional<LocalDateTime> findEarliestUnpurgedClosedAt();
 
     Optional<JobApplication> findByApplicantIdAndJobPostingId(Long applicantId, Long jobPostingId);
 

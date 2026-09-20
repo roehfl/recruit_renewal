@@ -1,12 +1,14 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.common.hash.AuditHmac;
+import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.entity.ApplicationAttachment;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.PurgeBatch;
 import com.shinyoung.recruit.domain.entity.Stage;
 import com.shinyoung.recruit.domain.entity.StageResult;
+import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationPiiPurgeRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
@@ -49,6 +51,10 @@ public class PurgeItemProcessor {
     public record PurgeItemOutcome(PurgeItemStatus status, AuditReasonCode reasonCode) {
     }
 
+    /** Applicant ciHash 익명화 sentinel 접두(리뷰 2차 #1) — 재익명화 스킵 판정에도 쓴다. */
+    private static final String PURGED_CI_HASH_PREFIX = "PURGED:";
+
+    private final ApplicantRepository applicantRepository;
     private final JobApplicationRepository jobApplicationRepository;
     private final StageRepository stageRepository;
     private final StageResultRepository stageResultRepository;
@@ -63,8 +69,12 @@ public class PurgeItemProcessor {
     private final PurgeJobItemRepository purgeJobItemRepository;
     private final Clock clock;
 
+    /**
+     * @param forced 정보주체 삭제 요청 등 강제 파기(Phase 10). true 면 적격성 판정을
+     *               ALREADY_PURGED·RETENTION_HOLD 두 가지로 줄인다 — 보존기간·anchor·전형 종료 여부를 보지 않는다.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public PurgeItemOutcome process(Long batchId, Long applicationId, LocalDateTime scanAt) {
+    public PurgeItemOutcome process(Long batchId, Long applicationId, LocalDateTime scanAt, boolean forced) {
         PurgeBatch batch = purgeBatchRepository.findById(batchId)
                 .orElseThrow(() -> new IllegalStateException("PurgeBatch not found. id=" + batchId));
         JobApplication application = jobApplicationRepository.findById(applicationId)
@@ -73,15 +83,17 @@ public class PurgeItemProcessor {
         Long jobPostingId = jobPosting.getId();
 
         // 실행 시 eligibility 재검증(dry-run 결과 불신뢰). 탈락 = SKIPPED + 사유(drift 기록).
-        RetentionEligibilityService.EligibilityDecision decision = retentionEligibilityService.evaluate(
-                application,
-                jobPosting,
-                retentionPolicyService.selectPolicy(jobPostingId, scanAt),
-                retentionHoldRepository.existsByApplicationIdAndReleasedAtIsNull(applicationId),
-                finalStages(jobPostingId),
-                finalStageResult(jobPostingId, applicationId),
-                scanAt
-        );
+        RetentionEligibilityService.EligibilityDecision decision = forced
+                ? forcedDecision(application, applicationId)
+                : retentionEligibilityService.evaluate(
+                        application,
+                        jobPosting,
+                        retentionPolicyService.selectPolicy(jobPostingId, scanAt),
+                        retentionHoldRepository.existsByApplicationIdAndReleasedAtIsNull(applicationId),
+                        finalStages(jobPostingId),
+                        finalStageResult(jobPostingId, applicationId),
+                        scanAt
+                );
         if (!decision.eligible()) {
             purgeJobItemRepository.save(
                     PurgeJobItem.skipped(batch, applicationId, jobPostingId, decision.reasonCode()));
@@ -176,6 +188,22 @@ public class PurgeItemProcessor {
     }
 
     /**
+     * 강제 파기 판정(Phase 10) — 보존기간·anchor·전형 상태를 보지 않는다. 남기는 두 가지는
+     * ① 이미 파기된 건(두 번 지울 것이 없다) ② 보류(법적 보존 의무가 삭제 요구권보다 우선).
+     * 정책·전형 조회를 하지 않으므로 불필요한 쿼리도 나가지 않는다.
+     */
+    private RetentionEligibilityService.EligibilityDecision forcedDecision(
+            JobApplication application, Long applicationId) {
+        if (application.getPurgeResult() != null) {
+            return new RetentionEligibilityService.EligibilityDecision(AuditReasonCode.ALREADY_PURGED);
+        }
+        if (retentionHoldRepository.existsByApplicationIdAndReleasedAtIsNull(applicationId)) {
+            return new RetentionEligibilityService.EligibilityDecision(AuditReasonCode.RETENTION_HOLD);
+        }
+        return new RetentionEligibilityService.EligibilityDecision(null);
+    }
+
+    /**
      * Applicant 공통 PII 는 ref-count(설계 §5.2) — 이 지원자의 <b>모든</b> JobApplication 이 파기 대상
      * (purgeResult 세팅)일 때만 익명화. ciHash 는 {@code "PURGED:"+UUID} sentinel(리뷰 2차 #1).
      */
@@ -188,8 +216,25 @@ public class PurgeItemProcessor {
                 .allMatch(sibling -> sibling.getPurgeResult() != null
                         || sibling.getId().equals(application.getId()));
         if (allTargeted) {
-            application.getApplicant().purgePersonalData("PURGED:" + UUID.randomUUID());
+            application.getApplicant().purgePersonalData(PURGED_CI_HASH_PREFIX + UUID.randomUUID());
         }
+    }
+
+    /**
+     * 지원 이력이 없는 계정의 익명화(Phase 10 강제 파기). 지원서가 0건이면 item 처리 경로를 타지 않아
+     * ref-count 익명화가 돌지 않으므로 별도 경로를 둔다. 이미 익명화된 계정은 건너뛴다.
+     *
+     * @return 실제로 익명화했으면 true
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean anonymizeApplicant(Long applicantId) {
+        Applicant applicant = applicantRepository.findById(applicantId)
+                .orElseThrow(() -> new IllegalStateException("Applicant not found. id=" + applicantId));
+        if (applicant.getCiHash() != null && applicant.getCiHash().startsWith(PURGED_CI_HASH_PREFIX)) {
+            return false;
+        }
+        applicant.purgePersonalData(PURGED_CI_HASH_PREFIX + UUID.randomUUID());
+        return true;
     }
 
     private List<Stage> finalStages(Long jobPostingId) {

@@ -143,3 +143,6 @@ client-event-log:
     per-minute-ip: ${CLIENT_EVENT_LOG_RATE_LIMIT_PER_MINUTE_IP:300}
     per-minute-session: ${CLIENT_EVENT_LOG_RATE_LIMIT_PER_MINUTE_SESSION:60}
     per-minute-principal: ${CLIENT_EVENT_LOG_RATE_LIMIT_PER_MINUTE_PRINCIPAL:120}
+retention:
+  # 보존기간 만료 지원서 자동 파기. 게이트(자동 파기 on/off, 다음 파기 예정일)를 통과할 때만 실제 스캔한다.
+  purge-cron: ${RETENTION_PURGE_CRON:0 0 3 * * *}

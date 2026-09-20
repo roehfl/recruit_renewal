@@ -7,6 +7,7 @@ import com.shinyoung.recruit.dto.response.PurgeBatchDetailResponse;
 import com.shinyoung.recruit.enumeration.AuditActionResult;
 import com.shinyoung.recruit.enumeration.AuditActionType;
 import com.shinyoung.recruit.enumeration.AuditTargetType;
+import com.shinyoung.recruit.enumeration.ForcedPurgeReason;
 import com.shinyoung.recruit.enumeration.PurgeBatchStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -95,6 +96,81 @@ public class PurgeBatchLifecycleService {
                 .targetType(AuditTargetType.PURGE_BATCH)
                 .targetId(String.valueOf(batchId))
                 .reasonMessage("execute batch failed")
+                .ipAddress(context.ipAddress())
+                .userAgent(context.userAgent())
+                .build());
+    }
+
+    /** 강제 파기 batch 시작(Phase 10) — item 처리 전에 RUNNING 으로 커밋해 둔다(원장 선기록). */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public PurgeBatch startForced(String actor) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        return purgeBatchRepository.save(PurgeBatch.startForced(now, now, actor));
+    }
+
+    /**
+     * 강제 파기 집계 완료(+PURGE_FORCED 감사, in-tx). {@code completeExecute} 의 마지막 인자는
+     * {@code binaryDeleteFailedCount} 인데, 여기서는 바이너리가 남은 건({@code pendingCount})을 그대로
+     * 실패로 집계해 PARTIAL_FAILED 가 되게 한다 — "DB PURGED + 파일 잔존"을 성공으로 보지 않는
+     * 기존 원칙(9d-1)과 같다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public PurgeBatchDetailResponse completeForced(
+            Long batchId,
+            String applicantRefHash,
+            ForcedPurgeReason reason,
+            long totalCount,
+            long purgedCount,
+            long pendingCount,
+            long skippedCount,
+            long failedCount,
+            String actor
+    ) {
+        PurgeBatch batch = findBatch(batchId);
+        batch.completeExecute(totalCount, purgedCount, pendingCount, skippedCount, failedCount,
+                pendingCount, LocalDateTime.now(clock));
+
+        AuditActorContext context = auditRequestContextResolver.resolve(actor);
+        activityLogService.recordInCurrentTx(AuditEvent.builder()
+                .actorType(context.actorType())
+                .actorId(context.actorId())
+                .actorRoleSnapshot(context.actorRoleSnapshot())
+                .actionType(AuditActionType.PURGE_FORCED)
+                .actionResult(batch.getStatus() == PurgeBatchStatus.PARTIAL_FAILED
+                        ? AuditActionResult.FAILURE
+                        : AuditActionResult.SUCCESS)
+                .targetType(AuditTargetType.PURGE_BATCH)
+                .targetId(String.valueOf(batchId))
+                .reasonMessage(batch.getStatus() == PurgeBatchStatus.PARTIAL_FAILED
+                        ? "forced purge partial failure: failedCount=" + failedCount
+                                + ", pendingCount=" + pendingCount
+                        : null)
+                .ipAddress(context.ipAddress())
+                .userAgent(context.userAgent())
+                .metadata(new ForcedPurgeMetadata(
+                        batchId, applicantRefHash, reason.name(),
+                        totalCount, purgedCount, pendingCount, skippedCount, failedCount))
+                .build());
+
+        return PurgeBatchDetailResponse.of(batch, purgeJobItemRepository.findByPurgeBatchIdOrderByIdAsc(batchId));
+    }
+
+    /** 강제 파기 오케스트레이션 실패 — batch FAILED 확정 + 실패 증적. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void failForced(Long batchId, String actor) {
+        PurgeBatch batch = findBatch(batchId);
+        batch.fail(LocalDateTime.now(clock));
+
+        AuditActorContext context = auditRequestContextResolver.resolve(actor);
+        activityLogService.recordInCurrentTx(AuditEvent.builder()
+                .actorType(context.actorType())
+                .actorId(context.actorId())
+                .actorRoleSnapshot(context.actorRoleSnapshot())
+                .actionType(AuditActionType.PURGE_FORCED)
+                .actionResult(AuditActionResult.FAILURE)
+                .targetType(AuditTargetType.PURGE_BATCH)
+                .targetId(String.valueOf(batchId))
+                .reasonMessage("forced purge batch failed")
                 .ipAddress(context.ipAddress())
                 .userAgent(context.userAgent())
                 .build());

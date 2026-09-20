@@ -59,7 +59,7 @@ public class PurgeExecutionService {
             for (Long applicationId : candidateApplicationIds) {
                 try {
                     PurgeItemProcessor.PurgeItemOutcome outcome =
-                            purgeItemProcessor.process(batch.getId(), applicationId, batch.getScanAt());
+                            purgeItemProcessor.process(batch.getId(), applicationId, batch.getScanAt(), false);
                     switch (outcome.status()) {
                         case PURGED -> purged++;
                         case PENDING -> {

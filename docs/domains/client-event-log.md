@@ -1,11 +1,11 @@
 # 클라이언트 이벤트 로그 (`client-event-log`)
 
 > 경로 표기 `{BE}` `{BT}` `{BR}` `{FE}` — 정의: [_index.md](_index.md). API 경로는 `/api` 접두 생략.
-> 관련 카드: [privacy-audit](privacy-audit.md)(서버 감사 로그 `ActivityLog`·`AuditHmac`·`ROLE_PRIVACY_ADMIN`) · [auth-account](auth-account.md)(`SecurityConfig` 경로 규칙·CORS `X-Request-Id` 노출·`authApi` 텔레메트리 옵션) · [application-sections](application-sections.md)(수동 로깅하는 지원서 섹션 화면) · [job-posting](job-posting.md)(`ApplicationDetailView`의 `skipClientEventLog`)
+> 관련 카드: [privacy-audit-audit](privacy-audit-audit.md)(서버 감사 로그 `ActivityLog`·`AuditHmac`) · [privacy-audit](privacy-audit.md)(`ROLE_PRIVACY_ADMIN` 소비) · [auth-account](auth-account.md)(`SecurityConfig` 경로 규칙·CORS `X-Request-Id` 노출·`authApi` 텔레메트리 옵션) · [application-sections](application-sections.md)(수동 로깅하는 지원서 섹션 화면) · [job-posting](job-posting.md)(`ApplicationDetailView`의 `skipClientEventLog`)
 
 ## 요약
 
-- 브라우저가 `POST /client-events`로 보낸 오류·주요 이벤트를 DB `client_event_log`(`ClientEventLog`)에 쌓는 **운영 진단 로그**. 감사 증적 아님(서버 감사 로그는 [privacy-audit](privacy-audit.md)).
+- 브라우저가 `POST /client-events`로 보낸 오류·주요 이벤트를 DB `client_event_log`(`ClientEventLog`)에 쌓는 **운영 진단 로그**. 감사 증적 아님(서버 감사 로그는 [privacy-audit-audit](privacy-audit-audit.md)).
 - 수집은 **공개·best-effort·fire-and-forget**. FE는 응답을 안 쓰고, 수집 실패를 다시 로깅하지 않는다.
 - 원문 PII 미저장: `message`는 safe code만, `metadata`는 eventType별 allowlist, 사용자는 HMAC만, IP·UA는 서버 추출.
 - 3단 in-memory rate limit(1분 고정 윈도우) 초과 429. 보존 90일(매일 04:00 스케줄러 + 수동 트리거).
@@ -122,7 +122,7 @@
 - 문자열 필드: 제어문자 → 공백, trim, 컬럼 길이로 truncate, blank → null. `routePath`·`apiPath`는 `?` 이후 제거. ({BE}/service/ClientEventLogService.java — safe·stripQuery)
 - `message`: DTO `@Pattern`과 서비스가 같은 safe code 패턴을 이중 검사하고, 통과해도 7자리 이상 숫자열(하이픈 포함, `[0-9][0-9-]{5,}[0-9]`)을 `*`로 바꾼다. ({BE}/service/ClientEventLogService.java — safeMessage·maskLongDigitRuns)
 - `receivedAt` = 서버 `Clock`, 정렬·보존 기준. `clientOccurredAt`은 참고값. ({BE}/service/ClientEventLogService.java — record)
-- 로그인 사용자는 loginId 원문 대신 `principalHash`만 저장한다(secret `AUDIT_HMAC_SECRET`, 비면 기동 실패 — [privacy-audit](privacy-audit.md)). ({BE}/service/ClientEventLogService.java — record)
+- 로그인 사용자는 loginId 원문 대신 `principalHash`만 저장한다(secret `AUDIT_HMAC_SECRET`, 비면 기동 실패 — [privacy-audit-audit](privacy-audit-audit.md)). ({BE}/service/ClientEventLogService.java — record)
 - 엔티티는 insert-only. 필수 6필드(`receivedAt`·`eventType`·`severity`·`source`·`clientSessionId`·`clientEventId`) 누락 시 `InvalidClientEventLogException`. Repository는 `JpaRepository`가 아닌 `Repository` 마커다 — update·단건 delete를 추가하지 않는다. ({BE}/domain/entity/ClientEventLog.java — validateRequired)
 - 킬 스위치 `client-event-log.enabled`(env `CLIENT_EVENT_LOG_ENABLED`) false면 저장 없이 200(Bean Validation 400은 유지). ({BE}/service/ClientEventLogService.java — record)
 

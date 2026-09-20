@@ -1,10 +1,14 @@
 package com.shinyoung.recruit.controller;
 
+import com.shinyoung.recruit.dto.request.ForcedPurgeRequest;
 import com.shinyoung.recruit.dto.request.PurgeExecuteRequest;
 import com.shinyoung.recruit.dto.request.RetentionAnchorRequest;
 import com.shinyoung.recruit.dto.request.RetentionHoldCreateRequest;
 import com.shinyoung.recruit.dto.request.RetentionPolicyRequest;
+import com.shinyoung.recruit.dto.request.RetentionScheduleRequest;
 import com.shinyoung.recruit.dto.response.ApiResponse;
+import com.shinyoung.recruit.dto.response.DataSubjectDetailResponse;
+import com.shinyoung.recruit.dto.response.DataSubjectSummaryResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.dto.response.PurgeBatchDetailResponse;
 import com.shinyoung.recruit.dto.response.PurgeBatchResponse;
@@ -12,8 +16,11 @@ import com.shinyoung.recruit.dto.response.PurgeReconcileResponse;
 import com.shinyoung.recruit.dto.response.RetentionAnchorResponse;
 import com.shinyoung.recruit.dto.response.RetentionHoldResponse;
 import com.shinyoung.recruit.dto.response.RetentionPolicyResponse;
+import com.shinyoung.recruit.dto.response.RetentionScheduleResponse;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.CurrentEmployeeService;
+import com.shinyoung.recruit.service.DataSubjectLookupService;
+import com.shinyoung.recruit.service.ForcedPurgeService;
 import com.shinyoung.recruit.service.PurgeBatchReadService;
 import com.shinyoung.recruit.service.PurgeExecutionService;
 import com.shinyoung.recruit.service.PurgeReconciliationService;
@@ -21,6 +28,7 @@ import com.shinyoung.recruit.service.RetentionAnchorService;
 import com.shinyoung.recruit.service.RetentionDryRunService;
 import com.shinyoung.recruit.service.RetentionHoldService;
 import com.shinyoung.recruit.service.RetentionPolicyService;
+import com.shinyoung.recruit.service.RetentionScheduleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -53,6 +61,9 @@ public class AdminRetentionController {
     private final PurgeExecutionService purgeExecutionService;
     private final PurgeReconciliationService purgeReconciliationService;
     private final CurrentEmployeeService currentEmployeeService;
+    private final DataSubjectLookupService dataSubjectLookupService;
+    private final ForcedPurgeService forcedPurgeService;
+    private final RetentionScheduleService retentionScheduleService;
 
     // ---- RetentionPolicy ----
 
@@ -178,5 +189,56 @@ public class AdminRetentionController {
     @GetMapping("/purge-batches/{batchId}")
     public ResponseEntity<ApiResponse<PurgeBatchDetailResponse>> getBatch(@PathVariable Long batchId) {
         return ResponseEntity.ok(ApiResponse.success(purgeBatchReadService.getBatch(batchId)));
+    }
+
+    // ---- 파기 대상자(정보주체) 조회·강제 파기 ----
+
+    /** 이름·휴대폰·이메일로 파기 대상자 검색(조건 1개 이상 필수, 상한 50건). */
+    @GetMapping("/data-subjects")
+    public ResponseEntity<ApiResponse<List<DataSubjectSummaryResponse>>> searchDataSubjects(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String phoneNumber,
+            @RequestParam(required = false) String email
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                dataSubjectLookupService.search(name, phoneNumber, email)));
+    }
+
+    /** 지원자 1명의 지원서 목록과 지원서별 적격성 판정. hold 사유 원문은 주지 않는다. */
+    @GetMapping("/data-subjects/{applicantId}")
+    public ResponseEntity<ApiResponse<DataSubjectDetailResponse>> getDataSubject(@PathVariable Long applicantId) {
+        return ResponseEntity.ok(ApiResponse.success(dataSubjectLookupService.getDetail(applicantId)));
+    }
+
+    /**
+     * 강제 파기(정보주체 삭제 요청). 보존기간과 무관하게 지원자 1명의 모든 지원서와 계정을 파기한다.
+     * 보류가 걸려 있으면 400.
+     */
+    @PostMapping("/purge-batches/force")
+    public ResponseEntity<ApiResponse<PurgeBatchDetailResponse>> forcePurge(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody ForcedPurgeRequest request
+    ) {
+        String actor = currentEmployeeService.getCurrentEmployeeActor(userDetails);
+        return ResponseEntity.ok(ApiResponse.success(forcedPurgeService.forcePurge(request, actor)));
+    }
+
+    // ---- 자동 파기 스케줄 설정 ----
+
+    /** 자동 파기 on/off, 다음 파기 예정일, 마지막 실행 결과. */
+    @GetMapping("/schedule")
+    public ResponseEntity<ApiResponse<RetentionScheduleResponse>> getSchedule() {
+        return ResponseEntity.ok(ApiResponse.success(retentionScheduleService.getSchedule()));
+    }
+
+    /** 자동 파기 켜기/끄기. 보존 정책이 없으면 켤 수 없다(켜도 전건 스킵되므로). */
+    @PostMapping("/schedule")
+    public ResponseEntity<ApiResponse<RetentionScheduleResponse>> updateSchedule(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody RetentionScheduleRequest request
+    ) {
+        String actor = currentEmployeeService.getCurrentEmployeeActor(userDetails);
+        return ResponseEntity.ok(ApiResponse.success(
+                retentionScheduleService.updateEnabled(request.enabled(), actor)));
     }
 }

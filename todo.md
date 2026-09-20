@@ -37,3 +37,12 @@
 - [ ] `recruit_front/.claude/mock/`: 백엔드 없이 관리자 메시지 화면을 보는 Vite 목업. 쓰려면 `.claude/launch.json`에 실행 설정을 다시 추가해야 한다(커밋에서 제외하려고 지웠다).
   `{ "name": "recruit-front-mock", "runtimeExecutable": "node", "runtimeArgs": ["recruit_front/node_modules/vite/bin/vite.js", "recruit_front", "--config", "recruit_front/.claude/mock/vite.mock.config.ts"], "port": 5174 }`
 - [ ] `design/공고-상세.html`, `design/채용공고-리스트.html`: 2026-09-11에 만든 이번 기능과 무관한 목업(각 약 4MB, 미추적). 필요 없으면 지운다.
+
+## 6. 개인정보 파기 운영 준비
+
+- [ ] **DDL 적용**: `recruit_back/recruit_backend/docs/ops/phase-10-retention-schedule-ddl.sql`(`retention_schedule_setting`). 엔티티와 컬럼 정의가 맞는지 사람이 대조해야 한다(테스트는 이 파일을 실행하지 않는다).
+- [ ] **전역 보존 정책 1건 등록**: 1825일(5년)·`CLOSED_AT`·enabled. 화면(`/admin/retention`)에서 등록할 수 있다. 없으면 자동 파기가 전건 스킵된다.
+- [ ] **메뉴 등록**: `/admin/menus`에 개인정보 파기(`/admin/retention`).
+- [ ] **권한 매핑**: 파기 담당자에게 `ROLE_PRIVACY_ADMIN`. `ROLE_RECRUIT_ADMIN`과 함께 가져야 화면에 들어올 수 있다.
+- [ ] **첫 가동 절차**: 자동 파기를 켜기 전에 수동 dry-run으로 대상 건수를 먼저 확인한다. 건수 상한이 없어 누적분이 한 번에 처리된다.
+- [ ] **환경변수**: `RETENTION_PURGE_CRON`(기본 `0 0 3 * * *`).

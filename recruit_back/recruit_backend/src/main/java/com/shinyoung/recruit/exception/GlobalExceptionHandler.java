@@ -193,7 +193,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
             RetentionPolicyNotFoundException.class,
             RetentionHoldNotFoundException.class,
-            PurgeBatchNotFoundException.class
+            PurgeBatchNotFoundException.class,
+            ApplicantNotFoundException.class
     })
     public ResponseEntity<ApiResponse<Void>> handleRetentionNotFound(RuntimeException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

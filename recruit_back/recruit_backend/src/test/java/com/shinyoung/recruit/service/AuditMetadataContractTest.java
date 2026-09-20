@@ -50,7 +50,10 @@ class AuditMetadataContractTest {
                     "purgedCount", "pendingCount", "skippedCount", "failedCount", "binaryDeleteFailedCount")),
             // Phase 09e — reconciliation sweep coarse 집계(PII-free).
             Map.entry(PurgeReconcileMetadata.class, Set.of("scannedCount", "promotedCount",
-                    "stillPendingCount", "errorCount"))
+                    "stillPendingCount", "errorCount")),
+            // Phase 10 — 정보주체 삭제 요청 등에 의한 강제 파기 coarse 집계(PII-free).
+            Map.entry(ForcedPurgeMetadata.class, Set.of("purgeBatchId", "applicantRefHash", "reasonCode",
+                    "totalCount", "purgedCount", "pendingCount", "skippedCount", "failedCount"))
     );
 
     @Test

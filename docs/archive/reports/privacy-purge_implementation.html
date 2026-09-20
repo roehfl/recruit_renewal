@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>개인정보 파기 구현 결과</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal</div>
+  <h1>개인정보 파기 구현 결과</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge done">전체 테스트 통과</span>
+  <span class="badge info">Task 20개 · 리뷰 20회</span>
+  <span class="badge muted">작성일: 2026-09-20</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>설계서(<code>privacy-purge_design.html</code>)대로 강제 파기·자동 파기·관리자 화면 세 덩어리를 전부 구현했다. 보존·파기·감사 백엔드 API 13종만 있고 화면이 없어 파기가 한 번도 실행되지 않던 상태가 해소됐다.</p>
+      <p>Task 20개를 각각 구현 → 스펙 준수 리뷰 → 코드 품질 리뷰 2단계로 진행했다. 리뷰가 실제 결함 <strong>8건</strong>을 잡아냈고 그중 <strong>Critical 2건</strong>은 테스트로는 드러나지 않는 종류였다.</p>
+      <p>백엔드 신규 24파일(+운영 DDL 1), 프론트 신규 14파일, 수정 26파일. 도메인 카드가 40KB 상한에 근접해 감사 부분을 별도 카드로 분리했다.</p>
+      <p>커밋하지 않았다. 사용자 지시에 따라 작업 트리에만 반영돼 있다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">S1 강제 파기 백엔드</span></p>
+      <p><span class="badge done">S2 자동 파기 백엔드</span></p>
+      <p><span class="badge done">S3 관리자 화면</span></p>
+      <p><span class="badge done">문서 카드 갱신</span></p>
+      <p><span class="badge info">check-docs 오류 0건</span></p>
+      <p><span class="badge pending">커밋 대기</span></p>
+      <p><span class="badge pending">운영 반영 준비 6항목</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 완료</h3>
+        <p><span class="badge done">이번 작업</span></p>
+        <ul class="list">
+          <li>강제 파기 API 3종 + forced 판정 경로</li>
+          <li>자동 파기 스케줄러 + 게이트 2단</li>
+          <li>스케줄 설정 API 2종 + 단일 행 테이블</li>
+          <li><code>ActorType.SYSTEM</code> 감사 기록</li>
+          <li>관리자 화면 <code>/admin/retention</code></li>
+          <li>보존 정책 조회·등록·수정 UI</li>
+          <li>도메인 카드 2종(분리)·색인·todo</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미반영</h3>
+        <p><span class="badge pending">운영 준비</span></p>
+        <ul class="list">
+          <li>운영 DDL 적용(<code>retention_schedule_setting</code>)</li>
+          <li>전역 보존 정책 1건 등록</li>
+          <li>관리자 메뉴 등록</li>
+          <li><code>ROLE_PRIVACY_ADMIN</code> 매핑</li>
+          <li>git 커밋</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">하지 않음</span></p>
+        <ul class="list">
+          <li>감사 로그 조회 화면</li>
+          <li>공고별 override 정책 UI</li>
+          <li><code>hiringEndedAt</code> 확정 UI</li>
+          <li>reconcile 실행 버튼</li>
+          <li>브라우저 실행 검증(백엔드 필요)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Slice별 결과</h2>
+    <table>
+      <tr><th>Slice</th><th>Task</th><th>산출물</th><th>상태</th></tr>
+      <tr>
+        <td><strong>S1</strong><br>강제 파기 백엔드</td>
+        <td>1–6</td>
+        <td><code>ForcedPurgeReason</code>·<code>PURGE_FORCED</code>·<code>ForcedPurgeMetadata</code>, <code>PurgeItemProcessor</code> forced 경로, <code>PurgeBatch.startForced</code> + lifecycle 3메서드, <code>DataSubjectLookupService</code>, <code>ForcedPurgeService</code>, API 3종 + 매처 3줄</td>
+        <td><span class="badge done">완료</span></td>
+      </tr>
+      <tr>
+        <td><strong>S2</strong><br>자동 파기 백엔드</td>
+        <td>7–12</td>
+        <td><code>RetentionScheduleSetting</code> + DDL, <code>RetentionScheduleService</code>(예정일·토글·실행 기록), <code>RetentionPurgeScheduler</code>, <code>ActorType.SYSTEM</code>, API 2종 + 매처 1줄</td>
+        <td><span class="badge done">완료</span></td>
+      </tr>
+      <tr>
+        <td><strong>S3</strong><br>관리자 화면</td>
+        <td>13–19</td>
+        <td>타입·API 모듈·라벨 매핑, 화면 뼈대·라우트, 정책 카드, 자동 파기 카드, 검색 패널·상세 드로어·확인 모달, 파기 이력 탭</td>
+        <td><span class="badge done">완료</span></td>
+      </tr>
+      <tr>
+        <td><strong>마무리</strong></td>
+        <td>20</td>
+        <td>카드 갱신·분리, 색인·todo, 연결 작업 3건</td>
+        <td><span class="badge done">완료</span></td>
+      </tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>리뷰가 잡은 결함</h2>
+    <p>구현자 자체 검증과 테스트 통과만으로는 드러나지 않았던 것들이다.</p>
+    <table>
+      <tr><th>등급</th><th>Task</th><th>내용</th><th>왜 테스트로 안 잡혔나</th></tr>
+      <tr>
+        <td><span class="badge out">Critical</span></td>
+        <td>5</td>
+        <td><strong>OSIV 1차 캐시 stale 재조회</strong> — 계정 익명화 판정이 엔티티를 재조회해 <code>purgeResult</code>를 확인했다. <code>open-in-view</code> 기본값이 <code>true</code>라 요청 스레드가 EntityManager를 공유하고, identity map이 갱신 전 인스턴스를 돌려준다. <strong>지원서 1건 이상인 계정은 전부 파기돼도 계정 PII가 영구히 남는다.</strong></td>
+        <td>서비스를 직접 호출하는 테스트에는 OSIV가 없어 매번 새 EntityManager가 쓰인다. 집계 쿼리(<code>countUnpurgedByApplicantId</code>)로 교체해 해결.</td>
+      </tr>
+      <tr>
+        <td><span class="badge out">Critical</span></td>
+        <td>15</td>
+        <td><strong>라우트 권한 불일치</strong> — <code>ROLE_ADMIN</code>(IT) 단독 사용자가 <code>ADMIN_ROLES</code> 가드를 통과하는데, 백엔드 retention GET은 RECRUIT·PRIVACY 전용이라 진입 즉시 403 → <code>/403</code>으로 튕긴다.</td>
+        <td>프론트·백엔드 권한 정의가 서로 다른 파일에 있어 한쪽만 봐서는 드러나지 않는다. 라우트 <code>meta.roles</code> 오버라이드로 해결.</td>
+      </tr>
+      <tr>
+        <td><span class="badge warn">Important</span></td>
+        <td>9</td>
+        <td><strong>감사 <code>targetId</code> 충돌</strong> — 스케줄 토글이 <code>RETENTION_POLICY</code>/<code>targetId=1</code>로 기록돼, id가 1인 실제 정책의 변경 이력과 섞인다.</td>
+        <td>기능은 정상 동작한다. <code>AuditTargetType.RETENTION_SCHEDULE</code> 신설로 해결.</td>
+      </tr>
+      <tr>
+        <td><span class="badge warn">Important</span></td>
+        <td>4</td>
+        <td><strong>허약한 테스트</strong> — 익명화 계정 제외 필터 검증이 <code>purgePersonalData()</code>를 써서 <code>userName</code>까지 null이 됐다. 필터를 통째로 지워도 통과하는 테스트였다.</td>
+        <td>테스트가 통과한다는 사실 자체가 증거가 되지 못한 사례. <code>ciHash</code>만 직접 세팅하도록 고치고 변이 검증으로 확인.</td>
+      </tr>
+      <tr>
+        <td><span class="badge warn">Important</span></td>
+        <td>2</td>
+        <td><strong>fixture가 판정을 격리하지 못함</strong> — "전형 미종료 무시"를 검증한다면서 정책을 안 만들어, 일반 경로면 앞 단계(<code>POLICY_NOT_FOUND</code>)에서 걸리는 상태였다.</td>
+        <td>적격성 판정이 순서가 고정된 9단계라, 앞 단계에서 걸리면 뒤 단계를 검증할 수 없다.</td>
+      </tr>
+      <tr>
+        <td><span class="badge warn">Important</span></td>
+        <td>5</td>
+        <td><code>completeForced</code> 실패 시 batch가 <code>RUNNING</code>으로 방치 — 기존 <code>PurgeExecutionService</code>가 한 번 겪고 고친 문제의 재도입.</td>
+        <td>정상 경로 테스트만으로는 드러나지 않는다.</td>
+      </tr>
+      <tr>
+        <td><span class="badge warn">Important</span></td>
+        <td>4</td>
+        <td>N+1 쿼리 — 검색 결과 50건 × 지원서 N건마다 hold 조회. 일괄 조회 2건으로 축소.</td>
+        <td>테스트 데이터 규모에서는 드러나지 않는다.</td>
+      </tr>
+      <tr>
+        <td><span class="badge muted">Minor</span></td>
+        <td>19</td>
+        <td>"스킵 사유별 집계"에 스킵이 아닌 <code>PURGE_ITEM_FAILED</code>가 섞임 — 제목 문구로 정리.</td>
+        <td>표시 의미의 문제라 자동 검증 대상이 아니다.</td>
+      </tr>
+    </table>
+    <div class="card small">
+      <strong>계획서 자체의 오류도 구현자들이 3건 잡아냈다</strong> — <code>AuditMetadataContractTest</code>의 맵 값 타입이 <code>Set</code>인데 <code>List.of</code>로 적혀 있던 것, <code>ActivityLogRepository</code>·<code>PurgeBatchRepository</code>가 append-only 설계라 <code>findAll()</code>이 없다는 것. 계획서를 그대로 따르지 않고 실제 코드와 대조한 결과다.
+    </div>
+  </section>
+
+  <section>
+    <h2>설계 대비 변경된 결정</h2>
+    <table>
+      <tr><th>항목</th><th>설계</th><th>구현</th><th>이유</th></tr>
+      <tr>
+        <td>계정 익명화 판정</td>
+        <td>지원서 재조회 후 <code>allMatch</code></td>
+        <td><code>countUnpurgedByApplicantId</code> 집계 쿼리</td>
+        <td>OSIV 1차 캐시 stale 회피(Critical)</td>
+      </tr>
+      <tr>
+        <td>스케줄 토글 감사</td>
+        <td><code>targetType=RETENTION_POLICY</code></td>
+        <td><code>targetType=RETENTION_SCHEDULE</code> 신설</td>
+        <td>정책 id 1과 <code>targetId</code> 충돌</td>
+      </tr>
+      <tr>
+        <td>라우트 권한</td>
+        <td>가드 변경 없음</td>
+        <td><code>meta.roles</code> 오버라이드 추가</td>
+        <td><code>ROLE_ADMIN</code> 단독 사용자 403 바운스</td>
+      </tr>
+      <tr>
+        <td>검색 결과 상한 표시</td>
+        <td>응답에 <code>truncated</code> 플래그</td>
+        <td>플래그 없이 화면이 "정확히 50건"으로 판단</td>
+        <td>DTO를 단순하게 유지</td>
+      </tr>
+      <tr>
+        <td>보존 정책 카드</td>
+        <td>enabled 정책만 표시</td>
+        <td>꺼진 정책도 구분해 표시 + 재활성화 가능</td>
+        <td>끄면 화면에서 사라져 되살릴 방법이 없었다</td>
+      </tr>
+      <tr>
+        <td>도메인 카드</td>
+        <td><code>privacy-audit.md</code> 단일</td>
+        <td><code>privacy-audit.md</code> + <code>privacy-audit-audit.md</code></td>
+        <td>갱신 후 38.7KB로 상한(40KB) 근접</td>
+      </tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>변경 규모</h2>
+    <div class="two">
+      <div class="card">
+        <h3>백엔드</h3>
+        <ul class="list">
+          <li>신규 Java 24파일 · 운영 DDL 1파일</li>
+          <li>수정 파일에 신규 엔드포인트 5개(총 18개)</li>
+          <li><code>SecurityConfig</code> 좁은 매처 4줄 추가</li>
+          <li>신규 enum 2종, 감사 타입 2값</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>프론트</h3>
+        <ul class="list">
+          <li>신규 14파일(컴포넌트 7 · 타입/API/라벨 3 · 테스트 4)</li>
+          <li>라우트 1개 추가(<code>meta.roles</code> 포함)</li>
+          <li>기존 화면·스토어 변경 없음</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card small">
+      추적 파일 diff 기준 26파일 수정, 506줄 추가 · 103줄 삭제. 삭제분은 대부분 기존 카드에서 새 카드로 옮겨진 문서 내용이다.
+    </div>
+  </section>
+
+  <section>
+    <h2>검증 결과</h2>
+    <table>
+      <tr><th>대상</th><th>명령</th><th>결과</th></tr>
+      <tr>
+        <td>백엔드</td>
+        <td><code>gradlew test</code> — Retention*·Purge*·ForcedPurge*·DataSubject*·Audit*·ActivityLogService·ApplicationPiiPurge*·AdminRetentionControllerTest·AdminAuditControllerTest·RetentionScheduleSettingRepositoryTest</td>
+        <td><span class="badge done">BUILD SUCCESSFUL</span><br><span class="small">22개 클래스 약 143건, 실패·오류 0</span></td>
+      </tr>
+      <tr>
+        <td>프론트</td>
+        <td><code>npm run type-check</code></td>
+        <td><span class="badge done">통과</span></td>
+      </tr>
+      <tr>
+        <td>프론트</td>
+        <td><code>npm run test:unit</code></td>
+        <td><span class="badge done">14 files / 88 tests 통과</span><br><span class="small">신규 15건(라벨 10 · 안전장치 5)</span></td>
+      </tr>
+      <tr>
+        <td>프론트</td>
+        <td><code>npm run build</code> · <code>npm run lint</code></td>
+        <td><span class="badge done">통과</span></td>
+      </tr>
+      <tr>
+        <td>문서</td>
+        <td><code>node tools/check-docs.mjs</code></td>
+        <td><span class="badge done">오류 0건</span><br><span class="small">경고 10건은 전부 기존 카드 크기 권장치 초과</span></td>
+      </tr>
+      <tr>
+        <td>화면</td>
+        <td>브라우저 실행</td>
+        <td><span class="badge pending">하지 않음</span><br><span class="small">백엔드(LDAP·DB) 기동이 필요하다</span></td>
+      </tr>
+    </table>
+    <div class="card">
+      <h3>안전장치는 변이 검증까지 했다</h3>
+      <p class="small">비가역 파기의 확인 모달 리셋과 드로어의 stale 응답 가드는 테스트를 통과시키는 데 그치지 않고, <strong>해당 가드를 일부러 제거했을 때 테스트가 실패하는지</strong>까지 확인했다. 익명화 계정 제외 필터도 같은 방식으로 검증했다. 통과하는 테스트가 실제로 무엇을 지키는지 확인하지 않으면 허약한 테스트를 걸러낼 수 없다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>알려진 한계</h2>
+    <table>
+      <tr><th>한계</th><th>영향</th><th>기록 위치</th></tr>
+      <tr>
+        <td><strong>게이트 상시 개방</strong> — 적격성을 영원히 통과하지 못하는 지원서(<code>DRAFT</code>·전형 미종결)가 있으면 그 공고의 예정일이 지난 뒤부터 매일 전량 스캔이 재개된다</td>
+        <td>운영 5년 뒤 발현. 그때는 실제 파기 대상이 생기는 시기라 "정상 동작"으로 볼 수도 있다</td>
+        <td><code>privacy-audit.md</code> 규칙 절, <code>RetentionScheduleService</code> Javadoc</td>
+      </tr>
+      <tr>
+        <td><strong>엔티티 ↔ 운영 DDL 불일치가 테스트로 검증되지 않는다</strong> — 테스트는 <code>ddl-auto: create-drop</code>으로 엔티티에서 스키마를 재생성하므로 <code>docs/ops/*.sql</code>은 실행되지 않는다</td>
+        <td>운영 기동 실패로 이어질 수 있다. 사람이 대조해야 한다</td>
+        <td><code>privacy-audit.md</code> 함정·결정, <code>todo.md</code></td>
+      </tr>
+      <tr>
+        <td><strong>첫 가동 부하</strong> — 건수 상한이 없어 누적 만료분이 한 번에 처리된다</td>
+        <td>첫 실행이 오래 걸릴 수 있다</td>
+        <td><code>todo.md</code> 운영 준비</td>
+      </tr>
+      <tr>
+        <td><strong><code>ROLE_PRIVACY_ADMIN</code> 단독 사용자는 화면에 못 들어온다</strong></td>
+        <td>설계 전제(담당자는 RECRUIT+PRIVACY 둘 다 보유)와 일치. 전제가 바뀌면 가드 재검토 필요</td>
+        <td><code>privacy-audit.md</code> 프론트 절</td>
+      </tr>
+      <tr>
+        <td><strong>브라우저 검증 미실시</strong></td>
+        <td>레이아웃·실제 상호작용은 확인되지 않았다</td>
+        <td>이 리포트</td>
+      </tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>다음 단계</h2>
+    <div class="card">
+      <h3>1. 커밋</h3>
+      <p class="small">사용자 지시로 커밋하지 않았다. 작업 트리에 백엔드 25파일 신규 + 프론트 14파일 신규 + 26파일 수정이 쌓여 있다. 무관한 미추적 파일은 <code>design/</code> 목업 2개뿐이다.</p>
+    </div>
+    <div class="card">
+      <h3>2. 화면 확인</h3>
+      <p class="small">백엔드를 띄우거나 목업 서버를 붙여 실제 화면을 확인하는 것이 좋다. 특히 확인 모달의 경고 배치와 파기 이력 드로어의 대량 item 접이식 동작은 눈으로 봐야 판단된다.</p>
+    </div>
+    <div class="card">
+      <h3>3. 운영 반영</h3>
+      <p class="small"><code>todo.md</code> 6절에 6항목으로 정리했다. 순서가 중요하다 — DDL 적용 → 전역 정책 등록 → 권한 매핑 → 메뉴 등록 → <strong>수동 dry-run으로 건수 확인</strong> → 자동 파기 켜기.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

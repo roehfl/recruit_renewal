@@ -133,6 +133,12 @@ public class PurgeBatch extends BaseEntity {
         return batch;
     }
 
+    /** 강제 파기 시작(Phase 10). 근거 dry-run 이 없고 트리거가 정보주체 요청이다. */
+    public static PurgeBatch startForced(LocalDateTime scanAt, LocalDateTime startedAt, String requestedBy) {
+        return new PurgeBatch(
+                PurgeBatchMode.EXECUTE, PurgeTriggerType.DATA_SUBJECT_REQUEST, scanAt, startedAt, requestedBy);
+    }
+
     /**
      * execute 집계 완료. item 실패 또는 바이너리 삭제 실패(9d-2 saga)가 하나라도 있으면
      * {@code PARTIAL_FAILED}(설계 §5.4 — batch 는 비원자 컨테이너). {@code FAILED} 는 시작/criteria 실패 전용({@link #fail}).

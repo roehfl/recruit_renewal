@@ -22,5 +22,6 @@ public sealed interface AuditMetadata permits
         RetentionPolicyChangeMetadata,
         PurgeBatchMetadata,
         PurgeExecuteMetadata,
-        PurgeReconcileMetadata {
+        PurgeReconcileMetadata,
+        ForcedPurgeMetadata {
 }

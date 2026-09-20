@@ -33,5 +33,7 @@ public enum AuditActionType {
     PURGE_SCAN,
     PURGE_EXECUTE,
     /** PURGE_PENDING 잔여 건의 바이너리 삭제 재처리 sweep(09e reconciliation). */
-    PURGE_RECONCILE
+    PURGE_RECONCILE,
+    /** 정보주체 삭제 요청 등으로 보존기간과 무관하게 실행하는 강제 파기(Phase 10). */
+    PURGE_FORCED
 }

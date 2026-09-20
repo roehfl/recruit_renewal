@@ -174,7 +174,7 @@
 - 단계 `RESULT_ANNOUNCED`·`CLOSED` 결과만 보인다. **발표 명령이 곧 공개 시점**(`resultAnnouncementDateTime` 도래는 안 봄). 이 상태 목록은 `findVisibleByJobApplicationIdForApplicant`와 `findVisibleByJobApplicationIdsForApplicantSummary`([application](application.md)) 두 default 메서드에 따로 있다 — 둘 다 바꾼다. ({BE}/domain/repository/StageResultRepository.java)
 - 지원자 응답은 전용 DTO(점수·코멘트·판정자 비노출), 본인 지원서만, DRAFT 거부. ({BE}/service/ApplicationStageResultService.java — getApplicantStageResults)
 
-**감사([privacy-audit](privacy-audit.md))**
+**감사([privacy-audit-audit](privacy-audit-audit.md))**
 - 발표 `STAGE_RESULT_ANNOUNCE`, 마감 `STAGE_RESULT_CONFIRM`, 단건·bulk 판정 `STAGE_RESULT_CORRECT`(metadata `stageId`·`changedCount`만), 업로드 commit `STAGE_RESULT_UPLOAD`(bulk 감사 끔). 성공은 in-tx, 업로드 거부·충돌은 REQUIRES_NEW. 업로드 원본 파일명 저장 금지(해시·확장자만). 템플릿 다운로드는 export 감사 실패 시 응답하지 않는다. ({BE}/service/StageService.java — recordStageAudit / {BE}/service/UploadAuditLogger.java / {BE}/controller/StageResultUploadController.java — uploadTemplate)
 
 **화면(FE)**

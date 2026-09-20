@@ -119,6 +119,16 @@ export const adminRoutes: RouteRecordRaw[] = [
         name: 'AdminMessageTemplates',
         component: () => import('@/views/admin/message/AdminMessageTemplateView.vue'),
       },
+      {
+        path: 'retention',
+        name: 'AdminRetention',
+        component: () => import('@/views/admin/retention/AdminRetentionView.vue'),
+        meta: {
+          // 백엔드 retention API 는 GET 도 RECRUIT·PRIVACY 전용이다(ADR-0007).
+          // ROLE_ADMIN 단독 사용자를 들여보내면 마운트 직후 403 → /403 으로 튕긴다.
+          roles: ['ROLE_RECRUIT_ADMIN', 'ROLE_PRIVACY_ADMIN'],
+        },
+      },
     ],
   },
   {

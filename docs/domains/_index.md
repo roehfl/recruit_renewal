@@ -33,7 +33,8 @@
 | [master-data](master-data.md) | 공통코드·학교·주소 검색 | 관리자·지원자 |
 | [board](board.md) | FAQ·공지사항 | 관리자·지원자 |
 | [statistics](statistics.md) | 관리자 대시보드·통계 | 관리자 |
-| [privacy-audit](privacy-audit.md) | 개인정보 보존·파기·감사 로그 | 관리자 |
+| [privacy-audit](privacy-audit.md) | 개인정보 보존·파기 | 관리자 |
+| [privacy-audit-audit](privacy-audit-audit.md) | 감사 로그(`ActivityLog`) | 관리자 |
 | [client-event-log](client-event-log.md) | 프론트 이벤트·오류 로그 수집 | 시스템·관리자 |
 | [message](message.md) | 메일·SMS 메시지 템플릿·대상자·작성·테스트 발송·발송 접수 | 관리자 |
 | [message-delivery](message-delivery.md) | 메시지 디스패치·게이트웨이·결과 수신·발송 상태·발송 이력 | 관리자 |
@@ -60,6 +61,7 @@
 | `AdminHome` | `/admin` | statistics |
 | `AdminMessageSend` · `AdminMessageTemplates` | `/admin/messages` · `/admin/messages/templates` | message |
 | `AdminMessageHistory` | `/admin/messages/history` | message-delivery |
+| `AdminRetention` | `/admin/retention` | privacy-audit |
 | `ApplicantHome` · `ApplicantBenefits` · `ApplicantDutyIntroduction` · `ApplicantRecruitProcedure` · `ApplicantPrivacy` | `/applicant/…` | 카드 없음(정적 화면) |
 
 ### API 경로 접두 → 카드 (`/api` 생략)
@@ -80,7 +82,8 @@
 | `/codes` · `/admin/codes` · `/schools` · `/admin/schools` · `/addresses` | master-data |
 | `/faqs` · `/admin/faq-categories` · `/board/notices` | board |
 | `/admin/job-postings/{id}/statistics` | statistics |
-| `/admin/retention` · `/admin/audit` | privacy-audit |
+| `/admin/retention` | privacy-audit |
+| `/admin/audit` | privacy-audit-audit |
 | `/client-events` · `/admin/client-events` | client-event-log |
 | `/admin/messages/history` | message-delivery |
 | `/admin/messages`(단, `/history`는 message-delivery) · `/admin/message-templates` | message |
@@ -103,7 +106,8 @@
 | 공통코드, 학교, 학교 검색, 학교 가져오기, 주소 검색 | master-data |
 | FAQ, 공지사항, 게시판 | board |
 | 대시보드, 통계, 퍼널, 일별 추이 | statistics |
-| 개인정보 보존, 파기(purge), 보존 정책(retention), 보류(hold), 감사 로그, activity log | privacy-audit |
+| 개인정보 보존, 파기(purge), 보존 정책(retention), 보류(hold), 개인정보 파기 화면, /admin/retention, 강제 파기, 자동 파기 | privacy-audit |
+| 감사 로그, activity log | privacy-audit-audit |
 | 클라이언트 이벤트, 텔레메트리, 프론트 오류 로그 | client-event-log |
 | 메일, SMS, 문자, LMS, 메시지 발송, 메시지 템플릿, 변수, 테스트 발송, 대상자, 미리보기, 발송 접수 | message |
 | 발송 결과, 결과 수신, 거래 ID, 게이트웨이, 발송 단위, 발송 이력, 발송 상태, 디스패치 | message-delivery |

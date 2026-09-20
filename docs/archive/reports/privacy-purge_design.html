@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>개인정보 파기 화면·강제 파기·자동 파기 설계</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal</div>
+  <h1>개인정보 파기 화면 · 강제 파기 · 자동 파기 설계</h1>
+  <span class="badge done">설계 완료</span>
+  <span class="badge info">사용자 승인</span>
+  <span class="badge muted">작성일: 2026-09-20</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>보존·파기·감사 백엔드 API 13종은 이미 구현·검증이 끝났지만 화면이 없어 파기가 한 번도 실행되지 않는 상태다. 이 설계는 그 공백을 메운다.</p>
+      <p>세 덩어리다. ① 삭제 요청을 받아 지원자 1명의 개인정보를 즉시 지우는 <strong>강제 파기</strong>, ② 보존기간 5년이 지난 지원서를 매일 새벽 자동으로 지우는 <strong>스케줄러</strong>, ③ 이 둘을 다루는 <strong>관리자 화면 1개</strong>.</p>
+      <p>보존 기준은 개인정보 처리방침에 이미 적혀 있는 "인력풀 5년 보관 · 삭제 요청 시 지체없이 삭제"를 그대로 따른다. 기산점은 공고 마감일(<code>CLOSED_AT</code>)로 잡아 사람이 공고마다 종료일을 확정하는 절차를 없앤다.</p>
+      <p>구현은 3개 slice로 나눈다: 강제 파기 백엔드 → 자동 파기 백엔드 → 화면.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">설계 문서 추가됨</span></p>
+      <p><span class="badge done">사용자 승인 완료</span></p>
+      <p><span class="badge info">기존 백엔드 API 13종 재사용</span></p>
+      <p><span class="badge pending">구현 대기 (slice 3개)</span></p>
+      <p><span class="badge pending">운영 DDL 1건 추가 예정</span></p>
+      <p><span class="badge out">감사 로그 조회 화면 제외</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>배경</h2>
+    <div class="card">
+      <p>현재 단건 <code>execute</code>는 실행 시 적격성을 재검증한다. 따라서 보존기간이 남아 있는 지원서는 <code>RETENTION_NOT_DUE</code>로 스킵되고 파기되지 않는다. 즉 <strong>"지금 지워 달라"는 요청을 처리할 경로가 없다.</strong> 도메인 카드도 forced purge를 <code>미구현</code>으로 기록해 두었다.</p>
+      <p>스케줄 실행도 없다. 보존기간이 지나도 아무도 파기하지 않는다. 이 둘이 이번 설계의 대상이다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>설계 범위</h3>
+        <p><span class="badge done">이번 구현 대상</span></p>
+        <ul class="list">
+          <li>강제 파기(삭제 요청) API 3종</li>
+          <li><code>PurgeItemProcessor</code> forced 판정 경로</li>
+          <li>자동 파기 스케줄러 + 실행 게이트 2단</li>
+          <li>자동 파기 on/off 설정과 다음 파기 예정일</li>
+          <li>관리자 화면 <code>/admin/retention</code></li>
+          <li>보존 정책 조회·등록·수정 UI</li>
+          <li><code>ActorType.SYSTEM</code> 감사 기록</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현</h3>
+        <p><span class="badge pending">현재 없음</span></p>
+        <ul class="list">
+          <li>forced purge 엔드포인트 — enum 슬롯만 존재</li>
+          <li>스케줄 실행 — Java 코드 없음</li>
+          <li>보존·파기 프론트 화면 — 파일 0개</li>
+          <li><code>retention_schedule_setting</code> 테이블 — DDL 없음</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">이번에 하지 않음</span></p>
+        <ul class="list">
+          <li>감사 로그 조회 화면 (API는 있음)</li>
+          <li>공고별 override 정책 UI</li>
+          <li><code>hiringEndedAt</code>(anchor) 확정 UI</li>
+          <li>reconcile 실행 버튼</li>
+          <li>role-mappings 직무 분리 구멍 보완</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>보존 정책 전제</h2>
+    <p>전역 정책 1건만 쓴다. 근거는 이 서비스의 개인정보 처리방침 본문이다.</p>
+    <table>
+      <tr><th>항목</th><th>값</th><th>근거</th></tr>
+      <tr><td><code>retentionPeriodDays</code></td><td>1825 (5년)</td><td>처리방침 "인력풀에 5년 동안 보관"</td></tr>
+      <tr><td><code>baselineType</code></td><td><code>CLOSED_AT</code></td><td>공고 마감 시 자동 기록되는 값. 사람이 공고마다 확정할 필요가 없다</td></tr>
+      <tr><td><code>jobPostingId</code></td><td>null (전역)</td><td>공고별 차등 보존 요구 없음</td></tr>
+      <tr><td><code>enabled</code></td><td>true</td><td>—</td></tr>
+    </table>
+    <div class="card small">
+      <strong><code>HIRING_ENDED_AT</code>을 쓰지 않는 이유</strong> — 수동 확정이 한 번이라도 빠지면 그 공고의 지원서는 <code>ANCHOR_NOT_FIXED</code>로 <strong>영원히 파기되지 않는다.</strong> 5년 단위에서 "공고 마감"과 "채용 실질 종료"의 차이는 무시할 수 있다.
+    </div>
+  </section>
+
+  <section>
+    <h2>강제 파기 — 적격성 판정 축약</h2>
+    <p>forced 경로는 기존 적격성 9단계 중 <strong>2개만</strong> 적용한다. 나머지는 모두 무시한다.</p>
+    <table>
+      <tr><th>판정</th><th>forced</th><th>이유</th></tr>
+      <tr><td><code>ALREADY_PURGED</code></td><td><span class="badge done">적용</span></td><td>두 번 지울 것이 없다</td></tr>
+      <tr><td><code>RETENTION_HOLD</code></td><td><span class="badge out">차단</span></td><td>법적 보존 의무가 삭제 요구권보다 우선한다</td></tr>
+      <tr><td><code>POLICY_NOT_FOUND</code> · <code>POLICY_CONFLICT</code></td><td><span class="badge muted">무시</span></td><td>정책은 기간 계산용. 강제 파기는 기간을 보지 않는다</td></tr>
+      <tr><td><code>ANCHOR_NOT_FIXED</code> · <code>RETENTION_NOT_DUE</code></td><td><span class="badge muted">무시</span></td><td>기간 무관이 강제 파기의 정의다</td></tr>
+      <tr><td><code>APPLICATION_NOT_TERMINAL</code> · <code>INVALID_STAGE_CONFIGURATION</code></td><td><span class="badge muted">무시</span></td><td>진행 중 전형이 있어도 지운다(확인 모달이 경고)</td></tr>
+    </table>
+    <div class="card small">
+      판정 이후 처리(관계형 PII tombstone → 첨부 metadata → 바이너리 saga → ref-count 익명화)는 기존 경로와 완전히 같다. 파기 로직 자체는 건드리지 않고 판정 모드만 넘긴다.
+    </div>
+  </section>
+
+  <section>
+    <h2>신규 API</h2>
+    <h3>강제 파기</h3>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>권한</th></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/retention/data-subjects</code></td><td>이름·휴대폰·이메일로 지원자 검색(조건 1개 이상 필수, 상한 50건)</td><td><span class="badge warn">PRIVACY</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/retention/data-subjects/{applicantId}</code></td><td>지원서 목록 + 지원서별 적격성 판정 + 보류 여부</td><td><span class="badge warn">PRIVACY</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/retention/purge-batches/force</code></td><td>지원자 1명 전체 파기(<code>applicantId</code>, <code>reasonCode</code>, <code>confirm</code>)</td><td><span class="badge warn">PRIVACY</span></td></tr>
+    </table>
+    <h3>자동 파기 설정</h3>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>권한</th></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/retention/schedule</code></td><td>on/off · 다음 파기 예정일 · 마지막 실행 결과</td><td><span class="badge info">RECRUIT · PRIVACY</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/retention/schedule</code></td><td>자동 파기 켜기/끄기</td><td><span class="badge warn">PRIVACY</span></td></tr>
+    </table>
+    <div class="card small">
+      모든 신규 경로는 <code>SecurityConfig</code>의 broad <code>/api/admin/**</code> 매처보다 <strong>앞에</strong> 좁은 매처를 추가해야 한다. 순서가 곧 보안 요구사항이다.
+    </div>
+  </section>
+
+  <section>
+    <h2>강제 파기 흐름</h2>
+    <div class="transition">
+      <span class="state">지원자 검색</span>
+      <span class="arrow">&rarr;</span>
+      <span class="state">상세 · 판정 확인</span>
+      <span class="arrow">&rarr;</span>
+      <span class="action">confirm</span>
+      <span class="state">강제 파기 실행</span>
+      <span class="arrow">&rarr;</span>
+      <span class="state">지원서별 tombstone</span>
+      <span class="arrow">&rarr;</span>
+      <span class="state">계정 익명화</span>
+      <span class="arrow">&rarr;</span>
+      <span class="state">PURGE_FORCED 감사</span>
+    </div>
+    <table>
+      <tr><th>규칙</th><th>내용</th></tr>
+      <tr><td>단위</td><td><strong>지원자 1명 전체.</strong> 모든 지원서 + <code>Applicant</code> 계정을 한 <code>PurgeBatch</code>로 처리한다. 일부만 지우면 계정에 이름·연락처가 남아 "지체없이 삭제" 약속을 못 지킨다</td></tr>
+      <tr><td>계정</td><td>익명화되면 <code>loginId</code>가 null이 되어 로그인 불가. 재지원은 신규 가입</td></tr>
+      <tr><td>지원 0건 계정</td><td>대상에 포함. item 없이 <code>purgePersonalData</code>만 수행</td></tr>
+      <tr><td>보류 충돌</td><td>active hold가 하나라도 있으면 400 거부 + 화면 버튼 비활성</td></tr>
+      <tr><td>진행 중 전형</td><td>파기한다. 확인 모달이 "진행 중 N건이 함께 사라진다"를 빨간 배너로 경고</td></tr>
+      <tr><td>사유</td><td><code>ForcedPurgeReason</code> 선택형 3값만. <strong>자유 텍스트를 받지 않는다</strong></td></tr>
+    </table>
+    <div class="card">
+      <h3>사유를 선택형으로 제한한 이유</h3>
+      <p class="small"><code>ActivityLog</code>와 파기 대장(<code>PurgeBatch</code>·<code>PurgeJobItem</code>)은 <strong>파기 대상이 아니다.</strong> 담당자가 메모에 "홍길동 요청"처럼 쓰면 그 이름은 영구히 남는다. 선택형 코드만 받으면 이 경로가 아예 사라진다. 상세 경위는 오프라인 접수 대장이 맡는다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>자동 파기 — 실행 게이트</h2>
+    <p>cron은 매일 울리되, 실제 스캔은 관문 두 개를 통과해야 돌아간다.</p>
+    <pre>매일 03:00 (<code>retention.purge-cron</code>)
+  ├─ 자동 파기 OFF?              → SKIPPED_DISABLED 기록 후 종료
+  ├─ 오늘 &lt; 다음 파기 예정일?     → SKIPPED_NOT_DUE 기록 후 종료
+  └─ dryRun("SYSTEM")
+       ├─ ELIGIBLE 0건            → NO_TARGET 기록 후 종료
+       └─ execute(confirm, sourceDryRunBatchId, "SYSTEM")
+                                  → EXECUTED + batchId 기록
+     예외 발생                     → ERROR 기록 후 삼킴(다음날 재시도)</pre>
+    <div class="card">
+      <h3>게이트가 필요한 이유</h3>
+      <p class="small">게이트가 없으면 dry-run이 매일 밤 전 지원서를 <code>findAll</code>로 훑고 <strong>지원서 수만큼 <code>purge_job_item</code> 행을 쌓는다.</strong> 대상이 0건인 5년 동안에도 그렇다. 지원자 1만 명이면 연 360만 행이다. 게이트는 편의 기능이 아니라 이 누적을 막는 장치다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>다음 파기 예정일 계산</h2>
+    <p>정의: <strong>아직 파기되지 않은 지원서를 가진 마감된 공고 중 가장 이른 <code>closedAt</code> + 보존기간.</strong></p>
+    <table>
+      <tr><th>상황</th><th>반환값</th></tr>
+      <tr><td>미파기 지원서를 가진 마감 공고가 있음</td><td><code>min(closedAt) + retentionPeriodDays</code></td></tr>
+      <tr><td>마감된 공고가 없음(전부 진행 중)</td><td><code>9999-12-31</code></td></tr>
+      <tr><td>마감 공고의 지원서가 모두 파기됨</td><td><code>9999-12-31</code></td></tr>
+      <tr><td>전역 보존 정책이 없음</td><td><code>9999-12-31</code> + 화면 정책 경고</td></tr>
+      <tr><td>계산값이 과거이거나 오늘</td><td>게이트 통과 → 스캔 실행</td></tr>
+    </table>
+    <div class="card small">
+      이 값은 <strong>보존기간만</strong> 계산한 하한이다. 적격성 9단계(전형 종료 여부 등)를 반영하지 않으므로 그날 실제 파기 건수가 0일 수 있다. 화면 문구를 "이 날짜부터 파기 대상이 생길 수 있습니다"로 쓴다. 쿼리는 1건이며 인덱스로 커버된다.
+    </div>
+  </section>
+
+  <section>
+    <h2>자동 파기 설정 저장</h2>
+    <p>단일 행 테이블 <code>retention_schedule_setting</code>(id 고정 1).</p>
+    <table>
+      <tr><th>컬럼</th><th>타입</th><th>내용</th></tr>
+      <tr><td><code>id</code></td><td>BIGINT PK</td><td>항상 1</td></tr>
+      <tr><td><code>enabled</code></td><td>BOOLEAN NOT NULL</td><td>자동 파기 on/off</td></tr>
+      <tr><td><code>last_run_at</code></td><td>DATETIME</td><td>마지막 스케줄 기동 시각</td></tr>
+      <tr><td><code>last_run_result</code></td><td>VARCHAR(30)</td><td><code>SKIPPED_DISABLED</code> · <code>SKIPPED_NOT_DUE</code> · <code>NO_TARGET</code> · <code>EXECUTED</code> · <code>ERROR</code></td></tr>
+      <tr><td><code>last_run_batch_id</code></td><td>BIGINT</td><td>실행했다면 그 execute batch id</td></tr>
+      <tr><td><code>updated_by</code> · <code>updated_at</code></td><td>—</td><td>토글한 사람과 시각</td></tr>
+    </table>
+    <div class="two">
+      <div class="card">
+        <h3>안전 기본값</h3>
+        <p class="small">행이 없으면 <code>enabled=false</code>로 간주한다. 모르고 켜져 있는 것보다 꺼져 있는 편이 낫다. 최초 토글 시 행을 만든다.</p>
+      </div>
+      <div class="card">
+        <h3><code>RetentionPolicy.enabled</code>를 재사용하지 않는 이유</h3>
+        <p class="small">정책을 끄면 스케줄만 멈추는 게 아니라 적격성 판정이 <code>POLICY_NOT_FOUND</code>가 되어 강제 파기 화면의 판정 표시와 감사 사유까지 오염된다. 두 스위치는 의미가 다르다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>SYSTEM actor</h2>
+    <p>현재 <code>AuditRequestContextResolver.resolve(actor)</code>는 actorId가 있으면 무조건 <code>ActorType.EMPLOYEE</code>로 기록한다. 스케줄러 실행이 임직원 행위로 남으면 <strong>감사 로그가 거짓이 된다.</strong></p>
+    <ul class="list">
+      <li>예약 상수 <code>SYSTEM</code>을 두고, 이 값이면 <code>ActorType.SYSTEM</code>으로 기록한다(enum에 이미 있는 미사용 슬롯).</li>
+      <li>각 서비스의 <code>requireActor</code>는 빈 문자열만 거부하므로 <code>"SYSTEM"</code>은 그대로 통과한다. 수정 불필요.</li>
+      <li>임직원 loginId는 LDAP 사번 체계라 <code>SYSTEM</code>과 충돌하지 않는다.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>관리자 화면 <code>/admin/retention</code></h2>
+    <table>
+      <tr><th>영역</th><th>내용</th><th>필요 역할</th></tr>
+      <tr><td>보존 정책 카드</td><td>적용 중인 전역 정책 요약, 없으면 빨간 경고 + 등록 버튼. 보존 일수 단축 시 확인 경고</td><td>조회 RECRUIT·PRIVACY / 저장 PRIVACY</td></tr>
+      <tr><td>자동 파기 카드</td><td>on/off 스위치, 다음 파기 예정일, 마지막 실행 결과. 정책이 없으면 스위치 잠금</td><td>조회 RECRUIT·PRIVACY / 토글 PRIVACY</td></tr>
+      <tr><td>탭 1 — 삭제 요청 파기</td><td>검색 → 결과 표 → 상세 드로어 → 확인 모달 → 실행</td><td><span class="badge warn">PRIVACY 전용 · 없으면 탭 자체를 감춤</span></td></tr>
+      <tr><td>탭 2 — 자동 파기 이력</td><td>batch 목록 + 드로어(스킵 사유별 집계 우선, 지원서 id는 접이식)</td><td>RECRUIT · PRIVACY</td></tr>
+    </table>
+    <div class="card">
+      <h3>권한 없는 탭을 감추는 것은 필수다</h3>
+      <p class="small">공통 axios 인터셉터가 403 응답을 받으면 <code>/403</code>으로 리다이렉트한다. <code>ROLE_PRIVACY_ADMIN</code>이 없는 사용자에게 탭 1을 보여 주면 조회 호출 한 번에 화면 밖으로 튕긴다. 실제 차단은 백엔드가 하고, 프론트는 호출 자체를 만들지 않는다.</p>
+    </div>
+    <div class="card small">
+      <strong>연락처 표시</strong> — 관리자 화면에서 이메일·휴대폰을 마스킹하지 않는다(프로젝트 공통 규칙). 마스킹은 로그와 감사 metadata에만 적용한다.
+    </div>
+  </section>
+
+  <section>
+    <h2>구현 Slice 계획</h2>
+    <table>
+      <tr><th>Slice</th><th>범위</th><th>상태</th></tr>
+      <tr>
+        <td><strong>S1</strong><br>강제 파기 백엔드</td>
+        <td><code>ForcedPurgeReason</code>, <code>PURGE_FORCED</code>, <code>PurgeItemProcessor</code> forced 경로, <code>ForcedPurgeService</code>, <code>DataSubjectLookupService</code>, API 3종, <code>SecurityConfig</code> 매처, 테스트</td>
+        <td><span class="badge pending">대기</span></td>
+      </tr>
+      <tr>
+        <td><strong>S2</strong><br>자동 파기 백엔드</td>
+        <td><code>RetentionScheduleSetting</code> 엔티티·DDL, <code>RetentionScheduleService</code>(예정일 계산·토글), <code>RetentionPurgeScheduler</code>, SYSTEM actor, API 2종, 테스트</td>
+        <td><span class="badge pending">대기</span></td>
+      </tr>
+      <tr>
+        <td><strong>S3</strong><br>관리자 화면</td>
+        <td>API 모듈·타입, 정책 카드, 자동 파기 카드, 탭 2개, 라우트, 라벨 유닛 테스트, 카드 문서 갱신</td>
+        <td><span class="badge pending">대기</span></td>
+      </tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>보존기간 5년, 기산점 <code>CLOSED_AT</code></td><td>처리방침 본문이 5년을 명시. 마감일은 자동 기록되어 수동 확정 누락 위험이 없다</td></tr>
+      <tr><td>2</td><td>강제 파기 단위는 지원자 1명 전체</td><td>일부만 지우면 계정에 이름·연락처가 남아 "지체없이 삭제"를 못 지킨다</td></tr>
+      <tr><td>3</td><td>hold가 걸리면 강제 파기 거부</td><td>법적 보존 의무가 삭제 요구권보다 우선한다는 통상 해석</td></tr>
+      <tr><td>4</td><td>진행 중 전형도 파기하되 경고</td><td>삭제 요구권 우선. 담당자가 결과를 알고 누르게 한다</td></tr>
+      <tr><td>5</td><td>사유는 선택형 코드만</td><td>감사 로그·파기 대장은 파기 대상이 아니다. 자유 텍스트는 PII 영구 잔존 경로다</td></tr>
+      <tr><td>6</td><td><code>PURGE_FORCED</code> 신규 enum</td><td><code>PURGE_EXECUTE</code> 재사용 시 강제 파기만 따로 조회할 수 없다. VARCHAR라 DDL 불필요</td></tr>
+      <tr><td>7</td><td>스케줄 실행 게이트 2단</td><td>대상 0건인 5년 동안 매일 전 지원서 스캔 + item 누적을 막는다</td></tr>
+      <tr><td>8</td><td>스케줄 on/off는 별도 설정 테이블</td><td>정책 <code>enabled</code>를 끄면 적격성 판정과 감사 사유까지 오염된다</td></tr>
+      <tr><td>9</td><td>건수 상한 없음</td><td>"기간 경과 시 지체 없이 파기" 원칙에 맞춘다. 첫 가동 부하는 운영 절차로 관리</td></tr>
+      <tr><td>10</td><td>기존 dry-run → execute 2단계를 그대로 호출</td><td>근거 batch가 남아 무엇을 왜 지웠는지 추적된다</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>알려진 위험</h2>
+    <table>
+      <tr><th>위험</th><th>대응</th></tr>
+      <tr><td><span class="badge out">비가역</span> 강제 파기는 되돌릴 수 없다</td><td>확인 모달의 이름·연락처 재표시와 <code>confirm</code> 체크가 유일한 방어선</td></tr>
+      <tr><td><span class="badge warn">첫 가동 부하</span> 상한이 없어 누적 만료분이 한 번에 처리된다</td><td>운영 투입 첫날은 수동 dry-run으로 건수를 확인한 뒤 스케줄을 켠다</td></tr>
+      <tr><td><span class="badge warn">꺼 두고 잊기</span> 자동 파기가 꺼진 채 방치되면 만료 정보가 계속 남는다</td><td>화면 카드가 꺼짐 상태를 상시 노출. 운영 점검 항목에 포함해야 한다</td></tr>
+      <tr><td><span class="badge warn">정책 변경 파급</span> 보존 일수를 줄이면 다음 새벽에 더 많이 파기된다</td><td>저장 시 확인 모달 경고</td></tr>
+      <tr><td><span class="badge muted">예정일은 하한</span> 그날 실제 파기 건수가 0일 수 있다</td><td>화면 문구를 "이 날짜부터 파기 대상이 생길 수 있습니다"로 표기</td></tr>
+      <tr><td><span class="badge out">직무 분리 구멍</span> role-mappings 전용 매처 부재</td><td>기존 카드에 기록된 기존 이슈. 이번 범위 밖</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>다음 단계</h2>
+    <div class="card">
+      <p>구현 계획서를 작성한 뒤 slice S1 → S2 → S3 순으로 진행한다. 각 slice는 구현 → 스펙 준수 리뷰 → 코드 품질 리뷰를 거친다.</p>
+      <p class="small">S3 완료 후 도메인 카드(<code>privacy-audit</code>) API 계약을 🟢로 확정하고 파일 지도·규칙을 갱신한다. 운영 반영 전 체크: <code>retention_schedule_setting</code> DDL 적용, 전역 보존 정책 1건 등록, 관리자 메뉴에 <code>/admin/retention</code> 추가, 파기 담당자에게 <code>ROLE_PRIVACY_ADMIN</code> 매핑.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

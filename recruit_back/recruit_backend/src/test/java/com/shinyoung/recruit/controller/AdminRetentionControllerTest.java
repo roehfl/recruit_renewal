@@ -271,6 +271,104 @@ class AdminRetentionControllerTest {
                 .andExpect(jsonPath("$.success").value(false));
     }
 
+    @Test
+    void 파기대상자_검색은_미인증이면_401() throws Exception {
+        mockMvc.perform(get("/api/admin/retention/data-subjects")
+                        .param("name", "홍길동"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 파기대상자_검색은_RECRUIT_ADMIN이면_403_PII_반환이라_PRIVACY_전용() throws Exception {
+        mockMvc.perform(get("/api/admin/retention/data-subjects")
+                        .param("name", "홍길동")
+                        .with(authentication(adminAuthentication("ROLE_RECRUIT_ADMIN"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 파기대상자_검색은_PRIVACY_ADMIN이고_조건이_없으면_400() throws Exception {
+        mockMvc.perform(get("/api/admin/retention/data-subjects")
+                        .with(authentication(adminAuthentication("ROLE_PRIVACY_ADMIN"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void 파기대상자_상세도_RECRUIT_ADMIN이면_403() throws Exception {
+        mockMvc.perform(get("/api/admin/retention/data-subjects/{id}", 1L)
+                        .with(authentication(adminAuthentication("ROLE_RECRUIT_ADMIN"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 강제파기는_ADMIN_RECRUIT_ADMIN이면_403() throws Exception {
+        String body = """
+                { "applicantId": 1, "reasonCode": "DATA_SUBJECT_REQUEST", "confirm": true }
+                """;
+
+        mockMvc.perform(post("/api/admin/retention/purge-batches/force")
+                        .with(authentication(adminAuthentication("ROLE_ADMIN")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/admin/retention/purge-batches/force")
+                        .with(authentication(adminAuthentication("ROLE_RECRUIT_ADMIN")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 강제파기는_PRIVACY_ADMIN이고_confirm_false면_400() throws Exception {
+        mockMvc.perform(post("/api/admin/retention/purge-batches/force")
+                        .with(authentication(adminAuthentication("ROLE_PRIVACY_ADMIN")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "applicantId": 1, "reasonCode": "DATA_SUBJECT_REQUEST", "confirm": false }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void 스케줄_조회는_RECRUIT_ADMIN도_가능() throws Exception {
+        mockMvc.perform(get("/api/admin/retention/schedule")
+                        .with(authentication(adminAuthentication("ROLE_RECRUIT_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void 스케줄_변경은_ADMIN_RECRUIT_ADMIN이면_403() throws Exception {
+        String body = """
+                { "enabled": true }
+                """;
+
+        mockMvc.perform(post("/api/admin/retention/schedule")
+                        .with(authentication(adminAuthentication("ROLE_ADMIN")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/admin/retention/schedule")
+                        .with(authentication(adminAuthentication("ROLE_RECRUIT_ADMIN")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 스케줄_변경은_미인증이면_401() throws Exception {
+        mockMvc.perform(post("/api/admin/retention/schedule")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "enabled": true }
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
     private Long createPosting() {
         return jobPostingService.create(new JobPostingCreateRequest(
                 "retention api recruitment",

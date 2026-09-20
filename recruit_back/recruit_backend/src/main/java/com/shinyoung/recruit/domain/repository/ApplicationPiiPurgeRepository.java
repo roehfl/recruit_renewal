@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -44,6 +45,18 @@ public interface ApplicationPiiPurgeRepository extends Repository<JobApplication
     /** ref-count 판정용 — 해당 지원자의 전체 지원서. */
     @Query("select j from JobApplication j where j.applicant.id = :applicantId")
     List<JobApplication> findByApplicantId(@Param("applicantId") Long applicantId);
+
+    /**
+     * 아직 파기되지 않은 지원서 수(Phase 10 강제 파기). 엔티티 재조회는 영속성 컨텍스트의
+     * 1차 캐시가 stale 인스턴스를 돌려줄 수 있어(OSIV 하에서 item 처리(REQUIRES_NEW)가 별도
+     * EntityManager 로 커밋해도 요청 스레드의 1차 캐시는 갱신되지 않는다) 집계 쿼리로 확인한다.
+     */
+    @Query("select count(j) from JobApplication j where j.applicant.id = :applicantId and j.purgeResult is null")
+    long countUnpurgedByApplicantId(@Param("applicantId") Long applicantId);
+
+    /** 파기 대상자 검색 결과 일괄 조회용(Phase 10) — 지원자별 N+1 회피. */
+    @Query("select j from JobApplication j where j.applicant.id in :applicantIds")
+    List<JobApplication> findByApplicantIdIn(@Param("applicantIds") Collection<Long> applicantIds);
 
     /**
      * 바이너리 소멸 미확인 첨부 수(PURGED 승격 금지 판정). STORED 뿐 아니라 <b>soft-delete(DELETED)도 포함</b> —

@@ -102,6 +102,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/admin/audit/**").hasAnyAuthority(RoleNames.RECRUIT_ADMIN, RoleNames.PRIVACY_ADMIN)
                 // Retention(Phase 09c, ADR-0007) — write 는 ROLE_PRIVACY_ADMIN 전용, GET/dry-run 은 RECRUIT 포함.
                 // method 까지 분기(설계 리뷰 #5/#7). 전부 broad /api/admin/** 보다 먼저.
+                // 강제 파기(Phase 10) — 비가역 + 보존기간 무시라 PRIVACY 전용.
+                .requestMatchers(HttpMethod.POST, "/api/admin/retention/purge-batches/force").hasAuthority(RoleNames.PRIVACY_ADMIN)
                 .requestMatchers(HttpMethod.POST, "/api/admin/retention/purge-batches/execute").hasAuthority(RoleNames.PRIVACY_ADMIN)
                 .requestMatchers(HttpMethod.POST, "/api/admin/retention/purge-batches/reconcile").hasAuthority(RoleNames.PRIVACY_ADMIN)
                 .requestMatchers(HttpMethod.POST, "/api/admin/retention/purge-batches/dry-run").hasAnyAuthority(RoleNames.RECRUIT_ADMIN, RoleNames.PRIVACY_ADMIN)
@@ -111,7 +113,12 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/admin/retention/holds/**").hasAuthority(RoleNames.PRIVACY_ADMIN)
                 // hold reason 은 자유 텍스트(민감 가능) — 조회도 PRIVACY_ADMIN 전용(9c 리뷰 Medium 1, 아래 GET 보다 먼저).
                 .requestMatchers(HttpMethod.GET, "/api/admin/retention/holds/**").hasAuthority(RoleNames.PRIVACY_ADMIN)
+                // 파기 대상자 조회는 지원자 원문 PII 를 반환한다 — broad GET retention/** 보다 먼저 PRIVACY 로 좁힌다.
+                .requestMatchers(HttpMethod.GET, "/api/admin/retention/data-subjects/**").hasAuthority(RoleNames.PRIVACY_ADMIN)
+                .requestMatchers(HttpMethod.GET, "/api/admin/retention/data-subjects").hasAuthority(RoleNames.PRIVACY_ADMIN)
                 .requestMatchers(HttpMethod.POST, "/api/admin/retention/job-postings/*/anchor").hasAuthority(RoleNames.PRIVACY_ADMIN)
+                // 자동 파기 on/off — 쓰기는 PRIVACY. GET 은 아래 broad GET retention/** (RECRUIT·PRIVACY)로 충분하다.
+                .requestMatchers(HttpMethod.POST, "/api/admin/retention/schedule").hasAuthority(RoleNames.PRIVACY_ADMIN)
                 .requestMatchers(HttpMethod.GET, "/api/admin/retention/**").hasAnyAuthority(RoleNames.RECRUIT_ADMIN, RoleNames.PRIVACY_ADMIN)
                 // cleanup은 삭제(write) — retention 관례에 따라 PRIVACY_ADMIN 전용(설계 9장).
                 .requestMatchers(HttpMethod.POST, "/api/admin/client-events/cleanup").hasAuthority(RoleNames.PRIVACY_ADMIN)

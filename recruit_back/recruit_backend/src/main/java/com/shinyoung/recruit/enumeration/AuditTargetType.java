@@ -13,5 +13,7 @@ public enum AuditTargetType {
     RETENTION_POLICY,
     RETENTION_HOLD,
     JOB_POSTING,
-    PURGE_BATCH
+    PURGE_BATCH,
+    /** 자동 파기 스케줄 설정(Phase 10) — on/off 토글 감사 대상. */
+    RETENTION_SCHEDULE
 }

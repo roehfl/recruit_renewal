@@ -1,7 +1,7 @@
 # 관리자 지원현황·상세·엑셀·PDF (`admin-application`)
 
 > 경로 표기 `{BE}` `{BT}` `{BR}` `{FE}` — 정의: [_index.md](_index.md). API 경로는 `/api` 접두 생략.
-> 관련 카드: [application](application.md)(조회 구현) · [application-sections](application-sections.md)(섹션 엔티티) · [stage-result](stage-result.md) · [attachment](attachment.md) · [interview](interview.md)(면접 평가 조회) · [statistics](statistics.md) · [privacy-audit](privacy-audit.md) · [application-form](application-form.md) · [job-posting](job-posting.md) · [master-data](master-data.md) · [auth-account](auth-account.md)
+> 관련 카드: [application](application.md)(조회 구현) · [application-sections](application-sections.md)(섹션 엔티티) · [stage-result](stage-result.md) · [attachment](attachment.md) · [interview](interview.md)(면접 평가 조회) · [statistics](statistics.md) · [privacy-audit-audit](privacy-audit-audit.md)(반출 감사) · [application-form](application-form.md) · [job-posting](job-posting.md) · [master-data](master-data.md) · [auth-account](auth-account.md)
 
 ## 요약
 
@@ -230,7 +230,7 @@ JSON 응답은 `ApiResponse<T>`, 파일 응답은 래핑 없음(오류만 JSON).
 ### 새 목록 export 추가
 1. 대응 목록 서비스를 재사용해 `{BE}/service/AdminDatasetExportService.java`에 spec·메서드 추가.
 2. `{BE}/controller/AdminExportController.java`에 GET: actor 확인 → 생성 → `logExport` → `toResponse`, 감사 실패 시 `deleteQuietly` 후 재던짐.
-3. **`{BE}/service/ExportAuditLogger.java` `exportActionType`에 매핑 추가**(없으면 매 요청 실패). 새 `AuditActionType`은 [privacy-audit](privacy-audit.md).
+3. **`{BE}/service/ExportAuditLogger.java` `exportActionType`에 매핑 추가**(없으면 매 요청 실패). 새 `AuditActionType`은 [privacy-audit-audit](privacy-audit-audit.md).
 4. `{BT}/controller/AdminDatasetExportControllerTest.java`에 xlsx·404·권한. 카드 API 표 🟡 → 🟢, `node tools/check-docs.mjs`.
 
 ## 검증
