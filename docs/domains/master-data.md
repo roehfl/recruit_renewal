@@ -7,7 +7,7 @@
 
 - **공통코드**: 공개 `GET /codes`(활성만) = 드롭다운 소스. 관리자 CRUD·화면 `/admin/codes`. 삭제 없음(soft delete). **시드 없음** — 관리자 화면이 유일한 등록 경로.
 - **학교 검색** `GET /schools`: 외부 OpenAPI 프록시(고교=NEIS, 그 외=공공데이터포털 대학 표준데이터). 로컬 `school` 테이블은 검색에 안 쓴다. 모달 `SchoolModalBody.vue`를 지원서 학력 섹션이 연다.
-- **관리자 학교** `/admin/schools`(CRUD + xlsx import): 폐기 결정(2026-08-27) → ⛔. FE 미사용, 백엔드 코드·테스트만 잔존(제거 후보, 코드 제거는 별도 작업).
+- **관리자 학교** `/admin/schools`(CRUD + xlsx import): 폐기 결정(2026-08-27) → ⛔. FE 미사용, 백엔드 코드·테스트만 잔존. 2026-09-20 재확인 — **화면 계획 없음, 코드는 존치**(지우지 않기로 결정). 미구현 잔여 작업이 아니다.
 - **주소 검색** `GET /addresses`: juso.go.kr 도로명주소 프록시. 지원서 기본정보 주소 모달이 쓴다.
 - 외부 API 3종은 DMZ 웹서버 경유 — 폐쇄망 주의(`## 함정·결정` 첫 항목).
 
@@ -160,7 +160,10 @@
 - 키 미설정이면 외부 호출 없이 502 `"학교 검색 서비스가 설정되지 않았습니다."`, 네트워크·타임아웃·파싱 실패는 502 `"학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요."`. 키·상위 오류코드는 로그에만. ({BE}/service/NeisSchoolClient.java — search, {BE}/service/UnivInfoSchoolClient.java — search)
 - 공공데이터 키는 Encoding 표기로 정규화하고 URI를 직접 조립한다(URI 빌더에 넘기면 `+`가 공백 → 403). ({BE}/service/PublicDataServiceKey.java — toQueryValue, {BE}/service/UnivInfoSchoolClient.java — requestUri)
 
-**관리자 학교·import(🔴 FE 미사용)**
+**관리자 학교·import(⛔ 미사용 잔존물)**
+
+> 학교 검색이 외부 API 직접 호출로 바뀌면서(`706db0d`) 지원자 화면이 `School` 테이블을 거치지 않는다. 아래 관리자 학교·import API와 `SchoolRepository.search`는 그때 남은 잔존물이며 **화면을 만들 계획이 없다**(2026-09-20 확인). 코드는 지우지 않고 둔다. 미구현 잔여 작업으로 오해하지 말 것.
+
 - `schoolName` 필수(≤200), 나머지(`schoolType`·`schoolCategory`·`educationMode` 50, `region` 100, `address` 500, `countryCode` 10) 선택·공백→null, 백엔드 검증 미결합. 생성 시 중복 검사 없음. 수정은 서술 필드 전체 교체, `active` null이면 유지. ({BE}/domain/entity/School.java — create/update)
 - import 파일 레벨(위반 시 파일 전체 400): 비어 있지 않음, 확장자 `.xlsx`, 크기 ≤ `recruit.upload.max-file-size`(5MB), 데이터 행 ≤ `recruit.upload.max-rows`(10000), 첫 시트 1행 헤더가 정확히 `schoolName, schoolType, schoolCategory, educationMode, region, address, countryCode`(7열 순서 고정). ({BE}/service/SchoolImportParser.java — parse/validateHeader)
 - 셀은 문자열로 판독(정수는 정수 문자열, 날짜 ISO), 빈 행은 행 수에서 제외. ({BE}/service/SchoolImportParser.java — readCellString/isEmptyRow)
@@ -234,7 +237,7 @@ npm run type-check
 - DMZ 프록시 간헐 장애(2026-08-31): Apache `/gov`가 끊긴 유휴 연결 재사용 → 60초 무응답 → 502. 조치는 인프라 `ProxyPass ... disablereuse=On connectiontimeout=5 timeout=15`. `b98a573` HTTP 80 전환.
 - `a630a15`·`cf4e471`·`df58acd` 대학 API 스키마 3연속 정정 — 명세는 실응답으로 확인.
 - `940bc6c`·`f359d74` 서비스키 두 표기 허용 + URI 직접 조립("디코딩 키만" 주석은 낡음).
-- `706db0d` 학교 검색 외부 API 전환. `SchoolRepository.search`·관리자 학교 API 잔존(🔴), `School` 엔티티 주석("자동완성·통계 기준")은 낡았다.
+- `706db0d` 학교 검색 외부 API 전환. `SchoolRepository.search`·관리자 학교 API는 그때 남은 **미사용 잔존물**이다(⛔, 2026-09-20 확인 — 화면 계획 없음, 코드는 존치). `School` 엔티티 주석("자동완성·통계 기준")은 낡았다.
 - `8d7485d` `VALIDATED_GROUPS`에 `WORK_LOCATION` 추가, `SchoolModalBody` watch `immediate`(첫 오픈 `initial` 미반영 결함). `APPLICATION_ROUTE`는 아직 누락 — 비활성화해도 경고 없이 지원서 재저장이 400.
 - `86d12c9` 공통코드 조회 실패 처리(원문 코드 표시).
 - 소소한 FE 결함: `CODE_GROUP` 행 비활성화 문구("그룹 목록에서만 가려진다")와 달리 비활성 그룹도 계속 보인다. 주소 오류 fallback이 `'fallback 메세지'`, `addressApi.ts` 주석은 복붙 오류.

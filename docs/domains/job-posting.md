@@ -154,7 +154,7 @@
 - FE 저장 순서(`AdminJobPostingFormView` save): 본문 수정 → 삭제(1건 보류) → 신규 추가 → altText → 보류분 삭제(10장 상한 직전이면 먼저) → 전체 order. 성공한 삭제는 즉시 목록에서 뺀다(재시도 404 방지).
 
 **첨부 요건**
-- 두 API 모두 **FE 미사용**(관리자 요건 설정 화면 없음). 요건은 공개 상세, [application](application.md) 제출 검증·완성도, [application-form](application-form.md) 레이아웃·현황판이 읽는다.
+- 두 API 모두 **의도적 FE 미사용**. 관리자 요건 설정 화면은 **만들지 않는다** — 인사팀이 경력기술서·사진 외 첨부는 쓰지 않기로 결정했다(2026-09-20). 미구현 잔여 작업이 아니다. 요건은 공개 상세, [application](application.md) 제출 검증·완성도, [application-form](application-form.md) 레이아웃·현황판이 읽는다.
 - 응답 행: `{ requirementId, jobPostingId, attachmentType, sectionType, required, minCount, sortOrder, displayName, description }`(sortOrder·id asc). 조회는 공고가 없으면 404.
 - 교체: 전체 삭제 후 재생성(body 없으면 전부 삭제). 허용 밖 섹션은 400 "첨부 요구사항은 지원자가 파일을 올릴 수 있는 섹션(기본정보 BASIC_INFO, 경력 CAREER)에만 등록할 수 있습니다. sectionType=…"(2026-09-19 🟢, `ATTACHMENT` 제외는 523ab48, `BASIC_INFO`·`CAREER` 허용 목록은 300e792에서 도입). 나머지 메시지는 영문.
 
