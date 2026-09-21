@@ -58,7 +58,6 @@ const jobWorkLocationOptions = computed(() => {
 })
 
 const applicationTypeOptions = [
-  { value: '', label: '전체' },
   { value: 'NEW_GRADUATE', label: '신입' },
   { value: 'EXPERIENCED', label: '경력' },
   { value: 'NEW_GRADUATE_OR_EXPERIENCED', label: '신입/경력' },
@@ -372,7 +371,7 @@ onMounted(async () => {
         </div>
 
         <div class="form-actions">
-          <a-button type="primary" @click="search"><SearchOutlined />검색</a-button>
+          <a-button type="primary" @click="search" :disabled="interviewStages.length === 0"><SearchOutlined />검색</a-button>
           <a-button :disabled="selectedJobPostingId === null" @click="refresh"><ReloadOutlined />초기화</a-button>
         </div>
       </a-card>

@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { getApiErrorMessage } from '@/api/apiError'
-import { DeleteOutlined, ArrowDownOutlined, ArrowUpOutlined } from '@ant-design/icons-vue'
+import { DeleteOutlined, ArrowDownOutlined, ArrowUpOutlined, UpOutlined, DownOutlined } from '@ant-design/icons-vue'
 import type { QuestionItem, QuestionReOrderItem, QuestionReOrderRequest, QuestionRequest, QuestionForm } from '@/types/question'
 import { adminJobPostingApi } from '@/api/adminJobPostingApi'
 import QuestionModalBody from '@/views/admin/applicationForm/questionModal/QuestionModalBody.vue'
@@ -82,15 +82,6 @@ const columns = [
 
 const rowKey = (record: QuestionItem) => {
   return record.questionId!
-}
-
-const handleExpand = (expanded: boolean, record: QuestionItem) => {
-  if(expanded && record.questionId) {
-    expandedRowKeys.value = [record.questionId!]
-  }
-  else {
-    expandedRowKeys.value = []
-  }
 }
 
 /* 이웃 질문과 자리를 바꾸고 순서를 저장한다. 저장이 실패하면 reOrder 가 서버 순서로 되돌린다. */
@@ -396,19 +387,20 @@ onMounted( async () => {
           :loading="loading"
           :locale="tableLocale"
           :expand-row-by-click="false"
-          @expand="handleExpand"
         >
+          <template #expandIcon="{ record }">
+            <span
+              class="custom-expand-icon"
+              @click="toggleExpand(record)"
+            >
+              <DownOutlined v-if="isExpanded(record)"/>
+              <UpOutlined v-else/>
+            </span>
+          </template>
           <template #bodyCell="{ column, record }">
 
             <template v-if="column.key === 'questionText'">
-              <div
-                class="question-title"
-                @click.stop="toggleExpand(record)"
-              >
-                <span class="expand-icon">
-                  {{ isExpanded(record) ? '▼  ' : '▲  ' }}
-                </span>
-
+              <div class="question-title">
                 <span>
                   {{ record.questionText || '-' }}
                 </span>
@@ -599,7 +591,7 @@ em {
   margin-bottom: 12px;
 }
 .tab-description {
-  margin: 0;
+  margin: 0 0 14px;
   color: var(--app-text-secondary);
   font-size: 13px;
 }
@@ -714,17 +706,22 @@ em {
   background: #fff2f0;
 }
 
-:deep(.ant-table-cell .ant-table-row-expand-icon-cell) {
-  width: 0 !important;
-  display: none !important;
-  padding: 0 !important;
+.custom-expand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 25px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--app-text-secondary);
+  user-select: none;
+  padding: 4px 15px
 }
-
-:deep(.ant-table-cell .ant-table-row-expand-icon) {
-  width: 0 !important;
-  display: none !important;
-  padding: 0 !important;
+.custom-expand-icon:hover {
+  color: var(--app-color-primary);
+  background-color: #e8e8e8;
+  border-radius: 4px;
 }
-
 
 </style>
