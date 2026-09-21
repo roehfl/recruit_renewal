@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -116,6 +117,78 @@ class NiceVerificationControllerTest {
         mockMvc.perform(post("/api/auth/nice/callback/error")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("EncodeData", "INVALID"))
+                .andExpect(status().isSeeOther())
+                .andExpect(header().string("Location", "/nice-auth/result"));
+    }
+
+    /**
+     * Base64 부분에 '+' 가 들어간 성공 응답을 만든다.
+     *
+     * <p>'+'(sextet 111110)는 이 평문에서 한글 바이트에서만 나오고(ASCII 는 '>'·'~' 가 없으면 안 나온다),
+     * 한글이 Base64 3바이트 묶음의 어느 자리에서 시작하느냐에 달렸다. 그래서 한글 <b>앞에</b> ASCII 를
+     * 0~2자 붙여 시작 자리를 바꿔 가며 찾는다(뒤에 붙이면 한글의 자리가 바뀌지 않는다).
+     */
+    private String payloadContainingPlus(String reqSeq) {
+        for (int pad = 0; pad < 3; pad++) {
+            Map<String, String> fields = new LinkedHashMap<>();
+            fields.put("REQ_SEQ", reqSeq);
+            fields.put("NAME", "a".repeat(pad) + "홍길동");
+            fields.put("MOBILE_NO", "01012345678");
+            fields.put("CI", "CI-VALUE-1");
+            String payload = client.encode(codec.encode(fields));
+            if (payload.contains("+")) {
+                return payload;
+            }
+        }
+        throw new IllegalStateException("'+' 가 들어간 페이로드를 만들지 못했다");
+    }
+
+    /*
+     * NICE 는 인증 결과를 GET 쿼리(?EncodeData=...)로 돌려준다(외부 실인증에서 확인, 2026-09-22).
+     * 설계는 폼 POST 로 가정해 @PostMapping 이었고 405 가 났다. 레거시 JSP 는 메서드를 가리지 않아
+     * 이 차이가 드러나지 않았다.
+     */
+    @Test
+    void callbackAcceptsGetWithQueryParameter() throws Exception {
+        String reqSeq = issueReqSeq(new MockHttpSession());
+
+        MvcResult result = mockMvc.perform(get("/api/auth/nice/callback")
+                        .param("EncodeData", niceSuccessPayload(reqSeq)))
+                .andExpect(status().isSeeOther())
+                .andReturn();
+
+        assertTrue(result.getResponse().getHeader("Location").startsWith("/nice-auth/result?token="));
+    }
+
+    @Test
+    void errorCallbackAcceptsGet() throws Exception {
+        mockMvc.perform(get("/api/auth/nice/callback/error").param("EncodeData", "INVALID"))
+                .andExpect(status().isSeeOther())
+                .andExpect(header().string("Location", "/nice-auth/result"));
+    }
+
+    /*
+     * EncodeData 는 Base64 라 '+' 가 섞인다. NICE 가 쿼리에 퍼센트 인코딩 없이 붙이면 서블릿이 '+' 를
+     * 공백으로 디코드해 복호화가 깨진다. MockMvc 의 param 은 디코드가 끝난 값이므로, '+' 를 공백으로
+     * 바꿔 넣으면 정확히 그 상황이다.
+     */
+    @Test
+    void callbackRestoresPlusDecodedAsSpace() throws Exception {
+        String reqSeq = issueReqSeq(new MockHttpSession());
+        String payload = payloadContainingPlus(reqSeq);
+
+        MvcResult result = mockMvc.perform(get("/api/auth/nice/callback")
+                        .param("EncodeData", payload.replace('+', ' ')))
+                .andExpect(status().isSeeOther())
+                .andReturn();
+
+        assertTrue(result.getResponse().getHeader("Location").startsWith("/nice-auth/result?token="));
+    }
+
+    /* EncodeData 없이 들어오면(주소 직접 입력 등) 팝업에 400 JSON 을 띄우지 않고 실패 경로로 보낸다. */
+    @Test
+    void callbackWithoutEncodeDataRedirectsToFailure() throws Exception {
+        mockMvc.perform(get("/api/auth/nice/callback"))
                 .andExpect(status().isSeeOther())
                 .andExpect(header().string("Location", "/nice-auth/result"));
     }

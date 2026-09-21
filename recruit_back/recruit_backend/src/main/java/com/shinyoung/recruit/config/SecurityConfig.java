@@ -25,6 +25,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 @Configuration
 public class SecurityConfig {
@@ -67,8 +68,27 @@ public class SecurityConfig {
         corsConfiguration.setAllowCredentials(true);
         corsConfiguration.setMaxAge(3600L);
         source.registerCorsConfiguration("/**", corsConfiguration);
-        return source;
+        // 설정이 null 이면 CorsFilter 는 CORS 처리를 건너뛴다(CORS 응답 헤더도 붙이지 않는다).
+        return request -> CORS_EXEMPT_PATHS.contains(
+                request.getRequestURI().substring(request.getContextPath().length()))
+                ? null
+                : source.getCorsConfiguration(request);
     }
+
+    /**
+     * CORS 처리에서 빼는 경로. NICE 팝업이 보내는 cross-site 폼 POST 라 브라우저가
+     * Origin(https://nice.checkplus.co.kr, Referrer-Policy 에 따라 "null")을 붙인다. CorsFilter 는
+     * 폼 이동과 스크립트 요청을 구분하지 않고 허용 목록 밖 Origin 을 403 으로 거부하므로, 여기서
+     * 빼지 않으면 실제 NICE 인증이 전부 막힌다.
+     *
+     * <p>허용 목록에 NICE Origin 을 넣지 않는다. allowCredentials=true 라 그러면 NICE 쪽 스크립트가
+     * 모든 API 를 자격 증명과 함께 호출하고 응답을 읽을 수 있게 된다. "null" 은 샌드박스 iframe·file://
+     * 도 쓰는 값이라 허용하면 안 된다. 콜백의 안전성은 Origin 이 아니라 REQ_SEQ 대조와 암호문에 있다.
+     */
+    private static final Set<String> CORS_EXEMPT_PATHS = Set.of(
+            "/api/auth/nice/callback",
+            "/api/auth/nice/callback/error"
+    );
 
 
     @Bean

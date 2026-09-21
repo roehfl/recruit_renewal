@@ -296,4 +296,55 @@ public class SecurityConfigTest {
                         .content("{\"token\":\"INVALID\"}"))
                 .andExpect(status().is(allOf(not(401), not(403))));
     }
+
+    /*
+     * NICE 콜백은 NICE 팝업이 보내는 cross-site 폼 POST 라 브라우저가 Origin 을 붙인다
+     * (https://nice.checkplus.co.kr, Referrer-Policy 에 따라 "null"). CorsFilter 는 폼 이동과
+     * 스크립트 요청을 구분하지 않고 허용 목록 밖 Origin 을 403 "Invalid CORS request" 로 거부해,
+     * 실제 NICE 인증이 전부 여기서 막혔다(외부 접속 테스트에서 발견). 위 인가 테스트는 Origin 헤더가
+     * 없어 이 경로를 타지 않았다.
+     *
+     * 잘못된 EncodeData 라 성공은 아니지만, CORS 를 통과하면 컨트롤러가 토큰 없이 303 으로 넘긴다.
+     */
+    @Test
+    void 본인확인_콜백은_NICE_Origin이어도_CORS에서_막히지_않는다() throws Exception {
+        mockMvc.perform(post("/api/auth/nice/callback")
+                        .header("Origin", "https://nice.checkplus.co.kr")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("EncodeData", "INVALID"))
+                .andExpect(status().isSeeOther());
+    }
+
+    @Test
+    void 본인확인_실패콜백은_NICE_Origin이어도_CORS에서_막히지_않는다() throws Exception {
+        mockMvc.perform(post("/api/auth/nice/callback/error")
+                        .header("Origin", "https://nice.checkplus.co.kr")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("EncodeData", "INVALID"))
+                .andExpect(status().isSeeOther());
+    }
+
+    @Test
+    void 본인확인_콜백은_Origin이_null이어도_CORS에서_막히지_않는다() throws Exception {
+        mockMvc.perform(post("/api/auth/nice/callback")
+                        .header("Origin", "null")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("EncodeData", "INVALID"))
+                .andExpect(status().isSeeOther());
+    }
+
+    /* NICE 는 결과를 GET 쿼리로 돌려준다. 필터 체인 전체(인가·CORS)를 거쳐도 통과하는지 본다. */
+    @Test
+    void 본인확인_콜백은_GET으로_와도_통과한다() throws Exception {
+        mockMvc.perform(get("/api/auth/nice/callback").param("EncodeData", "INVALID"))
+                .andExpect(status().isSeeOther());
+    }
+
+    /* 콜백 예외가 CORS 를 통째로 끈 게 아닌지 본다 — 콜백 밖 경로는 허용 목록 밖 Origin 을 계속 거부한다. */
+    @Test
+    void 콜백_밖_경로는_허용목록_밖_Origin을_계속_거부한다() throws Exception {
+        mockMvc.perform(post("/api/auth/nice/request")
+                        .header("Origin", "https://nice.checkplus.co.kr"))
+                .andExpect(status().isForbidden());
+    }
 }
