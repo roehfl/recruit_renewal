@@ -144,7 +144,7 @@ Controller
 ## 8. 설정·실행
 
 - 설정 파일은 `{BR}/application.yaml` 하나(프로파일 파일 없음). 테스트는 `recruit_back/recruit_backend/src/test/resources/application.yaml`을 읽는다(H2 메모리, `ddl-auto: create-drop`, 테스트용 감사 HMAC 값).
-- 핵심 키: `server.port`(8000), `spring.jpa.hibernate.ddl-auto`, `spring.datasource.*`(H2 파일 DB, 운영은 외부 설정), `crypto.aes.key`, `audit.*`, `recruit.*`, `client-event-log.*`.
+- 핵심 키: `server.port`(8080), `spring.jpa.hibernate.ddl-auto`, `spring.datasource.*`(H2 파일 DB, 운영은 외부 설정), `crypto.aes.key`, `audit.*`, `recruit.*`, `client-event-log.*`.
 - 새 설정은 `recruit.<기능>` 아래에 `${ENV_NAME:기본값}`로 추가하고 `{BE}/config/`에 `@ConfigurationProperties(prefix = "recruit.<기능>")` 클래스를 둔다. 최상위 `recruit:` 키 중복 금지(`{BT}/config/ApplicationYamlTest.java`가 검사). 기본값 없는 키는 테스트 yaml에도 넣는다.
 
 환경변수(실제 값은 저장소·문서·로그에 남기지 않는다):
@@ -171,7 +171,7 @@ Controller
 - 나머지 한도·타임아웃 변수(`RECRUIT_*`, `JUSO_*`, `NEIS_*`, `UNIV_*`, `CLIENT_EVENT_LOG_*`)는 `{BR}/application.yaml`에서 확인한다.
 - 폐쇄망 등 환경변수 주입이 어려우면 소스를 고치지 말고 jar 옆 설정 파일로 덮어쓴다: `java -jar <jar> --spring.config.additional-location=file:./config/`.
 
-로컬 실행(백엔드 디렉터리, 포트 8000, Swagger `http://localhost:8000/swagger-ui`):
+로컬 실행(백엔드 디렉터리, 포트 8080, Swagger `http://localhost:8080/swagger-ui`):
 
 ```bash
 # Windows PowerShell
