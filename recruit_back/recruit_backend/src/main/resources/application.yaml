@@ -108,6 +108,20 @@ recruit:
     read-timeout-ms: ${UNIV_DEPT_READ_TIMEOUT_MS:5000}
     # 학과 단위 데이터라 같은 학교가 여러 행으로 온다. 중복 제거 후에도 결과가 남도록 크게 잡는다.
     page-size: ${UNIV_DEPT_PAGE_SIZE:100}
+  nice:
+    # NICE 체크플러스 본인확인. 사이트코드·사이트패스워드는 운영 자격증명이라 저장소에 값을 두지 않는다.
+    # 미설정 상태(기본값)는 mock-enabled 기본 false 와 맞물려 기동 실패한다 — NiceClientConfig 가드가 의도한 기본 동작이다.
+    site-code: ${NICE_SITE_CODE:}
+    site-password: ${NICE_SITE_PASSWORD:}
+    # NICE 에 등록한 리턴 URL 2종. 평문에 실려 암호화되므로 등록값과 정확히 같아야 한다.
+    return-url: ${NICE_RETURN_URL:}
+    error-url: ${NICE_ERROR_URL:}
+    # 개발 전용 Mock. 기본 false — 운영이 NICE 설정을 빠뜨리면 NiceClientConfig 가드가 기동을 막는다.
+    # 기본을 true 로 두면 설정 누락 시 운영에서 가짜 CI 로 가입이 조용히 된다(프로파일이 없어 구분 불가).
+    # 로컬 개발은 AUDIT_ALLOW_FALLBACK_SECRET 처럼 NICE_MOCK_ENABLED=true 를 명시적으로 준다.
+    mock-enabled: ${NICE_MOCK_ENABLED:false}
+    request-ttl-minutes: ${NICE_REQUEST_TTL_MINUTES:10}
+    verified-ttl-minutes: ${NICE_VERIFIED_TTL_MINUTES:30}
   attachment:
     storage-root: ${RECRUIT_ATTACHMENT_STORAGE_ROOT:attachments}
     max-file-size: ${RECRUIT_ATTACHMENT_MAX_FILE_SIZE:20MB}

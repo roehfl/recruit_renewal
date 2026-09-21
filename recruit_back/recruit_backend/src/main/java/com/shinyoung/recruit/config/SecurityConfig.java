@@ -84,6 +84,9 @@ public class SecurityConfig {
                 .accessDeniedHandler(accessDeniedHandler));
         http.authorizeHttpRequests(authorizeRequests -> authorizeRequests
                 .requestMatchers("/api/auth/login", "/api/auth/logout", "/api/auth/applicants/sign-up", "/api/auth/applicants/check-email").permitAll()
+                // 본인확인은 가입 전(미인증) 흐름이다. callback 2종은 NICE 팝업이 부르는
+                // cross-site POST 라 세션·인증이 없다.
+                .requestMatchers("/api/auth/nice/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**", "/h2-console/**", "/api/menu/tree").permitAll()
                 // 메뉴 관리 write — MenuController 의 base path 가 /menu 라 실제 경로가 /api/menu/admin/menu 이고,
                 // 아래 broad /api/admin/** 매처에 걸리지 않는다. 명시하지 않으면 anyRequest().permitAll() 로 흘러

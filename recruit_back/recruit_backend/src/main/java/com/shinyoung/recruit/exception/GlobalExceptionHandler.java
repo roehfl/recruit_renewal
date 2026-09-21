@@ -171,6 +171,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler(NiceVerificationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNiceVerification(NiceVerificationException e) {
+        return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(InvalidApplicantAccountException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidApplicantAccount(InvalidApplicantAccountException e) {
         return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));

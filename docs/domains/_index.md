@@ -19,7 +19,8 @@
 
 | 카드 | 도메인 | 주 사용자 |
 |---|---|---|
-| [auth-account](auth-account.md) | 로그인(세션·LDAP)·본인인증·지원자 가입/계정 | 지원자·관리자 |
+| [auth-account](auth-account.md) | 로그인(세션·LDAP)·지원자 가입/계정 | 지원자·관리자 |
+| [auth-nice-verification](auth-nice-verification.md) | NICE 본인확인 | 지원자 |
 | [role-menu](role-menu.md) | 부서 권한 매핑·메뉴 | 관리자 |
 | [job-posting](job-posting.md) | 공고·직무·근무지·공고 이미지·첨부 요건 | 관리자·지원자 |
 | [question](question.md) | 질문 템플릿·공고별 질문 | 관리자 |
@@ -45,7 +46,8 @@
 
 | 라우트 name | 경로 | 카드 |
 |---|---|---|
-| `Login` · `NiceAuthPopup` | `/login` · `/nice-auth` | auth-account |
+| `Login` | `/login` | auth-account |
+| `NiceAuth*` | `/nice-auth*` | auth-nice-verification |
 | `Signup` · `accountRecovery` · `ApplicantProfile` | `/applicant/signup` · `/applicant/accountRecovery` · `/applicant/profile` | auth-account |
 | `AdminMenuManage` · `AdminRoleMapping` | `/admin/menus` · `/admin/role-mappings` | role-menu |
 | `AdminJobPostingList` · `AdminJobPostingCreate` · `AdminJobPostingDetail` · `AdminJobPostingEdit` | `/admin/job-postings…` | job-posting |
@@ -70,6 +72,7 @@
 | 접두 | 카드 |
 |---|---|
 | `/auth` · `/applicant/account` | auth-account |
+| `/auth/nice` | auth-nice-verification |
 | `/menu` · `/admin/role-mappings` | role-menu |
 | `/admin/job-postings`(기본·`/images`·`/attachment-requirements`) · `/job-postings`(단, `/job-postings/{id}/application`은 application) | job-posting |
 | `/admin/question-templates` · `/admin/job-postings/{id}/questions` | question |
@@ -93,7 +96,8 @@
 
 | 키워드 | 카드 |
 |---|---|
-| 로그인, 세션, LDAP, 본인인증(NICE), 회원가입, 비밀번호, 휴대폰 변경, 계정 찾기 | auth-account |
+| 로그인, 세션, LDAP, 회원가입, 비밀번호, 휴대폰 변경, 계정 찾기 | auth-account |
+| NICE, 체크플러스 | auth-nice-verification |
 | 권한, 역할, 부서 권한 매핑, 메뉴, 사이드바, 헤더 메뉴 | role-menu |
 | 공고, 채용공고, 모집분야, 직무(`JobPosition`), 근무지, 공고 이미지, 첨부 요건, 신입/경력, 마감 | job-posting |
 | 질문 템플릿, 질문 은행, 공고 질문 | question |

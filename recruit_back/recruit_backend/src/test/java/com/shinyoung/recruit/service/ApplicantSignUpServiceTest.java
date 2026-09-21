@@ -7,7 +7,9 @@ import com.shinyoung.recruit.domain.repository.UserRepository;
 import com.shinyoung.recruit.dto.request.ApplicantSignUpRequest;
 import com.shinyoung.recruit.dto.response.ApplicantEmailAvailabilityResponse;
 import com.shinyoung.recruit.dto.response.ApplicantSignUpResponse;
+import com.shinyoung.recruit.enumeration.NiceVerificationPurpose;
 import com.shinyoung.recruit.exception.InvalidApplicantSignUpException;
+import com.shinyoung.recruit.service.nice.NiceVerifiedIdentity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +17,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -42,12 +46,17 @@ class ApplicantSignUpServiceTest {
         applicantSignUpService = new ApplicantSignUpService(applicantRepository, userRepository, passwordEncoder);
     }
 
+    private NiceVerifiedIdentity identity(String name, String phoneNumber, String ci) {
+        return new NiceVerifiedIdentity(
+                NiceVerificationPurpose.SIGNUP, name, phoneNumber, ci, Instant.now());
+    }
+
     @Test
     void 회원가입_성공() {
         ApplicantSignUpRequest request = new ApplicantSignUpRequest(
-                "applicant01", "Password1234!", "홍길동",
-                "01012345678", "applicant01@example.com", "test-ci-applicant01"
+                "applicant01", "Password1234!", "applicant01@example.com"
         );
+        NiceVerifiedIdentity identity = identity("홍길동", "01012345678", "test-ci-applicant01");
         given(userRepository.existsByLoginId("applicant01")).willReturn(false);
         given(applicantRepository.existsByEmail("applicant01@example.com")).willReturn(false);
         given(applicantRepository.existsByCiHash(anyString())).willReturn(false);
@@ -63,7 +72,7 @@ class ApplicantSignUpServiceTest {
             return a;
         });
 
-        ApplicantSignUpResponse response = applicantSignUpService.signUp(request);
+        ApplicantSignUpResponse response = applicantSignUpService.signUp(request, identity);
 
         assertThat(response.applicantId()).isEqualTo(1L);
         assertThat(response.loginId()).isEqualTo("applicant01");
@@ -73,12 +82,12 @@ class ApplicantSignUpServiceTest {
     @Test
     void loginId_중복이면_실패() {
         ApplicantSignUpRequest request = new ApplicantSignUpRequest(
-                "duplicate", "Password1234!", "홍길동",
-                "01012345678", null, "test-ci"
+                "duplicate", "Password1234!", null
         );
+        NiceVerifiedIdentity identity = identity("홍길동", "01012345678", "test-ci");
         given(userRepository.existsByLoginId("duplicate")).willReturn(true);
 
-        assertThatThrownBy(() -> applicantSignUpService.signUp(request))
+        assertThatThrownBy(() -> applicantSignUpService.signUp(request, identity))
                 .isInstanceOf(InvalidApplicantSignUpException.class)
                 .hasMessageContaining("아이디");
     }
@@ -87,12 +96,12 @@ class ApplicantSignUpServiceTest {
     void 임직원이_점유한_loginId면_실패() {
         // User 레벨 체크 검증 — 임직원(LDAP JIT) loginId도 users 테이블에 있으므로 가입이 차단되어야 한다.
         ApplicantSignUpRequest request = new ApplicantSignUpRequest(
-                "emp01", "Password1234!", "홍길동",
-                "01012345678", null, "test-ci"
+                "emp01", "Password1234!", null
         );
+        NiceVerifiedIdentity identity = identity("홍길동", "01012345678", "test-ci");
         given(userRepository.existsByLoginId("emp01")).willReturn(true);
 
-        assertThatThrownBy(() -> applicantSignUpService.signUp(request))
+        assertThatThrownBy(() -> applicantSignUpService.signUp(request, identity))
                 .isInstanceOf(InvalidApplicantSignUpException.class)
                 .hasMessageContaining("아이디");
     }
@@ -100,13 +109,13 @@ class ApplicantSignUpServiceTest {
     @Test
     void email_중복이면_실패() {
         ApplicantSignUpRequest request = new ApplicantSignUpRequest(
-                "newuser", "Password1234!", "홍길동",
-                "01012345678", "dup@example.com", "test-ci"
+                "newuser", "Password1234!", "dup@example.com"
         );
+        NiceVerifiedIdentity identity = identity("홍길동", "01012345678", "test-ci");
         given(userRepository.existsByLoginId("newuser")).willReturn(false);
         given(applicantRepository.existsByEmail("dup@example.com")).willReturn(true);
 
-        assertThatThrownBy(() -> applicantSignUpService.signUp(request))
+        assertThatThrownBy(() -> applicantSignUpService.signUp(request, identity))
                 .isInstanceOf(InvalidApplicantSignUpException.class)
                 .hasMessageContaining("이메일");
     }
@@ -114,13 +123,13 @@ class ApplicantSignUpServiceTest {
     @Test
     void ciHash_중복이면_실패() {
         ApplicantSignUpRequest request = new ApplicantSignUpRequest(
-                "newuser", "Password1234!", "홍길동",
-                "01012345678", null, "dup-ci"
+                "newuser", "Password1234!", null
         );
+        NiceVerifiedIdentity identity = identity("홍길동", "01012345678", "dup-ci");
         given(userRepository.existsByLoginId("newuser")).willReturn(false);
         given(applicantRepository.existsByCiHash(HashUtil.sha256("dup-ci"))).willReturn(true);
 
-        assertThatThrownBy(() -> applicantSignUpService.signUp(request))
+        assertThatThrownBy(() -> applicantSignUpService.signUp(request, identity))
                 .isInstanceOf(InvalidApplicantSignUpException.class)
                 .hasMessageContaining("본인인증");
     }
@@ -128,15 +137,15 @@ class ApplicantSignUpServiceTest {
     @Test
     void password가_인코딩되어_저장된다() {
         ApplicantSignUpRequest request = new ApplicantSignUpRequest(
-                "enctest", "RawPassword1!", "테스트",
-                "01011111111", null, "enc-ci"
+                "enctest", "RawPassword1!", null
         );
+        NiceVerifiedIdentity identity = identity("테스트", "01011111111", "enc-ci");
         given(userRepository.existsByLoginId("enctest")).willReturn(false);
         given(applicantRepository.existsByCiHash(anyString())).willReturn(false);
         given(passwordEncoder.encode("RawPassword1!")).willReturn("$2a$encoded");
         given(applicantRepository.save(any(Applicant.class))).willAnswer(invocation -> invocation.getArgument(0));
 
-        applicantSignUpService.signUp(request);
+        applicantSignUpService.signUp(request, identity);
 
         ArgumentCaptor<Applicant> captor = ArgumentCaptor.forClass(Applicant.class);
         verify(applicantRepository).save(captor.capture());
@@ -147,16 +156,16 @@ class ApplicantSignUpServiceTest {
     @Test
     void 응답에_민감정보가_없다() {
         ApplicantSignUpRequest request = new ApplicantSignUpRequest(
-                "safeuser", "Password1234!", "안전",
-                "01099999999", "safe@example.com", "safe-ci"
+                "safeuser", "Password1234!", "safe@example.com"
         );
+        NiceVerifiedIdentity identity = identity("안전", "01099999999", "safe-ci");
         given(userRepository.existsByLoginId("safeuser")).willReturn(false);
         given(applicantRepository.existsByEmail("safe@example.com")).willReturn(false);
         given(applicantRepository.existsByCiHash(anyString())).willReturn(false);
         given(passwordEncoder.encode(anyString())).willReturn("encoded");
         given(applicantRepository.save(any(Applicant.class))).willAnswer(invocation -> invocation.getArgument(0));
 
-        ApplicantSignUpResponse response = applicantSignUpService.signUp(request);
+        ApplicantSignUpResponse response = applicantSignUpService.signUp(request, identity);
 
         assertThat(response.loginId()).isNotNull();
         assertThat(response.name()).isNotNull();

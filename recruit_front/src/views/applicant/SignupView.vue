@@ -100,6 +100,7 @@ import { message } from 'ant-design-vue'
 import { applicationApi } from '@/api/applicationApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import type { checkEmailRequest } from '@/types/application'
+import { NICE_MESSAGE_SOURCE, type NiceAuthMessage } from '@/types/auth/nice'
 
 const loading = ref(false);
 const isAvailable = ref(false);
@@ -116,7 +117,6 @@ interface SignupForm {
   loginId: string
   phoneNumber: string
   name: string
-  ci: string
   password: string
   passwordConfirm : string
 }
@@ -133,7 +133,6 @@ const form = reactive<SignupForm>({
   loginId: '',
   phoneNumber: '',
   name: '',
-  ci: '',
   password: '',
   passwordConfirm : '',
 })
@@ -220,25 +219,42 @@ const clickToEmailCertificationButton = async () => {
   isEmailCertificationDone.value = true;
 }
 
-const phoneAuthCallback = (data: { name: string, phoneNumber: string, ci:string }) => {
-  form.name = data.name;
-  form.phoneNumber = data.phoneNumber;
-  form.ci = data.ci
-
-  if(form.name && form.phoneNumber && form.ci) {
-    message.success('본인인증이 완료되었습니다.');
-    NiceAuthComplete(true);
-    isNiceAuthPopupOpen.value = false;
+/**
+ * 팝업이 postMessage 로 결과를 보낸다. 전역 함수(window.phoneAuthCallback)를 쓰던
+ * 방식에서 바뀌었다 — 전역은 다른 화면과 충돌하고 origin 검증이 불가능하다.
+ *
+ * CI 는 오지 않는다. 서버 세션에만 있고 가입 제출 때 서버가 꺼내 쓴다.
+ */
+const onNiceMessage = (event: MessageEvent) => {
+  if (event.origin !== window.location.origin) {
+    return
   }
-};
-window.phoneAuthCallback = phoneAuthCallback;
+  const payload = event.data as NiceAuthMessage | undefined
+  if (payload?.source !== NICE_MESSAGE_SOURCE) {
+    return
+  }
 
-// 화면을 떠난 뒤 팝업이 콜백을 부르지 않도록 정리한다. 다른 화면이 새로 등록한 콜백은 지우지 않는다.
+  isNiceAuthPopupOpen.value = false
+
+  if (payload.status !== 'SUCCESS' || !payload.name || !payload.phoneNumber) {
+    message.error('본인인증에 실패했습니다. 다시 시도해주세요.')
+    isNiceAuthComplete.value = false
+    return
+  }
+
+  form.name = payload.name
+  form.phoneNumber = payload.phoneNumber
+  message.success('본인인증이 완료되었습니다.')
+  isNiceAuthComplete.value = true
+}
+
+window.addEventListener('message', onNiceMessage)
+
+// 화면을 떠난 뒤 팝업이 메시지를 보내도 반응하지 않게 한다.
+// 자기가 등록한 리스너만 지운다 — 다른 화면의 리스너를 건드리지 않는다.
 onBeforeUnmount(() => {
-  if (window.phoneAuthCallback === phoneAuthCallback) {
-    window.phoneAuthCallback = undefined;
-  }
-});
+  window.removeEventListener('message', onNiceMessage)
+})
 
 const clickToNiceAuthPopupOpen = async () => {
   if(!isEmailCertificationDone.value){
@@ -252,12 +268,6 @@ const clickToNiceAuthPopupOpen = async () => {
     "width=450, height=480, resizable=no"
   );
 };
-
-const NiceAuthComplete = async (result:boolean) => {
-  // 나이스 인증 후 로직
-  isNiceAuthPopupOpen.value = false;
-  isNiceAuthComplete.value = result;
-}
 
 const isPasswordMismatch = computed(() => {
     if(!form.passwordConfirm.trim()) {
@@ -282,10 +292,7 @@ async function clickToSignupButton() {
     const request = {
         loginId: form.loginId,
         password: form.password,
-        name: form.name,
-        phoneNumber: form.phoneNumber.replaceAll(/-/g, ''),
         email: form.loginId,
-        ci: form.ci
     };
 
     await applicationApi.signup(request);

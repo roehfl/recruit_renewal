@@ -30,5 +30,8 @@ crypto:
 audit:
   hmac-secret: test-audit-hmac-pepper-0001
 recruit:
+  nice:
+    # 테스트는 NICE 실모듈을 쓰지 않는다. 모듈은 자기 암호문을 복호화하지 못해 왕복 테스트가 불가능하다.
+    mock-enabled: true
   attachment:
     storage-root: build/test-attachments

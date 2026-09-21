@@ -119,13 +119,14 @@ export interface ChangePasswordRequest {
   success: boolean
 }
 
+/**
+ * 가입 요청 본문. 이름·휴대폰·CI 는 없다 — 서버가 NICE 본인확인 결과를 세션에서 꺼내 쓴다.
+ * 클라이언트가 보낸 값을 믿으면 본인확인이 무의미해지고 CI 중복 차단도 뚫린다.
+ */
 export interface SignupUser {
   loginId: string,
   password: string,
-  name: string,
-  phoneNumber: string,
-  email: string,
-  ci: string
+  email: string
 }
 
 export interface checkEmailRequest {

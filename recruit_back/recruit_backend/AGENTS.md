@@ -154,6 +154,8 @@ Controller
 | `AES_SECRET_KEY` | 비밀 | 없음(필수) | 32자. 로컬 예시 `22791194512954214612461221261067` — **로컬·테스트 전용 예시, 운영 키 아님** |
 | `AUDIT_HMAC_SECRET` | 비밀 | 빈 값 | 비면 기동 실패(`AUDIT_ALLOW_FALLBACK_SECRET=true`면 비운영 대체 값, `prod` 프로파일에서는 거부) |
 | `AUDIT_ALLOW_FALLBACK_SECRET` | 플래그 | `false` | 로컬에서만 `true` |
+| `NICE_MOCK_ENABLED` | 플래그 | `false` | 로컬에서만 `true` |
+| `NICE_SITE_CODE`·`NICE_SITE_PASSWORD`·`NICE_RETURN_URL`·`NICE_ERROR_URL` | 자격증명·환경 | 빈 값 | 상세 auth-nice-verification 카드 |
 | `LDAP_MANAGER_DN` | 자격증명 | 없음 | 바인드 계정 DN. 유출 시 교체 대상 |
 | `LDAP_MANAGER_PASSWORD` | 자격증명 | 없음 | 로그·저장소에 절대 남기지 않는다 |
 | `LDAP_URL` | 환경 정보 | `ldap://`(미설정) | 내부망 주소 |
@@ -163,6 +165,7 @@ Controller
 | `SPRING_JPA_DDL_AUTO` | 설정 | `update` | 운영은 `validate`/`none` 권장 |
 | `RECRUIT_ATTACHMENT_STORAGE_ROOT`, `RECRUIT_POSTING_IMAGE_STORAGE_ROOT` | 환경 정보 | `attachments`, `posting-images` | 상대경로면 실행 디렉터리 기준 |
 
+- NICE 모듈(`libs/NiceID.jar`)은 기동에 **`--add-exports java.base/com.sun.crypto.provider=ALL-UNNAMED` 가 필수**다(없으면 `IllegalAccessError`). `bootRun`·`test` 는 `build.gradle` 에 있고 **운영 실행 스크립트에도 넣는다**.
 - 조직 정보는 자격증명은 아니지만 조직 구조가 드러나므로 실제 값을 커밋하지 않는다.
 - LDAP 값이 비어도 기동은 된다. 경고 로그가 남고 LDAP 로그인만 실패한다(최소 `LDAP_URL`·`LDAP_MANAGER_DN`·`LDAP_MANAGER_PASSWORD`·`LDAP_USER_SEARCH_BASE` 필요).
 - 나머지 한도·타임아웃 변수(`RECRUIT_*`, `JUSO_*`, `NEIS_*`, `UNIV_*`, `CLIENT_EVENT_LOG_*`)는 `{BR}/application.yaml`에서 확인한다.
@@ -172,9 +175,9 @@ Controller
 
 ```bash
 # Windows PowerShell
-$env:AES_SECRET_KEY='<로컬 예시 키>'; $env:AUDIT_ALLOW_FALLBACK_SECRET='true'; .\gradlew.bat bootRun
+$env:AES_SECRET_KEY='<로컬 예시 키>'; $env:AUDIT_ALLOW_FALLBACK_SECRET='true'; $env:NICE_MOCK_ENABLED='true'; .\gradlew.bat bootRun
 # Linux (실행 권한이 없으면 chmod +x ./gradlew)
-AES_SECRET_KEY='<로컬 예시 키>' AUDIT_ALLOW_FALLBACK_SECRET=true ./gradlew bootRun
+AES_SECRET_KEY='<로컬 예시 키>' AUDIT_ALLOW_FALLBACK_SECRET=true NICE_MOCK_ENABLED=true ./gradlew bootRun
 ```
 
 - 로그: `{BR}/logback.xml` → 실행 디렉터리 `logs/recruit.log`.

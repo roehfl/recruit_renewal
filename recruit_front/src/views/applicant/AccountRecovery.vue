@@ -170,7 +170,7 @@ const closeFindPassword = () => {
 const clickToNiceAuthPopupOpen = async () => {
   isNiceAuthPopupOpen.value = true;
   window.open(
-    "/nice-auth",
+    "/nice-auth/mock",
     "Nice-Auth",
     "width=450, height=480"
   );

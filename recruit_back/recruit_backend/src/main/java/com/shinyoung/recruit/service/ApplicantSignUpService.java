@@ -8,6 +8,7 @@ import com.shinyoung.recruit.dto.request.ApplicantSignUpRequest;
 import com.shinyoung.recruit.dto.response.ApplicantEmailAvailabilityResponse;
 import com.shinyoung.recruit.dto.response.ApplicantSignUpResponse;
 import com.shinyoung.recruit.exception.InvalidApplicantSignUpException;
+import com.shinyoung.recruit.service.nice.NiceVerifiedIdentity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,12 +27,12 @@ public class ApplicantSignUpService {
     }
 
     @Transactional
-    public ApplicantSignUpResponse signUp(ApplicantSignUpRequest request) {
+    public ApplicantSignUpResponse signUp(ApplicantSignUpRequest request, NiceVerifiedIdentity identity) {
         String loginId = request.loginId().trim();
-        String name = request.name().trim();
-        String phoneNumber = request.phoneNumber().trim();
+        String name = identity.name().trim();
+        String phoneNumber = identity.phoneNumber().trim();
         String email = normalizeEmail(request.email());
-        String ci = request.ci().trim();
+        String ci = identity.ci().trim();
 
         // 로그인 해석(findUserByLoginId)이 users 테이블 전체에서 일어나므로 중복체크도 User 레벨로 수행한다.
         // (Applicant 레벨만 체크하면 임직원(LDAP JIT) loginId와 충돌해 양쪽 로그인 장애가 된다.)

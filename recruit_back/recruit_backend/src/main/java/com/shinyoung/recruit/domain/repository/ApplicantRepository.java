@@ -18,6 +18,8 @@ public interface ApplicantRepository extends JpaRepository<Applicant, Long> {
 
     boolean existsByCiHash(String ciHash);
 
+    Optional<Applicant> findByCiHash(String ciHash);
+
     /**
      * 파기 대상자 검색(Phase 10). 세 조건 AND, 전부 부분 일치. 휴대폰은 저장값과 입력값 모두
      * 하이픈·공백을 제거해 비교한다(기존 JobApplicationRepository 검색 규칙과 동일).

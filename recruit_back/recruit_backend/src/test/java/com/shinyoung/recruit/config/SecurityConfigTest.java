@@ -256,4 +256,44 @@ public class SecurityConfigTest {
                         .with(user("applicant").authorities(() -> "ROLE_APPLICANT")))
                 .andExpect(status().isForbidden());
     }
+
+    /*
+     * NICE 본인확인은 가입 전(비로그인) 흐름이다. callback 2종은 NICE 팝업이 부르는
+     * cross-site POST 라 세션·인증이 아예 없다.
+     *
+     * 전용 매처(/api/auth/nice/**)가 없어도 anyRequest().permitAll() 로 흘러 지금은 통과하지만,
+     * 위쪽에 broad 매처가 추가되면 비로그인 가입 경로가 조용히 막힌다. 그 회귀를 잡는다.
+     *
+     * 본문이 유효하지 않아 400(결과 교환) 또는 303(콜백)이 나므로 isOk() 로 단언하지 않는다.
+     * 관심사는 "인가 단계에서 막히지 않는다"(401/403 아님) 뿐이다.
+     */
+    @Test
+    void 본인확인_요청은_비인증이어도_인가를_통과() throws Exception {
+        mockMvc.perform(post("/api/auth/nice/request"))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
+
+    @Test
+    void 본인확인_콜백은_비인증이어도_인가를_통과() throws Exception {
+        mockMvc.perform(post("/api/auth/nice/callback")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("EncodeData", "INVALID"))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
+
+    @Test
+    void 본인확인_실패콜백은_비인증이어도_인가를_통과() throws Exception {
+        mockMvc.perform(post("/api/auth/nice/callback/error")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("EncodeData", "INVALID"))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
+
+    @Test
+    void 본인확인_결과교환은_비인증이어도_인가를_통과() throws Exception {
+        mockMvc.perform(post("/api/auth/nice/result")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"INVALID\"}"))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
 }

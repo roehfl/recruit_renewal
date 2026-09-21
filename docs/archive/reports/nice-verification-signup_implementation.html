@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NICE 본인확인 실연동(가입 흐름) 구현 리포트</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="small" style="color:#b9cadb;">신영증권 채용 Renewal · auth-nice-verification</div>
+  <h1>NICE 본인확인 실연동 — 가입 흐름</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge warn">실인증 검증 대기</span>
+  <span class="badge muted">2026-09-21</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2 style="margin-top:0;">요약</h2>
+      <p>지원자 가입 시 본인확인을 프론트 목업에서 <b>NICE 체크플러스 실연동</b>으로 바꿨다. 이전에는 프론트가 <code>crypto.randomUUID()</code>로 만든 가짜 CI를 서버가 그대로 믿어, 본인 확인이 사실상 없었고 <code>ciHash</code> 중복 차단도 무의미했다.</p>
+      <p>이제 서버가 NICE 응답을 복호화해 얻은 CI만 쓰며 <b>CI는 브라우저로 한 번도 내려가지 않는다.</b> NICE 콜백은 cross-site POST라 세션 쿠키가 없으므로, 콜백은 <code>REQ_SEQ</code>로만 찾고 세션 대조는 뒤따르는 same-site 요청으로 미뤘다.</p>
+      <p>최종 코드 리뷰가 순차 테스트로는 안 보이던 <b>동시성 결함 3건</b>을 재현했고, 벤더 모듈 실측으로 <b>EUC-KR 규격·JVM 플래그·자체 왕복 불가</b>를 확인했다. 전부 반영했다.</p>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0;">현황</h2>
+      <p><span class="badge done">백엔드 132 통과</span></p>
+      <p><span class="badge done">프론트 112 통과</span></p>
+      <p><span class="badge done">타입체크 0건</span></p>
+      <p><span class="badge done">문서 점검 오류 0</span></p>
+      <p><span class="badge done">리뷰 결함 9건 조치</span></p>
+      <p><span class="badge warn">복호화 실검증 대기</span></p>
+      <p><span class="badge muted">커밋 전</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3><span class="badge done">구현 범위</span></h3>
+        <ul class="list">
+          <li>NICE 공통 계층 — 요청 발급·콜백 검증·결과 교환</li>
+          <li><code>NiceClient</code> 경계 + <code>RealNiceClient</code>(벤더 jar) · <code>MockNiceClient</code>(jar 비의존)</li>
+          <li>인메모리 <code>NiceVerificationStore</code> + 원자 연산 3종</li>
+          <li>fail-closed 가드 (<code>NiceClientConfig</code>)</li>
+          <li>가입 API에서 이름·휴대폰·CI 제거, 세션 값 사용</li>
+          <li>프론트 팝업 실연동 · 결과 중계 화면 · postMessage</li>
+          <li>도메인 카드 분리 (<code>auth-nice-verification</code>)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge pending">미구현 · 미검증</span></h3>
+        <ul class="list">
+          <li>NICE 실응답 복호화·필드 키 이름 — <b>배포 후 1회 실인증</b>으로만 확인 가능</li>
+          <li><code>getCipherDateTime()</code> 포맷 — 바이트코드상 <code>yyMMddHHmmss</code>, 실응답 미확인</li>
+          <li>운영 기동 스크립트의 JVM 플래그 반영</li>
+          <li>NICE 관리 화면에 신규 리턴 URL 2종 등록</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge out">범위 외</span></h3>
+        <ul class="list">
+          <li>이메일 찾기 · 비밀번호 재설정 — <code>NiceVerificationPurpose</code>에 값만 추가하면 얹힌다</li>
+          <li>아이디·비번 찾기 화면 — <code>NiceAuthMockPopup.vue</code> 목업 유지</li>
+          <li><code>loginId</code>/<code>email</code> 중복 전송 정리</li>
+          <li>다중 인스턴스 대응 (세션과 같은 단일 인스턴스 전제)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>인증 흐름</h2>
+    <div class="card">
+      <pre>[1] 가입 화면 → window.open('/nice-auth')
+[2] 팝업 → POST /api/auth/nice/request            same-site, 세션 O
+      REQ_SEQ 발급(saveIfAbsent, 충돌 시 최대 5회 재발급) → 평문 조립 → 암호화
+[3] 팝업 → NICE 표준창으로 폼 POST                 사용자 브라우저 → NICE
+[4] NICE 자동 submit → POST /api/auth/nice/callback   cross-site, 세션 X, form-urlencoded
+      복호화 → REQ_SEQ 대조 → compareAndSet(PENDING→VERIFIED) → resultToken 발급
+      303 → /nice-auth/result?token=...           (실패 시 토큰 없이 303)
+[5] 팝업 → POST /api/auth/nice/result { token }      same-site, 세션 O
+      takeByResultToken → 세션 대조 → 세션에 CI 저장 → 이름·휴대폰만 반환
+[6] 팝업 → window.opener.postMessage(...) → close   origin 검증
+[7] 가입 제출 → 서버가 세션의 CI 사용 → 소비 후 제거</pre>
+      <p class="small">콜백에 세션 쿠키가 없는 것이 설계를 결정한 제약이다. <code>SameSite=None</code>으로 푸는 대신 콜백이 세션에 의존하지 않게 했다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>API 목록</h2>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>상태</th></tr>
+      <tr><td><code>POST</code></td><td><code>/auth/nice/request</code></td><td>요청번호 발급, 암호문 반환</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/auth/nice/callback</code></td><td>NICE 성공 콜백(form). <code>303</code> 결과 화면</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/auth/nice/callback/error</code></td><td>NICE 실패·취소 콜백(form). <code>303</code> 결과 화면</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/auth/nice/result</code></td><td>1회용 토큰을 인증 결과로 교환. CI 미포함</td><td><span class="badge done">신규</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/auth/applicants/sign-up</code></td><td>요청에서 <code>name</code>·<code>phoneNumber</code>·<code>ci</code> 제거</td><td><span class="badge warn">계약 변경</span></td></tr>
+    </table>
+    <p class="small">전부 permitAll(가입 전 흐름). <code>SecurityConfigTest</code>에 인가 통과 테스트 4건을 넣어, 위쪽에 broad 매처가 추가되면 잡히게 했다(변이 검증: 401로 깨짐 확인).</p>
+  </section>
+
+  <section>
+    <h2>상태 전이 — <code>NiceVerificationRecord</code></h2>
+    <div class="card">
+      <div class="transition">
+        <span class="state">PENDING</span><span class="arrow">→</span><span class="action">성공 콜백 · CAS</span><span class="arrow">→</span><span class="state">VERIFIED</span><span class="arrow">→</span><span class="action">토큰 교환 · 원자적 꺼냄</span><span class="arrow">→</span><span class="state">세션 NICE_VERIFIED</span>
+      </div>
+      <div class="transition">
+        <span class="state">PENDING</span><span class="arrow">→</span><span class="action">실패 콜백 · CAS</span><span class="arrow">→</span><span class="state">FAIL</span><span class="arrow">→</span><span class="action">교환 시 거부 · 제거</span>
+      </div>
+      <p class="small">모든 전이는 <code>ConcurrentHashMap</code>의 원자 연산으로 한다. <code>find</code>→검사→<code>save</code>로 하면 같은 콜백 두 건이 동시에 둘 다 통과한다(리뷰에서 재현).</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>핵심 보안 속성</h2>
+    <table>
+      <tr><th>속성</th><th>보장 방식</th><th>상태</th></tr>
+      <tr><td>CI는 브라우저로 내려가지 않는다</td><td>결과 응답·postMessage에 CI 없음, 서버 세션에만 저장. 통합 테스트가 응답 본문 전체를 훑어 확인</td><td><span class="badge done">지켜짐</span></td></tr>
+      <tr><td>가입은 서버 세션 값만 쓴다</td><td>요청 DTO에서 3필드 제거. 인증 결과는 소비 후 제거(1회용)</td><td><span class="badge done">지켜짐</span></td></tr>
+      <tr><td><code>REQ_SEQ</code> 1회용</td><td><code>compareAndSet</code>. 만료 검사 + 암호문 생성 시각 2차 게이트(<code>Asia/Seoul</code>)</td><td><span class="badge done">지켜짐</span></td></tr>
+      <tr><td><code>resultToken</code> 1회용 + 세션 결속</td><td><code>takeByResultToken</code>(<code>remove(key, value)</code>) — 거부돼도 소각</td><td><span class="badge done">지켜짐</span></td></tr>
+      <tr><td>운영에 Mock 혼입 불가</td><td>2×2 가드 + 실연동 설정 4개 필수. <code>mock-enabled</code> 기본 <code>false</code> — 설정 누락 시 기동 실패</td><td><span class="badge done">지켜짐</span></td></tr>
+      <tr><td>용도 대조</td><td><code>requireFresh</code>가 <code>SIGNUP</code> 대조</td><td><span class="badge done">지켜짐</span></td></tr>
+      <tr><td>원인을 사용자에게 구분해 보여주지 않는다</td><td>파이프라인 실패 문구 1개, 원인은 로그로만. NICE 원시 오류코드 비노출</td><td><span class="badge done">지켜짐</span></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>벤더 모듈 실측 발견</h2>
+    <p class="small"><code>libs/NiceID.jar</code>(<code>NiceID.Check.CPClient</code> 단독, 2013년 빌드)를 <code>javap</code>와 직접 실행으로 확인했다. 설계 초안의 가정 다섯 개가 틀렸다.</p>
+    <table>
+      <tr><th>항목</th><th>설계 초안</th><th>실측</th><th>영향</th></tr>
+      <tr><td>Java 17 동작</td><td>그대로 동작</td><td><b><code>--add-exports java.base/com.sun.crypto.provider=ALL-UNNAMED</code> 필수</b> — 생성자가 JDK 내부 클래스를 직접 만들어 <code>IllegalAccessError</code>. 레거시 기동 스크립트도 같은 플래그 사용(확인)</td><td><code>build.gradle</code> <code>test</code>·<code>bootRun</code>에 추가. 운영 스크립트 필요</td></tr>
+      <tr><td>자체 암호문 왕복</td><td>가능 — 가짜 NICE 응답으로 테스트</td><td><b>불가</b> — <code>fnEncode</code> 뒤 <code>fnDecode</code>는 항상 <code>-6</code>. 요청·응답 포맷이 다르다</td><td>복호화는 배포 후 실인증으로만 검증</td></tr>
+      <tr><td>평문 길이 문자셋</td><td>UTF-8</td><td><b>EUC-KR</b> — 모듈이 <code>"euc-kr"</code> 하드코딩(5곳)</td><td>코덱 교체</td></tr>
+      <tr><td><code>getCipherDateTime</code></td><td>암호문 인자</td><td><b>인자 없음</b> — <code>fnDecode</code>가 채운 인스턴스 상태</td><td><code>NiceDecodeResult</code>로 평문·시각을 함께 반환</td></tr>
+      <tr><td><code>fnParse</code></td><td>그대로 위임</td><td>파싱 실패 시 <b>입력 조각을 stdout에 직접 출력</b>, 쓰레기 입력엔 예외 없이 <code>null</code></td><td>운영 파서를 우리 코덱으로 교체(사용자 결정)</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>최종 리뷰 결함 조치</h2>
+    <p class="small">구현 완료 시점 테스트 106개가 전부 순차 시나리오라 초록이었다. 최종 리뷰가 재현 테스트로 결함을 찾았다.</p>
+    <table>
+      <tr><th>심각도</th><th>결함</th><th>조치</th></tr>
+      <tr><td><span class="badge out">Important</span></td><td><code>REQ_SEQ</code> 충돌 — 모듈 값이 밀리초+<code>random%100</code>. 순차 2,000회 중 1,765건 중복, <code>save</code>가 앞사람 요청을 덮어씀</td><td><code>saveIfAbsent</code> + 최대 5회 재발급</td></tr>
+      <tr><td><span class="badge out">Important</span></td><td>콜백 동시 재전송 — check-then-act 경쟁으로 둘 다 통과</td><td><code>compareAndSet</code></td></tr>
+      <tr><td><span class="badge out">Important</span></td><td>같은 토큰 동시 교환이 둘 다 성공</td><td><code>takeByResultToken</code></td></tr>
+      <tr><td><span class="badge warn">Minor</span></td><td>NICE 원시 오류코드가 응답에 노출</td><td>로그에만</td></tr>
+      <tr><td><span class="badge warn">Minor</span></td><td>원인별 메시지가 응답으로 새어 나감(상태코드는 통일했는데)</td><td>문구 통일, 원인은 로그</td></tr>
+      <tr><td><span class="badge warn">Minor</span></td><td>시간대 <code>systemDefault</code> — 운영 JVM이 UTC면 전 인증 거부. <b>KST 개발 PC에서는 숨는다</b></td><td><code>Asia/Seoul</code> 고정 (UTC JVM으로 재현)</td></tr>
+      <tr><td><span class="badge warn">Minor</span></td><td>콜백 예외 시 팝업에 원시 JSON</td><td>토큰 없이 <code>303</code> → 결과 화면이 FAIL 전달</td></tr>
+      <tr><td><span class="badge warn">Minor</span></td><td>가드가 <code>site-code</code>만 확인</td><td>실연동 설정 4개 필수</td></tr>
+      <tr><td><span class="badge info">자체 발견</span></td><td>코덱이 UTF-8, 벤더 <code>fnParse</code>가 stdout에 입력 조각 출력</td><td>EUC-KR 교체 + 운영 파서를 코덱으로</td></tr>
+    </table>
+    <p class="small">동시성 테스트는 <code>Store</code>를 상속해 읽기 메서드 안에 <code>CyclicBarrier(2)</code>를 넣어 경쟁을 결정적으로 재현한다. 수정 전 5개 전부 실패를 확인했고, 수정 후 5회 반복 모두 통과했다.</p>
+  </section>
+
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>콜백은 세션에 의존하지 않는다</td><td>cross-site POST라 <code>SameSite=Lax</code> 쿠키가 안 온다. <code>SameSite=None</code>은 전역 CSRF 표면을 넓힌다</td></tr>
+      <tr><td>2</td><td>백엔드는 HTML을 반환하지 않고 <code>303</code>으로 프론트 라우트에 넘긴다</td><td>백엔드에 프론트 리소스 금지 규칙</td></tr>
+      <tr><td>3</td><td><code>MockNiceClient</code>를 jar와 분리(Base64)</td><td>jar 확보 전 개발 가능, 이후 자체 왕복 불가가 확인돼 결정이 옳았다</td></tr>
+      <tr><td>4</td><td><code>mock-enabled</code> 기본 <code>false</code></td><td>기본 <code>true</code>면 운영이 설정을 빠뜨렸을 때 가짜 CI로 가입이 된다. <code>AUDIT_ALLOW_FALLBACK_SECRET</code>과 같은 선례</td></tr>
+      <tr><td>5</td><td>검증 실패는 전부 <code>400</code>, 감사 로그 대신 <code>log.warn</code></td><td>원인 구분 금지 원칙. 가입 전 익명 흐름이라 <code>ActivityLog</code>에 귀속할 행위자가 없다</td></tr>
+      <tr><td>6</td><td>시각 파싱 실패는 거부하지 않고 2차 게이트만 건너뛴다</td><td>포맷을 실응답으로 확인할 수 없다. 주 방어선(Store 대조)은 그대로다</td></tr>
+      <tr><td>7</td><td>운영 파서를 벤더 <code>fnParse</code>에서 우리 코덱으로</td><td>벤더가 파싱 실패 시 이름·CI 조각을 stdout에 찍는다. 호환성은 교차 검증 테스트가 보장</td></tr>
+      <tr><td>8</td><td>도메인 카드 분리</td><td><code>auth-account</code>가 40KB 상한 348바이트 앞까지 찼다</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>변경 파일</h2>
+    <div class="two">
+      <div class="card">
+        <h3>백엔드 신규</h3>
+        <ul class="list small">
+          <li><code>controller/NiceVerificationController</code></li>
+          <li><code>service/nice/</code> — <code>NiceClient</code> · <code>RealNiceClient</code> · <code>MockNiceClient</code> · <code>NicePlaindataCodec</code> · <code>NiceDecodeResult</code> · <code>NiceVerificationRecord</code> · <code>NiceVerifiedIdentity</code> · <code>NiceVerificationStore</code> · <code>NiceVerificationService</code> · <code>NiceVerificationCleanupScheduler</code></li>
+          <li><code>config/NiceProperties</code> · <code>NiceClientConfig</code></li>
+          <li><code>enumeration/NiceVerificationPurpose</code> · <code>NiceVerificationStatus</code></li>
+          <li><code>exception/NiceVerificationException</code></li>
+          <li>DTO 3종, <code>libs/NiceID.jar</code></li>
+        </ul>
+        <h3 style="margin-top:12px;">백엔드 수정</h3>
+        <ul class="list small">
+          <li><code>ApplicantSignUpRequest</code> · <code>Controller</code> · <code>Service</code></li>
+          <li><code>ApplicantRepository.findByCiHash</code></li>
+          <li><code>SecurityConfig</code> · <code>GlobalExceptionHandler</code></li>
+          <li><code>build.gradle</code> · <code>application.yaml</code>(메인·테스트)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>프론트</h3>
+        <ul class="list small">
+          <li>신규: <code>NiceAuthResult.vue</code> · <code>NiceAuthMockPopup.vue</code> · <code>api/auth/niceApi.ts</code> · <code>types/auth/nice.ts</code></li>
+          <li>수정: <code>NiceAuthPopup.vue</code>(목업 → 실연동) · <code>SignupView.vue</code>(postMessage, 읽기 전용) · <code>AccountRecovery.vue</code>(목업 경로) · <code>types/application.ts</code> · <code>routes/authRoutes.ts</code></li>
+        </ul>
+        <h3 style="margin-top:12px;">문서</h3>
+        <ul class="list small">
+          <li>신규 카드 <code>docs/domains/auth-nice-verification.md</code></li>
+          <li><code>auth-account.md</code>(NICE 분리) · <code>_index.md</code></li>
+          <li>백엔드 <code>AGENTS.md</code> 8절 — JVM 플래그, <code>NICE_*</code> 환경변수</li>
+        </ul>
+        <p class="small" style="margin-top:10px;">같은 세션에서 폐쇄망 수정분 <code>ApplicationFormQuestionTab.vue</code> · <code>interviewScheduling.vue</code>도 머지했다(이 기능과 무관).</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>테스트 결과</h2>
+    <table>
+      <tr><th>범위</th><th>건수</th><th>결과</th></tr>
+      <tr><td>NICE 서비스·Store·코덱·Mock·Real·동시성·교차 검증</td><td>59</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><code>NiceClientConfigTest</code>(가드)</td><td>7</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><code>NiceVerificationControllerTest</code></td><td>7</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td>가입 연동(컨트롤러 9 · 통합 5 · 서비스 10)</td><td>24</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><code>SecurityConfigTest</code></td><td>31</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><code>ApplicationYamlTest</code> · <code>RecruitApplicationTests</code></td><td>4</td><td><span class="badge done">통과</span></td></tr>
+      <tr><td><b>백엔드 합계</b> (<code>--rerun</code>)</td><td><b>132</b></td><td><span class="badge done">실패 0</span></td></tr>
+      <tr><td>프론트 단위 테스트 · 타입체크</td><td>112 · 0건</td><td><span class="badge done">통과</span></td></tr>
+    </table>
+    <p class="small">보안 가드마다 변이 검증을 했다 — 가드를 일부러 지워 해당 테스트가 실제로 깨지는지 확인하고 원복했다(재전송·2차 게이트·세션 대조·토큰 1회용·CAS 3종·매처 순서·JVM 플래그·시간대·문자셋·파서 교체).</p>
+  </section>
+
+  <section>
+    <h2>알려진 한계</h2>
+    <table>
+      <tr><th>한계</th><th>내용</th><th>대응</th></tr>
+      <tr><td>복호화 로컬 검증 불가</td><td>모듈 자체 왕복이 항상 <code>-6</code></td><td>배포 후 1회 실인증. 응답 키가 다르면 수신 키 목록을 WARN 로그로 남긴다</td></tr>
+      <tr><td>희귀 한글</td><td>모듈이 <code>euc-kr</code>을 쓰므로 EUC-KR 2,350자 밖 글자는 <code>?</code>가 된다(예: <code>김똠뷁</code> → <code>김??</code>)</td><td>벤더 한계, 레거시도 같다. 해당 이름은 <code>?</code>가 섞여 저장된다</td></tr>
+      <tr><td>단일 인스턴스 전제</td><td><code>NiceVerificationStore</code>가 인메모리</td><td>HTTP 세션과 같은 전제. 다중 인스턴스 시 둘 다 외부 저장소로</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>다음 단계 권장</h2>
+    <div class="card">
+      <h3>배포 전 (운영 준비)</h3>
+      <ul class="list">
+        <li>운영 <code>java -jar</code> 기동 스크립트에 <code>--add-exports java.base/com.sun.crypto.provider=ALL-UNNAMED</code> 추가</li>
+        <li><code>NICE_SITE_CODE</code> · <code>NICE_SITE_PASSWORD</code> · <code>NICE_RETURN_URL</code> · <code>NICE_ERROR_URL</code> 주입 (하나라도 빠지면 기동 실패)</li>
+        <li>NICE 관리 화면에 신규 리턴 URL 2종 등록 — 평문에 실려 암호화되므로 등록값과 정확히 같아야 한다</li>
+      </ul>
+      <h3 style="margin-top:14px;">배포 직후</h3>
+      <ul class="list">
+        <li>실인증 1회로 응답 키(<code>NAME</code>·<code>MOBILE_NO</code>·<code>CI</code>)와 시각 포맷 확인. 어긋나면 WARN 로그에 실제 키 목록이 남는다</li>
+      </ul>
+      <h3 style="margin-top:14px;">후속 기능</h3>
+      <ul class="list">
+        <li>이메일 찾기(NICE 인증 후 마스킹 표시) — <code>NiceVerificationPurpose</code>에 값 추가로 얹힌다</li>
+        <li>비밀번호 재설정(이메일 토큰 링크) — 메일 발송·토큰 만료 인프라가 필요한 별도 주제</li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

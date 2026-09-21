@@ -40,6 +40,8 @@ dependencies {
 	implementation 'org.apache.poi:poi-ooxml:5.3.0'
 	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 	implementation 'com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10'
+	// NICE 체크플러스 본인확인 모듈. 공개 저장소에 없어 저장소에 파일을 두고 직접 참조한다.
+	implementation files('libs/NiceID.jar')
 	runtimeOnly 'com.h2database:h2'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.mysql:mysql-connector-j'
@@ -59,4 +61,12 @@ tasks.named('test') {
 	useJUnitPlatform()
 	// 캐시된 Spring 테스트 컨텍스트(service 테스트만 약 29개, 개당 약 25MB)가 Gradle 기본 512m 힙을 넘겨 OOM이 난다.
 	maxHeapSize = '2g'
+	// NICE 모듈이 JDK 내부 클래스 com.sun.crypto.provider.SunJCE 를 직접 만든다.
+	// 없으면 Java 9+ 에서 IllegalAccessError. 레거시 기동 스크립트도 같은 플래그를 쓴다.
+	jvmArgs '--add-exports', 'java.base/com.sun.crypto.provider=ALL-UNNAMED'
+}
+
+tasks.named('bootRun') {
+	// NICE 모듈 JVM 플래그. test 블록 주석 참고.
+	jvmArgs '--add-exports', 'java.base/com.sun.crypto.provider=ALL-UNNAMED'
 }
