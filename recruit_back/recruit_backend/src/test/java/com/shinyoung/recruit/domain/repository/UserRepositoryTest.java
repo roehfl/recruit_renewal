@@ -39,7 +39,7 @@ public class UserRepositoryTest {
         employee = employeeRepository.save(employee);
 
         String ciValue = "testCIValue";
-        Applicant applicant = new Applicant(ciValue, HashUtil.sha256(ciValue));
+        Applicant applicant = new Applicant(HashUtil.sha256(ciValue));
         applicant.setEmail("roehfl@gmail.com");
         applicant.setUserName("이솔");
         applicant.setPhoneNumber("01071939211");
@@ -64,7 +64,7 @@ public class UserRepositoryTest {
         employee.setName("임직원");
         employeeRepository.saveAndFlush(employee);
 
-        Applicant applicant = new Applicant("dup-ci", HashUtil.sha256("dup-ci"));
+        Applicant applicant = new Applicant(HashUtil.sha256("dup-ci"));
         applicant.setLoginId("dup-login");
         applicant.setUserName("지원자");
 
@@ -74,11 +74,11 @@ public class UserRepositoryTest {
 
     @Test
     void null_loginId_2건은_제약에_걸리지_않는다() {
-        Applicant first = new Applicant("null-ci-1", HashUtil.sha256("null-ci-1"));
+        Applicant first = new Applicant(HashUtil.sha256("null-ci-1"));
         first.setUserName("지원자1");
         applicantRepository.saveAndFlush(first);
 
-        Applicant second = new Applicant("null-ci-2", HashUtil.sha256("null-ci-2"));
+        Applicant second = new Applicant(HashUtil.sha256("null-ci-2"));
         second.setUserName("지원자2");
         applicantRepository.saveAndFlush(second);
 

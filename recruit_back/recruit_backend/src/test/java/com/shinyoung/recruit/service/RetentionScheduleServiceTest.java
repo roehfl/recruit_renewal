@@ -211,7 +211,7 @@ class RetentionScheduleServiceTest {
     }
 
     private JobApplication createApplication(Long jobPostingId, String loginId) {
-        Applicant applicant = new Applicant(loginId + "-ci", HashUtil.sha256(loginId + "-ci"));
+        Applicant applicant = new Applicant(HashUtil.sha256(loginId + "-ci"));
         applicant.setLoginId(loginId);
         applicant.setName("User " + loginId);
         applicant.setUserName("Applicant " + loginId);

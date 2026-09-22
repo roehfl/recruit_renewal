@@ -1,6 +1,6 @@
 package com.shinyoung.recruit.controller;
 
-import com.shinyoung.recruit.common.hash.HashUtil;
+import com.shinyoung.recruit.common.hash.AuditHmac;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.enumeration.NiceVerificationPurpose;
@@ -20,7 +20,9 @@ import java.time.Clock;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -36,6 +38,9 @@ class ApplicantSignUpNiceIntegrationTest {
     @Autowired
     private Clock clock;
 
+    @Autowired
+    private AuditHmac auditHmac;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -43,12 +48,14 @@ class ApplicantSignUpNiceIntegrationTest {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
     }
 
-    private MockHttpSession sessionWithIdentity(String ci) {
+    private static final String DUPLICATE_IDENTITY_MESSAGE = "이미 가입된 본인인증 정보입니다.";
+
+    private MockHttpSession sessionWithIdentity(String phoneNumber, String birthDate, String gender) {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(
                 NiceVerificationController.VERIFIED_SESSION_KEY,
                 new NiceVerifiedIdentity(
-                        NiceVerificationPurpose.SIGNUP, "홍길동", "01012345678", ci, clock.instant()));
+                        NiceVerificationPurpose.SIGNUP, "홍길동", phoneNumber, birthDate, gender, clock.instant()));
         return session;
     }
 
@@ -60,12 +67,13 @@ class ApplicantSignUpNiceIntegrationTest {
     @Test
     void signUpUsesIdentityFromSessionNotFromRequestBody() throws Exception {
         mockMvc.perform(post("/api/auth/applicants/sign-up")
-                        .session(sessionWithIdentity("CI-FROM-SERVER"))
+                        .session(sessionWithIdentity("01012345678", "19900101", "1"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(signUpBody("nice1@example.test")))
                 .andExpect(status().isOk());
 
-        Applicant saved = applicantRepository.findByCiHash(HashUtil.sha256("CI-FROM-SERVER")).orElseThrow();
+        Applicant saved = applicantRepository
+                .findByCiHash(auditHmac.identityHash("홍길동", "19900101", "1")).orElseThrow();
         assertEquals("홍길동", saved.getUserName());
         assertEquals("01012345678", saved.getPhoneNumber());
     }
@@ -81,7 +89,7 @@ class ApplicantSignUpNiceIntegrationTest {
 
     @Test
     void signUpConsumesIdentitySoItCannotBeReused() throws Exception {
-        MockHttpSession session = sessionWithIdentity("CI-ONCE");
+        MockHttpSession session = sessionWithIdentity("01012345678", "19900101", "1");
 
         mockMvc.perform(post("/api/auth/applicants/sign-up")
                         .session(session)
@@ -98,18 +106,55 @@ class ApplicantSignUpNiceIntegrationTest {
     }
 
     @Test
-    void sameCiCannotSignUpTwice() throws Exception {
+    void sameIdentityCannotSignUpTwice() throws Exception {
         mockMvc.perform(post("/api/auth/applicants/sign-up")
-                        .session(sessionWithIdentity("CI-DUPLICATE"))
+                        .session(sessionWithIdentity("01012345678", "19900101", "1"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(signUpBody("nice5@example.test")))
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/auth/applicants/sign-up")
-                        .session(sessionWithIdentity("CI-DUPLICATE"))
+                        .session(sessionWithIdentity("01012345678", "19900101", "1"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(signUpBody("nice6@example.test")))
-                .andExpect(status().is4xxClientError());
+                .andExpect(status().is4xxClientError())
+                .andExpect(jsonPath("$.message").value(DUPLICATE_IDENTITY_MESSAGE));
+    }
+
+    /* 중복 판정에 휴대폰은 들어가지 않는다 — 번호만 바꿔 두 번째 계정을 만들 수 없어야 한다. */
+    @Test
+    void sameIdentityWithDifferentPhoneIsRejected() throws Exception {
+        mockMvc.perform(post("/api/auth/applicants/sign-up")
+                        .session(sessionWithIdentity("01012345678", "19900101", "1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signUpBody("nice8@example.test")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/applicants/sign-up")
+                        .session(sessionWithIdentity("01099998888", "19900101", "1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signUpBody("nice9@example.test")))
+                .andExpect(status().is4xxClientError())
+                .andExpect(jsonPath("$.message").value(DUPLICATE_IDENTITY_MESSAGE));
+    }
+
+    /* 이름·생년월일이 같아도 성별이 다르면 다른 사람이다 — 둘 다 가입된다. */
+    @Test
+    void sameNameAndBirthDateWithDifferentGenderCanBothSignUp() throws Exception {
+        mockMvc.perform(post("/api/auth/applicants/sign-up")
+                        .session(sessionWithIdentity("01012345678", "19900101", "1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signUpBody("nice10@example.test")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/applicants/sign-up")
+                        .session(sessionWithIdentity("01012345678", "19900101", "0"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signUpBody("nice11@example.test")))
+                .andExpect(status().isOk());
+
+        assertTrue(applicantRepository.existsByCiHash(auditHmac.identityHash("홍길동", "19900101", "1")));
+        assertTrue(applicantRepository.existsByCiHash(auditHmac.identityHash("홍길동", "19900101", "0")));
     }
 
     @Test
@@ -118,7 +163,7 @@ class ApplicantSignUpNiceIntegrationTest {
         session.setAttribute(
                 NiceVerificationController.VERIFIED_SESSION_KEY,
                 new NiceVerifiedIdentity(
-                        NiceVerificationPurpose.SIGNUP, "홍길동", "01012345678", "CI-STALE",
+                        NiceVerificationPurpose.SIGNUP, "홍길동", "01012345678", "19900101", "1",
                         clock.instant().minus(Duration.ofMinutes(31))));
 
         mockMvc.perform(post("/api/auth/applicants/sign-up")

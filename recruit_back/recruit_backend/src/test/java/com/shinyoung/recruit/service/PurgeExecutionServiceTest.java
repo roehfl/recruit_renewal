@@ -247,7 +247,6 @@ class PurgeExecutionServiceTest {
         assertThat(purgedApplicant.getLoginId()).isNull();
         assertThat(purgedApplicant.getEmail()).isNull();
         assertThat(purgedApplicant.getPhoneNumber()).isNull();
-        assertThat(purgedApplicant.getCi()).isNull();
         assertThat(purgedApplicant.getCiHash()).startsWith("PURGED:");
 
         Applicant sagaFailedApplicant = applicantRepository.findById(sagaFailedApp.getApplicant().getId()).orElseThrow();
@@ -344,7 +343,7 @@ class PurgeExecutionServiceTest {
     }
 
     private Long createSubmittedApplication(String loginId, Long jobPostingId) {
-        Applicant applicant = new Applicant(loginId + "-ci", HashUtil.sha256(loginId + "-ci"));
+        Applicant applicant = new Applicant(HashUtil.sha256(loginId + "-ci"));
         applicant.setLoginId(loginId);
         applicant.setName("User " + loginId);
         applicant.setUserName("Applicant " + loginId);

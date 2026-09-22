@@ -38,7 +38,7 @@ class NiceVerificationStoreTest {
     void findByResultTokenLocatesRecord() {
         NiceVerificationRecord pending =
                 NiceVerificationRecord.pending("req-2", NiceVerificationPurpose.SIGNUP, "sess-1", NOW);
-        store.save(pending.verified("tok-2", NOW, "홍길동", "01012345678", "CI-VALUE"));
+        store.save(pending.verified("tok-2", NOW, "홍길동", "01012345678", "19900101", "1"));
 
         assertEquals("req-2", store.findByResultToken("tok-2").orElseThrow().reqSeq());
     }
@@ -84,10 +84,10 @@ class NiceVerificationStoreTest {
                 NiceVerificationRecord.pending("req-5", NiceVerificationPurpose.SIGNUP, "sess-1", NOW);
         store.save(pending);
         // 다른 요청이 먼저 처리해 값이 바뀐 상황.
-        store.save(pending.verified("tok-A", NOW, "홍길동", "01012345678", "CI-VALUE"));
+        store.save(pending.verified("tok-A", NOW, "홍길동", "01012345678", "19900101", "1"));
 
         boolean replaced = store.compareAndSet(
-                pending, pending.verified("tok-B", NOW, "홍길동", "01012345678", "CI-VALUE"));
+                pending, pending.verified("tok-B", NOW, "홍길동", "01012345678", "19900101", "1"));
 
         assertFalse(replaced);
         assertEquals("tok-A", store.find("req-5").orElseThrow().resultToken());
@@ -100,7 +100,7 @@ class NiceVerificationStoreTest {
         store.save(pending);
 
         boolean replaced = store.compareAndSet(
-                pending, pending.verified("tok-6", NOW, "홍길동", "01012345678", "CI-VALUE"));
+                pending, pending.verified("tok-6", NOW, "홍길동", "01012345678", "19900101", "1"));
 
         assertTrue(replaced);
         assertEquals("tok-6", store.find("req-6").orElseThrow().resultToken());
@@ -110,7 +110,7 @@ class NiceVerificationStoreTest {
     void takeByResultTokenHandsOutRecordOnlyOnce() {
         NiceVerificationRecord pending =
                 NiceVerificationRecord.pending("req-7", NiceVerificationPurpose.SIGNUP, "sess-1", NOW);
-        store.save(pending.verified("tok-7", NOW, "홍길동", "01012345678", "CI-VALUE"));
+        store.save(pending.verified("tok-7", NOW, "홍길동", "01012345678", "19900101", "1"));
 
         Optional<NiceVerificationRecord> first = store.takeByResultToken("tok-7");
         Optional<NiceVerificationRecord> second = store.takeByResultToken("tok-7");

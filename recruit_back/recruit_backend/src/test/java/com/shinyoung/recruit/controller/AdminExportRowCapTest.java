@@ -93,7 +93,7 @@ class AdminExportRowCapTest {
 
     private void persistApplication(Long jobPostingId, String loginId, String name) {
         String ci = loginId + "-ci";
-        Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
+        Applicant applicant = new Applicant(HashUtil.sha256(ci));
         applicant.setLoginId(loginId);
         applicant.setName(name);
         applicant.setUserName(name);

@@ -65,7 +65,7 @@ class ApplicationSubmitValidatorBasicInfoTest {
     }
 
     private JobApplication newApplication() {
-        Applicant applicant = new Applicant("submit-ci", HashUtil.sha256("submit-ci"));
+        Applicant applicant = new Applicant(HashUtil.sha256("submit-ci"));
         applicant.setLoginId("submit-applicant");
         applicant.setName("User-Submit");
         applicant.setUserName("Submit");

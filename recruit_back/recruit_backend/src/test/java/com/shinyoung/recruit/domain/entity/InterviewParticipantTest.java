@@ -95,7 +95,7 @@ class InterviewParticipantTest {
         JobPosting jobPosting = jobPosting();
         JobPosition jobPosition = JobPosition.create("본사영업", 1);
         return JobApplication.create(
-                new Applicant("test-ci", "test-ci-hash"),
+                new Applicant("test-ci-hash"),
                 jobPosting,
                 jobPosition,
                 "지원자",

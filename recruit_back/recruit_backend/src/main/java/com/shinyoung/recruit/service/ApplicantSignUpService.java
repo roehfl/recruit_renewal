@@ -1,6 +1,6 @@
 package com.shinyoung.recruit.service;
 
-import com.shinyoung.recruit.common.hash.HashUtil;
+import com.shinyoung.recruit.common.hash.AuditHmac;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.UserRepository;
@@ -19,11 +19,13 @@ public class ApplicantSignUpService {
     private final ApplicantRepository applicantRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditHmac auditHmac;
 
-    public ApplicantSignUpService(ApplicantRepository applicantRepository, UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public ApplicantSignUpService(ApplicantRepository applicantRepository, UserRepository userRepository, PasswordEncoder passwordEncoder, AuditHmac auditHmac) {
         this.applicantRepository = applicantRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.auditHmac = auditHmac;
     }
 
     @Transactional
@@ -32,7 +34,6 @@ public class ApplicantSignUpService {
         String name = identity.name().trim();
         String phoneNumber = identity.phoneNumber().trim();
         String email = normalizeEmail(request.email());
-        String ci = identity.ci().trim();
 
         // 로그인 해석(findUserByLoginId)이 users 테이블 전체에서 일어나므로 중복체크도 User 레벨로 수행한다.
         // (Applicant 레벨만 체크하면 임직원(LDAP JIT) loginId와 충돌해 양쪽 로그인 장애가 된다.)
@@ -44,12 +45,14 @@ public class ApplicantSignUpService {
             throw new InvalidApplicantSignUpException("이미 사용 중인 이메일입니다.");
         }
 
-        String ciHash = HashUtil.sha256(ci);
-        if (applicantRepository.existsByCiHash(ciHash)) {
+        // 중복 판정 키 = 이름+생년월일+성별의 HMAC(NICE 계약에 CI 가 없어 CI 대신 쓴다).
+        // 휴대폰은 넣지 않는다 — 번호만 바꿔 중복 가입하는 것을 막는다.
+        String identityKey = auditHmac.identityHash(identity.name(), identity.birthDate(), identity.gender());
+        if (applicantRepository.existsByCiHash(identityKey)) {
             throw new InvalidApplicantSignUpException("이미 가입된 본인인증 정보입니다.");
         }
 
-        Applicant applicant = new Applicant(ci, ciHash);
+        Applicant applicant = new Applicant(identityKey);
         applicant.setLoginId(loginId);
         applicant.setName(name);
         applicant.setUserName(name);

@@ -54,8 +54,8 @@ class NiceVerificationServiceCallbackTest {
         fields.put("REQ_SEQ", reqSeq);
         fields.put("NAME", "홍길동");
         fields.put("MOBILE_NO", "01012345678");
-        fields.put("CI", "CI-VALUE-1");
-        fields.put("DI", "DI-VALUE-1");
+        fields.put("BIRTHDATE", "19900101");
+        fields.put("GENDER", "1");
         return client.encode(codec.encode(fields));
     }
 
@@ -76,7 +76,8 @@ class NiceVerificationServiceCallbackTest {
         assertEquals(NiceVerificationStatus.VERIFIED, record.status());
         assertEquals("홍길동", record.name());
         assertEquals("01012345678", record.phoneNumber());
-        assertEquals("CI-VALUE-1", record.ci());
+        assertEquals("19900101", record.birthDate());
+        assertEquals("1", record.gender());
         assertEquals(token, record.resultToken());
     }
 
@@ -128,7 +129,8 @@ class NiceVerificationServiceCallbackTest {
         fields.put("REQ_SEQ", reqSeq);
         fields.put("NAME", "홍길동");
         fields.put("MOBILE_NO", "01012345678");
-        fields.put("CI", "CI-VALUE-1");
+        fields.put("BIRTHDATE", "19900101");
+        fields.put("GENDER", "1");
         String stale = staleClient.encode(codec.encode(fields));
 
         NiceVerificationException e =
@@ -141,11 +143,30 @@ class NiceVerificationServiceCallbackTest {
         NiceVerificationService service = serviceAt(NOW);
         String reqSeq = issueRequest(service);
 
-        // CI 가 없는 응답. 키 이름 가정이 틀렸을 때 조용히 null 로 저장되면 안 된다.
+        // BIRTHDATE 가 없는 응답. 키 이름 가정이 틀렸을 때 조용히 null 로 저장되면 안 된다.
         Map<String, String> fields = new LinkedHashMap<>();
         fields.put("REQ_SEQ", reqSeq);
         fields.put("NAME", "홍길동");
         fields.put("MOBILE_NO", "01012345678");
+        fields.put("GENDER", "1");
+        String incomplete = client.encode(codec.encode(fields));
+
+        NiceVerificationException e =
+                assertThrows(NiceVerificationException.class, () -> service.handleCallback(incomplete));
+        assertEquals(FAILURE_MESSAGE, e.getMessage());
+    }
+
+    @Test
+    void callbackMissingGenderIsRejected() {
+        NiceVerificationService service = serviceAt(NOW);
+        String reqSeq = issueRequest(service);
+
+        // GENDER 가 없는 응답. 중복 판정 키의 재료라 빠지면 받지 않는다.
+        Map<String, String> fields = new LinkedHashMap<>();
+        fields.put("REQ_SEQ", reqSeq);
+        fields.put("NAME", "홍길동");
+        fields.put("MOBILE_NO", "01012345678");
+        fields.put("BIRTHDATE", "19900101");
         String incomplete = client.encode(codec.encode(fields));
 
         NiceVerificationException e =

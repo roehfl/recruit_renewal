@@ -103,7 +103,7 @@
 
 **감사 HMAC 키** ({BE}/config/AuditConfig.java — auditHmac)
 - `audit.hmac-secret` = env `AUDIT_HMAC_SECRET`. 비면 기동 실패. 단 `audit.allow-fallback-secret=true`(env `AUDIT_ALLOW_FALLBACK_SECRET`)이고 active profile에 `prod`가 없으면 비운영 대체 값 + 경고, `prod`면 flag가 true여도 거부. 테스트 값은 `recruit_back/recruit_backend/src/test/resources/application.yaml`. 실제 키 값은 문서·코드에 쓰지 않는다.
-- `AuditHmac` 입력 접두 `APPLICANT:`·`CERT_NO:`·`FILE_NAME:`. ci·email·phone 원문 입력 금지. ({BE}/common/hash/AuditHmac.java)
+- `AuditHmac` 입력 접두 `APPLICANT:`·`CERT_NO:`·`FILE_NAME:`·`IDENTITY:`. ci·email·phone 원문 입력 금지 — 예외는 `IDENTITY:`(가입 중복 판정 키 = 이름·생년월일·성별, `identityHash`). 이 값은 `Applicant.ciHash`에 저장되고 파기 때 `PURGED:`로 덮어써져 파기 후 연결자가 되지 않는다([auth-nice-verification](auth-nice-verification.md)). **`AUDIT_HMAC_SECRET`을 교체하면 가입 중복 판정 키가 바뀐다** — 교체 금지 또는 전 가입자 재계산. ({BE}/common/hash/AuditHmac.java)
 
 ## 변경 레시피
 

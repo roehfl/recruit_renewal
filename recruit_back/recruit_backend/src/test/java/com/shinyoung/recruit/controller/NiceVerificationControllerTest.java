@@ -68,7 +68,8 @@ class NiceVerificationControllerTest {
         fields.put("REQ_SEQ", reqSeq);
         fields.put("NAME", "홍길동");
         fields.put("MOBILE_NO", "01012345678");
-        fields.put("CI", "CI-VALUE-1");
+        fields.put("BIRTHDATE", "19900101");
+        fields.put("GENDER", "1");
         return client.encode(codec.encode(fields));
     }
 
@@ -134,7 +135,8 @@ class NiceVerificationControllerTest {
             fields.put("REQ_SEQ", reqSeq);
             fields.put("NAME", "a".repeat(pad) + "홍길동");
             fields.put("MOBILE_NO", "01012345678");
-            fields.put("CI", "CI-VALUE-1");
+            fields.put("BIRTHDATE", "19900101");
+            fields.put("GENDER", "1");
             String payload = client.encode(codec.encode(fields));
             if (payload.contains("+")) {
                 return payload;
@@ -194,7 +196,7 @@ class NiceVerificationControllerTest {
     }
 
     @Test
-    void resultStoresIdentityInSessionAndOmitsCiFromResponse() throws Exception {
+    void resultStoresIdentityInSessionAndOmitsBirthDateAndGenderFromResponse() throws Exception {
         MockHttpSession session = new MockHttpSession();
         String token = callbackAndExtractToken(issueReqSeq(session));
 
@@ -206,15 +208,18 @@ class NiceVerificationControllerTest {
                 .andExpect(jsonPath("$.data.status").value("SUCCESS"))
                 .andExpect(jsonPath("$.data.name").value("홍길동"))
                 .andExpect(jsonPath("$.data.phoneNumber").value("01012345678"))
+                .andExpect(jsonPath("$.data.birthDate").doesNotExist())
+                .andExpect(jsonPath("$.data.gender").doesNotExist())
                 .andReturn();
 
-        // 응답 본문 어디에도 CI 가 없어야 한다. 이 기능의 핵심 보안 속성이다.
-        assertEquals(-1, result.getResponse().getContentAsString().indexOf("CI-VALUE-1"));
+        // 응답 본문 어디에도 생년월일이 없어야 한다. 가입자 중복 판정 키의 재료라 서버 세션에만 둔다.
+        assertEquals(-1, result.getResponse().getContentAsString().indexOf("19900101"));
 
         NiceVerifiedIdentity identity = (NiceVerifiedIdentity)
                 session.getAttribute(NiceVerificationController.VERIFIED_SESSION_KEY);
         assertNotNull(identity);
-        assertEquals("CI-VALUE-1", identity.ci());
+        assertEquals("19900101", identity.birthDate());
+        assertEquals("1", identity.gender());
     }
 
     @Test

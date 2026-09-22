@@ -22,7 +22,7 @@ public class ApplicantRepositoryTest {
     @Test
     void 저장_조회_엔티티검증() {
         String ciValue = "testCIValue";
-        Applicant applicant = new Applicant(ciValue, HashUtil.sha256(ciValue));
+        Applicant applicant = new Applicant(HashUtil.sha256(ciValue));
         applicant.setEmail("roehfl@gmail.com");
         applicant.setUserName("이솔");
         applicant.setPhoneNumber("01071939211");

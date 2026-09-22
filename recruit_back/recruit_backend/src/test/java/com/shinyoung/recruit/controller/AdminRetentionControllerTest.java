@@ -385,7 +385,7 @@ class AdminRetentionControllerTest {
         JobPostingImageTestSupport.attachContentImage(jobPostingRepository, jobPostingImageRepository, jobPostingId);
         jobPostingService.publish(jobPostingId);
         String ci = loginId + "-ci";
-        Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
+        Applicant applicant = new Applicant(HashUtil.sha256(ci));
         applicant.setLoginId(loginId);
         applicant.setName("User " + loginId);
         applicant.setUserName("Applicant " + loginId);

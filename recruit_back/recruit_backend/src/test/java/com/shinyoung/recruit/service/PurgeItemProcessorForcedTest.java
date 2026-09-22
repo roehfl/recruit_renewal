@@ -185,7 +185,7 @@ class PurgeItemProcessorForcedTest {
     }
 
     private Long createSubmittedApplication(String loginId, Long jobPostingId) {
-        Applicant applicant = new Applicant(loginId + "-ci", HashUtil.sha256(loginId + "-ci"));
+        Applicant applicant = new Applicant(HashUtil.sha256(loginId + "-ci"));
         applicant.setLoginId(loginId);
         applicant.setName("User " + loginId);
         applicant.setUserName("Applicant " + loginId);

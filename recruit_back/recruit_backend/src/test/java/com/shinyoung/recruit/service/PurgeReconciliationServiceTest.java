@@ -187,7 +187,7 @@ class PurgeReconciliationServiceTest {
 
     /** 관계형 PII 제거는 끝났으나 바이너리 삭제만 실패한 상태(PURGE_PENDING + BINARY_DELETE_FAILED)를 만든다. */
     private Long createPurgePendingWithFailedAttachment(String loginId, Long jobPostingId, String storagePath) {
-        Applicant applicant = new Applicant(loginId + "-ci", HashUtil.sha256(loginId + "-ci"));
+        Applicant applicant = new Applicant(HashUtil.sha256(loginId + "-ci"));
         applicant.setLoginId(loginId);
         applicant.setUserName("Applicant " + loginId);
         applicant.setPassword("encoded");

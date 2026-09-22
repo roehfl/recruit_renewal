@@ -14,7 +14,7 @@ class CustomUserDetailsTest {
 
     @Test
     void applicant_username_is_login_id() {
-        Applicant applicant = new Applicant("test-ci", HashUtil.sha256("test-ci"));
+        Applicant applicant = new Applicant(HashUtil.sha256("test-ci"));
         applicant.setLoginId("applicant-login");
         applicant.setName("Applicant Name");
         applicant.setPassword("encoded-password");

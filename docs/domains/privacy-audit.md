@@ -199,7 +199,7 @@
 | `JobApplication` | `applicantNameSnapshot` ph, `purgeResult`·`purgeBatchId`·`purgedAt` |
 | `ApplicationAttachment` | `originalFileName` ph, `filenameHash` = `AuditHmac("FILE_NAME:"+원본명)`, 삭제자·사유 null |
 | `MessageRecipient`([message-delivery](message-delivery.md)) | 이름·이메일·휴대폰 null(AES 컬럼이라 ph 불가). 채널 상태·거래 ID·실패 사유(결과코드) 유지. 테스트 수신자(`jobApplication` null)는 대상 아님 |
-| `Applicant`(ref-count 0) | `purgePersonalData` — loginId·이름·이메일·비밀번호·전화·ci null, `ciHash` = `PURGED:`+UUID([auth-account](auth-account.md)) |
+| `Applicant`(ref-count 0) | `purgePersonalData` — loginId·이름·이메일·비밀번호·전화 null, `ciHash` = `PURGED:`+UUID([auth-account](auth-account.md)) |
 
 **saga ②③·reconcile** ({BE}/service/AttachmentPurgeSagaService.java — completeBinaryDeletion, {BE}/service/PurgeItemProcessor.java — finalizeBinaryDeletion, {BE}/service/PurgeReconciliationService.java — reconcile)
 - ② 대상 = `BINARY_DELETE_PENDING`·`_FAILED` 첨부. 삭제 후 `exists` 재확인, 이미 없음 = 성공, 경로 없음 = 실패(`EMPTY_STORAGE_PATH`). 그 외 실패 코드 `DELETE_FAILED`·`STILL_EXISTS`·`EXCEPTION`·`UNKNOWN`.

@@ -322,7 +322,7 @@ class ApplicationBasicInfoServiceTest {
 
     private Applicant createApplicant(String loginId, String userName) {
         String ci = loginId + "-ci";
-        Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
+        Applicant applicant = new Applicant(HashUtil.sha256(ci));
         applicant.setLoginId(loginId);
         applicant.setName("User-" + userName);
         applicant.setUserName(userName);

@@ -246,7 +246,7 @@ class ApplicationAttachmentDownloadServiceTest {
 
     private Applicant createApplicant(String loginId, String applicantName) {
         String ci = loginId + "-ci";
-        Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
+        Applicant applicant = new Applicant(HashUtil.sha256(ci));
         applicant.setLoginId(loginId);
         applicant.setName("User-" + applicantName);
         applicant.setUserName(applicantName);

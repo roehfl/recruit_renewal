@@ -141,7 +141,7 @@ class SchoolControllerTest {
 
     private Applicant saveApplicant() {
         String ci = "ci-" + UUID.randomUUID();
-        Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
+        Applicant applicant = new Applicant(HashUtil.sha256(ci));
         applicant.setLoginId("applicant-" + UUID.randomUUID());
         applicant.setName("지원자");
         applicant.setUserName("지원자");

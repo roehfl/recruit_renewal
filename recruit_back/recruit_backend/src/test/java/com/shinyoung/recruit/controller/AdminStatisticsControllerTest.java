@@ -850,7 +850,7 @@ class AdminStatisticsControllerTest {
 
     private Applicant saveApplicant(String name) {
         String ci = "ci-" + UUID.randomUUID();
-        Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
+        Applicant applicant = new Applicant(HashUtil.sha256(ci));
         applicant.setLoginId("applicant-" + UUID.randomUUID());
         applicant.setName(name);
         applicant.setUserName(name);

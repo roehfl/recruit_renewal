@@ -25,26 +25,29 @@ public record NiceVerificationRecord(
         Instant resultTokenIssuedAt,
         String name,
         String phoneNumber,
-        String ci
+        String birthDate,
+        String gender
 ) {
 
     public static NiceVerificationRecord pending(
             String reqSeq, NiceVerificationPurpose purpose, String sessionId, Instant issuedAt) {
         return new NiceVerificationRecord(
                 reqSeq, purpose, sessionId, issuedAt,
-                NiceVerificationStatus.PENDING, null, null, null, null, null);
+                NiceVerificationStatus.PENDING, null, null, null, null, null, null);
     }
 
     public NiceVerificationRecord verified(
-            String resultToken, Instant tokenIssuedAt, String name, String phoneNumber, String ci) {
+            String resultToken, Instant tokenIssuedAt,
+            String name, String phoneNumber, String birthDate, String gender) {
         return new NiceVerificationRecord(
                 reqSeq, purpose, sessionId, issuedAt,
-                NiceVerificationStatus.VERIFIED, resultToken, tokenIssuedAt, name, phoneNumber, ci);
+                NiceVerificationStatus.VERIFIED, resultToken, tokenIssuedAt,
+                name, phoneNumber, birthDate, gender);
     }
 
     public NiceVerificationRecord failed(String resultToken, Instant tokenIssuedAt) {
         return new NiceVerificationRecord(
                 reqSeq, purpose, sessionId, issuedAt,
-                NiceVerificationStatus.FAIL, resultToken, tokenIssuedAt, null, null, null);
+                NiceVerificationStatus.FAIL, resultToken, tokenIssuedAt, null, null, null, null);
     }
 }

@@ -59,7 +59,8 @@ class NiceVerificationServiceExchangeTest {
         fields.put("REQ_SEQ", reqSeq);
         fields.put("NAME", "홍길동");
         fields.put("MOBILE_NO", "01012345678");
-        fields.put("CI", "CI-VALUE-1");
+        fields.put("BIRTHDATE", "19900101");
+        fields.put("GENDER", "1");
         return service.handleCallback(client.encode(codec.encode(fields)));
     }
 
@@ -72,7 +73,8 @@ class NiceVerificationServiceExchangeTest {
 
         assertEquals("홍길동", identity.name());
         assertEquals("01012345678", identity.phoneNumber());
-        assertEquals("CI-VALUE-1", identity.ci());
+        assertEquals("19900101", identity.birthDate());
+        assertEquals("1", identity.gender());
         assertEquals(NiceVerificationPurpose.SIGNUP, identity.purpose());
     }
 

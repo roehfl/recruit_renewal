@@ -45,7 +45,7 @@ class RetentionEligibilityServiceTest {
     }
 
     private JobApplication application(JobPosting posting) {
-        Applicant applicant = new Applicant("elig-ci", HashUtil.sha256("elig-ci"));
+        Applicant applicant = new Applicant(HashUtil.sha256("elig-ci"));
         JobPosition position = JobPosition.create("Backend", 1);
         JobApplication application = JobApplication.create(applicant, posting, position, "name", "title", "pos");
         application.submit(LocalDateTime.of(2025, 1, 10, 10, 0));

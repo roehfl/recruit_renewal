@@ -133,7 +133,7 @@ class ApplicationPdfSecurityHardeningTest {
 
     private JobApplication saveSubmittedApplication(String name, String ci) {
         JobPosting jobPosting = saveJobPosting();
-        Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
+        Applicant applicant = new Applicant(HashUtil.sha256(ci));
         applicant.setLoginId("applicant-" + UUID.randomUUID());
         applicant.setName(name);
         applicant.setUserName(name);

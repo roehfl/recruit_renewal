@@ -18,7 +18,7 @@
 | 임직원 `Employee` | AD 계정. 비밀번호를 저장하지 않는다. `userType="Employee"`, 권한은 역할 매핑에서 계산 |
 | `User` | 두 유형의 부모 엔티티. `users` 테이블 JOINED 상속, `loginId` 전역 unique |
 | JIT 생성 | DB에 없는 loginId가 LDAP 인증에 성공하면 즉시 `Employee` 행을 저장하는 것 |
-| CI / `ciHash` | 본인인증 연계정보. `ci`는 AES 컬럼 암호화(`{BE}/common/crypto/AesAttributeConverter.java`), `ciHash`=SHA-256(`{BE}/common/hash/HashUtil.java`)로 중복 가입 차단 |
+| CI / `ciHash` | `ciHash`는 **이름+생년월일+성별의 HMAC**(`{BE}/common/hash/AuditHmac.java` `identityHash`)으로 중복 가입을 차단한다 — NICE 계약상 CI를 받지 않아 필드명만 남았다. `ci` 컬럼은 제거했다(운영 DDL `recruit_back/recruit_backend/docs/ops/applicant-drop-ci-ddl.sql`). 상세 [auth-nice-verification](auth-nice-verification.md) |
 | principal | 세션에 저장되는 `CustomUserDetails`(loginId, name, deptName, userType, authorities) |
 | authority(역할) | `ROLE_` 접두까지 포함한 완전한 문자열. 단일 출처는 `RoleNames` |
 | 부서·개인 매핑 | `dept_role_mapping`(AD 그룹 cn 부분일치) / `user_role_mapping`(loginId 완전일치). [role-menu](role-menu.md) 소유 |
@@ -47,7 +47,7 @@
 | config | `{BE}/security/auth/CustomAuthenticationEntryPoint.java` | 필터 401 JSON |
 | config | `{BE}/security/auth/CustomAccessDeniedHandler.java` | 필터 403 JSON |
 | entity | `{BE}/domain/entity/User.java` | `users`, `loginId` unique |
-| entity | `{BE}/domain/entity/Applicant.java` | email(unique)·password·phoneNumber·ci·ciHash(unique) |
+| entity | `{BE}/domain/entity/Applicant.java` | email(unique)·password·phoneNumber·ciHash(unique) |
 | entity | `{BE}/domain/entity/Employee.java` | `deptName`(unique 아님) |
 | repository | `{BE}/domain/repository/UserRepository.java` | `findUserByLoginId`, `existsByLoginId` |
 | repository | `{BE}/domain/repository/ApplicantRepository.java` | `findByLoginId`, `existsByEmail`, `existsByCiHash` |
@@ -211,9 +211,9 @@ NICE 4종(`request`·`callback`·`callback/error`·`result`) 상세는 [auth-nic
 ### 지원자 가입·계정
 - loginId 중복은 **users 전체**(`existsByLoginId`)에서 검사한다. 지원자 범위만 보면 임직원 loginId와 겹쳐 양쪽 다 로그인이 막힌다. 최종 방어선은 `User.loginId` unique다. (`{BE}/service/ApplicantSignUpService.java` — signUp)
 - 저장 전 처리: loginId·name·phoneNumber·ci는 trim, email은 trim 후 빈 값이면 null(소문자화 안 함). 비밀번호는 BCrypt로 저장하고, name은 `userName`에도 복사한다.
-- ci·ciHash·password는 응답·로그·export에 넣지 않는다. (`{BT}/service/ApplicantSignUpServiceTest.java` — 응답에_민감정보가_없다)
+- ciHash·password는 응답·로그·export에 넣지 않는다. (`{BT}/service/ApplicantSignUpServiceTest.java` — 응답에_민감정보가_없다)
 - **(2026-09-21 해소)** ci는 더 이상 클라이언트가 보낸 값을 쓰지 않는다. 서버가 세션에 둔 NICE 인증 결과만 쓴다(`ApplicantSignUpRequest` javadoc). 상세는 [auth-nice-verification](auth-nice-verification.md) 참고.
-- 파기: `Applicant.purgePersonalData`가 PII를 null로 만들고 ciHash를 `PURGED:`+UUID로 덮어쓴다. 이후 그 계정은 로그인할 수 없고 같은 CI로 재가입할 수 있다. 호출은 [privacy-audit](privacy-audit.md). (`{BE}/domain/entity/Applicant.java`)
+- 파기: `Applicant.purgePersonalData`가 PII를 null로 만들고 ciHash를 `PURGED:`+UUID로 덮어쓴다. 이후 그 계정은 로그인할 수 없고 같은 사람(이름+생년월일+성별)이 재가입할 수 있다. 호출은 [privacy-audit](privacy-audit.md). (`{BE}/domain/entity/Applicant.java`)
 - 비밀번호·전화번호 변경에는 `currentPassword` 재확인이 필수다(세션 탈취만으로 통지 채널을 바꾸지 못하게). 변경은 setter 대신 `Applicant.changePassword`/`changePhoneNumber`로 한다. (`{BE}/service/ApplicantAccountService.java` — verifyCurrentPassword)
 - 이메일 변경, 아이디(이메일) 찾기, 로그인 전 비밀번호 재설정 API는 아직 없다. **loginId 정책은 확정됐고**(아래 "함정·결정" — 이메일 = loginId), NICE 실연동 인프라는 가입 흐름에 만들어졌다(2026-09-21). 나머지 둘은 `NiceVerificationPurpose`에 값만 추가하면 얹을 수 있지만 범위 밖이라 아직 없다.
   - **이메일 변경: 불허**(2026-09-20 결정). 이메일이 곧 로그인 아이디라 변경 = 아이디 변경이다. API를 만들지 않는다.
@@ -225,7 +225,7 @@ NICE 4종(`request`·`callback`·`callback/error`·`result`) 상세는 [auth-nic
 - 전역 가드 순서: 미초기화면 `fetchMe` → `meta.public`이면 통과 → `requiresAuth`인데 미로그인이면 `fetchMe`를 한 번 더 호출하고, 실패하면 `/login?redirect=<fullPath>` → `meta.roles`가 하나도 맞지 않으면 `/403`. (`{FE}/routes/index.ts`)
 - 로그인 후 이동: `redirect` 쿼리 → `ADMIN_ROLES`(`{FE}/routes/adminRoutes.ts`) 보유 시 `/admin` → 그 외 `/applicant`. userType이 아니라 역할로 판정한다. (`{FE}/views/auth/LoginView.vue` — moveAfterLogin)
 - `{FE}/api/client.ts`(공통 기반, `withCredentials: true`): 401이면 `/login?redirect=`로 보낸다(`skipAuthRedirect`이거나 이미 `/login`이면 제외). 403이면 `/403`으로 보낸다. `authApi.login`은 `skipSessionExpiredLog`를 붙인다(`{FE}/common/httpErrorTelemetry.ts`).
-- 본인인증(가입, 실연동): `SignupView`가 연 `/nice-auth` 팝업이 `postMessage({ source:'nice-auth', status, name?, phoneNumber? }, origin)`로 결과를 알린다(`ci` 없음). `event.origin`·`payload.source` 검증 후 반영. 아이디·비번 찾기(`AccountRecovery`)는 `/nice-auth/mock` 팝업이 옛 방식 그대로 `window.opener.phoneAuthCallback({ name, phoneNumber, ci })`를 호출한다(목업). 두 경우 모두 등록한 화면은 unmount 때 **자기가 등록한 리스너·함수일 때만** 해제한다.
+- 본인인증(가입, 실연동): `SignupView`가 연 `/nice-auth` 팝업이 `postMessage({ source:'nice-auth', status, name?, phoneNumber? }, origin)`로 결과를 알린다(생년월일·성별 없음). `event.origin`·`payload.source` 검증 후 반영. 아이디·비번 찾기(`AccountRecovery`)는 `/nice-auth/mock` 팝업이 옛 방식 그대로 `window.opener.phoneAuthCallback({ name, phoneNumber, ci })`를 호출한다(목업). 두 경우 모두 등록한 화면은 unmount 때 **자기가 등록한 리스너·함수일 때만** 해제한다.
 - 가입 화면은 loginId와 email에 같은 이메일을 보내고, 전화번호에서 `-`를 뺀다.
 
 ## 변경 레시피

@@ -36,7 +36,7 @@ class ApplicantAccountServiceTest {
     void setUp() {
         applicantAccountService = new ApplicantAccountService(applicantRepository, passwordEncoder);
 
-        applicant = new Applicant("account-ci", HashUtil.sha256("account-ci"));
+        applicant = new Applicant(HashUtil.sha256("account-ci"));
         applicant.setLoginId("account01");
         applicant.setName("홍길동");
         applicant.setUserName("홍길동");

@@ -69,7 +69,7 @@ class ApplicationBasicInfoEncryptionTest {
     }
 
     private JobApplication newApplication() {
-        Applicant applicant = new Applicant("enc-ci", HashUtil.sha256("enc-ci"));
+        Applicant applicant = new Applicant(HashUtil.sha256("enc-ci"));
         applicant.setLoginId("enc-applicant");
         applicant.setName("User-Enc");
         applicant.setUserName("Enc User");

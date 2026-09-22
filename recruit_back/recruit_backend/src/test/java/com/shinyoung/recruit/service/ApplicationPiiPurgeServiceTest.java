@@ -150,7 +150,7 @@ class ApplicationPiiPurgeServiceTest {
         Long positionId = posting.getJobPositions().stream()
                 .sorted(Comparator.comparing(JobPosition::getSortOrder)).map(JobPosition::getId).findFirst().orElseThrow();
 
-        Applicant applicant = new Applicant("pii-ci", HashUtil.sha256("pii-ci"));
+        Applicant applicant = new Applicant(HashUtil.sha256("pii-ci"));
         applicant.setLoginId("pii-purge-applicant");
         applicant.setName("홍길동");
         applicant.setUserName("홍길동");
@@ -350,7 +350,7 @@ class ApplicationPiiPurgeServiceTest {
                 LocalDateTime.of(2026, 9, 1, 9, 0), LocalDateTime.of(2026, 9, 22, 18, 0));
         posting.replaceJobPositions(List.of(JobPosition.create("Sales", 1)));
         posting = jobPostingRepository.saveAndFlush(posting);
-        Applicant applicant = new Applicant("message-pii-ci", HashUtil.sha256("message-pii-ci"));
+        Applicant applicant = new Applicant(HashUtil.sha256("message-pii-ci"));
         applicant.setLoginId("message-pii-applicant");
         applicant.setName("김지원");
         applicant.setUserName("김지원");

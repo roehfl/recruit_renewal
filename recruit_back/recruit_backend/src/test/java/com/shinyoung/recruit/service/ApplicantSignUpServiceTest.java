@@ -1,6 +1,6 @@
 package com.shinyoung.recruit.service;
 
-import com.shinyoung.recruit.common.hash.HashUtil;
+import com.shinyoung.recruit.common.hash.AuditHmac;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.UserRepository;
@@ -39,16 +39,18 @@ class ApplicantSignUpServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    private final AuditHmac auditHmac = new AuditHmac("test-secret-value");
+
     private ApplicantSignUpService applicantSignUpService;
 
     @BeforeEach
     void setUp() {
-        applicantSignUpService = new ApplicantSignUpService(applicantRepository, userRepository, passwordEncoder);
+        applicantSignUpService = new ApplicantSignUpService(applicantRepository, userRepository, passwordEncoder, auditHmac);
     }
 
-    private NiceVerifiedIdentity identity(String name, String phoneNumber, String ci) {
+    private NiceVerifiedIdentity identity(String name, String phoneNumber, String birthDate, String gender) {
         return new NiceVerifiedIdentity(
-                NiceVerificationPurpose.SIGNUP, name, phoneNumber, ci, Instant.now());
+                NiceVerificationPurpose.SIGNUP, name, phoneNumber, birthDate, gender, Instant.now());
     }
 
     @Test
@@ -56,7 +58,7 @@ class ApplicantSignUpServiceTest {
         ApplicantSignUpRequest request = new ApplicantSignUpRequest(
                 "applicant01", "Password1234!", "applicant01@example.com"
         );
-        NiceVerifiedIdentity identity = identity("홍길동", "01012345678", "test-ci-applicant01");
+        NiceVerifiedIdentity identity = identity("홍길동", "01012345678", "19900101", "1");
         given(userRepository.existsByLoginId("applicant01")).willReturn(false);
         given(applicantRepository.existsByEmail("applicant01@example.com")).willReturn(false);
         given(applicantRepository.existsByCiHash(anyString())).willReturn(false);
@@ -84,7 +86,7 @@ class ApplicantSignUpServiceTest {
         ApplicantSignUpRequest request = new ApplicantSignUpRequest(
                 "duplicate", "Password1234!", null
         );
-        NiceVerifiedIdentity identity = identity("홍길동", "01012345678", "test-ci");
+        NiceVerifiedIdentity identity = identity("홍길동", "01012345678", "19900101", "1");
         given(userRepository.existsByLoginId("duplicate")).willReturn(true);
 
         assertThatThrownBy(() -> applicantSignUpService.signUp(request, identity))
@@ -98,7 +100,7 @@ class ApplicantSignUpServiceTest {
         ApplicantSignUpRequest request = new ApplicantSignUpRequest(
                 "emp01", "Password1234!", null
         );
-        NiceVerifiedIdentity identity = identity("홍길동", "01012345678", "test-ci");
+        NiceVerifiedIdentity identity = identity("홍길동", "01012345678", "19900101", "1");
         given(userRepository.existsByLoginId("emp01")).willReturn(true);
 
         assertThatThrownBy(() -> applicantSignUpService.signUp(request, identity))
@@ -111,7 +113,7 @@ class ApplicantSignUpServiceTest {
         ApplicantSignUpRequest request = new ApplicantSignUpRequest(
                 "newuser", "Password1234!", "dup@example.com"
         );
-        NiceVerifiedIdentity identity = identity("홍길동", "01012345678", "test-ci");
+        NiceVerifiedIdentity identity = identity("홍길동", "01012345678", "19900101", "1");
         given(userRepository.existsByLoginId("newuser")).willReturn(false);
         given(applicantRepository.existsByEmail("dup@example.com")).willReturn(true);
 
@@ -125,9 +127,9 @@ class ApplicantSignUpServiceTest {
         ApplicantSignUpRequest request = new ApplicantSignUpRequest(
                 "newuser", "Password1234!", null
         );
-        NiceVerifiedIdentity identity = identity("홍길동", "01012345678", "dup-ci");
+        NiceVerifiedIdentity identity = identity("홍길동", "01012345678", "19900101", "1");
         given(userRepository.existsByLoginId("newuser")).willReturn(false);
-        given(applicantRepository.existsByCiHash(HashUtil.sha256("dup-ci"))).willReturn(true);
+        given(applicantRepository.existsByCiHash(auditHmac.identityHash("홍길동", "19900101", "1"))).willReturn(true);
 
         assertThatThrownBy(() -> applicantSignUpService.signUp(request, identity))
                 .isInstanceOf(InvalidApplicantSignUpException.class)
@@ -139,7 +141,7 @@ class ApplicantSignUpServiceTest {
         ApplicantSignUpRequest request = new ApplicantSignUpRequest(
                 "enctest", "RawPassword1!", null
         );
-        NiceVerifiedIdentity identity = identity("테스트", "01011111111", "enc-ci");
+        NiceVerifiedIdentity identity = identity("테스트", "01011111111", "19910202", "0");
         given(userRepository.existsByLoginId("enctest")).willReturn(false);
         given(applicantRepository.existsByCiHash(anyString())).willReturn(false);
         given(passwordEncoder.encode("RawPassword1!")).willReturn("$2a$encoded");
@@ -158,7 +160,7 @@ class ApplicantSignUpServiceTest {
         ApplicantSignUpRequest request = new ApplicantSignUpRequest(
                 "safeuser", "Password1234!", "safe@example.com"
         );
-        NiceVerifiedIdentity identity = identity("안전", "01099999999", "safe-ci");
+        NiceVerifiedIdentity identity = identity("안전", "01099999999", "19951231", "1");
         given(userRepository.existsByLoginId("safeuser")).willReturn(false);
         given(applicantRepository.existsByEmail("safe@example.com")).willReturn(false);
         given(applicantRepository.existsByCiHash(anyString())).willReturn(false);
@@ -170,7 +172,7 @@ class ApplicantSignUpServiceTest {
         assertThat(response.loginId()).isNotNull();
         assertThat(response.name()).isNotNull();
         assertThat(response.toString()).doesNotContain("Password1234!");
-        assertThat(response.toString()).doesNotContain("safe-ci");
+        assertThat(response.toString()).doesNotContain("19951231");
         assertThat(response.toString()).doesNotContain("safe@example.com");
         assertThat(response.toString()).doesNotContain("01099999999");
     }

@@ -157,7 +157,7 @@ class ApplicationPdfServiceTest {
 
     private Applicant saveApplicant(String name, String phone, String email) {
         String ci = "ci-" + UUID.randomUUID();
-        Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
+        Applicant applicant = new Applicant(HashUtil.sha256(ci));
         applicant.setLoginId("pdf-test-" + UUID.randomUUID());
         applicant.setName(name);
         applicant.setUserName(name);

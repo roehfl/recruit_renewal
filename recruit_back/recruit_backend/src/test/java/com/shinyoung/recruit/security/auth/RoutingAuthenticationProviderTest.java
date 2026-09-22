@@ -152,7 +152,7 @@ class RoutingAuthenticationProviderTest {
     @Test
     void JIT_race_재조회가_Employee가_아니면_예외가_전파된다() {
         Authentication request = loginRequest("user01");
-        Applicant applicant = new Applicant("race-ci", HashUtil.sha256("race-ci"));
+        Applicant applicant = new Applicant(HashUtil.sha256("race-ci"));
         applicant.setLoginId("user01");
         given(userRepository.findUserByLoginId("user01"))
                 .willReturn(Optional.empty())

@@ -76,7 +76,8 @@ class NiceVerificationConcurrencyTest {
         fields.put("REQ_SEQ", reqSeq);
         fields.put("NAME", "홍길동");
         fields.put("MOBILE_NO", "01012345678");
-        fields.put("CI", "CI-VALUE-1");
+        fields.put("BIRTHDATE", "19900101");
+        fields.put("GENDER", "1");
         return mockClient.encode(codec.encode(fields));
     }
 

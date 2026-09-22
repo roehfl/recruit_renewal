@@ -122,7 +122,7 @@ class MessageSendCommandControllerTest {
 
     private JobApplication submitted(String name) {
         String ci = "test-ci-" + UUID.randomUUID();
-        Applicant applicant = new Applicant(ci, HashUtil.sha256(ci));
+        Applicant applicant = new Applicant(HashUtil.sha256(ci));
         applicant.setLoginId("applicant-" + UUID.randomUUID());
         applicant.setName(name);
         applicant.setEmail(UUID.randomUUID() + "@example.com");

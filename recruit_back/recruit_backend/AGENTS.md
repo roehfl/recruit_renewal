@@ -132,10 +132,10 @@ Controller
 ## 7. 개인정보·암호화
 
 - `@Convert(converter = AesAttributeConverter.class)` 필드는 AES/CBC(무작위 IV)로 저장된다. 키 `crypto.aes.key`(= `AES_SECRET_KEY`, 32자). 암호문이 매번 달라 검색·비교·unique가 불가능하다.
-- 암호화 필드: `Applicant.ci`, `ApplicationBasicInfo`의 이름·`countryCode`·연락처(`mobilePhone`·`emergencyPhone`·`email`)·장애 코드·주소.
+- 암호화 필드: `ApplicationBasicInfo`의 이름·`countryCode`·연락처(`mobilePhone`·`emergencyPhone`·`email`)·장애 코드·주소.
 - 평문(현행): `User.loginId`·`User.name`, `Applicant.email`(unique)·`Applicant.phoneNumber`. 암호화 전환은 요청 시에만(기존 데이터 이행 필요).
-- 검색할 개인정보는 별도 해시 컬럼으로 찾는다. 예: `Applicant.ciHash` = `HashUtil.sha256(ci)`(unique, 중복 가입 확인).
-- `HashUtil`: 키 없는 SHA-256(검색 키·파일 해시). `AuditHmac`: `AUDIT_HMAC_SECRET` 기반 HMAC-SHA256(감사 로그 가명 연결자·파기 덮어쓰기 값). `AuditHmac`에 CI·이메일·전화 원문을 넣지 않는다.
+- 검색할 개인정보는 별도 해시 컬럼으로 찾는다. 예: `Applicant.ciHash` = `AuditHmac.identityHash`(이름·생년월일·성별, unique, 중복 가입 확인).
+- `HashUtil`: 키 없는 SHA-256(검색 키·파일 해시). `AuditHmac`: `AUDIT_HMAC_SECRET` 기반 HMAC-SHA256(감사 로그 가명 연결자·파기 덮어쓰기 값). `AuditHmac`에 CI·이메일·전화 원문을 넣지 않는다(예외 `identityHash`).
 - 새 개인정보 필드는 암호화 여부를 사용자에게 확인한다. 파기 대상이면 privacy-audit 카드를 따른다.
 - `v-html`로 렌더될 HTML은 응답 DTO에서 `HtmlTextUtils.sanitize`를 거친다(예: `NoticeDetailResponse`). 검색용 텍스트는 `HtmlTextUtils.extractText`.
 - 로그·예외 메시지·응답에 개인정보 원문·비밀값·내부 저장 경로를 남기지 않는다.
@@ -152,10 +152,10 @@ Controller
 | 변수 | 부류 | 기본값 | 비고 |
 |---|---|---|---|
 | `AES_SECRET_KEY` | 비밀 | 없음(필수) | 32자. 로컬 예시 `22791194512954214612461221261067` — **로컬·테스트 전용 예시, 운영 키 아님** |
-| `AUDIT_HMAC_SECRET` | 비밀 | 빈 값 | 비면 기동 실패(`AUDIT_ALLOW_FALLBACK_SECRET=true`면 비운영 대체 값, `prod` 프로파일에서는 거부) |
+| `AUDIT_HMAC_SECRET` | 비밀 | 빈 값 | 비면 기동 실패(`AUDIT_ALLOW_FALLBACK_SECRET=true`면 비운영 대체 값, `prod` 프로파일에서는 거부). **교체 금지**(가입 중복 키) |
 | `AUDIT_ALLOW_FALLBACK_SECRET` | 플래그 | `false` | 로컬에서만 `true` |
 | `NICE_MOCK_ENABLED` | 플래그 | `false` | 로컬에서만 `true` |
-| `NICE_SITE_CODE`·`NICE_SITE_PASSWORD`·`NICE_RETURN_URL`·`NICE_ERROR_URL` | 자격증명·환경 | 빈 값 | 상세 auth-nice-verification 카드 |
+| `NICE_SITE_*`·`NICE_*_URL` | 자격증명·환경 | 빈 값 | auth-nice-verification 카드 |
 | `LDAP_MANAGER_DN` | 자격증명 | 없음 | 바인드 계정 DN. 유출 시 교체 대상 |
 | `LDAP_MANAGER_PASSWORD` | 자격증명 | 없음 | 로그·저장소에 절대 남기지 않는다 |
 | `LDAP_URL` | 환경 정보 | `ldap://`(미설정) | 내부망 주소 |

@@ -97,7 +97,8 @@ public class NiceVerificationService {
                 clock.instant(),
                 required(fields, "NAME"),
                 required(fields, "MOBILE_NO"),
-                required(fields, "CI"));
+                required(fields, "BIRTHDATE"),
+                required(fields, "GENDER"));
         if (!store.compareAndSet(record, verified)) {
             log.info("본인확인 콜백 거부: 동시 처리에서 먼저 처리된 요청. reqSeq={}", record.reqSeq());
             throw new NiceVerificationException(FAILURE_MESSAGE);
@@ -149,7 +150,8 @@ public class NiceVerificationService {
         }
 
         return new NiceVerifiedIdentity(
-                record.purpose(), record.name(), record.phoneNumber(), record.ci(), clock.instant());
+                record.purpose(), record.name(), record.phoneNumber(),
+                record.birthDate(), record.gender(), clock.instant());
     }
 
     /**
@@ -242,9 +244,9 @@ public class NiceVerificationService {
     /**
      * 응답에서 필수 필드를 꺼낸다.
      *
-     * <p>키 이름은 모듈의 {@code fnParse} 가 정한다. 운영 사이트코드가 1개뿐이라
-     * 실응답의 키 구성을 배포 전에 확인할 수 없으므로, 없을 때 <b>실제로 온 키 목록을
-     * 로그로 남긴다</b> — 첫 실인증에서 바로 진짜 이름이 드러난다.
+     * <p>키 이름은 NICE 응답 규격이다. 실응답(2026-09-22)은 {@code REQ_SEQ, RES_SEQ, AUTH_TYPE, NAME,
+     * BIRTHDATE, GENDER, NATIONALINFO, MOBILE_NO, UTF8_NAME} — <b>CI·DI 는 없다</b>(이 사이트코드 계약에
+     * 제공이 없다). 없을 때 <b>실제로 온 키 목록을 로그로 남긴다</b> — 이 로그로 CI 부재를 찾았다.
      *
      * <p>키 목록은 로그에만 남긴다. 예외 메시지는 사용자 응답으로 나가므로 넣지 않는다.
      */

@@ -48,24 +48,24 @@ class ApplicantSignUpControllerTest {
     /**
      * NICE 본인확인을 마친 세션을 만든다.
      *
-     * 가입 API 는 이제 이름·휴대폰·CI 를 요청 본문이 아니라 이 세션 속성에서 읽는다.
+     * 가입 API 는 이제 이름·휴대폰·생년월일·성별을 요청 본문이 아니라 이 세션 속성에서 읽는다.
      * 이 세션이 없으면 어떤 요청이든 400 이 나므로, 가입 로직을 검증하려는
      * 테스트는 반드시 이 세션을 붙여야 한다 — 안 붙이면 다른 이유로 400 이 나서
      * 테스트가 의도한 것을 검증하지 못한다.
      */
-    private MockHttpSession verifiedSession(String name, String phoneNumber, String ci) {
+    private MockHttpSession verifiedSession(String name, String phoneNumber, String birthDate, String gender) {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(
                 NiceVerificationController.VERIFIED_SESSION_KEY,
                 new NiceVerifiedIdentity(
-                        NiceVerificationPurpose.SIGNUP, name, phoneNumber, ci, clock.instant()));
+                        NiceVerificationPurpose.SIGNUP, name, phoneNumber, birthDate, gender, clock.instant()));
         return session;
     }
 
     @Test
     void 회원가입_성공() throws Exception {
         mockMvc.perform(post("/api/auth/applicants/sign-up")
-                        .session(verifiedSession("홍길동", "01012345678", "test-ci-applicant01"))
+                        .session(verifiedSession("홍길동", "01012345678", "19900101", "1"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -82,6 +82,8 @@ class ApplicantSignUpControllerTest {
                 .andExpect(jsonPath("$.data.password").doesNotExist())
                 .andExpect(jsonPath("$.data.ci").doesNotExist())
                 .andExpect(jsonPath("$.data.ciHash").doesNotExist())
+                .andExpect(jsonPath("$.data.birthDate").doesNotExist())
+                .andExpect(jsonPath("$.data.gender").doesNotExist())
                 .andExpect(jsonPath("$.data.phoneNumber").doesNotExist())
                 .andExpect(jsonPath("$.data.email").doesNotExist());
     }
@@ -89,7 +91,7 @@ class ApplicantSignUpControllerTest {
     @Test
     void validation_실패_시_400() throws Exception {
         mockMvc.perform(post("/api/auth/applicants/sign-up")
-                        .session(verifiedSession("검증실패", "01099999999", "test-ci-validation-fail"))
+                        .session(verifiedSession("검증실패", "01099999999", "19900101", "1"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -104,7 +106,7 @@ class ApplicantSignUpControllerTest {
 
     @Test
     void loginId_중복_시_400() throws Exception {
-        Applicant existing = new Applicant("existing-ci", HashUtil.sha256("existing-ci"));
+        Applicant existing = new Applicant(HashUtil.sha256("existing-ci"));
         existing.setLoginId("duplicate-id");
         existing.setName("기존사용자");
         existing.setUserName("기존사용자");
@@ -113,7 +115,7 @@ class ApplicantSignUpControllerTest {
         applicantRepository.save(existing);
 
         mockMvc.perform(post("/api/auth/applicants/sign-up")
-                        .session(verifiedSession("새사용자", "01011111111", "new-ci-value"))
+                        .session(verifiedSession("새사용자", "01011111111", "19900101", "1"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -158,7 +160,7 @@ class ApplicantSignUpControllerTest {
 
     @Test
     void 이메일_가용성_점유면_available_false() throws Exception {
-        Applicant existing = new Applicant("email-ci", HashUtil.sha256("email-ci"));
+        Applicant existing = new Applicant(HashUtil.sha256("email-ci"));
         existing.setLoginId("email-holder");
         existing.setName("기존사용자");
         existing.setUserName("기존사용자");
