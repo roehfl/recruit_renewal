@@ -56,7 +56,7 @@
                   </div>
                   <span class="item-nice-description">이름 · 전화번호 입력을 통해 본인인증을 진행합니다.</span>
                 </div>
-                  <a-button class="item-nice-button" @click="clickToNiceAuthPopupOpen" :disable="isNiceAuthComplete">본인 인증</a-button>
+                  <a-button class="item-nice-button" @click="clickToNiceAuthPopupOpen" :disabled="isNiceAuthComplete">본인 인증</a-button>
               </div>            
               <span class="item-description">수신 가능한 전화번호 입력 (해당 연락처로 전형결과등 안내 예정)</span>
             </a-form-item>
