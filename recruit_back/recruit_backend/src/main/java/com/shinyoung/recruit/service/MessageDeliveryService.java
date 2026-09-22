@@ -58,11 +58,11 @@ public class MessageDeliveryService {
         String html = messageMailLayout.render(unit.subject(), unit.body());
         MailMessage message = new MailMessage(
                 messageProperties.getSenderName(), messageProperties.getSenderEmail(), unit.subject(), html, unit.body());
-        return mailGateway.send(message, unit.to());
+        return mailGateway.send(message, unit.to(), unit.names());
     }
 
     private GatewayResult sendSms(DeliveryUnit unit) {
         SmsMessage message = new SmsMessage(messageProperties.getSmsCallbackNumber(), unit.body(), unit.smsKind());
-        return smsGateway.send(message, unit.to());
+        return smsGateway.send(message, unit.to(), unit.names());
     }
 }

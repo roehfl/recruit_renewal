@@ -26,7 +26,7 @@ public class DeliveryReportHandler {
     private final DeliveryReportBuffer deliveryReportBuffer;
     private final Clock clock;
 
-    /** 소켓 클라이언트(목업은 MockDeliveryReportScheduler)가 결과 1건마다 부른다. */
+    /** 결과 수신부(UmsReportServer, 목업은 MockDeliveryReportScheduler)가 결과 1건(수신자 1명)마다 부른다. */
     public void handle(DeliveryReport report) {
         if (report == null || report.transactionId() == null || report.transactionId().isBlank()) {
             log.warn("거래 ID 가 없는 발송 결과를 무시합니다.");
@@ -36,9 +36,9 @@ public class DeliveryReportHandler {
         tryApply(report);
     }
 
-    /** 디스패처가 단위 접수를 기록한 직후 부른다. 먼저 도착해 보관 중인 결과가 있으면 반영한다. */
+    /** 디스패처가 단위 접수를 기록한 직후 부른다. 먼저 도착해 보관 중인 그 거래의 결과(수신자별)를 반영한다. */
     public void applyBuffered(String transactionId) {
-        deliveryReportBuffer.find(transactionId).ifPresent(this::tryApply);
+        deliveryReportBuffer.find(transactionId).forEach(this::tryApply);
     }
 
     /** 1분마다 보관 결과를 다시 시도하고, 받은 지 10분이 지나도 짝이 없으면 버린다. */
@@ -47,7 +47,7 @@ public class DeliveryReportHandler {
         LocalDateTime expiredBefore = LocalDateTime.now(clock).minus(BUFFER_TTL);
         for (DeliveryReportBuffer.Entry entry : deliveryReportBuffer.entries()) {
             if (!tryApply(entry.report()) && entry.receivedAt().isBefore(expiredBefore)) {
-                deliveryReportBuffer.remove(entry.report().transactionId());
+                deliveryReportBuffer.remove(entry.report());
                 log.warn("발송 결과와 맞는 수신자가 10분 동안 없어 버립니다: transactionId={}",
                         entry.report().transactionId());
             }
@@ -57,7 +57,7 @@ public class DeliveryReportHandler {
     private boolean tryApply(DeliveryReport report) {
         try {
             if (messageDispatchRecorder.applyReport(report)) {
-                deliveryReportBuffer.remove(report.transactionId());
+                deliveryReportBuffer.remove(report);
                 return true;
             }
         } catch (RuntimeException e) {

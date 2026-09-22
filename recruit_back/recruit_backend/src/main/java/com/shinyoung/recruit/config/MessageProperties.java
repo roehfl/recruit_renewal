@@ -1,5 +1,6 @@
 package com.shinyoung.recruit.config;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -47,9 +48,14 @@ public class MessageProperties {
     @Min(1)
     private int resultWaitMinutes = 60;
 
-    /** 성공으로 볼 발송 결과코드 목록. 솔루션 스펙 확정 전 기본 0000(설계서 17절 6번). */
+    /** 성공으로 볼 발송 결과코드 목록. 솔루션(UMS) 결과 RES 2자리 중 성공은 00. */
     @NotEmpty
-    private List<String> successResultCodes = new ArrayList<>(List.of("0000"));
+    private List<String> successResultCodes = new ArrayList<>(List.of("00"));
+
+    /** 발송 결과를 받는 TCP 포트(gateway=trnode 일 때 UmsReportServer). 레거시와 같은 7779. 0 이면 빈 포트(테스트용). */
+    @Min(0)
+    @Max(65535)
+    private int reportPort = 7779;
 
     public String getSenderName() {
         return senderName;
@@ -113,5 +119,13 @@ public class MessageProperties {
 
     public void setSuccessResultCodes(List<String> successResultCodes) {
         this.successResultCodes = successResultCodes;
+    }
+
+    public int getReportPort() {
+        return reportPort;
+    }
+
+    public void setReportPort(int reportPort) {
+        this.reportPort = reportPort;
     }
 }

@@ -24,6 +24,7 @@ class DeliveryUnitTest {
         assertThat(units.get(0).recipientIds()).hasSize(10);
         assertThat(units.get(1).recipientIds()).containsExactly(11L);
         assertThat(units.get(0).to()).hasSize(10).allMatch(address -> address.endsWith("@example.com"));
+        assertThat(units.get(1).names()).containsExactly("수신자11");
     }
 
     @Test
@@ -40,7 +41,7 @@ class DeliveryUnitTest {
     @Test
     void 메일_단위를_SMS_단위보다_먼저_둔다() {
         List<DeliveryUnit> units = DeliveryUnit.group(List.of(
-                new DeliveryItem(1L, MessageChannel.SMS, "01000000001", null, "문자", SmsKind.SMS),
+                new DeliveryItem(1L, MessageChannel.SMS, "수신자1", "01000000001", null, "문자", SmsKind.SMS),
                 mail(1L, "공지", "본문")
         ));
 
@@ -49,6 +50,6 @@ class DeliveryUnitTest {
     }
 
     private DeliveryItem mail(Long recipientId, String subject, String body) {
-        return new DeliveryItem(recipientId, MessageChannel.MAIL, "user" + recipientId + "@example.com", subject, body, null);
+        return new DeliveryItem(recipientId, MessageChannel.MAIL, "수신자" + recipientId, "user" + recipientId + "@example.com", subject, body, null);
     }
 }

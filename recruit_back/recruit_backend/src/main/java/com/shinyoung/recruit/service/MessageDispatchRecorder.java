@@ -3,8 +3,11 @@ package com.shinyoung.recruit.service;
 import com.shinyoung.recruit.config.MessageProperties;
 import com.shinyoung.recruit.domain.entity.MessageRecipient;
 import com.shinyoung.recruit.domain.repository.MessageRecipientRepository;
+import com.shinyoung.recruit.enumeration.MessageChannel;
 import com.shinyoung.recruit.enumeration.MessageDeliveryStatus;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +25,7 @@ import java.util.List;
 @Transactional
 public class MessageDispatchRecorder {
 
+    private static final Logger log = LoggerFactory.getLogger(MessageDispatchRecorder.class);
     private static final int FAILURE_REASON_MAX_LENGTH = 200;
 
     private final MessageRecipientRepository messageRecipientRepository;
@@ -42,25 +46,55 @@ public class MessageDispatchRecorder {
     }
 
     /**
-     * 발송 결과 1건을 거래 ID 가 같고 아직 REQUESTED 인 수신자·채널에 반영한다. 이미 반영된 행은 바뀌지 않는다(멱등).
-     * 결과코드가 성공 목록(recruit.message.success-result-codes)에 있으면 SENT, 아니면 FAILED + 사유 = 결과코드.
+     * 발송 결과 1건(수신자 1명)을 반영한다. 그 채널 거래 ID 의 수신자 중 연락처가 같고 아직 REQUESTED 인 한 명만 바꾼다.
+     * 이미 반영된 행은 바뀌지 않는다(멱등). 결과코드가 성공 목록(recruit.message.success-result-codes)에 있으면 SENT,
+     * 아니면 FAILED + 사유 = 결과코드. 연락처가 맞는 수신자가 없으면(파기 등) 채널·거래 ID 만 경고로 남기고 버린다.
      *
-     * @return 거래 ID 를 알면(이번에 바꾼 행이 있거나 이미 기록된 거래) true. false 면 아직 접수 기록 전이라 보관해야 한다.
+     * @return 거래 ID 를 알면 true. false 면 아직 접수 기록 전이라 보관해야 한다.
      */
     public boolean applyReport(DeliveryReport report) {
+        MessageChannel channel = report.channel();
+        // 수신자를 먼저 읽고 id 로 update 한다. 접수 기록이 아직 커밋 전이면(READ COMMITTED) 빈 목록이라
+        // 보관해 두고 applyBuffered/retryBuffered 로 나중에 다시 반영한다.
+        List<MessageRecipient> candidates = channel == MessageChannel.MAIL
+                ? messageRecipientRepository.findByMailTransactionId(report.transactionId())
+                : messageRecipientRepository.findBySmsTransactionId(report.transactionId());
+        if (candidates.isEmpty()) {
+            return false;
+        }
+        List<Long> matchedIds = candidates.stream()
+                .filter(recipient -> sameContact(channel, recipient, report.to()))
+                .map(MessageRecipient::getId)
+                .toList();
+        if (matchedIds.isEmpty()) {
+            log.warn("발송 결과와 연락처가 맞는 수신자가 없어 버립니다: channel={}, transactionId={}",
+                    channel, report.transactionId());
+            return true;
+        }
         boolean success = messageProperties.getSuccessResultCodes().contains(report.resultCode());
         MessageDeliveryStatus status = success ? MessageDeliveryStatus.SENT : MessageDeliveryStatus.FAILED;
         String reason = success ? null : truncate(report.resultCode());
         LocalDateTime now = LocalDateTime.now(clock);
-        String transactionId = report.transactionId();
-        // 존재 확인을 update 전에 한다: update 뒤에 확인하면, 그 사이(READ COMMITTED) 접수 기록이 막 커밋돼
-        // update 는 0행(REQUESTED 상태를 아직 못 봄)인데 확인은 true 가 되는 경우 이미 기록된 거래로 오판해
-        // 버퍼에서 빠지고 결과가 영영 반영되지 않는다. 존재하지 않으면(false) 아직 접수 전이라 보관해 두고
-        // applyBuffered/retryBuffered 로 나중에 다시 반영한다.
-        boolean recorded = messageRecipientRepository.existsByMailTransactionIdOrSmsTransactionId(transactionId, transactionId);
-        int updated = messageRecipientRepository.applyMailReport(transactionId, status, reason, now)
-                + messageRecipientRepository.applySmsReport(transactionId, status, reason, now);
-        return updated > 0 || recorded;
+        // 같은 연락처가 한 거래에 두 번 들어간 경우 결과 한 줄은 아직 REQUESTED 인 첫 행에만 반영한다.
+        for (Long recipientId : matchedIds) {
+            int updated = channel == MessageChannel.MAIL
+                    ? messageRecipientRepository.applyMailReport(recipientId, status, reason, now)
+                    : messageRecipientRepository.applySmsReport(recipientId, status, reason, now);
+            if (updated > 0) {
+                break;
+            }
+        }
+        return true;
+    }
+
+    /** 메일은 앞뒤 공백을 뺀 주소를 대소문자 없이, SMS 는 숫자만 남긴 번호를 비교한다. */
+    private static boolean sameContact(MessageChannel channel, MessageRecipient recipient, String to) {
+        if (channel == MessageChannel.MAIL) {
+            String email = MessageContacts.normalizeEmail(recipient.getEmail());
+            return email != null && email.equalsIgnoreCase(MessageContacts.normalizeEmail(to));
+        }
+        String phone = MessageContacts.normalizePhone(recipient.getPhone());
+        return phone != null && !phone.isEmpty() && phone.equals(MessageContacts.normalizePhone(to));
     }
 
     private static String truncate(String reason) {

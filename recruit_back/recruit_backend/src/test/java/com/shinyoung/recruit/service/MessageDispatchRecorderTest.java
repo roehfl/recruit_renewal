@@ -67,46 +67,51 @@ class MessageDispatchRecorderTest {
     }
 
     @Test
-    void 결과는_거래_ID가_같고_REQUESTED인_채널만_바꾸고_성공_코드면_SENT로_둔다() {
+    void 결과는_그_채널_거래에서_연락처가_같은_수신자만_바꾸고_성공_코드면_SENT로_둔다() {
         MessageSend send = saveSend(2);
-        MessageRecipient first = saveRecipient(send, MessageDeliveryStatus.PENDING, MessageDeliveryStatus.PENDING);
-        MessageRecipient second = saveRecipient(send, MessageDeliveryStatus.PENDING, MessageDeliveryStatus.SKIPPED);
-        recorder.recordUnit(unit(MessageChannel.MAIL, first.getId(), second.getId()), GatewayResult.accepted("TX-MAIL-1"));
-        recorder.recordUnit(unit(MessageChannel.SMS, first.getId()), GatewayResult.accepted("TX-SMS-1"));
+        MessageRecipient kim = saveRecipient(send, "kim@example.com", "01000000000",
+                MessageDeliveryStatus.PENDING, MessageDeliveryStatus.PENDING);
+        MessageRecipient lee = saveRecipient(send, "lee@example.com", "01000000001",
+                MessageDeliveryStatus.PENDING, MessageDeliveryStatus.SKIPPED);
+        recorder.recordUnit(unit(MessageChannel.MAIL, kim.getId(), lee.getId()), GatewayResult.accepted("TX-1"));
+        recorder.recordUnit(unit(MessageChannel.SMS, kim.getId()), GatewayResult.accepted("TX-1"));
 
-        boolean known = recorder.applyReport(new DeliveryReport("TX-MAIL-1", "0000"));
+        boolean known = recorder.applyReport(new DeliveryReport(MessageChannel.MAIL, "TX-1", " KIM@example.com ", "00"));
 
         assertThat(known).isTrue();
-        MessageRecipient reloadedFirst = messageRecipientRepository.findById(first.getId()).orElseThrow();
-        assertThat(reloadedFirst.getMailStatus()).isEqualTo(MessageDeliveryStatus.SENT);
-        assertThat(reloadedFirst.getMailFailureReason()).isNull();
-        assertThat(reloadedFirst.getSmsStatus()).isEqualTo(MessageDeliveryStatus.REQUESTED);
-        assertThat(messageRecipientRepository.findById(second.getId()).orElseThrow().getMailStatus())
-                .isEqualTo(MessageDeliveryStatus.SENT);
+        MessageRecipient reloadedKim = messageRecipientRepository.findById(kim.getId()).orElseThrow();
+        assertThat(reloadedKim.getMailStatus()).isEqualTo(MessageDeliveryStatus.SENT);
+        assertThat(reloadedKim.getMailFailureReason()).isNull();
+        assertThat(reloadedKim.getSmsStatus()).as("같은 거래 ID 라도 SMS 채널은 바꾸지 않는다")
+                .isEqualTo(MessageDeliveryStatus.REQUESTED);
+        assertThat(messageRecipientRepository.findById(lee.getId()).orElseThrow().getMailStatus())
+                .isEqualTo(MessageDeliveryStatus.REQUESTED);
     }
 
     @Test
-    void 성공_코드가_아니면_FAILED로_두고_결과코드를_사유로_남긴다() {
+    void 성공_코드가_아니면_FAILED로_두고_결과코드를_사유로_남긴다_SMS는_숫자만_비교한다() {
         MessageSend send = saveSend(1);
-        MessageRecipient recipient = saveRecipient(send, MessageDeliveryStatus.SKIPPED, MessageDeliveryStatus.PENDING);
+        MessageRecipient recipient = saveRecipient(send, "kim@example.com", "010-1234-5678",
+                MessageDeliveryStatus.SKIPPED, MessageDeliveryStatus.PENDING);
         recorder.recordUnit(unit(MessageChannel.SMS, recipient.getId()), GatewayResult.accepted("TX-SMS-2"));
 
-        recorder.applyReport(new DeliveryReport("TX-SMS-2", "E102"));
+        recorder.applyReport(new DeliveryReport(MessageChannel.SMS, "TX-SMS-2", "01012345678", "E1"));
 
         MessageRecipient reloaded = messageRecipientRepository.findById(recipient.getId()).orElseThrow();
         assertThat(reloaded.getSmsStatus()).isEqualTo(MessageDeliveryStatus.FAILED);
-        assertThat(reloaded.getSmsFailureReason()).isEqualTo("E102");
+        assertThat(reloaded.getSmsFailureReason()).isEqualTo("E1");
         assertThat(reloaded.getSmsTransactionId()).isEqualTo("TX-SMS-2");
     }
 
     @Test
-    void 이미_반영된_거래의_결과가_다시_오면_바꾸지_않고_아는_거래로_본다() {
+    void 이미_반영된_수신자의_결과가_다시_오면_바꾸지_않고_아는_거래로_본다() {
         MessageSend send = saveSend(1);
-        MessageRecipient recipient = saveRecipient(send, MessageDeliveryStatus.PENDING, MessageDeliveryStatus.SKIPPED);
+        MessageRecipient recipient = saveRecipient(send, "kim@example.com", "01000000000",
+                MessageDeliveryStatus.PENDING, MessageDeliveryStatus.SKIPPED);
         recorder.recordUnit(unit(MessageChannel.MAIL, recipient.getId()), GatewayResult.accepted("TX-MAIL-3"));
-        recorder.applyReport(new DeliveryReport("TX-MAIL-3", "0000"));
+        recorder.applyReport(new DeliveryReport(MessageChannel.MAIL, "TX-MAIL-3", "kim@example.com", "00"));
 
-        boolean known = recorder.applyReport(new DeliveryReport("TX-MAIL-3", "9999"));
+        boolean known = recorder.applyReport(new DeliveryReport(MessageChannel.MAIL, "TX-MAIL-3", "kim@example.com", "99"));
 
         assertThat(known).isTrue();
         MessageRecipient reloaded = messageRecipientRepository.findById(recipient.getId()).orElseThrow();
@@ -115,13 +120,45 @@ class MessageDispatchRecorderTest {
     }
 
     @Test
+    void 연락처가_맞는_수신자가_없으면_아무것도_바꾸지_않고_버린다() {
+        MessageSend send = saveSend(1);
+        MessageRecipient recipient = saveRecipient(send, "kim@example.com", "01000000000",
+                MessageDeliveryStatus.PENDING, MessageDeliveryStatus.SKIPPED);
+        recorder.recordUnit(unit(MessageChannel.MAIL, recipient.getId()), GatewayResult.accepted("TX-MAIL-4"));
+
+        boolean known = recorder.applyReport(new DeliveryReport(MessageChannel.MAIL, "TX-MAIL-4", "other@example.com", "00"));
+
+        assertThat(known).isTrue();
+        assertThat(messageRecipientRepository.findById(recipient.getId()).orElseThrow().getMailStatus())
+                .isEqualTo(MessageDeliveryStatus.REQUESTED);
+    }
+
+    @Test
+    void 같은_연락처가_한_거래에_두_번_있으면_결과_한_줄은_한_명에게만_반영한다() {
+        MessageSend send = saveSend(2);
+        MessageRecipient first = saveRecipient(send, "kim@example.com", "01000000000",
+                MessageDeliveryStatus.PENDING, MessageDeliveryStatus.SKIPPED);
+        MessageRecipient second = saveRecipient(send, "kim@example.com", "01000000000",
+                MessageDeliveryStatus.PENDING, MessageDeliveryStatus.SKIPPED);
+        recorder.recordUnit(unit(MessageChannel.MAIL, first.getId(), second.getId()), GatewayResult.accepted("TX-MAIL-5"));
+
+        recorder.applyReport(new DeliveryReport(MessageChannel.MAIL, "TX-MAIL-5", "kim@example.com", "00"));
+        recorder.applyReport(new DeliveryReport(MessageChannel.MAIL, "TX-MAIL-5", "kim@example.com", "99"));
+
+        assertThat(messageRecipientRepository.findAllById(List.of(first.getId(), second.getId())))
+                .extracting(MessageRecipient::getMailStatus)
+                .containsExactlyInAnyOrder(MessageDeliveryStatus.SENT, MessageDeliveryStatus.FAILED);
+    }
+
+    @Test
     void 기록되지_않은_거래_ID면_모른다고_답한다() {
-        assertThat(recorder.applyReport(new DeliveryReport("TX-UNKNOWN", "0000"))).isFalse();
+        assertThat(recorder.applyReport(new DeliveryReport(MessageChannel.MAIL, "TX-UNKNOWN", "kim@example.com", "00")))
+                .isFalse();
     }
 
     private DeliveryUnit unit(MessageChannel channel, Long... recipientIds) {
         return new DeliveryUnit(channel, null, "본문", channel == MessageChannel.SMS ? SmsKind.SMS : null,
-                List.of(recipientIds), List.of());
+                List.of(recipientIds), List.of(), List.of());
     }
 
     private MessageSend saveSend(int recipientCount) {
@@ -136,8 +173,13 @@ class MessageDispatchRecorderTest {
     }
 
     private MessageRecipient saveRecipient(MessageSend send, MessageDeliveryStatus mail, MessageDeliveryStatus sms) {
+        return saveRecipient(send, "kim@example.com", "01000000000", mail, sms);
+    }
+
+    private MessageRecipient saveRecipient(MessageSend send, String email, String phone,
+                                           MessageDeliveryStatus mail, MessageDeliveryStatus sms) {
         return messageRecipientRepository.saveAndFlush(MessageRecipient.create(
-                send, null, "김지원", "kim@example.com", "01000000000",
+                send, null, "김지원", email, phone,
                 mail, mail == MessageDeliveryStatus.SKIPPED ? MessageContacts.NO_CONTACT : null,
                 sms, sms == MessageDeliveryStatus.SKIPPED ? MessageContacts.NO_CONTACT : null,
                 SmsKind.SMS));

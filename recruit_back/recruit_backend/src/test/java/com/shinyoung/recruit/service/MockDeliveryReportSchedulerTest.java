@@ -1,5 +1,6 @@
 package com.shinyoung.recruit.service;
 
+import com.shinyoung.recruit.enumeration.MessageChannel;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.scheduling.TaskScheduler;
@@ -25,8 +26,8 @@ class MockDeliveryReportSchedulerTest {
             new MockDeliveryReportScheduler(taskScheduler, handler, Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
-    void 접수_3초_뒤_성공_코드로_결과를_넘긴다() {
-        scheduler.schedule("TX-1", List.of("kim@example.com"));
+    void 접수_3초_뒤_수신자마다_성공_코드로_결과를_넘긴다() {
+        scheduler.schedule(MessageChannel.MAIL, "TX-1", List.of("kim@example.com", "lee@example.com"));
 
         ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
         verify(taskScheduler).schedule(task.capture(), eq(NOW.plusSeconds(3)));
@@ -34,17 +35,19 @@ class MockDeliveryReportSchedulerTest {
 
         task.getValue().run();
 
-        verify(handler).handle(new DeliveryReport("TX-1", "0000"));
+        verify(handler).handle(new DeliveryReport(MessageChannel.MAIL, "TX-1", "kim@example.com", "00"));
+        verify(handler).handle(new DeliveryReport(MessageChannel.MAIL, "TX-1", "lee@example.com", "00"));
     }
 
     @Test
-    void 연락처에_fail이_있으면_실패_코드로_넘긴다() {
-        scheduler.schedule("TX-2", List.of("ok@example.com", "FAIL.test@example.com"));
+    void 연락처에_fail이_있는_수신자만_실패_코드로_넘긴다() {
+        scheduler.schedule(MessageChannel.SMS, "TX-2", List.of("01000000000", "010fail0000"));
 
         ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
         verify(taskScheduler).schedule(task.capture(), any(Instant.class));
         task.getValue().run();
 
-        verify(handler).handle(new DeliveryReport("TX-2", "9999"));
+        verify(handler).handle(new DeliveryReport(MessageChannel.SMS, "TX-2", "01000000000", "00"));
+        verify(handler).handle(new DeliveryReport(MessageChannel.SMS, "TX-2", "010fail0000", "99"));
     }
 }

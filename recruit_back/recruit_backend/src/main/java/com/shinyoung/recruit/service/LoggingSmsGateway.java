@@ -1,5 +1,6 @@
 package com.shinyoung.recruit.service;
 
+import com.shinyoung.recruit.enumeration.MessageChannel;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,14 +24,14 @@ public class LoggingSmsGateway implements SmsGateway {
     private final MockDeliveryReportScheduler mockDeliveryReportScheduler;
 
     @Override
-    public GatewayResult send(SmsMessage message, List<String> toNumbers) {
+    public GatewayResult send(SmsMessage message, List<String> toNumbers, List<String> names) {
         String transactionId = UUID.randomUUID().toString();
         log.info("[message-sms] transactionId={} to={} kind={} bodyLength={}",
                 transactionId,
                 toNumbers.stream().map(MessageContacts::maskPhone).toList(),
                 message.kind(),
                 message.body().length());
-        mockDeliveryReportScheduler.schedule(transactionId, toNumbers);
+        mockDeliveryReportScheduler.schedule(MessageChannel.SMS, transactionId, toNumbers);
         return GatewayResult.accepted(transactionId);
     }
 }

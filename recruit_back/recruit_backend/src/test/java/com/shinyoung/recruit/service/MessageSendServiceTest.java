@@ -99,8 +99,8 @@ class MessageSendServiceTest {
                 LocalDateTime.of(2026, 9, 1, 9, 0), LocalDateTime.of(2026, 9, 22, 18, 0));
         posting.replaceJobPositions(List.of(JobPosition.create("Sales", 1)));
         posting = jobPostingRepository.saveAndFlush(posting);
-        when(mailGateway.send(any(), anyList())).thenReturn(GatewayResult.accepted("TX-MAIL-1"));
-        when(smsGateway.send(any(), anyList())).thenReturn(GatewayResult.accepted("TX-SMS-1"));
+        when(mailGateway.send(any(), anyList(), anyList())).thenReturn(GatewayResult.accepted("TX-MAIL-1"));
+        when(smsGateway.send(any(), anyList(), anyList())).thenReturn(GatewayResult.accepted("TX-SMS-1"));
     }
 
     @Test
@@ -130,12 +130,15 @@ class MessageSendServiceTest {
         MessageSendRequestedEvent event = applicationEvents.stream(MessageSendRequestedEvent.class).findFirst().orElseThrow();
         assertThat(event.messageSendId()).isEqualTo(send.getId());
         assertThat(event.items()).filteredOn(item -> item.channel() == MessageChannel.MAIL)
-                .extracting(DeliveryItem::subject)
-                .containsExactly("[신영증권] 김민준님 안내", "[신영증권] 이서연님 안내");
+                .extracting(DeliveryItem::name, DeliveryItem::subject)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("김민준", "[신영증권] 김민준님 안내"),
+                        org.assertj.core.groups.Tuple.tuple("이서연", "[신영증권] 이서연님 안내"));
         assertThat(event.items()).filteredOn(item -> item.channel() == MessageChannel.SMS)
                 .singleElement()
                 .satisfies(item -> {
                     assertThat(item.body()).isEqualTo("김민준님 안내 문자");
+                    assertThat(item.name()).isEqualTo("김민준");
                     assertThat(item.to()).isEqualTo("01000000000");
                     assertThat(item.smsKind()).isEqualTo(SmsKind.SMS);
                 });
@@ -247,10 +250,12 @@ class MessageSendServiceTest {
                         org.assertj.core.groups.Tuple.tuple(MessageChannel.MAIL, MessageDeliveryStatus.REQUESTED),
                         org.assertj.core.groups.Tuple.tuple(MessageChannel.SMS, MessageDeliveryStatus.REQUESTED));
         ArgumentCaptor<MailMessage> mail = ArgumentCaptor.forClass(MailMessage.class);
-        verify(mailGateway).send(mail.capture(), org.mockito.ArgumentMatchers.eq(List.of("hr.kim@example.com")));
+        verify(mailGateway).send(mail.capture(), org.mockito.ArgumentMatchers.eq(List.of("hr.kim@example.com")),
+                org.mockito.ArgumentMatchers.eq(List.of("김인사")));
         assertThat(mail.getValue().subject()).isEqualTo("[테스트] [신영증권] 김민준님 안내");
         ArgumentCaptor<SmsMessage> sms = ArgumentCaptor.forClass(SmsMessage.class);
-        verify(smsGateway).send(sms.capture(), org.mockito.ArgumentMatchers.eq(List.of("01000001234")));
+        verify(smsGateway).send(sms.capture(), org.mockito.ArgumentMatchers.eq(List.of("01000001234")),
+                org.mockito.ArgumentMatchers.eq(List.of("김인사")));
         assertThat(sms.getValue().body()).isEqualTo("[테스트] 김민준님 문자");
         MessageSend send = messageSendRepository.findById(response.sendId()).orElseThrow();
         assertThat(send.isTest()).isTrue();
@@ -263,8 +268,8 @@ class MessageSendServiceTest {
     @Test
     void 테스트_발송_중에_먼저_온_결과가_반영되면_바로_SENT로_읽힌다() {
         JobApplication kim = submitted("김민준");
-        when(mailGateway.send(any(), anyList())).thenReturn(GatewayResult.accepted("T-EARLY"));
-        deliveryReportBuffer.put(new DeliveryReport("T-EARLY", "0000"));
+        when(mailGateway.send(any(), anyList(), anyList())).thenReturn(GatewayResult.accepted("T-EARLY"));
+        deliveryReportBuffer.put(new DeliveryReport(MessageChannel.MAIL, "T-EARLY", "hr.kim@example.com", "00"));
 
         MessageTestSendResponse response = messageSendService.testSend(new MessageTestSendRequest(
                 MessageType.FREE, posting.getId(), null, null, null, JobApplicationStatus.SUBMITTED,

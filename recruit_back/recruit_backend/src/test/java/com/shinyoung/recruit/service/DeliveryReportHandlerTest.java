@@ -1,5 +1,6 @@
 package com.shinyoung.recruit.service;
 
+import com.shinyoung.recruit.enumeration.MessageChannel;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -33,7 +34,7 @@ class DeliveryReportHandlerTest {
     private final MessageDispatchRecorder recorder = mock(MessageDispatchRecorder.class);
     private final DeliveryReportBuffer buffer = new DeliveryReportBuffer(clock);
     private final DeliveryReportHandler handler = new DeliveryReportHandler(recorder, buffer, clock);
-    private final DeliveryReport report = new DeliveryReport("TX-1", "0000");
+    private final DeliveryReport report = new DeliveryReport(MessageChannel.MAIL, "TX-1", "kim@example.com", "00");
 
     @Test
     void 반영되면_보관하지_않는다() {
@@ -50,12 +51,28 @@ class DeliveryReportHandlerTest {
         when(recorder.applyReport(report)).thenReturn(false, true);
 
         handler.handle(report);
-        assertThat(buffer.find("TX-1")).contains(report);
+        assertThat(buffer.find("TX-1")).containsExactly(report);
 
         handler.applyBuffered("TX-1");
 
         assertThat(buffer.size()).isZero();
         verify(recorder, times(2)).applyReport(report);
+    }
+
+    @Test
+    void 같은_거래의_수신자별_결과를_따로_보관했다가_접수_기록_직후_모두_반영한다() {
+        DeliveryReport other = new DeliveryReport(MessageChannel.MAIL, "TX-1", "lee@example.com", "99");
+        when(recorder.applyReport(report)).thenReturn(false, true);
+        when(recorder.applyReport(other)).thenReturn(false, true);
+
+        handler.handle(report);
+        handler.handle(other);
+        assertThat(buffer.size()).isEqualTo(2);
+
+        handler.applyBuffered("TX-1");
+
+        assertThat(buffer.size()).isZero();
+        verify(recorder, times(2)).applyReport(other);
     }
 
     @Test
@@ -101,7 +118,7 @@ class DeliveryReportHandlerTest {
 
     @Test
     void 거래_ID가_없는_결과는_무시한다() {
-        handler.handle(new DeliveryReport(" ", "0000"));
+        handler.handle(new DeliveryReport(MessageChannel.MAIL, " ", "kim@example.com", "00"));
         handler.handle(null);
 
         assertThat(buffer.size()).isZero();

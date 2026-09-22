@@ -32,14 +32,26 @@ class MessageDispatcherTest {
     void 발송_단위마다_전달하고_접수_결과를_기록한_뒤_먼저_온_결과를_반영한다() {
         List<DeliveryItem> items = new ArrayList<>();
         for (long id = 1; id <= 11; id++) {
-            items.add(new DeliveryItem(id, MessageChannel.MAIL, "u" + id + "@example.com", "공지", "같은 본문", null));
+            items.add(new DeliveryItem(id, MessageChannel.MAIL, "수신자" + id, "u" + id + "@example.com", "공지", "같은 본문", null));
         }
-        items.add(new DeliveryItem(1L, MessageChannel.SMS, "01000000001", null, "문자", SmsKind.SMS));
+        items.add(new DeliveryItem(1L, MessageChannel.SMS, "수신자1", "01000000001", null, "문자", SmsKind.SMS));
         when(deliveryService.deliver(any())).thenReturn(
                 GatewayResult.accepted("TX-1"), GatewayResult.failure("X"), GatewayResult.accepted("TX-3"));
+        ch.qos.logback.classic.Logger dispatcherLogger =
+                (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(MessageDispatcher.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> logAppender =
+                new ch.qos.logback.core.read.ListAppender<>();
+        logAppender.start();
+        dispatcherLogger.addAppender(logAppender);
 
-        dispatcher.dispatch(items);
+        try {
+            dispatcher.dispatch(7L, items);
+        } finally {
+            dispatcherLogger.detachAppender(logAppender);
+        }
 
+        assertThat(logAppender.list).singleElement().extracting(event -> event.getFormattedMessage()).asString()
+                .contains("sendId=7 units=3 accepted=2 failed=1 elapsedMs=");
         ArgumentCaptor<DeliveryUnit> units = ArgumentCaptor.forClass(DeliveryUnit.class);
         verify(deliveryService, times(3)).deliver(units.capture());
         assertThat(units.getAllValues()).extracting(DeliveryUnit::channel)
@@ -64,7 +76,7 @@ class MessageDispatcherTest {
         when(deliveryService.deliver(any())).thenReturn(GatewayResult.accepted("TX-1"));
 
         dispatcher.onSendRequested(new MessageSendRequestedEvent(3L, List.of(
-                new DeliveryItem(1L, MessageChannel.SMS, "01000000001", null, "문자", SmsKind.SMS))));
+                new DeliveryItem(1L, MessageChannel.SMS, "수신자1", "01000000001", null, "문자", SmsKind.SMS))));
 
         verify(recorder).recordUnit(any(), eq(GatewayResult.accepted("TX-1")));
         verify(reportHandler).applyBuffered("TX-1");
@@ -73,13 +85,13 @@ class MessageDispatcherTest {
     @Test
     void 기록이_예외로_끝나도_다음_단위를_계속_처리한다() {
         List<DeliveryItem> items = List.of(
-                new DeliveryItem(1L, MessageChannel.MAIL, "u1@example.com", "공지1", "본문1", null),
-                new DeliveryItem(2L, MessageChannel.MAIL, "u2@example.com", "공지2", "본문2", null));
+                new DeliveryItem(1L, MessageChannel.MAIL, "수신자1", "u1@example.com", "공지1", "본문1", null),
+                new DeliveryItem(2L, MessageChannel.MAIL, "수신자2", "u2@example.com", "공지2", "본문2", null));
         when(deliveryService.deliver(any())).thenReturn(
                 GatewayResult.accepted("TX-1"), GatewayResult.accepted("TX-2"));
         doThrow(new RuntimeException("lock timeout")).doNothing().when(recorder).recordUnit(any(), any());
 
-        dispatcher.dispatch(items);
+        dispatcher.dispatch(7L, items);
 
         verify(deliveryService, times(2)).deliver(any());
         verify(recorder, times(2)).recordUnit(any(), any());

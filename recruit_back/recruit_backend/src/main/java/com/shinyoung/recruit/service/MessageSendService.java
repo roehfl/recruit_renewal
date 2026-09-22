@@ -104,7 +104,7 @@ public class MessageSendService {
             MessageRecipient recipient = messageRecipientRepository.save(plan.toRecipient(
                     send, jobApplicationRepository.getReferenceById(target.applicationId()),
                     target.name(), target.email(), target.phone()));
-            items.addAll(plan.items(recipient.getId()));
+            items.addAll(plan.items(recipient.getId(), target.name()));
         }
         eventPublisher.publishEvent(new MessageSendRequestedEvent(send.getId(), items));
         return new MessageSendResultResponse(send.getId(), MessageSendStatus.SENDING, recipients.size(),
@@ -138,9 +138,9 @@ public class MessageSendService {
             MessageTesterRequest tester = testers.get(index);
             MessageRecipient recipient = messageRecipientRepository.save(
                     plans.get(index).toRecipient(send, null, tester.name(), tester.email(), tester.phone()));
-            items.addAll(plans.get(index).items(recipient.getId()));
+            items.addAll(plans.get(index).items(recipient.getId(), tester.name()));
         }
-        messageDispatcher.dispatch(items);
+        messageDispatcher.dispatch(send.getId(), items);
 
         // 먼저 도착한 발송 결과를 반영하면(bulk update) 영속성 컨텍스트가 비워지므로 응답은 수신자를 다시 읽어 만든다.
         List<MessageTestSendResultResponse> results = new ArrayList<>();
@@ -323,13 +323,13 @@ public class MessageSendService {
                     mailStatus, mailReason, smsStatus, smsReason, smsKind);
         }
 
-        List<DeliveryItem> items(Long recipientId) {
+        List<DeliveryItem> items(Long recipientId, String name) {
             List<DeliveryItem> items = new ArrayList<>(2);
             if (mailStatus == MessageDeliveryStatus.PENDING) {
-                items.add(new DeliveryItem(recipientId, MessageChannel.MAIL, mailTo, mailSubject, mailBody, null));
+                items.add(new DeliveryItem(recipientId, MessageChannel.MAIL, name, mailTo, mailSubject, mailBody, null));
             }
             if (smsStatus == MessageDeliveryStatus.PENDING) {
-                items.add(new DeliveryItem(recipientId, MessageChannel.SMS, smsTo, null, smsBody, smsKind));
+                items.add(new DeliveryItem(recipientId, MessageChannel.SMS, name, smsTo, null, smsBody, smsKind));
             }
             return items;
         }

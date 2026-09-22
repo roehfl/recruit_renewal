@@ -35,3 +35,6 @@ recruit:
     mock-enabled: true
   attachment:
     storage-root: build/test-attachments
+node:
+  # TRNodeEngine 은 항상 빈으로 뜨므로 키가 있어야 한다. 테스트는 TR 노드를 부르지 않는다.
+  url: ""

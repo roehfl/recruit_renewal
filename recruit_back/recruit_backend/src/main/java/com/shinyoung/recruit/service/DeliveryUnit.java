@@ -11,7 +11,7 @@ import java.util.Map;
 
 /**
  * 게이트웨이 1회 호출 단위 = 채널별로 내용이 완전히 같은 수신자 최대 10명(설계서 7.1.1).
- * 변수로 사람마다 내용이 달라지면 1명당 1단위가 된다.
+ * 변수로 사람마다 내용이 달라지면 1명당 1단위가 된다. recipientIds·names·to 는 같은 순서다.
  */
 public record DeliveryUnit(
         MessageChannel channel,
@@ -19,6 +19,7 @@ public record DeliveryUnit(
         String body,
         SmsKind smsKind,
         List<Long> recipientIds,
+        List<String> names,
         List<String> to
 ) {
 
@@ -38,6 +39,7 @@ public record DeliveryUnit(
                 units.add(new DeliveryUnit(
                         key.channel(), key.subject(), key.body(), key.smsKind(),
                         chunk.stream().map(DeliveryItem::recipientId).toList(),
+                        chunk.stream().map(DeliveryItem::name).toList(),
                         chunk.stream().map(DeliveryItem::to).toList()
                 ));
             }

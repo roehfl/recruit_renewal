@@ -1,5 +1,6 @@
 package com.shinyoung.recruit.service;
 
+import com.shinyoung.recruit.enumeration.MessageChannel;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,14 +24,14 @@ public class LoggingMailGateway implements MailGateway {
     private final MockDeliveryReportScheduler mockDeliveryReportScheduler;
 
     @Override
-    public GatewayResult send(MailMessage message, List<String> toAddresses) {
+    public GatewayResult send(MailMessage message, List<String> toAddresses, List<String> names) {
         String transactionId = UUID.randomUUID().toString();
         log.info("[message-mail] transactionId={} to={} subjectLength={} htmlLength={}",
                 transactionId,
                 toAddresses.stream().map(MessageContacts::maskEmail).toList(),
                 message.subject().length(),
                 message.html().length());
-        mockDeliveryReportScheduler.schedule(transactionId, toAddresses);
+        mockDeliveryReportScheduler.schedule(MessageChannel.MAIL, transactionId, toAddresses);
         return GatewayResult.accepted(transactionId);
     }
 }

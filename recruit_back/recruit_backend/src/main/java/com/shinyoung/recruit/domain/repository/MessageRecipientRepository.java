@@ -15,11 +15,14 @@ public interface MessageRecipientRepository extends JpaRepository<MessageRecipie
 
     List<MessageRecipient> findByMessageSendIdOrderByIdAsc(Long messageSendId);
 
-    /** 발송 결과의 거래 ID 가 이미 접수 기록된 거래인지(메일·SMS 어느 쪽이든). */
-    boolean existsByMailTransactionIdOrSmsTransactionId(String mailTransactionId, String smsTransactionId);
+    /** 메일 거래 1건의 수신자(최대 10명). 발송 결과를 받을 수신자를 연락처로 고르는 데 쓴다. */
+    List<MessageRecipient> findByMailTransactionId(String mailTransactionId);
+
+    /** SMS 거래 1건의 수신자(최대 10명). */
+    List<MessageRecipient> findBySmsTransactionId(String smsTransactionId);
 
     /**
-     * 메일 발송 결과 반영. 거래 ID 가 같고 아직 REQUESTED 인 행만 바꾸므로 다시 온 결과는 0행이다(멱등).
+     * 수신자 1명의 메일 발송 결과 반영. 아직 REQUESTED 인 행만 바꾸므로 다시 온 결과는 0행이다(멱등).
      * bulk update 라 엔티티 감사(updatedAt)는 거치지 않고 processedAt 만 갱신한다. 같은 트랜잭션의 이후 조회가
      * 새 값을 보도록 영속성 컨텍스트를 비운다(테스트 발송은 요청 트랜잭션에 합류한다).
      */
@@ -27,26 +30,26 @@ public interface MessageRecipientRepository extends JpaRepository<MessageRecipie
     @Query("""
             update MessageRecipient r
             set r.mailStatus = :status, r.mailFailureReason = :failureReason, r.processedAt = :processedAt
-            where r.mailTransactionId = :transactionId
+            where r.id = :recipientId
               and r.mailStatus = com.shinyoung.recruit.enumeration.MessageDeliveryStatus.REQUESTED
             """)
     int applyMailReport(
-            @Param("transactionId") String transactionId,
+            @Param("recipientId") Long recipientId,
             @Param("status") MessageDeliveryStatus status,
             @Param("failureReason") String failureReason,
             @Param("processedAt") LocalDateTime processedAt
     );
 
-    /** SMS 발송 결과 반영. 규칙은 applyMailReport 와 같다. */
+    /** 수신자 1명의 SMS 발송 결과 반영. 규칙은 applyMailReport 와 같다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update MessageRecipient r
             set r.smsStatus = :status, r.smsFailureReason = :failureReason, r.processedAt = :processedAt
-            where r.smsTransactionId = :transactionId
+            where r.id = :recipientId
               and r.smsStatus = com.shinyoung.recruit.enumeration.MessageDeliveryStatus.REQUESTED
             """)
     int applySmsReport(
-            @Param("transactionId") String transactionId,
+            @Param("recipientId") Long recipientId,
             @Param("status") MessageDeliveryStatus status,
             @Param("failureReason") String failureReason,
             @Param("processedAt") LocalDateTime processedAt

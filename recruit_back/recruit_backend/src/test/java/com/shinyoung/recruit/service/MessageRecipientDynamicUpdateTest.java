@@ -94,7 +94,7 @@ class MessageRecipientDynamicUpdateTest {
             TransactionTemplate tx2 = new TransactionTemplate(transactionManager);
             tx2.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
             tx2.executeWithoutResult(innerStatus ->
-                    assertThat(recorder.applyReport(new DeliveryReport("T-MAIL", "0000"))).isTrue());
+                    assertThat(recorder.applyReport(new DeliveryReport(MessageChannel.MAIL, "T-MAIL", "kim@example.com", "00"))).isTrue());
 
             recipient.recordRequested(MessageChannel.SMS, "T-SMS", LocalDateTime.of(2026, 9, 19, 10, 5));
         });

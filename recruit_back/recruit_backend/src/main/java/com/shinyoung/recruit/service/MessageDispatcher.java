@@ -29,13 +29,22 @@ public class MessageDispatcher {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onSendRequested(MessageSendRequestedEvent event) {
-        dispatch(event.items());
+        dispatch(event.messageSendId(), event.items());
     }
 
-    /** 테스트 발송은 이 메서드를 요청 트랜잭션 안에서 동기로 부른다. */
-    public void dispatch(List<DeliveryItem> items) {
-        for (DeliveryUnit unit : DeliveryUnit.group(items)) {
+    /**
+     * 테스트 발송은 이 메서드를 요청 트랜잭션 안에서 동기로 부른다.
+     * 끝나면 단위 수·접수/실패 건수·전체 소요 시간을 한 줄 남긴다(대량 발송 소요 시간 측정용).
+     */
+    public void dispatch(Long messageSendId, List<DeliveryItem> items) {
+        long startedAt = System.nanoTime();
+        List<DeliveryUnit> units = DeliveryUnit.group(items);
+        int accepted = 0;
+        for (DeliveryUnit unit : units) {
             GatewayResult result = messageDeliveryService.deliver(unit);
+            if (result.accepted()) {
+                accepted++;
+            }
             try {
                 messageDispatchRecorder.recordUnit(unit, result);
                 if (result.accepted()) {
@@ -46,5 +55,7 @@ public class MessageDispatcher {
                         unit.channel(), unit.recipientIds().size(), e.getClass().getSimpleName());
             }
         }
+        log.info("발송 디스패치 완료: sendId={} units={} accepted={} failed={} elapsedMs={}",
+                messageSendId, units.size(), accepted, units.size() - accepted, (System.nanoTime() - startedAt) / 1_000_000);
     }
 }
