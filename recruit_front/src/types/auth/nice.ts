@@ -28,3 +28,13 @@ export const NICE_CHECKPLUS_M = 'checkplusSerivce'
 
 /** postMessage 식별자. 다른 라이브러리 메시지와 섞이지 않게 한다. */
 export const NICE_MESSAGE_SOURCE = 'nice-auth'
+
+/** 본인확인 용도. 백엔드 NiceVerificationPurpose 와 같은 값이다. 서버가 발급 시 기록하고 소비 시 대조한다. */
+export const NICE_PURPOSES = ['SIGNUP', 'FIND_EMAIL'] as const
+
+export type NiceVerificationPurpose = (typeof NICE_PURPOSES)[number]
+
+/** 팝업 쿼리(?purpose=)로 받은 값이 알려진 용도인지 확인한다. */
+export function isNicePurpose(value: unknown): value is NiceVerificationPurpose {
+  return typeof value === 'string' && (NICE_PURPOSES as readonly string[]).includes(value)
+}

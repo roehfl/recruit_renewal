@@ -1,10 +1,10 @@
 package com.shinyoung.recruit.controller;
 
+import com.shinyoung.recruit.dto.request.NiceRequestRequest;
 import com.shinyoung.recruit.dto.request.NiceResultRequest;
 import com.shinyoung.recruit.dto.response.ApiResponse;
 import com.shinyoung.recruit.dto.response.NiceRequestResponse;
 import com.shinyoung.recruit.dto.response.NiceResultResponse;
-import com.shinyoung.recruit.enumeration.NiceVerificationPurpose;
 import com.shinyoung.recruit.exception.NiceVerificationException;
 import com.shinyoung.recruit.service.nice.NiceVerificationService;
 import com.shinyoung.recruit.service.nice.NiceVerifiedIdentity;
@@ -50,9 +50,9 @@ public class NiceVerificationController {
     }
 
     @PostMapping("/request")
-    public ResponseEntity<ApiResponse<NiceRequestResponse>> request(HttpSession session) {
-        String encodeData =
-                niceVerificationService.request(NiceVerificationPurpose.SIGNUP, session.getId());
+    public ResponseEntity<ApiResponse<NiceRequestResponse>> request(
+            @Valid @RequestBody NiceRequestRequest request, HttpSession session) {
+        String encodeData = niceVerificationService.request(request.purpose(), session.getId());
         return ResponseEntity.ok(ApiResponse.success(new NiceRequestResponse(encodeData)));
     }
 

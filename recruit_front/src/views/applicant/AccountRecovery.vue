@@ -43,10 +43,10 @@
                 </div>
                 <div class="find-id-view" v-if="isNiceAuthComplete">
                   <div class="find-id-view-text-area">
-                    <p class="find-id-view-text">휴대전화번호 정보와 일치하는 아이디입니다.</p>
+                    <p class="find-id-view-text">본인인증 정보와 일치하는 아이디입니다.</p>
                     <div class="find-id-view-text">
                         <span>아이디 : </span>
-                        <span>abc12345@gmail.com</span>
+                        <span>{{ maskedEmail }}</span>
                     </div>
                   </div> 
                 </div> 
@@ -114,7 +114,9 @@ import { ref, onBeforeUnmount } from 'vue'
 import { CloseOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue';
 import { applicationApi } from '@/api/applicationApi';
+import { getApiErrorMessage } from '@/api/apiError';
 import type { checkEmailRequest } from '@/types/application';
+import { NICE_MESSAGE_SOURCE, type NiceAuthMessage } from '@/types/auth/nice';
 
 const loginId = ref('');
 const loading = ref(false);
@@ -123,6 +125,7 @@ const findPassword = ref(false);
 
 const isNiceAuthPopupOpen = ref(false);
 const isNiceAuthComplete = ref(false);
+const maskedEmail = ref('');
 
 const isAvailable = ref(false);
 const isEmailChecked = ref(false);
@@ -145,6 +148,7 @@ const openFindId = () => {
   else {
     findId.value = true;
     isNiceAuthComplete.value = false;
+    maskedEmail.value = '';
   }
 }
 
@@ -170,34 +174,48 @@ const closeFindPassword = () => {
 const clickToNiceAuthPopupOpen = async () => {
   isNiceAuthPopupOpen.value = true;
   window.open(
-    "/nice-auth/mock",
+    "/nice-auth?purpose=FIND_EMAIL",
     "Nice-Auth",
-    "width=450, height=480"
+    "width=450, height=480, resizable=no"
   );
 };
 
-const phoneAuthCallback = (data: { name: string, phoneNumber: string, ci:string }) => {
-
-  if(data.name && data.phoneNumber && data.ci) {
-    message.success('본인인증이 완료되었습니다.');
-    NiceAuthComplete(true);
-    isNiceAuthPopupOpen.value = false;
+/**
+ * 팝업이 postMessage 로 결과를 보낸다(SignupView 와 같은 방식).
+ * 성공 알림에는 아이디가 없다 — 서버 세션에 담긴 인증 결과로 find-email 을 불러야 나온다.
+ */
+const onNiceMessage = async (event: MessageEvent) => {
+  if (event.origin !== window.location.origin) {
+    return
   }
-};
-window.phoneAuthCallback = phoneAuthCallback;
-
-// 화면을 떠난 뒤 팝업이 콜백을 부르지 않도록 정리한다. 다른 화면이 새로 등록한 콜백은 지우지 않는다.
-onBeforeUnmount(() => {
-  if (window.phoneAuthCallback === phoneAuthCallback) {
-    window.phoneAuthCallback = undefined;
+  const payload = event.data as NiceAuthMessage | undefined
+  if (payload?.source !== NICE_MESSAGE_SOURCE) {
+    return
   }
-});
 
-const NiceAuthComplete = async (result:boolean) => {
-  // 나이스 인증 후 로직
-  isNiceAuthPopupOpen.value = false;
-  isNiceAuthComplete.value = result;
+  isNiceAuthPopupOpen.value = false
+
+  if (payload.status !== 'SUCCESS') {
+    message.error('본인인증에 실패했습니다. 다시 시도해주세요.')
+    return
+  }
+
+  try {
+    const { data } = await applicationApi.findEmail()
+    maskedEmail.value = data.data.maskedEmail
+    message.success('본인인증이 완료되었습니다.')
+    isNiceAuthComplete.value = true
+  } catch (error) {
+    message.error(getApiErrorMessage(error, '아이디를 찾지 못했습니다.'))
+  }
 }
+
+window.addEventListener('message', onNiceMessage)
+
+// 화면을 떠난 뒤 팝업이 메시지를 보내도 반응하지 않게 한다. 자기가 등록한 리스너만 지운다.
+onBeforeUnmount(() => {
+  window.removeEventListener('message', onNiceMessage)
+})
 
 const clickToEmailCheckButton = async () => {
   if(!loginId.value) {

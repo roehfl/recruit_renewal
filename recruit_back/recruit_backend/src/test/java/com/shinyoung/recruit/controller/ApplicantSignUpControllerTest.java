@@ -193,4 +193,27 @@ class ApplicantSignUpControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").exists());
     }
+
+    /* 용도 대조 역방향 — 아이디 찾기용 인증 결과로 계정을 만들 수 없어야 한다. */
+    @Test
+    void 아이디_찾기용_인증으로는_가입할_수_없다() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(
+                NiceVerificationController.VERIFIED_SESSION_KEY,
+                new NiceVerifiedIdentity(
+                        NiceVerificationPurpose.FIND_EMAIL, "홍길동", "01012345678", "19900101", "1", clock.instant()));
+
+        mockMvc.perform(post("/api/auth/applicants/sign-up")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "loginId": "purpose-mismatch@example.com",
+                                  "password": "Password1234!",
+                                  "email": "purpose-mismatch@example.com"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("본인인증 용도가 일치하지 않습니다."));
+    }
 }

@@ -1,6 +1,6 @@
 import { apiClient } from './client'
 import type { ApiResponse } from '@/types/api'
-import type { ApplicantStageResult, ApplicationSearchParams, MyApplicationList, ChangePasswordParams, ChangePasswordRequest, SignupUser, checkEmailRequest } from '@/types/application'
+import type { ApplicantStageResult, ApplicationSearchParams, MyApplicationList, ChangePasswordParams, ChangePasswordRequest, SignupUser, checkEmailRequest, FindEmailResponse } from '@/types/application'
 
 export const applicationApi = {
 
@@ -26,6 +26,11 @@ export const applicationApi = {
         email,
       },
     })
+  },
+
+  /** 아이디 찾기. 요청 본문은 없다 — 서버가 세션의 NICE 인증 결과(용도 FIND_EMAIL)를 1회 소비한다. */
+  findEmail() {
+    return apiClient.post<ApiResponse<FindEmailResponse>>('/auth/applicants/find-email')
   },
 
 }

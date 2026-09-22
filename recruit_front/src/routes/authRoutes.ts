@@ -25,12 +25,4 @@ export const authRoutes: RouteRecordRaw[] = [
       public: true,
     },
   },
-  {
-    path: '/nice-auth/mock',
-    name: 'NiceAuthMockPopup',
-    component: () => import('@/views/auth/pop-up/NiceAuthMockPopup.vue'),
-    meta: {
-      public: true,
-    },
-  },
 ]

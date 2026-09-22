@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NICE 본인확인 기반 아이디(이메일) 찾기 - 구현</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal · auth-account / auth-nice-verification</div>
+  <h1>NICE 본인확인 기반 아이디(이메일) 찾기 — 구현</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge pending">실인증 확인 대기</span>
+  <span class="badge muted">작성일: 2026-09-22</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>아이디 찾기 화면을 목업(하드코딩 결과)에서 NICE 실연동 본인확인 + 서버 조회로 바꿨다. 결과는 부분 마스킹한 아이디만 보여준다.</p>
+      <p>가입과 같은 2단계 흐름이다. 팝업이 용도 <code>FIND_EMAIL</code>로 요청을 발급받고, 인증 결과가 서버 세션에 담기면 새 API <code>find-email</code>이 이를 1회 소비해 식별 키(이름+생년월일+성별 HMAC)로 계정을 찾는다.</p>
+      <p>용도 대조를 양방향으로 막았다. 가입용 인증으로는 아이디를 찾을 수 없고, 아이디 찾기용 인증으로는 가입할 수 없다.</p>
+      <p>남은 것은 개발 서버 실인증 확인 3건이다. 로컬 Mock은 NICE 표준창을 통과하지 못한다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">백엔드 구현·테스트 158건 통과</span></p>
+      <p><span class="badge done">프론트 type-check 0 · vitest 112 통과</span></p>
+      <p><span class="badge done">카드 갱신·분할, 문서 점검 통과</span></p>
+      <p><span class="badge info">API 계약 변경 2건</span></p>
+      <p><span class="badge pending">개발 서버 실인증 미확인</span></p>
+      <p><span class="badge muted">커밋 안 함(요청 시)</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li><code>NiceVerificationPurpose.FIND_EMAIL</code> 추가</li>
+          <li><code>/auth/nice/request</code>가 본문 <code>{ purpose }</code>를 필수로 받음</li>
+          <li><code>POST /auth/applicants/find-email</code> 신규(세션 소비·부분 마스킹)</li>
+          <li>팝업 쿼리 용도 검사, 가입·아이디 찾기 화면이 용도를 넘김</li>
+          <li><code>AccountRecovery.vue</code> postMessage 방식으로 교체</li>
+          <li>목업 팝업·라우트·<code>types/window.ts</code> 삭제</li>
+          <li>NICE 카드 분할(<code>auth-nice-verification-module</code>)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미검증</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>개발 서버 실인증: 가입한 계정으로 아이디 찾기 → 마스킹 아이디 표시</li>
+          <li>개발 서버 실인증: 미가입 명의 → 404 안내</li>
+          <li>개발 서버 실인증: 가입 흐름 회귀(용도 쿼리 추가 후 가입 성공)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>비밀번호 재발급(목업 유지, 이메일 토큰 방식 예정)</li>
+          <li>가입 이메일 인증 목업</li>
+          <li><code>/applicant/account/phone-number</code>의 NICE 연동</li>
+          <li>NICE 호출 rate limit·감사 로그 연동</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>흐름</h2>
+    <div class="card">
+      <div class="transition">
+        <span class="state">아이디 찾기 화면</span><span class="arrow">→</span>
+        <span class="action">팝업 /nice-auth?purpose=FIND_EMAIL</span><span class="arrow">→</span>
+        <span class="state">NICE 표준창</span><span class="arrow">→</span>
+        <span class="action">콜백·결과 교환(기존)</span><span class="arrow">→</span>
+        <span class="state">세션 NICE_VERIFIED(FIND_EMAIL)</span>
+      </div>
+      <div class="transition">
+        <span class="state">postMessage SUCCESS</span><span class="arrow">→</span>
+        <span class="action">POST /auth/applicants/find-email</span><span class="arrow">→</span>
+        <span class="state">requireFresh → 세션 제거 → findByCiHash</span><span class="arrow">→</span>
+        <span class="state">maskedEmail 표시 / 404 안내</span>
+      </div>
+      <p class="small">콜백·결과 교환 단계는 용도와 무관하게 기존 코드를 그대로 쓴다. 용도는 발급 시 레코드에 기록돼 세션 인증 결과까지 따라온다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>API 변경</h2>
+    <table>
+      <tr><th>상태</th><th>메서드</th><th>경로</th><th>요청</th><th>응답</th><th>소유 카드</th></tr>
+      <tr><td><span class="badge info">변경</span></td><td><code>POST</code></td><td><code>/auth/nice/request</code></td><td><code>{ purpose }</code> 필수(<code>SIGNUP</code>·<code>FIND_EMAIL</code>). 기존: 본문 없음</td><td><code>{ encodeData }</code></td><td>auth-nice-verification</td></tr>
+      <tr><td><span class="badge done">신규</span></td><td><code>POST</code></td><td><code>/auth/applicants/find-email</code></td><td>없음(세션의 NICE 인증 결과)</td><td><code>{ maskedEmail }</code></td><td>auth-account</td></tr>
+    </table>
+    <p class="small">둘 다 계약 🟢로 확정했다. 응답은 모두 <code>ApiResponse&lt;T&gt;</code>로 감싼다.</p>
+  </section>
+
+  <section>
+    <h2>검증 및 비즈니스 규칙</h2>
+    <div class="two">
+      <div class="card">
+        <h3><code>find-email</code> 오류</h3>
+        <table>
+          <tr><th>상황</th><th>상태</th><th>메시지</th></tr>
+          <tr><td>세션에 인증 결과 없음</td><td>400</td><td>본인인증을 먼저 진행해주세요.</td></tr>
+          <tr><td>가입용 인증(용도 불일치)</td><td>400</td><td>본인인증 용도가 일치하지 않습니다.</td></tr>
+          <tr><td>인증 후 30분 경과</td><td>400</td><td>본인인증이 만료되었습니다. 다시 진행해주세요.</td></tr>
+          <tr><td>일치 계정 없음(미가입·파기)</td><td>404</td><td>본인인증 정보와 일치하는 계정이 없습니다.</td></tr>
+        </table>
+        <p class="small"><code>request</code>는 본문 없음·모르는 값 400 <code>Invalid request.</code>, <code>null</code>은 400 <code>purpose는 필수입니다.</code></p>
+      </div>
+      <div class="card">
+        <h3>마스킹 규칙</h3>
+        <table>
+          <tr><th>입력</th><th>출력</th></tr>
+          <tr><td><code>abc12345@gmail.com</code></td><td><code>ab******@gmail.com</code></td></tr>
+          <tr><td><code>abc@x.com</code></td><td><code>ab*@x.com</code></td></tr>
+          <tr><td><code>ab@x.com</code></td><td><code>a*@x.com</code></td></tr>
+          <tr><td><code>a@x.com</code></td><td><code>a*@x.com</code></td></tr>
+          <tr><td><code>hongildong</code></td><td><code>ho********</code></td></tr>
+        </table>
+        <p class="small">로컬부 3자 이상은 앞 2자, 2자 이하는 앞 1자를 남기고 나머지 길이만큼 <code>*</code>(최소 1개). 도메인은 그대로. <code>@</code>가 없으면 전체를 로컬부로 본다.</p>
+      </div>
+    </div>
+    <div class="card">
+      <h3>불변식</h3>
+      <ul class="list">
+        <li><strong>인증 1회 = 조회 1회.</strong> 세션 인증 결과는 조회 전에 제거한다. 계정이 없어도 소비된다.</li>
+        <li><strong>용도 대조 양방향.</strong> <code>requireFresh</code>가 가입·아이디 찾기 양쪽에서 용도를 확인한다.</li>
+        <li><strong>원문 비노출.</strong> 응답은 마스킹 아이디뿐이다. 원문 아이디·생년월일·성별은 응답·로그에 없다.</li>
+        <li><strong>용도 기본값 없음.</strong> 호출부가 용도를 빠뜨리면 조용히 가입용이 되지 않고 400이 난다.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>D1</td><td>결과는 부분 마스킹</td><td>사용자 결정. 휴대폰을 잠깐 쥔 제3자에게 원문이 드러나지 않고 본인은 알아본다</td></tr>
+      <tr><td>D2</td><td>2단계 흐름(세션 저장 → <code>find-email</code> 소비)</td><td>가입과 같은 패턴. NICE 모듈이 지원자 도메인에 의존하지 않고 <code>/auth/nice/result</code> 응답 모양이 용도마다 달라지지 않는다</td></tr>
+      <tr><td>D3</td><td><code>request</code>는 <code>purpose</code> 필수(기본값 없음)</td><td>기본값이 있으면 용도 누락이 조용히 가입용이 된다</td></tr>
+      <tr><td>D4</td><td>세션 인증 결과는 조회 전에 제거</td><td>조회는 결정적이라 같은 인증으로 다시 시도할 이유가 없다</td></tr>
+      <tr><td>D5</td><td>목업 팝업·라우트·<code>window.phoneAuthCallback</code> 타입 삭제</td><td>이번 변경으로 사용처가 0이 됐다</td></tr>
+      <tr><td>D6</td><td>마스킹을 새 서비스 안에 둠(<code>MessageContacts.maskEmail</code> 미재사용)</td><td>그 함수는 로그용이고 형식(첫 글자+<code>***</code>)과 소유 도메인이 다르다</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>변경 파일</h2>
+    <div class="two">
+      <div class="card">
+        <h3>백엔드</h3>
+        <table>
+          <tr><th>구분</th><th>파일</th></tr>
+          <tr><td><span class="badge done">신규</span></td><td><code>ApplicantAccountRecoveryController</code></td></tr>
+          <tr><td><span class="badge done">신규</span></td><td><code>ApplicantAccountRecoveryService</code></td></tr>
+          <tr><td><span class="badge done">신규</span></td><td><code>NiceRequestRequest</code>, <code>ApplicantFindEmailResponse</code></td></tr>
+          <tr><td><span class="badge info">수정</span></td><td><code>NiceVerificationPurpose</code>, <code>NiceVerificationController</code>, <code>SecurityConfig</code></td></tr>
+          <tr><td><span class="badge done">신규 테스트</span></td><td><code>ApplicantAccountRecoveryControllerTest</code>(6), <code>ApplicantAccountRecoveryServiceTest</code>(4)</td></tr>
+          <tr><td><span class="badge info">수정 테스트</span></td><td><code>NiceVerificationControllerTest</code>(+4), <code>ApplicantSignUpControllerTest</code>(+1), <code>SecurityConfigTest</code>(+1)</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>프론트·문서</h3>
+        <table>
+          <tr><th>구분</th><th>파일</th></tr>
+          <tr><td><span class="badge info">수정</span></td><td><code>AccountRecovery.vue</code>, <code>NiceAuthPopup.vue</code>, <code>SignupView.vue</code></td></tr>
+          <tr><td><span class="badge info">수정</span></td><td><code>niceApi.ts</code>, <code>applicationApi.ts</code>, <code>types/auth/nice.ts</code>, <code>types/application.ts</code>, <code>authRoutes.ts</code></td></tr>
+          <tr><td><span class="badge out">삭제</span></td><td><code>NiceAuthMockPopup.vue</code>, <code>types/window.ts</code></td></tr>
+          <tr><td><span class="badge done">신규</span></td><td><code>docs/domains/auth-nice-verification-module.md</code></td></tr>
+          <tr><td><span class="badge info">수정</span></td><td><code>auth-account.md</code>, <code>auth-nice-verification.md</code>, <code>_index.md</code></td></tr>
+        </table>
+      </div>
+    </div>
+    <p class="small">NICE 카드는 40,741바이트로 상한 직전이어서, 벤더 모듈 실측·평문 규격·레거시 연동 확인분(약 10KB)을 하위 카드로 옮긴 뒤 갱신했다. 파일 지도는 옮기지 않았다(원 카드가 계속 소유). 같은 카드의 가입 통합 테스트 건수 표기(5건 → 실제 7건)도 바로잡았다.</p>
+  </section>
+
+  <section>
+    <h2>테스트 결과</h2>
+    <div class="card">
+      <p>명령어: <code>gradlew test --tests (NICE·가입·아이디 찾기·보안 범위 18개 클래스)</code> — 결과: <span class="badge done">BUILD SUCCESSFUL</span></p>
+      <table>
+        <tr><th>묶음</th><th>건수</th><th>상태</th></tr>
+        <tr><td>NICE 카드 범위(<code>service.nice.*</code> 9개 클래스, <code>NiceVerificationControllerTest</code> 15, <code>NiceClientConfigTest</code> 7)</td><td>82</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>가입 연동(<code>ApplicantSignUpControllerTest</code> 10, <code>ApplicantSignUpNiceIntegrationTest</code> 7, <code>ApplicantSignUpServiceTest</code> 10, <code>SecurityConfigTest</code> 38, <code>RecruitApplicationTests</code> 1)</td><td>66</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>아이디 찾기(<code>ApplicantAccountRecoveryControllerTest</code> 6, <code>ApplicantAccountRecoveryServiceTest</code> 4)</td><td>10</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>프론트 <code>npm run type-check</code></td><td>오류 0</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>프론트 <code>vitest run</code></td><td>112</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>문서 <code>node tools/check-docs.mjs</code></td><td>오류 0</td><td><span class="badge done">통과</span></td></tr>
+      </table>
+      <p class="small">테스트는 실패를 먼저 확인한 뒤 구현했다: 본문 검증 3건(200 → 400), <code>FIND_EMAIL</code> 컴파일 실패, 서비스 컴파일 실패, 엔드포인트 6건(404). 전체 리그레션은 요청이 없어 돌리지 않았다.</p>
+      <p class="small">브라우저(프론트 개발 서버만 기동, 백엔드 없음): 실패 알림 → 오류 안내, 성공 알림 → <code>find-email</code> 호출, 모르는 용도 쿼리 → 서버 호출 없이 실패 안내, 올바른 용도 → <code>/auth/nice/request</code> 호출을 확인했다. API 응답은 백엔드가 없어 404였다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>다음 단계 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>개발 서버 실인증 확인</strong></p>
+      <p>배포 후 ① 가입한 계정으로 아이디 찾기 ② 미가입 명의로 아이디 찾기 ③ 가입 흐름 회귀를 실제 NICE 인증으로 확인한다. 목업 시절 가입 계정은 식별 키가 옛 방식이라 조회되지 않는다(새로 가입한 계정으로 확인).</p>
+      <p class="small">향후: 비밀번호 재설정(메일 발송 인프라 필요 — 카드 결정은 이메일 토큰 링크 방식), 전화번호 변경 화면을 열 때 NICE 연동.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

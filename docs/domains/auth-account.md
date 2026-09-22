@@ -7,7 +7,7 @@
 
 - 서버 **세션** 인증(Spring Security + `HttpSession`, `JSESSIONID` 쿠키). 토큰·JWT 없음.
 - 로그인 API는 `POST /auth/login` 하나다. `RoutingAuthenticationProvider`가 사용자 유형에 따라 경로를 나눈다. 지원자는 DB 로컬 계정(BCrypt)으로, 임직원은 AD(LDAP) bind로 인증한다. 처음 로그인한 임직원은 `Employee` 행이 자동 생성된다(JIT).
-- 지원자 계정 기능: 가입, 이메일 가용성 확인, 비밀번호 변경, 전화번호 변경. 아이디 찾기, 비밀번호 재발급, 이메일 인증은 **프론트 목업**이다(백엔드 없음). 가입은 세션에 담긴 NICE 본인확인 결과에 의존한다(요청 본문에 name·phoneNumber·ci가 없는 이유) — 연동 상세는 [auth-nice-verification](auth-nice-verification.md).
+- 지원자 계정 기능: 가입, 이메일 가용성 확인, 아이디(이메일) 찾기, 비밀번호 변경, 전화번호 변경. 아이디 찾기는 NICE 본인확인(용도 `FIND_EMAIL`) 뒤 `find-email`이 부분 마스킹한 아이디를 준다(2026-09-22). 비밀번호 재발급, 이메일 인증은 **프론트 목업**이다(백엔드 없음). 가입은 세션에 담긴 NICE 본인확인 결과에 의존한다(요청 본문에 name·phoneNumber·ci가 없는 이유) — 연동 상세는 [auth-nice-verification](auth-nice-verification.md).
 - URL 인가(`SecurityConfig`), 401/403 규약, 역할 상수(`RoleNames`), 현재 사용자 식별(`CurrentApplicantService`·`CurrentEmployeeService`)도 이 카드가 소유한다. 다른 카드가 공용으로 쓴다.
 
 ## 용어
@@ -32,8 +32,10 @@
 | controller | `{BE}/controller/AuthController.java` | 로그인·로그아웃·`/auth/me` |
 | controller | `{BE}/controller/ApplicantSignUpController.java` | 가입, 이메일 가용성 |
 | controller | `{BE}/controller/ApplicantAccountController.java` | 비밀번호·전화번호 변경 |
+| controller | `{BE}/controller/ApplicantAccountRecoveryController.java` | 아이디 찾기(`find-email`) — 세션 NICE 결과 검사·소비 |
 | service | `{BE}/service/ApplicantSignUpService.java` | 가입 검증·저장 |
 | service | `{BE}/service/ApplicantAccountService.java` | 현재 비밀번호 재확인 후 변경 |
+| service | `{BE}/service/ApplicantAccountRecoveryService.java` | 식별 키로 계정 조회, `loginId` 부분 마스킹 |
 | service | `{BE}/service/CurrentApplicantService.java` | principal → applicantId (401/403), 지원자 API 공용 |
 | service | `{BE}/service/CurrentEmployeeService.java` | principal → 임직원 actor/employeeId (401/403), 관리자·면접관 API 공용 |
 | config | `{BE}/config/SecurityConfig.java` | 필터 체인, URL 매처, CORS, 컨텍스트 저장소 |
@@ -50,7 +52,7 @@
 | entity | `{BE}/domain/entity/Applicant.java` | email(unique)·password·phoneNumber·ciHash(unique) |
 | entity | `{BE}/domain/entity/Employee.java` | `deptName`(unique 아님) |
 | repository | `{BE}/domain/repository/UserRepository.java` | `findUserByLoginId`, `existsByLoginId` |
-| repository | `{BE}/domain/repository/ApplicantRepository.java` | `findByLoginId`, `existsByEmail`, `existsByCiHash` |
+| repository | `{BE}/domain/repository/ApplicantRepository.java` | `findByLoginId`, `existsByEmail`, `existsByCiHash`, `findByCiHash` |
 | repository | `{BE}/domain/repository/EmployeeRepository.java` | `findByLoginId(In)` |
 | dto | `{BE}/dto/request/LoginRequest.java` | 로그인 요청 |
 | dto | `{BE}/dto/response/LoginUserResponse.java` | 로그인 사용자 응답 |
@@ -59,6 +61,7 @@
 | dto | `{BE}/dto/response/ApplicantEmailAvailabilityResponse.java` | `available` |
 | dto | `{BE}/dto/request/ApplicantPasswordChangeRequest.java` | 비밀번호 변경 요청 |
 | dto | `{BE}/dto/request/ApplicantPhoneNumberChangeRequest.java` | 전화번호 변경 요청 |
+| dto | `{BE}/dto/response/ApplicantFindEmailResponse.java` | `{ maskedEmail }` |
 | exception | `{BE}/exception/InvalidApplicantSignUpException.java` | 400 |
 | exception | `{BE}/exception/InvalidApplicantAccountException.java` | 400 |
 | exception | `{BE}/exception/AuthenticationRequiredException.java` | 401 |
@@ -67,6 +70,8 @@
 | test | `{BT}/controller/ApplicantAccountControllerTest.java` | `springSecurity()`: 401/403/400 |
 | test | `{BT}/service/ApplicantSignUpServiceTest.java` | 중복·인코딩·민감정보 미노출 |
 | test | `{BT}/service/ApplicantAccountServiceTest.java` | 비밀번호 불일치·동일값 거부 |
+| test | `{BT}/service/ApplicantAccountRecoveryServiceTest.java` | 조회·미존재·마스킹 규칙 |
+| test | `{BT}/controller/ApplicantAccountRecoveryControllerTest.java` | 성공·1회용·세션 없음·용도 불일치·만료·404 |
 | test | `{BT}/service/CurrentApplicantServiceTest.java` | 401/403 예외 |
 | test | `{BT}/service/CurrentEmployeeServiceTest.java` | 401/403·blank actor |
 | test | `{BT}/security/auth/RoutingAuthenticationProviderTest.java` | JIT·경합 복구·임직원 부서명(LDAP 최신값) |
@@ -83,21 +88,20 @@
 
 | 구분 | 파일 | 역할 |
 |---|---|---|
-| route | `{FE}/routes/authRoutes.ts` | `Login` `/login`, `NiceAuthPopup` `/nice-auth`, `NiceAuthResult` `/nice-auth/result`, `NiceAuthMockPopup` `/nice-auth/mock`(전부 `public`) |
+| route | `{FE}/routes/authRoutes.ts` | `Login` `/login`, `NiceAuthPopup` `/nice-auth`, `NiceAuthResult` `/nice-auth/result`(전부 `public`) |
 | route | `{FE}/routes/applicantRoutes.ts` | (공유) `Signup`·`accountRecovery`(`public`), `ApplicantProfile`(`requiresAuth`+`ROLE_APPLICANT`) |
 | view | `{FE}/views/auth/LoginView.vue` | 로그인, 로그인 후 이동 |
 | view | `{FE}/views/applicant/SignupView.vue` | 가입(이메일=loginId, 이메일 인증 목업). 이름·휴대폰은 NICE 결과로 채워지는 읽기 전용 필드 |
-| view | `{FE}/views/applicant/AccountRecovery.vue` | 아이디 찾기·비밀번호 재발급(전체 목업) |
+| view | `{FE}/views/applicant/AccountRecovery.vue` | 아이디 찾기(NICE 실연동, 마스킹 아이디 표시)·비밀번호 재발급(목업) |
 | view | `{FE}/views/applicant/ApplicantProfile.vue` | 마이페이지: 비밀번호 변경, 로그아웃, 내 지원 목록, 전형결과 모달 |
 | api | `{FE}/api/authApi.ts` | `login`, `me`, `logout` |
-| api | `{FE}/api/applicationApi.ts` | (공유) `signup`, `checkEmail`, `changePassword` |
+| api | `{FE}/api/applicationApi.ts` | (공유) `signup`, `checkEmail`, `findEmail`, `changePassword` |
 | types | `{FE}/types/auth.ts` | `LoginRequest`, `LoginUser` |
-| types | `{FE}/types/application.ts` | (공유) `SignupUser`(`{ loginId, password, email }`, name·phoneNumber·ci 없음), `checkEmailRequest`, `ChangePasswordParams`, `ChangePasswordRequest` |
-| types | `{FE}/types/window.ts` | `window.phoneAuthCallback` |
+| types | `{FE}/types/application.ts` | (공유) `SignupUser`(`{ loginId, password, email }`, name·phoneNumber·ci 없음), `checkEmailRequest`, `FindEmailResponse`, `ChangePasswordParams`, `ChangePasswordRequest` |
 | store | `{FE}/stores/authStore.ts` | `user`·`initialized`, `login`/`fetchMe`/`logout` |
 | test | `{FE}/stores/__tests__/authStore.spec.ts` | `fetchMe` 판정 |
 
-NICE 본인확인 컨트롤러·화면(`NiceVerificationController.java`, `NiceAuthPopup.vue`·`NiceAuthResult.vue`·`NiceAuthMockPopup.vue`)은 [auth-nice-verification](auth-nice-verification.md) 소유다. `{FE}/routes/authRoutes.ts`(위 표)는 이 카드가 소유한 `Login` 라우트와 함께 그 카드 소유 라우트 3개도 같은 파일에 선언한다.
+NICE 본인확인 컨트롤러·화면(`NiceVerificationController.java`, `NiceAuthPopup.vue`·`NiceAuthResult.vue`)은 [auth-nice-verification](auth-nice-verification.md) 소유다. `{FE}/routes/authRoutes.ts`(위 표)는 이 카드가 소유한 `Login` 라우트와 함께 그 카드 소유 라우트 2개도 같은 파일에 선언한다.
 
 ## API 계약
 
@@ -108,6 +112,7 @@ NICE 본인확인 컨트롤러·화면(`NiceVerificationController.java`, `NiceA
 | 🟢 | GET | /auth/me | 없음 | login과 동일 / 미로그인 401 | 공개(컨트롤러가 401) |
 | 🟢 | POST | /auth/applicants/sign-up | `{ loginId, password, email? }`(name·phoneNumber·ci 없음 — 서버가 세션의 NICE 인증 결과를 쓴다) | `{ applicantId, loginId, name }` | 공개 |
 | 🟢 | GET | /auth/applicants/check-email | `?email=` | `{ available }` | 공개 |
+| 🟢 | POST | /auth/applicants/find-email | 없음(세션의 NICE 인증 결과, 용도 `FIND_EMAIL`) | `{ maskedEmail }` | 공개 |
 | 🟢 | POST | /applicant/account/password | `{ currentPassword, newPassword }` | `Void` | 지원자 |
 | 🟢 | POST | /applicant/account/phone-number | `{ currentPassword, phoneNumber }` | `Void` | 지원자 |
 
@@ -137,6 +142,8 @@ NICE 4종(`request`·`callback`·`callback/error`·`result`) 상세는 [auth-nic
 - 가입 후 자동 로그인하지 않는다(FE는 `/applicant`로 이동). FE 응답 타입(`SignupUser`)은 틀렸지만 응답을 쓰지 않는다.
 
 **GET /auth/applicants/check-email**: `@NotBlank @Email @Size(max=255)` 위반은 400. trim한 뒤 `available = !existsByEmail`이다. 참고용(advisory)이고, 최종 판정은 가입 시 재검증과 DB unique가 한다. `SignupView`는 available=true를 "가입 가능"으로 읽고, `AccountRecovery`는 거꾸로 available=false를 "가입된 메일"로 읽는다. FE 응답 타입(`checkEmailRequest`)은 래퍼가 이중이라 `as unknown as` 캐스팅으로 우회한다.
+
+**POST /auth/applicants/find-email** 🟢(2026-09-22): 세션 `NICE_VERIFIED`를 `requireFresh(purpose=FIND_EMAIL)`로 검사한 뒤 **조회 전에 제거**한다(인증 1회 = 조회 1회, 계정이 없어도 소비). 식별 키(`identityHash`)로 `findByCiHash` → `loginId`를 부분 마스킹해 응답한다(로컬부 3자 이상은 앞 2자, 2자 이하는 앞 1자 + 나머지 길이만큼 `*`(최소 1개), 도메인 그대로 — `abc12345@gmail.com` → `ab******@gmail.com`). 오류: 인증 없음·용도 불일치·만료 400(`requireFresh` 문구), 일치 계정 없음(미가입·파기) 404 `"본인인증 정보와 일치하는 계정이 없습니다."`. 원문 아이디·생년월일·성별은 응답·로그에 없다. 가입용 인증으로는 호출할 수 없고, 이 인증으로는 가입할 수 없다.
 
 **POST /applicant/account/password**: 400 `"현재 비밀번호가 일치하지 않습니다."` / `"새 비밀번호가 현재 비밀번호와 달라야 합니다."` / `"지원자 정보를 찾을 수 없습니다."`, 미인증 401, 임직원 403(필터). 변경 후에도 현재 세션과 다른 세션을 무효화하지 않는다. FE(`ApplicantProfile` "내 정보 수정" 모달)는 새 비밀번호 확인 일치와 현재 비밀번호 입력 여부만 검사한다.
 
@@ -215,9 +222,9 @@ NICE 4종(`request`·`callback`·`callback/error`·`result`) 상세는 [auth-nic
 - **(2026-09-21 해소)** ci는 더 이상 클라이언트가 보낸 값을 쓰지 않는다. 서버가 세션에 둔 NICE 인증 결과만 쓴다(`ApplicantSignUpRequest` javadoc). 상세는 [auth-nice-verification](auth-nice-verification.md) 참고.
 - 파기: `Applicant.purgePersonalData`가 PII를 null로 만들고 ciHash를 `PURGED:`+UUID로 덮어쓴다. 이후 그 계정은 로그인할 수 없고 같은 사람(이름+생년월일+성별)이 재가입할 수 있다. 호출은 [privacy-audit](privacy-audit.md). (`{BE}/domain/entity/Applicant.java`)
 - 비밀번호·전화번호 변경에는 `currentPassword` 재확인이 필수다(세션 탈취만으로 통지 채널을 바꾸지 못하게). 변경은 setter 대신 `Applicant.changePassword`/`changePhoneNumber`로 한다. (`{BE}/service/ApplicantAccountService.java` — verifyCurrentPassword)
-- 이메일 변경, 아이디(이메일) 찾기, 로그인 전 비밀번호 재설정 API는 아직 없다. **loginId 정책은 확정됐고**(아래 "함정·결정" — 이메일 = loginId), NICE 실연동 인프라는 가입 흐름에 만들어졌다(2026-09-21). 나머지 둘은 `NiceVerificationPurpose`에 값만 추가하면 얹을 수 있지만 범위 밖이라 아직 없다.
+- 이메일 변경, 로그인 전 비밀번호 재설정 API는 아직 없다. **loginId 정책은 확정됐고**(아래 "함정·결정" — 이메일 = loginId), 아이디(이메일) 찾기는 NICE 실연동으로 구현됐다(2026-09-22).
   - **이메일 변경: 불허**(2026-09-20 결정). 이메일이 곧 로그인 아이디라 변경 = 아이디 변경이다. API를 만들지 않는다.
-  - **이메일 찾기**: NICE 본인인증으로 CI를 확보한 뒤 그 CI의 계정 이메일을 **마스킹해서** 표시한다(원문 노출 금지 — 이름·휴대폰만으로 남의 이메일을 수집하는 경로가 된다).
+  - **이메일 찾기(구현됨)**: NICE 본인인증 결과의 식별 키로 계정을 찾아 `loginId`를 **부분 마스킹해서** 표시한다(원문 노출 금지 — 휴대폰을 잠깐 쥔 제3자에게 아이디가 드러나지 않게, 2026-09-22 사용자 결정). 상세는 위 API 상세.
   - **비밀번호 재설정**: 이메일 토큰 링크 방식.
 
 ### 프론트
@@ -225,7 +232,7 @@ NICE 4종(`request`·`callback`·`callback/error`·`result`) 상세는 [auth-nic
 - 전역 가드 순서: 미초기화면 `fetchMe` → `meta.public`이면 통과 → `requiresAuth`인데 미로그인이면 `fetchMe`를 한 번 더 호출하고, 실패하면 `/login?redirect=<fullPath>` → `meta.roles`가 하나도 맞지 않으면 `/403`. (`{FE}/routes/index.ts`)
 - 로그인 후 이동: `redirect` 쿼리 → `ADMIN_ROLES`(`{FE}/routes/adminRoutes.ts`) 보유 시 `/admin` → 그 외 `/applicant`. userType이 아니라 역할로 판정한다. (`{FE}/views/auth/LoginView.vue` — moveAfterLogin)
 - `{FE}/api/client.ts`(공통 기반, `withCredentials: true`): 401이면 `/login?redirect=`로 보낸다(`skipAuthRedirect`이거나 이미 `/login`이면 제외). 403이면 `/403`으로 보낸다. `authApi.login`은 `skipSessionExpiredLog`를 붙인다(`{FE}/common/httpErrorTelemetry.ts`).
-- 본인인증(가입, 실연동): `SignupView`가 연 `/nice-auth` 팝업이 `postMessage({ source:'nice-auth', status, name?, phoneNumber? }, origin)`로 결과를 알린다(생년월일·성별 없음). `event.origin`·`payload.source` 검증 후 반영. 아이디·비번 찾기(`AccountRecovery`)는 `/nice-auth/mock` 팝업이 옛 방식 그대로 `window.opener.phoneAuthCallback({ name, phoneNumber, ci })`를 호출한다(목업). 두 경우 모두 등록한 화면은 unmount 때 **자기가 등록한 리스너·함수일 때만** 해제한다.
+- 본인인증(가입, 실연동): `SignupView`가 연 `/nice-auth` 팝업이 `postMessage({ source:'nice-auth', status, name?, phoneNumber? }, origin)`로 결과를 알린다(생년월일·성별 없음). `event.origin`·`payload.source` 검증 후 반영. 아이디 찾기(`AccountRecovery`)도 같은 방식으로 `/nice-auth?purpose=FIND_EMAIL` 팝업을 열고, 성공 알림을 받으면 `findEmail()`을 불러 마스킹 아이디를 표시한다(실패·404는 서버 문구 알림 후 인증 전 상태). 두 경우 모두 등록한 화면은 unmount 때 **자기가 등록한 리스너·함수일 때만** 해제한다.
 - 가입 화면은 loginId와 email에 같은 이메일을 보내고, 전화번호에서 `-`를 뺀다.
 
 ## 변경 레시피
@@ -282,10 +289,10 @@ AES_SECRET_KEY='<로컬 예시 키>' ./gradlew test --tests "*ApplicantSignUp*" 
 - **LDAP 미설정 기동 무검증**: `AuthenticationConfigTest`의 단정이 전부 주석이라 LDAP 미설정 빈 생성·기동을 확인하는 활성 테스트가 없다.
 - **로그인 후 이동은 역할 기준**(5082861): 관리자 역할이 없는 임직원(면접관 전용 등)은 `/applicant`로 간다.
 - **전역 본인인증 콜백**: 화면을 떠날 때 자기가 등록한 콜백만 해제한다(86d12c9). 무조건 지우면 다른 화면의 콜백이 사라진다.
-- **목업 보류**(8d7485d 결정, 2026-09-21 가입 NICE는 실연동으로 해제): 이메일 인증, 아이디 찾기(결과 `abc12345@gmail.com` 하드코딩), 비밀번호 재발급은 그대로 목업이다. 가입용 NICE 팝업(`/nice-auth`)이 실연동으로 바뀌며 공유하던 본인인증 목업이 끊겨, 아이디·비번 찾기 전용으로 `NiceAuthMockPopup.vue`(`/nice-auth/mock`)를 분리했다(CI 임의 UUID, 검사 `!name && !phoneNumber`는 둘 다 비어야 걸림). 나머지 연동 시 함께 교체.
+- **목업 보류**(8d7485d 결정, 2026-09-21 가입·2026-09-22 아이디 찾기 NICE 실연동으로 해제): 이메일 인증, 비밀번호 재발급은 그대로 목업이다. 아이디 찾기 전용으로 잠시 분리했던 `NiceAuthMockPopup.vue`(`/nice-auth/mock`)와 `window.phoneAuthCallback` 타입(`types/window.ts`)은 사용처가 없어져 삭제했다.
 - **NICE 연동 방식·모듈 제약(`NiceID.jar`)·호출 흐름·`REQ_SEQ`/`resultToken` 대조·평문 조립 규격·`RealNiceClient` 미구현 등**은 [auth-nice-verification](auth-nice-verification.md) 함정·결정 참고. 그 카드가 이 요약을 대체한다.
 - **loginId 정책 확정: 이메일 = loginId**(2026-09-20). 지원자 가입 화면은 **이미 이렇게 동작한다** — `{FE}/views/applicant/SignupView.vue`가 입력 라벨을 "이메일"로 두고 이메일 정규식으로 검증한 뒤 `loginId`·`email` 두 필드에 **같은 값**을 보낸다. `Applicant.email`·`User.loginId` 모두 unique다. 따라서 이메일 필수화·기존 데이터 이관은 할 일이 없다(오픈 전 시스템이라 기존 데이터도 없다).
-  - 후속: `check-login-id`는 만들지 않는다(이메일 중복 확인으로 갈음). 이메일 변경은 불허. 남은 작업은 이메일 찾기·비밀번호 재설정 둘뿐이다.
+  - 후속: `check-login-id`는 만들지 않는다(이메일 중복 확인으로 갈음). 이메일 변경은 불허. 남은 작업은 비밀번호 재설정뿐이다(이메일 찾기는 2026-09-22 구현).
   - BE가 아직 느슨한 부분: `ApplicantSignUpRequest.email`에 `@NotBlank`가 없고 `loginId`에 이메일 형식 검증이 없다. FE는 항상 채우지만 API 직접 호출로는 우회된다. 실연동 때 함께 조인다.
 - **계정 열거 감수**: check-email·가입 실패 메시지로 가입 여부가 드러난다. rate limit·시도 제한 없음.
 - **ADR**: `recruit_back/recruit_backend/docs/adr/0007-privacy-admin-role-separation.md`. 파기·민감 감사 권한은 `ROLE_PRIVACY_ADMIN`으로 분리한다. 매처 순서와 HTTP 메서드 구분이 보안 요구사항이다.

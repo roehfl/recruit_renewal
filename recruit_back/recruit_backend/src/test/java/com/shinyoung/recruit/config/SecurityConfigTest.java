@@ -267,6 +267,16 @@ public class SecurityConfigTest {
      * 본문이 유효하지 않아 400(결과 교환) 또는 303(콜백)이 나므로 isOk() 로 단언하지 않는다.
      * 관심사는 "인가 단계에서 막히지 않는다"(401/403 아님) 뿐이다.
      */
+    /*
+     * 아이디 찾기도 로그인 전 흐름이다. 세션 인증 결과가 없어 400 이 나지만 인가 단계에서 막히면 안 된다.
+     * 지금은 전용 매처가 없어도 anyRequest().permitAll() 로 통과한다 — broad 매처 추가 회귀를 잡는 용도다.
+     */
+    @Test
+    void 아이디_찾기는_비인증이어도_인가를_통과() throws Exception {
+        mockMvc.perform(post("/api/auth/applicants/find-email"))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
+
     @Test
     void 본인확인_요청은_비인증이어도_인가를_통과() throws Exception {
         mockMvc.perform(post("/api/auth/nice/request"))

@@ -135,6 +135,11 @@ export interface checkEmailRequest {
   message: string
 }
 
+/** POST /auth/applicants/find-email — 세션의 NICE 인증 결과로 찾은 아이디(부분 마스킹). 원문은 오지 않는다. */
+export interface FindEmailResponse {
+  maskedEmail: string
+}
+
 /** GET /applications/{applicationId}/stage-results — 발표된 전형 결과만 내려온다(임시저장 지원서는 400). */
 export interface ApplicantStageResult {
   stageName: string

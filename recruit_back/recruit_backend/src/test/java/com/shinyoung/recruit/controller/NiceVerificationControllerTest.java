@@ -1,6 +1,7 @@
 package com.shinyoung.recruit.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shinyoung.recruit.enumeration.NiceVerificationPurpose;
 import com.shinyoung.recruit.service.nice.MockNiceClient;
 import com.shinyoung.recruit.service.nice.NicePlaindataCodec;
 import com.shinyoung.recruit.service.nice.NiceVerifiedIdentity;
@@ -51,9 +52,16 @@ class NiceVerificationControllerTest {
         client = new MockNiceClient(clock, codec);
     }
 
-    /** 요청을 발급하고 그 EncodeData 에서 REQ_SEQ 를 꺼낸다. */
+    /** 요청을 발급하고 그 EncodeData 에서 REQ_SEQ 를 꺼낸다. 용도는 가입. */
     private String issueReqSeq(MockHttpSession session) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/auth/nice/request").session(session))
+        return issueReqSeq(session, "SIGNUP");
+    }
+
+    private String issueReqSeq(MockHttpSession session, String purpose) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/auth/nice/request")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"purpose\":\"" + purpose + "\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -262,5 +270,51 @@ class NiceVerificationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"token\":\"\"}"))
                 .andExpect(status().is4xxClientError());
+    }
+
+    /*
+     * 용도는 필수다. 기본값을 두면 호출부가 용도를 빠뜨려도 조용히 가입용이 된다.
+     */
+    @Test
+    void requestWithoutBodyIsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/auth/nice/request").session(new MockHttpSession()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void requestWithUnknownPurposeIsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/auth/nice/request")
+                        .session(new MockHttpSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"purpose\":\"UNKNOWN_PURPOSE\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void requestWithNullPurposeIsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/auth/nice/request")
+                        .session(new MockHttpSession())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"purpose\":null}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("purpose는 필수입니다."));
+    }
+
+    /* 발급 때 받은 용도가 콜백·결과 교환을 거쳐 세션의 인증 결과까지 그대로 따라와야 한다. */
+    @Test
+    void findEmailPurposeFlowsIntoSessionIdentity() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        String token = callbackAndExtractToken(issueReqSeq(session, "FIND_EMAIL"));
+
+        mockMvc.perform(post("/api/auth/nice/result")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + token + "\"}"))
+                .andExpect(status().isOk());
+
+        NiceVerifiedIdentity identity = (NiceVerifiedIdentity)
+                session.getAttribute(NiceVerificationController.VERIFIED_SESSION_KEY);
+        assertNotNull(identity);
+        assertEquals(NiceVerificationPurpose.FIND_EMAIL, identity.purpose());
     }
 }

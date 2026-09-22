@@ -6,14 +6,17 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { niceApi } from '@/api/auth/niceApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import {
   NICE_CHECKPLUS_ACTION,
   NICE_CHECKPLUS_M,
   NICE_MESSAGE_SOURCE,
+  isNicePurpose,
 } from '@/types/auth/nice'
 
+const route = useRoute()
 const message = ref('본인확인 창으로 이동합니다...')
 
 /**
@@ -50,9 +53,18 @@ function reportFailure(text: string) {
   )
 }
 
+/**
+ * 여는 화면이 용도를 쿼리로 넘긴다(/nice-auth?purpose=SIGNUP|FIND_EMAIL).
+ * 모르는 값이면 서버에 묻지 않고 실패로 알린다.
+ */
 onMounted(async () => {
+  const purpose = route.query.purpose
+  if (!isNicePurpose(purpose)) {
+    reportFailure('본인확인을 시작하지 못했습니다.')
+    return
+  }
   try {
-    const { data } = await niceApi.request()
+    const { data } = await niceApi.request(purpose)
     submitToNice(data.data.encodeData)
   } catch (error) {
     reportFailure(getApiErrorMessage(error, '본인확인을 시작하지 못했습니다.'))

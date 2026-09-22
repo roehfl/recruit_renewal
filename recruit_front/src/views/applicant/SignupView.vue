@@ -263,7 +263,7 @@ const clickToNiceAuthPopupOpen = async () => {
   }
   isNiceAuthPopupOpen.value = true;
   window.open(
-    "/nice-auth",
+    "/nice-auth?purpose=SIGNUP",
     "Nice-Auth",
     "width=450, height=480, resizable=no"
   );

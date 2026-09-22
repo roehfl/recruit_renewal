@@ -21,6 +21,7 @@
 |---|---|---|
 | [auth-account](auth-account.md) | 로그인(세션·LDAP)·지원자 가입/계정 | 지원자·관리자 |
 | [auth-nice-verification](auth-nice-verification.md) | NICE 본인확인 | 지원자 |
+| [auth-nice-verification-module](auth-nice-verification-module.md) | NICE 모듈 실측·규격 | — |
 | [role-menu](role-menu.md) | 부서 권한 매핑·메뉴 | 관리자 |
 | [job-posting](job-posting.md) | 공고·직무·근무지·공고 이미지·첨부 요건 | 관리자·지원자 |
 | [question](question.md) | 질문 템플릿·공고별 질문 | 관리자 |
