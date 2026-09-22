@@ -340,6 +340,17 @@ public class SecurityConfigTest {
                 .andExpect(status().isSeeOther());
     }
 
+    /*
+     * 개발 서버 주소는 CORS 허용 목록에 있어야 한다. 리버스 프록시 뒤에서는 same-origin 요청도 CORS 판정을
+     * 받으므로(프록시 헤더 처리 없음), 목록에 없으면 POST 가 전부 403 이다 — 외부 테스트의 첫 403.
+     */
+    @Test
+    void 개발서버_Origin은_POST가_CORS를_통과한다() throws Exception {
+        mockMvc.perform(post("/api/auth/nice/request")
+                        .header("Origin", "https://shinrecruitdev.shinyoung.com"))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
+
     /* 콜백 예외가 CORS 를 통째로 끈 게 아닌지 본다 — 콜백 밖 경로는 허용 목록 밖 Origin 을 계속 거부한다. */
     @Test
     void 콜백_밖_경로는_허용목록_밖_Origin을_계속_거부한다() throws Exception {

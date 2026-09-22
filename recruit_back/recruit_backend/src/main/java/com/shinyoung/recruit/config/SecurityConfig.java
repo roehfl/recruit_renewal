@@ -56,7 +56,8 @@ public class SecurityConfig {
 //        corsConfiguration.applyPermitDefaultValues();
         corsConfiguration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
-                "https://rec.shinyoung.com"
+                "https://rec.shinyoung.com",
+                "https://shinrecruitdev.shinyoung.com"
         ));
         corsConfiguration.setAllowedMethods(Arrays.asList("POST", "GET"));
         corsConfiguration.setAllowedHeaders(List.of(
