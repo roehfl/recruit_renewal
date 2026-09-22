@@ -92,7 +92,7 @@
 | route | `{FE}/routes/applicantRoutes.ts` | (공유) `Signup`·`accountRecovery`(`public`), `ApplicantProfile`(`requiresAuth`+`ROLE_APPLICANT`) |
 | view | `{FE}/views/auth/LoginView.vue` | 로그인, 로그인 후 이동 |
 | view | `{FE}/views/applicant/SignupView.vue` | 가입(이메일=loginId, 이메일 인증 목업). 이름·휴대폰은 NICE 결과로 채워지는 읽기 전용 필드 |
-| view | `{FE}/views/applicant/AccountRecovery.vue` | 아이디 찾기(NICE 실연동, 마스킹 아이디 표시)·비밀번호 재발급(목업) |
+| view | `{FE}/views/applicant/AccountRecovery.vue` | 가운데 단일 카드 + `a-tabs` 2개: 아이디 찾기(NICE 실연동, 마스킹 아이디 표시 후 로그인·비밀번호 재발급 탭으로 이동)·비밀번호 재발급(목업) |
 | view | `{FE}/views/applicant/ApplicantProfile.vue` | 마이페이지: 비밀번호 변경, 로그아웃, 내 지원 목록, 전형결과 모달 |
 | api | `{FE}/api/authApi.ts` | `login`, `me`, `logout` |
 | api | `{FE}/api/applicationApi.ts` | (공유) `signup`, `checkEmail`, `findEmail`, `changePassword` |

@@ -1,127 +1,74 @@
 <template>
   <section class="profile-page">
     <div class="page-inner">
+      <div class="recovery-column">
 
-      <h1 class="page-title">아이디 / 비밀번호 찾기</h1>
-      <p class="page-subtitle">아이디와 비밀번호를 모두 분실하신 경우 아이디 찾기를 먼저 실행하신 뒤 비밀번호 재발급을 실행해주세요</p>
+        <h1 class="page-title">아이디 / 비밀번호 찾기</h1>
+        <p class="page-subtitle">둘 다 잊으셨다면 아이디 찾기를 먼저 진행해주세요.</p>
 
-      <div class="page-card">
-
-        <div class="find-button-area">
-            <a-button
-                class="find-button"
-                html-type="submit"
-                size="large"
-                @click="openFindId"
-                block
-                :loading="loading"
-            >
-            아이디 찾기
-            </a-button>
-            <div class="find-item-area" v-if="findId">
-                <div class="find-item-area-top">
-                    <div class="find-item-area-top-left">
-                      <div>
-                        <p class="sub-title">NICE 인증을 통해 아이디 찾기</p>
-                      </div>
-                      <div>
-                        <span class="page-description">NICE 본인인증을 진행하시면 지원서 작성에 사용하신 아이디를 찾으실 수 있습니다.</span>
-                      </div>
-                    </div>
-                    <div class="find-item-area-top-right">
-                      <button type="button" class="remove-btn" @click="closeFindId"><CloseOutlined/></button>
-                    </div>      
+        <div class="page-card">
+          <a-tabs v-model:activeKey="activeTab" class="recovery-tabs">
+            <a-tab-pane key="findId" tab="아이디 찾기">
+              <div class="tab-body" v-if="!isNiceAuthComplete">
+                <div class="tab-icon"><MobileOutlined /></div>
+                <p class="tab-title">휴대폰 본인인증으로 찾기</p>
+                <p class="tab-description">NICE 본인인증 정보와 일치하는<br>아이디를 알려드립니다.</p>
+                <a-button type="primary" size="large" block @click="clickToNiceAuthPopupOpen">휴대폰 본인인증</a-button>
+              </div>
+              <div class="tab-body" v-else>
+                <div class="tab-icon"><CheckCircleOutlined /></div>
+                <p class="tab-title">본인인증 정보와 일치하는 아이디입니다</p>
+                <div class="masked-email">{{ maskedEmail }}</div>
+                <div class="result-actions">
+                  <a-button size="large" block @click="activeTab = 'resetPassword'">비밀번호 재발급</a-button>
+                  <a-button type="primary" size="large" block @click="goToLogin">로그인</a-button>
                 </div>
-                <div class="itme-nice" v-if="!isNiceAuthComplete">
-                    <div class="item-nice-left-area">
-                        <div class="item-nice-title">
-                        <span class="item-nice-text">본인인증을 진행해주세요</span>
-                        </div>
-                        <span class="item-nice-description">이름 · 전화번호 입력을 통해 본인인증을 진행합니다.</span>
-                    </div>
-                    <a-button class="item-nice-button" @click="clickToNiceAuthPopupOpen" :disable="isNiceAuthComplete">본인 인증</a-button>
-                </div>
-                <div class="find-id-view" v-if="isNiceAuthComplete">
-                  <div class="find-id-view-text-area">
-                    <p class="find-id-view-text">본인인증 정보와 일치하는 아이디입니다.</p>
-                    <div class="find-id-view-text">
-                        <span>아이디 : </span>
-                        <span>{{ maskedEmail }}</span>
-                    </div>
-                  </div> 
-                </div> 
-            </div>
+              </div>
+            </a-tab-pane>
 
-            <div class="find-password-area">
-                <a-button
-                    class="find-button"
-                    html-type="submit"
-                    size="large"
-                    @click="openFindPassword"
-                    block
-                    :loading="loading"
-                >
-                비밀번호 재발급
-                </a-button>
-                <div class="find-item-area" v-if="findPassword">
-                    <div class="find-item-area-top">
-                        <div class="find-item-area-top-left">
-                            <div>
-                                <p class="sub-title">메일주소를 통해 비밀번호 재발급 받기</p>
-                            </div>
-                            <div>
-                                <span class="page-description">메일주소 인증을 진행하시면 임시비밀번호를 발급 받으실 수 있습니다.</span>
-                            </div>    
-                        </div>
-                        <div class="find-item-area-top-right">
-                            <button type="button" class="remove-btn" @click="closeFindPassword"><CloseOutlined/></button>
-                        </div>        
-                    </div>
-                    <div class="itme-mail-area">
-                        <div label="이메일">
-                            <div class="item-abreast">
-                                <a-input class="item" size="large" placeholder="이메일을 입력해주세요."
-                                v-model:value="loginId" :disabled="isEmailCertificationDone">></a-input>   
-                                <a-button type="primary" class="mail-button" v-if="!isEmailCertificationDone"
-                                @click="clickToEmailCheckButton">메일 인증</a-button>
-                                <a-button type="primary" class="mail-button" v-if="isEmailCertificationDone"
-                                :disabled="isEmailCertificationDone">인증 완료</a-button>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="item-abreast" v-if="isEmailCertification">
-                                <a-input class="item" size="large" placeholder="이메일 인증번호를 입력해주세요.">
-                                    <template #prefix>
-                                    </template>
-                                </a-input>    
-                                <a-button type="primary" class="mail-button" @click="clickToEmailCertificationButton">인증확인</a-button>
-                            </div>
-                        </div>
-                    </div>
-                    <span class="page-description-dark" v-if="isEmailCertificationDone">해당 메일주소로 임시 비밀번호가 전송되었습니다.</span>   
+            <a-tab-pane key="resetPassword" tab="비밀번호 재발급">
+              <div class="tab-body">
+                <div class="tab-icon"><MailOutlined /></div>
+                <p class="tab-title">이메일 인증으로 재발급</p>
+                <p class="tab-description">가입한 이메일로 인증하시면<br>임시 비밀번호를 보내드립니다.</p>
+                <div class="mail-row">
+                  <a-input size="large" placeholder="이메일을 입력해주세요."
+                    v-model:value="loginId" :disabled="isEmailCertificationDone" />
+                  <a-button type="primary" size="large" class="mail-button" v-if="!isEmailCertificationDone"
+                    @click="clickToEmailCheckButton">메일 인증</a-button>
+                  <a-button type="primary" size="large" class="mail-button" v-else disabled>인증 완료</a-button>
                 </div>
-            </div>
+                <div class="mail-row" v-if="isEmailCertification">
+                  <a-input size="large" placeholder="이메일 인증번호를 입력해주세요." />
+                  <a-button type="primary" size="large" class="mail-button" @click="clickToEmailCertificationButton">인증확인</a-button>
+                </div>
+                <p class="mail-done" v-if="isEmailCertificationDone">해당 메일주소로 임시 비밀번호가 전송되었습니다.</p>
+              </div>
+            </a-tab-pane>
+          </a-tabs>
         </div>
-        
+
       </div>
-      
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { ref, onBeforeUnmount } from 'vue'
-import { CloseOutlined } from '@ant-design/icons-vue'
+import { useRouter } from 'vue-router'
+import { CheckCircleOutlined, MailOutlined, MobileOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue';
 import { applicationApi } from '@/api/applicationApi';
 import { getApiErrorMessage } from '@/api/apiError';
 import type { checkEmailRequest } from '@/types/application';
 import { NICE_MESSAGE_SOURCE, type NiceAuthMessage } from '@/types/auth/nice';
 
+const router = useRouter();
+
+/** 탭 키: 'findId'(아이디 찾기) · 'resetPassword'(비밀번호 재발급). */
+const activeTab = ref('findId');
+
 const loginId = ref('');
-const loading = ref(false);
-const findId = ref(false);
-const findPassword = ref(false);
 
 const isNiceAuthPopupOpen = ref(false);
 const isNiceAuthComplete = ref(false);
@@ -133,7 +80,7 @@ const isEmailCertification = ref(false);
 const isEmailCertificationDone = ref(false);
 
 const checkEmail = ref<checkEmailRequest>({
-  success: true, 
+  success: true,
   data: {available: true},
   message: '',
 })
@@ -141,34 +88,8 @@ const checkEmail = ref<checkEmailRequest>({
 // 회원가입(SignupView)과 같은 규칙. 백엔드 @Email 이 허용하는 '+' 태그와 4자 이상 최상위 도메인도 받는다.
 const regEmail = /^[0-9a-zA-Z]([-_.+]?[0-9a-zA-Z])*@[0-9a-zA-Z]([-_.]?[0-9a-zA-Z])*\.[a-zA-Z]{2,}$/i;
 
-const openFindId = () => {
-  if(findId.value) {
-    closeFindId();
-  }
-  else {
-    findId.value = true;
-    isNiceAuthComplete.value = false;
-    maskedEmail.value = '';
-  }
-}
-
-const closeFindId = () => {
-  findId.value = false;
-}
-
-const openFindPassword = () => {
-  if(findPassword.value) {
-    closeFindPassword();
-  }
-  else {
-    findPassword.value = true;
-  }
-}
-
-const closeFindPassword = () => {
-  findPassword.value = false;
-  loginId.value = '';
-  isEmailCertificationDone.value = false;
+const goToLogin = () => {
+  router.push({ name: 'Login' });
 }
 
 const clickToNiceAuthPopupOpen = async () => {
@@ -240,7 +161,7 @@ const checkAvailableEmail = async () => {
             data: result.data.data as unknown as {available: false},
             message: result.data.message ?? '',
         }
-        isAvailable.value = !(checkEmail.value.data.available);   
+        isAvailable.value = !(checkEmail.value.data.available);
     }
     catch (error) {
         console.error(error);
@@ -281,26 +202,15 @@ const clickToEmailCertificationButton = async () => {
   padding: 98px var(--app-frame-padding-x) 88px;
 }
 
-.page-card {
-  width: 100%;
-  max-width: none;
-  min-width: 680px;
-  min-height: 200;
-
-  padding: 17px 52px 42px;
-  margin-top: 38px;
-  margin-bottom: 50px;
-
-  border: 1px solid var(--app-border-subtle);
-  border-radius: 20px;
-
-  background-color: #ffffff;
-  box-shadow: 0 5px 20px var(--tap-panel-shadow);
+/* 로그인 화면처럼 가운데 좁은 단일 카드 */
+.recovery-column {
+  max-width: 480px;
+  margin: 0 auto;
 }
 
 .page-title {
   margin: 18px 0 0;
-  font-size: 38px;
+  font-size: 34px;
   font-weight: 800;
   line-height: 1.25;
   letter-spacing: -0.04em;
@@ -315,208 +225,123 @@ const clickToEmailCertificationButton = async () => {
   letter-spacing: -0.02em;
 }
 
-.page-description {
-  font-size: 15px;
-  padding: 0 10px;
+.page-card {
+  margin-top: 28px;
+  overflow: hidden;
+  border: 1px solid var(--app-border-subtle);
+  border-radius: 20px;
+  background-color: #ffffff;
+  box-shadow: 0 5px 20px var(--tap-panel-shadow);
 }
 
-.page-description-dark {
+/* =========================
+   탭 — 카드 폭을 반씩 나눠 쓴다
+========================= */
+
+.recovery-tabs :deep(.ant-tabs-nav) {
+  margin: 0;
+}
+
+.recovery-tabs :deep(.ant-tabs-nav-list) {
+  width: 100%;
+}
+
+.recovery-tabs :deep(.ant-tabs-tab) {
+  flex: 1;
+  justify-content: center;
+  margin: 0;
+  padding: 16px 0;
   font-size: 15px;
-  padding: 0 10px;
+}
+
+.recovery-tabs :deep(.ant-tabs-tab + .ant-tabs-tab) {
+  margin: 0;
+}
+
+/* =========================
+   탭 본문
+========================= */
+
+.tab-body {
+  padding: 32px 36px 36px;
+  text-align: center;
+}
+
+.tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: var(--app-bg-selected);
+  color: var(--app-color-primary);
+  font-size: 22px;
+}
+
+.tab-title {
+  margin: 0 0 6px;
+  font-size: 17px;
+  font-weight: 600;
   color: var(--tap-text);
 }
 
-/* =========================
-   공통 영역
-========================= */
-
-.find-button {
-    margin: 25px 0 10px;
-    min-width: 130px;
-}
-
-.find-item-area {
-    width: 100%;
-    min-width: 580px;
-    display: inline-block;
-    align-items: center;
-    justify-content: center;
-    background-color: var(--app-bg-color);
-    border-radius: 15px;
-    border: 1px solid var(--color-border);
-    padding: 20px;
-}
-
-.find-item-area-top {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-}
-
-.find-item-area-top-left {
-    display: inline-flex;
-    flex-direction: column;
-    margin-bottom: 20px;
-}
-
-.find-item-area-top-rigth {
-    display: flex;
-    flex-direction: column;
-    margin-left: 5px;
-}
-
-.sub-title {
-    font-size: 18px;
-    font-weight: 500;
-    padding: 0 10px;
-    margin-top: 10px;
-    margin-bottom: 5px;
-}
-
-.remove-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: none;
-  background: transparent;
+.tab-description {
+  margin: 0 0 22px;
+  font-size: 14px;
+  line-height: 1.6;
   color: var(--app-text-secondary);
-  font-size: 18px;
+}
+
+/* 아이디 찾기 결과 */
+.masked-email {
+  margin: 14px 0 22px;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--app-bg-selected);
+  color: var(--app-color-primary);
+  font-size: 20px;
   font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  padding: 4px 6px;
-  border-radius: 6px;
+  letter-spacing: 0.02em;
+  word-break: break-all;
 }
 
-.remove-btn:hover {
-  /* background: #fff2f0; */
-  background: var(--app-bg-btn-hover);
+.result-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
-/* =========================
-   아이디 찾기 영역
-========================= */
-
-.find-id-view {
-  background-color: white;
-  border: 1px solid var(--app-border-subtle);
-  border-radius: 10px;
-  width: 95%;
-}
-
-.find-id-view-text-area {
-  padding: 20px;
-}
-
-.find-id-view-text {
-  font-size: large;
-  margin: 10px
-}
-
-
-/* =========================
-    NICE 인증 영역
-========================= */
-
-.itme-nice {
+/* 비밀번호 재발급(메일 인증 목업) */
+.mail-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  width: 95%;
-  min-height: 100px;
-  padding: 20px;
-  border-radius: 10px;
-  margin-bottom: 20px;
-
-  background-color: #225537;
-}
-
-.itme-nice-complete {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  width: 95%;
-  min-height: 100px;
-  padding: 20px;
-  border-radius: 10px;
-  background-color: #517560;
-  margin-bottom: 20px;
-}
-
-.item-nice-left-area {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-}
-
-.item-nice-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 55px;
-  padding: 3px;
-  margin: 7px;
-  border-radius: 5px;
-
-  background-color: white;
-
-  font-weight: 600;
-  color: #33338E;
-}
-
-.item-nice-text {
-  margin-left: 5px;
-  font-weight: 500;
-  font-size: 15px;
-  color: white;
-}
-
-.item-nice-title {
-  font-weight: 700;
-}
-
-.item-nice-description {
-  margin-left: 4px;
-  margin-bottom: 10px;
-  color: white;
-}
-
-.item-nice-right-area {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.item-nice-button {
-  min-height: 40px;
-}
-
-.item-nice-button :deep(.ant-btn-primary) {
-  background-color: #33338E;
-}
-
-
-/* =========================
-    비밀번호 찾기 영역
-========================= */
-
-.itme-mail-area {
-    width: 95%;
-}
-
-.item-abreast {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  margin-bottom: 20px;
-}
-
-.item {
-  margin-right: 15px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .mail-button {
-  height: 35px;
+  flex-shrink: 0;
+  min-width: 96px;
+}
+
+.mail-done {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--tap-text);
+}
+
+@media (max-width: 860px) {
+  .page-inner {
+    padding: 56px 16px 64px;
+  }
+
+  .page-title {
+    font-size: 28px;
+  }
+
+  .tab-body {
+    padding: 28px 20px;
+  }
 }
 </style>
