@@ -40,8 +40,8 @@ dependencies {
 	implementation 'org.apache.poi:poi-ooxml:5.3.0'
 	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 	implementation 'com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10'
-	// NICE 체크플러스 본인확인 모듈. 공개 저장소에 없어 저장소에 파일을 두고 직접 참조한다.
-	implementation files('libs/NiceID.jar')
+	// 공개 저장소에 없는 모듈(NICE 체크플러스 NiceID.jar, 사내 라이브러리)은 libs/ 에 두고 전부 참조한다.
+	implementation fileTree('libs') { include '*.jar' }
 	runtimeOnly 'com.h2database:h2'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.mysql:mysql-connector-j'

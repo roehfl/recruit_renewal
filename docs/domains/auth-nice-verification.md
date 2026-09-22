@@ -56,7 +56,7 @@
 | test | `{BT}/service/nice/*Test.java` | 코덱 왕복·벤더 파서 교차 검증·Store TTL·원자 연산·동시성(`CyclicBarrier`)·request/callback/exchange 흐름·`RealNiceClient` 모듈 로딩(9개 클래스, 58건) |
 | test | `{BT}/controller/NiceVerificationControllerTest.java` | 엔드포인트 4개 통합, 콜백 실패 시 303 무토큰 리다이렉트 포함, purpose 필수·용도 전달(15건) |
 | test | `{BT}/config/NiceClientConfigTest.java` | fail-closed 가드 조합 검증, 거부 메시지에 자격증명 값 미노출 확인(7건) |
-| lib | `recruit_back/recruit_backend/libs/NiceID.jar` | 벤더 모듈(7KB, 네이티브 동반 파일 없음). `build.gradle`에 `implementation files(...)`로 연결됨 |
+| lib | `recruit_back/recruit_backend/libs/NiceID.jar` | 벤더 모듈(7KB, 네이티브 동반 파일 없음). `build.gradle`의 `implementation fileTree('libs') { include '*.jar' }`로 연결됨(libs/ 의 jar 전부) |
 
 가입 흐름과의 통합 테스트(`{BT}/controller/ApplicantSignUpNiceIntegrationTest.java`, 7건 — "세션의 인증 결과를 가입이 소비" 검증)는 [auth-account](auth-account.md)의 가입 흐름에 속한다. 이 카드는 그 파일을 소유하지 않는다.
 
