@@ -152,16 +152,22 @@ const changeJobPosition = async (jobPositionId: number | null) => {
 }
 
 const columns: TableColumnsType = [
-  { title: '일자', key: 'interviewDate' },
+  { title: '일자', key: 'interviewDate', sorter: (a, b) => (a.interviewDateTime ?? '').localeCompare(b.interviewDateTime ?? '') },
   { title: '장소', key: 'locationName' },
   { title: '도착시간', key: 'arrivalTime' },
   { title: '면접시간', key: 'interviewTime' },
   { title: '면접순서', key: 'interviewOrder' },
-  { title: '조', key: 'groupName' },
+  { title: '조', key: 'groupName', sorter: (a, b) => (a.groupName ?? '').localeCompare(b.groupName ?? '') },
   { title: '면접관', key: 'interviewerName' },
-  { title: '수험번호', key: 'applicationId' },
-  { title: '성명', key: 'applicantName' },
+  { title: '수험번호', key: 'applicationId', sorter: (a, b) => (a.applicationId ?? 0) - (b.applicationId ?? 0) },
+  { title: '성명', key: 'applicantName', sorter: (a, b) => (a.applicantName ?? '').localeCompare(b.applicantName ?? '', 'ko') },
 ]
+
+const tableLocale = {
+  triggerAsc: '오름차순으로 정렬',
+  triggerDesc: '내림차순으로 정렬',
+  cancelSort: '정렬 취소',
+}
 
 /* ---------------- 데이터 ---------------- */
 const interviews = ref<AdminInterviewScheduleRow[]>([])
@@ -391,14 +397,14 @@ onMounted(async () => {
         </div>
           <div class="button-area">
               <a-upload :before-upload="beforeUpload" :show-upload-list="false" accept=".xlsx">
-                <a-button danger><UploadOutlined />엑셀 업로드</a-button>
+                <a-button danger :disabled="!hasSearched || interviewStages.length === 0"><UploadOutlined />엑셀 업로드</a-button>
               </a-upload>
               <a-button @click="downloadExcel"><DownloadOutlined />엑셀 다운로드</a-button>
           </div>
         </div>
 
         <div class="table-overflow">
-          <a-table class="table-width" :columns="columns" :data-source="interviews" :pagination="{ pageSize: 10 }" :row-key="rowKey">
+          <a-table class="table-width" :columns="columns" :data-source="interviews" :row-key="rowKey" :locale="tableLocale" :pagination="false">
             <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'interviewDate'">{{ formatDate(record.interviewDateTime, 'YYYY-MM-DD') }}</template>
                 <template v-else-if="column.key === 'locationName'">{{ record.locationName ?? '' }}</template>

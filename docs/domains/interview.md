@@ -190,7 +190,8 @@
 31. 기본 공고 = 첫 `accepting` 공고, 기본 단계 = `IN_PROGRESS` → `READY` → 첫 면접 단계. `INTERVIEW_STAGE_TYPES`는 백엔드와 중복 정의.
 32. 단계를 바꾸면 표를 비운다(업로드는 현재 선택 단계로 감) (`changeStage`).
 33. 다운로드: 검색했으면 `{ stageId }`만으로 export, 아니면 템플릿 (`downloadExcel`).
-34. 업로드: `accept=".xlsx"`, 교체·즉시 공개 확인 모달 후 전송. 400 `data`가 있으면 오류 모달(50줄까지), 없으면 메시지. 성공 시 재조회 (`beforeUpload`·`uploadExcel`).
+34. 업로드: `accept=".xlsx"`, 교체·즉시 공개 확인 모달 후 전송. 400 `data`가 있으면 오류 모달(50줄까지), 없으면 메시지. 성공 시 재조회 (`beforeUpload`·`uploadExcel`). 검색 전이거나 면접 단계가 없으면 업로드 버튼을 막는다.
+35. 조회 표는 페이지 없이 전체를 보이고, 일자·조·수험번호·성명 열로 정렬한다(화면 안 정렬, `columns`의 `sorter`).
 
 ## 변경 레시피
 

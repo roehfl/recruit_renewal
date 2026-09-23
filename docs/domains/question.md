@@ -63,7 +63,7 @@
 | 구분 | 파일 | 역할 |
 |---|---|---|
 | route | `{FE}/routes/adminRoutes.ts` | (공유) `AdminQuestionTemplates`(`question-templates`), `AdminJobPostingQuestionTemplateEdit`(`question-template/:id?/edit`) |
-| view | `{FE}/views/admin/applicant/AdminQuestionTemplatesView.vue` | 템플릿 목록(size 10)·사용여부 스위치(activate/deactivate) |
+| view | `{FE}/views/admin/applicant/AdminQuestionTemplatesView.vue` | 템플릿 목록(size 10)·사용여부 스위치(activate/deactivate)·수정 버튼(상세로 이동) |
 | view | `{FE}/views/admin/applicant/AdminQuestionTemplateEditView.vue` | 템플릿 등록/수정(`:id` 없으면 등록) |
 | view | `{FE}/views/admin/applicationForm/ApplicationFormQuestionTab.vue` | 양식 상세의 질문 탭: 목록·펼쳐서 문구 수정·순서 이동·삭제·추가 모달 |
 | component | `{FE}/views/admin/applicationForm/questionModal/QuestionModalBody.vue` | "질문 추가"(직접 입력) 모달 |

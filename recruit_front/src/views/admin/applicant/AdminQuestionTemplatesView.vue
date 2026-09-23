@@ -5,6 +5,7 @@ import { message } from 'ant-design-vue'
 import { adminJobPostingApi } from '@/api/adminJobPostingApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import type { QuestionTemplateItem } from '@/types/question'
+import { EditOutlined } from '@ant-design/icons-vue'
 
 const router = useRouter();
 const loading = ref(false);
@@ -26,11 +27,12 @@ const QuestionTemplatesRequired: Record<string, string> = {
 }
 
 const columns = [
-  { title: '템플릿명', dataIndex: 'title', key: 'title', width: 250 },
-  { title: '질문', key: 'questionText', width: 300},
-  { title: '카테고리', key: 'category', width: 100, align: 'center'},
-  { title: '필수여부', key: 'defaultRequired', width: 100, align: 'center'},
-  { title: '사용여부', key: 'active', width: 100, align: 'center'},
+  { title: '템플릿명', dataIndex: 'title', key: 'title', width: 300 },
+  { title: '질문', key: 'questionText'},
+  { title: '카테고리', key: 'category', width: 120, align: 'center'},
+  { title: '필수여부', key: 'defaultRequired', width: 120, align: 'center'},
+  { title: '사용여부', key: 'active', width: 120, align: 'center'},
+  { title: '수정', key: 'edit', width: 120, align: 'center'},
 ]
 
 const pagination = computed(() => ({
@@ -109,7 +111,7 @@ onMounted(loadQuestionTemplates)
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'questionText'">
-          <span @click="goToDetail(record)" class="questionId-link">{{ record.questionText }}</span>
+          <span>{{ record.questionText }}</span>
         </template>
         <template v-if="column.key === 'category'">
           {{ QuestionTemplatesCategory[record.category] ?? record.category }}
@@ -120,9 +122,13 @@ onMounted(loadQuestionTemplates)
         <template v-else-if="column.key === 'active'">
           <a-switch class="switch-button" v-model:checked="record.active" @change="changeActive(record)"/>
         </template>
+        <template v-else-if="column.key === 'edit'">
+          <a-button @click="goToDetail(record)">
+            <EditOutlined/>수정
+          </a-button>
+        </template>
       </template>
     </a-table>
-    <p class="page-description">질문을 누르면 수정이 가능합니다.</p>
   </div>
 </template>
 
