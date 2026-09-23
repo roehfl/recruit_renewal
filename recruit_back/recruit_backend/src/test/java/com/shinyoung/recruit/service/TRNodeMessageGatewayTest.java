@@ -30,13 +30,8 @@ class TRNodeMessageGatewayTest {
     private static final SmsMessage SMS = new SmsMessage("0200000000", "본문", SmsKind.SMS);
 
     private final TRNodeEngine trNodeEngine = mock(TRNodeEngine.class);
-    /** 메일 주소 암호화·SMS InBlock1 은 폐쇄망에서 채운다. 여기서는 대역으로 나머지 전문·호출·응답 처리를 검증한다. */
+    /** SMS InBlock1 은 폐쇄망에서 채운다. 여기서는 대역으로 나머지 전문·호출·응답 처리를 검증한다. */
     private final TRNodeMessageGateway gateway = new TRNodeMessageGateway(trNodeEngine, "http://node.example.test") {
-        @Override
-        String encryptEmail(String email) {
-            return "ENC(" + email + ")";
-        }
-
         @Override
         List<Map<String, Object>> smsInBlock1(SmsMessage message) {
             return SMS_IN_BLOCK1;
@@ -67,7 +62,7 @@ class TRNodeMessageGatewayTest {
     }
 
     @Test
-    void 메일은_메일_TR로_InBlock1_수신자_암호화_주소와_InBlock3_내용을_보내고_CNFR_YN이_y면_UUID_ID로_접수한다() throws Exception {
+    void 메일은_메일_TR로_InBlock1_수신자_주소_원문과_InBlock3_내용을_보내고_CNFR_YN이_y면_UUID_ID로_접수한다() throws Exception {
         when(trNodeEngine.setNodeEngine(anyString(), any())).thenReturn(response("y", "UUID-1"));
 
         GatewayResult result = gateway.send(MAIL, List.of("kim@example.com", "lee@example.com"), List.of("김민준", "이서연"));
@@ -91,7 +86,7 @@ class TRNodeMessageGatewayTest {
         content.put("SECU_USE_YN", "N");
         content.put("EMAIL_CNTT_DATA", "<p>본문</p>");
         verify(trNodeEngine).setNodeEngine("oseai_mail_001a", Map.of(
-                "InBlock1", List.of(recipientRow("김민준", "ENC(kim@example.com)"), recipientRow("이서연", "ENC(lee@example.com)")),
+                "InBlock1", List.of(recipientRow("김민준", "kim@example.com"), recipientRow("이서연", "lee@example.com")),
                 "InBlock3", List.of(content)));
     }
 

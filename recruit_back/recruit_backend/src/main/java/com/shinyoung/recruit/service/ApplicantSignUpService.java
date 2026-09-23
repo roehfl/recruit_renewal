@@ -78,14 +78,14 @@ public class ApplicantSignUpService {
      * 가입 이메일 인증번호를 보내고 세션에 둘 상태를 돌려준다. 이미 가입된 이메일이면 보내지 않는다.
      *
      * <p>트랜잭션을 걸지 않는다 — 발송 이력은 SystemMailService 가 먼저 커밋한 뒤 게이트웨이를 부른다.
-     * 가입 인증 메일에는 이름이 없다(아직 본인확인 전일 수 있다).
+     * 가입 인증 메일은 아직 이름을 모른다(본인확인 전). 사내 메일 솔루션이 빈 수신자명을 거절해 "지원자"로 보낸다.
      */
     public EmailVerificationState sendEmailVerification(EmailVerificationState previous, String email) {
         String normalized = normalizeEmail(email);
         if (applicantRepository.existsByEmail(normalized)) {
             throw new InvalidApplicantSignUpException("이미 사용 중인 이메일입니다.");
         }
-        return emailVerificationService.send(previous, EmailVerificationPurpose.SIGNUP, normalized, "");
+        return emailVerificationService.send(previous, EmailVerificationPurpose.SIGNUP, normalized, "지원자");
     }
 
     /**

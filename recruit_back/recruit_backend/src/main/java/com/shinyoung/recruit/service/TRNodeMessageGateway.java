@@ -18,7 +18,7 @@ import java.util.Map;
 
 /**
  * 사내 TR 노드(TRNodeEngine)로 메일·SMS 발송을 접수한다(recruit.message.gateway=trnode). 채널마다 TR·전문 형식이 다르다.
- * 메일: TR oseai_mail_001a, InBlock1 = 수신자(주소는 암호화), InBlock3 = 발송 내용.
+ * 메일: TR oseai_mail_001a, InBlock1 = 수신자(주소 원문), InBlock3 = 발송 내용.
  * SMS: TR oseai_isms_001a, InBlock1 = 발송 내용(SMS/LMS 코드값은 SmsMessage.kind, 90byte 기준), InBlock2 = 수신자.
  * 호출 1회의 수신자는 내용이 같으면 최대 10명, 사람마다 내용이 다르면 1명이다(DeliveryUnit). 레거시처럼 고정길이로 채우지 않는다.
  * 응답 body.OutBlock1 에서 CNFR_YN 이 y 인 행의 UUID_ID 가 거래 ID 다. 최종 발송 결과 수신(DeliveryReport)은 아직 없다.
@@ -57,11 +57,11 @@ public class TRNodeMessageGateway implements MailGateway, SmsGateway {
                 toNumbers.stream().map(MessageContacts::maskPhone).toList());
     }
 
-    /** 메일 전문. InBlock1 = 수신자(RCMS_DATA 는 암호화한 주소), InBlock3 = 레거시 고정 코드값 + 보낸사람·제목·HTML 본문. */
+    /** 메일 전문. InBlock1 = 수신자(RCMS_DATA 는 주소 원문), InBlock3 = 레거시 고정 코드값 + 보낸사람·제목·HTML 본문. */
     Map<String, Object> mailBody(MailMessage message, List<String> toAddresses, List<String> names) {
         List<Map<String, Object>> inBlock1 = new ArrayList<>(toAddresses.size());
         for (int index = 0; index < toAddresses.size(); index++) {
-            inBlock1.add(recipientRow(names.get(index), encryptEmail(toAddresses.get(index))));
+            inBlock1.add(recipientRow(names.get(index), toAddresses.get(index)));
         }
         Map<String, Object> content = new HashMap<>();
         content.put("MSG_APLY_CODE", "S");
@@ -90,14 +90,6 @@ public class TRNodeMessageGateway implements MailGateway, SmsGateway {
             inBlock2.add(recipientRow(names.get(index), toNumbers.get(index)));
         }
         return Map.of("InBlock1", smsInBlock1(message), "InBlock2", inBlock2);
-    }
-
-    /**
-     * TODO(폐쇄망): 메일 수신자 RCMS_DATA. 이메일 주소를 사내 암호화 라이브러리로 암호화한 값.
-     * 채우기 전에는 예외를 던져 발송이 GATEWAY_ERROR 로 기록된다.
-     */
-    String encryptEmail(String email) {
-        throw new UnsupportedOperationException("메일 주소 암호화 미작성");
     }
 
     /**

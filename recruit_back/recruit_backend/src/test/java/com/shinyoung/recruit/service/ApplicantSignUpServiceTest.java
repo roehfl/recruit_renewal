@@ -253,11 +253,11 @@ class ApplicantSignUpServiceTest {
     }
 
     @Test
-    void 가입_인증번호는_이름_없이_보낸다() {
+    void 가입_인증번호는_수신자명을_지원자로_보낸다() {
         EmailVerificationState state = EmailVerificationState.issued(EmailVerificationPurpose.SIGNUP,
                 "new@example.com", "hash", LocalDateTime.of(2026, 9, 23, 10, 5), LocalDateTime.of(2026, 9, 23, 10, 0));
         given(applicantRepository.existsByEmail("new@example.com")).willReturn(false);
-        given(emailVerificationService.send(null, EmailVerificationPurpose.SIGNUP, "new@example.com", "")).willReturn(state);
+        given(emailVerificationService.send(null, EmailVerificationPurpose.SIGNUP, "new@example.com", "지원자")).willReturn(state);
 
         assertThat(applicantSignUpService.sendEmailVerification(null, "new@example.com")).isSameAs(state);
     }

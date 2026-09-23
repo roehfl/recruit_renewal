@@ -7,7 +7,7 @@
 
 - [message](message.md)의 발송 접수가 커밋되면 비동기로 발송 단위마다 게이트웨이(발송 솔루션)를 호출하고 접수 결과(거래 ID)를 수신자에 기록한다. 솔루션은 실제 발송 결과를 나중에 메시지큐로 보내고, 거래 ID로 수신자에 반영한다. 발송 상태·건수는 저장하지 않고 조회할 때 계산해 발송 이력에 보인다.
 - 시스템 자동발송(2026-09-23): 가입 인증·비밀번호 재설정·제출 완료 메일을 `SystemMailService`가 기본 템플릿으로 보낸다. 이력은 같은 `message_send`·`message_recipient`에 `origin=SYSTEM`으로 남고(인증 2종은 공고·지원서 없음), 이력 화면에서 발송 구분으로 거른다.
-- 설계서 7.1·7.3·7.4절(`docs/archive/superpowers/specs/2026-09-19-message-send-design.md`). S3(디스패치)·S4(결과 수신·이력) 구현 완료. 사내 TR 노드 게이트웨이(`TRNodeMessageGateway`, `gateway=trnode`)는 채널별 TR·전문·호출·응답 처리까지 있고 메일 주소 암호화와 SMS 발송 내용 블록은 폐쇄망에서 채운다. 발송 결과는 `UmsReportServer`(TCP, 레거시와 같은 규약)로 수신자별로 받는다(기본은 목업 게이트웨이·목업 결과).
+- 설계서 7.1·7.3·7.4절(`docs/archive/superpowers/specs/2026-09-19-message-send-design.md`). S3(디스패치)·S4(결과 수신·이력) 구현 완료. 사내 TR 노드 게이트웨이(`TRNodeMessageGateway`, `gateway=trnode`)는 채널별 TR·전문·호출·응답 처리까지 있고 SMS 발송 내용 블록은 폐쇄망에서 채운다. 발송 결과는 `UmsReportServer`(TCP, 레거시와 같은 규약)로 수신자별로 받는다(기본은 목업 게이트웨이·목업 결과).
 - 화면: `/admin/messages/history`(`AdminMessageHistory`, 목록·상세 드로어). 발송 화면의 테스트 발송 카드도 이력 상세 API로 최종 결과를 갱신한다([message](message.md)).
 - 경계: 발송 접수(검증·수신자 행 생성·이벤트 발행)·테스트 발송은 `MessageSendService` → [message](message.md). 프론트 `{FE}/api/admin/messageApi.ts`·`{FE}/types/admin/message.ts`는 [message](message.md) 소유(이력 API·타입 포함). 연락처 마스킹 함수 `MessageContacts` → [message](message.md). 지원서 파기 → [privacy-audit](privacy-audit.md).
 
@@ -44,7 +44,7 @@
 | service | `{BE}/service/SmsGateway.java` | 문자 발송 연동 인터페이스 |
 | service | `{BE}/service/LoggingMailGateway.java` | 목업 메일 게이트웨이(기본값, 항상 접수·가짜 거래 ID·로그만, 로컬 확인용으로 본문 `text`도 로그) |
 | service | `{BE}/service/LoggingSmsGateway.java` | 목업 문자 게이트웨이(기본값, 항상 접수·가짜 거래 ID·로그만) |
-| service | `{BE}/service/TRNodeMessageGateway.java` | 사내 TR 노드 메일·SMS 게이트웨이(`gateway=trnode`, 두 인터페이스 함께 구현, 채널별 TR·전문). 메일 주소 암호화·SMS InBlock1은 폐쇄망에서 채운다 |
+| service | `{BE}/service/TRNodeMessageGateway.java` | 사내 TR 노드 메일·SMS 게이트웨이(`gateway=trnode`, 두 인터페이스 함께 구현, 채널별 TR·전문). SMS InBlock1은 폐쇄망에서 채운다 |
 | common | `{BE}/common/TRNodeEngine.java` | TR 노드 HTTP 호출(`{node.url}/query`, 공유 `RestClient`) |
 | service | `{BE}/service/MessageMailLayout.java` | 치환된 본문을 고정 브랜드 레이아웃에 입힘 |
 | template | `{BR}/templates/message-mail.html` | 메일 브랜드 레이아웃 |
@@ -136,16 +136,16 @@ API 모듈·타입은 [message](message.md) 소유 `{FE}/api/admin/messageApi.ts
 - 로그: 목업 게이트웨이·호출 실패 로그는 이메일·전화번호를 마스킹하고(`MessageContacts`, [message](message.md)) 본문·예외 메시지는 남기지 않는다. 예외: 로컬 목업 `LoggingMailGateway`는 인증번호 확인용으로 본문 `text`도 남긴다(2026-09-23 결정, `TRNodeMessageGateway`는 남기지 않음). 결과 처리 로그는 거래 ID만 남긴다.
 - 파기 연동: 지원서 파기 시 그 지원서의 `MessageRecipient` 이름·이메일·휴대폰(암호화 컬럼이라 null)과 `createdBy`·`updatedBy`를 null로 바꾼다. 채널 상태·거래 ID·실패 사유(결과코드)는 유지하고, 테스트 수신자(`jobApplication` null)는 대상이 아니다(`ApplicationPiiPurgeRepository.purgeMessageRecipients`, [privacy-audit](privacy-audit.md)). 화면은 지원서 수신자인데 이름·연락처가 모두 비었으면 "(파기됨)"으로 보인다.
 - 목업 결과(`recruit.message.gateway=logging`, 기본): 목업 게이트웨이는 항상 접수(가짜 거래 ID = UUID)하고 `MockDeliveryReportScheduler`가 3초 뒤 수신자마다 결과를 넘긴다. 결과코드는 실제 솔루션처럼 `00`, 연락처에 `fail`이 들어 있는 수신자만 `99`.
-- 시스템 자동발송(`SystemMailService.send`): 종류의 기본 템플릿(`defaultTemplate=true`)이 없으면 보내지 않고 경고 로그(`NO_TEMPLATE`). 있으면 `MessageSend.createSystem`(원문 = 템플릿 치환 전 제목·본문) + 수신자 1명(메일 `PENDING`, SMS `SKIPPED`/`CHANNEL_OFF`)을 저장·커밋한 뒤 `MessageDispatcher.dispatch`를 동기로 부르고 수신자 메일 상태가 `REQUESTED`·`SENT`면 `ACCEPTED`, 아니면 `FAILED`. `#{이름}`·`#{채용사이트}`는 비어 있으면 이름·설정값으로 채운다. 치환 결과(인증번호)는 `DeliveryItem`에만 있다. 결과 수신·이력 상세는 관리자 발송과 같은 경로다.
+- 시스템 자동발송(`SystemMailService.send`): 종류의 기본 템플릿(`defaultTemplate=true`)이 없으면 보내지 않고 경고 로그(`NO_TEMPLATE`). 있으면 `MessageSend.createSystem`(원문 = 템플릿 치환 전 제목·본문) + 수신자 1명(메일 `PENDING`, SMS `SKIPPED`/`CHANNEL_OFF`)을 저장·커밋한 뒤 `MessageDispatcher.dispatch`를 동기로 부르고 수신자 메일 상태가 `REQUESTED`·`SENT`면 `ACCEPTED`, 아니면 `FAILED`. `#{이름}`·`#{채용사이트}`는 비어 있으면 이름·설정값으로 채운다. 사내 메일 솔루션은 빈 수신자명(`RCMS_CNRP_NAME`)을 거절하므로 이름을 모르는 가입 인증 메일은 `지원자`로 보낸다. 치환 결과(인증번호)는 `DeliveryItem`에만 있다. 결과 수신·이력 상세는 관리자 발송과 같은 경로다.
 - 제출 완료 메일: `ApplicationSubmittedEvent`(제출·재제출 성공, [application](application.md)) → `ApplicationSubmittedMailListener`(`AFTER_COMMIT` + `@Async`). 받는 주소 = 기본정보 이메일 → 회원 이메일(둘 다 없으면 경고 로그만), 이름 = 대상자 조회와 같은 규칙, 변수 `#{공고명}`·`#{제출일시}`(`yyyy-MM-dd HH:mm`). 예외는 경고 로그만, 제출 응답에 영향 없음.
 - TR 게이트웨이(`recruit.message.gateway=trnode`, `TRNodeMessageGateway`): 채널마다 TR·전문 형식이 다르고 `TRNodeEngine.setNodeEngine(TR명, body)`로 보낸다. 수신자 행은 공통으로 `CUST_ID`=`recruit` 고정, `RCMS_CNRP_NAME`=이름(null이면 빈 값), `RCMS_DATA`이고 레거시처럼 고정길이로 채우지 않는다.
-  - 메일 `oseai_mail_001a`: `InBlock1` = 수신자(`RCMS_DATA` = 사내 암호화 라이브러리로 암호화한 이메일, `encryptEmail`), `InBlock3` = 레거시 고정 코드값(`MSG_APLY_CODE=S`·`EMAIL_APLY_CODE=2`·`USER_ID=recruit`·`UI_DEPT_CODE1=180`·`TRNM_SLIP_NO=WEB` 등) + `USER_NAME`·`EMAIL_NAME`(= `recruit.message.sender-name`·`sender-email`) + `TITL_CNTT`(제목) + `EMAIL_CNTT_DATA`(레이아웃 HTML).
+  - 메일 `oseai_mail_001a`: `InBlock1` = 수신자(`RCMS_DATA` = 이메일 주소 원문. 암호화하지 않는다 — 2026-09-23 폐쇄망 확인), `InBlock3` = 레거시 고정 코드값(`MSG_APLY_CODE=S`·`EMAIL_APLY_CODE=2`·`USER_ID=recruit`·`UI_DEPT_CODE1=180`·`TRNM_SLIP_NO=WEB` 등) + `USER_NAME`·`EMAIL_NAME`(= `recruit.message.sender-name`·`sender-email`) + `TITL_CNTT`(제목) + `EMAIL_CNTT_DATA`(레이아웃 HTML).
   - SMS `oseai_isms_001a`: `InBlock1` = 발송 내용(`smsInBlock1`), `InBlock2` = 수신자(`RCMS_DATA` = 숫자만 남긴 번호, 암호화 안 함).
   - 솔루션은 내용이 같으면 한 전문에 10명까지, 사람마다 내용이 다르면 1명씩 받으며 이는 발송 단위 규칙과 같다. SMS InBlock1의 길이별 코드값은 `SmsMessage.kind()`(90byte 이하 `SMS`, `MessageRenderer` 기준)로 정한다. 레거시 솔루션 분기는 80byte였지만 화면 판정과 같은 90으로 통일했다(2026-09-21 결정). 응답 `body.OutBlock1` 행 중 `CNFR_YN`이 `y`(대소문자 무시)이고 `UUID_ID`가 있는 첫 행의 `UUID_ID`(앞뒤 공백 제거)가 거래 ID다(`errorData`는 보지 않는다). 호출 예외·빈 응답·JSON 아님·미접수는 모두 `GATEWAY_ERROR`이고, 로그에는 채널·마스킹 수신자·거래 ID(실패면 예외 클래스)만 남긴다. `node.url`이 비면 기동을 거부한다.
 
 ## 변경 레시피
 
-- **TR 게이트웨이 완성(폐쇄망)**: `TRNodeMessageGateway`의 `encryptEmail`(메일 주소 암호화, 사내 라이브러리)과 `smsInBlock1`(SMS 발송 내용)을 채운다. 나머지 블록은 이미 만든다. 메일 발신자는 운영 `RECRUIT_MESSAGE_SENDER_NAME`·`RECRUIT_MESSAGE_SENDER_EMAIL`로 준다. 채우기 전에는 `send`가 `UnsupportedOperationException`을 던져 `GATEWAY_ERROR`로 기록된다. 운영은 `RECRUIT_MESSAGE_GATEWAY=trnode`, `NODE_URL`을 준다. `TRNodeEngine` 헤더(`queryDataHeader`)의 값도 폐쇄망 원본으로 맞춘다. 결과 수신은 아래 항목을 따른다.
+- **TR 게이트웨이 완성(폐쇄망)**: `TRNodeMessageGateway`의 `smsInBlock1`(SMS 발송 내용)을 채운다. 나머지 블록은 이미 만든다. 메일 발신자는 운영 `RECRUIT_MESSAGE_SENDER_NAME`·`RECRUIT_MESSAGE_SENDER_EMAIL`로 준다. 채우기 전에는 `send`가 `UnsupportedOperationException`을 던져 `GATEWAY_ERROR`로 기록된다. 운영은 `RECRUIT_MESSAGE_GATEWAY=trnode`, `NODE_URL`을 준다. `TRNodeEngine` 헤더(`queryDataHeader`)의 값도 폐쇄망 원본으로 맞춘다. 결과 수신은 아래 항목을 따른다.
 - **실제 솔루션 연동**: `MailGateway`·`SmsGateway` 구현체를 `@ConditionalOnProperty(prefix = "recruit.message", name = "gateway", havingValue = "<값>")`로 추가한다(위 게이트웨이 계약). 결과 수신부는 받은 결과를 `DeliveryReport(채널, 거래 ID, 연락처, 결과코드)`로 바꿔 `DeliveryReportHandler.handle`만 부른다. 성공 코드는 `RECRUIT_MESSAGE_SUCCESS_RESULT_CODES`(쉼표 구분). `gateway`가 `logging`이 아니면 목업 게이트웨이와 `MockDeliveryReportScheduler`는 뜨지 않는다. `spring-boot-starter-mail` 등 새 의존성은 사용자 승인이 필요하다.
 
 ## 검증
