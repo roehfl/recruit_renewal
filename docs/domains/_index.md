@@ -97,7 +97,7 @@
 
 | 키워드 | 카드 |
 |---|---|
-| 로그인, 세션, LDAP, 회원가입, 비밀번호, 휴대폰 변경, 계정 찾기 | auth-account |
+| 로그인, 세션, LDAP, 회원가입, 비밀번호, 휴대폰 변경, 계정 찾기, 이메일 인증 | auth-account |
 | NICE, 체크플러스 | auth-nice-verification |
 | 권한, 역할, 부서 권한 매핑, 메뉴, 사이드바, 헤더 메뉴 | role-menu |
 | 공고, 채용공고, 모집분야, 직무(`JobPosition`), 근무지, 공고 이미지, 첨부 요건, 신입/경력, 마감 | job-posting |
@@ -116,7 +116,7 @@
 | 감사 로그, activity log, 감사 로그 조회 화면, 행위 증적 | privacy-audit-audit |
 | 클라이언트 이벤트, 텔레메트리, 프론트 오류 로그, 로그 조회, /admin/logs, 지원자 이벤트, 지원자 찾기 | client-event-log |
 | 메일, SMS, 문자, LMS, 메시지 발송, 메시지 템플릿, 변수, 테스트 발송, 대상자, 미리보기, 발송 접수 | message |
-| 발송 결과, 결과 수신, 거래 ID, 게이트웨이, 발송 단위, 발송 이력, 발송 상태, 디스패치 | message-delivery |
+| 발송 결과, 결과 수신, 거래 ID, 게이트웨이, 발송 단위, 발송 이력, 발송 상태, 디스패치, 자동발송, 제출 메일 | message-delivery |
 
 ## 공통 기반 (카드 없음 — 레포 AGENTS.md 참조)
 

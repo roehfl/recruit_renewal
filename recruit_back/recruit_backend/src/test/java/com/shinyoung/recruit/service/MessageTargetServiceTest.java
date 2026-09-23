@@ -337,6 +337,14 @@ class MessageTargetServiceTest {
                 .hasMessage("전형을 찾을 수 없습니다.");
     }
 
+    @Test
+    void 시스템_자동발송_유형은_대상을_조회할_수_없다() {
+        assertThatThrownBy(() -> messageTargetService.getTargets(
+                condition(MessageType.SIGNUP_VERIFICATION, null, null, null, null)))
+                .isInstanceOf(InvalidMessageException.class)
+                .hasMessage("시스템 자동발송 유형은 직접 보낼 수 없습니다.");
+    }
+
     private List<Long> ids(MessageTargetCondition condition) {
         return messageTargetService.getTargets(condition).recipients().stream()
                 .map(MessageTargetRecipientResponse::applicationId)

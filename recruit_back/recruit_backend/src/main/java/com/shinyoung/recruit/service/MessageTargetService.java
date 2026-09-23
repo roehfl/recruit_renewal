@@ -58,6 +58,7 @@ public class MessageTargetService {
             .comparing((String group) -> !group.matches("\\d+"))
             .thenComparingInt(group -> group.matches("\\d+") ? group.length() : 0)
             .thenComparing(Comparator.naturalOrder());
+    static final String SYSTEM_TYPE_REJECTED = "시스템 자동발송 유형은 직접 보낼 수 없습니다.";
 
     private final JobPostingRepository jobPostingRepository;
     private final StageRepository stageRepository;
@@ -68,6 +69,9 @@ public class MessageTargetService {
     private final Clock clock;
 
     public MessageTargetResponse getTargets(MessageTargetCondition condition) {
+        if (condition.type().isSystem()) {
+            throw new InvalidMessageException(SYSTEM_TYPE_REJECTED);
+        }
         JobPosting jobPosting = jobPostingRepository.findById(condition.jobPostingId())
                 .orElseThrow(() -> new JobPostingNotFoundException("공고를 찾을 수 없습니다."));
         Stage stage = findStage(condition, jobPosting);
@@ -76,6 +80,8 @@ public class MessageTargetService {
             case DEADLINE_REMINDER -> deadlineTargets(jobPosting);
             case INTERVIEW_SCHEDULE, INTERVIEW_NOTICE -> interviewTargets(condition, stage);
             case FREE -> freeTargets(condition, jobPosting, stage);
+            case SIGNUP_VERIFICATION, PASSWORD_RESET, APPLICATION_SUBMITTED ->
+                    throw new InvalidMessageException(SYSTEM_TYPE_REJECTED);
         };
         List<String> interviewGroups = isInterview(condition.type())
                 ? messageTargetRepository.findConfirmedInterviewGroups(stage.getId()).stream().sorted(GROUP_ORDER).toList()
@@ -224,7 +230,7 @@ public class MessageTargetService {
         return type == MessageType.INTERVIEW_SCHEDULE || type == MessageType.INTERVIEW_NOTICE;
     }
 
-    private static String firstNonBlank(String... values) {
+    static String firstNonBlank(String... values) {
         for (String value : values) {
             if (value != null && !value.isBlank() && !JobApplication.PURGED_PLACEHOLDER.equals(value)) {
                 return value;

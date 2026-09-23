@@ -3,7 +3,10 @@ package com.shinyoung.recruit.controller;
 import com.shinyoung.recruit.common.hash.HashUtil;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.enumeration.EmailVerificationPurpose;
 import com.shinyoung.recruit.enumeration.NiceVerificationPurpose;
+import com.shinyoung.recruit.service.EmailVerificationService;
+import com.shinyoung.recruit.service.EmailVerificationState;
 import com.shinyoung.recruit.service.nice.NiceVerifiedIdentity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Clock;
+import java.time.LocalDateTime;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -62,14 +66,24 @@ class ApplicantSignUpControllerTest {
         return session;
     }
 
+    /** 가입 이메일 인증까지 마친 세션으로 만든다. 번호 발송·확인 흐름은 ApplicantEmailVerificationControllerTest 가 본다. */
+    private MockHttpSession withVerifiedEmail(MockHttpSession session, String email) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        EmailVerificationState state = EmailVerificationState.issued(
+                EmailVerificationPurpose.SIGNUP, email, "dummy-hash", now.plusMinutes(5), now);
+        state.markVerified(now);
+        session.setAttribute(EmailVerificationService.sessionKey(EmailVerificationPurpose.SIGNUP), state);
+        return session;
+    }
+
     @Test
     void 회원가입_성공() throws Exception {
         mockMvc.perform(post("/api/auth/applicants/sign-up")
-                        .session(verifiedSession("홍길동", "01012345678", "19900101", "1"))
+                        .session(withVerifiedEmail(verifiedSession("홍길동", "01012345678", "19900101", "1"), "applicant01@example.com"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "loginId": "applicant01",
+                                  "loginId": "applicant01@example.com",
                                   "password": "Password1234!",
                                   "email": "applicant01@example.com"
                                 }
@@ -77,7 +91,7 @@ class ApplicantSignUpControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.applicantId").isNumber())
-                .andExpect(jsonPath("$.data.loginId").value("applicant01"))
+                .andExpect(jsonPath("$.data.loginId").value("applicant01@example.com"))
                 .andExpect(jsonPath("$.data.name").value("홍길동"))
                 .andExpect(jsonPath("$.data.password").doesNotExist())
                 .andExpect(jsonPath("$.data.ci").doesNotExist())
@@ -107,7 +121,7 @@ class ApplicantSignUpControllerTest {
     @Test
     void loginId_중복_시_400() throws Exception {
         Applicant existing = new Applicant(HashUtil.sha256("existing-ci"));
-        existing.setLoginId("duplicate-id");
+        existing.setLoginId("duplicate-new@example.com");
         existing.setName("기존사용자");
         existing.setUserName("기존사용자");
         existing.setPassword("encoded");
@@ -115,17 +129,85 @@ class ApplicantSignUpControllerTest {
         applicantRepository.save(existing);
 
         mockMvc.perform(post("/api/auth/applicants/sign-up")
-                        .session(verifiedSession("새사용자", "01011111111", "19900101", "1"))
+                        .session(withVerifiedEmail(verifiedSession("새사용자", "01011111111", "19900101", "1"),
+                                "duplicate-new@example.com"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "loginId": "duplicate-id",
-                                  "password": "Password1234!"
+                                  "loginId": "duplicate-new@example.com",
+                                  "password": "Password1234!",
+                                  "email": "duplicate-new@example.com"
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.message").value("이미 사용 중인 아이디입니다."));
+    }
+
+    @Test
+    void 이메일_인증_없이는_가입할_수_없다() throws Exception {
+        mockMvc.perform(post("/api/auth/applicants/sign-up")
+                        .session(verifiedSession("메일미인증", "01022222222", "19900202", "1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "loginId": "no-verify@example.com",
+                                  "password": "Password1234!",
+                                  "email": "no-verify@example.com"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("이메일 인증이 필요합니다."));
+    }
+
+    @Test
+    void 인증한_이메일과_다른_이메일로는_가입할_수_없다() throws Exception {
+        mockMvc.perform(post("/api/auth/applicants/sign-up")
+                        .session(withVerifiedEmail(verifiedSession("메일다름", "01033333333", "19900303", "1"),
+                                "verified@example.com"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "loginId": "other@example.com",
+                                  "password": "Password1234!",
+                                  "email": "other@example.com"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("이메일 인증이 필요합니다."));
+    }
+
+    @Test
+    void 아이디가_인증한_이메일과_다르면_가입할_수_없다() throws Exception {
+        mockMvc.perform(post("/api/auth/applicants/sign-up")
+                        .session(withVerifiedEmail(verifiedSession("아이디다름", "01055555555", "19900505", "1"),
+                                "mine@example.com"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "loginId": "someone-else@example.com",
+                                  "password": "Password1234!",
+                                  "email": "mine@example.com"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("아이디는 인증한 이메일과 같아야 합니다."));
+    }
+
+    @Test
+    void 이메일을_비우면_이메일_인증이_필요하다() throws Exception {
+        mockMvc.perform(post("/api/auth/applicants/sign-up")
+                        .session(withVerifiedEmail(verifiedSession("메일없음", "01044444444", "19900404", "1"),
+                                "verified@example.com"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "loginId": "no-email-id",
+                                  "password": "Password1234!"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("이메일 인증이 필요합니다."));
     }
 
     @Test

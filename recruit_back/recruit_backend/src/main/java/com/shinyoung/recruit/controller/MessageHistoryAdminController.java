@@ -5,6 +5,7 @@ import com.shinyoung.recruit.dto.response.ApiResponse;
 import com.shinyoung.recruit.dto.response.MessageSendDetailResponse;
 import com.shinyoung.recruit.dto.response.MessageSendSummaryResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
+import com.shinyoung.recruit.enumeration.MessageOrigin;
 import com.shinyoung.recruit.enumeration.MessageType;
 import com.shinyoung.recruit.service.MessageHistoryService;
 import lombok.RequiredArgsConstructor;
@@ -33,10 +34,11 @@ public class MessageHistoryAdminController {
             @RequestParam(required = false) MessageType type,
             @RequestParam(required = false) Long jobPostingId,
             @RequestParam(required = false) Boolean test,
+            @RequestParam(required = false) MessageOrigin origin,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        MessageHistoryCondition condition = new MessageHistoryCondition(from, to, type, jobPostingId, test);
+        MessageHistoryCondition condition = new MessageHistoryCondition(from, to, type, jobPostingId, test, origin);
         return ResponseEntity.ok(ApiResponse.success(messageHistoryService.search(condition, page, size)));
     }
 

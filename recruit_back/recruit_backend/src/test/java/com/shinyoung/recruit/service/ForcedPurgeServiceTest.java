@@ -32,6 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -61,6 +62,8 @@ class ForcedPurgeServiceTest {
     @Autowired private ApplicationBasicInfoRepository basicInfoRepository;
     @Autowired private PurgeBatchRepository purgeBatchRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
+    // 커밋된 제출이 비동기 제출 완료 메일(message_recipient → job_application FK)을 만들지 않게 막는다.
+    @MockitoBean private ApplicationSubmittedMailListener applicationSubmittedMailListener;
 
     @AfterEach
     void cleanUp() {

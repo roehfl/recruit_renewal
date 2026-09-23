@@ -7,19 +7,19 @@ import { messageApi } from '@/api/admin/messageApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import { formatDate } from '@/common/dateUtil'
 import type {
+  AnyMessageType,
   MessageTemplate,
   MessageTemplateSaveRequest,
-  MessageType,
   MessageVariable,
 } from '@/types/admin/message'
-import { MESSAGE_TYPES, messageTypeLabel } from './messageTypes'
+import { ALL_MESSAGE_TYPES, isSystemMessageType, messageTypeLabel } from './messageTypes'
 import { smsByteLength, smsKindOf } from './messageRender'
 import { FIELD_MAX_LENGTH, useVariableCursor } from './useVariableCursor'
 
 const NAME_MAX_LENGTH = 100
 
 interface TemplateForm {
-  type: MessageType
+  type: AnyMessageType
   name: string
   defaultTemplate: boolean
   mailSubject: string
@@ -33,10 +33,10 @@ const loading = ref(false)
 const saving = ref(false)
 
 const keyword = ref('')
-const typeFilter = ref<MessageType | 'ALL'>('ALL')
+const typeFilter = ref<AnyMessageType | 'ALL'>('ALL')
 const selectedId = ref<number | null>(null)
 
-const emptyForm = (type: MessageType): TemplateForm => ({
+const emptyForm = (type: AnyMessageType): TemplateForm => ({
   type,
   name: '',
   defaultTemplate: false,
@@ -54,12 +54,12 @@ const { resetCursor, rememberCursor, insertVariable } = useVariableCursor(
   },
 )
 
-const typeOptions = MESSAGE_TYPES.map((meta) => ({ value: meta.type, label: `${meta.group} · ${meta.name}` }))
+const typeOptions = ALL_MESSAGE_TYPES.map((meta) => ({ value: meta.type, label: `${meta.group} · ${meta.name}` }))
 const typeFilterOptions = [{ value: 'ALL', label: '전체 종류' }, ...typeOptions]
 
 const groups = computed(() => {
   const word = keyword.value.trim()
-  return MESSAGE_TYPES.filter((meta) => typeFilter.value === 'ALL' || meta.type === typeFilter.value).map(
+  return ALL_MESSAGE_TYPES.filter((meta) => typeFilter.value === 'ALL' || meta.type === typeFilter.value).map(
     (meta) => ({
       meta,
       items: templates.value.filter((template) => template.type === meta.type && (!word || template.name.includes(word))),
@@ -70,6 +70,15 @@ const groups = computed(() => {
 const selectedTemplate = computed<MessageTemplate | undefined>(() =>
   templates.value.find((template) => template.id === selectedId.value),
 )
+
+/* 시스템 자동발송은 메일만 보낸다. SMS 입력을 숨기고 저장하지 않는다(서버도 null 로 저장). */
+const isSystemType = computed(() => isSystemMessageType(form.type))
+
+/* 시스템 기본 템플릿은 자동발송이 쓰므로 삭제할 수 없다(서버도 400). */
+const isLockedSystemDefault = computed(() => {
+  const template = selectedTemplate.value
+  return template !== undefined && template.defaultTemplate && isSystemMessageType(template.type)
+})
 
 const availableVariables = computed(() => variables.value.filter((variable) => variable.types.includes(form.type)))
 
@@ -140,7 +149,7 @@ const toRequest = (): MessageTemplateSaveRequest => ({
   defaultTemplate: form.defaultTemplate,
   mailSubject: blankToNull(form.mailSubject),
   mailBody: blankToNull(form.mailBody),
-  smsBody: blankToNull(form.smsBody),
+  smsBody: isSystemType.value ? null : blankToNull(form.smsBody),
 })
 
 const save = async (): Promise<void> => {
@@ -263,7 +272,7 @@ onMounted(async () => {
             </p>
           </div>
           <a-space>
-            <a-button v-if="selectedId !== null" danger @click="remove">삭제</a-button>
+            <a-button v-if="selectedId !== null && !isLockedSystemDefault" danger @click="remove">삭제</a-button>
             <a-button v-if="selectedId !== null" @click="duplicate">복제</a-button>
             <a-button type="primary" :loading="saving" @click="save">저장</a-button>
           </a-space>
@@ -303,15 +312,17 @@ onMounted(async () => {
             />
           </div>
 
-          <h3 class="section-title">
-            <MessageOutlined /> SMS <span class="hint">변수 치환 전 {{ smsBytes }}byte · {{ smsKindText }}</span>
-          </h3>
-          <a-textarea
-            v-model:value="form.smsBody"
-            :rows="5"
-            :maxlength="FIELD_MAX_LENGTH.smsBody"
-            @blur="rememberCursor('smsBody', $event)"
-          />
+          <template v-if="!isSystemType">
+            <h3 class="section-title">
+              <MessageOutlined /> SMS <span class="hint">변수 치환 전 {{ smsBytes }}byte · {{ smsKindText }}</span>
+            </h3>
+            <a-textarea
+              v-model:value="form.smsBody"
+              :rows="5"
+              :maxlength="FIELD_MAX_LENGTH.smsBody"
+              @blur="rememberCursor('smsBody', $event)"
+            />
+          </template>
 
           <div class="variables">
             <span class="variables-label">이 종류에서 쓸 수 있는 변수</span>

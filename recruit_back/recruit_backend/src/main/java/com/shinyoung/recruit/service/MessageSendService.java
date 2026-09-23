@@ -154,6 +154,9 @@ public class MessageSendService {
     }
 
     private void validateContent(MessageType type, MessageContentRequest content) {
+        if (type.isSystem()) {
+            throw new InvalidMessageException(MessageTargetService.SYSTEM_TYPE_REJECTED);
+        }
         boolean mail = Boolean.TRUE.equals(content.mailEnabled());
         boolean sms = Boolean.TRUE.equals(content.smsEnabled());
         if (!mail && !sms) {

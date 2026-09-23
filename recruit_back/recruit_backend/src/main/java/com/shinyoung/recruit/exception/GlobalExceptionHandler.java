@@ -176,6 +176,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler(InvalidEmailVerificationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidEmailVerification(InvalidEmailVerificationException e) {
+        return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(InvalidApplicantAccountException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidApplicantAccount(InvalidApplicantAccountException e) {
         return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));

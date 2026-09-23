@@ -6,6 +6,7 @@
 ## 요약
 
 - 관리자가 지원자에게 메일·SMS를 보낸다. 종류 5개를 고르면 대상자와 문구가 자동으로 채워지고, 수신자별 미리보기 → 담당자 테스트 발송 → 실제 발송 요청 순서로 진행한다.
+- 시스템 자동발송 종류 3개(`SIGNUP_VERIFICATION`·`PASSWORD_RESET`·`APPLICATION_SUBMITTED`, 2026-09-23)는 이 카드가 템플릿만 관리한다(기동 시 기본 템플릿 생성, `SystemMessageTemplateInitializer`). 발송은 [message-delivery](message-delivery.md)의 `SystemMailService`가 하고, 관리자 발송·테스트 발송·대상 조회는 400으로 막는다.
 - 이 카드 범위: 템플릿·변수, 종류별 대상자 조회, 작성·미리보기, 테스트 발송·발송 **접수**(검증 → 수신자 행 저장 → `MessageSendRequestedEvent` 발행). **접수 뒤의 디스패치·게이트웨이·결과 수신·상태 계산·발송 이력은 [message-delivery](message-delivery.md).**
 - 설계서: `docs/archive/superpowers/specs/2026-09-19-message-send-design.md`. 구현은 S1 템플릿 → S2 대상자·작성 → S3 발송 → S4 결과 수신·이력 순서로 나눴고 S4까지 완료했다.
 - 화면: `/admin/messages`(`AdminMessageSend`, 종류·조건·작성·미리보기·테스트 발송·발송) · `/admin/messages/templates`(`AdminMessageTemplates`). 발송 이력 `/admin/messages/history`는 [message-delivery](message-delivery.md).
@@ -15,10 +16,10 @@
 
 | 용어 | 코드 | 설명 |
 |---|---|---|
-| 메시지 종류 | `MessageType` | `RESULT_ANNOUNCEMENT` 결과 발표 · `DEADLINE_REMINDER` 서류 마감 임박 · `INTERVIEW_SCHEDULE` 면접 일정·장소 · `INTERVIEW_NOTICE` 면접 공지 · `FREE` 직접 입력 |
+| 메시지 종류 | `MessageType` | `RESULT_ANNOUNCEMENT` 결과 발표 · `DEADLINE_REMINDER` 서류 마감 임박 · `INTERVIEW_SCHEDULE` 면접 일정·장소 · `INTERVIEW_NOTICE` 면접 공지 · `FREE` 직접 입력 · 시스템 자동발송 `SIGNUP_VERIFICATION`·`PASSWORD_RESET`·`APPLICATION_SUBMITTED`(`isSystem()`) |
 | 템플릿 | `MessageTemplate` | 종류 1개에 속한 메일 제목·본문 + SMS 본문 |
 | 기본 템플릿 | `defaultTemplate` | 종류당 최대 1개. 발송 화면에서 종류를 고르면 자동으로 불러온다 |
-| 변수 | `MessageVariable` | 본문의 `#{키}`. 키는 한글(`이름`, `면접일시` 등 12개). 종류별 허용 목록의 단일 출처 |
+| 변수 | `MessageVariable` | 본문의 `#{키}`. 키는 한글(`이름`, `면접일시` 등 14개). 종류별 허용 목록의 단일 출처 |
 | 발송 접수 | `MessageSendService.send` | 대상 재조회·검증 뒤 발송 1회와 수신자 행을 저장하고 이벤트를 발행한다. 실제 호출은 커밋 후 비동기([message-delivery](message-delivery.md)) |
 | 제외 사유 | `MessageContacts` 상수 | `CHANNEL_OFF` 채널 끔 · `NO_CONTACT` 연락처 없음 · `INVALID_CONTACT` 형식 오류 → 그 채널은 `SKIPPED`. 그 밖의 채널 상태·사유는 [message-delivery](message-delivery.md) |
 
@@ -31,6 +32,7 @@
 | controller | `{BE}/controller/MessageTemplateAdminController.java` | 템플릿 CRUD 5개 |
 | controller | `{BE}/controller/MessageSendAdminController.java` | 변수 카탈로그·대상자 조회·테스트 발송·발송 접수 |
 | service | `{BE}/service/MessageTemplateService.java` | 검증·기본 단일화·CRUD·변수 목록 |
+| service | `{BE}/service/SystemMessageTemplateInitializer.java` | 기동 시 시스템 종류 기본 템플릿이 없으면 초안 생성(`ApplicationRunner`) |
 | service | `{BE}/service/MessageRenderer.java` | `#{키}` 허용 검사·치환(줄바꿈 LF 통일)·SMS byte/구분 |
 | service | `{BE}/service/MessageTargetService.java` | 종류별 대상 조건 검증·조회·연락처 판정·변수 조립 |
 | service | `{BE}/service/MessageVariableFormatter.java` | 수신자별 `#{변수}` 값 계산·형식 |
@@ -40,8 +42,8 @@
 | entity | `{BE}/domain/entity/MessageTemplate.java` | 템플릿. 컬럼 `message_type` |
 | repository | `{BE}/domain/repository/MessageTemplateRepository.java` | 종류별·기본 조회 |
 | repository | `{BE}/domain/repository/MessageTargetRepository.java` | 대상 JPQL(철회·파기 제외). `Repository<JobApplication, Long>` |
-| enum | `{BE}/enumeration/MessageType.java` | 종류 5개 |
-| enum | `{BE}/enumeration/MessageVariable.java` | 변수 12개·허용 종류 |
+| enum | `{BE}/enumeration/MessageType.java` | 종류 8개(관리자 5 + 시스템 3, `isSystem`) |
+| enum | `{BE}/enumeration/MessageVariable.java` | 변수 14개·허용 종류 |
 | enum | `{BE}/enumeration/SmsKind.java` | `SMS`·`LMS` |
 | dto | `{BE}/dto/request/MessageTemplateSaveRequest.java` | 등록·수정 공용 |
 | dto | `{BE}/dto/request/MessageContentRequest.java` | 발송 화면에서 작성한 내용(치환 전) |
@@ -75,8 +77,8 @@
 |---|---|---|
 | route | `{FE}/routes/adminRoutes.ts` | `AdminMessageSend`(`/admin/messages`) · `AdminMessageTemplates`(`/admin/messages/templates`) — 공유 파일 |
 | api | `{FE}/api/admin/messageApi.ts` | 템플릿·변수·대상자·테스트 발송·발송·이력 API(이력은 [message-delivery](message-delivery.md) 화면이 씀) |
-| type | `{FE}/types/admin/message.ts` | 타입(이력 타입 포함) |
-| view | `{FE}/views/admin/message/AdminMessageTemplateView.vue` | 템플릿 관리 화면 |
+| type | `{FE}/types/admin/message.ts` | 타입(이력 타입 포함). `MessageType` = 관리자 종류, `AnyMessageType` = 전체 |
+| view | `{FE}/views/admin/message/AdminMessageTemplateView.vue` | 템플릿 관리 화면(시스템 종류는 SMS 숨김·기본 템플릿 삭제 버튼 숨김) |
 | view | `{FE}/views/admin/message/AdminMessageSendView.vue` | 발송 화면 조립·상태·테스트 결과 폴링·발송 후 이력 알림 |
 | view | `{FE}/views/admin/message/MessageTypePicker.vue` | 종류 카드 |
 | view | `{FE}/views/admin/message/MessageTargetBar.vue` | 조건 바·인원 요약 |
@@ -86,7 +88,7 @@
 | view | `{FE}/views/admin/message/MessageTestSendCard.vue` | 테스트 발송 카드(담당자 추가·최근 수신자 기억·접수/최종 결과 표시, 결과 변환은 `messageHistory.ts`) |
 | view | `{FE}/views/admin/message/MessageSendBar.vue` | 하단 고정 발송 바 |
 | view | `{FE}/views/admin/message/MessageSendConfirmModal.vue` | 발송 확인 모달 |
-| util | `{FE}/views/admin/message/messageTypes.ts` | 종류 표시 메타(묶음·이름·설명) |
+| util | `{FE}/views/admin/message/messageTypes.ts` | 종류 표시 메타(관리자 `MESSAGE_TYPES`·시스템 `SYSTEM_MESSAGE_TYPES`·전체 `ALL_MESSAGE_TYPES`) |
 | util | `{FE}/views/admin/message/messageRender.ts` | 치환·조각 분리·SMS byte/구분(서버 `MessageRenderer`와 같은 규칙) |
 | util | `{FE}/views/admin/message/messageCondition.ts` | 조건 상태·쿼리 변환·라벨 |
 | util | `{FE}/views/admin/message/useVariableCursor.ts` | 변수 칩 삽입(템플릿·발송 화면 공유) |
@@ -94,12 +96,13 @@
 | test | `{FE}/views/admin/message/__tests__/messageRender.spec.ts` | Vitest |
 | test | `{FE}/views/admin/message/__tests__/messageCondition.spec.ts` | Vitest |
 | test | `{FE}/views/admin/message/__tests__/messageSendSummary.spec.ts` | Vitest |
+| test | `{FE}/views/admin/message/__tests__/messageTypes.spec.ts` | Vitest |
 
 ## API 계약
 
 | 상태 | 메서드 | 경로 | 요청 | 응답 |
 |---|---|---|---|---|
-| 🟢 | GET | /admin/messages/variables | 없음 | `List<MessageVariableResponse>` `{ key, label, types[] }` 12개 |
+| 🟢 | GET | /admin/messages/variables | 없음 | `List<MessageVariableResponse>` `{ key, label, types[] }` 14개 |
 | 🟢 | GET | /admin/message-templates | query `type?` | `List<MessageTemplateResponse>` 종류 → 기본 우선 → 이름순 |
 | 🟢 | GET | /admin/message-templates/{id} | 없음 | `MessageTemplateResponse` (FE 미사용) |
 | 🟢 | POST | /admin/message-templates | `{ type, name, defaultTemplate, mailSubject?, mailBody?, smsBody? }` | `MessageTemplateResponse` |
@@ -123,6 +126,8 @@
 - 인증: 비로그인 401, `ROLE_ADMIN`·`ROLE_RECRUIT_ADMIN`이 아니면 403(`/api/admin/**` 보안 설정). test·send는 서비스에서 한 번 더 임직원인지 확인한다(`CurrentEmployeeService.getCurrentEmployeeActor`).
 - test 응답 `results[].status`는 솔루션 접수 결과다(`REQUESTED` 접수 · `FAILED` 접수 실패 · `SKIPPED` 제외). 최종 결과는 발송 결과가 오면 이력 상세에 반영된다. 상태·`failureReason` 코드의 뜻과 전이는 [message-delivery](message-delivery.md) `## 규칙·불변식`.
 - send 응답 `status`는 저장값이 아니라 항상 `SENDING`이다(발송 상태는 조회 때 계산 — [message-delivery](message-delivery.md)).
+- 템플릿 등록·수정 400(시스템 종류): `시스템 자동발송 템플릿은 메일 제목과 본문을 입력해야 합니다.` · `인증 메일에는 #{인증번호}가 있어야 합니다.`(가입 인증·비밀번호 재설정, 제목 또는 본문) · `시스템 기본 템플릿은 기본을 해제할 수 없습니다.`(기본 해제·종류 변경). 삭제 400: `시스템 기본 템플릿은 삭제할 수 없습니다.` 시스템 종류의 `smsBody`는 보내도 null로 저장한다.
+- targets·test·send 공통 400: `시스템 자동발송 유형은 직접 보낼 수 없습니다.`
 
 ## 규칙·불변식
 
@@ -138,13 +143,14 @@
 - 화면에서 변수 칩으로 넣을 때도 입력란 글자 수 제한(제목 200·본문 10,000·SMS 2,000, 백엔드 @Size와 같음)을 넘으면 삽입하지 않는다. (`useVariableCursor.ts` `insertVariable`, 템플릿·발송 화면 공유)
 - 발송 접수(`MessageSendService.send`)는 대상자를 접수 시점에 다시 조회해 요청한 `applicationIds`와의 교집합만 받는다. 조건이 그새 바뀌어 빠진 인원은 `excludedCount`로 알린다. 한 번에 최대 `recruit.message.max-recipients`(기본 3,000)명. 치환 후 SMS가 2,000byte를 넘는 수신자가 1명이라도 있으면 전체를 400으로 막는다. 치환은 접수 요청 시점에 하고, `MessageSend`·`MessageRecipient`에는 치환 전 원문만 저장하며 치환 결과는 이벤트로만 넘긴다.
 - 테스트 발송(`MessageSendService.testSend`)은 요청 트랜잭션 안에서 디스패처(`MessageDispatcher.dispatch`)를 동기로 부른다. 메일 제목·SMS 앞에 `[테스트] `를 붙이고, 미리보기 중인 수신자(`previewApplicationId`)의 변수 값으로 치환한다(테스터 이름은 본문에 넣지 않는다). 테스터는 최대 5명. 응답은 접수 결과이고 디스패치 뒤 수신자를 다시 읽어 만든다. 화면은 `REQUESTED`가 있으면 이력 상세를 3초마다 최대 2분 다시 읽어 최종 결과로 바꾸고, 접수된 채널이 하나라도 있으면 테스트한 것으로 본다(`AdminMessageSendView.runTest`).
-- 연락처 마스킹은 로그 전용이다: 게이트웨이 목업·호출 실패 로그는 `MessageContacts.maskEmail`·`maskPhone`을 쓰고 본문은 남기지 않는다([message-delivery](message-delivery.md)). 화면(발송·테스트 발송·이력)은 연락처를 가리지 않는다(2026-09-19 사용자 결정).
+- 연락처 마스킹은 로그 전용이다: 게이트웨이 목업·호출 실패 로그는 `MessageContacts.maskEmail`·`maskPhone`을 쓰고 본문은 남기지 않는다(로컬 목업 메일 게이트웨이만 예외, [message-delivery](message-delivery.md)). 화면(발송·테스트 발송·이력)은 연락처를 가리지 않는다(2026-09-19 사용자 결정).
 - 발송 요청이 접수되면 화면은 알림의 "이력 보기"로 `/admin/messages/history?sendId={id}`를 연다(이력 화면 동작은 [message-delivery](message-delivery.md)).
+- 시스템 종류 템플릿: 메일 필수·SMS 저장 안 함, 인증 2종은 `#{인증번호}` 필수, 종류마다 기본 템플릿 1개는 삭제·기본 해제 불가(다른 템플릿을 기본으로 지정하면 기존 기본 전환 로직으로 바뀐다). 변수: `#{인증번호}`(인증 2종), `#{제출일시}`(제출 완료), `#{공고명}`은 관리자 5종 + 제출 완료, `#{이름}`·`#{채용사이트}`는 전체.
 
 ## 변경 레시피
 
 - **변수 추가**: `MessageVariable`에 상수 추가(키·설명·허용 종류) → `MessageTemplateServiceTest`의 변수 개수·`MessageTemplateAdminControllerTest` 개수 단언 갱신 → 변수 값 계산은 `MessageVariableFormatter`의 `switch`에 추가(누락 시 컴파일 오류). 프론트는 카탈로그 API로 받으므로 수정 불필요.
-- **종류 추가**: `MessageType` → `MessageVariable` 허용 종류 → 프론트 `types/admin/message.ts`의 `MessageType`·`messageTypes.ts`의 `MESSAGE_TYPES`.
+- **종류 추가**: `MessageType` → `MessageVariable` 허용 종류 → 프론트 `types/admin/message.ts`의 `MessageType`·`messageTypes.ts`의 `MESSAGE_TYPES`. 시스템 종류면 `isSystem()`·`SYSTEM_MESSAGE_TYPES`·`SystemMessageTemplateInitializer`도 고친다.
 - **메뉴**: 코드가 아니라 메뉴 관리 화면(`/admin/menus`)에서 등록한다. 그룹 "메시지" 아래 "메시지 발송"(`/admin/messages`), "발송 이력"(`/admin/messages/history`), "메시지 템플릿"(`/admin/messages/templates`).
 
 ## 검증

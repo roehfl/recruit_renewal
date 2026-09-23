@@ -14,6 +14,8 @@ public interface ApplicantRepository extends JpaRepository<Applicant, Long> {
 
     Optional<Applicant> findByLoginId(String loginId);
 
+    Optional<Applicant> findByEmail(String email);
+
     boolean existsByEmail(String email);
 
     boolean existsByCiHash(String ciHash);

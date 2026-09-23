@@ -8,18 +8,22 @@ import { getAllJobPostings } from '@/api/adminJobPostingApi'
 import { messageApi } from '@/api/admin/messageApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import { formatDate } from '@/common/dateUtil'
-import type { MessageHistoryQuery, MessageSendSummary, MessageType } from '@/types/admin/message'
+import type { AnyMessageType, MessageHistoryQuery, MessageOrigin, MessageSendSummary } from '@/types/admin/message'
 import type { AdminJobPostingListItem } from '@/types/jobPosting'
 import MessageHistoryDrawer from './MessageHistoryDrawer.vue'
-import { channelCellText, defaultHistoryRange, resultCounts, sendStatusView } from './messageHistory'
-import { MESSAGE_TYPES, messageTypeLabel } from './messageTypes'
+import { MESSAGE_ORIGIN_LABEL, channelCellText, defaultHistoryRange, resultCounts, sendStatusView } from './messageHistory'
+import { ALL_MESSAGE_TYPES, messageTypeLabel } from './messageTypes'
 
 type TestFilter = 'ALL' | 'REAL' | 'TEST'
 type HistoryFilter = Omit<MessageHistoryQuery, 'page' | 'size'>
 
 const PAGE_SIZE = 20
 
-const TYPE_OPTIONS = MESSAGE_TYPES.map((meta) => ({ value: meta.type, label: meta.name }))
+const TYPE_OPTIONS = ALL_MESSAGE_TYPES.map((meta) => ({ value: meta.type, label: meta.name }))
+const ORIGIN_OPTIONS: { value: MessageOrigin; label: string }[] = [
+  { value: 'ADMIN', label: MESSAGE_ORIGIN_LABEL.ADMIN },
+  { value: 'SYSTEM', label: MESSAGE_ORIGIN_LABEL.SYSTEM },
+]
 const TEST_FILTER_OPTIONS: { value: TestFilter; label: string }[] = [
   { value: 'ALL', label: '실발송+테스트' },
   { value: 'REAL', label: '실발송만' },
@@ -28,6 +32,7 @@ const TEST_FILTER_OPTIONS: { value: TestFilter; label: string }[] = [
 
 const columns = [
   { title: '발송일시', dataIndex: 'requestedAt', key: 'requestedAt', width: 140 },
+  { title: '발송 구분', dataIndex: 'originLabel', key: 'origin', width: 120 },
   { title: '종류', key: 'type', width: 200 },
   { title: '공고 · 조건', key: 'posting', width: 240 },
   { title: '제목', dataIndex: 'title', key: 'title', ellipsis: true },
@@ -42,7 +47,8 @@ const route = useRoute()
 const router = useRouter()
 
 const range = ref<[string, string]>(defaultHistoryRange(new Date()))
-const typeFilter = ref<MessageType | undefined>(undefined)
+const typeFilter = ref<AnyMessageType | undefined>(undefined)
+const originFilter = ref<MessageOrigin | undefined>(undefined)
 const jobPostingId = ref<number | undefined>(undefined)
 const testFilter = ref<TestFilter>('ALL')
 const postings = ref<AdminJobPostingListItem[]>([])
@@ -64,8 +70,9 @@ const tableRows = computed(() =>
     id: summary.id,
     requestedAt: formatDate(summary.requestedAt, 'YYYY-MM-DD HH:mm'),
     typeLabel: messageTypeLabel(summary.type),
+    originLabel: MESSAGE_ORIGIN_LABEL[summary.origin],
     test: summary.test,
-    jobPostingTitle: summary.jobPostingTitle,
+    jobPostingTitle: summary.jobPostingTitle ?? '-',
     conditionSummary: summary.conditionSummary ?? '',
     title: summary.title ?? '',
     mail: channelCellText(summary.mailEnabled, summary.mail),
@@ -90,6 +97,7 @@ const toFilter = (): HistoryFilter => ({
   from: range.value[0],
   to: range.value[1],
   type: typeFilter.value,
+  origin: originFilter.value,
   jobPostingId: jobPostingId.value,
   test: testFilter.value === 'ALL' ? undefined : testFilter.value === 'TEST',
 })
@@ -201,6 +209,14 @@ onMounted(async () => {
         allow-clear
       />
       <a-select
+        v-model:value="originFilter"
+        class="origin-select"
+        :options="ORIGIN_OPTIONS"
+        placeholder="발송 구분 전체"
+        aria-label="발송 구분"
+        allow-clear
+      />
+      <a-select
         v-model:value="jobPostingId"
         class="posting-select"
         :options="postingOptions"
@@ -276,6 +292,10 @@ onMounted(async () => {
 
 .type-select {
   width: 170px;
+}
+
+.origin-select {
+  width: 150px;
 }
 
 .posting-select {

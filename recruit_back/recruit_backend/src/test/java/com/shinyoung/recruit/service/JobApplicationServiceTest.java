@@ -63,6 +63,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -81,6 +83,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = "crypto.aes.key=22791194512954214612461221261067")
 @Transactional
+@RecordApplicationEvents
 class JobApplicationServiceTest {
 
     private static final Clock FIXED_CLOCK = Clock.fixed(
@@ -92,6 +95,9 @@ class JobApplicationServiceTest {
 
     @Autowired
     private JobApplicationService jobApplicationService;
+
+    @Autowired
+    private ApplicationEvents applicationEvents;
 
     @Autowired
     private JobPostingService jobPostingService;
@@ -547,6 +553,9 @@ class JobApplicationServiceTest {
         assertThat(application.getStatus()).isEqualTo(JobApplicationStatus.SUBMITTED);
         assertThat(application.getSubmittedAt()).isEqualTo(NOW);
         assertThat(application.getWithdrawnAt()).isNull();
+        assertThat(applicationEvents.stream(ApplicationSubmittedEvent.class))
+                .extracting(ApplicationSubmittedEvent::applicationId)
+                .containsExactly(submittedId);
     }
 
     @Test

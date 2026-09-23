@@ -1,5 +1,6 @@
 package com.shinyoung.recruit.domain.entity;
 
+import com.shinyoung.recruit.enumeration.MessageOrigin;
 import com.shinyoung.recruit.enumeration.MessageType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -23,6 +24,7 @@ import java.time.LocalDateTime;
 /**
  * 메시지 발송 요청 1회. 치환 전 원문·조건 요약·발송자를 보관한다(설계서 8절).
  * 상태·채널별 건수는 저장하지 않고 조회할 때 수신자 채널 상태로 계산한다(7.4, MessageHistoryService).
+ * 시스템 자동발송(origin = SYSTEM)은 공고가 없을 수 있다(가입 인증·비밀번호 재설정). 관리자 발송은 서비스가 공고를 필수로 검증한다.
  */
 @Entity
 @Getter
@@ -36,6 +38,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MessageSend extends BaseEntity {
 
+    public static final String SYSTEM_SENDER_LOGIN_ID = "SYSTEM";
+    public static final String SYSTEM_SENDER_NAME = "시스템";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -44,11 +49,15 @@ public class MessageSend extends BaseEntity {
     @Column(name = "message_type", nullable = false, length = 40)
     private MessageType type;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private MessageOrigin origin;
+
     @Column(name = "test_send", nullable = false)
     private boolean test;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "job_posting_id", nullable = false)
+    @JoinColumn(name = "job_posting_id")
     private JobPosting jobPosting;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -91,6 +100,7 @@ public class MessageSend extends BaseEntity {
     @Column(name = "requested_at", nullable = false)
     private LocalDateTime requestedAt;
 
+    /** 관리자 발송(발송 화면의 발송·테스트 발송). */
     public static MessageSend create(MessageType type, boolean test, JobPosting jobPosting, Stage stage,
                                      String conditionSummary, Long templateId, String templateName,
                                      boolean mailEnabled, boolean smsEnabled,
@@ -99,6 +109,7 @@ public class MessageSend extends BaseEntity {
                                      int recipientCount, LocalDateTime requestedAt) {
         MessageSend send = new MessageSend();
         send.type = type;
+        send.origin = MessageOrigin.ADMIN;
         send.test = test;
         send.jobPosting = jobPosting;
         send.stage = stage;
@@ -114,6 +125,19 @@ public class MessageSend extends BaseEntity {
         send.senderName = senderName;
         send.recipientCount = recipientCount;
         send.requestedAt = requestedAt;
+        return send;
+    }
+
+    /**
+     * 시스템 자동발송 1통(수신자 1명, 메일만). 원문은 사용한 기본 템플릿의 치환 전 제목·본문이다.
+     * 인증번호 같은 치환 값은 여기에 들어가지 않는다(설계서 4절).
+     */
+    public static MessageSend createSystem(MessageType type, JobPosting jobPosting, MessageTemplate template,
+                                           LocalDateTime requestedAt) {
+        MessageSend send = create(type, false, jobPosting, null, null, template.getId(), template.getName(),
+                true, false, template.getMailSubject(), template.getMailBody(), null,
+                SYSTEM_SENDER_LOGIN_ID, SYSTEM_SENDER_NAME, 1, requestedAt);
+        send.origin = MessageOrigin.SYSTEM;
         return send;
     }
 }

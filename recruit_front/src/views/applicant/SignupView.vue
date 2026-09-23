@@ -28,10 +28,11 @@
 
             <a-form-item>
               <div class="item-abreast" v-if="isEmailCertification">
-                <a-input class="item" size="large" placeholder="이메일 인증번호를 입력해주세요.">
+                <a-input class="item" size="large" placeholder="이메일 인증번호를 입력해주세요."
+                  v-model:value="verificationCode" :maxlength="6">
                   <template #prefix>
                   </template>
-                </a-input>    
+                </a-input>
                 <a-button type="primary" class="mail-button" @click="clickToEmailCertificationButton">인증확인</a-button>
               </div>
             </a-form-item>
@@ -109,6 +110,9 @@ const isEmailCertification = ref(false);
 const isEmailCertificationDone = ref(false);
 const isNiceAuthPopupOpen = ref(false);
 const isNiceAuthComplete = ref(false);
+const verificationCode = ref('');
+// 이 화면에서 현재 메일주소로 인증번호를 한 번이라도 보냈는지. 재발송 실패 때만 입력칸을 남기는 데 쓴다.
+const hasSentCode = ref(false);
 
 // 백엔드 @Email 이 허용하는 '+' 태그와 4자 이상 최상위 도메인(.info 등)도 받는다.
 const regEmail = /^[0-9a-zA-Z]([-_.+]?[0-9a-zA-Z])*@[0-9a-zA-Z]([-_.]?[0-9a-zA-Z])*\.[a-zA-Z]{2,}$/i;
@@ -172,10 +176,12 @@ watch(() => form.loginId, () => {
   isAvailable.value = false;
   isEmailChecked.value = false;
   isEmailCertification.value = false;
+  hasSentCode.value = false;
+  verificationCode.value = '';
 });
 
 const checkDuplicateEmailButton = async () => {
-  // 재확인이 실패하면 인증번호 입력칸이 이전 결과로 남지 않도록 먼저 되돌린다.
+  // 가용성 확인이 실패하면 인증번호 입력칸이 이전 결과로 남지 않도록 먼저 되돌린다.
   isEmailChecked.value = false;
   isEmailCertification.value = false;
   if (!(await checkAvailableEmail())) {
@@ -183,12 +189,23 @@ const checkDuplicateEmailButton = async () => {
   }
   if(!isAvailable.value) {
     message.error('이미 가입된 메일주소 입니다.');
+    return;
   }
-  if (isAvailable.value) {
-    isEmailChecked.value = true;
-    isEmailCertification.value = true;
-    message.success('해당 메일주소로 인증번호를 발송하였습니다.');
+  try {
+    await applicationApi.sendSignupEmailVerification(form.loginId);
   }
+  catch (error) {
+    // 60초 재발송 제한·발송 실패는 서버 문구를 그대로 보여 준다. 직전에 받은 번호는 서버 세션에 남아 있으므로
+    // 이미 보낸 적이 있을 때만 입력칸을 남긴다. 첫 발송 실패면 입력할 번호가 없으니 열지 않는다.
+    message.error(getApiErrorMessage(error, '인증 메일을 보내지 못했습니다.'));
+    isEmailChecked.value = hasSentCode.value;
+    isEmailCertification.value = hasSentCode.value;
+    return;
+  }
+  hasSentCode.value = true;
+  isEmailChecked.value = true;
+  isEmailCertification.value = true;
+  message.success('해당 메일주소로 인증번호를 발송하였습니다.');
 };
 
 // 확인 요청이 완료되면 true, 통신 오류 등으로 확인하지 못하면 false 를 돌려준다.
@@ -214,6 +231,17 @@ const checkAvailableEmail = async (): Promise<boolean> => {
 }
 
 const clickToEmailCertificationButton = async () => {
+  if (!verificationCode.value.trim()) {
+    message.warning('인증번호를 입력해주세요.');
+    return;
+  }
+  try {
+    await applicationApi.verifySignupEmail({ email: form.loginId, code: verificationCode.value.trim() });
+  }
+  catch (error) {
+    message.error(getApiErrorMessage(error, '인증번호를 확인하지 못했습니다.'));
+    return;
+  }
   message.success('이메일 인증이 완료되었습니다.');
   isEmailCertification.value = false;
   isEmailCertificationDone.value = true;
@@ -300,7 +328,14 @@ async function clickToSignupButton() {
     router.replace('/applicant');
   }
   catch (error) {
-    message.error(getApiErrorMessage(error, '회원가입에 실패했습니다.'));
+    const errorMessage = getApiErrorMessage(error, '회원가입에 실패했습니다.');
+    message.error(errorMessage);
+    // 인증 만료 등으로 재인증이 필요하면 같은 화면에서 다시 인증받을 수 있게 상태를 되돌린다. NICE 인증 상태는 건드리지 않는다.
+    if (errorMessage === '이메일 인증이 필요합니다.') {
+      isEmailCertificationDone.value = false;
+      isEmailCertification.value = true;
+      verificationCode.value = '';
+    }
     console.error(error);
   }
   finally{

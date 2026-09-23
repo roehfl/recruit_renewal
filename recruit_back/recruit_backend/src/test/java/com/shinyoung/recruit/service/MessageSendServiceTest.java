@@ -146,6 +146,23 @@ class MessageSendServiceTest {
     }
 
     @Test
+    void 시스템_자동발송_유형은_발송도_테스트_발송도_거부한다() {
+        JobApplication kim = submitted("김민준");
+
+        assertThatThrownBy(() -> messageSendService.send(new MessageSendRequest(
+                MessageType.SIGNUP_VERIFICATION, posting.getId(), null, null, null, null,
+                List.of(kim.getId()), content("제목", "#{인증번호}", null)), HR))
+                .isInstanceOf(InvalidMessageException.class)
+                .hasMessage("시스템 자동발송 유형은 직접 보낼 수 없습니다.");
+        assertThatThrownBy(() -> messageSendService.testSend(new MessageTestSendRequest(
+                MessageType.APPLICATION_SUBMITTED, posting.getId(), null, null, null, null, kim.getId(),
+                List.of(new MessageTesterRequest("김인사", "hr.kim@example.com", null)),
+                content("제목", "본문", null)), HR))
+                .isInstanceOf(InvalidMessageException.class)
+                .hasMessage("시스템 자동발송 유형은 직접 보낼 수 없습니다.");
+    }
+
+    @Test
     void 끈_채널은_CHANNEL_OFF로_제외하고_원문도_저장하지_않는다() {
         JobApplication kim = submitted("김민준");
 

@@ -40,6 +40,7 @@ import com.shinyoung.recruit.exception.InvalidJobApplicationException;
 import com.shinyoung.recruit.exception.JobApplicationNotFoundException;
 import com.shinyoung.recruit.exception.JobPostingNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -73,6 +74,7 @@ public class JobApplicationService {
     private final ApplicationAttachmentRepository applicationAttachmentRepository;
     private final ApplicationSubmitValidator applicationSubmitValidator;
     private final AdminApplicationSearchConditionFactory searchConditionFactory;
+    private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
     @Transactional
@@ -160,6 +162,7 @@ public class JobApplicationService {
         validateWorkLocationChoice(application.getJobPosition(), application.getWorkLocationCode());
         applicationSubmitValidator.validate(application);
         application.submit(LocalDateTime.now(clock));
+        eventPublisher.publishEvent(new ApplicationSubmittedEvent(application.getId()));
 
         return application.getId();
     }

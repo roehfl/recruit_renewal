@@ -6,6 +6,7 @@
 ## 요약
 
 - [message](message.md)의 발송 접수가 커밋되면 비동기로 발송 단위마다 게이트웨이(발송 솔루션)를 호출하고 접수 결과(거래 ID)를 수신자에 기록한다. 솔루션은 실제 발송 결과를 나중에 메시지큐로 보내고, 거래 ID로 수신자에 반영한다. 발송 상태·건수는 저장하지 않고 조회할 때 계산해 발송 이력에 보인다.
+- 시스템 자동발송(2026-09-23): 가입 인증·비밀번호 재설정·제출 완료 메일을 `SystemMailService`가 기본 템플릿으로 보낸다. 이력은 같은 `message_send`·`message_recipient`에 `origin=SYSTEM`으로 남고(인증 2종은 공고·지원서 없음), 이력 화면에서 발송 구분으로 거른다.
 - 설계서 7.1·7.3·7.4절(`docs/archive/superpowers/specs/2026-09-19-message-send-design.md`). S3(디스패치)·S4(결과 수신·이력) 구현 완료. 사내 TR 노드 게이트웨이(`TRNodeMessageGateway`, `gateway=trnode`)는 채널별 TR·전문·호출·응답 처리까지 있고 메일 주소 암호화와 SMS 발송 내용 블록은 폐쇄망에서 채운다. 발송 결과는 `UmsReportServer`(TCP, 레거시와 같은 규약)로 수신자별로 받는다(기본은 목업 게이트웨이·목업 결과).
 - 화면: `/admin/messages/history`(`AdminMessageHistory`, 목록·상세 드로어). 발송 화면의 테스트 발송 카드도 이력 상세 API로 최종 결과를 갱신한다([message](message.md)).
 - 경계: 발송 접수(검증·수신자 행 생성·이벤트 발행)·테스트 발송은 `MessageSendService` → [message](message.md). 프론트 `{FE}/api/admin/messageApi.ts`·`{FE}/types/admin/message.ts`는 [message](message.md) 소유(이력 API·타입 포함). 연락처 마스킹 함수 `MessageContacts` → [message](message.md). 지원서 파기 → [privacy-audit](privacy-audit.md).
@@ -20,6 +21,7 @@
 | 발송 단위 | `DeliveryUnit` | 내용이 같은 수신자를 최대 10명씩 묶은 게이트웨이 호출 1회 |
 | 거래 ID | `transactionId` | 발송 단위 호출 1회에 솔루션이 준 ID. 결과 매칭의 유일한 키(`mailTransactionId`·`smsTransactionId`) |
 | 발송 결과 | `DeliveryReport` | 나중에 오는 수신자 1명의 결과(채널 + 거래 ID + 연락처 + 결과코드). 그 채널 거래에서 연락처가 같은 한 명에게 적용 |
+| 발송 구분 | `MessageOrigin` | `ADMIN` 관리자 발송 · `SYSTEM` 시스템 자동발송(발송자 `SYSTEM`/`시스템`, 메일만, 수신자 1명) |
 | 실패 사유 | `failureReason` | `GATEWAY_ERROR` 접수 실패(서버 코드) 또는 솔루션 결과코드. 제외 사유 `CHANNEL_OFF`·`NO_CONTACT`·`INVALID_CONTACT`는 [message](message.md) |
 
 ## 파일 지도
@@ -40,7 +42,7 @@
 | service | `{BE}/service/SmsMessage.java` | 문자 1건 내용(발신번호·본문·SMS/LMS 구분) |
 | service | `{BE}/service/MailGateway.java` | 메일 발송 연동 인터페이스 |
 | service | `{BE}/service/SmsGateway.java` | 문자 발송 연동 인터페이스 |
-| service | `{BE}/service/LoggingMailGateway.java` | 목업 메일 게이트웨이(기본값, 항상 접수·가짜 거래 ID·로그만) |
+| service | `{BE}/service/LoggingMailGateway.java` | 목업 메일 게이트웨이(기본값, 항상 접수·가짜 거래 ID·로그만, 로컬 확인용으로 본문 `text`도 로그) |
 | service | `{BE}/service/LoggingSmsGateway.java` | 목업 문자 게이트웨이(기본값, 항상 접수·가짜 거래 ID·로그만) |
 | service | `{BE}/service/TRNodeMessageGateway.java` | 사내 TR 노드 메일·SMS 게이트웨이(`gateway=trnode`, 두 인터페이스 함께 구현, 채널별 TR·전문). 메일 주소 암호화·SMS InBlock1은 폐쇄망에서 채운다 |
 | common | `{BE}/common/TRNodeEngine.java` | TR 노드 HTTP 호출(`{node.url}/query`, 공유 `RestClient`) |
@@ -52,9 +54,9 @@
 | service | `{BE}/service/DeliveryReportBuffer.java` | 짝을 못 찾은 결과의 메모리 보관(결과 자체가 키, 서버 1대 전제) |
 | service | `{BE}/service/MockDeliveryReportScheduler.java` | 목업 게이트웨이의 가짜 결과(3초 뒤 수신자마다, `recruit.message.gateway=logging`일 때만) |
 | service | `{BE}/service/MessageHistoryService.java` | 이력 목록·상세, 상태·건수·지연 계산(읽기 전용) |
-| entity | `{BE}/domain/entity/MessageSend.java` | 발송 요청 1회. 치환 전 원문·템플릿 이름·조건 요약·발송자·`requestedAt`(상태·건수는 저장하지 않음) |
+| entity | `{BE}/domain/entity/MessageSend.java` | 발송 요청 1회. 치환 전 원문·템플릿 이름·조건 요약·발송자·`requestedAt`·`origin`(상태·건수는 저장하지 않음). 공고는 선택값(시스템 발송), `createSystem` |
 | entity | `{BE}/domain/entity/MessageRecipient.java` | 발송 1회의 수신자 1명·채널별 결과·거래 ID. 이름·연락처 AES 암호화, `@DynamicUpdate` |
-| repository | `{BE}/domain/repository/MessageSendRepository.java` | 발송 CRUD·이력 검색(기간·종류·공고·구분, 최신순) |
+| repository | `{BE}/domain/repository/MessageSendRepository.java` | 발송 CRUD·이력 검색(기간·종류·공고·구분·발송 구분, 최신순) |
 | repository | `{BE}/domain/repository/MessageRecipientRepository.java` | 수신자 CRUD·채널별 거래 수신자 조회·수신자 1명 결과 반영 bulk update·발송별 상태 건수 |
 | repository | `{BE}/domain/repository/MessageRecipientStatusCount.java` | 상태 건수 projection(발송 id·메일 상태·SMS 상태·수) |
 | config | `{BE}/config/MessageProperties.java` | `recruit.message.*` 발신 정보·사이트 주소·최대 수신자·게이트웨이 선택·결과 대기 시간·성공 결과코드 |
@@ -84,15 +86,20 @@
 | test | `{BT}/service/MessageRecipientDynamicUpdateTest.java` | `@DynamicUpdate` 회귀(같은 행의 메일·SMS 채널이 서로 덮어쓰지 않음) |
 | test | `{BT}/service/MessageHistoryServiceTest.java` | 필터·정렬·건수·상태·지연·상세·파기된 수신자 |
 | test | `{BT}/controller/MessageHistoryAdminControllerTest.java` | 이력 API·400·404 |
+| service | `{BE}/service/SystemMailService.java` | 시스템 메일 1통: 기본 템플릿으로 이력 저장·커밋 → 동기 디스패치 → 접수 판정 |
+| service | `{BE}/service/ApplicationSubmittedMailListener.java` | 제출 커밋 후 비동기 제출 완료 메일(기본정보 → 회원 이메일) |
+| enum | `{BE}/enumeration/MessageOrigin.java` `{BE}/enumeration/SystemMailOutcome.java` | 발송 구분, 시스템 메일 결과(`ACCEPTED`·`FAILED`·`NO_TEMPLATE`) |
+| ops | `recruit_back/recruit_backend/docs/ops/message-send-origin-ddl.sql` | 운영 DDL(새 버전 기동 전 필수): `message_type` ENUM 값 3개 추가(`message_template`·`message_send`)·`origin` 추가·`job_posting_id` NULL 허용 |
+| test | `{BT}/service/SystemMailServiceTest.java` `{BT}/service/ApplicationSubmittedMailListenerTest.java` `{BT}/domain/entity/MessageSendTest.java` | 시스템 이력·인증번호 미저장·실패·템플릿 없음, 제출 메일 주소 선택, 생성 규칙 |
 
 ### 프론트
 
 | 종류 | 파일 | 역할 |
 |---|---|---|
 | route | `{FE}/routes/adminRoutes.ts` | `AdminMessageHistory`(`/admin/messages/history`) — 공유 파일 |
-| view | `{FE}/views/admin/message/AdminMessageHistoryView.vue` | 발송 이력 목록(필터·서버 페이지), `sendId` 쿼리면 상세 드로어 자동 열기 |
+| view | `{FE}/views/admin/message/AdminMessageHistoryView.vue` | 발송 이력 목록(필터·서버 페이지), `sendId` 쿼리면 상세 드로어 자동 열기, 발송 구분 열·필터 |
 | view | `{FE}/views/admin/message/MessageHistoryDrawer.vue` | 발송 상세 드로어(원문·수신자별 결과, 완료 전 5초 새로고침) |
-| util | `{FE}/views/admin/message/messageHistory.ts` | 상태·사유 라벨, 채널 칸·건수, 파기 표시, 테스트 결과 변환(`toTestResults`, 테스트 발송 카드가 씀), 기본 기간 |
+| util | `{FE}/views/admin/message/messageHistory.ts` | 상태·사유 라벨, 채널 칸·건수, 파기 표시, 테스트 결과 변환(`toTestResults`, 테스트 발송 카드가 씀), 기본 기간, 발송 구분 라벨 |
 | test | `{FE}/views/admin/message/__tests__/messageHistory.spec.ts` | Vitest |
 
 API 모듈·타입은 [message](message.md) 소유 `{FE}/api/admin/messageApi.ts`(`getHistory`·`getHistoryDetail`)·`{FE}/types/admin/message.ts`를 쓴다.
@@ -101,15 +108,15 @@ API 모듈·타입은 [message](message.md) 소유 `{FE}/api/admin/messageApi.ts
 
 | 상태 | 메서드 | 경로 | 요청 | 응답 |
 |---|---|---|---|---|
-| 🟢 | GET | /admin/messages/history | query `from?, to?, type?, jobPostingId?, test?, page(0), size(20)` | `PageResponse<MessageSendSummaryResponse>` 발송일시 desc, id desc |
+| 🟢 | GET | /admin/messages/history | query `from?, to?, type?, jobPostingId?, test?, origin?, page(0), size(20)` | `PageResponse<MessageSendSummaryResponse>` 발송일시 desc, id desc |
 | 🟢 | GET | /admin/messages/history/{sendId} | 없음 | `MessageSendDetailResponse` |
 
 권한: `/api/admin/**` 규칙(`ADMIN`, `RECRUIT_ADMIN`). 비로그인 401, 그 밖 역할 403. 테스트 발송·발송 접수 API는 [message](message.md).
 
 ### 엔드포인트 상세
 
-- history query: `from`·`to`는 `YYYY-MM-DD`(발송일, 양끝 포함). 비우면 `to` = 오늘, `from` = `to` − 29일(최근 30일). `test` 없음 = 실발송+테스트, `true` = 테스트만, `false` = 실발송만. `size` 1~100.
-- `MessageSendSummaryResponse`: `{ id, requestedAt, type, test, jobPostingTitle, stageName, conditionSummary, title, mailEnabled, smsEnabled, recipientCount, mail{ pending, requested, sent, failed, skipped }, sms{ 〃 }, status, delayed, senderName }`. `title` = 메일을 켰으면 메일 제목, 아니면 SMS 원문 앞 40자. `status`·건수·`delayed`는 조회할 때 계산(`## 규칙·불변식`).
+- history query: `from`·`to`는 `YYYY-MM-DD`(발송일, 양끝 포함). 비우면 `to` = 오늘, `from` = `to` − 29일(최근 30일). `test` 없음 = 실발송+테스트, `true` = 테스트만, `false` = 실발송만. `size` 1~100. `origin` 없음 = 전체, `ADMIN`·`SYSTEM`. `jobPostingId`로 거르면 공고 없는 시스템 발송은 빠진다.
+- `MessageSendSummaryResponse`: `{ id, requestedAt, type, test, origin, jobPostingTitle, stageName, conditionSummary, title, mailEnabled, smsEnabled, recipientCount, mail{ pending, requested, sent, failed, skipped }, sms{ 〃 }, status, delayed, senderName }`. `title` = 메일을 켰으면 메일 제목, 아니면 SMS 원문 앞 40자. `status`·건수·`delayed`는 조회할 때 계산(`## 규칙·불변식`). 공고 없는 시스템 발송은 `jobPostingTitle`이 null.
 - `MessageSendDetailResponse`: 요약 필드 전부(같은 이름) + `{ templateName, mailSubject, mailBody, smsBody(치환 전 원문), recipients[{ id, applicationId(테스트 수신자 null), name, email, phone, mailStatus, mailFailureReason, smsStatus, smsFailureReason, smsKind }] }` 수신자 id 순. 연락처는 가리지 않는다. 파기된 수신자는 `name`·`email`·`phone`이 null.
 - history 400(`InvalidMessageException`): `page는 0 이상이어야 합니다.` · `size는 1 이상 100 이하여야 합니다.` · `조회 시작일이 종료일보다 늦습니다.`(날짜·enum 형식 오류는 공통 400). 상세 404: `발송 기록을 찾을 수 없습니다.`(`MessageSendNotFoundException`).
 
@@ -126,9 +133,11 @@ API 모듈·타입은 [message](message.md) 소유 `{FE}/api/admin/messageApi.ts
 - 발송 상태·건수는 저장하지 않는다(`MessageSend`에 상태·집계 컬럼 없음). 조회할 때 수신자 채널 상태로 센다: `PENDING`이 있으면 `SENDING`, 없고 `REQUESTED`가 있으면 `RESULT_PENDING`, 둘 다 없으면 `COMPLETED`(`MessageSendStatus.of`). 지연이면 화면은 `RESULT_PENDING`을 "결과 미수신", `SENDING`을 "발송 중단"으로 보인다. DB 값은 바꾸지 않고, 시간이 지났다고 실패로 처리하지 않는다.
 - 이력 목록(`MessageHistoryService.search`): 기간·종류·공고·구분 필터, `requestedAt desc, id desc`, 건수는 페이지의 발송 id로 group by 쿼리 1개(`countStatusesByMessageSendIds`). 끈 채널은 건수가 아니라 `mailEnabled`·`smsEnabled`로 "제외" 표시. 목록 행은 상태 태그 + 채널별 건수 텍스트("N건"/"제외") + 결과 칸(성공·실패·수신 중 건수 텍스트, 막대 그래프 아님)으로 보인다. 목록은 새로고침 버튼으로 갱신하고, `sendId` 쿼리로 들어오면 그 상세 드로어를 바로 연다. 상세 드로어는 완료가 아니면 열려 있는 동안 5초마다 다시 읽는다.
 - 수신자 연락처(`MessageRecipient`의 `recipientName`·`email`·`phone`)는 발송 시점 값을 AES로 암호화해 저장한다. 발송 뒤 지원자가 연락처를 바꿔도 발송 당시 값이 남는다.
-- 로그: 목업 게이트웨이·호출 실패 로그는 이메일·전화번호를 마스킹하고(`MessageContacts`, [message](message.md)) 본문·예외 메시지는 남기지 않는다. 결과 처리 로그는 거래 ID만 남긴다.
+- 로그: 목업 게이트웨이·호출 실패 로그는 이메일·전화번호를 마스킹하고(`MessageContacts`, [message](message.md)) 본문·예외 메시지는 남기지 않는다. 예외: 로컬 목업 `LoggingMailGateway`는 인증번호 확인용으로 본문 `text`도 남긴다(2026-09-23 결정, `TRNodeMessageGateway`는 남기지 않음). 결과 처리 로그는 거래 ID만 남긴다.
 - 파기 연동: 지원서 파기 시 그 지원서의 `MessageRecipient` 이름·이메일·휴대폰(암호화 컬럼이라 null)과 `createdBy`·`updatedBy`를 null로 바꾼다. 채널 상태·거래 ID·실패 사유(결과코드)는 유지하고, 테스트 수신자(`jobApplication` null)는 대상이 아니다(`ApplicationPiiPurgeRepository.purgeMessageRecipients`, [privacy-audit](privacy-audit.md)). 화면은 지원서 수신자인데 이름·연락처가 모두 비었으면 "(파기됨)"으로 보인다.
 - 목업 결과(`recruit.message.gateway=logging`, 기본): 목업 게이트웨이는 항상 접수(가짜 거래 ID = UUID)하고 `MockDeliveryReportScheduler`가 3초 뒤 수신자마다 결과를 넘긴다. 결과코드는 실제 솔루션처럼 `00`, 연락처에 `fail`이 들어 있는 수신자만 `99`.
+- 시스템 자동발송(`SystemMailService.send`): 종류의 기본 템플릿(`defaultTemplate=true`)이 없으면 보내지 않고 경고 로그(`NO_TEMPLATE`). 있으면 `MessageSend.createSystem`(원문 = 템플릿 치환 전 제목·본문) + 수신자 1명(메일 `PENDING`, SMS `SKIPPED`/`CHANNEL_OFF`)을 저장·커밋한 뒤 `MessageDispatcher.dispatch`를 동기로 부르고 수신자 메일 상태가 `REQUESTED`·`SENT`면 `ACCEPTED`, 아니면 `FAILED`. `#{이름}`·`#{채용사이트}`는 비어 있으면 이름·설정값으로 채운다. 치환 결과(인증번호)는 `DeliveryItem`에만 있다. 결과 수신·이력 상세는 관리자 발송과 같은 경로다.
+- 제출 완료 메일: `ApplicationSubmittedEvent`(제출·재제출 성공, [application](application.md)) → `ApplicationSubmittedMailListener`(`AFTER_COMMIT` + `@Async`). 받는 주소 = 기본정보 이메일 → 회원 이메일(둘 다 없으면 경고 로그만), 이름 = 대상자 조회와 같은 규칙, 변수 `#{공고명}`·`#{제출일시}`(`yyyy-MM-dd HH:mm`). 예외는 경고 로그만, 제출 응답에 영향 없음.
 - TR 게이트웨이(`recruit.message.gateway=trnode`, `TRNodeMessageGateway`): 채널마다 TR·전문 형식이 다르고 `TRNodeEngine.setNodeEngine(TR명, body)`로 보낸다. 수신자 행은 공통으로 `CUST_ID`=`recruit` 고정, `RCMS_CNRP_NAME`=이름(null이면 빈 값), `RCMS_DATA`이고 레거시처럼 고정길이로 채우지 않는다.
   - 메일 `oseai_mail_001a`: `InBlock1` = 수신자(`RCMS_DATA` = 사내 암호화 라이브러리로 암호화한 이메일, `encryptEmail`), `InBlock3` = 레거시 고정 코드값(`MSG_APLY_CODE=S`·`EMAIL_APLY_CODE=2`·`USER_ID=recruit`·`UI_DEPT_CODE1=180`·`TRNM_SLIP_NO=WEB` 등) + `USER_NAME`·`EMAIL_NAME`(= `recruit.message.sender-name`·`sender-email`) + `TITL_CNTT`(제목) + `EMAIL_CNTT_DATA`(레이아웃 HTML).
   - SMS `oseai_isms_001a`: `InBlock1` = 발송 내용(`smsInBlock1`), `InBlock2` = 수신자(`RCMS_DATA` = 숫자만 남긴 번호, 암호화 안 함).
@@ -143,7 +152,7 @@ API 모듈·타입은 [message](message.md) 소유 `{FE}/api/admin/messageApi.ts
 
 ```bash
 # 백엔드 (recruit_back/recruit_backend/)
-$env:AES_SECRET_KEY='<로컬 예시 키>'; .\gradlew.bat test --tests "com.shinyoung.recruit.service.MessageDispatch*" --tests "com.shinyoung.recruit.service.MessageDelivery*" --tests "com.shinyoung.recruit.service.Delivery*" --tests "com.shinyoung.recruit.service.MockDeliveryReport*" --tests "com.shinyoung.recruit.service.UmsReportServerTest" --tests "com.shinyoung.recruit.service.TRNodeMessageGateway*" --tests "com.shinyoung.recruit.common.TRNodeEngineTest" --tests "com.shinyoung.recruit.service.MessageHistory*" --tests "com.shinyoung.recruit.service.MessageMailLayout*" --tests "com.shinyoung.recruit.service.MessageRecipient*" --tests "com.shinyoung.recruit.service.MessageSendAsyncFlow*" --tests "com.shinyoung.recruit.service.ApplicationPiiPurge*" --tests "com.shinyoung.recruit.controller.MessageHistory*" --tests "com.shinyoung.recruit.config.AsyncConfigTest" --tests "com.shinyoung.recruit.config.ApplicationYamlTest" --tests "com.shinyoung.recruit.config.SecurityConfigTest" --no-daemon
+$env:AES_SECRET_KEY='<로컬 예시 키>'; .\gradlew.bat test --tests "com.shinyoung.recruit.service.MessageDispatch*" --tests "com.shinyoung.recruit.service.MessageDelivery*" --tests "com.shinyoung.recruit.service.Delivery*" --tests "com.shinyoung.recruit.service.MockDeliveryReport*" --tests "com.shinyoung.recruit.service.UmsReportServerTest" --tests "com.shinyoung.recruit.service.TRNodeMessageGateway*" --tests "com.shinyoung.recruit.common.TRNodeEngineTest" --tests "com.shinyoung.recruit.service.MessageHistory*" --tests "com.shinyoung.recruit.service.MessageMailLayout*" --tests "com.shinyoung.recruit.service.MessageRecipient*" --tests "com.shinyoung.recruit.service.MessageSendAsyncFlow*" --tests "com.shinyoung.recruit.service.SystemMail*" --tests "com.shinyoung.recruit.service.ApplicationSubmittedMail*" --tests "com.shinyoung.recruit.domain.entity.MessageSendTest" --tests "com.shinyoung.recruit.service.ApplicationPiiPurge*" --tests "com.shinyoung.recruit.controller.MessageHistory*" --tests "com.shinyoung.recruit.config.AsyncConfigTest" --tests "com.shinyoung.recruit.config.ApplicationYamlTest" --tests "com.shinyoung.recruit.config.SecurityConfigTest" --no-daemon
 # 프론트 (recruit_front/)
 npm run type-check
 npx vitest run src/views/admin/message/__tests__/messageHistory.spec.ts
@@ -170,3 +179,5 @@ npx vitest run src/views/admin/message/__tests__/messageHistory.spec.ts
 - S4에서 `MessageSend`의 `status`·채널별 집계 6개·`completedAt`을 없앴다. 결과가 거래마다 나중에 여러 스레드에서 오므로 저장된 집계를 고치지 않고 조회할 때 센다. S3 코드로 만든 로컬 H2 DB에는 이 NOT NULL 컬럼이 남고, `@Enumerated(STRING)` 컬럼의 네이티브 `enum` 타입(Hibernate 7 H2·MariaDB 방언)에 `REQUESTED`가 없어 저장이 실패한다. `ddl-auto: update`는 둘 다 고치지 않으므로 로컬은 `message_recipient`·`message_send`를 지우고 다시 만든다. 운영 테이블 생성 SQL(설계서 17절 1번)은 S4 엔티티 기준으로 작성해야 한다.
 - `MessageSendAsyncFlowTest`는 `@Transactional` 없이 기본 로깅 게이트웨이로 커밋 → 비동기 접수 → 목업 결과 → `COMPLETED`를 확인하고, 만든 행은 `@AfterEach`에서 지운다(테스트 H2를 다른 테스트와 공유).
 - 프론트: 이력 기간은 `a-range-picker`의 `value-format="YYYY-MM-DD"` 문자열만 쓴다(`dayjs`는 `package.json` 직접 의존이 아니라 가져오지 않는다). 테스트 결과 폴링·상세 드로어 새로고침은 `setTimeout` 연쇄로 하고 요청 번호로 늦은 응답을 버린다.
+- 시스템 메일 저장은 `TransactionTemplate` 기본 전파다(설계서의 REQUIRES_NEW 대신). 운영 호출자는 트랜잭션 밖이라 이력이 먼저 커밋되고, `@Transactional` 테스트에서는 합류해 롤백된다(다른 테스트 이력 오염 방지).
+- 가입 인증·비밀번호 재설정 수신자 행은 `jobApplication`이 null이라 지원서 파기(`purgeMessageRecipients`) 대상이 아니다. 이메일·이름이 암호화된 채 남는다(2026-09-23 범위 밖, 파기 정책 미결).

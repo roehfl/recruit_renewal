@@ -12,7 +12,8 @@ import java.util.UUID;
 
 /**
  * 목업 메일 게이트웨이. 항상 접수(가짜 거래 ID)하고 3초 뒤 목업 결과를 예약한다(MockDeliveryReportScheduler).
- * 거래 ID·마스킹한 수신자·길이만 로그로 남긴다(본문 금지).
+ * 거래 ID·마스킹한 수신자·길이를 로그로 남긴다.
+ * 로컬 목업이라 본문(text)도 남긴다(인증번호 확인용). 운영 게이트웨이(trnode)는 본문을 남기지 않는다.
  */
 @Component
 @RequiredArgsConstructor
@@ -31,6 +32,7 @@ public class LoggingMailGateway implements MailGateway {
                 toAddresses.stream().map(MessageContacts::maskEmail).toList(),
                 message.subject().length(),
                 message.html().length());
+        log.info("[message-mail] transactionId={} text={}", transactionId, message.text());
         mockDeliveryReportScheduler.schedule(MessageChannel.MAIL, transactionId, toAddresses);
         return GatewayResult.accepted(transactionId);
     }

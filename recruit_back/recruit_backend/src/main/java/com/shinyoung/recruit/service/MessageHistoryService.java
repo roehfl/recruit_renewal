@@ -57,7 +57,8 @@ public class MessageHistoryService {
         }
         Page<MessageSend> sends = messageSendRepository.search(
                 from.atStartOfDay(), to.plusDays(1).atStartOfDay(),
-                condition.type(), condition.jobPostingId(), condition.test(), PageRequest.of(page, size));
+                condition.type(), condition.jobPostingId(), condition.test(), condition.origin(),
+                PageRequest.of(page, size));
         Map<Long, ChannelTally> tallies = tally(sends.getContent().stream().map(MessageSend::getId).toList());
         LocalDateTime now = LocalDateTime.now(clock);
         return PageResponse.from(sends.map(send ->

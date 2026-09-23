@@ -44,6 +44,7 @@ const detail = (recipients: MessageHistoryRecipient[]): MessageSendDetail => ({
   requestedAt: '2026-09-19T10:00:00',
   type: 'FREE',
   test: true,
+  origin: 'ADMIN',
   jobPostingTitle: '공고',
   stageName: null,
   conditionSummary: '제출 완료',

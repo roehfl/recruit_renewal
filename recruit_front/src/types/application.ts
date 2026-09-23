@@ -140,6 +140,18 @@ export interface FindEmailResponse {
   maskedEmail: string
 }
 
+/** 이메일 인증번호 확인 요청(가입·비밀번호 재발급 공용). 같은 세션에서 발송한 번호를 확인한다. */
+export interface EmailVerificationRequest {
+  email: string
+  code: string
+}
+
+/** POST /auth/applicants/password-reset — 같은 세션에서 인증번호를 확인한 뒤 10분 안에 보낸다. */
+export interface PasswordResetRequest {
+  email: string
+  newPassword: string
+}
+
 /** GET /applications/{applicationId}/stage-results — 발표된 전형 결과만 내려온다(임시저장 지원서는 400). */
 export interface ApplicantStageResult {
   stageName: string

@@ -27,10 +27,10 @@
             </a-tab-pane>
 
             <a-tab-pane key="resetPassword" tab="비밀번호 재발급">
-              <div class="tab-body">
+              <div class="tab-body" v-if="!isPasswordResetDone">
                 <div class="tab-icon"><MailOutlined /></div>
-                <p class="tab-title">이메일 인증으로 재발급</p>
-                <p class="tab-description">가입한 이메일로 인증하시면<br>임시 비밀번호를 보내드립니다.</p>
+                <p class="tab-title">이메일 인증으로 재설정</p>
+                <p class="tab-description">가입한 이메일로 받은 인증번호를 확인한 뒤<br>새 비밀번호를 설정합니다.</p>
                 <div class="mail-row">
                   <a-input size="large" placeholder="이메일을 입력해주세요."
                     v-model:value="loginId" :disabled="isEmailCertificationDone" />
@@ -39,10 +39,24 @@
                   <a-button type="primary" size="large" class="mail-button" v-else disabled>인증 완료</a-button>
                 </div>
                 <div class="mail-row" v-if="isEmailCertification">
-                  <a-input size="large" placeholder="이메일 인증번호를 입력해주세요." />
+                  <a-input size="large" placeholder="이메일 인증번호를 입력해주세요."
+                    v-model:value="verificationCode" :maxlength="6" />
                   <a-button type="primary" size="large" class="mail-button" @click="clickToEmailCertificationButton">인증확인</a-button>
                 </div>
-                <p class="mail-done" v-if="isEmailCertificationDone">해당 메일주소로 임시 비밀번호가 전송되었습니다.</p>
+                <template v-if="isEmailCertificationDone">
+                  <a-input-password class="password-input" size="large" placeholder="새 비밀번호를 입력해주세요. (8자 이상)"
+                    v-model:value="newPassword" />
+                  <a-input-password class="password-input" size="large" placeholder="새 비밀번호를 다시 입력해주세요."
+                    v-model:value="newPasswordConfirm" />
+                  <a-button type="primary" size="large" block :loading="isResetting"
+                    @click="clickToResetPasswordButton">비밀번호 변경</a-button>
+                </template>
+              </div>
+              <div class="tab-body" v-else>
+                <div class="tab-icon"><CheckCircleOutlined /></div>
+                <p class="tab-title">비밀번호가 변경되었습니다</p>
+                <p class="tab-description">새 비밀번호로 로그인해주세요.</p>
+                <a-button type="primary" size="large" block @click="goToLogin">로그인</a-button>
               </div>
             </a-tab-pane>
           </a-tabs>
@@ -60,7 +74,6 @@ import { CheckCircleOutlined, MailOutlined, MobileOutlined } from '@ant-design/i
 import { message } from 'ant-design-vue';
 import { applicationApi } from '@/api/applicationApi';
 import { getApiErrorMessage } from '@/api/apiError';
-import type { checkEmailRequest } from '@/types/application';
 import { NICE_MESSAGE_SOURCE, type NiceAuthMessage } from '@/types/auth/nice';
 
 const router = useRouter();
@@ -74,16 +87,13 @@ const isNiceAuthPopupOpen = ref(false);
 const isNiceAuthComplete = ref(false);
 const maskedEmail = ref('');
 
-const isAvailable = ref(false);
-const isEmailChecked = ref(false);
 const isEmailCertification = ref(false);
 const isEmailCertificationDone = ref(false);
-
-const checkEmail = ref<checkEmailRequest>({
-  success: true,
-  data: {available: true},
-  message: '',
-})
+const verificationCode = ref('');
+const newPassword = ref('');
+const newPasswordConfirm = ref('');
+const isResetting = ref(false);
+const isPasswordResetDone = ref(false);
 
 // 회원가입(SignupView)과 같은 규칙. 백엔드 @Email 이 허용하는 '+' 태그와 4자 이상 최상위 도메인도 받는다.
 const regEmail = /^[0-9a-zA-Z]([-_.+]?[0-9a-zA-Z])*@[0-9a-zA-Z]([-_.]?[0-9a-zA-Z])*\.[a-zA-Z]{2,}$/i;
@@ -146,45 +156,64 @@ const clickToEmailCheckButton = async () => {
     message.error('올바른 형식의 이메일 주소를 작성해주세요.');
     return;
   }
-  else{
-    await checkDuplicateEmailButton();
+  try {
+    await applicationApi.sendPasswordResetCode(loginId.value);
   }
+  catch (error) {
+    // 미가입(404)·60초 재발송 제한·발송 실패는 서버 문구를 그대로 보여 준다.
+    message.error(getApiErrorMessage(error, '인증 메일을 보내지 못했습니다.'));
+    return;
+  }
+  isEmailCertification.value = true;
+  message.success('해당 메일주소로 인증번호를 발송하였습니다.');
 }
-
-const checkAvailableEmail = async () => {
-    try {
-        const result = await applicationApi.checkEmail(
-            loginId.value,
-        )
-            checkEmail.value = {
-            success: result.data.success,
-            data: result.data.data as unknown as {available: false},
-            message: result.data.message ?? '',
-        }
-        isAvailable.value = !(checkEmail.value.data.available);
-    }
-    catch (error) {
-        console.error(error);
-    }
-}
-
-const checkDuplicateEmailButton = async () => {
-  await checkAvailableEmail();
-  if(!isAvailable.value) {
-    message.error('가입되지 않은 메일주소 입니다.');
-  }
-  if (isAvailable.value) {
-    isEmailChecked.value = true;
-    isEmailCertification.value = true;
-    message.success('해당 메일주소로 인증번호를 발송하였습니다.');
-  }
-};
 
 const clickToEmailCertificationButton = async () => {
-  // 메일 인증 후 임시비밀번호로 비밀번호 변경
+  if (!verificationCode.value.trim()) {
+    message.warning('인증번호를 입력해주세요.');
+    return;
+  }
+  try {
+    await applicationApi.verifyPasswordResetCode({ email: loginId.value, code: verificationCode.value.trim() });
+  }
+  catch (error) {
+    message.error(getApiErrorMessage(error, '인증번호를 확인하지 못했습니다.'));
+    return;
+  }
   message.success('이메일 인증이 완료되었습니다.');
   isEmailCertification.value = false;
   isEmailCertificationDone.value = true;
+}
+
+const clickToResetPasswordButton = async () => {
+  // 백엔드 ApplicantPasswordResetRequest 는 가입과 같이 8자 이상을 요구한다.
+  if (newPassword.value.length < 8) {
+    message.warning('비밀번호는 8자 이상 입력해주세요.');
+    return;
+  }
+  if (newPassword.value !== newPasswordConfirm.value) {
+    message.warning('비밀번호 확인이 일치하지 않습니다.');
+    return;
+  }
+  isResetting.value = true;
+  try {
+    await applicationApi.resetPassword({ email: loginId.value, newPassword: newPassword.value });
+    message.success('비밀번호가 변경되었습니다.');
+    isPasswordResetDone.value = true;
+  }
+  catch (error) {
+    const errorMessage = getApiErrorMessage(error, '비밀번호를 변경하지 못했습니다.');
+    message.error(errorMessage);
+    // 인증 만료 등으로 재인증이 필요하면 같은 화면에서 다시 인증받을 수 있게 상태를 되돌린다.
+    if (errorMessage === '이메일 인증이 필요합니다.') {
+      isEmailCertificationDone.value = false;
+      isEmailCertification.value = true;
+      verificationCode.value = '';
+    }
+  }
+  finally {
+    isResetting.value = false;
+  }
 }
 
 </script>
@@ -313,7 +342,7 @@ const clickToEmailCertificationButton = async () => {
   gap: 10px;
 }
 
-/* 비밀번호 재발급(메일 인증 목업) */
+/* 비밀번호 재발급(메일 인증) */
 .mail-row {
   display: flex;
   gap: 10px;
@@ -325,10 +354,8 @@ const clickToEmailCertificationButton = async () => {
   min-width: 96px;
 }
 
-.mail-done {
-  margin: 4px 0 0;
-  font-size: 14px;
-  color: var(--tap-text);
+.password-input {
+  margin-bottom: 12px;
 }
 
 @media (max-width: 860px) {

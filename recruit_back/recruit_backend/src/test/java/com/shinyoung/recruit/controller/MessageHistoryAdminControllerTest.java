@@ -79,12 +79,23 @@ class MessageHistoryAdminControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.content[0].id").value(send.getId()))
+                .andExpect(jsonPath("$.data.content[0].origin").value("ADMIN"))
                 .andExpect(jsonPath("$.data.content[0].jobPostingTitle").value("이력 API 공고"))
                 .andExpect(jsonPath("$.data.content[0].title").value("[신영증권] #{이름}님 안내"))
                 .andExpect(jsonPath("$.data.content[0].mail.requested").value(1))
                 .andExpect(jsonPath("$.data.content[0].sms.skipped").value(1))
                 .andExpect(jsonPath("$.data.content[0].status").value("RESULT_PENDING"))
                 .andExpect(jsonPath("$.data.content[0].delayed").value(false));
+    }
+
+    @Test
+    void 이력_목록은_발송_구분으로_거른다() throws Exception {
+        mockMvc.perform(get("/api/admin/messages/history")
+                        .param("jobPostingId", String.valueOf(posting.getId()))
+                        .param("origin", "SYSTEM")
+                        .with(authentication(employee())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
     }
 
     @Test

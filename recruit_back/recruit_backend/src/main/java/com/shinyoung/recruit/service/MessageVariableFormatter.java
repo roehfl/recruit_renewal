@@ -56,6 +56,8 @@ public class MessageVariableFormatter {
             case INTERVIEW_METHOD -> interview == null ? "" : methodLabel(interview.getMethod());
             case MEETING_URL -> interview == null ? "" : Objects.toString(interview.getOnlineMeetingUrl(), "");
             case GROUP -> interview == null ? "" : groupLabel(interview.getGroupName());
+            // 시스템 자동발송 전용 변수. 관리자 종류에는 허용되지 않아 여기서 값이 쓰이지 않는다(값은 SystemMailService 호출자가 넣는다).
+            case VERIFICATION_CODE, SUBMITTED_AT -> "";
         };
     }
 

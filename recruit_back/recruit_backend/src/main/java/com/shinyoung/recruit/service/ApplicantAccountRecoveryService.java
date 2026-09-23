@@ -4,28 +4,37 @@ import com.shinyoung.recruit.common.hash.AuditHmac;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.dto.response.ApplicantFindEmailResponse;
+import com.shinyoung.recruit.enumeration.EmailVerificationPurpose;
 import com.shinyoung.recruit.exception.ApplicantNotFoundException;
 import com.shinyoung.recruit.service.nice.NiceVerifiedIdentity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 로그인 전 계정 복구. 지금은 아이디(이메일) 찾기뿐이다.
+ * 로그인 전 계정 복구: 아이디(이메일) 찾기, 비밀번호 재설정.
  *
- * <p>세션을 직접 만지지 않는다. 컨트롤러가 세션의 NICE 인증 결과를 검사·소비한 뒤 값으로 넘긴다
+ * <p>세션을 직접 만지지 않는다. 컨트롤러가 세션의 NICE 인증 결과·이메일 인증 상태를 검사·소비한 뒤 값으로 넘긴다
  * — 서비스가 {@code HttpSession} 을 알면 단위 테스트가 서블릿 컨테이너에 묶인다.
  */
 @Service
 public class ApplicantAccountRecoveryService {
 
     private static final String NOT_FOUND_MESSAGE = "본인인증 정보와 일치하는 계정이 없습니다.";
+    private static final String EMAIL_NOT_FOUND_MESSAGE = "가입된 이메일이 아닙니다.";
 
     private final ApplicantRepository applicantRepository;
     private final AuditHmac auditHmac;
+    private final EmailVerificationService emailVerificationService;
+    private final PasswordEncoder passwordEncoder;
 
-    public ApplicantAccountRecoveryService(ApplicantRepository applicantRepository, AuditHmac auditHmac) {
+    public ApplicantAccountRecoveryService(ApplicantRepository applicantRepository, AuditHmac auditHmac,
+                                           EmailVerificationService emailVerificationService,
+                                           PasswordEncoder passwordEncoder) {
         this.applicantRepository = applicantRepository;
         this.auditHmac = auditHmac;
+        this.emailVerificationService = emailVerificationService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     /**
@@ -41,6 +50,27 @@ public class ApplicantAccountRecoveryService {
                 .map(Applicant::getLoginId)
                 .orElseThrow(() -> new ApplicantNotFoundException(NOT_FOUND_MESSAGE));
         return new ApplicantFindEmailResponse(maskLoginId(loginId));
+    }
+
+    /**
+     * 가입 이메일로 비밀번호 재설정 인증번호를 보내고 세션에 둘 상태를 돌려준다. 가입된 지원자가 없으면 404
+     * (계정 열거 감수 — 기존 결정). 트랜잭션을 걸지 않는다 — 발송 이력은 SystemMailService 가 먼저 커밋한다.
+     */
+    public EmailVerificationState sendPasswordResetCode(EmailVerificationState previous, String email) {
+        Applicant applicant = findByEmail(email);
+        return emailVerificationService.send(previous, EmailVerificationPurpose.PASSWORD_RESET,
+                applicant.getEmail(), applicant.getName());
+    }
+
+    /** 인증을 마친 이메일의 비밀번호를 바꾼다(BCrypt). 다른 로그인 세션은 건드리지 않는다. */
+    @Transactional
+    public void resetPassword(String email, String newPassword) {
+        findByEmail(email).changePassword(passwordEncoder.encode(newPassword));
+    }
+
+    private Applicant findByEmail(String email) {
+        return applicantRepository.findByEmail(email.trim())
+                .orElseThrow(() -> new ApplicantNotFoundException(EMAIL_NOT_FOUND_MESSAGE));
     }
 
     /**

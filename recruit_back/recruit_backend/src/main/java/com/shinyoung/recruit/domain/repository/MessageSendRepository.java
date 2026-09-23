@@ -1,6 +1,7 @@
 package com.shinyoung.recruit.domain.repository;
 
 import com.shinyoung.recruit.domain.entity.MessageSend;
+import com.shinyoung.recruit.enumeration.MessageOrigin;
 import com.shinyoung.recruit.enumeration.MessageType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,6 +23,7 @@ public interface MessageSendRepository extends JpaRepository<MessageSend, Long> 
               and (:type is null or s.type = :type)
               and (:jobPostingId is null or s.jobPosting.id = :jobPostingId)
               and (:test is null or s.test = :test)
+              and (:origin is null or s.origin = :origin)
             order by s.requestedAt desc, s.id desc
             """)
     Page<MessageSend> search(
@@ -30,6 +32,7 @@ public interface MessageSendRepository extends JpaRepository<MessageSend, Long> 
             @Param("type") MessageType type,
             @Param("jobPostingId") Long jobPostingId,
             @Param("test") Boolean test,
+            @Param("origin") MessageOrigin origin,
             Pageable pageable
     );
 }

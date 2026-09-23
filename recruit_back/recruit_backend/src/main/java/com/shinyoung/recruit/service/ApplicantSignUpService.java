@@ -7,6 +7,7 @@ import com.shinyoung.recruit.domain.repository.UserRepository;
 import com.shinyoung.recruit.dto.request.ApplicantSignUpRequest;
 import com.shinyoung.recruit.dto.response.ApplicantEmailAvailabilityResponse;
 import com.shinyoung.recruit.dto.response.ApplicantSignUpResponse;
+import com.shinyoung.recruit.enumeration.EmailVerificationPurpose;
 import com.shinyoung.recruit.exception.InvalidApplicantSignUpException;
 import com.shinyoung.recruit.service.nice.NiceVerifiedIdentity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,12 +21,15 @@ public class ApplicantSignUpService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditHmac auditHmac;
+    private final EmailVerificationService emailVerificationService;
 
-    public ApplicantSignUpService(ApplicantRepository applicantRepository, UserRepository userRepository, PasswordEncoder passwordEncoder, AuditHmac auditHmac) {
+    public ApplicantSignUpService(ApplicantRepository applicantRepository, UserRepository userRepository, PasswordEncoder passwordEncoder, AuditHmac auditHmac,
+                                  EmailVerificationService emailVerificationService) {
         this.applicantRepository = applicantRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditHmac = auditHmac;
+        this.emailVerificationService = emailVerificationService;
     }
 
     @Transactional
@@ -34,6 +38,11 @@ public class ApplicantSignUpService {
         String name = identity.name().trim();
         String phoneNumber = identity.phoneNumber().trim();
         String email = normalizeEmail(request.email());
+
+        // 이메일 인증은 email 만 확인한다. 아이디가 다르면 남의 이메일을 아이디로 가입할 수 있다.
+        if (email == null || !loginId.equalsIgnoreCase(email)) {
+            throw new InvalidApplicantSignUpException("아이디는 인증한 이메일과 같아야 합니다.");
+        }
 
         // 로그인 해석(findUserByLoginId)이 users 테이블 전체에서 일어나므로 중복체크도 User 레벨로 수행한다.
         // (Applicant 레벨만 체크하면 임직원(LDAP JIT) loginId와 충돌해 양쪽 로그인 장애가 된다.)
@@ -63,6 +72,20 @@ public class ApplicantSignUpService {
         applicantRepository.save(applicant);
 
         return ApplicantSignUpResponse.from(applicant);
+    }
+
+    /**
+     * 가입 이메일 인증번호를 보내고 세션에 둘 상태를 돌려준다. 이미 가입된 이메일이면 보내지 않는다.
+     *
+     * <p>트랜잭션을 걸지 않는다 — 발송 이력은 SystemMailService 가 먼저 커밋한 뒤 게이트웨이를 부른다.
+     * 가입 인증 메일에는 이름이 없다(아직 본인확인 전일 수 있다).
+     */
+    public EmailVerificationState sendEmailVerification(EmailVerificationState previous, String email) {
+        String normalized = normalizeEmail(email);
+        if (applicantRepository.existsByEmail(normalized)) {
+            throw new InvalidApplicantSignUpException("이미 사용 중인 이메일입니다.");
+        }
+        return emailVerificationService.send(previous, EmailVerificationPurpose.SIGNUP, normalized, "");
     }
 
     /**

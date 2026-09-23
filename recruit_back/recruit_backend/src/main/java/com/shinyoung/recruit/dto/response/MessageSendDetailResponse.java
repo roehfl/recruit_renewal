@@ -1,6 +1,7 @@
 package com.shinyoung.recruit.dto.response;
 
 import com.shinyoung.recruit.domain.entity.MessageSend;
+import com.shinyoung.recruit.enumeration.MessageOrigin;
 import com.shinyoung.recruit.enumeration.MessageSendStatus;
 import com.shinyoung.recruit.enumeration.MessageType;
 
@@ -13,6 +14,7 @@ public record MessageSendDetailResponse(
         LocalDateTime requestedAt,
         MessageType type,
         boolean test,
+        MessageOrigin origin,
         String jobPostingTitle,
         String stageName,
         String conditionSummary,
@@ -39,6 +41,7 @@ public record MessageSendDetailResponse(
                 summary.requestedAt(),
                 summary.type(),
                 summary.test(),
+                summary.origin(),
                 summary.jobPostingTitle(),
                 summary.stageName(),
                 summary.conditionSummary(),

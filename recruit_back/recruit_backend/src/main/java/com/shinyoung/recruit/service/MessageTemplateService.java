@@ -26,6 +26,8 @@ public class MessageTemplateService {
             .comparing(MessageTemplate::getType)
             .thenComparing(MessageTemplate::isDefaultTemplate, Comparator.reverseOrder())
             .thenComparing(MessageTemplate::getName);
+    private static final String VERIFICATION_CODE_TOKEN = "#{" + MessageVariable.VERIFICATION_CODE.getKey() + "}";
+    private static final String SYSTEM_DEFAULT_LOCKED = "시스템 기본 템플릿은 기본을 해제할 수 없습니다.";
 
     private final MessageTemplateRepository messageTemplateRepository;
     private final MessageRenderer messageRenderer;
@@ -66,6 +68,10 @@ public class MessageTemplateService {
     @Transactional
     public MessageTemplateResponse updateTemplate(Long templateId, MessageTemplateSaveRequest request) {
         MessageTemplate template = findTemplate(templateId);
+        // 시스템 기본 템플릿은 자동발송이 쓰므로 스스로 기본에서 빠지면 안 된다. 다른 템플릿을 기본으로 지정하면 아래 clearDefault 로 바뀐다.
+        if (isSystemDefault(template) && (!request.defaultTemplate() || request.type() != template.getType())) {
+            throw new InvalidMessageException(SYSTEM_DEFAULT_LOCKED);
+        }
         Content content = validate(request);
         if (request.defaultTemplate()) {
             clearDefault(request.type(), templateId);
@@ -81,7 +87,11 @@ public class MessageTemplateService {
 
     @Transactional
     public void deleteTemplate(Long templateId) {
-        messageTemplateRepository.delete(findTemplate(templateId));
+        MessageTemplate template = findTemplate(templateId);
+        if (isSystemDefault(template)) {
+            throw new InvalidMessageException("시스템 기본 템플릿은 삭제할 수 없습니다.");
+        }
+        messageTemplateRepository.delete(template);
     }
 
     private MessageTemplate findTemplate(Long templateId) {
@@ -95,12 +105,20 @@ public class MessageTemplateService {
                 .forEach(MessageTemplate::unmarkDefault);
     }
 
+    private static boolean isSystemDefault(MessageTemplate template) {
+        return template.isDefaultTemplate() && template.getType().isSystem();
+    }
+
     private Content validate(MessageTemplateSaveRequest request) {
+        boolean system = request.type().isSystem();
         Content content = new Content(
                 blankToNull(request.mailSubject()),
                 blankToNull(request.mailBody()),
-                blankToNull(request.smsBody())
+                system ? null : blankToNull(request.smsBody())
         );
+        if (system && (content.mailSubject() == null || content.mailBody() == null)) {
+            throw new InvalidMessageException("시스템 자동발송 템플릿은 메일 제목과 본문을 입력해야 합니다.");
+        }
         if ((content.mailSubject() == null) != (content.mailBody() == null)) {
             throw new InvalidMessageException("메일은 제목과 본문을 함께 입력해야 합니다.");
         }
@@ -108,6 +126,11 @@ public class MessageTemplateService {
             throw new InvalidMessageException("메일 또는 SMS 내용을 입력해야 합니다.");
         }
         messageRenderer.validateVariables(request.type(), content.mailSubject(), content.mailBody(), content.smsBody());
+        if (MessageVariable.VERIFICATION_CODE.isAllowedFor(request.type())
+                && !content.mailSubject().contains(VERIFICATION_CODE_TOKEN)
+                && !content.mailBody().contains(VERIFICATION_CODE_TOKEN)) {
+            throw new InvalidMessageException("인증 메일에는 #{인증번호}가 있어야 합니다.");
+        }
         return content;
     }
 

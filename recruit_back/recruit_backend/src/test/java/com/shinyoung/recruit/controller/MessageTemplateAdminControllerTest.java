@@ -121,7 +121,7 @@ class MessageTemplateAdminControllerTest {
     void 변수_카탈로그를_조회한다() throws Exception {
         mockMvc.perform(get("/api/admin/messages/variables"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(12))
+                .andExpect(jsonPath("$.data.length()").value(14))
                 .andExpect(jsonPath("$.data[0].key").value("이름"))
                 .andExpect(jsonPath("$.data[0].label").value("지원자 이름"));
     }

@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>시스템 자동발송 메일 - 구현 결과 보고서</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===== 헤더 ===== -->
+<header>
+  <div>신영증권 채용 Renewal</div>
+  <h1>시스템 자동발송 메일 — 가입 이메일 인증 · 비밀번호 재발급 · 제출 완료 안내</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge warn">미커밋</span>
+  <span class="badge muted">작성일: 2026-09-23</span>
+</header>
+
+<main>
+
+  <!-- ===== 요약 + 현황 ===== -->
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>사내 TR 게이트웨이로 메일 실발송·결과 수신이 확인되어, 목업이던 가입 이메일 인증과 비밀번호 재발급을 실제 메일 연동으로 바꾸고 지원서 제출·재제출 완료 안내 메일을 새로 추가했다.</p>
+      <p>비밀번호 재발급은 임시 비밀번호·재설정 링크 방식을 폐지하고 "인증번호 확인 → 그 자리에서 새 비밀번호 설정" 방식으로 대체했다. 3종 메일 이력은 기존 <code>message_send</code>·<code>message_recipient</code>를 재사용하며 발송 구분 <code>origin</code>(<code>ADMIN</code>/<code>SYSTEM</code>)을 추가했다.</p>
+      <p>인증번호는 숫자 6자리·유효 5분·5회 오류·재발송 60초·확인 후 10분 규칙을 따르며, DB와 운영 로그에는 남기지 않는다(세션에는 SHA-256 해시만 저장).</p>
+      <p>백엔드·프론트 구현과 대상 범위 테스트, 문서 갱신까지 마쳤으며, 커밋 전 최종 리뷰에서 enum 컬럼 확장 관련 Critical 이슈를 발견해 운영 DDL에 반영했다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">백엔드 구현 완료</span></p>
+      <p><span class="badge done">프론트 구현 완료</span></p>
+      <p><span class="badge done">문서 갱신 완료</span></p>
+      <p><span class="badge done">대상 범위 테스트 통과</span></p>
+      <p><span class="badge warn">전체 회귀 미실행</span></p>
+      <p><span class="badge warn">MariaDB DDL 실행 미검증</span></p>
+      <p><span class="badge pending">git 커밋 전</span></p>
+    </div>
+  </section>
+
+  <!-- ===== 범위 ===== -->
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>가입 이메일 인증 실연동 — 가입 시 서버가 인증 여부를 강제하고 <code>loginId=email</code>을 강제</li>
+          <li>비밀번호 재발급 — 인증번호 확인 후 새 비밀번호 설정 방식(임시 비밀번호·링크 방식 대체)</li>
+          <li>지원서 제출·재제출 완료 안내 메일 — 커밋 후 비동기 발송, 실패해도 제출 자체에는 영향 없음</li>
+          <li>이력 <code>origin</code>(<code>ADMIN</code>/<code>SYSTEM</code>) 추가, <code>job_posting_id</code> nullable 전환, 이력 화면 발송 구분 열·필터</li>
+          <li>관리자 템플릿 관리 — 시스템 유형 3종 기동 시 기본 템플릿 자동 생성, 삭제·기본 해제·유형 변경 차단, 인증 템플릿 <code>#{인증번호}</code> 필수</li>
+          <li>새 API 5개 및 이력 조회 <code>origin</code> 파라미터 추가</li>
+          <li>인증번호 6자리·5분·5회·재발송 60초·확인 후 10분 규칙, 세션 저장, verify 동시성 처리</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미확인/검증 못한 항목</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>MariaDB 운영 DDL 실행 검증(로컬은 H2용 임시 테스트로만 검증)</li>
+          <li>전체 회귀 테스트 미실행(수정 범위 테스트만 실행)</li>
+          <li>폐쇄망 실환경에서의 3종 메일 실발송·결과 수신 확인</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>SMS 인증</li>
+          <li>인증 시도 IP 단위 제한</li>
+          <li>세션 밖(다른 브라우저) 인증 이어가기</li>
+          <li>제출 완료 메일 재발송</li>
+          <li>가입 인증·비밀번호 재설정 이력 수신자 행의 파기 정책(추후 결정)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Enum 설계 ===== -->
+  <section>
+    <h2>Enum 설계</h2>
+    <div class="two">
+      <div class="card">
+        <h3>MessageOrigin (신설)</h3>
+        <table>
+          <tr><th>값</th><th>설명</th></tr>
+          <tr><td><code>ADMIN</code></td><td>관리자가 직접 발송</td></tr>
+          <tr><td><code>SYSTEM</code></td><td>시스템 자동발송(가입 인증·비밀번호 재발급·제출 완료)</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>MessageType (추가 3종)</h3>
+        <table>
+          <tr><th>값</th><th>설명</th></tr>
+          <tr><td><code>SIGNUP_VERIFICATION</code></td><td>가입 이메일 인증번호 메일</td></tr>
+          <tr><td><code>PASSWORD_RESET</code></td><td>비밀번호 재발급 인증번호 메일</td></tr>
+          <tr><td><code>APPLICATION_SUBMITTED</code></td><td>지원서 제출·재제출 완료 안내 메일</td></tr>
+        </table>
+        <p class="small"><code>MessageType.isSystem()</code>으로 세 값을 구분한다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== API 목록 ===== -->
+  <section>
+    <h2>API 목록</h2>
+
+    <h3>신규 API (5개)</h3>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th></tr>
+      <tr><td><code>POST</code></td><td><code>/auth/applicants/email-verification/send</code></td><td>가입 이메일 인증번호 발송</td></tr>
+      <tr><td><code>POST</code></td><td><code>/auth/applicants/email-verification/verify</code></td><td>가입 이메일 인증번호 확인</td></tr>
+      <tr><td><code>POST</code></td><td><code>/auth/applicants/password-reset/send</code></td><td>비밀번호 재발급 인증번호 발송</td></tr>
+      <tr><td><code>POST</code></td><td><code>/auth/applicants/password-reset/verify</code></td><td>비밀번호 재발급 인증번호 확인</td></tr>
+      <tr><td><code>POST</code></td><td><code>/auth/applicants/password-reset</code></td><td>새 비밀번호 설정</td></tr>
+    </table>
+
+    <h3>기존 API 변경</h3>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>변경 내용</th></tr>
+      <tr><td><code>GET</code></td><td><code>/admin/messages/history</code></td><td><code>origin</code>(<code>ADMIN</code>/<code>SYSTEM</code>) 필터 파라미터 추가, 응답에 <code>origin</code> 필드 추가</td></tr>
+    </table>
+  </section>
+
+  <!-- ===== 결정 로그 ===== -->
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>비밀번호 재발급을 인증번호 확인 후 즉시 새 비밀번호 설정 방식으로 통일</td><td>기존 카드의 "임시 비밀번호·재설정 링크" 결정을 대체, 사용자 흐름 단순화</td></tr>
+      <tr><td>2</td><td>인증번호는 세션에만 SHA-256 해시로 저장, DB 테이블 없음</td><td>인증번호가 DB·운영 로그에 남지 않도록 하기 위함</td></tr>
+      <tr><td>3</td><td>로컬 목업 게이트웨이(<code>gateway=logging</code>)만 메일 본문(text)을 로그에 남김</td><td>로컬 환경에서 인증번호 확인 목적, <code>TRNodeMessageGateway</code>(운영)는 본문 미기록 유지</td></tr>
+      <tr><td>4</td><td>가입 인증 만료 시 화면에서 재인증 단계로 자동 복귀</td><td>10분 경과로 가입이 "이메일 인증이 필요합니다."로 실패해도 새로고침 없이 재인증 가능하게 함</td></tr>
+      <tr><td>5</td><td>가입 인증·비밀번호 재설정 이력 수신자 행의 파기 정책은 이번 범위에서 제외</td><td>지원서와 연결되지 않는 행의 처리 기준은 별도로 정할 필요가 있어 사용자가 보류 결정</td></tr>
+      <tr><td>6</td><td>제출 완료 메일은 별도 <code>sendAfterCommit</code> 경로 없이 리스너 내부에서 동기 디스패치로 처리</td><td>리스너가 이미 <code>@TransactionalEventListener(AFTER_COMMIT)</code> + <code>@Async</code>로 비동기 실행되므로 추가 이벤트 경유가 불필요</td></tr>
+      <tr><td>7</td><td>비밀번호 재발급 미가입 이메일은 404로 응답(계정 열거 가능성 감수)</td><td>기존 카드의 결정을 유지</td></tr>
+    </table>
+  </section>
+
+  <!-- ===== 검증 및 비즈니스 규칙 ===== -->
+  <section>
+    <h2>검증 및 비즈니스 규칙</h2>
+
+    <h3>인증번호 규칙</h3>
+    <table>
+      <tr><th>규칙</th><th>설명</th></tr>
+      <tr><td>형식</td><td>숫자 6자리</td></tr>
+      <tr><td>유효 기간</td><td>발급 후 5분</td></tr>
+      <tr><td>오류 허용</td><td>5회 틀리면 무효</td></tr>
+      <tr><td>재발송 제한</td><td>직전 발급 후 60초 이내 재요청 불가</td></tr>
+      <tr><td>확인 유효</td><td>확인(verify) 성공 후 10분 안에 가입/비밀번호 변경을 완료해야 함</td></tr>
+      <tr><td>동시성</td><td>verify 요청은 세션 단위 mutex로 동기화</td></tr>
+    </table>
+
+    <h3>템플릿 규칙</h3>
+    <table>
+      <tr><th>규칙</th><th>설명</th></tr>
+      <tr><td>시스템 기본 템플릿</td><td>기동 시 시스템 유형 3종 각각 기본 템플릿이 없으면 자동 생성</td></tr>
+      <tr><td>삭제·기본 해제·유형 변경</td><td>시스템 기본 템플릿은 삭제·기본 해제·유형 변경 모두 차단</td></tr>
+      <tr><td>인증 템플릿 필수 변수</td><td><code>SIGNUP_VERIFICATION</code>·<code>PASSWORD_RESET</code> 템플릿은 <code>#{인증번호}</code> 포함 필수</td></tr>
+      <tr><td>채널 제한</td><td>시스템 유형은 메일 전용(SMS 본문 저장 안 함)</td></tr>
+      <tr><td>관리자 발송 차단</td><td>관리자 발송·테스트 발송·대상 조회에서 시스템 유형 선택 시 거부</td></tr>
+    </table>
+  </section>
+
+  <!-- ===== 변경 파일 ===== -->
+  <section>
+    <h2>변경 파일</h2>
+    <div class="card">
+      <p>백엔드·프론트·문서에 걸쳐 총 53개 파일이 수정되었고(신규 파일 다수 포함), <code>git diff --stat</code> 기준 1091줄 추가·248줄 삭제다.</p>
+      <h3>주요 신규 파일(백엔드)</h3>
+      <table>
+        <tr><th>파일</th><th>역할</th></tr>
+        <tr><td><code>service/SystemMailService.java</code></td><td>시스템 자동발송 메일 공통 처리</td></tr>
+        <tr><td><code>service/EmailVerificationService.java</code>, <code>service/EmailVerificationState.java</code></td><td>인증번호 발급·검증·세션 상태 관리</td></tr>
+        <tr><td><code>service/SystemMessageTemplateInitializer.java</code></td><td>기동 시 시스템 기본 템플릿 자동 생성</td></tr>
+        <tr><td><code>service/ApplicationSubmittedEvent.java</code>, <code>service/ApplicationSubmittedMailListener.java</code></td><td>제출 완료 이벤트 발행·비동기 메일 발송</td></tr>
+        <tr><td><code>enumeration/MessageOrigin.java</code>, <code>enumeration/EmailVerificationPurpose.java</code>, <code>enumeration/SystemMailOutcome.java</code></td><td>신설 enum</td></tr>
+        <tr><td><code>exception/InvalidEmailVerificationException.java</code></td><td>인증 관련 예외</td></tr>
+        <tr><td><code>dto/request/EmailVerificationSendRequest.java</code> 등 3개</td><td>인증·비밀번호 재발급 요청 DTO</td></tr>
+      </table>
+      <h3>주요 수정 파일(백엔드)</h3>
+      <table>
+        <tr><th>파일</th><th>변경 내용</th></tr>
+        <tr><td><code>domain/entity/MessageSend.java</code></td><td><code>origin</code> 필드, <code>createSystem(...)</code> 정적 생성 메서드 추가</td></tr>
+        <tr><td><code>config/SecurityConfig.java</code></td><td>신규 공개 경로 5개 permitAll 추가</td></tr>
+        <tr><td><code>controller/ApplicantAccountRecoveryController.java</code>, <code>controller/ApplicantSignUpController.java</code></td><td>인증·비밀번호 재발급 API 추가</td></tr>
+        <tr><td><code>service/MessageTemplateService.java</code>, <code>service/MessageTargetService.java</code>, <code>service/MessageVariableFormatter.java</code></td><td>시스템 유형 발송·조회 거부, 템플릿 검증 규칙 추가</td></tr>
+        <tr><td><code>service/LoggingMailGateway.java</code></td><td>로컬 목업 게이트웨이 본문 로그 추가</td></tr>
+      </table>
+      <h3>주요 수정 파일(프론트)</h3>
+      <table>
+        <tr><th>파일</th><th>변경 내용</th></tr>
+        <tr><td><code>views/applicant/SignupView.vue</code></td><td>이메일 인증 실연동, 인증 만료 시 재인증 단계 복귀</td></tr>
+        <tr><td><code>views/applicant/AccountRecovery.vue</code></td><td>비밀번호 탭 3단계(이메일 → 인증번호 → 새 비밀번호)로 전면 변경</td></tr>
+        <tr><td><code>views/admin/message/AdminMessageHistoryView.vue</code>, <code>messageHistory.ts</code></td><td>발송 구분 열·필터 추가</td></tr>
+        <tr><td><code>views/admin/message/AdminMessageTemplateView.vue</code>, <code>messageTypes.ts</code></td><td>시스템 유형 표시, 삭제 버튼 숨김, 타입 분리(<code>SystemMessageType</code>/<code>AnyMessageType</code>)</td></tr>
+        <tr><td><code>api/applicationApi.ts</code></td><td>인증·재발급 API 5개 추가</td></tr>
+      </table>
+      <p class="small">문서 4건(<code>docs/domains/_index.md</code>, <code>application.md</code>, <code>auth-account.md</code>, <code>message-delivery.md</code>, <code>message.md</code>)과 운영 DDL(<code>docs/ops/message-send-origin-ddl.sql</code>)도 함께 갱신했다.</p>
+    </div>
+  </section>
+
+  <!-- ===== 테스트 결과 ===== -->
+  <section>
+    <h2>테스트 결과</h2>
+    <div class="card">
+      <p>백엔드: 수정 대상 범위 테스트 91개 클래스 805건 통과. 최종 리뷰 수정 반영 후 인증 관련 7개 클래스 61건 재통과.</p>
+      <p>프론트: <code>npm run type-check</code> 통과, 메시지 관련 단위 테스트 46건 통과.</p>
+      <p>문서: <code>node tools/check-docs.mjs</code> 오류 0건.</p>
+      <table>
+        <tr><th>항목</th><th>결과</th></tr>
+        <tr><td>백엔드 대상 범위 테스트</td><td><span class="badge done">통과 (91 클래스 / 805건)</span></td></tr>
+        <tr><td>백엔드 재검증(리뷰 수정 후)</td><td><span class="badge done">통과 (7 클래스 / 61건)</span></td></tr>
+        <tr><td>프론트 type-check</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>프론트 단위 테스트</td><td><span class="badge done">통과 (46건)</span></td></tr>
+        <tr><td>문서 점검(check-docs)</td><td><span class="badge done">오류 0건</span></td></tr>
+        <tr><td>전체 회귀</td><td><span class="badge warn">미실행</span></td></tr>
+        <tr><td>MariaDB DDL 실행</td><td><span class="badge warn">미검증(H2용 DDL은 임시 테스트로 검증)</span></td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== 미결 사항 ===== -->
+  <section>
+    <h2>미결 사항 / 주의 사항</h2>
+    <table>
+      <tr><th>#</th><th>항목</th><th>현재 입장</th></tr>
+      <tr><td>1</td><td>운영 배포 전 enum 컬럼 확장 DDL 반영이 필요한가?</td><td>필수. 최종 리뷰에서 발견된 Critical 이슈 — H2·MariaDB 모두 <code>message_type</code> 컬럼이 네이티브 ENUM이라 <code>ddl-auto: update</code>로는 새 값이 늘지 않아 기동이 실패한다. 운영 DDL(<code>message-send-origin-ddl.sql</code>)에 <code>message_type</code> ENUM 확장을 추가했으며, 새 버전 기동 전 반드시 수동 반영해야 한다.</td></tr>
+      <tr><td>2</td><td>운영에서 메일 게이트웨이 설정이 누락되면?</td><td>목업 게이트웨이(<code>gateway=logging</code>)가 켜져 메일 본문이 로그에 남을 수 있으므로, 운영 설정에 <code>recruit.message.gateway=trnode</code>가 명시돼 있는지 배포 전 확인이 필요하다.</td></tr>
+      <tr><td>3</td><td>세션 밖 발송 제한은 없는가?</td><td>새 세션으로 인증 절차를 반복할 수 있다(범위 외 결정). 비밀번호 재발급 미가입 이메일은 404로 응답해 계정 열거 가능성을 감수하는 기존 결정을 유지한다.</td></tr>
+      <tr><td>4</td><td>가입 인증·비밀번호 재설정 이력 수신자 행의 파기 정책은?</td><td>미정. 지원서와 연결되지 않아 기존 파기 정책 대상이 아니므로 별도로 정해야 한다.</td></tr>
+      <tr><td>5</td><td>문서 카드 용량은 여유가 있는가?</td><td><code>auth-account.md</code> 카드가 40KB 상한에 근접해 향후 분할이 필요할 것으로 보이며, <code>_index.md</code>도 12KB 상한에 근접했다.</td></tr>
+      <tr><td>6</td><td>기존 문서의 DDL 불요 주석이 사실과 다른가?</td><td>기존 <code>phase-09e-reconciliation-ddl.sql</code> 주석에 "enum은 VARCHAR라 DDL 불요"라는 설명이 있으나, 실제로는 네이티브 ENUM이라 해당 enum 값 추가 시에도 운영 DB 확인이 필요하다. 이번 작업 범위 밖이라 수정하지 않고 보고만 한다.</td></tr>
+    </table>
+  </section>
+
+  <!-- ===== 최종 리뷰에서 발견·조치한 사항 ===== -->
+  <section>
+    <h2>최종 리뷰 발견·조치 사항</h2>
+    <div class="card">
+      <p><span class="badge out">Critical</span> H2·MariaDB 모두 <code>message_type</code>이 네이티브 ENUM 컬럼이라 <code>ddl-auto: update</code>로는 새 값이 늘지 않아 기동이 실패한다 → 운영 DDL에 ENUM 확장 추가, 새 버전 기동 전 반영 필수로 조치.</p>
+      <p><span class="badge warn">Minor(조치 완료)</span> verify 요청 동시성 처리, 가입 시 <code>loginId=email</code> 강제, 비밀번호 재설정 이메일 대소문자 처리, 첫 발송 실패 시 인증번호 입력칸 유지.</p>
+    </div>
+  </section>
+
+  <!-- ===== 다음 Phase 권장 ===== -->
+  <section>
+    <h2>다음 Phase 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>운영 반영 및 실환경 검증</strong></p>
+      <p>운영 DDL(<code>message-send-origin-ddl.sql</code>)을 새 버전 기동 전에 반영한 뒤, 폐쇄망 환경에서 3종 메일(가입 인증·비밀번호 재발급·제출 완료 안내)의 실발송과 결과 수신을 확인한다.</p>
+      <p class="small">향후 과제: 가입 인증·비밀번호 재설정 이력 수신자 행의 파기 정책 결정, 이번 변경의 git 커밋.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

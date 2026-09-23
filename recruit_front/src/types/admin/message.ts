@@ -4,6 +4,7 @@
  */
 import type { StageResultStatus } from '@/types/admin/stage'
 
+/** 관리자가 발송 화면에서 고르는 종류. */
 export type MessageType =
   | 'RESULT_ANNOUNCEMENT'
   | 'DEADLINE_REMINDER'
@@ -11,9 +12,18 @@ export type MessageType =
   | 'INTERVIEW_NOTICE'
   | 'FREE'
 
+/** 시스템 자동발송 종류(가입 인증·비밀번호 재설정·제출 완료). 발송 화면에서는 고를 수 없다. */
+export type SystemMessageType = 'SIGNUP_VERIFICATION' | 'PASSWORD_RESET' | 'APPLICATION_SUBMITTED'
+
+/** 템플릿·변수·발송 이력에 나오는 전체 종류. */
+export type AnyMessageType = MessageType | SystemMessageType
+
+/** 발송 구분. ADMIN 관리자 발송 · SYSTEM 시스템 자동발송. */
+export type MessageOrigin = 'ADMIN' | 'SYSTEM'
+
 export interface MessageTemplate {
   id: number
-  type: MessageType
+  type: AnyMessageType
   name: string
   defaultTemplate: boolean
   mailSubject: string | null
@@ -24,7 +34,7 @@ export interface MessageTemplate {
 
 /** 등록·수정 공용. 빈 채널은 null 로 보낸다. 메일은 제목·본문을 함께 채우거나 함께 비운다. */
 export interface MessageTemplateSaveRequest {
-  type: MessageType
+  type: AnyMessageType
   name: string
   defaultTemplate: boolean
   mailSubject: string | null
@@ -36,7 +46,7 @@ export interface MessageTemplateSaveRequest {
 export interface MessageVariable {
   key: string
   label: string
-  types: MessageType[]
+  types: AnyMessageType[]
 }
 
 /** 대상자 조회 조건. 값이 없는 키는 "조건 없음"(결과 전체·전체 조·작성 중+제출). */
@@ -154,10 +164,12 @@ export interface MessageTestSendResponse {
 export interface MessageHistoryQuery {
   from?: string
   to?: string
-  type?: MessageType
+  type?: AnyMessageType
   jobPostingId?: number
   /** 없으면 실발송+테스트, true 테스트만, false 실발송만 */
   test?: boolean
+  /** 없으면 관리자 발송+시스템 자동발송 */
+  origin?: MessageOrigin
   page: number
   size: number
 }
@@ -175,9 +187,11 @@ export interface MessageChannelCount {
 export interface MessageSendSummary {
   id: number
   requestedAt: string
-  type: MessageType
+  type: AnyMessageType
   test: boolean
-  jobPostingTitle: string
+  origin: MessageOrigin
+  /** 공고 없는 시스템 발송(가입 인증·비밀번호 재설정)은 null */
+  jobPostingTitle: string | null
   stageName: string | null
   conditionSummary: string | null
   /** 메일 제목. 메일을 끈 발송은 SMS 원문 앞 40자 */

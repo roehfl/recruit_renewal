@@ -118,7 +118,7 @@ onBeforeUnmount(() => {
             <a-tag v-if="detail.test" color="purple">테스트</a-tag>
           </a-descriptions-item>
           <a-descriptions-item label="발송일시">{{ formatDate(detail.requestedAt, 'YYYY-MM-DD HH:mm:ss') }}</a-descriptions-item>
-          <a-descriptions-item label="공고">{{ detail.jobPostingTitle }}</a-descriptions-item>
+          <a-descriptions-item label="공고">{{ detail.jobPostingTitle ?? '-' }}</a-descriptions-item>
           <a-descriptions-item label="전형 · 조건">{{ detail.conditionSummary || '-' }}</a-descriptions-item>
           <a-descriptions-item label="템플릿">{{ detail.templateName ?? '직접 작성' }}</a-descriptions-item>
           <a-descriptions-item label="발송자">{{ detail.senderName ?? '-' }}</a-descriptions-item>

@@ -7,6 +7,7 @@ import com.shinyoung.recruit.domain.entity.JobPosition;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.domain.entity.MessageRecipient;
 import com.shinyoung.recruit.domain.entity.MessageSend;
+import com.shinyoung.recruit.domain.entity.MessageTemplate;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
@@ -19,6 +20,7 @@ import com.shinyoung.recruit.dto.response.MessageSendDetailResponse;
 import com.shinyoung.recruit.dto.response.MessageSendSummaryResponse;
 import com.shinyoung.recruit.dto.response.PageResponse;
 import com.shinyoung.recruit.enumeration.MessageDeliveryStatus;
+import com.shinyoung.recruit.enumeration.MessageOrigin;
 import com.shinyoung.recruit.enumeration.MessageSendStatus;
 import com.shinyoung.recruit.enumeration.MessageType;
 import com.shinyoung.recruit.enumeration.SmsKind;
@@ -88,6 +90,34 @@ class MessageHistoryServiceTest {
         assertThat(ids(search(null, null, null, false))).containsExactly(announcement.getId(), dayAgo.getId());
         assertThat(ids(search(now.toLocalDate().minusDays(45), null, null, null)))
                 .containsExactly(test.getId(), announcement.getId(), dayAgo.getId(), old.getId());
+    }
+
+    @Test
+    void 발송_구분으로_거르고_공고_없는_시스템_발송은_공고_조건에서_빠진다() {
+        MessageSend admin = saveSend(MessageType.FREE, false, true, false, now.minusMinutes(2));
+        MessageSend system = messageSendRepository.saveAndFlush(MessageSend.createSystem(
+                MessageType.SIGNUP_VERIFICATION, null,
+                MessageTemplate.create(MessageType.SIGNUP_VERIFICATION, "회원가입 인증 메일", true,
+                        "[신영증권 채용] 회원가입 이메일 인증번호", "인증번호: #{인증번호}", null),
+                now.minusMinutes(1)));
+
+        List<Long> systemOnly = ids(messageHistoryService.search(
+                new MessageHistoryCondition(null, null, null, null, null, MessageOrigin.SYSTEM), 0, 100));
+        List<Long> adminOnly = ids(messageHistoryService.search(
+                new MessageHistoryCondition(null, null, null, null, null, MessageOrigin.ADMIN), 0, 100));
+
+        assertThat(systemOnly).contains(system.getId()).doesNotContain(admin.getId());
+        assertThat(adminOnly).contains(admin.getId()).doesNotContain(system.getId());
+        assertThat(ids(search(null, null, null, null))).containsExactly(admin.getId());
+        MessageSendSummaryResponse summary = messageHistoryService.search(
+                        new MessageHistoryCondition(null, null, MessageType.SIGNUP_VERIFICATION, null, null, MessageOrigin.SYSTEM), 0, 100)
+                .content().stream()
+                .filter(row -> row.id().equals(system.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(summary.origin()).isEqualTo(MessageOrigin.SYSTEM);
+        assertThat(summary.jobPostingTitle()).isNull();
+        assertThat(messageHistoryService.detail(system.getId()).origin()).isEqualTo(MessageOrigin.SYSTEM);
     }
 
     @Test
@@ -217,7 +247,7 @@ class MessageHistoryServiceTest {
 
     @Test
     void 페이지와_기간이_잘못되면_거부한다() {
-        MessageHistoryCondition all = new MessageHistoryCondition(null, null, null, null, null);
+        MessageHistoryCondition all = new MessageHistoryCondition(null, null, null, null, null, null);
         LocalDate today = LocalDate.now(clock);
 
         assertThatThrownBy(() -> messageHistoryService.search(all, -1, 20))
@@ -227,13 +257,13 @@ class MessageHistoryServiceTest {
                 .isInstanceOf(InvalidMessageException.class)
                 .hasMessage("size는 1 이상 100 이하여야 합니다.");
         assertThatThrownBy(() -> messageHistoryService.search(
-                new MessageHistoryCondition(today, today.minusDays(1), null, null, null), 0, 20))
+                new MessageHistoryCondition(today, today.minusDays(1), null, null, null, null), 0, 20))
                 .isInstanceOf(InvalidMessageException.class)
                 .hasMessage("조회 시작일이 종료일보다 늦습니다.");
     }
 
     private PageResponse<MessageSendSummaryResponse> search(LocalDate from, LocalDate to, MessageType type, Boolean test) {
-        return messageHistoryService.search(new MessageHistoryCondition(from, to, type, posting.getId(), test), 0, 20);
+        return messageHistoryService.search(new MessageHistoryCondition(from, to, type, posting.getId(), test, null), 0, 20);
     }
 
     private Map<Long, MessageSendSummaryResponse> summariesById() {

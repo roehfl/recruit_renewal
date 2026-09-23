@@ -3,6 +3,7 @@ package com.shinyoung.recruit.service;
 import com.shinyoung.recruit.common.hash.AuditHmac;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.repository.ApplicantRepository;
+import com.shinyoung.recruit.enumeration.EmailVerificationPurpose;
 import com.shinyoung.recruit.enumeration.NiceVerificationPurpose;
 import com.shinyoung.recruit.exception.ApplicantNotFoundException;
 import com.shinyoung.recruit.service.nice.NiceVerifiedIdentity;
@@ -11,14 +12,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class ApplicantAccountRecoveryServiceTest {
@@ -26,13 +30,19 @@ class ApplicantAccountRecoveryServiceTest {
     @Mock
     private ApplicantRepository applicantRepository;
 
+    @Mock
+    private EmailVerificationService emailVerificationService;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
     private final AuditHmac auditHmac = new AuditHmac("test-secret-value");
 
     private ApplicantAccountRecoveryService service;
 
     @BeforeEach
     void setUp() {
-        service = new ApplicantAccountRecoveryService(applicantRepository, auditHmac);
+        service = new ApplicantAccountRecoveryService(applicantRepository, auditHmac, emailVerificationService, passwordEncoder);
     }
 
     private NiceVerifiedIdentity identity() {
@@ -76,5 +86,46 @@ class ApplicantAccountRecoveryServiceTest {
         assertThat(ApplicantAccountRecoveryService.maskLoginId("ab@x.com")).isEqualTo("a*@x.com");
         assertThat(ApplicantAccountRecoveryService.maskLoginId("a@x.com")).isEqualTo("a*@x.com");
         assertThat(ApplicantAccountRecoveryService.maskLoginId("hongildong")).isEqualTo("ho********");
+    }
+
+    @Test
+    void 가입되지_않은_이메일이면_재설정_메일을_보내지_않는다() {
+        given(applicantRepository.findByEmail("none@example.com")).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.sendPasswordResetCode(null, " none@example.com "))
+                .isInstanceOf(ApplicantNotFoundException.class)
+                .hasMessage("가입된 이메일이 아닙니다.");
+        verifyNoInteractions(emailVerificationService);
+    }
+
+    @Test
+    void 재설정_메일은_지원자_이름으로_보낸다() {
+        Applicant applicant = applicantWithEmail("reset@example.com", "김재설정");
+        EmailVerificationState state = EmailVerificationState.issued(EmailVerificationPurpose.PASSWORD_RESET,
+                "reset@example.com", "hash", LocalDateTime.of(2026, 9, 23, 10, 5), LocalDateTime.of(2026, 9, 23, 10, 0));
+        given(applicantRepository.findByEmail("reset@example.com")).willReturn(Optional.of(applicant));
+        given(emailVerificationService.send(null, EmailVerificationPurpose.PASSWORD_RESET, "reset@example.com", "김재설정"))
+                .willReturn(state);
+
+        assertThat(service.sendPasswordResetCode(null, "reset@example.com")).isSameAs(state);
+    }
+
+    @Test
+    void 새_비밀번호는_인코딩해_저장한다() {
+        Applicant applicant = applicantWithEmail("reset@example.com", "김재설정");
+        given(applicantRepository.findByEmail("reset@example.com")).willReturn(Optional.of(applicant));
+        given(passwordEncoder.encode("NewPassword1!")).willReturn("encoded-new");
+
+        service.resetPassword("reset@example.com", "NewPassword1!");
+
+        assertThat(applicant.getPassword()).isEqualTo("encoded-new");
+    }
+
+    private static Applicant applicantWithEmail(String email, String name) {
+        Applicant applicant = new Applicant("test-ci-hash");
+        applicant.setLoginId(email);
+        applicant.setName(name);
+        applicant.setEmail(email);
+        return applicant;
     }
 }

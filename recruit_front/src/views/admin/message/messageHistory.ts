@@ -3,6 +3,7 @@ import type {
   MessageChannelCount,
   MessageDeliveryStatus,
   MessageHistoryRecipient,
+  MessageOrigin,
   MessageSendDetail,
   MessageSendStatus,
   MessageTestSendResultItem,
@@ -10,6 +11,12 @@ import type {
 
 /** 발송 이력 기본 기간(일). 서버 MessageHistoryService 기본값(종료일 오늘, 시작일 = 종료일 - 29일)과 같다. */
 export const HISTORY_RANGE_DAYS = 30
+
+/** 발송 구분 라벨(이력 목록 열·필터). */
+export const MESSAGE_ORIGIN_LABEL: Record<MessageOrigin, string> = {
+  ADMIN: '관리자 발송',
+  SYSTEM: '시스템 자동발송',
+}
 
 export const DELIVERY_STATUS_LABEL: Record<MessageDeliveryStatus, string> = {
   PENDING: '대기',

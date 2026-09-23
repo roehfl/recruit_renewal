@@ -104,7 +104,10 @@ public class SecurityConfig {
                 .authenticationEntryPoint(authenticationEntryPoint)
                 .accessDeniedHandler(accessDeniedHandler));
         http.authorizeHttpRequests(authorizeRequests -> authorizeRequests
-                .requestMatchers("/api/auth/login", "/api/auth/logout", "/api/auth/applicants/sign-up", "/api/auth/applicants/check-email", "/api/auth/applicants/find-email").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/logout", "/api/auth/applicants/sign-up", "/api/auth/applicants/check-email", "/api/auth/applicants/find-email",
+                        "/api/auth/applicants/email-verification/send", "/api/auth/applicants/email-verification/verify",
+                        "/api/auth/applicants/password-reset/send", "/api/auth/applicants/password-reset/verify",
+                        "/api/auth/applicants/password-reset").permitAll()
                 // 본인확인은 가입 전(미인증) 흐름이다. callback 2종은 NICE 팝업이 부르는
                 // cross-site POST 라 세션·인증이 없다.
                 .requestMatchers("/api/auth/nice/**").permitAll()

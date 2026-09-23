@@ -277,6 +277,37 @@ public class SecurityConfigTest {
                 .andExpect(status().is(allOf(not(401), not(403))));
     }
 
+    /* 가입 이메일 인증번호 발송·확인도 로그인 전에 쓴다. 본문이 없어 400 이지만 401/403 이 아니면 인가 통과다. */
+    @Test
+    void 가입_인증번호_발송은_비인증이어도_인가를_통과() throws Exception {
+        mockMvc.perform(post("/api/auth/applicants/email-verification/send"))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
+
+    @Test
+    void 가입_인증번호_확인은_비인증이어도_인가를_통과() throws Exception {
+        mockMvc.perform(post("/api/auth/applicants/email-verification/verify"))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
+
+    @Test
+    void 재설정_인증번호_발송은_비인증이어도_인가를_통과() throws Exception {
+        mockMvc.perform(post("/api/auth/applicants/password-reset/send"))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
+
+    @Test
+    void 재설정_인증번호_확인은_비인증이어도_인가를_통과() throws Exception {
+        mockMvc.perform(post("/api/auth/applicants/password-reset/verify"))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
+
+    @Test
+    void 비밀번호_재설정은_비인증이어도_인가를_통과() throws Exception {
+        mockMvc.perform(post("/api/auth/applicants/password-reset"))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
+
     @Test
     void 본인확인_요청은_비인증이어도_인가를_통과() throws Exception {
         mockMvc.perform(post("/api/auth/nice/request"))
