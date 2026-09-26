@@ -118,6 +118,14 @@ export const adminApplicationApi = {
     })
   },
 
+  // 인쇄용: 선택한 지원서를 PDF 한 개로 합쳐 받는다(내용은 단건 PDF 와 같다). 화면이 새 탭에 띄워 인쇄한다.
+  printApplicationPdf(applicationIds: number[]) {
+    return apiClient.post<Blob>('/admin/applications/pdf/print', { applicationIds }, {
+      responseType: 'blob',
+      timeout: PDF_BULK_DOWNLOAD_TIMEOUT_MS,
+    })
+  },
+
   // 엑셀 컬럼 카탈로그(모달 체크박스 원천). 항목 정의는 백엔드 enum 이 단일 출처다.
   getApplicationExportColumns() {
     return apiClient.get<ApiResponse<ApplicationExportColumnGroup[]>>('/admin/applications/export/columns')

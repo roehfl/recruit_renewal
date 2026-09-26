@@ -5,7 +5,7 @@
 
 ## 요약
 
-- 지원현황(`/admin/applications`): 공고 선택 → 검색 → 그리드 → 지원서 상세(새 탭)·PDF. 엑셀은 같은 검색 조건 + 선택 컬럼(44개, 기본 14). PDF는 1건 1파일, 최대 20건 zip.
+- 지원현황(`/admin/applications`): 공고 선택 → 검색 → 그리드 → 지원서 상세(새 탭)·PDF. 엑셀은 같은 검색 조건 + 선택 컬럼(44개, 기본 14). PDF는 1건 1파일, 최대 20건 zip. 인쇄는 선택한 지원서를 PDF 1개로 합쳐 바로 인쇄 대화상자를 연다.
 - export 컨트롤러는 전형결과·면접·평가 목록 export도 제공한다. 전부 읽기 전용, 반출은 `ActivityLog` 감사 성공 후에만(fail-close).
 - 목록·상세 조회 구현은 [application](application.md) 소유 파일에 있다: `{BE}/service/JobApplicationService.java`(`getApplicationsForAdmin`·`getApplicationForAdmin`·`loadAdminSummaryEnrichments`), `{BE}/domain/repository/JobApplicationRepository.java`(`ADMIN_SEARCH_WHERE`와 쿼리 3개). 고칠 때 이 카드 규칙을 따른다.
 - 공용 export 인프라(`ExcelExportWriter`·`ExcelExportService`·`ExcelExportResponseFactory`·`ExportAuditLogger`)도 이 카드 소유. 소비처: `{BE}/controller/StageResultUploadController.java`, `{BE}/controller/InterviewScheduleController.java`.
@@ -46,7 +46,7 @@
 | service | `{BE}/service/ExportAuditLogger.java`, `{BE}/service/ExportAuditContext.java`, `{BE}/service/ExportMetadata.java` | export 감사 |
 | service | `{BE}/service/ApplicationPdfService.java`, `{BE}/service/ApplicationPdfLabels.java` | PDF 표시 모델, enum 한글 라벨(엑셀 공용) |
 | service | `{BE}/service/ApplicationPdfRenderer.java`, `{BE}/service/ApplicationPdfDocument.java`, `{BE}/service/ApplicationPhotoLoader.java` | 렌더, 결과, 증명사진 data URI |
-| service | `{BE}/service/ApplicationPdfBulkService.java`, `{BE}/service/ApplicationPdfZipFile.java` | 일괄 zip |
+| service | `{BE}/service/ApplicationPdfBulkService.java`, `{BE}/service/ApplicationPdfZipFile.java`, `{BE}/service/ApplicationPdfPrintFile.java` | 일괄 zip, 인쇄용 합본 PDF(`generateMerged`) |
 | service | `{BE}/service/PdfAuditLogger.java`, `{BE}/service/PdfMetadata.java` | PDF 감사 |
 | dto | `{BE}/dto/request/AdminApplicationSearchRequest.java`, `{BE}/dto/condition/AdminApplicationSearchCondition.java` | 검색 조건 17종, 파싱 결과 |
 | dto | `{BE}/dto/request/ApplicationPdfBulkRequest.java` | `{ applicationIds }` |
@@ -69,7 +69,7 @@
 | 구분 | 파일 | 역할 |
 |---|---|---|
 | route | `{FE}/routes/adminRoutes.ts` | (공유) `AdminApplicationStatus`, `AdminApplication`(레이아웃 밖, 새 탭) |
-| view | `{FE}/views/admin/application/ApplicationStatus.vue` | 지원현황: 검색폼·그리드(20건)·엑셀 모달·선택 PDF zip·경력기술서 |
+| view | `{FE}/views/admin/application/ApplicationStatus.vue` | 지원현황: 검색폼·그리드(20건)·엑셀 모달·선택 PDF zip·선택 인쇄(합본 PDF 즉시 인쇄)·경력기술서 |
 | view | `{FE}/views/admin/application/Application.vue` | 상세: layout `enabled` 섹션만 조회, 사진·공통코드 표시, PDF |
 | component | `{FE}/views/admin/application/ApplicationExcelColumnModal.vue` | 엑셀 컬럼 선택 모달 |
 | api | `{FE}/api/admin/adminApplicationApi.ts` | 이 카드 API + 레이아웃·첨부 다운로드 호출 |
@@ -105,6 +105,7 @@ JSON 응답은 `ApiResponse<T>`, 파일 응답은 래핑 없음(오류만 JSON).
 | 🟢 | GET | /admin/stages/{stageId}/interview-evaluations/export | path | xlsx | 관리자+임직원 |
 | 🟢 | GET | /admin/applications/{applicationId}/pdf | path | `application/pdf` | 관리자+임직원 |
 | 🟢 | POST | /admin/applications/pdf/bulk | `{ applicationIds: number[] }` | `application/zip` | 관리자+임직원 |
+| 🟢 | POST | /admin/applications/pdf/print | `{ applicationIds: number[] }` | `application/pdf`(합친 1개, inline) | 관리자+임직원 |
 
 ### 엔드포인트 상세
 
@@ -195,6 +196,7 @@ JSON 응답은 `ApiResponse<T>`, 파일 응답은 래핑 없음(오류만 JSON).
 **감사**
 - 파일 생성 → `ActivityLog` `recordRequiresNew` → 성공해야 응답. 실패하면 파일 미반출. ({BE}/service/ExportAuditLogger.java — logExport, {BE}/service/PdfAuditLogger.java — logApplicationPdf)
 - 일괄 PDF: zip 완성 → 건별 `APPLICATION_PDF` 감사(같은 `requestId`) → 스트리밍(시작 후엔 200을 되돌릴 수 없음). ({BE}/controller/ApplicationPdfController.java — applicationPdfBulk)
+- 인쇄 PDF: 일괄과 같은 요청·상한(20건)·감사 순서, 선택 순서대로 합친 PDF 1개를 `Content-Disposition: inline`(`applications-print-{시각}.pdf`)으로 준다. 각 지원서 내용은 단건 PDF와 같다. ({BE}/controller/ApplicationPdfController.java — applicationPdfPrint)
 - datasetType → `AuditActionType` 고정 매핑(APPLICATIONS·STAGE_RESULTS·INTERVIEWS·INTERVIEW_SCHEDULES·INTERVIEW_EVALUATIONS·STAGE_RESULT_UPLOAD_TEMPLATE). 미등록이면 예외 → 반출 실패. ({BE}/service/ExportAuditLogger.java — exportActionType)
 - 필터는 비-PII allowlist만: 지원현황은 `jobPostingId`·`jobPositionId`·canonical `status`·`columns`. 이름·연락처 조건은 기록 안 함. 제어문자 제거 후 JSON + `filtersHash`. 주체는 loginId·authority·IP·UA·`X-Request-Id`. ({BE}/service/ExportAuditLogger.java — logApplicationsExport)
 
@@ -206,6 +208,8 @@ JSON 응답은 `ApiResponse<T>`, 파일 응답은 래핑 없음(오류만 JSON).
 - 섹션은 `AdminApplicationSectionService` 재사용(마스킹 상속), 기본정보는 원천 규칙. ({BE}/service/ApplicationPdfService.java — buildBasicInfo)
 - 학기별 성적: 공채 공고·전문대 이상만, 1~8학기 고정 표, 5학년 이상 성적이 있으면 9~16학기 표 추가. ({BE}/service/ApplicationPdfService.java — semesterGradeSections)
 - 일괄: 중복 제거로 상한 우회 차단, 1건씩 렌더해 zip으로 흘림, 한 건 실패 시 전체 실패 + temp 삭제. ({BE}/service/ApplicationPdfBulkService.java — generate)
+- 인쇄 합본: 건별 PDF를 temp 파일로 쓴 뒤 PDFBox `PDFMergerUtility`(openhtmltopdf가 끌어오는 PDFBox 2.0.x, 직접 선언한 의존성 아님)로 temp 파일 버퍼를 써서 합친다. 실패 시 전체 실패, 조각 파일은 항상 삭제. ({BE}/service/ApplicationPdfBulkService.java — generateMerged)
+- 인쇄 화면: 받은 PDF를 화면에 보이지 않는 iframe(크기 0, `display:none`이면 빈 인쇄 가능)에 blob 주소로 불러오고 `load` 때 `contentWindow.print()`로 인쇄 대화상자를 연다. 새 탭을 쓰지 않아 팝업 차단과 무관. iframe·주소는 다음 인쇄나 화면 이탈 때 정리(대화상자 종료 시점을 알 수 없음). 클릭부터 인쇄 대화상자까지 닫을 수 없는 진행 창(단계 `1/2 PDF 만들기`→`2/2 인쇄 창 열기`, 흐르는 막대, 경과 초)을 띄운다 — 서버가 다 만든 뒤 보내 실제 %는 없다. 20초 안에 iframe이 로드되지 않으면 닫고 안내. ({FE}/views/admin/application/ApplicationStatus.vue — printSelectedPdf)
 
 ## 변경 레시피
 

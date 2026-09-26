@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>마이페이지 보완·지원서 인쇄 - 구현 결과</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    .transition { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .transition .state { background: #edf3f8; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .transition .arrow { color: #536171; font-size: 16px; }
+    .transition .action { font-size: 12px; color: #1d4ed8; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+
+<header>
+  <div>신영증권 채용 Renewal</div>
+  <h1>마이페이지 보완·지원서 인쇄 - 구현 결과</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge muted">작성일: 2026-09-27</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>API는 있었지만 화면이 없던 기능 3개를 붙이고, 점검에서 찾은 작은 결함 2개를 고쳤습니다.</p>
+      <p>지원자 마이페이지에 면접 일정 조회와 휴대폰 번호 변경을 넣었고, 관리자 지원현황의 "인쇄"는 선택 지원서를 합본 PDF로 받아 바로 인쇄 대화상자를 여는 방식으로 구현했습니다.</p>
+      <p>지원 철회 화면은 만들지 않기로 결정했습니다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">결함 2건 수정</span></p>
+      <p><span class="badge done">기능 3건 구현</span></p>
+      <p><span class="badge done">새 API 1개 🟢</span></p>
+      <p><span class="badge done">테스트·문서 점검 통과</span></p>
+      <p><span class="badge out">지원 철회 화면 제외</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>가입 화면 "인증 완료" 버튼 <code>disable</code> 오타 → <code>disabled</code></li>
+          <li>board 카드의 낡은 "관리자 공지 화면 미구현" 문구 정정</li>
+          <li>마이페이지 "면접 일정" 열 + 일정 모달</li>
+          <li>"내 정보 수정"에 휴대폰 번호 변경 메뉴</li>
+          <li>지원현황 "인쇄": <code>POST /admin/applications/pdf/print</code> + 숨은 iframe 즉시 인쇄</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미확인</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>실제 백엔드와 연결한 화면 확인(로컬은 관리자 LDAP 로그인 불가, 모의 응답으로 확인)</li>
+          <li>실제 브라우저에서 인쇄 대화상자가 뜨는 것(앱 내 브라우저에서는 iframe 로드·인쇄 호출 직전까지 확인)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>지원자 지원 철회 화면(사용자 결정)</li>
+          <li>휴대폰 번호 변경 시 NICE 재인증(사용자 결정: 비밀번호 확인만)</li>
+          <li>서버 쪽 휴대폰 번호 형식 검증(화면에서만 확인)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>API 목록</h2>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>상태</th></tr>
+      <tr><td><code>POST</code></td><td><code>/admin/applications/pdf/print</code></td><td>선택 지원서(최대 20건)를 선택 순서대로 합친 PDF 1개, <code>inline</code></td><td><span class="badge done">신규 🟢</span></td></tr>
+      <tr><td><code>GET</code></td><td><code>/applicant/interviews</code></td><td>내 확정·취소 면접 일정(마이페이지에서 처음 사용)</td><td><span class="badge info">기존</span></td></tr>
+      <tr><td><code>POST</code></td><td><code>/applicant/account/phone-number</code></td><td>현재 비밀번호 확인 후 번호 변경(마이페이지에서 처음 사용)</td><td><span class="badge info">기존</span></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>검증 및 비즈니스 규칙</h2>
+    <h3>인쇄</h3>
+    <table>
+      <tr><th>규칙</th><th>설명</th></tr>
+      <tr><td>내용</td><td>각 지원서는 단건 PDF와 같고, 합본은 선택 순서대로 이어 붙인다</td></tr>
+      <tr><td>상한·권한·감사</td><td>일괄 zip과 같음: 20건, 관리자+임직원 세션, 합본을 다 만든 뒤 건별 <code>APPLICATION_PDF</code> 감사 → 스트리밍</td></tr>
+      <tr><td>진행 표시</td><td>클릭부터 인쇄 대화상자까지 닫을 수 없는 진행 창: 단계(PDF 만들기 → 인쇄 창 열기), 흐르는 막대, 경과 초. 실제 %는 서버가 다 만든 뒤 보내 알 수 없음. 20초 안에 못 열면 안내</td></tr>
+      <tr><td>메모리</td><td>건별 PDF를 temp 파일로 쓰고 PDFBox 합치기도 temp 파일 버퍼 사용, 조각 파일은 항상 삭제</td></tr>
+      <tr><td>즉시 인쇄</td><td>PDF를 보이지 않는 iframe(크기 0)에 불러와 로드되면 <code>print()</code>로 인쇄 대화상자를 연다. 새 탭을 쓰지 않아 팝업 차단과 무관하고, iframe은 다음 인쇄나 화면 이탈 때 정리</td></tr>
+    </table>
+    <h3>면접 일정·휴대폰 번호</h3>
+    <table>
+      <tr><th>규칙</th><th>설명</th></tr>
+      <tr><td>면접 일정 칸</td><td>지원서에 면접이 있으면 [확인] + 취소되지 않은 가장 이른 일시, 모두 취소면 "취소됨", 없으면 "-"</td></tr>
+      <tr><td>일정 모달</td><td>단계·면접 일시·도착 시간·방식·장소(호실)·온라인 링크, 취소 면접은 취소선과 태그</td></tr>
+      <tr><td>번호 형식</td><td>숫자만 남겨 <code>^01[016789]\d{7,8}$</code> 확인 후 숫자만 전송</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>지원 철회 화면은 만들지 않음</td><td>사용자 결정</td></tr>
+      <tr><td>2</td><td>인쇄 = 선택 지원서 합본 PDF로 바로 인쇄 대화상자</td><td>사용자 요청(파일 받지 않고 인쇄까지). zip은 인쇄할 수 없어 합본 API 추가, 새 탭 PDF 보기는 스크립트 인쇄가 불안정해 숨은 iframe 사용</td></tr>
+      <tr><td>3</td><td>PDF 합치기는 기존 라이브러리가 포함한 PDFBox 사용</td><td>새 의존성 추가 금지 규칙</td></tr>
+      <tr><td>4</td><td>번호 변경은 비밀번호 확인만</td><td>사용자 결정, 기존 API 그대로</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>변경 파일</h2>
+    <div class="two">
+      <div class="card">
+        <h3>백엔드</h3>
+        <ul class="list small">
+          <li>신규 <code>service/ApplicationPdfPrintFile.java</code></li>
+          <li><code>service/ApplicationPdfBulkService.java</code> — <code>generateMerged</code></li>
+          <li><code>controller/ApplicationPdfController.java</code> — <code>applicationPdfPrint</code></li>
+          <li><code>ApplicationPdfBulkControllerTest</code> — 인쇄 테스트 2건</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>프론트·문서</h3>
+        <ul class="list small">
+          <li><code>views/applicant/SignupView.vue</code>(결함), <code>views/applicant/ApplicantProfile.vue</code></li>
+          <li><code>views/admin/application/ApplicationStatus.vue</code>, <code>api/admin/adminApplicationApi.ts</code></li>
+          <li>신규 <code>api/applicantInterviewApi.ts</code>, <code>types/applicantInterview.ts</code>; <code>api/applicationApi.ts</code>, <code>types/application.ts</code></li>
+          <li>카드 <code>admin-application</code>·<code>interview</code>·<code>auth-account</code>·<code>board</code></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>테스트 결과</h2>
+    <div class="card">
+      <p>백엔드: <code>gradlew test --tests "*ApplicationPdf*"</code> — <span class="badge done">BUILD SUCCESSFUL</span> (6개 클래스 25건, 새 인쇄 테스트: 합본 쪽수 = 단건 쪽수 합, <code>inline</code>·보안 헤더, 상한 400, 지원자 403, 건별 감사)</p>
+      <p>프론트: <code>npm run type-check</code> <span class="badge done">통과</span> · <code>npm run test:unit</code> 114건 <span class="badge done">통과</span> · 문서: <code>node tools/check-docs.mjs</code> <span class="badge done">오류 0</span></p>
+      <p class="small">화면 확인(개발 서버 + 브라우저 안 모의 응답): 면접 일정 열·모달, 번호 형식 오류(요청 안 보냄)·비밀번호 오류·성공, 비밀번호 변경 메뉴 유지, 인쇄 버튼 선택 전 비활성·선택 후 활성, 새 탭 없이 숨은 iframe에 PDF blob 로드·인쇄 호출 도달, 재인쇄 시 iframe 1개 유지.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>다음 단계 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>실환경 확인</strong></p>
+      <p>실제 로그인 환경에서 인쇄 대화상자(Chrome·Edge, Firefox는 iframe PDF 인쇄가 막힐 수 있음)와 마이페이지 면접 일정·번호 변경을 한 번 확인합니다.</p>
+      <p class="small">남은 큰 기능은 면접평가(면접관 화면 포함)입니다.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

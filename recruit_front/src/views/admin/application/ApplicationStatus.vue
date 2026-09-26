@@ -1,6 +1,6 @@
 <!-- eslint-disable @typescript-eslint/no-unused-vars -->
 <script setup lang="ts">
-import { computed, onMounted, ref, h, reactive } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, h, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { adminJobPostingApi, getAllJobPostings } from '@/api/adminJobPostingApi'
@@ -310,6 +310,98 @@ const downloadSelectedPdf = async () => {
   }
 }
 
+/*
+ * 인쇄: 선택한 지원서를 PDF 한 개로 받아 화면에 보이지 않는 iframe 에 불러온 뒤 바로 인쇄 대화상자를 연다.
+ * 새 탭을 열지 않아 팝업 차단과 무관하다. iframe 과 blob 주소는 다음 인쇄나 화면을 떠날 때 정리한다
+ * (대화상자가 닫히는 시점을 알 수 없어서 인쇄 직후에는 지우지 않는다).
+ */
+const printingPdf = ref(false)
+let printFrame: HTMLIFrameElement | null = null
+let printUrl: string | null = null
+
+/*
+ * 진행 표시: 서버가 PDF 를 다 만든 뒤 한 번에 보내므로 실제 %는 알 수 없다.
+ * 단계(만드는 중 → 인쇄 창 여는 중)와 경과 시간만 보여 주고, 인쇄 대화상자가 뜰 때까지 유지한다.
+ */
+const PRINT_LOAD_TIMEOUT_MS = 20000
+const printStep = ref<'building' | 'opening'>('building')
+const printCount = ref(0)
+const printElapsed = ref(0)
+let printTicker: ReturnType<typeof setInterval> | undefined
+let printLoadTimer: ReturnType<typeof setTimeout> | undefined
+
+const startPrintProgress = (count: number) => {
+  printCount.value = count
+  printStep.value = 'building'
+  printElapsed.value = 0
+  printingPdf.value = true
+  const startedAt = Date.now()
+  printTicker = setInterval(() => {
+    printElapsed.value = Math.floor((Date.now() - startedAt) / 1000)
+  }, 1000)
+}
+
+const finishPrintProgress = () => {
+  printingPdf.value = false
+  if (printTicker) clearInterval(printTicker)
+  if (printLoadTimer) clearTimeout(printLoadTimer)
+  printTicker = undefined
+  printLoadTimer = undefined
+}
+
+const clearPrintFrame = () => {
+  finishPrintProgress()
+  printFrame?.remove()
+  printFrame = null
+  if (printUrl) URL.revokeObjectURL(printUrl)
+  printUrl = null
+}
+
+const printSelectedPdf = async () => {
+  if (printingPdf.value || selectRowKeys.value.length === 0) return
+  if (selectRowKeys.value.length > PDF_BULK_MAX_COUNT) {
+    message.warning(`한 번에 최대 ${PDF_BULK_MAX_COUNT}건까지 인쇄할 수 있습니다. (선택 ${selectRowKeys.value.length}건)`)
+    return
+  }
+
+  const ids = [...selectRowKeys.value]
+  clearPrintFrame()
+  startPrintProgress(ids.length)
+  try {
+    const response = await adminApplicationApi.printApplicationPdf(ids)
+    printStep.value = 'opening'
+    const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
+    const frame = document.createElement('iframe')
+    // display:none 이면 브라우저가 PDF 를 그리지 않아 빈 인쇄가 될 수 있어 크기 0 으로 숨긴다.
+    frame.setAttribute('style', 'visibility: hidden; position: fixed; right: 0; bottom: 0; width: 0; height: 0; border: 0')
+    frame.onload = () => {
+      // 진행 창을 먼저 닫는다. print() 는 대화상자가 닫힐 때까지 화면을 멈추게 할 수 있다.
+      finishPrintProgress()
+      setTimeout(() => {
+        try {
+          frame.contentWindow?.focus()
+          frame.contentWindow?.print()
+        } catch {
+          message.warning('이 브라우저에서는 바로 인쇄할 수 없습니다. PDF 다운로드 후 인쇄해 주세요.')
+        }
+      }, 100)
+    }
+    printLoadTimer = setTimeout(() => {
+      finishPrintProgress()
+      message.warning('인쇄 창을 열지 못했습니다. PDF 다운로드 후 인쇄해 주세요.')
+    }, PRINT_LOAD_TIMEOUT_MS)
+    frame.src = url
+    document.body.appendChild(frame)
+    printFrame = frame
+    printUrl = url
+  } catch (error) {
+    finishPrintProgress()
+    message.error(await getBlobErrorMessage(error, '인쇄할 지원서를 만들지 못했습니다.'))
+  }
+}
+
+onBeforeUnmount(clearPrintFrame)
+
 // 엑셀 버튼은 항목 선택 모달을 연다. 모달에서 고른 컬럼으로, 마지막으로 조회한 조건 그대로 받는다
 // (검색 없이 입력란만 바꿔도 조건이 달라지지 않아 보이는 목록과 일치한다). 조회 전에는 버튼을 막는다.
 const excelModalOpen = ref(false)
@@ -482,10 +574,9 @@ onMounted(async () => {
 
       <a-card :bordered="false" class="form-card">
         <div class="button-area">
-          <!-- 인쇄 기능은 아직 없다. 눌러도 반응 없는 버튼으로 두지 않고 막아 둔다. -->
-          <a-tooltip title="준비 중입니다.">
-            <a-button disabled><PrinterOutlined />인쇄</a-button>
-          </a-tooltip>
+          <a-button :loading="printingPdf" :disabled="selectRowKeys.length === 0" @click="printSelectedPdf">
+            <PrinterOutlined />인쇄
+          </a-button>
           <a-button :disabled="appliedSearch === null" @click="excelModalOpen = true">
             <FileExcelOutlined />엑셀 다운로드
           </a-button>
@@ -529,6 +620,31 @@ onMounted(async () => {
       </a-card>
 
     </a-spin>
+
+    <a-modal
+      :open="printingPdf"
+      :closable="false"
+      :mask-closable="false"
+      :keyboard="false"
+      :footer="null"
+      :width="420"
+      centered
+    >
+      <div class="print-progress">
+        <PrinterOutlined class="print-progress-icon" />
+        <div class="print-progress-title">{{ printStep === 'building' ? '인쇄 준비 중' : '인쇄 창을 여는 중' }}</div>
+        <p class="print-progress-text">
+          <template v-if="printStep === 'building'">지원서 {{ printCount }}건을 인쇄용 PDF로 만드는 중입니다.</template>
+          <template v-else>곧 인쇄 창이 열립니다.</template>
+        </p>
+        <div class="print-progress-bar"><i /></div>
+        <div class="print-progress-meta">
+          <span>{{ printStep === 'building' ? '1/2 PDF 만들기' : '2/2 인쇄 창 열기' }}</span>
+          <span>{{ printElapsed }}초</span>
+        </div>
+      </div>
+    </a-modal>
+
     <ApplicationExcelColumnModal
       v-model:open="excelModalOpen"
       :downloading="downloadingExcel"
@@ -538,6 +654,55 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.print-progress {
+  padding: 12px 4px 4px;
+  text-align: center;
+}
+.print-progress-icon {
+  font-size: 30px;
+  color: var(--app-color-primary);
+}
+.print-progress-title {
+  margin-top: 10px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.print-progress-text {
+  margin: 6px 0 16px;
+  color: var(--app-text-secondary);
+}
+/* 실제 %를 알 수 없어 한 구간이 계속 흐르는 막대로 "진행 중"만 알린다. */
+.print-progress-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--app-bg-selected);
+  overflow: hidden;
+}
+.print-progress-bar i {
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--app-color-primary);
+  animation: print-progress-slide 1.2s ease-in-out infinite;
+}
+@keyframes print-progress-slide {
+  to {
+    left: 100%;
+  }
+}
+.print-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--app-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .job-posting-form {
   padding: 24px;
 }

@@ -5,6 +5,7 @@ import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.ApplicationPdfBulkService;
 import com.shinyoung.recruit.service.ApplicationPdfDocument;
 import com.shinyoung.recruit.service.ApplicationPdfService;
+import com.shinyoung.recruit.service.ApplicationPdfPrintFile;
 import com.shinyoung.recruit.service.ApplicationPdfZipFile;
 import com.shinyoung.recruit.service.CurrentEmployeeService;
 import com.shinyoung.recruit.service.ExportAuditContext;
@@ -28,6 +29,7 @@ import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -111,18 +113,67 @@ public class ApplicationPdfController {
                 .body(body);
     }
 
-    private void deleteQuietly(ApplicationPdfZipFile zipFile) {
+    /**
+     * 인쇄용: 선택한 지원서를 PDF 한 개로 합쳐 {@code inline} 으로 내려준다. 화면이 새 탭에 띄워 인쇄한다.
+     * 감사 순서·건별 기록은 zip 과 같다(다 만든 뒤 감사, 그다음 스트리밍).
+     */
+    @PostMapping("/admin/applications/pdf/print")
+    public ResponseEntity<StreamingResponseBody> applicationPdfPrint(
+            @Valid @RequestBody ApplicationPdfBulkRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            HttpServletRequest httpRequest
+    ) {
+        String actor = currentEmployeeService.getCurrentEmployeeActor(userDetails);
+        ApplicationPdfPrintFile printFile = applicationPdfBulkService.generateMerged(request.applicationIds());
+
         try {
-            Files.deleteIfExists(zipFile.path());
+            ExportAuditContext auditContext = auditContext(actor, userDetails, httpRequest);
+            for (ApplicationPdfZipFile.Entry entry : printFile.entries()) {
+                pdfAuditLogger.logApplicationPdf(
+                        auditContext, entry.applicationId(), entry.jobPostingId(), entry.jobPositionId());
+            }
+        } catch (RuntimeException e) {
+            deleteQuietly(printFile.path());
+            throw e;
+        }
+
+        StreamingResponseBody body = outputStream -> {
+            try (InputStream in = Files.newInputStream(printFile.path())) {
+                in.transferTo(outputStream);
+            } finally {
+                Files.deleteIfExists(printFile.path());
+            }
+        };
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_TYPE, ApplicationPdfPrintFile.CONTENT_TYPE)
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition("inline", printFile.fileName()))
+                .header("X-Content-Type-Options", "nosniff")
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .header(HttpHeaders.PRAGMA, "no-cache")
+                .body(body);
+    }
+
+    private void deleteQuietly(ApplicationPdfZipFile zipFile) {
+        deleteQuietly(zipFile.path());
+    }
+
+    private void deleteQuietly(Path path) {
+        try {
+            Files.deleteIfExists(path);
         } catch (IOException ignored) {
             // temp 파일 정리 실패는 원인 예외 전파를 막지 않는다.
         }
     }
 
     private String contentDisposition(String fileName) {
+        return disposition("attachment", fileName);
+    }
+
+    private String disposition(String type, String fileName) {
         String safe = fileName.replace('"', '_');
         String encoded = URLEncoder.encode(safe, StandardCharsets.UTF_8).replace("+", "%20");
-        return "attachment; filename=\"" + safe + "\"; filename*=UTF-8''" + encoded;
+        return type + "; filename=\"" + safe + "\"; filename*=UTF-8''" + encoded;
     }
 
     private ExportAuditContext auditContext(String actor, CustomUserDetails userDetails, HttpServletRequest request) {

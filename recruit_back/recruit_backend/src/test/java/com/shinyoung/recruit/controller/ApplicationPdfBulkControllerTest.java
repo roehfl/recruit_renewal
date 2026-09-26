@@ -13,6 +13,7 @@ import com.shinyoung.recruit.domain.repository.ApplicantRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
+import org.apache.pdfbox.pdmodel.PDDocument;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
@@ -42,6 +43,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -52,6 +54,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ApplicationPdfBulkControllerTest {
 
     private static final String PATH = "/api/admin/applications/pdf/bulk";
+    private static final String PRINT_PATH = "/api/admin/applications/pdf/print";
 
     @Autowired
     private WebApplicationContext context;
@@ -175,7 +178,76 @@ class ApplicationPdfBulkControllerTest {
         }
     }
 
+    @Test
+    void 인쇄는_선택한_지원서를_PDF_한_개로_합쳐_inline으로_준다() throws Exception {
+        JobApplication first = saveSubmittedApplication("인쇄1");
+        JobApplication second = saveSubmittedApplication("인쇄2");
+        int firstPages = pageCount(singlePdf(first.getId()));
+        int secondPages = pageCount(singlePdf(second.getId()));
+
+        MvcResult result = performBulk(post(PRINT_PATH)
+                .with(authentication(adminAuthentication()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body(first.getId(), second.getId())));
+
+        assertThat(result.getResponse().getContentType()).isEqualTo("application/pdf");
+        assertThat(result.getResponse().getHeader("Content-Disposition"))
+                .startsWith("inline;").contains("applications-print-").contains(".pdf");
+        assertThat(result.getResponse().getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(pageCount(result.getResponse().getContentAsByteArray())).isEqualTo(firstPages + secondPages);
+    }
+
+    @Test
+    void 인쇄도_상한_권한_감사를_일괄과_같게_지킨다() throws Exception {
+        int max = pdfProperties.getBulkMaxCount();
+        List<Long> ids = new ArrayList<>();
+        for (int i = 0; i <= max; i++) {
+            ids.add((long) (900000 + i));
+        }
+        mockMvc.perform(post(PRINT_PATH)
+                        .with(authentication(adminAuthentication()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(ids.toArray(new Long[0]))))
+                .andExpect(status().isBadRequest());
+
+        JobApplication application = saveSubmittedApplication("인쇄감사");
+        Applicant applicant = saveApplicant("Blocked", "ci-" + UUID.randomUUID());
+        mockMvc.perform(post(PRINT_PATH)
+                        .with(authentication(applicantAuthentication(applicant)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(application.getId())))
+                .andExpect(status().isForbidden());
+
+        Logger auditLogger = (Logger) LoggerFactory.getLogger("recruit.audit.pdf");
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        auditLogger.addAppender(appender);
+        try {
+            performBulk(post(PRINT_PATH)
+                    .with(authentication(adminAuthentication()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body(application.getId())));
+            assertThat(appender.list.stream().map(ILoggingEvent::getFormattedMessage))
+                    .anyMatch(m -> m.contains("applicationId=" + application.getId()));
+        } finally {
+            auditLogger.detachAppender(appender);
+        }
+    }
+
     // ---------- helpers ----------
+
+    private byte[] singlePdf(Long applicationId) throws Exception {
+        return mockMvc.perform(get("/api/admin/applications/{id}/pdf", applicationId)
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+    }
+
+    private int pageCount(byte[] pdf) throws Exception {
+        try (PDDocument document = PDDocument.load(pdf)) {
+            return document.getNumberOfPages();
+        }
+    }
 
     /** StreamingResponseBody 는 비동기라 asyncDispatch 로 한 번 더 디스패치해야 본문이 채워진다. */
     private MvcResult performBulk(MockHttpServletRequestBuilder builder) throws Exception {

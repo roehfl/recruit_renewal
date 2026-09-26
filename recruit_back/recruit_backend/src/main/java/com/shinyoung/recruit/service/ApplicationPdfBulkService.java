@@ -4,6 +4,8 @@ import com.shinyoung.recruit.config.PdfProperties;
 import com.shinyoung.recruit.exception.PdfBulkLimitExceededException;
 import com.shinyoung.recruit.exception.PdfGenerationException;
 import lombok.RequiredArgsConstructor;
+import org.apache.pdfbox.io.MemoryUsageSetting;
+import org.apache.pdfbox.multipdf.PDFMergerUtility;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -72,7 +74,50 @@ public class ApplicationPdfBulkService {
             throw e;
         }
 
-        return new ApplicationPdfZipFile(tempFile, buildZipFileName(), entries);
+        return new ApplicationPdfZipFile(tempFile, buildFileName("applications-", ".zip"), entries);
+    }
+
+    /**
+     * 인쇄용: 선택한 지원서 PDF 를 선택 순서대로 이어 붙여 PDF 한 개로 만든다. 각 지원서 내용은 단건 PDF 와 같다.
+     * zip 과 같은 이유로 temp 파일에 다 만든 뒤 응답하고, 메모리에는 렌더 중인 한 건만 올린다
+     * (렌더 결과는 건별 temp 파일로 흘려보내고 합칠 때도 temp 파일 버퍼를 쓴다).
+     */
+    public ApplicationPdfPrintFile generateMerged(List<Long> applicationIds) {
+        List<Long> targets = distinct(applicationIds);
+        int maxCount = pdfProperties.getBulkMaxCount();
+        if (targets.size() > maxCount) {
+            throw new PdfBulkLimitExceededException(targets.size(), maxCount);
+        }
+
+        List<Path> parts = new ArrayList<>();
+        Path merged = createTempFile("application-pdf-print-", ".pdf");
+        List<ApplicationPdfZipFile.Entry> entries = new ArrayList<>();
+        try {
+            PDFMergerUtility merger = new PDFMergerUtility();
+            for (Long applicationId : targets) {
+                ApplicationPdfDocument document = applicationPdfService.generate(applicationId);
+                Path part = createTempFile("application-pdf-part-", ".pdf");
+                parts.add(part);
+                Files.write(part, document.content());
+                merger.addSource(part.toFile());
+                entries.add(new ApplicationPdfZipFile.Entry(
+                        applicationId, document.jobPostingId(), document.jobPositionId()));
+            }
+            try (OutputStream out = Files.newOutputStream(merged)) {
+                merger.setDestinationStream(out);
+                merger.mergeDocuments(MemoryUsageSetting.setupTempFileOnly());
+            }
+        } catch (IOException e) {
+            deleteQuietly(merged);
+            throw new PdfGenerationException("인쇄용 지원서 PDF 생성에 실패했습니다.", e);
+        } catch (RuntimeException e) {
+            deleteQuietly(merged);
+            throw e;
+        } finally {
+            parts.forEach(this::deleteQuietly);
+        }
+
+        return new ApplicationPdfPrintFile(merged, buildFileName("applications-print-", ".pdf"), entries);
     }
 
     /** 같은 id 를 반복 전송해 상한을 우회하지 못하도록 중복을 제거한다. 선택 순서는 유지한다. */
@@ -100,13 +145,17 @@ public class ApplicationPdfBulkService {
         return candidate;
     }
 
-    private String buildZipFileName() {
-        return "applications-" + LocalDateTime.now(clock).format(FILE_TIMESTAMP) + ".zip";
+    private String buildFileName(String prefix, String extension) {
+        return prefix + LocalDateTime.now(clock).format(FILE_TIMESTAMP) + extension;
     }
 
     private Path createTempFile() {
+        return createTempFile("application-pdf-bulk-", ".zip");
+    }
+
+    private Path createTempFile(String prefix, String suffix) {
         try {
-            return Files.createTempFile("application-pdf-bulk-", ".zip");
+            return Files.createTempFile(prefix, suffix);
         } catch (IOException e) {
             throw new PdfGenerationException("지원서 PDF 임시 파일 생성에 실패했습니다.", e);
         }
