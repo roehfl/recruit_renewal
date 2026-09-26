@@ -1,7 +1,7 @@
 # 면접 일정·면접관·면접 평가 (`interview`)
 
 > 경로 표기 `{BE}` `{BT}` `{BR}` `{FE}` — 정의: [_index.md](_index.md). API 경로는 `/api` 접두 생략.
-> 관련 카드: [stage-result](stage-result.md) (단계·전형결과·단계 삭제) · [admin-application](admin-application.md) (면접·평가 export, 지원서 상세) · [auth-account](auth-account.md) (직원 로그인·`Employee`) · [role-menu](role-menu.md) (`ROLE_INTERVIEWER`) · [job-posting](job-posting.md) (공고) · [privacy-audit](privacy-audit.md) (감사·파기)
+> 관련 카드: [interview-supplement](interview-supplement.md) (면접 추가사항 — 조 도착시간을 입력 시간 기본값으로 씀) · [stage-result](stage-result.md) (단계·전형결과·단계 삭제) · [admin-application](admin-application.md) (면접·평가 export, 지원서 상세) · [auth-account](auth-account.md) (직원 로그인·`Employee`) · [role-menu](role-menu.md) (`ROLE_INTERVIEWER`) · [job-posting](job-posting.md) (공고) · [privacy-audit](privacy-audit.md) (감사·파기)
 
 ## 요약
 
@@ -224,7 +224,7 @@
 
 ## 검증
 
-백엔드(`recruit_back/recruit_backend/`에서). `*Interview*`는 이 카드 테스트 20개와 정확히 맞는다.
+백엔드(`recruit_back/recruit_backend/`에서). `*Interview*`는 이 카드 테스트 20개와 [interview-supplement](interview-supplement.md) 테스트 4개(`*InterviewSupplement*`)를 함께 잡는다. 파일 지도의 `Interview*`·`*Interview*` 묶음에서 `InterviewSupplement*` 파일은 그 카드 소유다.
 
 ```powershell
 # Windows PowerShell

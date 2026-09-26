@@ -42,6 +42,7 @@ public class StageService {
     private final JobPostingRepository jobPostingRepository;
     private final StageResultRepository stageResultRepository;
     private final InterviewRepository interviewRepository;
+    private final InterviewSupplementAdminService interviewSupplementAdminService;
     private final ActivityLogService activityLogService;
     private final AuditRequestContextResolver auditRequestContextResolver;
 
@@ -199,6 +200,8 @@ public class StageService {
         // DRAFT 면접은 관리자 내부 초안이라 지원자/면접관에게 노출되지 않고(VISIBLE_STATUSES = CONFIRMED, CANCELLED)
         // 평가도 붙을 수 없다(평가 생성은 CONFIRMED 필수). 참가자는 Interview 의 cascade/orphanRemoval 로 함께 지워진다.
         interviewRepository.deleteAll(interviewRepository.findByStageIdAndStatus(stageId, InterviewStatus.DRAFT));
+        // 면접 추가사항(interview-supplement 카드) 질문 세트. 노출된 면접이 없으니 답변은 있을 수 없다.
+        interviewSupplementAdminService.deleteForStage(stageId);
         stageRepository.delete(stage);
         return stageId;
     }

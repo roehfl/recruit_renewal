@@ -155,7 +155,7 @@
 **단계 설정**
 - `stageOrder` 공고 내 유일·≥0, `finalStage=true` 최대 1개(0개 허용). ({BE}/service/StageService.java — validateStageOrderForCreate, validateFinalStageForCreate 외)
 - 최종 단계가 정확히 1개가 아니면 파기 판정이 `INVALID_STAGE_CONFIGURATION` → 그 공고 지원서 전부가 파기 대상에서 빠진다([privacy-audit](privacy-audit.md)). FE 드로어는 경고·확인만. ({BE}/service/RetentionEligibilityService.java — evaluate / {FE}/views/admin/stageResult/StageConfigDrawer.vue — finalStageCount)
-- 삭제는 READY만. READY 단계 결과 행은 항상 PENDING placeholder(판정은 IN_PROGRESS만)라는 전제로 함께 지운다. ({BE}/service/StageService.java — delete)
+- 삭제는 READY만. READY 단계 결과 행은 항상 PENDING placeholder(판정은 IN_PROGRESS만)라는 전제로 함께 지운다. 면접 추가사항 질문 세트도 함께 지운다([interview-supplement](interview-supplement.md) `deleteForStage`). ({BE}/service/StageService.java — delete)
 - 시작된 단계가 있으면 `reorder` 불가 → FE는 READY 행 "맨 뒤로"(max+10, `update`)만, 신규도 max+10. 드로어 저장 순서: 삭제 → 수정(최종단계를 내려놓는 행 먼저) → 생성 → 순서, 부분 실패 가능. ({FE}/views/admin/stageResult/StageConfigDrawer.vue — save, moveToEnd)
 
 **대상자·판정·정정**

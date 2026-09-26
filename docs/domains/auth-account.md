@@ -97,7 +97,7 @@
 | view | `{FE}/views/auth/LoginView.vue` | 로그인, 로그인 후 이동 |
 | view | `{FE}/views/applicant/SignupView.vue` | 가입(이메일=loginId, 메일 인증번호). 이름·휴대폰은 NICE 결과로 채워지는 읽기 전용 필드 |
 | view | `{FE}/views/applicant/AccountRecovery.vue` | 가운데 단일 카드 + `a-tabs` 2개: 아이디 찾기(NICE 실연동, 마스킹 아이디 표시 후 로그인·비밀번호 재발급 탭으로 이동)·비밀번호 재발급(인증번호 → 새 비밀번호) |
-| view | `{FE}/views/applicant/ApplicantProfile.vue` | 마이페이지: 비밀번호 변경, 로그아웃, 내 지원 목록, 전형결과 모달 |
+| view | `{FE}/views/applicant/ApplicantProfile.vue` | 마이페이지: 비밀번호 변경, 로그아웃, 내 지원 목록(760px 이하 카드), 전형결과 모달, 면접 추가사항 열 |
 | api | `{FE}/api/authApi.ts` | `login`, `me`, `logout` |
 | api | `{FE}/api/applicationApi.ts` | (공유) `signup`, `checkEmail`, `findEmail`, `changePassword`, 인증번호 5종 |
 | types | `{FE}/types/auth.ts` | `LoginRequest`, `LoginUser` |
@@ -128,7 +128,7 @@ NICE 본인확인 컨트롤러·화면(`NiceVerificationController.java`, `NiceA
 NICE 본인확인 엔드포인트 4개(`/auth/nice/request`·`/auth/nice/callback`·`/auth/nice/callback/error`·`/auth/nice/result`)는 [auth-nice-verification](auth-nice-verification.md) 소유.
 
 - 응답은 모두 `ApiResponse<T>`(`{ success, data, message }`)로 감싼다. 이 표는 코드 기준으로 작성했다(이전 계약 문서에 섹션 없음).
-- ApplicantProfile이 호출하는 다른 카드 API: `GET /applications/me`(내 지원 목록, pageSize 5) → [application](application.md), `GET /applications/{applicationId}/stage-results` → [stage-result](stage-result.md).
+- ApplicantProfile이 호출하는 다른 카드 API: `GET /applications/me`(내 지원 목록, pageSize 5) → [application](application.md), `GET /applications/{applicationId}/stage-results` → [stage-result](stage-result.md), `GET /applicant/interview-supplements`(추가사항 입력 열·입력 모달) → [interview-supplement](interview-supplement.md).
 
 ### 엔드포인트 상세
 

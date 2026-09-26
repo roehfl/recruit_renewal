@@ -88,6 +88,18 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
+    @ExceptionHandler(InterviewSupplementNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInterviewSupplementNotFound(InterviewSupplementNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidInterviewSupplementException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidInterviewSupplement(InvalidInterviewSupplementException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(InterviewEvaluationNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleInterviewEvaluationNotFound(InterviewEvaluationNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

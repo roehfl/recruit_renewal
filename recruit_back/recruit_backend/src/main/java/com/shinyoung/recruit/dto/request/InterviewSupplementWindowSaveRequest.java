@@ -1,0 +1,14 @@
+package com.shinyoung.recruit.dto.request;
+
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+public record InterviewSupplementWindowSaveRequest(
+        @NotEmpty List<@NotNull Long> jobApplicationIds,
+        @NotNull LocalDateTime startDateTime,
+        @NotNull LocalDateTime endDateTime
+) {
+}

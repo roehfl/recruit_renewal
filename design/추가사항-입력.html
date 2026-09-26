@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>지원자 추가사항 입력 디자인</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+:root{
+  --primary:#0f4726;--primary-hover:#146135;--primary-dark:#0a321b;--emerald:#2f6f55;
+  --text:#1f2937;--text-2:#6b7280;--text-3:#9ca3af;--text-dis:#bfbfbf;
+  --bg:#f5f7fa;--surface:#fff;--muted:#f9fafb;--soft:#f8faf6;--selected:#f4f8f0;
+  --border:#e5e7eb;--border-strong:#d1d5db;
+  --danger:#e5484d;--danger-bg:#fff1f0;--warning:#d97706;--warning-bg:#fff7e6;--success:#2f855a;--success-bg:#edf7f0;
+  --r:8px;--r-sm:4px;--r-lg:12px;
+  --shadow-panel:0 8px 24px rgba(31,41,55,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans KR','Apple SD Gothic Neo',sans-serif;font-size:14px;color:var(--text);background:#fff;line-height:1.5}
+button{font:inherit;cursor:pointer}
+textarea{font:inherit;color:inherit}
+
+/* header */
+.hdr{height:72px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 50px;gap:40px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:800;color:var(--primary);font-size:18px;letter-spacing:-.02em}
+.logo span{width:30px;height:30px;border-radius:7px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px}
+.gnb{display:flex;gap:34px;font-size:15.5px;font-weight:500;color:#374151}
+.hdr .me{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:14px}
+.hdr .me .av{width:28px;height:28px;border-radius:50%;background:var(--selected);color:var(--primary);display:flex;align-items:center;justify-content:center}
+
+/* page */
+.page-inner{width:85%;margin:0 auto;padding:98px 50px 88px}
+.page-title{font-size:38px;font-weight:800;line-height:1.25;letter-spacing:-.04em}
+.profile-card{margin-top:28px;display:flex;justify-content:space-between;align-items:center;padding:26px 30px;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--soft)}
+.profile-card .name{font-size:20px;font-weight:700}
+.profile-card .email{color:var(--text-2);font-size:14px}
+.profile-card .acts{display:flex;gap:8px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 15px;border:1px solid var(--border-strong);background:#fff;border-radius:6px;color:var(--text);font-size:14px;white-space:nowrap;transition:.12s}
+.btn:hover{border-color:var(--primary);color:var(--primary)}
+.btn i{font-size:16px}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-hover);color:#fff}
+.btn:disabled,.btn:disabled:hover{background:#f5f5f5;border-color:#d9d9d9;color:var(--text-dis);cursor:not-allowed}
+.btn-lg{height:40px;padding:0 20px;font-size:15px}
+.sub-title{font-size:22px;font-weight:700;margin:44px 0 16px 15px}
+
+/* table (ant-table look) */
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;min-width:860px}
+.tbl th{background:#fafafa;font-weight:600;font-size:14px;text-align:left;padding:14px 16px;border-bottom:1px solid #f0f0f0;position:relative}
+.tbl th+th::before{content:"";position:absolute;left:0;top:50%;height:1.6em;transform:translateY(-50%);width:1px;background:#f0f0f0}
+.tbl td{padding:16px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+.tbl .c{text-align:center}
+.tbl tbody tr:hover td{background:#fafafa}
+.tbl th.new{background:var(--selected);color:var(--primary)}
+.tbl td.new{background:rgb(244 248 240/55%)}
+.status-tag{font-size:13px}
+.status-tag.SUBMITTED{color:var(--success)}
+.status-tag.DRAFT{color:var(--warning)}
+.ai{display:flex;flex-direction:column;align-items:center;gap:5px}
+.ai .meta{font-size:12px;color:var(--text-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ai .meta.live{color:var(--success);font-weight:500}
+.ai .meta.urgent{color:var(--danger);font-weight:500}
+.ai .done-mark{font-size:11.5px;color:var(--primary);display:inline-flex;align-items:center;gap:2px}
+.pager{display:flex;justify-content:flex-end;gap:6px;padding:16px 0}
+.pager span{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px;font-size:14px}
+.pager .on{border:1px solid var(--primary);color:var(--primary)}
+
+/* modal */
+.dim{position:fixed;inset:0;background:rgb(0 0 0/45%);display:none;align-items:flex-start;justify-content:center;z-index:40;overflow:auto;padding:60px 16px}
+.dim.on{display:flex}
+.modal{width:900px;max-width:100%;background:#fff;border-radius:var(--r-lg);box-shadow:0 12px 40px rgb(0 0 0/18%);animation:pop .16s ease-out}
+@keyframes pop{from{opacity:0;transform:translateY(-8px)}}
+.m-head{display:flex;align-items:flex-start;gap:12px;padding:20px 24px 14px}
+.m-head h3{font-size:17px;font-weight:700}
+.m-head .ctx{font-size:13px;color:var(--text-2);margin-top:2px}
+.m-head .x{margin-left:auto;border:0;background:none;width:30px;height:30px;border-radius:6px;color:var(--text-3);font-size:20px;display:flex;align-items:center;justify-content:center}
+.m-head .x:hover{background:var(--muted);color:var(--text)}
+
+.timer{margin:0 24px;border:1px solid #cfe0c6;background:var(--selected);border-radius:var(--r);padding:12px 16px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;align-items:center;transition:.2s}
+.timer .ic{grid-row:1/3;width:40px;height:40px;border-radius:50%;background:#fff;color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:22px}
+.timer .lbl{font-size:12.5px;color:var(--text-2)}
+.timer .left{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.01em;color:var(--primary);line-height:1.2}
+.timer .end{grid-row:1/3;grid-column:3;text-align:right;font-size:12.5px;color:var(--text-2);font-variant-numeric:tabular-nums}
+.timer .end b{display:block;font-size:14px;color:var(--text);font-weight:500}
+.timer .bar{grid-column:1/4;height:4px;border-radius:2px;background:rgb(15 71 38/10%);overflow:hidden;margin-top:8px}
+.timer .bar i{display:block;height:100%;background:var(--primary);transition:width 1s linear}
+.timer.warn{border-color:#ffd591;background:var(--warning-bg)}
+.timer.warn .ic,.timer.warn .left{color:#b45309}
+.timer.warn .bar{background:rgb(217 119 6/14%)}.timer.warn .bar i{background:var(--warning)}
+.timer.crit{border-color:#ffccc7;background:var(--danger-bg)}
+.timer.crit .ic,.timer.crit .left{color:var(--danger)}
+.timer.crit .bar{background:rgb(229 72 77/14%)}.timer.crit .bar i{background:var(--danger)}
+.timer.crit .ic{animation:pulse 1s infinite}
+@keyframes pulse{50%{transform:scale(1.08)}}
+
+.guide{margin:12px 24px 0;font-size:12.5px;color:var(--text-2);display:flex;gap:6px;align-items:flex-start}
+.guide i{font-size:15px;margin-top:1px;color:var(--text-3)}
+
+.m-body{padding:18px 24px 6px;max-height:calc(100vh - 380px);min-height:220px;overflow:auto}
+.qa{padding:16px 0;border-top:1px solid var(--border)}
+.qa:first-child{border-top:0;padding-top:4px}
+.qa .q{display:flex;gap:10px;font-weight:500;line-height:1.6;margin-bottom:10px}
+.qa .q .no{flex:none;font-size:12px;font-weight:700;color:var(--primary);background:var(--selected);border-radius:4px;padding:1px 7px;height:22px;margin-top:1px}
+.qa textarea{width:100%;min-height:110px;resize:vertical;border:1px solid var(--border-strong);border-radius:6px;padding:10px 12px;line-height:1.6;font-size:14px}
+.qa textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgb(15 71 38/12%)}
+.qa .cnt{text-align:right;font-size:12px;color:var(--text-3);margin-top:4px;font-variant-numeric:tabular-nums}
+
+.m-foot{display:flex;align-items:center;gap:8px;padding:14px 24px 18px;border-top:1px solid var(--border);margin-top:8px}
+.m-foot .prog{font-size:12.5px;font-weight:500;color:var(--primary);background:var(--selected);border-radius:10px;padding:1px 9px;white-space:nowrap}
+.m-foot .save-st{margin-right:auto;font-size:12.5px;color:var(--text-2);display:flex;align-items:center;gap:5px}
+.m-foot .save-st i{font-size:15px}
+.m-foot .save-st.ok i{color:var(--success)}
+.m-foot .save-st.ing i{color:var(--text-3);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ended notice */
+.notice{width:420px;max-width:100%;background:#fff;border-radius:var(--r-lg);padding:28px 26px 20px;text-align:center;box-shadow:0 12px 40px rgb(0 0 0/18%);align-self:center;animation:pop .16s ease-out}
+.notice .big{width:52px;height:52px;border-radius:50%;background:var(--warning-bg);color:var(--warning);font-size:28px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+.notice h4{font-size:16px;margin-bottom:6px}
+.notice p{font-size:13.5px;color:var(--text-2);line-height:1.65}
+.notice .btn{margin-top:18px;width:100%}
+
+.toast{position:fixed;left:50%;top:18px;transform:translate(-50%,-10px);background:#fff;box-shadow:0 6px 16px rgb(0 0 0/12%);border-radius:var(--r);padding:9px 16px;font-size:14px;display:flex;gap:8px;align-items:center;opacity:0;transition:.18s;z-index:70;pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast i{color:var(--success);font-size:17px}
+
+/* demo panel */
+.demo{position:fixed;right:18px;bottom:18px;z-index:80;width:250px;background:#111827;color:#e5e7eb;border-radius:10px;padding:12px 14px;font-size:12px;box-shadow:0 10px 30px rgb(0 0 0/25%)}
+.demo b{display:flex;align-items:center;gap:6px;color:#fff;font-size:12.5px;margin-bottom:4px}
+.demo .clk{font-variant-numeric:tabular-nums;color:#9fe870;font-size:13px;margin-bottom:8px}
+.demo button{width:100%;margin-top:5px;height:28px;border-radius:6px;border:1px solid #374151;background:#1f2937;color:#e5e7eb;font-size:12px;text-align:left;padding:0 10px}
+.demo button:hover{border-color:#9fe870;color:#fff}
+.demo .min{position:absolute;right:8px;top:8px;width:auto;margin:0;height:22px;border:0;background:none;padding:0 4px}
+.demo.fold>*:not(b):not(.min){display:none}
+
+.memo{margin-top:36px;padding:16px 18px;border:1px dashed var(--border-strong);border-radius:var(--r);background:var(--muted);font-size:12.5px;color:var(--text-2);line-height:1.8}
+.memo b{color:var(--text)}
+
+@media (max-width:760px){
+  .hdr{padding:0 16px;gap:16px}.gnb{display:none}
+  .page-inner{width:100%;padding:40px 16px 60px}
+  .page-title{font-size:28px}
+  .profile-card{padding:18px;flex-wrap:wrap;gap:12px}
+  /* 지원 목록: 표 → 카드 */
+  .tbl{display:block;min-width:0}
+  .tbl colgroup,.tbl thead{display:none}
+  .tbl tbody{display:block}
+  .tbl tr{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px 0;border-bottom:1px solid #f0f0f0}
+  .tbl td{display:block;padding:0;border:0;text-align:left!important;font-size:13px}
+  .tbl td::before{content:attr(data-label);display:block;font-size:11.5px;color:var(--text-3);margin-bottom:4px}
+  .tbl td:first-child{grid-column:1/-1;font-size:15px;font-weight:600}
+  .tbl tbody tr:hover td{background:none}
+  .tbl td.new{grid-column:1/-1;background:none;padding:10px 12px;border:1px solid #cfe0c6;border-radius:var(--r);background:var(--soft)}
+  .tbl td.new.empty{display:none}
+  .tbl td.new .ai{flex-direction:row;justify-content:space-between;align-items:center}
+  .tbl td.new .ai .btn{height:40px;padding:0 18px;font-size:15px}
+  .tbl-wrap{overflow:visible}
+  /* 모달: 전체 화면, 타이머·버튼 고정, 질문만 스크롤 */
+  .dim{padding:0;overflow:hidden}
+  .modal{border-radius:0;height:100dvh;display:flex;flex-direction:column}
+  .m-head{padding-top:14px}
+  .m-body{flex:1;max-height:none;min-height:0}
+  .m-foot{flex-wrap:wrap;margin-top:0}
+  .m-foot .save-st{flex:1 1 auto;margin-right:0}
+  .m-foot .btn{flex:1 1 40%}
+  .timer{margin:0 16px}.guide{margin:10px 16px 0}.m-body,.m-head,.m-foot{padding-left:16px;padding-right:16px}
+  .timer .end{grid-row:auto;grid-column:2;text-align:left}
+  .demo{width:200px;bottom:150px}
+}
+</style>
+</head>
+<body>
+<header class="hdr">
+  <div class="logo"><span>SY</span>신영증권 채용</div>
+  <nav class="gnb"><span>회사소개</span><span>인재상</span><span>채용공고</span><span>채용문의</span></nav>
+  <div class="me"><span class="av"><i class="ti ti-user"></i></span>홍길동<i class="ti ti-chevron-down" style="color:var(--text-3)"></i></div>
+</header>
+
+<section class="page-inner">
+  <h1 class="page-title">마이페이지</h1>
+  <div class="profile-card">
+    <div><div class="name">홍길동</div><div class="email">gildong.hong@example.com</div></div>
+    <div class="acts"><button class="btn">수정</button><button class="btn">로그아웃</button></div>
+  </div>
+
+  <h2 class="sub-title">지원 목록</h2>
+  <div class="tbl-wrap">
+  <table class="tbl">
+    <colgroup><col><col style="width:130px"><col style="width:150px"><col style="width:150px"><col style="width:190px"></colgroup>
+    <thead><tr><th>공고명</th><th class="c">상태</th><th class="c">지원서 수정</th><th class="c">전형결과 확인</th><th class="c new">추가사항 입력</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  </div>
+  <div class="pager"><span class="on">1</span></div>
+
+  <div class="memo">
+    <b>목업 메모</b><br>
+    · 기존 목록 위의 <b>「지원자 추가사항 입력」</b> 단일 버튼은 없애고, 공고별로 표 맨 오른쪽 <b>추가사항 입력</b> 열에 버튼을 둡니다.<br>
+    · 버튼은 관리자가 <b>그 지원자에게 정한 입력 가능 시간 안에서만</b> 활성화됩니다(기본값: 본인 조의 도착시간 ~ +2시간). 시작 전은 「입력 대기」와 시작 시각, 끝나면 「입력 마감」. <b>추가사항을 받지 않는 면접</b>이거나 면접 대상이 아니면 「-」(4번째 행).<br>
+    · 모달은 남은 시간이 5분 이하면 주황, 1분 이하면 빨강으로 바뀌고, 0이 되면 작성 내용을 저장한 뒤 <b>자동으로 닫힙니다</b>. 남은 시간은 서버 시각 기준으로 계산합니다.<br>
+    · 면접 대기 중에는 휴대폰으로 입력할 가능성이 높아, 좁은 화면에서는 지원 목록이 <b>카드</b>로 바뀌고 모달은 <b>전체 화면</b>이 됩니다(타이머·저장 버튼 고정, 질문만 스크롤).<br>
+    · 오른쪽 아래 <b>시연</b> 패널로 시각을 옮겨 상태 변화와 자동 닫힘을 볼 수 있습니다.
+  </div>
+</section>
+
+<!-- 입력 모달 -->
+<div class="dim" id="dim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <div class="m-head">
+      <div><h3 id="mTitle">추가사항 입력</h3><div class="ctx" id="mCtx"></div></div>
+      <button class="x" id="mX" aria-label="닫기"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="timer" id="timer">
+      <span class="ic"><i class="ti ti-hourglass-high"></i></span>
+      <span class="lbl">남은 입력 시간</span>
+      <span class="left" id="tLeft">--:--:--</span>
+      <span class="end">입력 종료<b id="tEnd"></b></span>
+      <div class="bar"><i id="tBar"></i></div>
+    </div>
+    <p class="guide"><i class="ti ti-info-circle"></i><span>입력 시간이 끝나면 이 창은 자동으로 닫힙니다. 작성 내용은 자동 저장되며, 종료 시점에 저장된 답변이 최종 답변으로 제출됩니다.</span></p>
+    <div class="m-body" id="mBody"></div>
+    <div class="m-foot">
+      <span class="prog" id="prog"></span>
+      <span class="save-st ok" id="saveSt"><i class="ti ti-circle-check"></i><span>불러온 답변</span></span>
+      <button class="btn btn-lg" id="mClose">닫기</button>
+      <button class="btn btn-primary btn-lg" id="mSave"><i class="ti ti-device-floppy"></i>저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 종료 안내 -->
+<div class="dim" id="endDim">
+  <div class="notice">
+    <div class="big"><i class="ti ti-clock-off"></i></div>
+    <h4>입력 시간이 종료되었습니다</h4>
+    <p>작성 중인 내용을 저장하고 창을 닫았습니다.<br>마지막으로 저장된 답변이 제출되었습니다.</p>
+    <button class="btn btn-primary btn-lg" id="endOk">확인</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"><i class="ti ti-circle-check"></i><span></span></div>
+
+<div class="demo" id="demo">
+  <b><i class="ti ti-player-play"></i>시연</b>
+  <button class="min" id="demoMin" title="접기"><i class="ti ti-minus"></i></button>
+  <div class="clk">가상 현재 시각 <span id="dClock"></span></div>
+  <button data-jump="start">① 첫 공고 입력 시작 직후로</button>
+  <button data-jump="warn">② 종료 5분 전으로</button>
+  <button data-jump="end">③ 종료 20초 전으로 (자동 닫힘)</button>
+  <button data-jump="before">④ 모든 공고 입력 시작 전으로</button>
+</div>
+
+<script>
+const pad = n => String(n).padStart(2,'0');
+const fmtT = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const fmtDT = d => `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${fmtT(d)}`;
+const fmtMD = d => `${pad(d.getMonth()+1)}.${pad(d.getDate())} ${fmtT(d)}`;
+const hms = ms => { const s = Math.max(0,Math.ceil(ms/1000)); return `${pad(Math.floor(s/3600))}:${pad(Math.floor(s%3600/60))}:${pad(s%60)}`; };
+const human = ms => { const m = Math.ceil(ms/60000); return m >= 60 ? `${Math.floor(m/60)}시간 ${m%60}분` : `${m}분`; };
+
+/* 가상 시계: 시연용 기준 시각 + 실제 흐른 시간 */
+let base = new Date('2026-10-06T10:40:00').getTime(), realStart = Date.now();
+const now = () => new Date(base + (Date.now() - realStart));
+const setNow = d => { base = d.getTime(); realStart = Date.now(); };
+
+const QUESTIONS = [
+  '지원하신 직무에서 입사 후 1년 안에 이루고 싶은 목표를 적어 주세요.',
+  '최근 관심 있게 본 금융 시장 이슈 하나와 그에 대한 본인의 생각을 적어 주세요.',
+  '팀 과제에서 의견이 부딪혔을 때 어떻게 풀었는지 경험을 적어 주세요.',
+  '본인의 강점 한 가지를 구체적인 사례와 함께 적어 주세요.',
+  '본인의 약점과 그것을 보완하기 위해 해 온 노력을 적어 주세요.',
+  '신영증권을 알게 된 계기와 지원을 결심한 이유를 적어 주세요.',
+  '고객의 신뢰를 얻기 위해 가장 중요하다고 생각하는 것은 무엇인지 적어 주세요.',
+  '예상하지 못한 문제를 짧은 시간 안에 해결했던 경험을 적어 주세요.',
+  '최근 1년 안에 새로 배운 것과 그것을 어떻게 익혔는지 적어 주세요.',
+  '원하지 않는 업무를 맡게 되었을 때 어떻게 대응할지 적어 주세요.',
+  '10년 뒤 본인이 되고 싶은 모습을 적어 주세요.',
+  '면접관에게 꼭 전하고 싶은 말이 있다면 적어 주세요.'
+];
+const blank = (first = '') => QUESTIONS.map((_, i) => i === 0 ? first : '');
+const apps = [
+  {id:101,title:'2026년 하반기 신입사원 공개채용',status:'SUBMITTED',edit:false,stage:'1차 면접',group:'2조',win:['2026-10-06T09:30','2026-10-06T11:30'],answers:blank()},
+  {id:102,title:'2026년 하반기 IT 경력직 수시채용',status:'SUBMITTED',edit:false,stage:'1차 면접',group:'1조',win:['2026-10-08T13:00','2026-10-08T15:00'],answers:blank()},
+  {id:103,title:'2026년 상반기 리서치센터 인턴',status:'SUBMITTED',edit:false,stage:'최종 면접',group:'3조',win:['2026-05-20T09:00','2026-05-20T11:00'],answers:blank('입력했던 답변')},
+  {id:104,title:'2026년 디지털부문 경력 수시채용',status:'SUBMITTED',edit:true,win:null},
+  {id:105,title:'2026년 하반기 WM 영업직 채용',status:'DRAFT',edit:true,win:null}
+].map(a => ({...a, win: a.win && a.win.map(s => new Date(s))}));
+const statusLabel = {DRAFT:'임시저장',SUBMITTED:'제출완료',WITHDRAWN:'제출취소'};
+
+function state(a){
+  if(!a.win || a.status==='DRAFT') return 'none';
+  const t = now();
+  if(t < a.win[0]) return 'wait';
+  if(t < a.win[1]) return 'live';
+  return 'done';
+}
+function aiCell(a){
+  const s = state(a), t = now();
+  const wrote = a.answers && a.answers.some(x => x.trim());
+  if(s==='none') return '-';
+  if(s==='wait') return `<div class="ai"><button class="btn" disabled>입력 대기</button><span class="meta">${fmtMD(a.win[0])}부터</span></div>`;
+  if(s==='done') return `<div class="ai"><button class="btn" disabled>입력 마감</button>${wrote?'<span class="done-mark"><i class="ti ti-check"></i>제출됨</span>':'<span class="meta">미작성</span>'}</div>`;
+  const left = a.win[1]-t;
+  return `<div class="ai"><button class="btn btn-primary" data-open="${a.id}">${wrote?'<i class="ti ti-pencil"></i>수정하기':'<i class="ti ti-edit"></i>입력하기'}</button><span class="meta ${left<=300e3?'urgent':'live'}">${fmtT(a.win[1])}까지 · ${human(left)} 남음</span></div>`;
+}
+function renderRows(){
+  document.getElementById('rows').innerHTML = apps.map(a => `<tr>
+    <td>${a.title}</td>
+    <td class="c" data-label="상태"><span class="status-tag ${a.status}">${statusLabel[a.status]}</span></td>
+    <td class="c" data-label="지원서 수정">${a.edit?'<button class="btn">바로가기</button>':'-'}</td>
+    <td class="c" data-label="전형결과 확인">${a.status==='DRAFT'?'-':'<button class="btn">확인</button>'}</td>
+    <td class="c new ${state(a)==='none'?'empty':''}" data-label="추가사항 입력">${aiCell(a)}</td></tr>`).join('');
+}
+document.getElementById('rows').addEventListener('click', e => {
+  const b = e.target.closest('[data-open]'); if(b) openModal(+b.dataset.open);
+});
+
+/* ---------- 모달 ---------- */
+let cur = null, dirty = false, saveTimer = null;
+function openModal(id){
+  const target = apps.find(a => a.id===id);
+  if(state(target)!=='live'){ renderRows(); return; }
+  cur = target;
+  document.getElementById('mCtx').textContent = `${cur.title} · ${cur.stage} · ${cur.group}`;
+  document.getElementById('tEnd').textContent = fmtDT(cur.win[1]);
+  document.getElementById('mBody').innerHTML = QUESTIONS.map((q,i) => `
+    <div class="qa">
+      <div class="q"><span class="no">질문 ${i+1}</span><span>${q}</span></div>
+      <textarea maxlength="1000" data-i="${i}" placeholder="답변을 입력하세요.">${cur.answers[i]}</textarea>
+      <div class="cnt"><span>${cur.answers[i].length}</span> / 1,000자</div>
+    </div>`).join('');
+  setSave('ok', cur.answers.some(x=>x.trim()) ? '저장된 답변을 불러왔습니다' : '아직 저장된 답변이 없습니다');
+  dirty = false; updateProg();
+  document.getElementById('dim').classList.add('on');
+  tick();
+}
+document.getElementById('mBody').addEventListener('input', e => {
+  const ta = e.target.closest('textarea'); if(!ta) return;
+  ta.nextElementSibling.firstElementChild.textContent = ta.value.length.toLocaleString();
+  dirty = true; setSave('ing','작성 중…'); updateProg();
+  clearTimeout(saveTimer); saveTimer = setTimeout(() => save('auto'), 1500);
+});
+function updateProg(){ const n = [...document.querySelectorAll('#mBody textarea')].filter(t => t.value.trim()).length; document.getElementById('prog').textContent = `작성 ${n} / ${QUESTIONS.length}`; }
+function collect(){ document.querySelectorAll('#mBody textarea').forEach(t => cur.answers[+t.dataset.i] = t.value); }
+function save(mode){
+  if(!cur) return;
+  collect(); clearTimeout(saveTimer); dirty = false;
+  const t = now();
+  setSave('ok', `${mode==='auto'?'자동 저장됨':'저장됨'} ${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}`);
+  if(mode==='manual') toast('답변을 저장했습니다.');
+}
+function setSave(cls,txt){
+  const el = document.getElementById('saveSt'); el.className = 'save-st ' + cls;
+  el.querySelector('i').className = cls==='ing' ? 'ti ti-loader-2' : 'ti ti-circle-check';
+  el.querySelector('span').textContent = txt;
+}
+function closeModal(){
+  if(!cur) return;
+  if(dirty) save('auto');
+  document.getElementById('dim').classList.remove('on'); cur = null; renderRows();
+}
+document.getElementById('mSave').onclick = () => save('manual');
+document.getElementById('mClose').onclick = closeModal;
+document.getElementById('mX').onclick = closeModal;
+document.getElementById('endOk').onclick = () => document.getElementById('endDim').classList.remove('on');
+
+function tick(){
+  const t = now();
+  document.getElementById('dClock').textContent = fmtDT(t) + ':' + pad(t.getSeconds());
+  if(cur){
+    const left = cur.win[1] - t, total = cur.win[1] - cur.win[0];
+    if(left <= 0){
+      save('auto');
+      document.getElementById('dim').classList.remove('on'); cur = null;
+      document.getElementById('endDim').classList.add('on');
+      renderRows(); return;
+    }
+    document.getElementById('tLeft').textContent = hms(left);
+    document.getElementById('tBar').style.width = (left/total*100).toFixed(2) + '%';
+    const tm = document.getElementById('timer');
+    tm.className = 'timer' + (left <= 60e3 ? ' crit' : left <= 300e3 ? ' warn' : '');
+    tm.querySelector('.ic i').className = left <= 300e3 ? 'ti ti-hourglass-low' : 'ti ti-hourglass-high';
+  }
+}
+setInterval(() => { tick(); if(!cur) renderRows(); }, 1000);
+
+/* ---------- 시연 ---------- */
+document.getElementById('demo').addEventListener('click', e => {
+  if(e.target.closest('#demoMin')){ document.getElementById('demo').classList.toggle('fold'); return; }
+  const b = e.target.closest('[data-jump]'); if(!b) return;
+  const a = apps[0], j = b.dataset.jump;
+  if(j==='start') setNow(new Date(a.win[0].getTime() + 60e3));
+  if(j==='warn') setNow(new Date(a.win[1].getTime() - 5*60e3 + 2e3));
+  if(j==='end') setNow(new Date(a.win[1].getTime() - 20e3));
+  if(j==='before') setNow(new Date('2026-10-06T08:50:00'));
+  if(cur && state(cur)!=='live'){ document.getElementById('dim').classList.remove('on'); cur = null; }
+  tick(); renderRows();
+  if(j!=='before' && !cur) openModal(a.id);
+});
+
+let tt;
+function toast(msg){ const t = document.getElementById('toast'); t.querySelector('span').textContent = msg; t.classList.add('on'); clearTimeout(tt); tt = setTimeout(()=>t.classList.remove('on'),1600); }
+
+renderRows(); tick();
+</script>
+</body>
+</html>

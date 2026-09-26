@@ -196,6 +196,7 @@
 | `ApplicationLanguage` | `languageName`·`testName` ph, 나머지(`registrationNumber` 포함) null |
 | `ApplicationMilitary` · `ApplicationAward` · `ApplicationGapPeriod` | 날짜·사유 null / 이름·기관 ph·설명 null / `reason` ph·설명 null |
 | `InterviewEvaluation` · `StageResult` · `StageResultCorrectionHistory` | `comment` null / `comment` null / `reason` ph·전후 comment null. 결과·점수·Interview memo 유지 |
+| `InterviewSupplementAnswer` | `answerText` null. 질문은 유지([interview-supplement](interview-supplement.md)) |
 | `JobApplication` | `applicantNameSnapshot` ph, `purgeResult`·`purgeBatchId`·`purgedAt` |
 | `ApplicationAttachment` | `originalFileName` ph, `filenameHash` = `AuditHmac("FILE_NAME:"+원본명)`, 삭제자·사유 null |
 | `MessageRecipient`([message-delivery](message-delivery.md)) | 이름·이메일·휴대폰 null(AES 컬럼이라 ph 불가). 채널 상태·거래 ID·실패 사유(결과코드) 유지. 테스트 수신자(`jobApplication` null)는 대상 아님 |

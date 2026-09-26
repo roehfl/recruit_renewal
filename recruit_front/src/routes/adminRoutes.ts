@@ -115,6 +115,11 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/interview/interviewScheduling.vue')
       },
       {
+        path: 'interview-supplements',
+        name: 'AdminInterviewSupplement',
+        component: () => import('@/views/admin/interview/AdminInterviewSupplementView.vue'),
+      },
+      {
         path: 'messages',
         name: 'AdminMessageSend',
         component: () => import('@/views/admin/message/AdminMessageSendView.vue'),

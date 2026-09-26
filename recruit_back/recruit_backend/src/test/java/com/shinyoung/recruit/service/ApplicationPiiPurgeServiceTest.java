@@ -15,6 +15,9 @@ import com.shinyoung.recruit.domain.entity.ApplicationMilitary;
 import com.shinyoung.recruit.domain.entity.Employee;
 import com.shinyoung.recruit.domain.entity.Interview;
 import com.shinyoung.recruit.domain.entity.InterviewEvaluation;
+import com.shinyoung.recruit.domain.entity.InterviewSupplement;
+import com.shinyoung.recruit.domain.entity.InterviewSupplementAnswer;
+import com.shinyoung.recruit.domain.entity.InterviewSupplementQuestion;
 import com.shinyoung.recruit.domain.entity.InterviewParticipant;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.domain.entity.JobPosting;
@@ -37,6 +40,9 @@ import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationMilitaryRepository;
 import com.shinyoung.recruit.domain.repository.EmployeeRepository;
 import com.shinyoung.recruit.domain.repository.InterviewEvaluationRepository;
+import com.shinyoung.recruit.domain.repository.InterviewSupplementAnswerRepository;
+import com.shinyoung.recruit.domain.repository.InterviewSupplementQuestionRepository;
+import com.shinyoung.recruit.domain.repository.InterviewSupplementRepository;
 import com.shinyoung.recruit.domain.repository.InterviewParticipantRepository;
 import com.shinyoung.recruit.domain.repository.InterviewRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
@@ -129,6 +135,9 @@ class ApplicationPiiPurgeServiceTest {
     @Autowired private InterviewRepository interviewRepository;
     @Autowired private InterviewParticipantRepository interviewParticipantRepository;
     @Autowired private InterviewEvaluationRepository interviewEvaluationRepository;
+    @Autowired private InterviewSupplementRepository interviewSupplementRepository;
+    @Autowired private InterviewSupplementQuestionRepository interviewSupplementQuestionRepository;
+    @Autowired private InterviewSupplementAnswerRepository interviewSupplementAnswerRepository;
     @Autowired private AuditHmac auditHmac;
     @Autowired private MessageSendRepository messageSendRepository;
     @Autowired private MessageRecipientRepository messageRecipientRepository;
@@ -392,5 +401,38 @@ class ApplicationPiiPurgeServiceTest {
         MessageRecipient keptTester = messageRecipientRepository.findById(tester.getId()).orElseThrow();
         assertThat(keptTester.getRecipientName()).isEqualTo("김인사"); // 테스트 수신자는 대상 아님
         assertThat(keptTester.getEmail()).isEqualTo("hr.kim@example.com");
+    }
+
+    @Test
+    void 면접_추가사항_답변_본문이_파기된다() {
+        JobPosting posting = JobPosting.create("추가사항 파기 공고", "Content",
+                LocalDateTime.of(2026, 9, 1, 9, 0), LocalDateTime.of(2026, 9, 22, 18, 0));
+        posting.replaceJobPositions(List.of(JobPosition.create("Sales", 1)));
+        posting = jobPostingRepository.saveAndFlush(posting);
+        Applicant applicant = new Applicant(HashUtil.sha256("supplement-pii-ci"));
+        applicant.setLoginId("supplement-pii-applicant");
+        applicant.setName("김지원");
+        applicant.setUserName("김지원");
+        applicant.setPhoneNumber("01000000000");
+        applicant = applicantRepository.save(applicant);
+        JobPosition position = posting.getJobPositions().get(0);
+        JobApplication application = jobApplicationRepository.save(JobApplication.create(
+                applicant, posting, position, "김지원", posting.getTitle(), position.getPositionName()));
+        Stage stage = stageRepository.save(Stage.create(posting, "1차 면접", StageType.FIRST_INTERVIEW, 1, null, false));
+        InterviewSupplement supplement = interviewSupplementRepository.save(InterviewSupplement.create(stage));
+        InterviewSupplementQuestion question = interviewSupplementQuestionRepository.save(
+                InterviewSupplementQuestion.create(supplement, "입사 후 목표?", 1));
+        InterviewSupplementAnswer answer = interviewSupplementAnswerRepository.save(
+                InterviewSupplementAnswer.create(question, application, "저는 김지원이고 010-0000-0000 입니다"));
+        entityManager.flush();
+
+        applicationPiiPurgeService.purgeRelationalPii(application.getId());
+        entityManager.flush();
+        entityManager.clear();
+
+        InterviewSupplementAnswer purged = interviewSupplementAnswerRepository.findById(answer.getId()).orElseThrow();
+        assertThat(purged.getAnswerText()).isNull();
+        assertThat(interviewSupplementQuestionRepository.findById(question.getId()).orElseThrow().getContent())
+                .isEqualTo("입사 후 목표?"); // 질문은 개인정보가 아니다(KEEP)
     }
 }

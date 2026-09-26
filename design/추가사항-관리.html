@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>면접 추가사항 관리 디자인</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+:root{
+  --primary:#0f4726;--primary-hover:#146135;--primary-dark:#0a321b;--emerald:#2f6f55;
+  --text:#1f2937;--text-2:#6b7280;--text-3:#9ca3af;
+  --bg:#f5f7fa;--surface:#fff;--muted:#f9fafb;--soft:#f8faf6;--selected:#f4f8f0;
+  --border:#e5e7eb;--border-strong:#d1d5db;
+  --danger:#e5484d;--danger-bg:#fff1f0;--warning:#d97706;--warning-bg:#fff7e6;--success:#2f855a;--success-bg:#edf7f0;--info:#1677ff;--info-bg:#eef5ff;
+  --r:8px;--r-sm:4px;--r-lg:12px;
+  --shadow:0 1px 3px rgb(0 0 0/6%);--shadow-panel:0 8px 24px rgba(31,41,55,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Noto Sans KR','Apple SD Gothic Neo',sans-serif;font-size:14px;color:var(--text);background:var(--bg);line-height:1.5}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+.app{display:flex;min-height:100vh}
+.sidebar{width:240px;flex:none;display:flex;flex-direction:column;background:linear-gradient(180deg,var(--primary) 0%,#0a3a1e 100%);color:#fff;position:sticky;top:0;height:100vh}
+.brand{height:56px;display:flex;align-items:center;gap:9px;padding:0 18px;border-bottom:1px solid rgb(255 255 255/10%)}
+.brand-logo{width:28px;height:28px;border-radius:7px;background:#fff;color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+.brand-name{font-weight:700;font-size:14px;display:block;line-height:1.15}
+.brand-sub{font-size:10px;letter-spacing:.08em;opacity:.6}
+.nav{flex:1;overflow:auto;padding:14px 10px}
+.nav-label{font-size:11px;opacity:.5;padding:12px 10px 6px}
+.nav-item{width:100%;display:flex;align-items:center;gap:10px;padding:8px 10px;border:0;background:none;color:rgb(255 255 255/78%);border-radius:var(--r);text-align:left;font-size:13.5px}
+.nav-item i{font-size:17px}
+.nav-item:hover{background:rgb(255 255 255/8%);color:#fff}
+.nav-item.active{background:rgb(255 255 255/14%);color:#fff;font-weight:500}
+.nav-item .new{margin-left:auto;font-size:10px;background:#9fe870;color:var(--primary-dark);border-radius:10px;padding:0 6px;font-weight:700}
+.user{display:flex;align-items:center;gap:10px;padding:14px 18px;border-top:1px solid rgb(255 255 255/10%)}
+.avatar{width:30px;height:30px;border-radius:50%;background:rgb(255 255 255/16%);display:flex;align-items:center;justify-content:center;font-size:13px}
+.user small{display:block;opacity:.6;font-size:11px}
+.main{flex:1;min-width:0;max-width:1080px;padding:24px 28px 40px}
+.page-header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:18px}
+.page-title{font-size:20px;font-weight:700}
+.page-desc{color:var(--text-2);font-size:13px;margin-top:2px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;border:1px solid var(--border-strong);background:#fff;border-radius:var(--r);color:var(--text);font-size:13.5px;white-space:nowrap}
+.btn:hover{border-color:var(--primary);color:var(--primary)}
+.btn i{font-size:16px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:disabled:hover{border-color:var(--border-strong);color:var(--text)}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-hover);color:#fff}
+.btn-lg{height:40px;padding:0 20px;font-size:14.5px;font-weight:500}
+.btn-sm{height:26px;padding:0 10px;font-size:12.5px}
+.btn-sm i{font-size:14px}
+.btn-text{border-color:transparent;background:none;color:var(--text-2)}
+.btn-text:hover{background:var(--muted);border-color:transparent}
+.btn-danger-text{border-color:transparent;background:none;color:var(--text-2)}
+.btn-danger-text:hover{color:var(--danger);background:var(--danger-bg);border-color:transparent}
+.btn-icon{width:28px;height:28px;padding:0;justify-content:center;border-color:transparent;background:none;color:var(--text-2)}
+.btn-icon:hover{background:var(--muted);border-color:transparent}
+.btn-icon.danger:hover{color:var(--danger);background:var(--danger-bg)}
+.btn-danger-fill{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn-danger-fill:hover{background:#d63b40;border-color:#d63b40;color:#fff}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field>label{font-size:12px;color:var(--text-2);font-weight:500}
+.input,.select,.textarea{border:1px solid var(--border-strong);border-radius:var(--r);background:#fff;min-width:0;width:100%}
+.input,.select{height:32px;padding:0 10px}
+.textarea{padding:8px 10px;resize:vertical;min-height:64px;line-height:1.55}
+.select{appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;padding-right:28px}
+.input:focus,.select:focus,.textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgb(15 71 38/12%)}
+.input.err{border-color:var(--danger)}
+.tag{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:var(--r-sm);font-size:12px;border:1px solid var(--border);background:var(--muted);color:var(--text-2);white-space:nowrap}
+.tag i{font-size:13px}
+.tag.sm{height:18px;font-size:11px;padding:0 6px}
+.tag.green{background:var(--success-bg);border-color:#b7dfc4;color:var(--success)}
+.tag.amber{background:var(--warning-bg);border-color:#ffd591;color:#b45309}
+.tag.brand{background:var(--selected);border-color:#cfe0c6;color:var(--primary)}
+.tag.blue{background:var(--info-bg);border-color:#bcd6ff;color:var(--info)}
+.muted{color:var(--text-2)}.small{font-size:12px}
+.cb{width:15px;height:15px;accent-color:var(--primary);cursor:pointer;vertical-align:middle}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:var(--r);font-size:13px;border:1px solid}
+.alert i{font-size:17px;margin-top:1px;flex:none}
+.alert.warn{background:var(--warning-bg);border-color:#ffd591;color:#92400e}
+.alert.info{background:var(--soft);border-color:#dfe8d6;color:#345}
+.num{font-variant-numeric:tabular-nums}
+
+/* filters */
+.filters{display:flex;align-items:flex-end;gap:12px;padding:14px 16px;margin-bottom:16px;flex-wrap:wrap}
+.w-post{width:340px}.w-stage{width:240px}
+.filters .ctx{margin-left:auto;display:flex;gap:18px;align-items:center;font-size:12.5px;color:var(--text-2)}
+.filters .ctx b{color:var(--text);font-weight:500;margin-left:4px}
+
+/* empty (not used) */
+.off-card{padding:56px 24px;text-align:center}
+.off-card .ic{width:56px;height:56px;border-radius:50%;background:var(--muted);color:var(--text-3);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 14px}
+.off-card h3{font-size:16px;margin-bottom:6px}
+.off-card p{color:var(--text-2);font-size:13px;line-height:1.7;margin-bottom:18px}
+
+/* tabs */
+.tabs{display:flex;align-items:center;gap:22px;padding:0 16px;border-bottom:1px solid var(--border)}
+.tab{height:48px;border:0;background:none;padding:0 2px;font-size:14px;font-weight:500;color:var(--text-2);border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:6px}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--primary);border-color:var(--primary);font-weight:700}
+.tab .n{font-size:12px;font-weight:500;color:var(--text-2);background:var(--muted);border-radius:10px;padding:0 8px;line-height:20px}
+.tab.on .n{color:var(--primary);background:var(--selected)}
+.tabs .right{margin-left:auto;display:flex;align-items:center;gap:8px}
+
+/* 설정 탭: 왼쪽 질문 / 오른쪽 시간 */
+.t-panel{padding:16px}
+.t-hint{margin-left:auto;display:flex;align-items:center;gap:4px}
+.t-hint b{color:var(--text);font-weight:500}
+.t-tools{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.t-tools .select{width:110px;flex:none}
+.t-tools .input{width:220px}
+.t-all{display:flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer}
+.t-panel .bulk{margin:0 0 10px}
+.t-list{border:1px solid var(--border);border-radius:var(--r)}
+.t-g{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fbfcfa;border-bottom:1px solid var(--border);position:sticky;top:34px;z-index:1;font-size:12px;color:var(--text-2)}
+.t-g .g{font-weight:700;color:var(--text);font-size:13.5px}
+.t-g b{color:var(--text);font-weight:500}
+.t-g .btn{margin-left:auto}
+.t-h,.t-r{display:grid;grid-template-columns:18px 110px 96px 1fr max-content;gap:12px;align-items:center;padding:0 12px}
+.t-h{height:34px;background:var(--muted);border-bottom:1px solid var(--border);font-size:12px;color:var(--text-2);font-weight:500;position:sticky;top:0;z-index:2}
+.t-r{padding-top:8px;padding-bottom:8px;border-bottom:1px solid var(--border);font-size:14px}
+.t-r:last-child{border-bottom:0}
+.t-r:hover{background:#fcfdfc}
+.t-r.sel{background:var(--selected)}
+.t-r .nm{font-weight:500}
+.t-r .id{font-variant-numeric:tabular-nums;color:var(--text)}
+.t-r .btn{justify-self:end}
+.t-h.v,.t-r.v{grid-template-columns:minmax(60px,100px) 72px minmax(140px,1fr) 118px 84px max-content;gap:10px}
+.t-r .sv{font-size:13px;font-variant-numeric:tabular-nums}
+.pane{display:none}.pane.on{display:block}
+
+/* questions */
+.q-wrap{padding:16px;max-width:920px}
+.q-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:12.5px;color:var(--text-2)}
+.q-list{list-style:none;display:flex;flex-direction:column;gap:8px}
+.q-item{position:relative;display:flex;gap:10px;align-items:flex-start;padding:10px 10px 10px 12px;border:1px solid var(--border);border-radius:var(--r);background:#fff;transition:border-color .12s}
+.q-item:hover{border-color:var(--border-strong)}
+.q-item.editing{border-color:var(--primary);box-shadow:0 0 0 2px rgb(15 71 38/10%)}
+.q-grip{flex:none;width:18px;height:26px;margin:1px -4px 0 -6px;display:flex;align-items:center;justify-content:center;color:var(--text-3);cursor:grab;border-radius:var(--r-sm)}
+.q-grip:hover{color:var(--text);background:var(--muted)}
+.q-grip:active{cursor:grabbing}
+.q-grip.off{cursor:default;visibility:hidden}
+.q-grip i{font-size:16px}
+.q-item.dragging{opacity:.4;border-style:dashed}
+.q-item.drop-before::before,.q-item.drop-after::after{content:"";position:absolute;left:-1px;right:-1px;height:3px;border-radius:2px;background:var(--primary)}
+.q-item.drop-before::before{top:-6px}
+.q-item.drop-after::after{bottom:-6px}
+.q-item.moved{animation:moved 1.2s ease-out}
+@keyframes moved{0%{background:var(--selected);border-color:var(--primary)}}
+.q-no{flex:none;width:26px;height:26px;border-radius:50%;background:var(--selected);color:var(--primary);font-weight:700;font-size:12.5px;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.q-body{flex:1;min-width:0}
+.q-text{white-space:pre-wrap;word-break:keep-all;line-height:1.6;padding-top:2px}
+.q-acts{display:flex;gap:2px;flex:none}
+.q-edit-foot{display:flex;align-items:center;gap:6px;margin-top:6px}
+.q-edit-foot .cnt{font-size:12px;color:var(--text-3);margin-right:auto}
+.q-add{margin-top:10px;display:flex;gap:8px;align-items:flex-start;padding:10px;border:1px dashed var(--border-strong);border-radius:var(--r);background:var(--muted)}
+.q-add .textarea{min-height:40px;height:40px}
+.q-empty{padding:28px 0;text-align:center;color:var(--text-3);font-size:13px}
+.q-empty i{font-size:28px;display:block;margin-bottom:6px}
+
+/* candidates */
+.bulk{display:none;align-items:center;gap:8px;margin:0 16px 10px;padding:8px 12px;border-radius:var(--r);background:var(--selected);border:1px solid #cfe0c6;font-size:13px}
+.bulk.on{display:flex}
+.bulk b{color:var(--primary)}
+.nm{font-weight:500}
+.win{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+.win .t{font-weight:500}
+.win .t .arrow{color:var(--text-3);margin:0 3px}
+.prog{display:flex;align-items:center;gap:8px;min-width:120px}
+.prog .bar{flex:1;height:6px;border-radius:3px;background:var(--border);overflow:hidden;max-width:70px}
+.prog .bar i{display:block;height:100%;background:var(--warning)}
+.prog.full .bar i{background:var(--success)}
+.prog .v{font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.prog.zero .v{color:var(--text-3)}
+.c-empty{padding:40px 0;text-align:center;color:var(--text-3)}
+
+/* drawer */
+.dim{position:fixed;inset:0;background:rgb(17 24 39/38%);display:none;z-index:50}
+.dim.on{display:block}
+.drawer{position:fixed;top:0;right:0;height:100vh;width:640px;max-width:100vw;background:#fff;box-shadow:-8px 0 24px rgb(0 0 0/10%);z-index:51;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .2s ease}
+.drawer.on{transform:none}
+.dr-head{display:flex;align-items:flex-start;gap:10px;padding:18px 20px 14px;border-bottom:1px solid var(--border)}
+.dr-head .who b{font-size:16px}
+.dr-head .who div{font-size:12.5px;color:var(--text-2);margin-top:2px}
+.dr-head .nav2{margin-left:auto;display:flex;gap:2px;align-items:center}
+.dr-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border)}
+.dr-sum div{background:var(--muted);padding:10px 14px}
+.dr-sum span{display:block;font-size:11.5px;color:var(--text-3)}
+.dr-sum b{font-size:13px;font-weight:500;font-variant-numeric:tabular-nums}
+.dr-body{flex:1;overflow:auto;padding:14px 20px 24px}
+.dr-body .alert{margin-bottom:12px}
+.ans{padding:14px 0;border-top:1px solid var(--border)}
+.ans:first-of-type{border-top:0}
+.ans .q{display:flex;gap:8px;font-weight:500;line-height:1.6;margin-bottom:8px}
+.ans .q .no{flex:none;font-size:11.5px;font-weight:700;color:var(--primary);background:var(--selected);border-radius:4px;padding:1px 7px;height:21px;margin-top:1px}
+.ans .a{white-space:pre-wrap;line-height:1.7;background:var(--muted);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;font-size:13.5px}
+.ans .a.none{color:var(--text-3);background:#fff;border-style:dashed}
+.ans .meta{text-align:right;font-size:11.5px;color:var(--text-3);margin-top:4px}
+
+/* modal */
+.mdim{position:fixed;inset:0;background:rgb(17 24 39/38%);display:none;align-items:center;justify-content:center;z-index:60;padding:16px}
+.mdim.on{display:flex}
+.dlg{width:440px;max-width:100%;background:#fff;border-radius:var(--r-lg);box-shadow:var(--shadow-panel);padding:20px}
+.dlg h4{font-size:15px;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.dlg h4 i{font-size:20px}
+.dlg p{font-size:13px;color:var(--text-2);line-height:1.6}
+.dlg .quote{margin:10px 0 0;padding:8px 10px;background:var(--muted);border-radius:var(--r);font-size:12.5px;color:var(--text)}
+.dlg-foot{display:flex;justify-content:flex-end;gap:6px;margin-top:18px}
+.tform{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.tform .row{display:flex;align-items:center;gap:8px}
+.tform .row>span{font-size:12.5px;color:var(--text-2);width:32px;flex:none}
+.tform .quick{display:flex;gap:4px;flex-wrap:wrap;padding-left:40px}
+.tform .hint{font-size:12px;color:var(--danger);padding-left:40px;min-height:18px}
+.chip{height:24px;padding:0 9px;border:1px solid var(--border-strong);border-radius:12px;background:#fff;font-size:12px;color:var(--text-2)}
+.chip:hover{border-color:var(--primary);color:var(--primary)}
+.toast{position:fixed;left:50%;top:18px;transform:translate(-50%,-10px);background:#fff;border:1px solid var(--border);box-shadow:var(--shadow-panel);border-radius:var(--r);padding:9px 14px;font-size:13px;display:flex;gap:8px;align-items:center;opacity:0;transition:.18s;z-index:70;pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast i{color:var(--success);font-size:17px}
+
+.note{font-size:12px;color:var(--text-3);margin-top:14px;line-height:1.8}
+.note b{color:var(--text-2);font-weight:500}
+
+@media (max-width:760px){
+  .sidebar{display:none}
+  .main{padding:16px}
+  .w-post,.w-stage{width:100%}
+  .filters .ctx{margin-left:0;flex-wrap:wrap}
+  .dr-sum{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><span class="brand-logo">SY</span><span><span class="brand-name">신영증권</span><span class="brand-sub">RECRUIT ADMIN</span></span></div>
+  <nav class="nav">
+    <button class="nav-item"><i class="ti ti-layout-dashboard"></i>대시보드</button>
+    <p class="nav-label">채용 운영</p>
+    <button class="nav-item"><i class="ti ti-speakerphone"></i>채용공고 관리</button>
+    <button class="nav-item"><i class="ti ti-users"></i>지원현황</button>
+    <button class="nav-item"><i class="ti ti-list-check"></i>전형결과 관리</button>
+    <button class="nav-item"><i class="ti ti-calendar-event"></i>면접 스케줄링</button>
+    <button class="nav-item active"><i class="ti ti-message-question"></i>면접 추가사항<span class="new">NEW</span></button>
+    <p class="nav-label">메시지</p>
+    <button class="nav-item"><i class="ti ti-send"></i>메시지 발송</button>
+    <button class="nav-item"><i class="ti ti-history"></i>발송 이력</button>
+    <p class="nav-label">콘텐츠</p>
+    <button class="nav-item"><i class="ti ti-help-circle"></i>FAQ 관리</button>
+    <button class="nav-item"><i class="ti ti-bell"></i>공지사항 관리</button>
+    <p class="nav-label">설정</p>
+    <button class="nav-item"><i class="ti ti-forms"></i>지원서 양식</button>
+    <button class="nav-item"><i class="ti ti-shield-lock"></i>개인정보 파기</button>
+  </nav>
+  <div class="user"><span class="avatar">김</span><span>김인사<small>인사팀</small></span></div>
+</aside>
+
+<main class="main">
+  <header class="page-header">
+    <div>
+      <h2 class="page-title">면접 추가사항 관리</h2>
+      <p class="page-desc">면접단계마다 추가사항을 받을지 정하고, 질문과 지원자별 입력 가능 시간을 설정하고, 작성된 답변을 봅니다. 입력 시간은 기본으로 <b>지원자의 도착시간 ~ +2시간</b>입니다.</p>
+    </div>
+  </header>
+
+  <div class="card filters">
+    <div class="field w-post"><label>채용공고</label>
+      <select class="select"><option>2026년 하반기 신입사원 공개채용</option><option>2026년 하반기 IT 경력직 수시채용</option></select>
+    </div>
+    <div class="field w-stage"><label>면접단계</label>
+      <select class="select" id="stageSel"></select>
+    </div>
+    <div class="ctx">
+      <span>면접 조<b id="ctxGroups"></b></span>
+      <span>대상 지원자<b id="ctxCands"></b></span>
+      <span>기준 시각<b>2026.10.06 10:40</b></span>
+    </div>
+  </div>
+
+  <!-- 추가사항을 받지 않는 면접 -->
+  <section class="card off-card" id="offCard">
+    <div class="ic"><i class="ti ti-message-off"></i></div>
+    <h3>이 면접단계는 추가사항을 받지 않습니다</h3>
+    <p>지원자 마이페이지에도 이 면접의 추가사항 입력 버튼이 나오지 않습니다.<br>추가사항을 받으려면 켜고 질문을 등록하세요.</p>
+    <button class="btn btn-primary btn-lg" id="btnEnable"><i class="ti ti-plus"></i>이 면접에서 추가사항 받기</button>
+  </section>
+
+  <!-- 추가사항을 받는 면접 -->
+  <section class="card" id="onCard">
+    <div class="tabs">
+      <button class="tab on" data-tab="q"><i class="ti ti-message-question"></i>질문 설정 <span class="n" id="tabQn"></span></button>
+      <button class="tab" data-tab="time"><i class="ti ti-clock-hour-4"></i>입력 시간 설정 <span class="n" id="tabCn"></span></button>
+      <button class="tab" data-tab="view"><i class="ti ti-file-search"></i>답변 조회 <span class="n" id="tabVn"></span></button>
+      <div class="right"><button class="btn btn-sm btn-danger-text" id="btnDisable"><i class="ti ti-power"></i>추가사항 받지 않기</button></div>
+    </div>
+
+    <div class="pane on" id="pane-q">
+      <div class="q-wrap">
+        <div class="alert warn" id="liveWarn" style="margin-bottom:12px">
+          <i class="ti ti-alert-triangle"></i>
+          <span><b>지금 입력 중인 지원자가 <span id="liveN"></span>명 있습니다.</b> 질문을 고치거나 지우면 이미 작성된 답변과 질문이 어긋날 수 있습니다.</span>
+        </div>
+        <div class="alert warn" id="zeroWarn" style="margin-bottom:12px;display:none">
+          <i class="ti ti-alert-circle"></i>
+          <span><b>등록된 질문이 없습니다.</b> 질문을 1개 이상 등록해야 지원자에게 입력 버튼이 보입니다.</span>
+        </div>
+        <div class="q-top"><span><i class="ti ti-grip-vertical"></i> 끌어서 순서 변경 · 이 순서로 지원자에게 보입니다</span></div>
+        <ol class="q-list" id="qList"></ol>
+        <div class="q-add">
+          <textarea class="textarea" id="qNew" placeholder="새 질문을 입력하세요 (최대 500자)" maxlength="500" rows="1"></textarea>
+          <button class="btn btn-primary" id="qAddBtn"><i class="ti ti-plus"></i>추가</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-time">
+      <div class="t-panel">
+        <div class="t-tools">
+          <select class="select" id="tG"></select>
+          <input class="input" id="tK" placeholder="성명·수험번호 검색">
+          <label class="small muted t-all"><input type="checkbox" class="cb" id="tAll"> 전체 선택</label>
+          <span class="small muted t-hint"><i class="ti ti-info-circle"></i> 기본값: 지원자 조의 도착시간 ~ +2시간</span>
+        </div>
+        <div class="bulk" id="bulk">
+          <b id="bulkN"></b>
+          <button class="btn btn-sm" id="bulkTime"><i class="ti ti-clock-edit"></i>시간 변경</button>
+          <button class="btn btn-sm" id="bulkReset"><i class="ti ti-restore"></i>기본값 복원</button>
+          <button class="btn btn-sm btn-text" id="bulkClear" style="margin-left:auto">해제</button>
+        </div>
+        <div class="t-list" id="tList"></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-view">
+      <div class="t-panel">
+        <div class="t-tools">
+          <select class="select" id="fG"></select>
+          <input class="input" id="fK" placeholder="성명·수험번호 검색">
+          <select class="select" id="fA"><option value="">작성 전체</option><option value="zero">미작성</option><option value="part">작성 중</option><option value="full">모두 작성</option></select>
+          <span class="small muted t-hint" id="cSum"></span>
+        </div>
+        <div class="t-list" id="vList"></div>
+      </div>
+    </div>
+  </section>
+
+  <p class="note">
+    <b>목업 메모</b> · 면접단계 선택에서 <b>최종 면접</b>을 고르면 추가사항을 받지 않는 면접 화면을 볼 수 있습니다.<br>
+    지원자 목록은 면접 스케줄 업로드로 배정된 지원자입니다. 입력 시간은 지원자마다 따로 저장하며, 바꾸지 않은 지원자는 자기 조의 도착시간 ~ +2시간을 씁니다. 도착시간이 없으면 직접 지정해야 하고, 지정 전까지 그 지원자의 버튼은 비활성입니다.<br>
+    이미 작성된 답변이 있으면 「추가사항 받지 않기」로 끌 수 없습니다(답변 보호).
+  </p>
+</main>
+</div>
+
+<!-- 답변 보기 드로어 -->
+<div class="dim" id="dim"></div>
+<aside class="drawer" id="drawer" aria-label="답변 보기">
+  <div class="dr-head">
+    <div class="who"><b id="drName"></b><div id="drMeta"></div></div>
+    <div class="nav2">
+      <button class="btn btn-icon" id="drPrev" title="이전 지원자"><i class="ti ti-chevron-up"></i></button>
+      <button class="btn btn-icon" id="drNext" title="다음 지원자"><i class="ti ti-chevron-down"></i></button>
+      <button class="btn btn-icon" id="drClose" title="닫기"><i class="ti ti-x"></i></button>
+    </div>
+  </div>
+  <div class="dr-sum" id="drSum"></div>
+  <div class="dr-body" id="drBody"></div>
+</aside>
+
+<!-- 시간 변경 / 확인 모달 -->
+<div class="mdim" id="mdim">
+  <div class="dlg" id="dlg"></div>
+</div>
+<div class="toast" id="toast"><i class="ti ti-circle-check"></i><span></span></div>
+
+<script>
+const NOW = new Date('2026-10-06T10:40');
+const pad = n => String(n).padStart(2,'0');
+const fmtT = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const fmtD = d => `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`;
+const fmtMD = d => `${pad(d.getMonth()+1)}.${pad(d.getDate())}`;
+const toLocal = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${fmtT(d)}`;
+const plusH = (d,h) => new Date(d.getTime()+h*3600e3);
+const plusM = (d,m) => new Date(d.getTime()+m*60e3);
+const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+const Q12 = [
+  '지원하신 직무에서 입사 후 1년 안에 이루고 싶은 목표를 적어 주세요.',
+  '최근 관심 있게 본 금융 시장 이슈 하나와 그에 대한 본인의 생각을 적어 주세요.',
+  '팀 과제에서 의견이 부딪혔을 때 어떻게 풀었는지 경험을 적어 주세요.',
+  '본인의 강점 한 가지를 구체적인 사례와 함께 적어 주세요.',
+  '본인의 약점과 그것을 보완하기 위해 해 온 노력을 적어 주세요.',
+  '신영증권을 알게 된 계기와 지원을 결심한 이유를 적어 주세요.',
+  '고객의 신뢰를 얻기 위해 가장 중요하다고 생각하는 것은 무엇인지 적어 주세요.',
+  '예상하지 못한 문제를 짧은 시간 안에 해결했던 경험을 적어 주세요.',
+  '최근 1년 안에 새로 배운 것과 그것을 어떻게 익혔는지 적어 주세요.',
+  '원하지 않는 업무를 맡게 되었을 때 어떻게 대응할지 적어 주세요.',
+  '10년 뒤 본인이 되고 싶은 모습을 적어 주세요.',
+  '면접관에게 꼭 전하고 싶은 말이 있다면 적어 주세요.'
+];
+const SAMPLE = [
+  '리테일 영업 현장에서 고객 상담 경험을 충분히 쌓고, 입사 1년 안에 투자자산운용사 자격을 취득하는 것이 목표입니다.',
+  '최근 금리 인하 기대감으로 채권형 상품에 자금이 몰리고 있습니다. 단기 수익률보다 고객의 투자 기간에 맞춘 설명이 더 중요하다고 생각합니다.',
+  '졸업 프로젝트에서 일정과 범위를 두고 의견이 갈렸을 때, 각자 우선순위를 표로 정리해 공통 목표부터 합의했습니다.\n그 결과 마감 일주일 전에 핵심 기능을 먼저 완성할 수 있었습니다.',
+  '꼼꼼함입니다. 동아리 회계를 맡아 1년 동안 영수증 누락 없이 결산을 마쳤습니다.',
+  '처음 보는 사람 앞에서 말이 빨라지는 편이라, 발표 전 요점을 세 줄로 정리하고 녹음해 들어 보는 연습을 해 왔습니다.'
+];
+const NAMES = '김민준 이서연 박도윤 최하은 정시우 강지유 조서준 윤하린 장예준 임수아 한지호 오채원 서은우 신지안 권유준 황서윤 안건우 송다은 류현우 전예린 홍길동 고민서 문태윤 양소율 손주원 배나은 백준서 허윤서 유시현 남도현 심가은 노승민 하예서 곽지훈 성유나 차은호 주하윤 우태오 표세아 방준혁 염다온 석지율 변하람 탁서진'.split(' ');
+
+/* 면접단계별 데이터 */
+function makeCands(groups, spec, idStart, nameStart){
+  const list = []; let id = idStart, ni = nameStart;
+  groups.forEach((g, gi) => {
+    for(let k=0;k<g.cnt;k++){
+      const s = (spec[gi]||[])[k] || {};
+      list.push({id:id++, name:NAMES[ni++ % NAMES.length], g:g.g, order:k+1, win:s.win ? s.win.map(x=>new Date(x)) : null, n:s.n||0});
+    }
+  });
+  return list;
+}
+const stages = {
+  first: {
+    name:'1차 면접', enabled:true, questions:Q12.slice(),
+    groups:[
+      {g:'1',arr:'2026-10-06T08:30',itv:'2026-10-06T09:00',cnt:8},
+      {g:'2',arr:'2026-10-06T09:30',itv:'2026-10-06T10:00',cnt:8},
+      {g:'3',arr:'2026-10-06T13:00',itv:'2026-10-06T13:30',cnt:8},
+      {g:'4',arr:'2026-10-07T09:30',itv:'2026-10-07T10:00',cnt:7},
+      {g:'5',arr:null,itv:'2026-10-07T13:30',cnt:7}
+    ],
+    spec:[
+      [12,12,12,9,12,0,12,12].map(n=>({n})),
+      [{n:12},{n:7,win:['2026-10-06T09:30','2026-10-06T12:00']},{n:3},{n:0},{n:10},{n:12},{n:5},{n:1}],
+      [{},{},{win:['2026-10-06T12:30','2026-10-06T14:30']}],
+      [],
+      [{win:['2026-10-07T13:00','2026-10-07T15:00']}]
+    ]
+  },
+  final: {
+    name:'최종 면접', enabled:false, questions:[],
+    groups:[
+      {g:'1',arr:'2026-10-20T09:30',itv:'2026-10-20T10:00',cnt:5},
+      {g:'2',arr:'2026-10-20T13:30',itv:'2026-10-20T14:00',cnt:5}
+    ],
+    spec:[]
+  }
+};
+Object.values(stages).forEach((s, i) => {
+  s.groups = s.groups.map(g => ({...g, arr: g.arr ? new Date(g.arr) : null, itv: new Date(g.itv)}));
+  s.cands = makeCands(s.groups, s.spec, 10201 + i*100, i*20);
+});
+let cur = stages.first;
+
+const grpOf = c => cur.groups.find(g => g.g === c.g);
+const defWin = c => { const g = grpOf(c); return g.arr ? [g.arr, plusH(g.arr,2)] : null; };
+const winOf = c => c.win || defWin(c);
+const isCustom = c => !!c.win;
+const statusOf = c => { const w = winOf(c); if(!w) return 'none'; if(NOW < w[0]) return 'wait'; if(NOW < w[1]) return 'live'; return 'done'; };
+const answered = c => Math.min(c.n, cur.questions.length);
+const savedAt = c => { if(!c.n) return null; const w = winOf(c); const end = statusOf(c)==='live' ? NOW : w[1]; return plusM(w[0], Math.max(3, Math.floor((end - w[0]) / 60e3 * (0.35 + (c.id % 5) * 0.12)))); };
+const anyAnswers = () => cur.cands.some(c => c.n > 0);
+
+/* ---------- 단계 전환 ---------- */
+const stageSel = document.getElementById('stageSel');
+function renderStageSel(){
+  stageSel.innerHTML = Object.entries(stages).map(([k,s]) =>
+    `<option value="${k}" ${s===cur?'selected':''}>${s.name} · ${s.enabled ? `추가사항 ${s.questions.length}문항` : '추가사항 없음'}</option>`).join('');
+}
+stageSel.onchange = () => { cur = stages[stageSel.value]; selected.clear(); renderAll(); };
+function renderAll(){
+  renderStageSel();
+  document.getElementById('ctxGroups').textContent = cur.groups.length + '개';
+  document.getElementById('ctxCands').textContent = cur.cands.length + '명';
+  document.getElementById('offCard').style.display = cur.enabled ? 'none' : '';
+  document.getElementById('onCard').style.display = cur.enabled ? '' : 'none';
+  if(cur.enabled){ renderQ(); renderGSel(); renderC(); }
+}
+document.getElementById('btnEnable').onclick = () => {
+  cur.enabled = true; switchTab('q'); renderAll(); document.getElementById('qNew').focus();
+  toast(`${cur.name}에서 추가사항을 받습니다. 질문을 등록하세요.`);
+};
+document.getElementById('btnDisable').onclick = () => {
+  if(anyAnswers()){
+    const n = cur.cands.filter(c => c.n > 0).length;
+    dialog({icon:'ti-lock', color:'var(--warning)', title:'추가사항을 끌 수 없습니다', msg:`이미 답변을 작성한 지원자가 ${n}명 있습니다. 작성된 답변을 보호하기 위해 추가사항을 끌 수 없습니다.`, ok:'확인', cancel:false});
+    return;
+  }
+  dialog({icon:'ti-power', color:'var(--danger)', title:'추가사항 받지 않기', msg:`${cur.name}에서 추가사항을 받지 않습니다. 등록한 질문 ${cur.questions.length}개와 지원자별로 바꾼 입력 시간이 삭제되고, 지원자 화면에서 버튼이 사라집니다.`, ok:'받지 않기', danger:true, onOk(){
+    cur.enabled = false; cur.questions = []; cur.cands.forEach(c => c.win = null); renderAll(); toast('추가사항을 받지 않도록 바꿨습니다.');
+  }});
+};
+
+/* ---------- 탭 ---------- */
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab===t));
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id==='pane-'+t));
+}
+document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if(b) switchTab(b.dataset.tab); });
+
+/* ---------- 질문 ---------- */
+let editingQ = -1;
+function renderQ(){
+  const qs = cur.questions, ul = document.getElementById('qList');
+  document.getElementById('tabQn').textContent = qs.length;
+  const live = cur.cands.filter(c => statusOf(c)==='live').length;
+  document.getElementById('liveN').textContent = live;
+  document.getElementById('liveWarn').style.display = live && qs.length ? '' : 'none';
+  document.getElementById('zeroWarn').style.display = qs.length ? 'none' : '';
+  if(!qs.length){ ul.innerHTML = '<li class="q-empty"><i class="ti ti-message-plus"></i>아래 입력칸에서 첫 질문을 추가하세요.</li>'; return; }
+  ul.innerHTML = qs.map((q,i) => i===editingQ ? `
+    <li class="q-item editing">
+      <span class="q-grip off"></span><span class="q-no">${i+1}</span>
+      <div class="q-body">
+        <textarea class="textarea" id="qEdit" maxlength="500" rows="3">${esc(q)}</textarea>
+        <div class="q-edit-foot">
+          <span class="cnt" id="qEditCnt">${q.length} / 500</span>
+          <button class="btn btn-sm btn-text" data-act="cancel">취소</button>
+          <button class="btn btn-sm btn-primary" data-act="save" data-i="${i}"><i class="ti ti-check"></i>저장</button>
+        </div>
+      </div>
+    </li>` : `
+    <li class="q-item" data-i="${i}">
+      <span class="q-grip" title="끌어서 순서 변경"><i class="ti ti-grip-vertical"></i></span>
+      <span class="q-no">${i+1}</span>
+      <div class="q-body"><div class="q-text">${esc(q)}</div></div>
+      <div class="q-acts">
+        <button class="btn btn-icon" title="수정" data-act="edit" data-i="${i}"><i class="ti ti-pencil"></i></button>
+        <button class="btn btn-icon danger" title="삭제" data-act="del" data-i="${i}"><i class="ti ti-trash"></i></button>
+      </div>
+    </li>`).join('');
+  const ta = document.getElementById('qEdit');
+  if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length);
+    ta.oninput = () => document.getElementById('qEditCnt').textContent = ta.value.length + ' / 500'; }
+}
+const qList = document.getElementById('qList');
+qList.addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'); if(!b) return;
+  const i = +b.dataset.i, act = b.dataset.act, qs = cur.questions;
+  if(act==='edit') editingQ = i;
+  else if(act==='cancel') editingQ = -1;
+  else if(act==='save'){ const v = document.getElementById('qEdit').value.trim(); if(!v) return; qs[i]=v; editingQ=-1; toast('질문을 수정했습니다.'); }
+  else if(act==='del'){ dialog({icon:'ti-trash', color:'var(--danger)', title:'질문 삭제', msg:`질문 ${i+1}을 삭제합니다. 이 질문에 작성된 답변도 함께 보이지 않게 됩니다.`, quote:qs[i], ok:'삭제', danger:true, onOk(){ qs.splice(i,1); renderQ(); renderStageSel(); toast('질문을 삭제했습니다.'); }}); return; }
+  renderQ();
+});
+document.getElementById('qAddBtn').onclick = () => {
+  const ta = document.getElementById('qNew'); const v = ta.value.trim(); if(!v){ ta.focus(); return; }
+  cur.questions.push(v); ta.value=''; editingQ=-1; renderQ(); renderStageSel(); toast('질문을 추가했습니다.');
+};
+let dragFrom = -1, dropAt = -1;
+const clearDrop = () => qList.querySelectorAll('.drop-before,.drop-after').forEach(el => el.classList.remove('drop-before','drop-after'));
+qList.addEventListener('mousedown', e => { const li = e.target.closest('.q-grip:not(.off)')?.closest('.q-item'); if(li && editingQ < 0) li.draggable = true; });
+qList.addEventListener('dragstart', e => {
+  const li = e.target.closest('.q-item'); if(!li || !li.draggable) return;
+  dragFrom = +li.dataset.i; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragFrom);
+  requestAnimationFrame(() => li.classList.add('dragging'));
+});
+qList.addEventListener('dragover', e => {
+  if(dragFrom < 0) return; const li = e.target.closest('.q-item[data-i]'); if(!li) return;
+  e.preventDefault();
+  const r = li.getBoundingClientRect(), after = e.clientY > r.top + r.height/2, i = +li.dataset.i;
+  dropAt = after ? i + 1 : i; clearDrop(); li.classList.add(after ? 'drop-after' : 'drop-before');
+});
+qList.addEventListener('drop', e => {
+  if(dragFrom < 0) return; e.preventDefault();
+  const to = dropAt > dragFrom ? dropAt - 1 : dropAt;
+  if(to !== dragFrom && to >= 0){
+    const [q] = cur.questions.splice(dragFrom, 1); cur.questions.splice(to, 0, q);
+    renderQ(); qList.children[to].classList.add('moved'); toast(`질문 ${dragFrom+1} → ${to+1}번으로 옮겼습니다.`);
+  }
+});
+qList.addEventListener('dragend', () => { clearDrop(); qList.querySelectorAll('.q-item').forEach(li => { li.draggable = false; li.classList.remove('dragging'); }); dragFrom = dropAt = -1; });
+
+/* ---------- 지원자 ---------- */
+const selected = new Set();
+const fG = document.getElementById('fG'), fA = document.getElementById('fA'), fK = document.getElementById('fK');
+const tG = document.getElementById('tG'), tK = document.getElementById('tK');
+function renderGSel(){
+  const opts = '<option value="">전체 조</option>' + cur.groups.map(g => `<option value="${g.g}">${g.g}조</option>`).join('');
+  fG.innerHTML = opts; tG.innerHTML = opts;
+}
+[fG,fA].forEach(el => el.onchange = renderV); fK.oninput = renderV;
+tG.onchange = renderT; tK.oninput = renderT;
+const matchK = (c, k) => !k || c.name.includes(k) || String(c.id).includes(k);
+/* 조회 탭 필터 */
+function filtered(){
+  const k = fK.value.trim();
+  return cur.cands.filter(c => {
+    const a = answered(c), q = cur.questions.length;
+    return (!fG.value || c.g===fG.value)
+      && (!fA.value || (fA.value==='zero' ? a===0 : fA.value==='full' ? q && a===q : a>0 && a<q))
+      && matchK(c, k);
+  });
+}
+/* 설정 탭 필터 */
+const filteredT = () => cur.cands.filter(c => (!tG.value || c.g===tG.value) && matchK(c, tK.value.trim()));
+function winCell(c){
+  const w = winOf(c);
+  if(!w) return '<div class="win"><span class="t muted">—</span><span class="tag sm amber"><i class="ti ti-alert-circle"></i>직접 지정 필요</span></div>';
+  const same = fmtD(w[0])===fmtD(w[1]);
+  return `<div class="win"><span class="t">${fmtMD(w[0])} ${fmtT(w[0])}<span class="arrow">→</span>${same?'':fmtMD(w[1])+' '}${fmtT(w[1])}</span>${isCustom(c)?'<span class="tag sm blue">직접 지정</span>':'<span class="tag sm brand">기본값</span>'}</div>`;
+}
+function progCell(c){
+  const q = cur.questions.length, a = answered(c);
+  if(!a) return `<div class="prog zero"><span class="bar"><i style="width:0"></i></span><span class="v">미작성</span></div>`;
+  return `<div class="prog ${a===q?'full':''}"><span class="bar"><i style="width:${a/q*100}%"></i></span><span class="v">${a} / ${q}</span></div>`;
+}
+function renderC(){ renderT(); renderV(); }
+
+/* 설정 탭 오른쪽: 지원자별 입력 시간 */
+function renderT(){
+  const list = filteredT(), box = document.getElementById('tList');
+  document.getElementById('tabCn').textContent = cur.cands.length;
+  if(!list.length){ box.innerHTML = '<div class="c-empty">조건에 맞는 지원자가 없습니다.</div>'; syncBulk(); return; }
+  box.innerHTML = `<div class="t-h"><span></span><span>성명</span><span>수험번호</span><span>입력 가능 시간</span><span></span></div>` + cur.groups.map(g => {
+    const rows = list.filter(c => c.g===g.g); if(!rows.length) return '';
+    const allSel = rows.every(c => selected.has(c.id));
+    const def = g.arr ? `${fmtT(g.arr)}→${fmtT(plusH(g.arr,2))}` : '<span style="color:var(--warning)">도착시간 없음</span>';
+    return `<div class="t-g"><input type="checkbox" class="cb" data-gsel="${g.g}" ${allSel?'checked':''}>
+        <span class="g">${g.g}조</span><span>${fmtMD(g.itv)} 도착 <b>${g.arr?fmtT(g.arr):'—'}</b></span><span>기본 <b>${def}</b></span><span>${rows.length}명</span>
+        <button class="btn btn-sm" data-gtime="${g.g}"><i class="ti ti-clock-edit"></i>조 전체 변경</button></div>` +
+      rows.map(c => `<div class="t-r ${selected.has(c.id)?'sel':''}">
+        <input type="checkbox" class="cb" data-sel="${c.id}" ${selected.has(c.id)?'checked':''}>
+        <span class="nm">${c.name}</span>
+        <span class="id">${c.id}</span>
+        ${winCell(c)}
+        <button class="btn btn-sm" data-time="${c.id}"><i class="ti ti-clock-edit"></i>시간 변경</button>
+      </div>`).join('');
+  }).join('');
+  document.getElementById('tAll').checked = list.every(c => selected.has(c.id));
+  syncBulk();
+}
+function syncBulk(){
+  const n = selected.size;
+  document.getElementById('bulk').classList.toggle('on', n > 0);
+  document.getElementById('bulkN').textContent = `${n}명 선택`;
+}
+document.getElementById('tList').addEventListener('click', e => {
+  const s = e.target.closest('[data-sel]'), gs = e.target.closest('[data-gsel]');
+  if(s){ const id = +s.dataset.sel; s.checked ? selected.add(id) : selected.delete(id); renderT(); return; }
+  if(gs){ filteredT().filter(c => c.g===gs.dataset.gsel).forEach(c => gs.checked ? selected.add(c.id) : selected.delete(c.id)); renderT(); return; }
+  const gt = e.target.closest('[data-gtime]'); if(gt){ timeDialog(cur.cands.filter(c => c.g===gt.dataset.gtime)); return; }
+  const t = e.target.closest('[data-time]'); if(t) timeDialog([cur.cands.find(c => c.id===+t.dataset.time)]);
+});
+document.getElementById('tAll').onchange = e => { filteredT().forEach(c => e.target.checked ? selected.add(c.id) : selected.delete(c.id)); renderT(); };
+document.getElementById('bulkClear').onclick = () => { selected.clear(); renderT(); };
+document.getElementById('bulkTime').onclick = () => timeDialog(cur.cands.filter(c => selected.has(c.id)));
+document.getElementById('bulkReset').onclick = () => {
+  const targets = cur.cands.filter(c => selected.has(c.id) && c.win);
+  if(!targets.length){ toast('선택한 지원자는 모두 기본값입니다.'); return; }
+  dialog({icon:'ti-restore', color:'var(--primary)', title:'기본값 복원', msg:`직접 지정한 ${targets.length}명의 입력 시간을 각자 조의 도착시간 ~ +2시간으로 되돌립니다. 도착시간이 없는 조의 지원자는 시간 미지정이 됩니다.`, ok:'복원', onOk(){ targets.forEach(c => c.win = null); renderC(); toast(`${targets.length}명을 기본값으로 되돌렸습니다.`); }});
+};
+
+/* 조회 탭: 작성 현황·답변 보기 */
+function renderV(){
+  const list = filtered(), qn = cur.questions.length, box = document.getElementById('vList');
+  document.getElementById('tabVn').textContent = `${cur.cands.filter(c => answered(c)).length} / ${cur.cands.length}`;
+  document.getElementById('cSum').innerHTML = `모두 작성 <b>${cur.cands.filter(c => qn && answered(c)===qn).length}</b> · 미작성 <b>${cur.cands.filter(c => !answered(c)).length}</b>`;
+  if(!list.length){ box.innerHTML = '<div class="c-empty">조건에 맞는 지원자가 없습니다.</div>'; return; }
+  box.innerHTML = `<div class="t-h v"><span>성명</span><span>수험번호</span><span>입력 가능 시간</span><span>작성</span><span>최종 저장</span><span></span></div>` + cur.groups.map(g => {
+    const rows = list.filter(c => c.g===g.g); if(!rows.length) return '';
+    return `<div class="t-g"><span class="g">${g.g}조</span><span>${fmtMD(g.itv)} 도착 <b>${g.arr?fmtT(g.arr):'—'}</b></span><span>면접 <b>${fmtT(g.itv)}</b></span><span>${rows.length}명</span></div>` +
+      rows.map(c => { const sv = savedAt(c); return `<div class="t-r v">
+        <span class="nm">${c.name}</span>
+        <span class="id">${c.id}</span>
+        ${winCell(c)}
+        ${progCell(c)}
+        <span class="sv ${sv?'':'muted'}">${sv ? fmtMD(sv)+' '+fmtT(sv) : '-'}</span>
+        <button class="btn btn-sm" data-ans="${c.id}" ${answered(c)?'':'disabled'}><i class="ti ti-file-text"></i>답변 보기</button>
+      </div>`; }).join('');
+  }).join('');
+}
+document.getElementById('vList').addEventListener('click', e => {
+  const a = e.target.closest('[data-ans]'); if(a) openAns(+a.dataset.ans);
+});
+
+/* ---------- 입력 시간 변경 모달 ---------- */
+function timeDialog(targets){
+  if(!targets.length) return;
+  const one = targets.length === 1, c0 = targets[0], w = winOf(c0);
+  const byG = {}; targets.forEach(c => byG[c.g] = (byG[c.g]||0) + 1);
+  const who = one ? `${c0.g}조 ${c0.order}번 <b>${c0.name}</b> (수험번호 ${c0.id})` : `선택한 지원자 <b>${targets.length}명</b> (${Object.entries(byG).map(([g,n]) => `${g}조 ${n}명`).join(', ')})`;
+  const live = targets.filter(c => statusOf(c)==='live').length;
+  const dlg = document.getElementById('dlg');
+  dlg.innerHTML = `
+    <h4><i class="ti ti-clock-edit" style="color:var(--primary)"></i>입력 가능 시간 변경</h4>
+    <p>${who}</p>
+    ${live ? `<div class="alert warn" style="margin-top:10px"><i class="ti ti-alert-triangle"></i><span>지금 입력 중인 지원자가 ${live}명 있습니다. 종료 시각을 앞당기면 그 지원자의 창이 그 시각에 닫힙니다.</span></div>` : ''}
+    <div class="tform">
+      <div class="row"><span>시작</span><input type="datetime-local" class="input" id="tS" value="${one && w ? toLocal(w[0]) : ''}"></div>
+      <div class="row"><span>종료</span><input type="datetime-local" class="input" id="tE" value="${one && w ? toLocal(w[1]) : ''}"></div>
+      <div class="quick">
+        <button class="chip" data-h="1">시작 +1시간</button><button class="chip" data-h="2">시작 +2시간</button><button class="chip" data-h="3">시작 +3시간</button>
+        ${one && defWin(c0) ? '<button class="chip" data-def>기본값으로</button>' : ''}
+      </div>
+      <div class="hint" id="tHint"></div>
+    </div>
+    <div class="dlg-foot"><button class="btn" data-x>취소</button><button class="btn btn-primary" data-ok><i class="ti ti-check"></i>${one?'저장':`${targets.length}명에게 적용`}</button></div>`;
+  const S = dlg.querySelector('#tS'), E = dlg.querySelector('#tE'), H = dlg.querySelector('#tHint');
+  if(!one){ const g = grpOf(c0); const base = g.arr || g.itv; S.value = toLocal(base); E.value = toLocal(plusH(base,2)); }
+  dlg.onclick = e => {
+    const ch = e.target.closest('.chip');
+    if(ch){ if(ch.hasAttribute('data-def')){ const d = defWin(c0); S.value = toLocal(d[0]); E.value = toLocal(d[1]); } else { if(!S.value) return; E.value = toLocal(plusH(new Date(S.value), +ch.dataset.h)); } H.textContent=''; E.classList.remove('err'); return; }
+    if(e.target.closest('[data-x]')){ closeDlg(); return; }
+    if(e.target.closest('[data-ok]')){
+      if(!S.value || !E.value){ H.textContent = '시작·종료 시각을 모두 입력하세요.'; return; }
+      const s = new Date(S.value), en = new Date(E.value);
+      if(en <= s){ H.textContent = '종료 시각은 시작 시각보다 늦어야 합니다.'; E.classList.add('err'); return; }
+      targets.forEach(c => { const d = defWin(c); c.win = d && +d[0]===+s && +d[1]===+en ? null : [s, en]; });
+      closeDlg(); renderC(); renderQ(); toast(one ? `${c0.name}의 입력 시간을 저장했습니다.` : `${targets.length}명의 입력 시간을 바꿨습니다.`);
+    }
+  };
+  document.getElementById('mdim').classList.add('on');
+}
+
+/* ---------- 답변 드로어 ---------- */
+let ansId = null;
+function openAns(id){
+  const c = cur.cands.find(x => x.id===id); ansId = id;
+  const w = winOf(c), s = statusOf(c), a = answered(c), q = cur.questions.length, sv = savedAt(c);
+  document.getElementById('drName').textContent = c.name;
+  document.getElementById('drMeta').textContent = `수험번호 ${c.id} · ${cur.name} ${c.g}조 ${c.order}번`;
+  document.getElementById('drSum').innerHTML = `
+    <div><span>입력 가능 시간</span><b>${w ? `${fmtMD(w[0])} ${fmtT(w[0])}~${fmtT(w[1])}` : '—'}</b></div>
+    <div><span>작성</span><b>${a} / ${q}</b></div>
+    <div><span>최종 저장</span><b>${sv ? fmtMD(sv)+' '+fmtT(sv) : '-'}</b></div>`;
+  document.getElementById('drBody').innerHTML =
+    (s==='live' ? '<div class="alert warn"><i class="ti ti-pencil"></i><span>지원자가 아직 입력 중입니다. 입력 시간이 끝날 때까지 답변이 바뀔 수 있습니다.</span></div>' : '') +
+    cur.questions.map((qq,i) => {
+      const txt = i < a ? SAMPLE[(c.id + i) % SAMPLE.length] : '';
+      return `<div class="ans"><div class="q"><span class="no">질문 ${i+1}</span><span>${esc(qq)}</span></div>
+        <div class="a ${txt?'':'none'}">${txt ? esc(txt) : '작성하지 않았습니다.'}</div>${txt ? `<div class="meta">${txt.length}자</div>` : ''}</div>`;
+    }).join('');
+  document.getElementById('drBody').scrollTop = 0;
+  const list = filtered().filter(x => answered(x)), idx = list.findIndex(x => x.id===id);
+  document.getElementById('drPrev').disabled = idx <= 0;
+  document.getElementById('drNext').disabled = idx < 0 || idx >= list.length - 1;
+  document.getElementById('dim').classList.add('on'); document.getElementById('drawer').classList.add('on');
+}
+function stepAns(d){ const list = filtered().filter(x => answered(x)), idx = list.findIndex(x => x.id===ansId); const n = list[idx + d]; if(n) openAns(n.id); }
+document.getElementById('drPrev').onclick = () => stepAns(-1);
+document.getElementById('drNext').onclick = () => stepAns(1);
+const closeAns = () => { document.getElementById('dim').classList.remove('on'); document.getElementById('drawer').classList.remove('on'); };
+document.getElementById('drClose').onclick = closeAns;
+document.getElementById('dim').onclick = closeAns;
+document.addEventListener('keydown', e => { if(e.key==='Escape'){ closeAns(); closeDlg(); } });
+
+/* ---------- 공통 ---------- */
+function dialog({icon, color, title, msg, quote, ok, cancel=true, danger, onOk}){
+  const dlg = document.getElementById('dlg');
+  dlg.innerHTML = `<h4><i class="ti ${icon}" style="color:${color}"></i>${title}</h4><p>${msg}</p>${quote?`<div class="quote">${esc(quote)}</div>`:''}
+    <div class="dlg-foot">${cancel?'<button class="btn" data-x>취소</button>':''}<button class="btn ${danger?'btn-danger-fill':'btn-primary'}" data-ok>${ok}</button></div>`;
+  dlg.onclick = e => { if(e.target.closest('[data-x]')) closeDlg(); if(e.target.closest('[data-ok]')){ closeDlg(); onOk && onOk(); } };
+  document.getElementById('mdim').classList.add('on');
+}
+function closeDlg(){ document.getElementById('mdim').classList.remove('on'); }
+let tt;
+function toast(msg){ const t = document.getElementById('toast'); t.querySelector('span').textContent = msg; t.classList.add('on'); clearTimeout(tt); tt = setTimeout(()=>t.classList.remove('on'),1800); }
+
+renderAll();
+</script>
+</body>
+</html>

@@ -177,6 +177,14 @@ public interface ApplicationPiiPurgeRepository extends Repository<JobApplication
                 select p.id from InterviewParticipant p where p.jobApplication.id = :applicationId)""")
     int purgeEvaluationComments(@Param("applicationId") Long applicationId);
 
+    /** 면접 추가사항 답변(interview-supplement 카드) — 자기소개서 답변과 같이 본문만 NULLIFY. */
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update InterviewSupplementAnswer a
+            set a.answerText = null, a.createdBy = null, a.updatedBy = null
+            where a.jobApplication.id = :applicationId""")
+    int purgeInterviewSupplementAnswers(@Param("applicationId") Long applicationId);
+
     /** 첨부 metadata 감사 필드(인벤토리 §6 공통 — createdBy 는 updatable=false 라 bulk 필수, 9d-2). */
     @Modifying(flushAutomatically = true)
     @Query("""

@@ -81,8 +81,6 @@
       <div>
         <div class="page-inner-top">
           <h2 class="page-title-sub">지원 목록</h2>
-          <a-button class="more-info-button" type="primary"
-          @click="moreInfoModalOpen()">지원자 추가사항 입력</a-button>
         </div>
         <div class="myApplicationTable">
           <a-table
@@ -93,14 +91,12 @@
         </div>
       </div>
 
-      <a-modal
-        :getContainer="false"
-        v-model:open="isMoreInfoModalOpen"
-        title="지원자 추가사항 입력"
-        :width="900"
-        @cancel="moreInfoModalClose()">
-        <div>준비 중입니다.</div>
-      </a-modal>
+      <InterviewSupplementModal
+        v-model:open="supplementModalOpen"
+        :application-id="supplementTarget?.applicationId ?? null"
+        :stage-id="supplementTarget?.stageId ?? null"
+        @closed="loadSupplements"
+      />
 
       <a-modal
         v-model:open="resultModalOpen"
@@ -125,14 +121,17 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, h, ref, reactive } from 'vue'
+import { onBeforeUnmount, onMounted, h, ref, reactive } from 'vue'
 import type { ApplicantStageResult, ChangePasswordRequest, MyApplicationList, MyApplicationListItem } from '@/types/application'
+import type { ApplicantInterviewSupplementSummary } from '@/types/interviewSupplement'
 import { formatDate } from '@/common/dateUtil'
 import { Button, message, type TableColumnsType } from 'ant-design-vue'
 import { LockOutlined } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { applicationApi } from '@/api/applicationApi'
+import { interviewSupplementApi } from '@/api/interviewSupplementApi'
+import InterviewSupplementModal from './InterviewSupplementModal.vue'
 import { getApiErrorMessage } from '@/api/apiError'
 
 interface Password {
@@ -182,7 +181,6 @@ const selectMenu = ref('');
 const applicationList = ref<MyApplicationList[]>([])
 const applicationListItems = ref<MyApplicationListItem[]>([])
 const isSettingModalOpen = ref(false);
-const isMoreInfoModalOpen = ref(false);
 const pagination = reactive({ current: 1, pageSize: 5, total: 0 })
 const resultModalOpen = ref(false)
 const resultLoading = ref(false)
@@ -237,12 +235,77 @@ const settingModalClose = () => {
   PasswordForm.newPasswordCheck = '';
 }
 
-const moreInfoModalOpen = () => {
-  isMoreInfoModalOpen.value = true;
+/*
+ * 면접 추가사항(interview-supplement 카드). 버튼 활성화는 서버가 판정한 시각을 기준으로 한다.
+ * 기기 시계를 믿지 않으려고 "서버 시각 = 받은 순간의 서버 시각 + 그 뒤 흐른 performance.now()"로 추정한다.
+ * 실제 입력 허용은 서버가 조회·저장 때마다 다시 검사한다.
+ */
+const supplements = ref(new Map<number, ApplicantInterviewSupplementSummary>())
+const supplementModalOpen = ref(false)
+const supplementTarget = ref<ApplicantInterviewSupplementSummary | null>(null)
+const serverNowTick = ref(0)
+let serverOffsetMs = 0
+let supplementTicker: ReturnType<typeof setInterval> | undefined
+
+const parseLocal = (value: string): number => {
+  const [datePart = '', timePart = '00:00:00'] = value.split('T')
+  const [year = 0, month = 1, day = 1] = datePart.split('-').map(Number)
+  const [hour = 0, minute = 0, second = 0] = timePart.split(':').map(Number)
+  return new Date(year, month - 1, day, hour, minute, second).getTime()
+}
+const serverNow = (): number => performance.now() + serverOffsetMs
+
+const loadSupplements = async () => {
+  try {
+    const response = await interviewSupplementApi.getMySupplements()
+    const list = response.data.data
+    const first = list[0]
+    if (first) {
+      serverOffsetMs = parseLocal(first.endDateTime) - first.remainingSeconds * 1000 - performance.now()
+    }
+    supplements.value = new Map(list.map((item) => [item.applicationId, item]))
+    serverNowTick.value = serverNow()
+  } catch (error) {
+    // 지원 목록은 그대로 보여 주고 추가사항 칸만 비운다.
+    supplements.value = new Map()
+    console.error(error)
+  }
 }
 
-const moreInfoModalClose = () => {
-  isMoreInfoModalOpen.value = false;
+const openSupplement = (item: ApplicantInterviewSupplementSummary) => {
+  supplementTarget.value = item
+  supplementModalOpen.value = true
+}
+
+const formatRemaining = (ms: number): string => {
+  const minutes = Math.ceil(ms / 60000)
+  return minutes >= 60 ? `${Math.floor(minutes / 60)}시간 ${minutes % 60}분` : `${minutes}분`
+}
+
+const renderSupplementCell = (record?: MyApplicationListItem) => {
+  const item = record ? supplements.value.get(Number(record.applicationId)) : undefined
+  if (!item) return '-'
+  const now = serverNowTick.value
+  const start = parseLocal(item.startDateTime)
+  const end = parseLocal(item.endDateTime)
+  if (now < start) {
+    return h('div', { class: 'supplement-cell' }, [
+      h(Button, { disabled: true }, () => '입력 대기'),
+      h('span', { class: 'supplement-meta' }, `${formatDate(item.startDateTime, 'MM.DD HH:mm')}부터`),
+    ])
+  }
+  if (now >= end) {
+    return h('div', { class: 'supplement-cell' }, [
+      h(Button, { disabled: true }, () => '입력 마감'),
+      h('span', { class: 'supplement-meta' }, item.answeredCount > 0 ? '제출됨' : '미작성'),
+    ])
+  }
+  const left = end - now
+  return h('div', { class: 'supplement-cell' }, [
+    h(Button, { type: 'primary', onClick: () => openSupplement(item) }, () => (item.answeredCount > 0 ? '수정하기' : '입력하기')),
+    h('span', { class: ['supplement-meta', left <= 300000 ? 'urgent' : 'live'] },
+      `${formatDate(item.endDateTime, 'HH:mm')}까지 · ${formatRemaining(left)} 남음`),
+  ])
 }
 
 const checkPassword = async () => {
@@ -357,7 +420,24 @@ const columns: TableColumnsType<MyApplicationListItem> = [
         ? '-'
         : h(Button, { onClick: () => openStageResults(record) }, () => '확인'),
   },
+  {
+    title: '추가사항 입력',
+    key: 'supplement',
+    width: 200,
+    align: 'center',
+    customRender: ({ record }) => renderSupplementCell(record),
+  },
 ]
+
+/* 좁은 화면에서는 표를 카드로 바꾼다(아래 @media). 칸 이름을 보여 줄 수 있게 data-label 을 단다. */
+columns.forEach((column) => {
+  column.customCell = (record: MyApplicationListItem) => ({
+    'data-label': String(column.title),
+    class: column.key !== 'supplement'
+      ? undefined
+      : supplements.value.has(Number(record.applicationId)) ? 'supplement-td' : 'supplement-td empty',
+  })
+})
 
 const goForm = async (record: MyApplicationListItem) => {
   
@@ -373,6 +453,15 @@ const goForm = async (record: MyApplicationListItem) => {
 
 onMounted(() => {
   loadMyApplications();
+  loadSupplements();
+  // 입력 대기 → 입력 가능 → 마감 전환과 남은 시간 표시를 갱신한다.
+  supplementTicker = setInterval(() => {
+    serverNowTick.value = serverNow()
+  }, 30000)
+})
+
+onBeforeUnmount(() => {
+  if (supplementTicker) clearInterval(supplementTicker)
 })
 
 </script>
@@ -615,8 +704,93 @@ onMounted(() => {
    지원자 추가사항 영역
 ========================= */
 
-.more-info-button{
-  margin-right: 15px;
+.myApplicationTable :deep(.supplement-cell) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.myApplicationTable :deep(.supplement-meta) {
+  font-size: 12px;
+  color: var(--app-text-muted);
+  white-space: nowrap;
+}
+
+.myApplicationTable :deep(.supplement-meta.live) {
+  color: var(--app-color-success);
+  font-weight: 500;
+}
+
+.myApplicationTable :deep(.supplement-meta.urgent) {
+  color: var(--app-color-error);
+  font-weight: 500;
+}
+
+/* 면접 대기 중에는 휴대폰으로 입력하는 경우가 많아, 좁은 화면에서는 지원 목록을 카드로 보여 준다. */
+@media (max-width: 760px) {
+  /* 프로필 카드 버튼이 화면 밖으로 나가 페이지가 넓어지면 추가사항 모달이 화면에 맞지 않는다. */
+  .profile-card {
+    flex-wrap: wrap;
+    gap: 12px;
+    max-height: none;
+    padding: 24px;
+  }
+  .profile-left {
+    margin-left: 0;
+  }
+  .myApplicationTable :deep(.ant-table-thead),
+  .myApplicationTable :deep(colgroup) {
+    display: none;
+  }
+  .myApplicationTable :deep(table),
+  .myApplicationTable :deep(.ant-table-tbody) {
+    display: block;
+    width: 100%;
+  }
+  .myApplicationTable :deep(.ant-table-tbody > tr:not(.ant-table-placeholder)) {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    padding: 16px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .myApplicationTable :deep(.ant-table-tbody > tr:not(.ant-table-placeholder) > td) {
+    display: block;
+    padding: 0;
+    border: 0;
+    text-align: left !important;
+    background: none;
+  }
+  .myApplicationTable :deep(.ant-table-tbody > tr:not(.ant-table-placeholder) > td::before) {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    font-size: 11.5px;
+    color: var(--app-text-muted);
+  }
+  .myApplicationTable :deep(.ant-table-tbody > tr > td:first-child) {
+    grid-column: 1 / -1;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .myApplicationTable :deep(.ant-table-tbody > tr > td:first-child::before) {
+    display: none;
+  }
+  .myApplicationTable :deep(.ant-table-tbody > tr > td.supplement-td) {
+    grid-column: 1 / -1;
+    padding: 10px 12px;
+    border: 1px solid #cfe0c6;
+    border-radius: 8px;
+    background: var(--app-bg-soft);
+  }
+  .myApplicationTable :deep(.ant-table-tbody > tr > td.supplement-td.empty) {
+    display: none;
+  }
+  .myApplicationTable :deep(.supplement-td .supplement-cell) {
+    flex-direction: row;
+    justify-content: space-between;
+  }
 }
 
 .stage-result-list {
