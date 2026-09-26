@@ -132,13 +132,8 @@
               <template v-if="interview.arrivalDateTime">
                 <dt>도착 시간</dt><dd>{{ formatDate(interview.arrivalDateTime, 'HH:mm') }}까지</dd>
               </template>
-              <dt>방식</dt><dd>{{ interviewMethodLabelMap[interview.method] ?? interview.method }}</dd>
               <template v-if="interview.locationName">
                 <dt>장소</dt><dd>{{ interview.locationName }}<template v-if="interview.roomName"> · {{ interview.roomName }}</template></dd>
-              </template>
-              <template v-if="interview.onlineMeetingUrl">
-                <dt>온라인 접속</dt>
-                <dd><a :href="interview.onlineMeetingUrl" target="_blank" rel="noopener noreferrer">{{ interview.onlineMeetingUrl }}</a></dd>
               </template>
             </dl>
           </li>
@@ -178,7 +173,7 @@
 import { onBeforeUnmount, onMounted, h, ref, reactive } from 'vue'
 import type { ApplicantStageResult, ChangePasswordRequest, MyApplicationList, MyApplicationListItem } from '@/types/application'
 import type { ApplicantInterviewSupplementSummary } from '@/types/interviewSupplement'
-import type { ApplicantInterviewSummary, InterviewMethod } from '@/types/applicantInterview'
+import type { ApplicantInterviewSummary } from '@/types/applicantInterview'
 import { formatDate } from '@/common/dateUtil'
 import { Button, message, type TableColumnsType } from 'ant-design-vue'
 import { LockOutlined } from '@ant-design/icons-vue'
@@ -434,12 +429,6 @@ const changePhoneNumberButton = async () => {
 const interviewsByApplication = ref(new Map<number, ApplicantInterviewSummary[]>())
 const interviewModalOpen = ref(false)
 const interviewTarget = ref<ApplicantInterviewSummary[]>([])
-const interviewMethodLabelMap: Record<InterviewMethod, string> = {
-  IN_PERSON: '대면',
-  ONLINE: '온라인',
-  HYBRID: '대면·온라인',
-  OTHER: '기타',
-}
 
 const loadInterviews = async () => {
   try {
