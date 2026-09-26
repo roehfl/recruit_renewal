@@ -169,7 +169,7 @@ store 없음. 두 지원자 화면은 `{FE}/views/applicant/ApplicantBreadcrumb.
 **공지 등록 — 🟢 확정(2026-09-18, SecurityConfig 매처·테스트)**
 - `POST /board/notices`: **관리자 전용**(`ROLE_ADMIN`·`ROLE_RECRUIT_ADMIN`). 비인증 401, 그 외 권한 403. `BoardController` 기본 경로가 `/board`라 broad `/api/admin/**` 매처에 안 걸려 `POST /api/board/**` 전용 매처로 막는다.
 - 요청: `title` `@NotBlank`(위반 400), `content`(원본 HTML, 요청 검증 없음), `isPinned`(boolean, 생략 시 false). 응답 `data` = 새 id.
-- **FE 미사용**(관리자 공지 관리 화면 미구현, `recruit_front/src/api`에 호출처 없음).
+- FE 호출처: `{FE}/api/admin/adminNoticeApi.ts` — `createNotice`(관리자 공지 관리 화면 `AdminNoticeManage`).
 - 등록 시 `deleted`는 항상 false다. 미리 내려둔 상태로 만들려면 등록 후 `/delete`를 호출한다.
 
 ## 규칙·불변식

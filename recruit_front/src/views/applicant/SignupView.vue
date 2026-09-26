@@ -70,8 +70,7 @@
                   </div>
                   <span class="item-nice-description">인증 완료 후 재인증이 불가능합니다.</span>
                 </div>
-                <!-- TODO: 인증 완료 된 상태면 "인증 완료" 문구를 띄우거나  버튼을 막아버리기 -->
-                  <a-button class="item-nice-button" disable>인증 완료</a-button>
+                  <a-button class="item-nice-button" disabled>인증 완료</a-button>
               </div>
 
             <div class="item-abreast">
