@@ -34,8 +34,33 @@
               :class="{ active: selectMenu === 'password' }"
               @click="selectMenu = 'password'"
               >비밀번호 변경</div>
+            <div class="menu-item"
+              :class="{ active: selectMenu === 'phone' }"
+              @click="selectMenu = 'phone'"
+              >휴대폰 번호 변경</div>
           </div>
-          <div class="content-selection">
+          <div v-if="selectMenu === 'phone'" class="content-selection">
+            <a-form layout="vertical" autocomplete="off">
+              <a-form-item label="현재비밀번호" required>
+                <a-input-password v-model:value="PhoneForm.currentPassword" size="large" placeholder="비밀번호">
+                  <template #prefix>
+                    <LockOutlined />
+                  </template>
+                </a-input-password>
+              </a-form-item>
+              <a-form-item label="새 휴대폰 번호" required extra="전형 결과 등 안내 문자를 받을 번호입니다.">
+                <a-input v-model:value="PhoneForm.phoneNumber" size="large" placeholder="01012345678" :maxlength="13" />
+              </a-form-item>
+            </a-form>
+            <div class="changePassword">
+              <a-button class="changePasswordButton"
+              type="primary"
+              :loading="changingPhone"
+              @click="changePhoneNumberButton()"
+              >변경</a-button>
+            </div>
+          </div>
+          <div v-else class="content-selection">
             <div>
               <a-form
               :model="PasswordForm"
@@ -91,6 +116,35 @@
         </div>
       </div>
 
+      <a-modal
+        v-model:open="interviewModalOpen"
+        title="면접 일정"
+        :footer="null">
+        <p v-if="interviewTarget.length === 0">배정된 면접 일정이 없습니다.</p>
+        <ul v-else class="interview-list">
+          <li v-for="interview in interviewTarget" :key="interview.interviewId" :class="{ cancelled: interview.cancelled }">
+            <div class="interview-head">
+              <strong>{{ interview.stageName }}</strong>
+              <a-tag v-if="interview.cancelled" color="red">취소됨</a-tag>
+            </div>
+            <dl>
+              <dt>면접 일시</dt><dd>{{ formatDate(interview.startDateTime, 'YYYY.MM.DD HH:mm') }}</dd>
+              <template v-if="interview.arrivalDateTime">
+                <dt>도착 시간</dt><dd>{{ formatDate(interview.arrivalDateTime, 'HH:mm') }}까지</dd>
+              </template>
+              <dt>방식</dt><dd>{{ interviewMethodLabelMap[interview.method] ?? interview.method }}</dd>
+              <template v-if="interview.locationName">
+                <dt>장소</dt><dd>{{ interview.locationName }}<template v-if="interview.roomName"> · {{ interview.roomName }}</template></dd>
+              </template>
+              <template v-if="interview.onlineMeetingUrl">
+                <dt>온라인 접속</dt>
+                <dd><a :href="interview.onlineMeetingUrl" target="_blank" rel="noopener noreferrer">{{ interview.onlineMeetingUrl }}</a></dd>
+              </template>
+            </dl>
+          </li>
+        </ul>
+      </a-modal>
+
       <InterviewSupplementModal
         v-model:open="supplementModalOpen"
         :application-id="supplementTarget?.applicationId ?? null"
@@ -124,6 +178,7 @@
 import { onBeforeUnmount, onMounted, h, ref, reactive } from 'vue'
 import type { ApplicantStageResult, ChangePasswordRequest, MyApplicationList, MyApplicationListItem } from '@/types/application'
 import type { ApplicantInterviewSupplementSummary } from '@/types/interviewSupplement'
+import type { ApplicantInterviewSummary, InterviewMethod } from '@/types/applicantInterview'
 import { formatDate } from '@/common/dateUtil'
 import { Button, message, type TableColumnsType } from 'ant-design-vue'
 import { LockOutlined } from '@ant-design/icons-vue'
@@ -131,6 +186,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { applicationApi } from '@/api/applicationApi'
 import { interviewSupplementApi } from '@/api/interviewSupplementApi'
+import { applicantInterviewApi } from '@/api/applicantInterviewApi'
 import InterviewSupplementModal from './InterviewSupplementModal.vue'
 import { getApiErrorMessage } from '@/api/apiError'
 
@@ -177,7 +233,7 @@ const PasswordRules = {
 }
 
 const loading = ref(false);
-const selectMenu = ref('');
+const selectMenu = ref<'password' | 'phone'>('password');
 const applicationList = ref<MyApplicationList[]>([])
 const applicationListItems = ref<MyApplicationListItem[]>([])
 const isSettingModalOpen = ref(false);
@@ -230,6 +286,9 @@ const settingModalOpen = () => {
 
 const settingModalClose = () => {
   isSettingModalOpen.value = false;
+  selectMenu.value = 'password';
+  PhoneForm.currentPassword = '';
+  PhoneForm.phoneNumber = '';
   PasswordForm.currentPassword = '';
   PasswordForm.newPassword = '';
   PasswordForm.newPasswordCheck = '';
@@ -346,6 +405,75 @@ const changePasswordButton = async() => {
   await checkPassword();
 }
 
+/* 휴대폰 번호 변경. 백엔드는 길이(30자)만 보므로 형식은 화면에서 확인하고 숫자만 보낸다. */
+const PhoneForm = reactive({ currentPassword: '', phoneNumber: '' })
+const changingPhone = ref(false)
+const changePhoneNumberButton = async () => {
+  const phoneNumber = PhoneForm.phoneNumber.replace(/[^0-9]/g, '')
+  if (!PhoneForm.currentPassword) {
+    message.warning('현재 비밀번호를 입력하세요.')
+    return
+  }
+  if (!/^01[016789]\d{7,8}$/.test(phoneNumber)) {
+    message.warning('휴대폰 번호를 확인하세요. 예) 01012345678')
+    return
+  }
+  changingPhone.value = true
+  try {
+    await applicationApi.changePhoneNumber({ currentPassword: PhoneForm.currentPassword, phoneNumber })
+    message.success('휴대폰 번호가 변경되었습니다.')
+    settingModalClose()
+  } catch (error) {
+    message.error(getApiErrorMessage(error, '휴대폰 번호를 변경하지 못했습니다.'))
+  } finally {
+    changingPhone.value = false
+  }
+}
+
+/* 면접 일정(interview 카드 `GET /applicant/interviews`). 지원서별로 묶어 목록 열과 모달에 쓴다. */
+const interviewsByApplication = ref(new Map<number, ApplicantInterviewSummary[]>())
+const interviewModalOpen = ref(false)
+const interviewTarget = ref<ApplicantInterviewSummary[]>([])
+const interviewMethodLabelMap: Record<InterviewMethod, string> = {
+  IN_PERSON: '대면',
+  ONLINE: '온라인',
+  HYBRID: '대면·온라인',
+  OTHER: '기타',
+}
+
+const loadInterviews = async () => {
+  try {
+    const response = await applicantInterviewApi.getMyInterviews()
+    const map = new Map<number, ApplicantInterviewSummary[]>()
+    response.data.data.forEach((interview) => {
+      const list = map.get(interview.applicationId) ?? []
+      list.push(interview)
+      map.set(interview.applicationId, list)
+    })
+    interviewsByApplication.value = map
+  } catch (error) {
+    // 지원 목록은 그대로 보여 주고 면접 일정 칸만 비운다.
+    interviewsByApplication.value = new Map()
+    console.error(error)
+  }
+}
+
+const openInterviews = (list: ApplicantInterviewSummary[]) => {
+  interviewTarget.value = list
+  interviewModalOpen.value = true
+}
+
+/** 취소되지 않은 면접 중 가장 이른 것의 일시를 칸에 보여 준다. */
+const renderInterviewCell = (record?: MyApplicationListItem) => {
+  const list = record ? interviewsByApplication.value.get(Number(record.applicationId)) : undefined
+  if (!list || list.length === 0) return '-'
+  const next = list.find((interview) => !interview.cancelled)
+  return h('div', { class: 'supplement-cell' }, [
+    h(Button, { onClick: () => openInterviews(list) }, () => '확인'),
+    h('span', { class: 'supplement-meta' }, next ? formatDate(next.startDateTime, 'MM.DD HH:mm') : '취소됨'),
+  ])
+}
+
 const logout = async () => {
   try {
     await authStore.logout();
@@ -421,6 +549,13 @@ const columns: TableColumnsType<MyApplicationListItem> = [
         : h(Button, { onClick: () => openStageResults(record) }, () => '확인'),
   },
   {
+    title: '면접 일정',
+    key: 'interview',
+    width: 150,
+    align: 'center',
+    customRender: ({ record }) => renderInterviewCell(record),
+  },
+  {
     title: '추가사항 입력',
     key: 'supplement',
     width: 200,
@@ -454,6 +589,7 @@ const goForm = async (record: MyApplicationListItem) => {
 onMounted(() => {
   loadMyApplications();
   loadSupplements();
+  loadInterviews();
   // 입력 대기 → 입력 가능 → 마감 전환과 남은 시간 표시를 갱신한다.
   supplementTicker = setInterval(() => {
     serverNowTick.value = serverNow()
@@ -791,6 +927,45 @@ onBeforeUnmount(() => {
     flex-direction: row;
     justify-content: space-between;
   }
+}
+
+.interview-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.interview-list li {
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.interview-list li.cancelled dd {
+  color: var(--app-text-muted);
+  text-decoration: line-through;
+}
+
+.interview-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.interview-list dl {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.interview-list dt {
+  color: var(--app-text-secondary);
+}
+
+.interview-list dd {
+  margin: 0;
+  word-break: break-all;
 }
 
 .stage-result-list {

@@ -113,6 +113,11 @@ export interface ChangePasswordParams {
   newPassword: string
 }
 
+export interface ChangePhoneNumberParams {
+  currentPassword: string
+  phoneNumber: string
+}
+
 export interface ChangePasswordRequest {
   data: string
   message: string

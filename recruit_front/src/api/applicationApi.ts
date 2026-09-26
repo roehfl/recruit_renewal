@@ -1,6 +1,6 @@
 import { apiClient } from './client'
 import type { ApiResponse } from '@/types/api'
-import type { ApplicantStageResult, ApplicationSearchParams, MyApplicationList, ChangePasswordParams, ChangePasswordRequest, SignupUser, checkEmailRequest, FindEmailResponse, EmailVerificationRequest, PasswordResetRequest } from '@/types/application'
+import type { ApplicantStageResult, ApplicationSearchParams, MyApplicationList, ChangePasswordParams, ChangePhoneNumberParams, ChangePasswordRequest, SignupUser, checkEmailRequest, FindEmailResponse, EmailVerificationRequest, PasswordResetRequest } from '@/types/application'
 
 export const applicationApi = {
 
@@ -14,6 +14,10 @@ export const applicationApi = {
 
   changePassword(params: ChangePasswordParams){
     return apiClient.post<ApiResponse<ChangePasswordRequest>>('/applicant/account/password', params)
+  },
+
+  changePhoneNumber(params: ChangePhoneNumberParams) {
+    return apiClient.post<ApiResponse<void>>('/applicant/account/phone-number', params)
   },
 
   signup(request: SignupUser) {

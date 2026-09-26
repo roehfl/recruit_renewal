@@ -114,7 +114,7 @@
 
 ### 엔드포인트 상세
 
-- **FE 사용**: 스케줄 4개만. 나머지 22개(면접 명령 8·관리자 평가 5·면접관 6·지원자 3)는 **FE 미사용**(옛 계약 섹션 없음 → 🟢). 스케줄 4개와 "종료시각 제거"는 옛 계약 🟢 확정(2026-09-18). 면접 목록은 모두 `startDateTime`, id 순.
+- **FE 사용**: 스케줄 4개 + 지원자 `GET /applicant/interviews`(마이페이지 "면접 일정" 열·모달, [auth-account](auth-account.md) 소유 `ApplicantProfile.vue`, `{FE}/api/applicantInterviewApi.ts`·`{FE}/types/applicantInterview.ts`). 나머지 21개(면접 명령 8·관리자 평가 5·면접관 6·지원자 2)는 **FE 미사용**(옛 계약 섹션 없음 → 🟢). 스케줄 4개와 "종료시각 제거"는 옛 계약 🟢 확정(2026-09-18). 면접 목록은 모두 `startDateTime`, id 순.
 
 **응답 모양**
 

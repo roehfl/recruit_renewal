@@ -97,7 +97,7 @@
 | view | `{FE}/views/auth/LoginView.vue` | 로그인, 로그인 후 이동 |
 | view | `{FE}/views/applicant/SignupView.vue` | 가입(이메일=loginId, 메일 인증번호). 이름·휴대폰은 NICE 결과로 채워지는 읽기 전용 필드 |
 | view | `{FE}/views/applicant/AccountRecovery.vue` | 가운데 단일 카드 + `a-tabs` 2개: 아이디 찾기(NICE 실연동, 마스킹 아이디 표시 후 로그인·비밀번호 재발급 탭으로 이동)·비밀번호 재발급(인증번호 → 새 비밀번호) |
-| view | `{FE}/views/applicant/ApplicantProfile.vue` | 마이페이지: 비밀번호 변경, 로그아웃, 내 지원 목록(760px 이하 카드), 전형결과 모달, 면접 추가사항 열 |
+| view | `{FE}/views/applicant/ApplicantProfile.vue` | 마이페이지: 비밀번호·휴대폰 번호 변경, 로그아웃, 내 지원 목록(760px 이하 카드), 전형결과 모달, 면접 일정 열·모달, 면접 추가사항 열 |
 | api | `{FE}/api/authApi.ts` | `login`, `me`, `logout` |
 | api | `{FE}/api/applicationApi.ts` | (공유) `signup`, `checkEmail`, `findEmail`, `changePassword`, 인증번호 5종 |
 | types | `{FE}/types/auth.ts` | `LoginRequest`, `LoginUser` |
@@ -128,7 +128,7 @@ NICE 본인확인 컨트롤러·화면(`NiceVerificationController.java`, `NiceA
 NICE 본인확인 엔드포인트 4개(`/auth/nice/request`·`/auth/nice/callback`·`/auth/nice/callback/error`·`/auth/nice/result`)는 [auth-nice-verification](auth-nice-verification.md) 소유.
 
 - 응답은 모두 `ApiResponse<T>`(`{ success, data, message }`)로 감싼다. 이 표는 코드 기준으로 작성했다(이전 계약 문서에 섹션 없음).
-- ApplicantProfile이 호출하는 다른 카드 API: `GET /applications/me`(내 지원 목록, pageSize 5) → [application](application.md), `GET /applications/{applicationId}/stage-results` → [stage-result](stage-result.md), `GET /applicant/interview-supplements`(추가사항 입력 열·입력 모달) → [interview-supplement](interview-supplement.md).
+- ApplicantProfile이 호출하는 다른 카드 API: `GET /applicant/interviews`(면접 일정 열·모달) → [interview](interview.md), `GET /applications/me`(내 지원 목록, pageSize 5) → [application](application.md), `GET /applications/{applicationId}/stage-results` → [stage-result](stage-result.md), `GET /applicant/interview-supplements`(추가사항 입력 열·입력 모달) → [interview-supplement](interview-supplement.md).
 
 ### 엔드포인트 상세
 
@@ -161,7 +161,7 @@ NICE 4종(`request`·`callback`·`callback/error`·`result`) 상세는 [auth-nic
 
 **POST /applicant/account/password**: 400 `"현재 비밀번호가 일치하지 않습니다."` / `"새 비밀번호가 현재 비밀번호와 달라야 합니다."` / `"지원자 정보를 찾을 수 없습니다."`, 미인증 401, 임직원 403(필터). 변경 후에도 현재 세션과 다른 세션을 무효화하지 않는다. FE(`ApplicantProfile` "내 정보 수정" 모달)는 새 비밀번호 확인 일치와 현재 비밀번호 입력 여부만 검사한다.
 
-**POST /applicant/account/phone-number**: currentPassword를 재확인한 뒤 trim해서 저장한다. 전화번호 unique는 없다. **FE 미사용**(호출 코드·UI 없음).
+**POST /applicant/account/phone-number**: currentPassword를 재확인한 뒤 trim해서 저장한다. 전화번호 unique는 없다. 서버는 길이(30자)만 검사하고 형식은 보지 않는다. FE(`ApplicantProfile` "내 정보 수정" → 휴대폰 번호 변경, `applicationApi.changePhoneNumber`)가 숫자만 남겨 `^01[016789]\d{7,8}$`를 확인한 뒤 숫자만 보낸다. NICE 재인증은 요구하지 않는다(사용자 결정 2026-09-27).
 
 ## 규칙·불변식
 
