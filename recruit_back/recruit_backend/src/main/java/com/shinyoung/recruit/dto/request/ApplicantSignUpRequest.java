@@ -1,8 +1,12 @@
 package com.shinyoung.recruit.dto.request;
 
+import com.shinyoung.recruit.common.util.PasswordPolicy;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+
+import java.nio.charset.StandardCharsets;
 
 /**
  * 지원자 가입 요청.
@@ -23,4 +27,16 @@ public record ApplicantSignUpRequest(
         @Size(max = 255, message = "email은 255자 이하여야 합니다.")
         String email
 ) {
+
+    /** 조합 규칙({@link PasswordPolicy}). 프론트와 같은 규칙이다. */
+    @AssertTrue(message = PasswordPolicy.MESSAGE)
+    public boolean isPasswordComplexEnough() {
+        return PasswordPolicy.isAcceptable(password);
+    }
+
+    /** BCrypt는 72바이트까지만 처리하고 넘으면 인코딩에서 예외(500)가 난다. 한글은 글자당 3바이트다. */
+    @AssertTrue(message = "비밀번호는 72바이트 이하여야 합니다(한글은 약 24자).")
+    public boolean isPasswordWithinBcryptLimit() {
+        return password == null || password.getBytes(StandardCharsets.UTF_8).length <= 72;
+    }
 }

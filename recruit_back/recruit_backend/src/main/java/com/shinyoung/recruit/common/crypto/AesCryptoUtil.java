@@ -14,6 +14,10 @@ public class AesCryptoUtil {
 
     public AesCryptoUtil(String secretKey) {
         this.key = secretKey.getBytes();
+        // 키가 틀리면 첫 암호화 때가 아니라 기동할 때 실패시킨다(AES-256 = 32바이트).
+        if (key.length != KEY_SIZE) {
+            throw new IllegalStateException("crypto.aes.key(AES_SECRET_KEY)는 " + KEY_SIZE + "바이트여야 합니다: 현재 " + key.length);
+        }
     }
 
     public String encrypt(String plainText) {

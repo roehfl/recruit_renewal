@@ -1,7 +1,7 @@
 # 클라이언트 이벤트 로그 (`client-event-log`)
 
 > 경로 표기 `{BE}` `{BT}` `{BR}` `{FE}` — 정의: [_index.md](_index.md). API 경로는 `/api` 접두 생략.
-> 관련 카드: [privacy-audit-audit](privacy-audit-audit.md)(서버 감사 로그 `ActivityLog`·`AuditHmac`) · [privacy-audit](privacy-audit.md)(`ROLE_PRIVACY_ADMIN` 소비) · [auth-account](auth-account.md)(`SecurityConfig` 경로 규칙·CORS `X-Request-Id` 노출·`authApi` 텔레메트리 옵션) · [application-sections](application-sections.md)(수동 로깅하는 지원서 섹션 화면) · [job-posting](job-posting.md)(`ApplicationDetailView`의 `skipClientEventLog`)
+> 관련 카드: [privacy-audit-audit](privacy-audit-audit.md)(서버 감사 로그 `ActivityLog`·`AuditHmac`) · [privacy-audit](privacy-audit.md)(`ROLE_PRIVACY_ADMIN` 소비) · [auth-security](auth-security.md)(`SecurityConfig` 경로 규칙·CORS `X-Request-Id` 노출·`authApi` 텔레메트리 옵션) · [application-sections](application-sections.md)(수동 로깅하는 지원서 섹션 화면) · [job-posting](job-posting.md)(`ApplicationDetailView`의 `skipClientEventLog`)
 
 ## 요약
 
@@ -71,7 +71,7 @@
 | 구분 | 파일 | 역할 |
 |---|---|---|
 | api | `{FE}/api/clientEventApi.ts` | `record(payload)` → `POST /client-events` |
-| api | `{FE}/api/telemetryClient.ts` | 전용 axios(타임아웃 3초, 인터셉터 없음 — 재귀 로깅·로딩 표시 방지) |
+| api | `{FE}/api/telemetryClient.ts` | 전용 axios(타임아웃 3초, 인터셉터 없음 — 재귀 로깅·로딩 표시 방지, CSRF 헤더 `X-Requested-With` 기본 부착) |
 | api | `{FE}/common/clientEventLogger.ts` | `logClientEvent`·`buildPayload`: 공통 필드·FE 정제·예외 삼킴 |
 | api | `{FE}/common/clientSession.ts` | `getClientSessionId`·`createOpaqueId` |
 | api | `{FE}/common/httpErrorTelemetry.ts` | `logApiError`: axios 오류 → 이벤트, axios config 확장(`skipClientEventLog` 등) |
@@ -92,7 +92,7 @@
 
 ## API 계약
 
-코드 기준(옛 api-contract 섹션 없음). 응답은 `ApiResponse<T>`. 권한은 `{BE}/config/SecurityConfig.java`([auth-account](auth-account.md)) 매처 기준: 수집 = `POST /api/client-events` permitAll. 조회 = `GET /api/admin/client-events/**` `ROLE_RECRUIT_ADMIN`·`ROLE_PRIVACY_ADMIN`(**`ROLE_ADMIN`만 있으면 403** — broad `/api/admin/**`보다 앞 매처). cleanup = `ROLE_PRIVACY_ADMIN`.
+코드 기준(옛 api-contract 섹션 없음). 응답은 `ApiResponse<T>`. 권한은 `{BE}/config/SecurityConfig.java`([auth-security](auth-security.md)) 매처 기준: 수집 = `POST /api/client-events` permitAll. 조회 = `GET /api/admin/client-events/**` `ROLE_RECRUIT_ADMIN`·`ROLE_PRIVACY_ADMIN`(**`ROLE_ADMIN`만 있으면 403** — broad `/api/admin/**`보다 앞 매처). cleanup = `ROLE_PRIVACY_ADMIN`.
 
 | 상태 | 메서드 | 경로 | 요청 요약 | 응답 요약 | 권한 |
 |---|---|---|---|---|---|
@@ -202,7 +202,7 @@
 **송신 지점 ② HTTP 오류** ({FE}/common/httpErrorTelemetry.ts — logApiError)
 - `apiClient` 요청만 대상. 분류: `ECONNABORTED` → `API_TIMEOUT` / 응답 없음 → `NETWORK_ERROR` / 401 → `SESSION_EXPIRED` / 403 → `FORBIDDEN` / 그 외 → `API_ERROR`.
 - message 코드: `API_TIMEOUT_OCCURRED`·`NETWORK_ERROR_OCCURRED`·`SESSION_EXPIRED`·`FORBIDDEN_ACCESS`·`API_REQUEST_FAILED`.
-- `relatedCorrelationId` = 응답 헤더 `x-request-id`(CORS 노출 필요 — [auth-account](auth-account.md)). `apiPath` = `config.url`(쿼리 제거). `errorCode` = 응답 본문 `errorCode`·`code`·`messageCode`·`status` 중 `^[A-Z0-9_]{2,100}$`인 첫 값, 없으면 axios `error.code`. `durationMs` = `performance.now() - requestStartedAt`. `retryable` = 상태 없음·408·429·5xx.
+- `relatedCorrelationId` = 응답 헤더 `x-request-id`(CORS 노출 필요 — [auth-security](auth-security.md)). `apiPath` = `config.url`(쿼리 제거). `errorCode` = 응답 본문 `errorCode`·`code`·`messageCode`·`status` 중 `^[A-Z0-9_]{2,100}$`인 첫 값, 없으면 axios `error.code`. `durationMs` = `performance.now() - requestStartedAt`. `retryable` = 상태 없음·408·429·5xx.
 - 요청별 axios config 옵션: `skipClientEventLog: true` → 기록 안 함, `skipSessionExpiredLog: true` → 401만 기록 안 함, `clientEventContext` → `pageCode`·`componentCode`·`operation`·`jobPostingId`·`applicationId` 첨부(현재 사용처 없음).
 - 현재 옵션 사용처: `authApi.me`(`skipClientEventLog`, 비로그인 401이 정상)·`authApi.login`(`skipSessionExpiredLog`, 로그인 실패 401) — `{FE}/api/authApi.ts`([auth-account](auth-account.md)). 기지원 단건 조회(404가 정상) — `{FE}/views/applicant/ApplicationDetailView.vue`([job-posting](job-posting.md)).
 
@@ -265,7 +265,7 @@ $env:AES_SECRET_KEY='<로컬 예시 키>'; .\gradlew.bat test --tests "com.shiny
 AES_SECRET_KEY='<로컬 예시 키>' ./gradlew test --tests "com.shinyoung.recruit.controller.*ClientEventLog*" --tests "com.shinyoung.recruit.service.ClientEvent*" --tests "com.shinyoung.recruit.domain.repository.ClientEventLogRepositoryTest" --tests "com.shinyoung.recruit.config.SchedulingConfigTest" --no-daemon
 ```
 
-`SecurityConfig` 매처나 CORS를 바꿨으면 [auth-account](auth-account.md) 테스트도 돌린다.
+`SecurityConfig` 매처나 CORS를 바꿨으면 [auth-security](auth-security.md) 테스트도 돌린다.
 
 프론트(`recruit_front/`에서):
 

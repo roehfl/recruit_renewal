@@ -176,7 +176,7 @@ public class ExcelExportWriter {
     /**
      * formula injection 방어: 위험 prefix로 시작하는 값에 apostrophe를 붙여 텍스트로 강제한다.
      */
-    private String sanitize(String value) {
+    static String sanitize(String value) {
         if (value == null || value.isEmpty()) {
             return "";
         }

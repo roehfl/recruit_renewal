@@ -10,6 +10,7 @@ import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
+import com.shinyoung.recruit.support.AttachmentTestFiles;
 import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
@@ -41,7 +42,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
 
@@ -307,7 +307,7 @@ class ApplicationAttachmentControllerTest {
                 "file",
                 originalFileName,
                 contentType,
-                content.getBytes(StandardCharsets.UTF_8)
+                AttachmentTestFiles.content(originalFileName, content)
         );
     }
 

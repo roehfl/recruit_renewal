@@ -57,6 +57,9 @@ public class MessageProperties {
     @Max(65535)
     private int reportPort = 7779;
 
+    /** 발송 결과 수신을 허용할 발신 IP 목록(UmsReportServer). 비면 모두 허용한다. 운영은 UMS 서버 주소만 둔다. */
+    private List<String> reportAllowedIps = new ArrayList<>();
+
     public String getSenderName() {
         return senderName;
     }
@@ -127,5 +130,13 @@ public class MessageProperties {
 
     public void setReportPort(int reportPort) {
         this.reportPort = reportPort;
+    }
+
+    public List<String> getReportAllowedIps() {
+        return reportAllowedIps;
+    }
+
+    public void setReportAllowedIps(List<String> reportAllowedIps) {
+        this.reportAllowedIps = reportAllowedIps;
     }
 }

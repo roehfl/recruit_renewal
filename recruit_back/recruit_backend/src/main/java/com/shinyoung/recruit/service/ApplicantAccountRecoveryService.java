@@ -27,14 +27,16 @@ public class ApplicantAccountRecoveryService {
     private final AuditHmac auditHmac;
     private final EmailVerificationService emailVerificationService;
     private final PasswordEncoder passwordEncoder;
+    private final UserSessionRevoker userSessionRevoker;
 
     public ApplicantAccountRecoveryService(ApplicantRepository applicantRepository, AuditHmac auditHmac,
                                            EmailVerificationService emailVerificationService,
-                                           PasswordEncoder passwordEncoder) {
+                                           PasswordEncoder passwordEncoder, UserSessionRevoker userSessionRevoker) {
         this.applicantRepository = applicantRepository;
         this.auditHmac = auditHmac;
         this.emailVerificationService = emailVerificationService;
         this.passwordEncoder = passwordEncoder;
+        this.userSessionRevoker = userSessionRevoker;
     }
 
     /**
@@ -65,7 +67,10 @@ public class ApplicantAccountRecoveryService {
     /** 인증을 마친 이메일의 비밀번호를 바꾼다(BCrypt). 다른 로그인 세션은 건드리지 않는다. */
     @Transactional
     public void resetPassword(String email, String newPassword) {
-        findByEmail(email).changePassword(passwordEncoder.encode(newPassword));
+        Applicant applicant = findByEmail(email);
+        applicant.changePassword(passwordEncoder.encode(newPassword));
+        // 로그인 전 재설정이라 남길 세션이 없다. 이 계정의 로그인 세션을 모두 만료한다.
+        userSessionRevoker.expireSessions(applicant.getLoginId(), null);
     }
 
     private Applicant findByEmail(String email) {

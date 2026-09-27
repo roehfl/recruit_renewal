@@ -39,7 +39,8 @@
 | service | `{BE}/service/ApplicationAttachmentFileService.java` | 업로드·한도·롤백 시 파일 정리 |
 | service | `{BE}/service/ApplicationAttachmentDeleteService.java` | soft delete + 커밋 후 물리 삭제, 관리자 삭제 감사 |
 | service | `{BE}/service/ApplicationAttachmentDownloadService.java` | `STORED` 행 → 파일 로드 |
-| service | `{BE}/service/AttachmentFilePolicy.java` | 크기·파일명·확장자·content type 검증 |
+| service | `{BE}/service/AttachmentFilePolicy.java` | 크기·파일명·확장자·content type·시그니처 검증 |
+| service | `{BE}/service/AttachmentSignatureValidator.java` | 확장자별 매직바이트 판정 |
 | service | `{BE}/service/AttachmentStorageService.java` | 저장소 인터페이스 |
 | service | `{BE}/service/LocalAttachmentStorageService.java` | 로컬 구현, 루트 밖 경로 차단 |
 | service | `{BE}/service/AttachmentStorageHealthScanService.java` | 파일↔행 대조 점검 |
@@ -67,7 +68,9 @@
 | test | `{BT}/controller/ApplicationAttachmentDownloadControllerTest.java` | 다운로드 헤더, 삭제, 권한 |
 | test | `{BT}/controller/AdminAttachmentStorageHealthControllerTest.java` | 점검 API |
 | test | `{BT}/service/ApplicationAttachmentServiceTest.java` | 교체 |
-| test | `{BT}/service/ApplicationAttachmentFileServiceTest.java` | 업로드·한도·정책 |
+| test | `{BT}/service/ApplicationAttachmentFileServiceTest.java` | 업로드·한도·정책·위장 파일 거부 |
+| test | `{BT}/service/AttachmentSignatureValidatorTest.java` | 확장자별 시그니처 판정 |
+| test | `{BT}/support/AttachmentTestFiles.java` | 테스트 업로드 내용(확장자에 맞는 시그니처 + 본문) |
 | test | `{BT}/service/ApplicationAttachmentDeleteServiceTest.java` | 삭제 |
 | test | `{BT}/service/ApplicationAttachmentDownloadServiceTest.java` | 다운로드 |
 | test | `{BT}/service/AttachmentStorageHealthScanServiceTest.java` | 점검 |
@@ -141,7 +144,7 @@ JSON 응답은 `ApiResponse<T>`. 다운로드 성공은 바이너리, 실패는 
 
 **⛔ POST 메타데이터 교체(`replaceAttachments`) — FE 미사용, 쓰지 말 것**
 - `METADATA_ONLY` 행을 전부 hard delete 후 요청대로 다시 만든다(빈 목록 허용). 파일이 없어 다운로드 불가 — 파일은 업로드/삭제로 다룬다.
-- `storedFileName`·`storagePath` 전송, 요청 안 `sortOrder` 중복, 기존 `STORED` 행 `sortOrder`와 충돌은 400. `sectionRecordId` 규칙은 업로드와 같다. (`ApplicationAttachmentService` — validateRequest)
+- 목록 20개 초과, `originalFileName`·`contentType`의 제어문자는 400(요청 DTO 검증, 2026-09-27). `storedFileName`·`storagePath` 전송, 요청 안 `sortOrder` 중복, 기존 `STORED` 행 `sortOrder`와 충돌은 400. `sectionRecordId` 규칙은 업로드와 같다. (`ApplicationAttachmentService` — validateRequest)
 
 ## 규칙·불변식
 
@@ -156,11 +159,13 @@ JSON 응답은 `ApiResponse<T>`. 다운로드 성공은 바이너리, 실패는 
 - 파일 null·빈 파일·`maxFileSize` 초과 → 400. ({BE}/service/AttachmentFilePolicy.java — validate)
 - 원본 파일명: 공백·`/`·`\`·제어문자 거부, trim + 연속 공백 1칸, ≤255자, 기본명이 Windows 예약어(`CON`·`NUL`·`COM1`~`9`·`LPT1`~`9` 등)면 거부. ({BE}/service/AttachmentFilePolicy.java — sanitizeOriginalFileName)
 - 확장자 = 마지막 `.` 뒤(없으면 거부), 소문자로 허용 목록 비교. ({BE}/service/AttachmentFilePolicy.java — extractExtension, validateExtension)
-- content type = 클라이언트 multipart 값, 필수, 허용 목록(대소문자 무시: pdf·jpeg·png·msword·docx·xls·xlsx MIME, `application/x-hwp`, `application/haansofthwp`, `application/vnd.hancom.hwpx`). **확장자와 짝 검사·매직넘버·백신 검사 없음.** ({BE}/service/AttachmentFilePolicy.java — validateContentType)
+- content type = 클라이언트 multipart 값, 필수, 허용 목록(대소문자 무시: pdf·jpeg·png·msword·docx·xls·xlsx MIME, `application/x-hwp`, `application/haansofthwp`, `application/vnd.hancom.hwpx`). 확장자와 content type의 짝 검사·백신 검사는 없다. ({BE}/service/AttachmentFilePolicy.java — validateContentType)
+- 시그니처(2026-09-27): 앞 1024바이트가 확장자 형식이어야 한다 — pdf `%PDF-`(앞부분 안 어디든), jpg/jpeg `FFD8FF`, png 8바이트, doc·xls·hwp OLE2(`D0CF11E0…`, hwp는 `HWP Document File`도), docx·xlsx·hwpx ZIP(`PK`). 아니면 400 `Attachment file content does not match its extension.` 시그니처를 모르는 확장자는 거부하므로 허용 확장자를 늘리면 `AttachmentSignatureValidator`도 고친다. 테스트 업로드는 `AttachmentTestFiles.content`로 만든다. ({BE}/service/AttachmentFilePolicy.java — validateSignature)
 - 설정은 기동 시 검증(크기 >0, 개수 ≥1, 목록 비지 않음). 기본값은 `{BR}/application.yaml`과 클래스 초기값이 같다. ({BE}/config/AttachmentProperties.java)
 
 **한도·정렬**
 - 한도는 `STORED` 행만 센다: 개수 + 1 ≤ 20, 합계 + 새 파일 ≤ 100MB. ({BE}/service/ApplicationAttachmentFileService.java — validateStoredLimits)
+- 업로드는 지원서 행을 비관적 쓰기 잠금으로 읽는다(`findOwnedApplicationForUpdate` → `JobApplicationRepository.findByIdAndApplicantIdForUpdate`). 한도 조회와 저장 사이에 같은 지원서의 동시 업로드가 끼어 한도를 함께 넘지 못한다(2026-09-27).
 - `sortOrder` = 모든 행(삭제 포함) 최댓값 + 1(없으면 0). 번호 재사용 없음. ({BE}/service/ApplicationAttachmentFileService.java — nextSortOrder)
 
 **권한·작성 가능 기간**
@@ -221,7 +226,7 @@ JSON 응답은 `ApiResponse<T>`. 다운로드 성공은 바이너리, 실패는 
 4. 카드 요약의 사용처 쌍 갱신 → `npm run type-check` → `node tools/check-docs.mjs`.
 
 ### 다운로드 헤더·응답 필드 변경
-1. 헤더는 `{BE}/controller/AttachmentDownloadResponseFactory.java` 한 곳. `no-store`·`nosniff`는 빼지 않는다. JS가 읽을 새 헤더는 `{BE}/config/SecurityConfig.java` `setExposedHeaders`에 추가([auth-account](auth-account.md)).
+1. 헤더는 `{BE}/controller/AttachmentDownloadResponseFactory.java` 한 곳. `no-store`·`nosniff`는 빼지 않는다. JS가 읽을 새 헤더는 `{BE}/config/SecurityConfig.java` `setExposedHeaders`에 추가([auth-security](auth-security.md)).
 2. `AttachmentResponse` 필드 추가 시 저장 내부값 금지, FE `AttachmentResponse`(basicInfo.ts) 동기화.
 3. `{BT}/controller/ApplicationAttachmentDownloadControllerTest.java` 보강 → 검증 → 카드 갱신 → `node tools/check-docs.mjs`.
 

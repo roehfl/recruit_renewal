@@ -15,6 +15,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,6 +28,7 @@ public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final SecurityContextRepository securityContextRepository;
+    private final SessionRegistry sessionRegistry;
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginUserResponse>> login(@Valid @RequestBody LoginRequest loginRequest, HttpServletRequest request, HttpServletResponse response) {
@@ -44,6 +46,8 @@ public class AuthController {
         request.changeSessionId();
 
         securityContextRepository.saveContext(context, request, response);
+        // 비밀번호 변경 시 이 계정의 다른 세션을 만료할 수 있도록 등록한다(UserSessionRevoker).
+        sessionRegistry.registerNewSession(request.getSession().getId(), authentication.getPrincipal());
 
         LoginUserResponse loginUser = toLoginUserResponse(authentication);
 

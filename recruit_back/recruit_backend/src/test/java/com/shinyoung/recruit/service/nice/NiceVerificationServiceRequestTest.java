@@ -3,10 +3,12 @@ package com.shinyoung.recruit.service.nice;
 import com.shinyoung.recruit.config.NiceProperties;
 import com.shinyoung.recruit.enumeration.NiceVerificationPurpose;
 import com.shinyoung.recruit.enumeration.NiceVerificationStatus;
+import com.shinyoung.recruit.exception.NiceVerificationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -15,6 +17,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class NiceVerificationServiceRequestTest {
 
@@ -96,5 +99,26 @@ class NiceVerificationServiceRequestTest {
         String second = plaindataOf(service.request(NiceVerificationPurpose.SIGNUP, "sess-1")).get("REQ_SEQ");
 
         assertNotEquals(first, second);
+    }
+
+    /* 비로그인 공개 경로라 무한히 부를 수 있다. 보관소가 가득 차면 만료분을 정리해 보고, 그래도 가득이면 거부한다. */
+    @Test
+    void requestIsRejectedWhenStoreIsFullOfLiveRecords() {
+        for (int i = 0; i < NiceVerificationStore.MAX_RECORDS; i++) {
+            store.save(NiceVerificationRecord.pending("live-" + i, NiceVerificationPurpose.SIGNUP, "s", NOW));
+        }
+
+        assertThrows(NiceVerificationException.class, () -> service.request(NiceVerificationPurpose.SIGNUP, "sess-1"));
+    }
+
+    @Test
+    void requestPurgesExpiredRecordsWhenStoreIsFull() {
+        Instant old = NOW.minus(Duration.ofHours(1));
+        for (int i = 0; i < NiceVerificationStore.MAX_RECORDS; i++) {
+            store.save(NiceVerificationRecord.pending("old-" + i, NiceVerificationPurpose.SIGNUP, "s", old));
+        }
+
+        assertNotNull(service.request(NiceVerificationPurpose.SIGNUP, "sess-1"));
+        assertEquals(1, store.size());
     }
 }

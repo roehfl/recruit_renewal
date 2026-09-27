@@ -1,16 +1,29 @@
 server:
   port: 8080
+  servlet:
+    session:
+      cookie:
+        # CSRF 보호를 끈 상태라 교차 사이트 요청에 세션 쿠키가 실리지 않도록 Lax 를 명시한다(브라우저 기본값에 기대지 않는다).
+        # NICE 콜백(cross-site POST)은 원래 세션 없이 동작하도록 설계돼 있어 Lax 와 맞는다.
+        same-site: lax
+        # HTTPS 전용 쿠키. localhost 는 브라우저가 보안 출처로 취급해 http 로컬 개발도 동작한다.
+        # localhost 가 아닌 http 주소로 접속하는 환경에서만 SESSION_COOKIE_SECURE=false 로 끈다.
+        secure: ${SESSION_COOKIE_SECURE:true}
 springdoc:
+  # API 문서(swagger-ui·api-docs)는 관리자 API 전체 목록을 드러내므로 기본 비활성. 로컬에서만 SPRINGDOC_ENABLED=true.
   api-docs:
+    enabled: ${SPRINGDOC_ENABLED:false}
     path: /api-docs
   swagger-ui:
+    enabled: ${SPRINGDOC_ENABLED:false}
     path: /swagger-ui
     operations-sorter: method
     tags-sorter: alpha
 spring:
   h2:
     console:
-      enabled: true
+      # H2 콘솔은 인증 없이 SQL 실행(원격 코드 실행 포함)이 가능하므로 기본 비활성. 로컬에서만 H2_CONSOLE_ENABLED=true.
+      enabled: ${H2_CONSOLE_ENABLED:false}
       path: /h2-console
   application:
     name: recruit
@@ -60,6 +73,20 @@ recruit:
     user-search-base: ${LDAP_USER_SEARCH_BASE:}
     user-search-filter: ${LDAP_USER_SEARCH_FILTER:(sAMAccountName={0})}
     group-search-base: ${LDAP_GROUP_SEARCH_BASE:}
+  cors:
+    # 자격 증명 포함 CORS 허용 출처(쉼표 구분). 기본은 운영 주소만. 로컬·개발 서버는 환경변수로 자기 주소를 준다.
+    # 프록시 뒤에서는 같은 출처 요청도 CORS 판정을 받으므로, 서비스 주소가 목록에 없으면 POST 가 전부 403 이다.
+    allowed-origins: ${RECRUIT_CORS_ALLOWED_ORIGINS:https://rec.shinyoung.com}
+  csrf:
+    # /api 상태 변경 요청에 X-Requested-With 헤더를 요구한다(CsrfHeaderFilter). 로컬 Swagger 로 POST 할 때만 false.
+    header-required: ${RECRUIT_CSRF_HEADER_REQUIRED:true}
+  auth-attempt-limit:
+    # 세션과 무관한 서버 전역 시도 제한. 로그인은 아이디별 실패 횟수, 인증번호는 이메일별 발송·오답 횟수.
+    login-max-failures: ${RECRUIT_LOGIN_MAX_FAILURES:5}
+    login-lock-minutes: ${RECRUIT_LOGIN_LOCK_MINUTES:15}
+    code-max-sends: ${RECRUIT_CODE_MAX_SENDS:5}
+    code-max-failures: ${RECRUIT_CODE_MAX_FAILURES:10}
+    code-window-minutes: ${RECRUIT_CODE_WINDOW_MINUTES:60}
   export:
     max-rows: ${RECRUIT_EXPORT_MAX_ROWS:50000}
   upload:
@@ -142,12 +169,16 @@ recruit:
     sms-callback-number: ${RECRUIT_MESSAGE_SMS_CALLBACK:02-0000-0000}
     site-url: ${RECRUIT_MESSAGE_SITE_URL:https://recruit.example.co.kr}
     max-recipients: ${RECRUIT_MESSAGE_MAX_RECIPIENTS:3000}
-    gateway: ${RECRUIT_MESSAGE_GATEWAY:logging}
+    # 발송 연동 구현(trnode | logging). 기본값을 두지 않는다 — 운영이 빠뜨리면 로그 목업이 조용히 켜져
+    # 인증번호가 로그에 평문으로 남고 메일이 나가지 않으므로 기동을 막는다. 로컬은 RECRUIT_MESSAGE_GATEWAY=logging.
+    gateway: ${RECRUIT_MESSAGE_GATEWAY}
     # 결과 대기 시간(분)이 지나도 완료가 아니면 이력에 지연 표시. 성공 결과코드는 쉼표로 여러 개(솔루션 RES 성공 = 00).
     result-wait-minutes: ${RECRUIT_MESSAGE_RESULT_WAIT_MINUTES:60}
     success-result-codes: ${RECRUIT_MESSAGE_SUCCESS_RESULT_CODES:00}
     # 발송 결과 수신 TCP 포트(gateway=trnode 일 때만 연다). 솔루션이 결과를 보내는 목적지 포트와 같아야 한다.
     report-port: ${RECRUIT_MESSAGE_REPORT_PORT:7779}
+    # 발송 결과 수신을 허용할 발신 IP(쉼표 구분). 비면 모두 허용 — 운영은 UMS 서버 주소만 둔다.
+    report-allowed-ips: ${RECRUIT_MESSAGE_REPORT_ALLOWED_IPS:}
 client-event-log:
   # 지원자 화면 진단 로그(Phase 09f). 감사 로그(activity_log)와 분리된 단기 운영 데이터.
   enabled: ${CLIENT_EVENT_LOG_ENABLED:true}

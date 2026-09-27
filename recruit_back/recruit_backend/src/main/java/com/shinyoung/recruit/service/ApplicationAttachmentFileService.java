@@ -37,7 +37,8 @@ public class ApplicationAttachmentFileService {
             ApplicationSectionType sectionType,
             Long sectionRecordId
     ) {
-        JobApplication application = sectionAccessService.findOwnedApplication(applicantId, applicationId);
+        // 개수·합계 한도를 조회한 뒤 저장하므로, 같은 지원서의 동시 업로드가 한도를 함께 넘지 않도록 행을 잠근다.
+        JobApplication application = sectionAccessService.findOwnedApplicationForUpdate(applicantId, applicationId);
         sectionAccessService.validateWritable(application);
         validateMetadata(attachmentType, sectionType, sectionRecordId);
         AttachmentFilePolicy.ValidatedAttachmentFile validatedFile = filePolicy.validate(file);

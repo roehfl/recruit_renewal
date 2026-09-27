@@ -184,6 +184,14 @@ public class NiceVerificationService {
      */
     private String savePending(NiceVerificationPurpose purpose, String sessionId) {
         Instant now = clock.instant();
+        if (store.size() >= NiceVerificationStore.MAX_RECORDS) {
+            // 정리 스케줄러와 같은 기준으로 먼저 비워 보고, 그래도 가득이면 거부한다.
+            store.purgeExpired(now, Duration.ofMinutes(properties.getVerifiedTtlMinutes()));
+            if (store.size() >= NiceVerificationStore.MAX_RECORDS) {
+                log.warn("본인확인 요청 보관소가 가득 찼습니다({}건).", NiceVerificationStore.MAX_RECORDS);
+                throw new NiceVerificationException(FAILURE_MESSAGE);
+            }
+        }
         for (int attempt = 1; attempt <= MAX_REQUEST_NO_ATTEMPTS; attempt++) {
             String reqSeq = niceClient.generateRequestNo();
             if (store.saveIfAbsent(NiceVerificationRecord.pending(reqSeq, purpose, sessionId, now))) {

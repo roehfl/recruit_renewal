@@ -95,7 +95,8 @@ public class UnivInfoSchoolClient {
                     keyword.length(), e.getStatusCode(), snippet(e.getResponseBodyAsString()));
             throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.", e);
         } catch (RestClientException e) {
-            log.warn("대학 학교정보 검색 호출 실패(keyword 길이={}): {}", keyword.length(), e.getMessage());
+            // 예외 메시지에는 요청 URL(쿼리의 API 키 포함)이 들어가므로 로그에는 예외 종류만 남긴다.
+            log.warn("대학 학교정보 검색 호출 실패(keyword 길이={}): {}", keyword.length(), e.getClass().getSimpleName() + "/" + e.getMostSpecificCause().getClass().getSimpleName());
             throw new SchoolSearchException("학교 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.", e);
         }
 

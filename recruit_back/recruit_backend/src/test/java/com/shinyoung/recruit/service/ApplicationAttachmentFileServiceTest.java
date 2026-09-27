@@ -10,6 +10,7 @@ import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.AttachmentTestFiles;
 import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
@@ -35,7 +36,6 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.reflect.RecordComponent;
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -229,6 +229,26 @@ class ApplicationAttachmentFileServiceTest {
     }
 
     @Test
+    void upload_fails_when_content_does_not_match_extension() {
+        Applicant applicant = createApplicant("upload-signature", "Upload Signature");
+        Long applicationId = createApplication(applicant, createPublishedJobPosting());
+        // 실행 파일(MZ 헤더)을 PDF 이름·Content-Type 으로 올리는 경우
+        MockMultipartFile disguised = new MockMultipartFile(
+                "file", "resume.pdf", "application/pdf", new byte[]{'M', 'Z', (byte) 0x90, 0x00, 0x03});
+
+        assertThatThrownBy(() -> applicationAttachmentFileService.upload(
+                applicant.getId(),
+                applicationId,
+                disguised,
+                AttachmentType.RESUME,
+                ApplicationSectionType.APPLICATION,
+                null
+        )).isInstanceOf(InvalidJobApplicationException.class)
+                .hasMessage("Attachment file content does not match its extension.");
+        assertThat(attachmentRepository.findAll()).noneMatch(attachment -> attachment.getJobApplication().getId().equals(applicationId));
+    }
+
+    @Test
     void upload_fails_when_application_is_not_writable_or_not_owned() {
         Applicant owner = createApplicant("upload-owner", "Upload Owner");
         Applicant other = createApplicant("upload-other", "Upload Other");
@@ -261,7 +281,7 @@ class ApplicationAttachmentFileServiceTest {
                 "file",
                 originalFileName,
                 contentType,
-                content.getBytes(StandardCharsets.UTF_8)
+                AttachmentTestFiles.content(originalFileName, content)
         );
     }
 

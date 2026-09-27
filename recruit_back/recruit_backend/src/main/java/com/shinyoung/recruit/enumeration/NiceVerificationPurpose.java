@@ -8,5 +8,7 @@ package com.shinyoung.recruit.enumeration;
  */
 public enum NiceVerificationPurpose {
     SIGNUP,
-    FIND_EMAIL
+    FIND_EMAIL,
+    /** 로그인한 지원자의 휴대폰 번호 변경. 새 번호로 인증하고, 결과 명의가 계정 가입자와 같아야 한다. */
+    PHONE_CHANGE
 }

@@ -17,6 +17,9 @@ import java.util.Map;
 /**
  * 이메일 인증번호(설계서 6.2): 숫자 6자리 · 유효 5분 · 같은 목적 재발송은 60초 뒤 · 5회 틀리면 무효 ·
  * 확인 후 10분 안에 가입/재설정. 세션은 컨트롤러가 읽고 쓰며 이 서비스는 값만 다룬다(NICE 패턴과 같다).
+ *
+ * <p>위 제한은 세션 안에서만 걸리므로, 세션을 새로 만드는 대입·메일 폭탄은 {@link AuthAttemptLimiter}가
+ * 이메일 기준(발송·오답 횟수)으로 막는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -33,6 +36,7 @@ public class EmailVerificationService {
 
     private final SystemMailService systemMailService;
     private final Clock clock;
+    private final AuthAttemptLimiter attemptLimiter;
 
     /** 세션 속성 키. 목적별로 나눠 가입 인증과 비밀번호 재발급이 서로 덮어쓰지 않게 한다. */
     public static String sessionKey(EmailVerificationPurpose purpose) {
@@ -64,6 +68,7 @@ public class EmailVerificationService {
                 && now.isBefore(previous.getSentAt().plus(RESEND_INTERVAL))) {
             throw new InvalidEmailVerificationException("인증번호는 60초 후에 다시 받을 수 있습니다.");
         }
+        attemptLimiter.acquireCodeSend(email);
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
         EmailVerificationState state = EmailVerificationState.issued(
                 purpose, email.trim(), HashUtil.sha256(code), now.plus(CODE_TTL), now);
@@ -80,8 +85,10 @@ public class EmailVerificationService {
         if (state.getFailedCount() >= MAX_FAILURES) {
             throw new InvalidEmailVerificationException("인증번호를 5회 틀렸습니다. 인증번호를 다시 받아 주세요.");
         }
+        attemptLimiter.checkCodeVerify(email);
         if (code == null || !state.getCodeHash().equals(HashUtil.sha256(code.trim()))) {
             state.recordFailure();
+            attemptLimiter.recordCodeFailure(email);
             throw new InvalidEmailVerificationException("인증번호가 일치하지 않습니다.");
         }
         state.markVerified(now);

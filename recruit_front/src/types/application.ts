@@ -113,9 +113,9 @@ export interface ChangePasswordParams {
   newPassword: string
 }
 
+/** 새 번호는 보내지 않는다 — 서버가 세션의 NICE 본인확인 결과(용도 PHONE_CHANGE)에서 꺼낸다. */
 export interface ChangePhoneNumberParams {
   currentPassword: string
-  phoneNumber: string
 }
 
 export interface ChangePasswordRequest {

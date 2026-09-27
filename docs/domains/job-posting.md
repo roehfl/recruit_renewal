@@ -173,6 +173,7 @@
 - `title` 필수, `summary` ≤500자·HTML 태그 금지, `displayOrder` ≥0, 접수 시작·종료 필수(종료 > 시작), 노출 시작·종료가 둘 다 있으면 시작 ≤ 종료. ({BE}/service/JobPostingService.java — validateRequest)
 - 모집분야 ≥1, `positionName` 필수 ≤100, `jobTitle` ≤100, `sortOrder` 필수 ≥0, 요청 안 sortOrder 중복 금지. ({BE}/service/JobPostingService.java — validateJobPosition, validateJobPositionSortOrders)
 - null 기본값: `postingType`→`PUBLIC_RECRUITMENT`, `visible`→true, `pinned`→false, `displayOrder`→0, `applicationType`→`NEW_GRADUATE_OR_EXPERIENCED`, `employmentType`→`FULL_TIME`. ({BE}/service/JobPostingService.java — default*)
+- 관리자·공개 상세 응답의 `contentHtml`은 `HtmlTextUtils.sanitize`로 정제해 내보낸다(공지와 같은 규칙, 2026-09-27). 화면은 쓰지 않지만 `v-html`로 그리게 되면 저장형 XSS가 되기 때문이다.
 - `contentHtml` null은 `""`로 저장한다. `ddl-auto:update`가 기존 NOT NULL을 풀지 못해서다. ({BE}/domain/entity/JobPosting.java — defaultContentHtml)
 
 **모집분야·근무지**

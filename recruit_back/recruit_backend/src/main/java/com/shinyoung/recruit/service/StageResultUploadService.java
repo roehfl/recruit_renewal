@@ -97,7 +97,8 @@ public class StageResultUploadService {
                 .map(result -> new StageResultUploadTemplateRow(
                         String.valueOf(result.getId()),
                         String.valueOf(result.getJobApplication().getId()),
-                        result.getJobApplication().getApplicantNameSnapshot(),
+                        // 이름은 지원자 입력값이고 업로드 파서가 읽지 않는 열이라 수식 prefix 를 막는다(나머지 열은 왕복 비교 때문에 원문 유지).
+                        ExcelExportWriter.sanitize(result.getJobApplication().getApplicantNameSnapshot()),
                         formatToken(result.getUpdatedAt()),
                         StageResultStatusLabels.label(result.getResultStatus()),
                         result.getScore() == null ? "" : result.getScore().toPlainString(),

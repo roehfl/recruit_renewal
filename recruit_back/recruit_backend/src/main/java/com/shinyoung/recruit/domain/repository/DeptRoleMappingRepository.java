@@ -29,8 +29,11 @@ public interface DeptRoleMappingRepository extends JpaRepository<DeptRoleMapping
      * 등록하는 부서명은 다른 부서 그룹명의 부분문자열이 되지 않도록 충분히 구체적으로 넣어야 한다.
      *
      * <p>빈 {@code dept_name}은 모든 그룹에 매칭되므로 제외한다.
+     *
+     * <p>{@code like}가 아니라 {@code locate}로 판정한다. {@code like}면 {@code dept_name}의 {@code %}·{@code _}가
+     * 와일드카드로 해석돼 {@code "%%"} 한 건으로 모든 그룹(전 임직원)에 역할이 부여된다.
      */
     @Query("select m from DeptRoleMapping m "
-            + "where length(m.deptName) > 0 and :groupName like concat('%', m.deptName, '%')")
+            + "where length(m.deptName) > 0 and locate(m.deptName, :groupName) > 0")
     List<DeptRoleMapping> findByDeptNameContainedIn(@Param("groupName") String groupName);
 }

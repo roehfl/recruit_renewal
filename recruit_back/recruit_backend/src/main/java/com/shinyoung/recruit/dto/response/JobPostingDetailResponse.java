@@ -1,5 +1,6 @@
 package com.shinyoung.recruit.dto.response;
 
+import com.shinyoung.recruit.common.util.HtmlTextUtils;
 import com.shinyoung.recruit.domain.entity.JobPosting;
 import com.shinyoung.recruit.enumeration.JobPostingStatus;
 import com.shinyoung.recruit.enumeration.JobPostingType;
@@ -53,7 +54,8 @@ public record JobPostingDetailResponse(
                 jobPosting.getTitle(),
                 jobPosting.getPostingType(),
                 jobPosting.getSummary(),
-                jobPosting.getContentHtml(),
+                // 화면이 v-html 로 그리면 저장형 XSS 가 되므로 공지와 같은 규칙으로 정제해 내보낸다(현재 v-html 사용처 없음).
+                HtmlTextUtils.sanitize(jobPosting.getContentHtml()),
                 jobPosting.getReceptionStartDateTime(),
                 jobPosting.getReceptionEndDateTime(),
                 receptionStatus,

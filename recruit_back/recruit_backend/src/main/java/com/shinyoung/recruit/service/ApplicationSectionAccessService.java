@@ -25,6 +25,12 @@ public class ApplicationSectionAccessService {
                 .orElseThrow(() -> new JobApplicationNotFoundException("Application was not found."));
     }
 
+    /** {@link #findOwnedApplication}과 같지만 지원서 행을 잠근다(트랜잭션 안에서만). */
+    public JobApplication findOwnedApplicationForUpdate(Long applicantId, Long applicationId) {
+        return jobApplicationRepository.findByIdAndApplicantIdForUpdate(applicationId, applicantId)
+                .orElseThrow(() -> new JobApplicationNotFoundException("Application was not found."));
+    }
+
     public void validateWritable(JobApplication application) {
         if (application.getStatus() == JobApplicationStatus.WITHDRAWN) {
             throw new InvalidJobApplicationException("Withdrawn application detail cannot be modified.");

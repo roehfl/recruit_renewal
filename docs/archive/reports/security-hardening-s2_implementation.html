@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>보안 강화 2차 - 시도 제한·입력 검증·CSRF</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal</div>
+  <h1>보안 강화 2차 - 시도 제한·입력 검증·CSRF</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge muted">작성일: 2026-09-27</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>전 시스템 보안 점검의 2차로, 공격 횟수 제한·첨부 내용 검사·CSRF 방어·기본 인가 정책 전환을 구현했습니다.</p>
+      <p>로그인과 이메일 인증번호는 세션과 무관하게 아이디·이메일 기준으로 셉니다. 병렬 세션으로 인증번호를 대입하던 경로와 사내 AD 계정 대입 경로를 막았습니다.</p>
+      <p>첨부는 확장자별 매직바이트를 확인합니다. <code>/api</code> POST는 <code>X-Requested-With</code> 헤더를 요구합니다. 매처에 없는 경로는 이제 공개가 아니라 인증 필수입니다.</p>
+      <p>보안 설정 규칙이 늘어 auth-account 카드가 상한을 넘게 되어, 새 카드 auth-security로 분리했습니다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">백엔드·프론트 구현 완료</span></p>
+      <p><span class="badge done">영향 범위 테스트 통과</span></p>
+      <p><span class="badge done">실기동 검증 완료</span></p>
+      <p><span class="badge info">auth-security 카드 신설</span></p>
+      <p><span class="badge warn">응답 규약 추가(403·429)</span></p>
+      <p><span class="badge pending">3차 대기</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>로그인 실패 제한(아이디별 15분 5회)</li>
+          <li>인증번호 발송·오답 제한(이메일별 60분에 5회·10회)</li>
+          <li>첨부 매직바이트 검사</li>
+          <li>CSRF 헤더 필터와 프론트 axios 헤더</li>
+          <li>기본 정책 <code>anyRequest().authenticated()</code></li>
+          <li>로그인 화면 429 메시지 표시</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현 (3차)</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>프록시 헤더 신뢰(<code>forward-headers-strategy</code>)와 IP 기준 제한</li>
+          <li>비밀번호 정책·변경 후 다른 세션 만료</li>
+          <li>전화번호 변경 소유 확인</li>
+          <li>엑셀 파싱 메모리, UMS 수신 서버 제한 등 Low 항목</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>RECRUIT_ADMIN 권한 부여 범위(정책 결정 필요)</li>
+          <li>주소·학교·코드 조회의 로그인 필수화(현재 공개 동작 유지)</li>
+          <li>백신·CDR 연동, 레거시 <code>doc</code>/<code>xls</code> 허용 재검토</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>조치 내역</h2>
+    <table>
+      <tr><th>#</th><th>점검 항목</th><th>조치</th><th>심각도</th></tr>
+      <tr><td>1</td><td>로그인 시도 제한 없음. 사내 AD 계정 대입·대량 잠금 가능</td><td><code>RoutingAuthenticationProvider</code>가 인증 전에 <code>AuthAttemptLimiter.checkLogin</code>을 부릅니다. 실패는 기록하고 성공하면 초기화합니다. LDAP 장애는 세지 않습니다</td><td><span class="badge out">High</span></td></tr>
+      <tr><td>2</td><td>인증번호 5회 한도·60초 재발송이 세션 안에만 있어 병렬 세션으로 대입 가능, 메일 폭탄 가능</td><td><code>EmailVerificationService</code>가 이메일 기준 발송(<code>acquireCodeSend</code>)과 오답(<code>checkCodeVerify</code>·<code>recordCodeFailure</code>)을 서버 전역으로 셉니다</td><td><span class="badge out">High</span></td></tr>
+      <tr><td>3</td><td>CSRF 비활성: 본문 없는 POST·multipart POST가 preflight 없이 쿠키와 함께 전송됨</td><td><code>CsrfHeaderFilter</code>(<code>CorsFilter</code> 뒤)가 <code>/api/**</code> 상태 변경 요청에 <code>X-Requested-With</code>를 요구합니다. NICE 콜백은 제외. 프론트 axios 인스턴스 2개가 기본으로 붙입니다</td><td><span class="badge warn">Medium</span></td></tr>
+      <tr><td>4</td><td>첨부 내용 미검증(확장자·클라이언트 MIME만 비교)</td><td><code>AttachmentSignatureValidator</code>: pdf·jpg·png·OLE2(doc·xls·hwp)·ZIP(docx·xlsx·hwpx)·HWP 3.0 시그니처. 모르는 확장자는 거부</td><td><span class="badge warn">Medium</span></td></tr>
+      <tr><td>5</td><td>기본 정책 <code>anyRequest().permitAll()</code>: 새 경로가 자동 공개</td><td><code>anyRequest().authenticated()</code>로 바꾸고 공개 GET·<code>/error</code>·<code>/actuator/health</code>를 명시</td><td><span class="badge warn">Medium</span></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>API 공통 규약 변경</h2>
+    <table>
+      <tr><th>규약</th><th>내용</th><th>영향</th></tr>
+      <tr><td>CSRF 헤더</td><td><code>/api/**</code>의 GET·HEAD·OPTIONS·TRACE 외 요청에 <code>X-Requested-With</code>가 없으면 403</td><td>프론트는 axios 기본 헤더로 대응. 외부 클라이언트·스크립트가 있으면 헤더를 붙여야 합니다</td></tr>
+      <tr><td>429</td><td><code>POST /auth/login</code>, 인증번호 <code>send</code>·<code>verify</code> 4종. 본문 <code>ApiResponse.fail("…N분 후 다시 시도해 주세요.")</code></td><td>로그인 화면은 429일 때만 서버 메시지를 표시. 계정 찾기 화면은 원래 서버 메시지를 표시</td></tr>
+      <tr><td>기본 인증</td><td>인가 표에 없는 경로는 로그인 필수(역할 무관)</td><td>기존 공개 GET(코드·FAQ·공지·메뉴·주소·학교·공고·<code>/auth/me</code>)은 명시해 동작을 유지</td></tr>
+      <tr><td>첨부 업로드 400</td><td><code>Attachment file content does not match its extension.</code></td><td>확장자와 실제 형식이 다른 파일</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>CSRF는 토큰이 아니라 커스텀 헤더 검사</td><td>개발 환경에서 프론트·API 출처가 달라 axios가 XSRF 쿠키 토큰을 자동으로 붙이지 않습니다. 헤더 방식은 CORS 허용 목록과 맞물려 같은 효과를 내고 변경이 작습니다</td></tr>
+      <tr><td>2</td><td>IP 기준 제한은 두지 않음</td><td>프록시 헤더 처리가 없어 모든 요청 IP가 프록시 주소로 보입니다. IP 한도는 곧 전체 한도가 됩니다</td></tr>
+      <tr><td>3</td><td>한도는 설정값으로 두고, 테스트 yaml은 크게</td><td>한 Spring 컨텍스트에서 같은 계정·이메일을 여러 테스트가 쓰므로 공유 카운터에 걸립니다. 한도 동작은 단위 테스트가 검증합니다</td></tr>
+      <tr><td>4</td><td>MockMvc 테스트에서는 CSRF 필터를 끔(<code>recruit.csrf.header-required=false</code>)</td><td>기존 컨트롤러 테스트의 POST가 헤더를 붙이지 않습니다. 필터는 <code>CsrfHeaderFilterTest</code>와 실기동으로 검증했습니다. 로컬 Swagger POST에도 같은 스위치를 씁니다</td></tr>
+      <tr><td>5</td><td>맵 상한 초과 시 fail-closed</td><td>기존 <code>ClientEventRateLimiter</code>와 같은 방식입니다. 상한 100,000이라 채우려면 짧은 시간에 10만 건의 서로 다른 실패가 필요합니다</td></tr>
+      <tr><td>6</td><td>주소·학교·코드 조회는 공개 유지</td><td>이번 단계는 기본 정책만 전환하고 기존 공개 동작은 바꾸지 않았습니다. 모두 로그인 후 화면에서만 쓰여 로그인 필수화는 후속 후보입니다</td></tr>
+      <tr><td>7</td><td>보안 설정을 새 카드 auth-security로 분리</td><td>auth-account가 40KB 상한을 넘게 되어 카드 규칙(하위 도메인 분리)을 따랐습니다. 인가 표·CORS·CSRF·쿠키·시도 제한을 옮겼습니다</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>변경 파일</h2>
+    <h3>신규 파일</h3>
+    <table>
+      <tr><th>파일</th><th>타입</th></tr>
+      <tr><td><code>{BE}/config/CsrfHeaderFilter.java</code>, <code>{BE}/config/CsrfProperties.java</code></td><td>CSRF 헤더 필터·설정</td></tr>
+      <tr><td><code>{BE}/service/AuthAttemptLimiter.java</code>, <code>{BE}/config/AuthAttemptLimitProperties.java</code>, <code>{BE}/exception/AuthAttemptLimitExceededException.java</code></td><td>시도 제한·설정·429 예외</td></tr>
+      <tr><td><code>{BE}/service/AttachmentSignatureValidator.java</code></td><td>첨부 매직바이트 판정</td></tr>
+      <tr><td><code>{BT}/config/CsrfHeaderFilterTest.java</code>, <code>{BT}/service/AuthAttemptLimiterTest.java</code>, <code>{BT}/service/AttachmentSignatureValidatorTest.java</code>, <code>{BT}/support/AttachmentTestFiles.java</code></td><td>테스트·테스트 지원</td></tr>
+      <tr><td><code>docs/domains/auth-security.md</code></td><td>도메인 카드</td></tr>
+    </table>
+    <h3>수정 파일</h3>
+    <table>
+      <tr><th>파일</th><th>변경 내용</th></tr>
+      <tr><td><code>{BE}/config/SecurityConfig.java</code></td><td>CSRF 필터 등록, 공개 GET·오류·헬스체크 명시, <code>anyRequest().authenticated()</code></td></tr>
+      <tr><td><code>{BE}/security/auth/RoutingAuthenticationProvider.java</code>, <code>{BE}/config/AuthenticationConfig.java</code></td><td>로그인 시도 제한 호출</td></tr>
+      <tr><td><code>{BE}/service/EmailVerificationService.java</code></td><td>이메일 기준 발송·오답 제한 호출</td></tr>
+      <tr><td><code>{BE}/service/AttachmentFilePolicy.java</code></td><td><code>validateSignature</code></td></tr>
+      <tr><td><code>{BE}/exception/GlobalExceptionHandler.java</code></td><td><code>AuthAttemptLimitExceededException</code> → 429</td></tr>
+      <tr><td><code>{BR}/application.yaml</code>, 테스트 <code>application.yaml</code></td><td><code>recruit.csrf.*</code>, <code>recruit.auth-attempt-limit.*</code>(테스트는 필터 끔·한도 크게)</td></tr>
+      <tr><td><code>{FE}/api/client.ts</code>, <code>{FE}/api/telemetryClient.ts</code>, <code>{FE}/views/auth/LoginView.vue</code></td><td>CSRF 헤더, 429 메시지</td></tr>
+      <tr><td>첨부 업로드 테스트 6개, <code>SecurityConfigTest</code>, <code>RoutingAuthenticationProviderTest</code>, <code>EmailVerificationServiceTest</code></td><td>시그니처 포함 내용으로 교체, 새 규칙 테스트 추가</td></tr>
+      <tr><td>카드 auth-account·attachment·board·role-menu·master-data·client-event-log·privacy-audit·auth-nice-verification, <code>_index.md</code>, 백엔드·프론트 <code>AGENTS.md</code></td><td>보안 설정 소유 이전, 공개 표기(anyRequest → GET 매처), 시그니처·시도 제한 규칙</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>테스트 결과</h2>
+    <div class="two">
+      <div class="card">
+        <h3>자동 테스트</h3>
+        <p>백엔드 영향 범위: <code>config.*</code>, <code>security.*</code>, <code>controller.*</code> 전체, <code>*Attachment*</code>, <code>*EmailVerification*</code>, <code>*ApplicantSignUp*</code>, <code>*AccountRecovery*</code>, <code>*ApplicantAccount*</code></p>
+        <p>결과: 769건 중 1건 실패. 테스트 경로 목록을 수정한 뒤(<code>/auth/me</code>는 컨트롤러가 직접 401) 재실행해 <span class="badge done">통과</span></p>
+        <p>신규·변경 8개 클래스 재실행: <span class="badge done">94건 통과</span></p>
+        <p>프론트: <code>npm run type-check</code>, <code>npx vitest run src/api</code> <span class="badge done">통과</span></p>
+        <p>문서: <code>node tools/check-docs.mjs</code> <span class="badge done">오류 0건</span></p>
+      </div>
+      <div class="card">
+        <h3>실기동 검증 (운영 설정 파일 사용)</h3>
+        <table>
+          <tr><th>확인 항목</th><th>결과</th></tr>
+          <tr><td>헤더 없는 <code>POST /api/auth/login</code></td><td><span class="badge done">403</span></td></tr>
+          <tr><td>헤더 없는 NICE 콜백 POST</td><td><span class="badge done">303(예외 경로 통과)</span></td></tr>
+          <tr><td>비로그인 <code>/api/not-mapped</code>, <code>/api/applications</code></td><td><span class="badge done">401</span></td></tr>
+          <tr><td>비로그인 FAQ·공지·메뉴·공고·헬스체크</td><td><span class="badge done">200</span></td></tr>
+          <tr><td>인증번호 발송, 요청마다 새 세션으로 6회</td><td><span class="badge done">5회 200, 6회째 429</span></td></tr>
+        </table>
+        <p class="small">로그인 잠금은 로컬에 LDAP·지원자 계정이 없어 단위 테스트로만 검증했습니다. 로컬에서 DB에 없는 아이디로 로그인하면 LDAP URL 미설정 때문에 500이 나는데, 이번 변경과 무관한 기존 동작입니다.</p>
+      </div>
+    </div>
+    <p class="small">전체 회귀 테스트는 실행하지 않았습니다(요청 시에만 실행하는 규칙).</p>
+  </section>
+
+  <section>
+    <h2>다음 단계 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>보안 강화 3차 - Low 항목 정리</strong></p>
+      <p>프록시 헤더 신뢰와 IP 기준 제한, 비밀번호 정책(72바이트 상한 포함), 비밀번호 변경 시 다른 세션 만료, 전화번호 변경 소유 확인, 엑셀 파싱 메모리 제한, UMS 결과 수신 서버 제한 등을 다룹니다.</p>
+      <p class="small">정책 결정 필요: RECRUIT_ADMIN의 ADMIN·PRIVACY_ADMIN 부여 권한, 주소·학교·코드 조회의 로그인 필수화.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

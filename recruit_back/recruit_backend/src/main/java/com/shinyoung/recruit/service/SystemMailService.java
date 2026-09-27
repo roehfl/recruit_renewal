@@ -95,7 +95,7 @@ public class SystemMailService {
         values.putIfAbsent(MessageVariable.SITE_URL.getKey(), messageProperties.getSiteUrl());
         DeliveryItem item = new DeliveryItem(recipient.getId(), MessageChannel.MAIL, name,
                 MessageContacts.normalizeEmail(email),
-                messageRenderer.render(template.getMailSubject(), values),
+                messageRenderer.renderSubject(template.getMailSubject(), values),
                 messageRenderer.render(template.getMailBody(), values),
                 null);
         return new Prepared(send.getId(), item);

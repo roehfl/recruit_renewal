@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -55,7 +56,7 @@ class CommonCodeControllerTest {
     }
 
     @Test
-    void public_read_returns_active_codes_sorted_excluding_inactive() throws Exception {
+    void applicant_read_returns_active_codes_sorted_excluding_inactive() throws Exception {
         String group = "WORK_LOCATION_" + uuid();
         commonCodeRepository.saveAll(List.of(
                 CommonCode.create(group, "SEOUL", "Seoul", 2, true, null),
@@ -63,7 +64,7 @@ class CommonCodeControllerTest {
                 CommonCode.create(group, "OLD", "Retired", 3, false, null)));
 
         mockMvc.perform(get("/api/codes").param("groupCode", group)
-                        .with(anonymous()))
+                        .with(user("applicant").authorities(() -> "ROLE_APPLICANT")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].code").value("BUSAN")) // sortOrder 1 먼저
@@ -114,8 +115,8 @@ class CommonCodeControllerTest {
                 .andExpect(jsonPath("$.data.sortOrder").value(5))
                 .andExpect(jsonPath("$.data.active").value(false));
 
-        // public read 에서는 비활성이라 제외
-        mockMvc.perform(get("/api/codes").param("groupCode", group).with(anonymous()))
+        // 지원자 조회에서는 비활성이라 제외
+        mockMvc.perform(get("/api/codes").param("groupCode", group).with(user("applicant").authorities(() -> "ROLE_APPLICANT")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(0));
 

@@ -7,8 +7,8 @@
 
 - 서버 **세션** 인증(Spring Security + `HttpSession`, `JSESSIONID` 쿠키). 토큰·JWT 없음.
 - 로그인 API는 `POST /auth/login` 하나다. `RoutingAuthenticationProvider`가 사용자 유형에 따라 경로를 나눈다. 지원자는 DB 로컬 계정(BCrypt)으로, 임직원은 AD(LDAP) bind로 인증한다. 처음 로그인한 임직원은 `Employee` 행이 자동 생성된다(JIT).
-- 지원자 계정 기능: 가입, 이메일 가용성 확인, 아이디(이메일) 찾기, 비밀번호 재발급, 비밀번호 변경, 전화번호 변경. 아이디 찾기는 NICE 본인확인(용도 `FIND_EMAIL`) 뒤 `find-email`이 부분 마스킹한 아이디를 준다(2026-09-22). 가입 이메일 인증·비밀번호 재발급은 가입 이메일로 보낸 6자리 인증번호로 한다(2026-09-23). 가입은 세션의 NICE 본인확인 결과와 이메일 인증에 의존한다(요청 본문에 name·phoneNumber·ci가 없는 이유) — 연동 상세는 [auth-nice-verification](auth-nice-verification.md).
-- URL 인가(`SecurityConfig`), 401/403 규약, 역할 상수(`RoleNames`), 현재 사용자 식별(`CurrentApplicantService`·`CurrentEmployeeService`)도 이 카드가 소유한다. 다른 카드가 공용으로 쓴다.
+- 지원자 계정 기능: 가입, 이메일 가용성 확인, 아이디(이메일) 찾기, 비밀번호 재발급, 비밀번호 변경, 전화번호 변경(NICE 재인증, 용도 `PHONE_CHANGE`). 아이디 찾기는 NICE 본인확인(용도 `FIND_EMAIL`) 뒤 `find-email`이 부분 마스킹한 아이디를 준다(2026-09-22). 가입 이메일 인증·비밀번호 재발급은 가입 이메일로 보낸 6자리 인증번호로 한다(2026-09-23). 가입은 세션의 NICE 본인확인 결과와 이메일 인증에 의존한다(요청 본문에 name·phoneNumber·ci가 없는 이유) — 연동 상세는 [auth-nice-verification](auth-nice-verification.md).
+- 401/403 규약, 역할 상수(`RoleNames`), 현재 사용자 식별(`CurrentApplicantService`·`CurrentEmployeeService`)도 이 카드가 소유한다. 다른 카드가 공용으로 쓴다. URL 인가·CORS·CSRF·시도 제한은 [auth-security](auth-security.md).
 
 ## 용어
 
@@ -39,13 +39,12 @@
 | service | `{BE}/service/EmailVerificationService.java` `{BE}/service/EmailVerificationState.java` `{BE}/enumeration/EmailVerificationPurpose.java` | 인증번호 발급·확인·확인 후 10분 검사, 세션 값(번호는 해시), 목적 → 메일 종류 |
 | service | `{BE}/service/CurrentApplicantService.java` | principal → applicantId (401/403), 지원자 API 공용 |
 | service | `{BE}/service/CurrentEmployeeService.java` | principal → 임직원 actor/employeeId (401/403), 관리자·면접관 API 공용 |
-| config | `{BE}/config/SecurityConfig.java` | 필터 체인, URL 매처, CORS, 컨텍스트 저장소 |
 | config | `{BE}/config/AuthenticationConfig.java` | `AuthenticationManager`, LDAP/DAO provider, BCrypt |
 | config | `{BE}/config/LdapProperties.java` | `recruit.ldap.*`, `isConfigured()` |
-| config | `{BE}/security/auth/RoutingAuthenticationProvider.java` | 지원자 DAO / 임직원 LDAP 분기, JIT |
+| config | `{BE}/security/auth/RoutingAuthenticationProvider.java` | 지원자 DAO / 임직원 LDAP 분기, JIT, 로그인 시도 제한 호출 |
 | config | `{BE}/security/auth/CustomUserDetailsService.java` | 지원자 전용 조회, `ROLE_APPLICANT` 부여 |
 | config | `{BE}/security/auth/CustomLdapUserDetailsMapper.java` | AD 그룹 → 부서 role ∪ 개인 role, 부서명 결정 |
-| config | `{BE}/security/auth/CustomUserDetails.java` | 세션 principal (`fromUser`/`fromLdap`) |
+| config | `{BE}/security/auth/CustomUserDetails.java` | 세션 principal (`fromUser`/`fromLdap`), 인증 후 비밀번호 해시 삭제(`eraseCredentials`), loginId 기준 `equals` |
 | config | `{BE}/security/auth/RoleNames.java` | 역할 상수, `ASSIGNABLE_ROLES` |
 | config | `{BE}/security/auth/CustomAuthenticationEntryPoint.java` | 필터 401 JSON |
 | config | `{BE}/security/auth/CustomAccessDeniedHandler.java` | 필터 403 JSON |
@@ -61,7 +60,8 @@
 | dto | `{BE}/dto/response/ApplicantSignUpResponse.java` | 가입 응답 |
 | dto | `{BE}/dto/response/ApplicantEmailAvailabilityResponse.java` | `available` |
 | dto | `{BE}/dto/request/ApplicantPasswordChangeRequest.java` | 비밀번호 변경 요청 |
-| dto | `{BE}/dto/request/ApplicantPhoneNumberChangeRequest.java` | 전화번호 변경 요청 |
+| dto | `{BE}/dto/request/ApplicantPhoneNumberChangeRequest.java` | 전화번호 변경 요청(`currentPassword`만) |
+| common | `{BE}/common/util/PasswordPolicy.java` | 새 비밀번호 조합 규칙 |
 | dto | `{BE}/dto/response/ApplicantFindEmailResponse.java` | `{ maskedEmail }` |
 | dto | `{BE}/dto/request/EmailVerificationSendRequest.java` `{BE}/dto/request/EmailVerificationConfirmRequest.java` `{BE}/dto/request/ApplicantPasswordResetRequest.java` | 인증번호 발송·확인, 재설정 |
 | exception | `{BE}/exception/InvalidApplicantSignUpException.java` | 400 |
@@ -81,7 +81,6 @@
 | test | `{BT}/security/auth/RoutingAuthenticationProviderTest.java` | JIT·경합 복구·임직원 부서명(LDAP 최신값) |
 | test | `{BT}/security/auth/CustomLdapUserDetailsMapperTest.java` | 매핑 합집합 |
 | test | `{BT}/security/auth/CustomUserDetailsTest.java` | username·userType |
-| test | `{BT}/config/SecurityConfigTest.java` | 매처 401/403/통과 |
 | test | `{BT}/config/AuthenticationConfigTest.java` | 컨텍스트 로드만 시도(단정 전부 주석, 비활성 단정) |
 | test | `{BT}/config/LdapPropertiesTest.java` | `isConfigured()` |
 | test | `{BT}/domain/repository/UserRepositoryTest.java` | loginId unique |
@@ -123,7 +122,9 @@ NICE 본인확인 컨트롤러·화면(`NiceVerificationController.java`, `NiceA
 | 🟢 | POST | /auth/applicants/password-reset/verify | `{ email, code }` | `null` | 공개 |
 | 🟢 | POST | /auth/applicants/password-reset | `{ email, newPassword }` | `null` | 공개 |
 | 🟢 | POST | /applicant/account/password | `{ currentPassword, newPassword }` | `Void` | 지원자 |
-| 🟢 | POST | /applicant/account/phone-number | `{ currentPassword, phoneNumber }` | `Void` | 지원자 |
+| 🟢 | POST | /applicant/account/phone-number | `{ currentPassword }`(phoneNumber 없음 — 세션의 NICE 결과, 용도 `PHONE_CHANGE`) | `Void` | 지원자 |
+
+로그인·인증번호 `send`·`verify`는 시도 제한을 넘으면 429, 모든 POST는 `X-Requested-With` 헤더가 필요하다 — [auth-security](auth-security.md) 공통 규약.
 
 NICE 본인확인 엔드포인트 4개(`/auth/nice/request`·`/auth/nice/callback`·`/auth/nice/callback/error`·`/auth/nice/result`)는 [auth-nice-verification](auth-nice-verification.md) 소유.
 
@@ -140,7 +141,7 @@ NICE 본인확인 엔드포인트 4개(`/auth/nice/request`·`/auth/nice/callbac
 
 **POST /auth/logout**: SecurityContext를 비우고, 세션이 있으면 `invalidate()`한다. 호출 위치: `ApplicantProfile`, `{FE}/layouts/ApplicantHeader.vue`, `{FE}/layouts/AdminSidebar.vue`.
 
-**GET /auth/me** 🟢: 미인증이면 컨트롤러가 직접 401 `"로그인이 필요합니다."`를 반환한다(`anyRequest().permitAll()`로 통과). 응답은 login과 같다. `roles`에는 authority 문자열이 담긴다. FE는 `skipAuthRedirect`·`skipClientEventLog`를 붙여 호출한다.
+**GET /auth/me** 🟢: 미인증이면 컨트롤러가 직접 401 `"로그인이 필요합니다."`를 반환한다(공개 GET 매처로 통과). 응답은 login과 같다. `roles`에는 authority 문자열이 담긴다. FE는 `skipAuthRedirect`·`skipClientEventLog`를 붙여 호출한다.
 
 NICE 4종(`request`·`callback`·`callback/error`·`result`) 상세는 [auth-nice-verification](auth-nice-verification.md) 참고.
 
@@ -157,16 +158,17 @@ NICE 4종(`request`·`callback`·`callback/error`·`result`) 상세는 [auth-nic
 **인증번호 5종**(2026-09-23): 세션 키는 목적별, 값 `EmailVerificationState`(번호는 SHA-256 해시만). 숫자 6자리·유효 5분·재발송은 60초 뒤·5회 틀리면 무효·확인 후 10분 안에 가입/재설정. 메일은 `SystemMailService`가 동기 발송([message-delivery](message-delivery.md)), 접수되지 않으면 세션에 저장하지 않는다.
 - send 400: 가입 인증에서 가입된 이메일 `이미 사용 중인 이메일입니다.` · `인증번호는 60초 후에 다시 받을 수 있습니다.` · `인증 메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.` · `인증 메일 템플릿이 없습니다. 관리자에게 문의하세요.` / 재발급에서 미가입 404 `가입된 이메일이 아닙니다.`(계정 열거 감수).
 - verify 400: `인증번호를 다시 받아 주세요.`(상태 없음·이메일 다름·만료) · `인증번호를 5회 틀렸습니다. 인증번호를 다시 받아 주세요.` · `인증번호가 일치하지 않습니다.`(실패 수 +1).
-- `password-reset`: `requireVerified(PASSWORD_RESET, email)` 실패 400 → BCrypt 저장 → 세션 상태 제거. 다른 로그인 세션은 그대로.
+- send·verify 429: 세션과 무관하게 이메일당 60분에 발송 5회·오답 10회([auth-security](auth-security.md) 시도 제한).
+- `password-reset`: `requireVerified(PASSWORD_RESET, email)` 실패 400 → BCrypt 저장 → 세션 상태 제거 → 이 계정의 로그인 세션을 모두 만료(`UserSessionRevoker`, 2026-09-27).
 
 **POST /applicant/account/password**: 400 `"현재 비밀번호가 일치하지 않습니다."` / `"새 비밀번호가 현재 비밀번호와 달라야 합니다."` / `"지원자 정보를 찾을 수 없습니다."`, 미인증 401, 임직원 403(필터). 변경 후에도 현재 세션과 다른 세션을 무효화하지 않는다. FE(`ApplicantProfile` "내 정보 수정" 모달)는 새 비밀번호 확인 일치와 현재 비밀번호 입력 여부만 검사한다.
 
-**POST /applicant/account/phone-number**: currentPassword를 재확인한 뒤 trim해서 저장한다. 전화번호 unique는 없다. 서버는 길이(30자)만 검사하고 형식은 보지 않는다. FE(`ApplicantProfile` "내 정보 수정" → 휴대폰 번호 변경, `applicationApi.changePhoneNumber`)가 숫자만 남겨 `^01[016789]\d{7,8}$`를 확인한 뒤 숫자만 보낸다. NICE 재인증은 요구하지 않는다(사용자 결정 2026-09-27).
+**POST /applicant/account/phone-number** 🟢(2026-09-27 NICE 재인증으로 변경): 세션 `NICE_VERIFIED`를 `requireFresh(purpose=PHONE_CHANGE)`로 검사하고, currentPassword를 재확인한 뒤 인증 명의(이름+생년월일+성별의 `identityHash`)가 계정 `ciHash`와 같아야 NICE 결과의 번호(trim)로 바꾼다. 성공하면 인증 결과를 세션에서 지운다(1회용). 요청 본문에 번호를 넣어도 무시한다. 오류 400: 인증 없음·용도 불일치·만료(`requireFresh` 문구), 현재 비밀번호 불일치, `본인인증 명의가 가입자 정보와 일치하지 않습니다.` 전화번호 unique는 없다. FE(`ApplicantProfile` "내 정보 수정" → 휴대폰 번호 변경)는 `/nice-auth?purpose=PHONE_CHANGE` 팝업으로 인증하고 postMessage로 받은 번호를 표시만 한 뒤 `{ currentPassword }`를 보낸다. ({BE}/service/ApplicantAccountService.java — changePhoneNumber)
 
 ## 규칙·불변식
 
 ### 세션
-- 인증 상태는 서버 세션에만 둔다. 백엔드는 redirect하지 않고, 로그인 화면으로 보내는 일은 FE가 한다. CSRF·httpBasic·frameOptions(H2 콘솔 때문)는 끈다. 세션 정책은 `IF_REQUIRED`이고 타임아웃 설정은 없다(서블릿 기본값). (`{BE}/config/SecurityConfig.java` — filterChain)
+- 인증 상태는 서버 세션에만 둔다. 백엔드는 redirect하지 않고, 로그인 화면으로 보내는 일은 FE가 한다. CSRF·httpBasic은 끈다. `X-Frame-Options`는 `SAMEORIGIN`. 세션 쿠키는 `SameSite=Lax`·`Secure`(`SESSION_COOKIE_SECURE`, 기본 `true`)·`HttpOnly`(`{BR}/application.yaml` — `server.servlet.session.cookie.*`). 세션 정책은 `IF_REQUIRED`이고 타임아웃 설정은 없다(서블릿 기본값). (`{BE}/config/SecurityConfig.java` — filterChain)
 - formLogin을 쓰지 않으므로 세션 고정 방어는 `request.changeSessionId()` 한 줄뿐이다. **제거 금지.** (`{BE}/controller/AuthController.java` — login)
 - 역할은 로그인 시점에 계산해 세션에 저장한다. 역할 매핑을 바꾸면 **다시 로그인해야** 반영된다. (`{BE}/security/auth/RoutingAuthenticationProvider.java` — buildEmployeeAuthentication)
 
@@ -179,6 +181,7 @@ NICE 4종(`request`·`callback`·`callback/error`·`result`) 상세는 [auth-nic
 | 없음 | LDAP bind → 성공 시 `Employee` JIT 저장(`processLdapAndJit`) | LDAP 매퍼 |
 
 - DB에 없는 loginId는 모두 LDAP 경로로 간다. 지원자가 아이디를 오타 내도 LDAP bind를 시도한다.
+- 분기 전에 아이디별 실패 한도(15분 5회)를 보고, 넘었으면 인증 없이 429다([auth-security](auth-security.md) 시도 제한).
 - `CustomUserDetailsService`는 `Applicant`가 아니면 `UsernameNotFoundException`을 던진다. DAO 경로로는 임직원을 인증할 수 없다.
 - JIT 저장이 경합으로 `DataIntegrityViolationException`을 내면 다시 조회한다. `Employee`가 있으면 **LDAP 재인증 없이** 토큰을 만든다. 없으면 예외를 전파하고 409가 된다. (`RoutingAuthenticationProvider` — processLdapAndJit)
 - 기존 `Employee`의 name·deptName은 다시 로그인해도 갱신하지 않는다(JIT 시점 값 유지). 단 세션 principal의 부서명은 로그인마다 LDAP 최신값이다.
@@ -192,28 +195,10 @@ NICE 4종(`request`·`callback`·`callback/error`·`result`) 상세는 [auth-nic
 - **미설정이면**: 기동은 성공하고 경고 로그 1줄만 남는다(비밀값 미출력). 지원자 로그인은 정상. 임직원이나 DB에 없는 loginId는 LDAP 접속 실패로 401이 된다. 로컬 관리자 화면 우회 수단(목 사용자, dev 프로필)은 없다. 코드 추론이며 활성 테스트 없음. (`AuthenticationConfig` — ldapAuthenticationProvider)
 - LDAP 값을 `@NotBlank`로 강제하지 않는다. 강제하면 LDAP 없는 환경에서 기동이 실패한다.
 
-### 역할·URL 인가 (`SecurityConfig.filterChain`)
+### 역할
 - 역할: `ROLE_ADMIN`(IT), `ROLE_RECRUIT_ADMIN`(채용 운영), `ROLE_PRIVACY_ADMIN`(정보보호), `ROLE_INTERVIEWER`, `ROLE_EMPLOYEE`, `ROLE_APPLICANT`. 매핑 화면에서 부여할 수 있는 역할은 APPLICANT를 뺀 5개다. (`{BE}/security/auth/RoleNames.java`)
 - 매처에는 `hasAuthority`/`hasAnyAuthority`와 `RoleNames` 상수를 쓴다. **`hasRole` 금지**(`ROLE_ROLE_` 이중 접두가 된다).
-- 매처 경로는 `/api`를 포함해 쓴다(`{BE}/config/WebMvcConfig.java`가 접두를 붙인다). 먼저 맞는 매처가 적용되므로 **좁은 매처를 넓은 매처보다 먼저** 둔다.
-- 마지막이 `anyRequest().permitAll()`이다. 아래 보호 경로에 해당하지 않으면 **무인증으로 공개**된다.
-
-| 경로(`/api` 포함, 선언 순서) | 권한 |
-|---|---|
-| `/api/auth/login`, `/api/auth/logout`, `/api/auth/applicants/`(`sign-up`·`check-email`·`find-email`·`email-verification/*`·`password-reset[/*]`) | 공개 |
-| `/swagger-ui/**`, `/api-docs/**`, `/v3/api-docs/**`, `/h2-console/**`, `/api/menu/tree` | 공개 |
-| POST `/api/menu/admin/menu`, `/api/menu/admin/menu/*`, POST `/api/board/**` | ADMIN, RECRUIT_ADMIN |
-| GET `/api/job-postings/{jobPostingId}/application` | APPLICANT |
-| GET `/api/job-postings/**`, POST `/api/client-events` | 공개 |
-| GET `/api/admin/audit/**` | RECRUIT_ADMIN, PRIVACY_ADMIN |
-| `/api/admin/retention/**` | 쓰기(execute·reconcile·policies·holds·anchor)와 holds 조회 → PRIVACY_ADMIN / dry-run·그 외 GET → RECRUIT_ADMIN, PRIVACY_ADMIN |
-| `/api/admin/client-events/**` | POST cleanup → PRIVACY_ADMIN / GET → RECRUIT_ADMIN, PRIVACY_ADMIN |
-| `/api/admin/**` | ADMIN, RECRUIT_ADMIN |
-| `/api/applicant/**`, `/api/applications/**` | APPLICANT |
-| `/api/interviewer/**` | EMPLOYEE, ADMIN, RECRUIT_ADMIN, INTERVIEWER |
-| 그 외 | 공개 |
-
-- CORS: 허용 origin은 `http://localhost:5173`과 운영 도메인 1개. 메서드는 **GET·POST만** 허용하고, credentials 허용, 노출 헤더는 `X-Request-Id`·`Content-Disposition`. 그래서 수정·삭제 API도 POST로 만든다. (`SecurityConfig` — corsConfigurationSource)
+- URL 인가 표·CORS·CSRF·세션 쿠키·시도 제한은 [auth-security](auth-security.md) 소유다(2026-09-27 분리). 기본 정책은 인증 필수다.
 
 ### 401/403
 
@@ -236,6 +221,8 @@ NICE 4종(`request`·`callback`·`callback/error`·`result`) 상세는 [auth-nic
 - ciHash·password는 응답·로그·export에 넣지 않는다. (`{BT}/service/ApplicantSignUpServiceTest.java` — 응답에_민감정보가_없다)
 - **(2026-09-21 해소)** ci는 더 이상 클라이언트가 보낸 값을 쓰지 않는다. 서버가 세션에 둔 NICE 인증 결과만 쓴다(`ApplicantSignUpRequest` javadoc). 상세는 [auth-nice-verification](auth-nice-verification.md) 참고.
 - 파기: `Applicant.purgePersonalData`가 PII를 null로 만들고 ciHash를 `PURGED:`+UUID로 덮어쓴다. 이후 그 계정은 로그인할 수 없고 같은 사람(이름+생년월일+성별)이 재가입할 수 있다. 호출은 [privacy-audit](privacy-audit.md). (`{BE}/domain/entity/Applicant.java`)
+- 새 비밀번호(가입·재설정·변경)는 8~100자이면서 UTF-8 72바이트 이하다(BCrypt 상한, 넘으면 400 `비밀번호는 72바이트 이하여야 합니다(한글은 약 24자).` — 요청 DTO의 `@AssertTrue`). 조합 규칙(2026-09-27, KISA 권고): 영문 대문자·소문자·숫자·특수문자 중 2종류 이상이면 10자 이상, 3종류 이상이면 8자 이상. 공백은 종류로 세지 않고 한글은 특수문자로 센다. 위반 400 `PasswordPolicy.MESSAGE`. 서버 `{BE}/common/util/PasswordPolicy.java`와 FE `{FE}/common/passwordPolicy.ts`가 같은 규칙이다(현재 비밀번호·로그인은 검사하지 않는다 — 기존 계정은 그대로 로그인된다).
+- 비밀번호를 바꾸면 이 계정의 다른 로그인 세션을 만료한다(지금 세션은 유지). 만료된 세션의 다음 요청은 401이다([auth-security](auth-security.md)).
 - 비밀번호·전화번호 변경에는 `currentPassword` 재확인이 필수다(세션 탈취만으로 통지 채널을 바꾸지 못하게). 변경은 setter 대신 `Applicant.changePassword`/`changePhoneNumber`로 한다. (`{BE}/service/ApplicantAccountService.java` — verifyCurrentPassword)
 - 이메일 변경 API는 없다(불허). **loginId 정책은 확정됐고**(아래 "함정·결정" — 이메일 = loginId), 아이디 찾기(2026-09-22)와 로그인 전 비밀번호 재설정(2026-09-23)은 구현됐다.
   - **비밀번호 재설정**: 가입 이메일로 인증번호 → 화면에서 확인 → 그 자리에서 새 비밀번호 설정(2026-09-23, 임시 비밀번호·토큰 링크 방식을 대체).
@@ -252,12 +239,10 @@ NICE 4종(`request`·`callback`·`callback/error`·`result`) 상세는 [auth-nic
 ## 변경 레시피
 
 ### 인증이 필요한 새 API 경로 추가
-1. 가능하면 보호 접두(`/admin/**`, `/applicant/**`, `/applications/**`, `/interviewer/**`) 아래에 둔다. 그러면 매처를 추가할 필요가 없다.
-2. 불가능하면 `{BE}/config/SecurityConfig.java`에 `/api`를 포함한 매처를 넓은 매처보다 위에 추가한다(`RoleNames` + `hasAuthority`, 필요하면 HTTP 메서드도 지정).
-3. 컨트롤러는 `CurrentApplicantService`/`CurrentEmployeeService`로 사용자를 식별한다.
-4. `{BT}/config/SecurityConfigTest.java`에 비인증 401, 다른 권한 403, 허용 권한 통과(`not(401), not(403)`) 테스트를 추가한다.
-5. FE 라우트면 `meta.requiresAuth`와 `meta.roles`를 지정한다.
-6. 도메인 카드의 권한 열과 이 카드의 URL 표를 갱신하고 `node tools/check-docs.mjs`를 실행한다.
+1. 권한 매처는 [auth-security](auth-security.md) 변경 레시피를 따른다.
+2. 컨트롤러는 `CurrentApplicantService`/`CurrentEmployeeService`로 사용자를 식별한다.
+3. FE 라우트면 `meta.requiresAuth`와 `meta.roles`를 지정한다.
+4. 도메인 카드의 권한 열을 갱신하고 `node tools/check-docs.mjs`를 실행한다.
 
 ### 새 역할 추가
 1. `{BE}/security/auth/RoleNames.java`에 상수를 추가한다. 매핑 화면에서 부여할 역할이면 `ASSIGNABLE_ROLES`에도 넣는다([role-menu](role-menu.md)의 `/admin/role-mappings/roles`가 자동으로 반영).
@@ -284,9 +269,9 @@ NICE 4종(`request`·`callback`·`callback/error`·`result`) 상세는 [auth-nic
 
 ```bash
 # Windows PowerShell
-$env:AES_SECRET_KEY='<로컬 예시 키>'; .\gradlew.bat test --tests "*ApplicantSignUp*" --tests "*ApplicantAccount*" --tests "*EmailVerification*" --tests "*ApplicantPasswordReset*" --tests "*.service.Current*ServiceTest" --tests "com.shinyoung.recruit.security.auth.*" --tests "*.config.SecurityConfigTest" --tests "*.config.AuthenticationConfigTest" --tests "*.config.LdapPropertiesTest" --tests "*.UserRepositoryTest" --tests "*.ApplicantRepositoryTest" --tests "*.EmployeeRepositoryTest" --no-daemon
+$env:AES_SECRET_KEY='<로컬 예시 키>'; .\gradlew.bat test --tests "*ApplicantSignUp*" --tests "*ApplicantAccount*" --tests "*EmailVerification*" --tests "*ApplicantPasswordReset*" --tests "*.service.Current*ServiceTest" --tests "com.shinyoung.recruit.security.auth.*" --tests "*.config.AuthenticationConfigTest" --tests "*.config.LdapPropertiesTest" --tests "*.UserRepositoryTest" --tests "*.ApplicantRepositoryTest" --tests "*.EmployeeRepositoryTest" --no-daemon
 # Linux
-AES_SECRET_KEY='<로컬 예시 키>' ./gradlew test --tests "*ApplicantSignUp*" --tests "*ApplicantAccount*" --tests "*EmailVerification*" --tests "*ApplicantPasswordReset*" --tests "*.service.Current*ServiceTest" --tests "com.shinyoung.recruit.security.auth.*" --tests "*.config.SecurityConfigTest" --tests "*.config.AuthenticationConfigTest" --tests "*.config.LdapPropertiesTest" --tests "*.UserRepositoryTest" --tests "*.ApplicantRepositoryTest" --tests "*.EmployeeRepositoryTest" --no-daemon
+AES_SECRET_KEY='<로컬 예시 키>' ./gradlew test --tests "*ApplicantSignUp*" --tests "*ApplicantAccount*" --tests "*EmailVerification*" --tests "*ApplicantPasswordReset*" --tests "*.service.Current*ServiceTest" --tests "com.shinyoung.recruit.security.auth.*" --tests "*.config.AuthenticationConfigTest" --tests "*.config.LdapPropertiesTest" --tests "*.UserRepositoryTest" --tests "*.ApplicantRepositoryTest" --tests "*.EmployeeRepositoryTest" --no-daemon
 ```
 
 - 매처나 `Current*Service`(사용처: 지원자 컨트롤러 14개, 관리자·면접관 11개)를 바꾸면 영향받는 카드의 컨트롤러 테스트도 돌린다.
@@ -296,8 +281,6 @@ AES_SECRET_KEY='<로컬 예시 키>' ./gradlew test --tests "*ApplicantSignUp*" 
 ## 함정·결정
 
 - **로그인 응답 `deptName` 공란 결함(2026-09-19 수정)**: 임직원 principal을 `fromUser`로 다시 감싸 부서명이 `""`로 덮이던 문제(권한은 원래 정상, 표시용 필드만 공란 → 관리자 사이드바 부서 빈 값). `buildEmployeeAuthentication`을 `fromLdap`으로 바꾸고 `RoutingAuthenticationProviderTest`에 신규·기존 임직원 부서명 단정을 추가했다. 함께 BE 응답에 없던 FE `LoginUser.phoneNumber`와 `authStore.phoneNumber` getter를 제거했다.
-- **`anyRequest().permitAll()`**: `/menu`·`/board` 아래 쓰기 API가 매처 누락으로 무인증 상태였던 적이 있다(6e7f6cc, 8d7485d). 새 경로는 반드시 레시피 1을 따른다.
-- **CORS 빈 이름**: `http.cors(cors -> corsConfigurationSource())`의 람다는 설정을 지정하지 않는다. 실제로는 이름이 `corsConfigurationSource`인 빈을 Spring Security가 찾아서 쓴다. 메서드 이름을 바꾸면 CORS가 조용히 빠진다.
 - **Employee.deptName unique 제거**: 같은 부서의 두 번째 임직원 JIT 생성이 unique 충돌로 막히던 문제를 고쳤다. 운영 DB는 ddl-auto update라 제약이 자동으로 지워지지 않으므로 `recruit_back/recruit_backend/docs/ops/fix-employee-dept-name-unique-drop.sql`을 수동 적용한다(aa4e2a7). `users.login_id` unique는 유지한다.
 - **fetchMe 판정**: 200이어도 data가 비면 미로그인이다(439fbbf. 전에는 미로그인 사용자가 `/403`으로 빠졌다). 미로그인 확정은 401일 때만 한다(8d7485d, 배포 중 5xx에 로그아웃되는 것 방지). 403 인터셉터는 `skipAuthRedirect`를 존중한다(439fbbf).
 - **LDAP 미설정 기동 무검증**: `AuthenticationConfigTest`의 단정이 전부 주석이라 LDAP 미설정 빈 생성·기동을 확인하는 활성 테스트가 없다.
@@ -308,6 +291,6 @@ AES_SECRET_KEY='<로컬 예시 키>' ./gradlew test --tests "*ApplicantSignUp*" 
 - **loginId 정책 확정: 이메일 = loginId**(2026-09-20). 지원자 가입 화면은 **이미 이렇게 동작한다** — `{FE}/views/applicant/SignupView.vue`가 입력 라벨을 "이메일"로 두고 이메일 정규식으로 검증한 뒤 `loginId`·`email` 두 필드에 **같은 값**을 보낸다. `Applicant.email`·`User.loginId` 모두 unique다. 따라서 이메일 필수화·기존 데이터 이관은 할 일이 없다(오픈 전 시스템이라 기존 데이터도 없다).
   - 후속: `check-login-id`는 만들지 않는다(이메일 중복 확인으로 갈음). 이메일 변경은 불허.
   - BE가 느슨한 부분: `loginId`에 이메일 형식 검증이 없다(`email`은 이메일 인증 검사로 사실상 필수).
-- **계정 열거 감수**: check-email·가입 실패 메시지로 가입 여부가 드러난다. rate limit·시도 제한 없음.
+- **계정 열거 감수**: check-email·가입 실패 메시지로 가입 여부가 드러난다. 로그인·인증번호 시도 제한은 [auth-security](auth-security.md).
 - **ADR**: `recruit_back/recruit_backend/docs/adr/0007-privacy-admin-role-separation.md`. 파기·민감 감사 권한은 `ROLE_PRIVACY_ADMIN`으로 분리한다. 매처 순서와 HTTP 메서드 구분이 보안 요구사항이다.
-- **인증번호 한계**: 세션에만 있어 다른 브라우저로 이어갈 수 없고 IP 단위 시도 제한은 없다(2026-09-23 범위 제외).
+- **인증번호 한계**: 세션에만 있어 다른 브라우저로 이어갈 수 없다. 세션을 새로 만드는 대입은 이메일 기준 시도 제한이 막는다(2026-09-27). IP 단위 제한은 없다.

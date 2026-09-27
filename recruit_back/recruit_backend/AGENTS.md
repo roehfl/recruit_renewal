@@ -75,10 +75,11 @@ Controller
 | `/admin/...` | 관리자 |
 | `/applications/...` · `/applicant/...` | 로그인 지원자 |
 | `/interviewer/...` | 면접관(임직원) |
-| `/job-postings` · `/codes` · `/schools` · `/addresses` · `/faqs` · `/board/notices` · `/menu/tree` · `/client-events` | 비로그인 공개 |
+| `/job-postings` · `/faqs` · `/board/notices` · `/menu/tree` · `/client-events` | 비로그인 공개 |
+| `/codes` · `/schools` · `/addresses` | 로그인(역할 무관) |
 | `/auth/...` | 로그인·로그아웃·가입 |
 
-- 새 관리자 API는 `/admin/` 아래에 만든다. `/admin/` 밖(`/menu`, `/board` 등)의 쓰기 API는 `anyRequest().permitAll()`로 공개되므로 `SecurityConfig`에 매처를 추가해야 한다.
+- 새 관리자 API는 `/admin/` 아래에 만든다. `/admin/` 밖(`/menu`, `/board` 등)은 로그인만 하면 누구나 호출하므로 역할이 필요하면 `SecurityConfig`에 매처를 추가한다.
 - 기존 경로는 요청이 있을 때만 바꾼다. 도메인별 전체 경로는 카드 `## API 계약`.
 
 ## 5. 예외 처리
@@ -103,35 +104,21 @@ Controller
 
 ## 6. 인증·인가
 
-- Spring Security 세션 인증. JWT·OAuth·stateless로 바꾸지 않는다. CSRF·HTTP Basic·formLogin은 꺼져 있다.
+- Spring Security 세션 인증. JWT·OAuth·stateless로 바꾸지 않는다. 토큰 CSRF·HTTP Basic·formLogin은 꺼져 있다.
 - 로그인 `POST /auth/login`: `AuthenticationManager.authenticate` 직접 호출 → 세션 ID 변경 → `SecurityContext`를 세션에 저장.
 - `RoutingAuthenticationProvider`: loginId의 `User`가 `Applicant`면 DB 비밀번호(BCrypt) + `ROLE_APPLICANT` 고정, `Employee`면 LDAP bind, 없으면 LDAP 성공 시 `Employee` 자동 생성(JIT).
 - 임직원 권한 = `dept_role_mapping`(LDAP 그룹 cn에 부서명 포함) ∪ `user_role_mapping`(loginId 일치). 상세는 auth-account·role-menu 카드.
 - 역할 상수 `{BE}/security/auth/RoleNames.java`(값에 `ROLE_` 포함): `ADMIN`(IT 관리자), `RECRUIT_ADMIN`(채용 운영), `PRIVACY_ADMIN`(정보보호), `INTERVIEWER`, `EMPLOYEE`, `APPLICANT`(매핑 화면에서 부여 불가).
 - 매처는 `hasAuthority`/`hasAnyAuthority(RoleNames.X)`만. `hasRole`은 `ROLE_ROLE_`이 되므로 금지. 역할 문자열을 직접 쓰지 않는다.
 
-`SecurityConfig` 요약(위에서 아래로 첫 일치):
-
-| 경로(`/api` 포함) | 권한 |
-|---|---|
-| `/api/auth/login`·`logout`·`applicants/sign-up`·`applicants/check-email`, swagger·api-docs·h2-console, `/api/menu/tree` | 공개 |
-| `POST /api/menu/admin/menu[/*]`, `POST /api/board/**` | ADMIN, RECRUIT_ADMIN |
-| `GET /api/job-postings/{id}/application` | APPLICANT |
-| `GET /api/job-postings/**`, `POST /api/client-events` | 공개 |
-| `/api/admin/audit/**`·`retention/**`·`client-events/**` | 메서드별 세분(PRIVACY_ADMIN 등, privacy-audit·client-event-log 카드) |
-| `/api/admin/**` | ADMIN, RECRUIT_ADMIN |
-| `/api/applicant/**`, `/api/applications/**` | APPLICANT |
-| `/api/interviewer/**` | EMPLOYEE, ADMIN, RECRUIT_ADMIN, INTERVIEWER |
-| 그 밖의 모든 경로 | **공개**(`anyRequest().permitAll()`) |
-
-- 좁은 매처를 넓은 매처(`/api/admin/**`)보다 위에 둔다. 순서가 보안 요구사항이다.
-- 보호 접두 밖의 새 엔드포인트는 공개된다. 의도가 아니면 매처를 추가하고 `{BT}/config/SecurityConfigTest.java`에 허용·거부 테스트를 추가한다.
+- URL 인가 표·CORS·CSRF·쿠키·시도 제한은 auth-security 카드. 기본은 인증 필수(`anyRequest().authenticated()`)라 표에 없는 경로는 로그인한 누구나 통과한다. 좁은 매처를 넓은 매처보다 위에 둔다(순서가 보안 요구사항). 매처를 바꾸면 `{BT}/config/SecurityConfigTest.java`에 허용·거부 테스트를 추가한다.
+- CSRF: `/api/**` POST는 `X-Requested-With` 헤더가 없으면 403(`CsrfHeaderFilter`). MockMvc 테스트는 테스트 yaml이 필터를 꺼서 헤더가 필요 없다.
 - 서비스 확인: 지원자 API는 `CurrentApplicantService.getCurrentApplicantId(userDetails)`, 관리자·면접관 명령은 `CurrentEmployeeService`(null → 401, 유형 불일치 → 403).
 - LDAP 접속·검색 값은 코드에 쓰지 않고 `recruit.ldap.*`(`LdapProperties`)로만 주입한다(8절).
 
 ## 7. 개인정보·암호화
 
-- `@Convert(converter = AesAttributeConverter.class)` 필드는 AES/CBC(무작위 IV)로 저장된다. 키 `crypto.aes.key`(= `AES_SECRET_KEY`, 32자). 암호문이 매번 달라 검색·비교·unique가 불가능하다.
+- `@Convert(converter = AesAttributeConverter.class)` 필드는 AES/CBC(무작위 IV)로 저장된다. 키 `crypto.aes.key`(= `AES_SECRET_KEY`, 32바이트, 아니면 기동 실패). 암호문이 매번 달라 검색·비교·unique가 불가능하다.
 - 암호화 필드: `ApplicationBasicInfo`의 이름·`countryCode`·연락처(`mobilePhone`·`emergencyPhone`·`email`)·장애 코드·주소.
 - 평문(현행): `User.loginId`·`User.name`, `Applicant.email`(unique)·`Applicant.phoneNumber`. 암호화 전환은 요청 시에만(기존 데이터 이행 필요).
 - 검색할 개인정보는 별도 해시 컬럼으로 찾는다. 예: `Applicant.ciHash` = `AuditHmac.identityHash`(이름·생년월일·성별, unique, 중복 가입 확인).
@@ -153,11 +140,12 @@ Controller
 |---|---|---|---|
 | `AES_SECRET_KEY` | 비밀 | 없음(필수) | 32자. 로컬 예시 `22791194512954214612461221261067` — **로컬·테스트 전용 예시, 운영 키 아님** |
 | `AUDIT_HMAC_SECRET` | 비밀 | 빈 값 | 비면 기동 실패(`AUDIT_ALLOW_FALLBACK_SECRET=true`면 비운영 대체 값, `prod` 프로파일에서는 거부). **교체 금지**(가입 중복 키) |
-| `AUDIT_ALLOW_FALLBACK_SECRET` | 플래그 | `false` | 로컬에서만 `true` |
-| `NICE_MOCK_ENABLED` | 플래그 | `false` | 로컬에서만 `true` |
+| `AUDIT_ALLOW_FALLBACK_SECRET`, `NICE_MOCK_ENABLED`, `H2_CONSOLE_ENABLED`, `SPRINGDOC_ENABLED` | 플래그 | `false` | 로컬에서만 `true` |
+| `RECRUIT_MESSAGE_GATEWAY` | 설정 | 없음(필수) | 운영 `trnode`, 로컬 `logging` |
+| `RECRUIT_CSRF_HEADER_REQUIRED` | 플래그 | `true` | 로컬 Swagger로 POST할 때만 `false` |
+| `RECRUIT_CORS_ALLOWED_ORIGINS`, `SESSION_COOKIE_SECURE` | 환경 | 운영 주소, `true` | auth-account 카드 |
 | `NICE_SITE_*`·`NICE_*_URL` | 자격증명·환경 | 빈 값 | auth-nice-verification 카드 |
-| `LDAP_MANAGER_DN` | 자격증명 | 없음 | 바인드 계정 DN. 유출 시 교체 대상 |
-| `LDAP_MANAGER_PASSWORD` | 자격증명 | 없음 | 로그·저장소에 절대 남기지 않는다 |
+| `LDAP_MANAGER_DN`, `LDAP_MANAGER_PASSWORD` | 자격증명 | 없음 | 바인드 계정. 유출 시 교체 대상 |
 | `LDAP_URL` | 환경 정보 | `ldap://`(미설정) | 내부망 주소 |
 | `LDAP_BASE_DN`, `LDAP_USER_SEARCH_BASE`, `LDAP_GROUP_SEARCH_BASE` | 조직 정보 | 빈 값 | base DN, 사용자 검색 base, 그룹(부서) 검색 base |
 | `LDAP_USER_SEARCH_FILTER` | 관용구 | `(sAMAccountName={0})` | AD 표준이라 기본값을 둔다 |
@@ -166,22 +154,21 @@ Controller
 | `RECRUIT_ATTACHMENT_STORAGE_ROOT`, `RECRUIT_POSTING_IMAGE_STORAGE_ROOT` | 환경 정보 | `attachments`, `posting-images` | 상대경로면 실행 디렉터리 기준 |
 
 - NICE 모듈(`libs/NiceID.jar`)은 기동에 **`--add-exports java.base/com.sun.crypto.provider=ALL-UNNAMED` 가 필수**다(없으면 `IllegalAccessError`). `bootRun`·`test` 는 `build.gradle` 에 있고 **운영 실행 스크립트에도 넣는다**.
-- 조직 정보는 자격증명은 아니지만 조직 구조가 드러나므로 실제 값을 커밋하지 않는다.
 - LDAP 값이 비어도 기동은 된다. 경고 로그가 남고 LDAP 로그인만 실패한다(최소 `LDAP_URL`·`LDAP_MANAGER_DN`·`LDAP_MANAGER_PASSWORD`·`LDAP_USER_SEARCH_BASE` 필요).
 - 나머지 한도·타임아웃 변수(`RECRUIT_*`, `JUSO_*`, `NEIS_*`, `UNIV_*`, `CLIENT_EVENT_LOG_*`)는 `{BR}/application.yaml`에서 확인한다.
 - 폐쇄망 등 환경변수 주입이 어려우면 소스를 고치지 말고 jar 옆 설정 파일로 덮어쓴다: `java -jar <jar> --spring.config.additional-location=file:./config/`.
 
-로컬 실행(백엔드 디렉터리, 포트 8080, Swagger `http://localhost:8080/swagger-ui`):
+로컬 실행(백엔드 디렉터리, 포트 8080). 환경변수: `AES_SECRET_KEY`(로컬 예시 키), `AUDIT_ALLOW_FALLBACK_SECRET=true`, `NICE_MOCK_ENABLED=true`, `RECRUIT_MESSAGE_GATEWAY=logging`, `RECRUIT_CORS_ALLOWED_ORIGINS=http://localhost:5173`. Swagger(`/swagger-ui`)는 `SPRINGDOC_ENABLED=true`.
 
 ```bash
-# Windows PowerShell
-$env:AES_SECRET_KEY='<로컬 예시 키>'; $env:AUDIT_ALLOW_FALLBACK_SECRET='true'; $env:NICE_MOCK_ENABLED='true'; .\gradlew.bat bootRun
-# Linux (실행 권한이 없으면 chmod +x ./gradlew)
-AES_SECRET_KEY='<로컬 예시 키>' AUDIT_ALLOW_FALLBACK_SECRET=true NICE_MOCK_ENABLED=true ./gradlew bootRun
+# PowerShell($env:이름='값';)
+.\gradlew.bat bootRun
+# Linux(이름=값 을 앞에 붙인다. 권한이 없으면 chmod +x ./gradlew)
+./gradlew bootRun
 ```
 
 - 로그: `{BR}/logback.xml` → 실행 디렉터리 `logs/recruit.log`.
-- Jasypt: `JasyptConfig`의 암호 속성 `app.modules.pkgs`가 `application.yaml`에 없고 `ENC(...)` 설정도 주석 처리돼 있어 현재 쓰이지 않는다. `ENC()` 도입 전 사용자에게 확인한다.
+- Jasypt(`JasyptConfig`, 암호 속성 `app.modules.pkgs`)는 `ENC(...)` 설정이 주석이라 현재 쓰이지 않는다. 도입 전 사용자에게 확인한다.
 
 ## 9. 테스트
 
@@ -211,7 +198,7 @@ AES_SECRET_KEY='<로컬 예시 키>' AUDIT_ALLOW_FALLBACK_SECRET=true NICE_MOCK_
 
 아래 순서로 원인을 분류한다. 수정 범위 안이면 고치고, 밖이면 보고한다.
 
-1. `AES_SECRET_KEY` 누락 — `Could not resolve placeholder 'AES_SECRET_KEY'`.
+1. `AES_SECRET_KEY`·`RECRUIT_MESSAGE_GATEWAY` 누락 — `Could not resolve placeholder '...'`.
 2. `bootRun` 기동 실패 `AUDIT_HMAC_SECRET (audit.hmac-secret) must be set` — 로컬은 `AUDIT_ALLOW_FALLBACK_SECRET=true`.
 3. Gradle Wrapper — `gradlew` 실행 권한, 배포본(gradle-9.2.1)·의존성(`mavenCentral()`) 다운로드 실패. 외부망이 없으면 미리 채운 Gradle 캐시(`GRADLE_USER_HOME`)나 사내 미러가 필요하다. 설정 변경은 사용자에게 확인한다.
 4. 테스트 `OutOfMemoryError` — 9절 힙·컨텍스트 재사용.

@@ -10,6 +10,7 @@ import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.AttachmentTestFiles;
 import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
@@ -34,7 +35,6 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -107,7 +107,7 @@ class ApplicationAttachmentDownloadServiceTest {
                 draftApplicationId,
                 draftAttachmentId
         );
-        assertThat(draft.contentLength()).isEqualTo("draft-content".getBytes(StandardCharsets.UTF_8).length);
+        assertThat(draft.contentLength()).isEqualTo(AttachmentTestFiles.content("draft.pdf", "draft-content").length);
 
         Applicant submittedApplicant = createApplicant("download-submitted", "Download Submitted");
         Long submittedApplicationId = createApplication(submittedApplicant, createPublishedJobPosting());
@@ -224,7 +224,7 @@ class ApplicationAttachmentDownloadServiceTest {
         );
 
         assertThat(response.contentType()).isEqualTo("application/octet-stream");
-        assertThat(response.contentLength()).isEqualTo(5L);
+        assertThat(response.contentLength()).isEqualTo(AttachmentTestFiles.content("content.pdf", "abcde").length);
     }
 
     private Long upload(Applicant applicant, Long applicationId, String originalFileName, String content) {
@@ -235,7 +235,7 @@ class ApplicationAttachmentDownloadServiceTest {
                         "file",
                         originalFileName,
                         "application/pdf",
-                        content.getBytes(StandardCharsets.UTF_8)
+                        AttachmentTestFiles.content(originalFileName, content)
                 ),
                 AttachmentType.RESUME,
                 ApplicationSectionType.APPLICATION,

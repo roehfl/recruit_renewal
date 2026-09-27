@@ -1,7 +1,7 @@
 # 권한·메뉴 (`role-menu`)
 
 > 경로 표기 `{BE}` `{BT}` `{BR}` `{FE}` — 정의: [_index.md](_index.md). API 경로는 `/api` 접두 생략.
-> 관련 카드: [auth-account](auth-account.md)(로그인·세션·`RoleNames`·`SecurityConfig`), [privacy-audit](privacy-audit.md)(`ROLE_PRIVACY_ADMIN` 소비), [interview](interview.md)(`ROLE_INTERVIEWER` 소비), [board](board.md)(지원자 breadcrumb 사용 화면)
+> 관련 카드: [auth-account](auth-account.md)(로그인·세션·`RoleNames`), [auth-security](auth-security.md)(`SecurityConfig`), [privacy-audit](privacy-audit.md)(`ROLE_PRIVACY_ADMIN` 소비), [interview](interview.md)(`ROLE_INTERVIEWER` 소비), [board](board.md)(지원자 breadcrumb 사용 화면)
 
 ## 요약
 
@@ -38,7 +38,7 @@
 | entity | `{BE}/domain/entity/DeptRoleMapping.java` | `deptName`·`roleName` (DB unique 없음) |
 | entity | `{BE}/domain/entity/UserRoleMapping.java` | `loginId`·`roleName` (FK·unique 없음) |
 | repository | `{BE}/domain/repository/MenuRepository.java` | site별 정렬 조회, `findBySiteAndPath`, 중복 검사 `existsBySiteAndPath[AndIdNot]` |
-| repository | `{BE}/domain/repository/DeptRoleMappingRepository.java` | 목록·중복 검사, 로그인용 `findByDeptNameContainedIn`(부분일치 JPQL) |
+| repository | `{BE}/domain/repository/DeptRoleMappingRepository.java` | 목록·중복 검사, 로그인용 `findByDeptNameContainedIn`(부분일치 JPQL `locate`) |
 | repository | `{BE}/domain/repository/UserRoleMappingRepository.java` | 목록·중복 검사, 로그인용 `findByLoginId` |
 | dto | `{BE}/dto/request/MenuSaveRequest.java` | 메뉴 생성·수정 공용 요청 |
 | dto | `{BE}/dto/request/DeptRoleMappingSaveRequest.java` | 부서 매핑 요청 |
@@ -57,7 +57,7 @@
 | test | `{BT}/controller/MenuControllerTest.java` | path 중복 400 + 한글 메시지(MockMvc, 보안 필터 없음) |
 | test | `{BT}/service/MenuServiceTest.java` | icon 왕복, path 중복 규칙 6종 |
 | test | `{BT}/service/RoleMappingServiceTest.java` | 부여 가능 목록, 매핑 CRUD·검증 |
-| test | `{BT}/domain/repository/DeptRoleMappingRepositoryTest.java` | 부분일치 매칭(짧은 부서명 오매칭, 빈 부서명 제외) |
+| test | `{BT}/domain/repository/DeptRoleMappingRepositoryTest.java` | 부분일치 매칭(짧은 부서명 오매칭, 빈 부서명 제외, `%`·`_` 글자 그대로 비교) |
 
 ### 프론트
 
@@ -83,8 +83,8 @@
 | 상태 | 메서드 | 경로 | 요청 요약 | 응답 요약 | 권한 |
 |---|---|---|---|---|---|
 | 🟢 | GET | /menu/tree | query `site`(기본 `APPLICANT`) | `MenuResponse[]` — 대메뉴 목록, 각 `children` 소메뉴 | 공개(명시 permitAll) |
-| 🟢 | GET | /menu/{menuId} | path `menuId` | `MenuResponse`(`children: []`) | 공개(anyRequest) |
-| 🟢 | GET | /menu/breadcrumb | query `site`(기본 `APPLICANT`), `path`(필수) | `MenuResponse[]` 루트→대상 순서, 각 `children: []` | 공개(anyRequest) |
+| 🟢 | GET | /menu/{menuId} | path `menuId` | `MenuResponse`(`children: []`) | 공개(GET 매처) |
+| 🟢 | GET | /menu/breadcrumb | query `site`(기본 `APPLICANT`), `path`(필수) | `MenuResponse[]` 루트→대상 순서, 각 `children: []` | 공개(GET 매처) |
 | 🟢 | POST | /menu/admin/menu | `MenuSaveRequest` | `{ id }` | ADMIN·RECRUIT_ADMIN(명시 매처) |
 | 🟢 | POST | /menu/admin/menu/{menuId} | `MenuSaveRequest`(전체 교체) | `{ id }` | ADMIN·RECRUIT_ADMIN(명시 매처) |
 | 🟢 | GET | /admin/role-mappings/roles | 없음 | `[{ name, label }]` 부여 가능 5종 | ADMIN·RECRUIT_ADMIN |
@@ -144,7 +144,7 @@
 - 위 규칙 중 **path 중복만 400**이다. 나머지(`IllegalArgumentException`)는 `GlobalExceptionHandler`에 핸들러가 없어 500으로 나간다 — 화면 검증이 먼저 거르는 이유. ({BE}/service/MenuService.java — create/update)
 - 트리 조립은 루트와 그 직계 자식만 담는다(3단계 데이터가 있어도 손자는 응답에서 빠짐). ({BE}/service/MenuService.java — buildTwoLevelTree)
 - `sortOrder`: 생성 시 null이면 null 저장, 수정 시 null이면 0. ({BE}/domain/entity/Menu.java — update)
-- 메뉴 쓰기(POST `/menu/admin/menu`, `/menu/admin/menu/*`)는 ADMIN·RECRUIT_ADMIN만, 조회 3종은 공개. (`{BE}/config/SecurityConfig.java` — [auth-account](auth-account.md) 소유)
+- 메뉴 쓰기(POST `/menu/admin/menu`, `/menu/admin/menu/*`)는 ADMIN·RECRUIT_ADMIN만, 조회 3종은 공개. (`{BE}/config/SecurityConfig.java` — [auth-security](auth-security.md) 소유)
 
 **권한 매핑**
 - `roleName`은 trim 후 `RoleNames.isAssignable`이어야 한다(5종, `ROLE_APPLICANT` 불가). ({BE}/service/RoleMappingService.java — validateAssignableRole)
@@ -156,7 +156,7 @@
 
 **매핑이 역할 부여에 쓰이는 방식(로그인 — [auth-account](auth-account.md) 소유 코드)**
 - 임직원 LDAP 로그인 때만 계산한다. 지원자는 `ROLE_APPLICANT` 하드코딩(매핑 무관).
-- 부서 role: LDAP이 찾은 그룹 cn(예: `내부채널_부서_6315`)마다 `groupName LIKE %deptName%`인 부서 매핑을 모은다(빈 `deptName` 제외). ({BE}/domain/repository/DeptRoleMappingRepository.java — findByDeptNameContainedIn)
+- 부서 role: LDAP이 찾은 그룹 cn(예: `내부채널_부서_6315`)마다 `locate(deptName, groupName) > 0`인 부서 매핑을 모은다(빈 `deptName` 제외). `like`를 쓰지 않는다 — `deptName`의 `%`·`_`가 와일드카드가 되면 `%%` 한 건으로 전 임직원에게 역할이 붙는다. ({BE}/domain/repository/DeptRoleMappingRepository.java — findByDeptNameContainedIn)
 - 개인 role: `sAMAccountName`(loginId) 완전일치 사용자 매핑. ({BE}/domain/repository/UserRoleMappingRepository.java — findByLoginId)
 - 최종 authority = 부서 role ∪ 개인 role, distinct. **추가 부여만, revoke 없음**. 표시 부서명은 첫 매칭 부서 매핑의 `deptName` → 없으면 `department` 속성 → 첫 그룹 cn. (`{BE}/security/auth/CustomLdapUserDetailsMapper.java` — mapUserFromContext)
 - 권한은 로그인 시점에 세션에 담긴다. 매핑을 바꿔도 이미 로그인한 세션에는 재로그인 전까지 반영되지 않는다.
@@ -180,7 +180,7 @@
 
 ### 메뉴 쓰기 API 추가(예: 삭제)
 1. 레포 관례대로 POST(예: `/menu/admin/menu/{menuId}/delete`)로 만든다.
-2. **`SecurityConfig` 매처를 반드시 추가한다.** 기존 `/api/menu/admin/menu/*`는 한 세그먼트만 매칭해 `/{id}/delete`를 못 막는다 → 안 넣으면 `anyRequest().permitAll()`로 비인증 호출 가능. `{BT}/config/SecurityConfigTest.java`에 401/403/통과 케이스 추가.
+2. **`SecurityConfig` 매처를 반드시 추가한다.** 기존 `/api/menu/admin/menu/*`는 한 세그먼트만 매칭해 `/{id}/delete`를 못 막는다 → 안 넣으면 `anyRequest().authenticated()`로 로그인한 누구나(지원자 포함) 호출 가능. `{BT}/config/SecurityConfigTest.java`에 401/403/통과 케이스 추가.
 3. 삭제라면 자식 메뉴 처리(자식 있는 대메뉴 삭제 거부 등)를 정해 서비스에 넣고 테스트한다.
 4. `{FE}/api/menuApi.ts` → `{FE}/views/admin/MenuManageView.vue`, 카드 API 표에 🟡로 먼저 적고 구현 후 🟢, `node tools/check-docs.mjs`.
 
@@ -205,7 +205,7 @@ $env:AES_SECRET_KEY='<로컬 예시 키>'; .\gradlew.bat test --tests "com.shiny
 AES_SECRET_KEY='<로컬 예시 키>' ./gradlew test --tests "com.shinyoung.recruit.controller.MenuControllerTest" --tests "com.shinyoung.recruit.service.MenuServiceTest" --tests "com.shinyoung.recruit.service.RoleMappingServiceTest" --tests "com.shinyoung.recruit.domain.repository.DeptRoleMappingRepositoryTest" --no-daemon
 ```
 
-인가·로그인 권한 계산을 건드렸으면 [auth-account](auth-account.md) 소유 테스트도 함께 돌린다: `--tests "com.shinyoung.recruit.config.SecurityConfigTest" --tests "com.shinyoung.recruit.security.auth.CustomLdapUserDetailsMapperTest"`.
+인가·로그인 권한 계산을 건드렸으면 [auth-security](auth-security.md)·[auth-account](auth-account.md) 소유 테스트도 함께 돌린다: `--tests "com.shinyoung.recruit.config.SecurityConfigTest" --tests "com.shinyoung.recruit.security.auth.CustomLdapUserDetailsMapperTest"`.
 
 프론트(`recruit_front/`에서):
 
@@ -224,4 +224,5 @@ npx vitest run src/stores/__tests__/menuStore.spec.ts
 - 수정 API는 "자식이 있는 대메뉴를 다른 대메뉴 밑으로 옮기기"·"자식 있는 대메뉴의 site 변경"을 막지 않는다. 화면은 이런 이동을 만들지 않지만 API 직접 호출 시 트리에서 손자가 사라지거나 site가 섞인다.
 - 서버는 `path`를 trim하지 않는다(화면이 trim해서 보냄). `"/a "`와 `"/a"`는 서버에서 다른 path다.
 - `recruit_back/recruit_backend/docs/adr/0007-privacy-admin-role-separation.md` — 비가역 파기·민감 감사는 `ROLE_PRIVACY_ADMIN`으로 분리(`ROLE_RECRUIT_ADMIN` 재사용 금지), 두 권한 모두 부서 매핑에서 파생. 주의: 권한 관리 API는 `ROLE_RECRUIT_ADMIN`에게도 열려 있어 운영 관리자가 `ROLE_PRIVACY_ADMIN` 매핑을 만들 수 있다(설계 시 ADMIN·RECRUIT_ADMIN 접근으로 승인됨). 직무 분리를 강화하려면 `/api/admin/role-mappings/**` 쓰기 전용 매처를 broad 매처보다 먼저 추가한다.
+- **권한 부여 범위 현행 유지(2026-09-27 사용자 결정)**: 매핑 API는 `/api/admin/**`(ADMIN·RECRUIT_ADMIN)로만 막혀 있어 RECRUIT_ADMIN도 자기에게 ADMIN·PRIVACY_ADMIN을 줄 수 있고, 매핑 변경은 감사 로그에 남지 않는다. 전 시스템 보안 점검에서 직무 분리 위험(Medium)으로 지적됐으나 그대로 둔다. 바꾸려면 `POST /api/admin/role-mappings/**`를 ADMIN·PRIVACY_ADMIN 전용 매처로 좁힌다([auth-security](auth-security.md)).
 - 수동 DDL(ddl-auto를 validate/none으로 쓰는 운영 DB): `recruit_back/recruit_backend/docs/ops/role-mapping-user-role-mapping-ddl.sql`(`user_role_mapping` 테이블 + `login_id` 인덱스), `recruit_back/recruit_backend/docs/ops/fix-employee-dept-name-unique-drop.sql`(`employee.dept_name`에 남은 unique 인덱스 제거 — 같은 부서 두 번째 임직원 JIT 생성 실패 → 로그인 불가 결함). `menu`·`dept_role_mapping`용 DDL 파일은 없다.

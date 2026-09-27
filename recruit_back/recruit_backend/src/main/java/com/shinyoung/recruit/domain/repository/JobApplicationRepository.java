@@ -10,10 +10,12 @@ import com.shinyoung.recruit.enumeration.JobPositionApplicationType;
 import com.shinyoung.recruit.enumeration.PurgeResult;
 import com.shinyoung.recruit.enumeration.StageResultStatus;
 import com.shinyoung.recruit.enumeration.StageType;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -102,6 +104,11 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
 
 
     Optional<JobApplication> findByIdAndApplicantId(Long id, Long applicantId);
+
+    /** 행 잠금 조회. 첨부 업로드처럼 한도를 조회한 뒤 저장하는 작업의 동시 요청을 지원서 단위로 줄 세운다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from JobApplication a where a.id = :id and a.applicant.id = :applicantId")
+    Optional<JobApplication> findByIdAndApplicantIdForUpdate(@Param("id") Long id, @Param("applicantId") Long applicantId);
 
     /** reconciliation(09e) — 바이너리 삭제 미완(PURGE_PENDING) 잔여 건 재처리 대상(chunk 단위, 09e 리뷰 Medium 1). */
     List<JobApplication> findByPurgeResultOrderByIdAsc(PurgeResult purgeResult, Pageable pageable);

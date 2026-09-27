@@ -11,7 +11,7 @@
 - 흐름: ① 팝업이 `POST /auth/nice/request`로 암호문(`encodeData`)을 받아 NICE 표준창에 폼 POST ② 사용자 인증 후 NICE가 **사용자 브라우저를** `/auth/nice/callback`(성공)·`/auth/nice/callback/error`(실패)로 보낸다 — **GET 쿼리 `?EncodeData=`**(2026-09-22 실인증 확인, POST도 받는다. 세션 쿠키 없음, `REQ_SEQ`로만 레코드 식별) ③ `303`으로 리다이렉트된 `/nice-auth/result`가 same-site로 `POST /auth/nice/result`를 호출해 1회용 `resultToken`을 인증 결과로 교환하고 세션에 담는다.
 - **가입자 식별은 이름+생년월일+성별이다.** 이 사이트코드는 NICE 계약상 CI를 받지 않는다(2026-09-22 실응답 확인). 식별 값은 서버 세션에만 있다가 가입 제출 시 1회 소비되고 브라우저로 내려가지 않는다.
 - 벤더 모듈(`NiceID.jar`, `NiceID.Check.CPClient`)이 `build.gradle`에 연결돼 있고 `RealNiceClient`가 이를 호출해 실연동을 구현한다. `NiceClientConfig`는 `mock-enabled`×실연동 설정 4개(`site-code`·`site-password`·`return-url`·`error-url`) 조합을 검사하는 fail-closed 가드를 갖췄다 — 애매한 조합은 기동을 막는다(아래 "함정·결정").
-- 용도(`NiceVerificationPurpose`)는 `SIGNUP`·`FIND_EMAIL`이다. 팝업이 쿼리(`/nice-auth?purpose=`)로 받아 `request` 본문으로 보내고(필수, 기본값 없음), 서버가 레코드에 기록해 소비 시점(`requireFresh`)에 대조한다. 비밀번호 재설정은 같은 방식으로 값만 추가하면 얹을 수 있다(범위 밖).
+- 용도(`NiceVerificationPurpose`)는 `SIGNUP`·`FIND_EMAIL`·`PHONE_CHANGE`(로그인한 지원자의 휴대폰 번호 변경, 2026-09-27 — [auth-account](auth-account.md))이다. 팝업이 쿼리(`/nice-auth?purpose=`)로 받아 `request` 본문으로 보내고(필수, 기본값 없음), 서버가 레코드에 기록해 소비 시점(`requireFresh`)에 대조한다. 비밀번호 재설정은 같은 방식으로 값만 추가하면 얹을 수 있다(범위 밖).
 
 ## 용어
 
@@ -41,12 +41,12 @@
 | service | `{BE}/service/nice/NicePlaindataCodec.java` | 키+**EUC-KR** 바이트길이+값 조립·파싱. **요청 조립과 응답 파싱 모두 담당**(실연동 포함 — 벤더 `fnParse`를 쓰지 않는다) |
 | service | `{BE}/service/nice/NiceVerificationRecord.java` | Store 레코드(값 객체, 불변) |
 | service | `{BE}/service/nice/NiceVerifiedIdentity.java` | 세션에 담기는 인증 결과 |
-| service | `{BE}/service/nice/NiceVerificationStore.java` | 인메모리 보관소(`ConcurrentHashMap`) + 원자 연산(`saveIfAbsent`·`compareAndSet`·`takeByResultToken`) + TTL 정리 |
+| service | `{BE}/service/nice/NiceVerificationStore.java` | 인메모리 보관소(`ConcurrentHashMap`, 상한 `MAX_RECORDS` 10만) + 원자 연산(`saveIfAbsent`·`compareAndSet`·`takeByResultToken`) + TTL 정리 |
 | service | `{BE}/service/nice/NiceVerificationService.java` | 발급·콜백 검증·결과 교환 오케스트레이션. Store 원자 연산만 쓴다 |
 | service | `{BE}/service/nice/NiceVerificationCleanupScheduler.java` | 만료 레코드 정리(`verified-ttl-minutes` 기준, `recruit.nice.cleanup-interval-ms` 주기 — 기본 5분) |
 | config | `{BE}/config/NiceProperties.java` | `recruit.nice.*` 바인딩 |
 | config | `{BE}/config/NiceClientConfig.java` | 구현 선택 + fail-closed 가드(`mock-enabled`×실연동 설정 4개 조합, 아래 "함정·결정") |
-| enumeration | `{BE}/enumeration/NiceVerificationPurpose.java` | `SIGNUP`·`FIND_EMAIL` |
+| enumeration | `{BE}/enumeration/NiceVerificationPurpose.java` | `SIGNUP`·`FIND_EMAIL`·`PHONE_CHANGE` |
 | enumeration | `{BE}/enumeration/NiceVerificationStatus.java` | `PENDING`·`VERIFIED`·`FAIL` |
 | exception | `{BE}/exception/NiceVerificationException.java` | 검증 실패(복호화·요청번호·세션 불일치 전부 포함, 사유 구분 없이 사용자에 반환) |
 | dto | `{BE}/dto/response/NiceRequestResponse.java` | `{ encodeData }` |
@@ -64,7 +64,7 @@
 
 | 구분 | 파일 | 역할 |
 |---|---|---|
-| view | `{FE}/views/auth/pop-up/NiceAuthPopup.vue` | NICE 실연동 팝업(`/nice-auth?purpose=SIGNUP` 또는 `FIND_EMAIL`). 쿼리 용도를 검사해 `request` 호출 후 표준창으로 폼 POST(진행 안내만, 입력 UI 없음) |
+| view | `{FE}/views/auth/pop-up/NiceAuthPopup.vue` | NICE 실연동 팝업(`/nice-auth?purpose=SIGNUP`·`FIND_EMAIL`·`PHONE_CHANGE`). 쿼리 용도를 검사해 `request` 호출 후 표준창으로 폼 POST(진행 안내만, 입력 UI 없음) |
 | view | `{FE}/views/auth/pop-up/NiceAuthResult.vue` | NICE 콜백 결과 중계(`/nice-auth/result`). `result` 호출 → `postMessage` → `window.close()` |
 | api | `{FE}/api/auth/niceApi.ts` | `request(purpose)`·`exchangeResult` |
 | types | `{FE}/types/auth/nice.ts` | 요청·응답 타입, 상수, `NiceVerificationPurpose`·`isNicePurpose` |
@@ -75,7 +75,7 @@
 
 | 상태 | 메서드 | 경로 | 요청 요약 | 응답 요약 | 권한 |
 |---|---|---|---|---|---|
-| 🟢 | POST | /auth/nice/request | `{ purpose: 'SIGNUP' \| 'FIND_EMAIL' }` 필수(세션으로 요청자 식별) | `{ encodeData }` | 공개 |
+| 🟢 | POST | /auth/nice/request | `{ purpose: 'SIGNUP' \| 'FIND_EMAIL' \| 'PHONE_CHANGE' }` 필수(세션으로 요청자 식별) | `{ encodeData }` | 공개 |
 | 🟢 | GET·POST | /auth/nice/callback | `EncodeData` — NICE는 **GET 쿼리**로 보낸다(POST form도 받음, 세션 없음) | `303` → `/nice-auth/result?token=...`(성공) 또는 토큰 없이(검증 실패) | 공개 |
 | 🟢 | GET·POST | /auth/nice/callback/error | `EncodeData` — GET 쿼리 또는 POST form(세션 없음) | `303` → `/nice-auth/result?token=...`(정상 실패 콜백) 또는 토큰 없이(검증 예외) | 공개 |
 | 🟢 | POST | /auth/nice/result | `{ token }` | `{ status, name, phoneNumber }` | 공개 |
@@ -100,12 +100,12 @@
 - **`AUDIT_HMAC_SECRET`을 교체하면 중복 가입 판정이 깨진다.** 기존 가입자의 키와 새로 계산한 키가 달라져 같은 사람이 다시 가입할 수 있다. 교체하지 않거나, 교체 시 전 가입자 키를 재계산한다.
 - **식별 값은 브라우저로 내려가지 않는다.** 서버가 복호화한 생년월일·성별을 세션에만 두고 가입 시 꺼내 쓴다. 가입 요청 본문에 이름·휴대폰·식별 값이 없다. 예전엔 프론트가 만든 가짜 CI를 서버가 믿어 본인확인이 사실상 없었다.
 - **콜백엔 세션 쿠키가 없다**(cross-site 이동, `SameSite=Lax`). `callback`·`callback/error`는 `REQ_SEQ`로만 레코드를 찾는다. 세션 대조는 뒤따르는 same-site `result`에서 한다.
-- **콜백 2종은 CORS 처리에서 빠진다**(`SecurityConfig.CORS_EXEMPT_PATHS`). NICE는 현재 GET으로 돌려주고 브라우저는 **GET 이동엔 `Origin`을 붙이지 않으므로** 실사용 경로는 원래 CORS 대상이 아니다. 다만 콜백이 POST도 받으므로 그 경우를 위해 예외를 둔다. POST 이동에는 브라우저가 `Origin: https://nice.checkplus.co.kr`(Referrer-Policy에 따라 `null`)을 붙이는데, `CorsFilter`는 폼 이동과 스크립트 요청을 구분하지 않고 허용 목록 밖 Origin을 `403 Invalid CORS request`로 거부한다. **NICE Origin을 허용 목록에 넣지 않는다** — `allowCredentials=true`라 NICE 쪽 스크립트가 모든 API를 자격 증명과 함께 읽을 수 있게 된다. `null`은 샌드박스 iframe·`file://`도 쓰는 값이라 허용하면 안 된다. 콜백의 안전성은 Origin이 아니라 `REQ_SEQ` 대조와 암호문에 있다. 예외는 이 두 경로뿐이고 `request`·`result`는 허용 목록 검사를 그대로 받는다.
+- **콜백 2종은 CORS 처리와 CSRF 헤더 검사에서 빠진다**(`SecurityConfig.CORS_EXEMPT_PATHS`, [auth-security](auth-security.md)). NICE는 현재 GET으로 돌려주고 브라우저는 **GET 이동엔 `Origin`을 붙이지 않으므로** 실사용 경로는 원래 CORS 대상이 아니다. 다만 콜백이 POST도 받으므로 그 경우를 위해 예외를 둔다. POST 이동에는 브라우저가 `Origin: https://nice.checkplus.co.kr`(Referrer-Policy에 따라 `null`)을 붙이는데, `CorsFilter`는 폼 이동과 스크립트 요청을 구분하지 않고 허용 목록 밖 Origin을 `403 Invalid CORS request`로 거부한다. **NICE Origin을 허용 목록에 넣지 않는다** — `allowCredentials=true`라 NICE 쪽 스크립트가 모든 API를 자격 증명과 함께 읽을 수 있게 된다. `null`은 샌드박스 iframe·`file://`도 쓰는 값이라 허용하면 안 된다. 콜백의 안전성은 Origin이 아니라 `REQ_SEQ` 대조와 암호문에 있다. 예외는 이 두 경로뿐이고 `request`·`result`는 허용 목록 검사를 그대로 받는다.
 - **파이프라인 실패는 사용자에게 문구 하나로만 보인다.** `request`·`callback`·`callback/error`·`result` 전부 `"본인확인에 실패했습니다. 다시 시도해주세요."`(`NiceVerificationService.FAILURE_MESSAGE`)다. 원인은 로그로만 구분한다(세션 불일치·재발급 상한 초과·모듈 오류 `warn`, 만료·이미 처리됨 등 `info`) — 원인별로 다른 문구를 보여주면 재전송·토큰 탈취 시도자에게 정보가 된다. 가입 제출 시점 `requireFresh` 안내 문구는 예외다(아래 API 계약 상세).
 - **`REQ_SEQ`는 1회용이다.** 레코드가 `PENDING`이 아니면 거부한다(`consumePending`). 암호문 생성 시각 검사(`NiceDecodeResult.cipherEpochSeconds`, **KST 고정** — 서버 JVM이 UTC로 떠도 무관)가 독립된 2차 게이트로 붙는다 — 둘 중 하나만 걸려도 거부한다. 시각을 읽지 못하면 거부 대신 경고 로그만 남기고 2차 게이트를 건너뛴다(포맷을 실응답으로 확인할 수단이 없어 fail-open, 주 방어선은 Store 대조). 레거시엔 이 대조가 없어 재전송에 열려 있었다.
 - **Store 원자 연산으로 동시 재전송을 막는다.** `find`→검사→`save`는 check-then-act 경쟁이라 동시 재전송을 막지 못했다(최종 코드 리뷰가 재현). 발급은 `saveIfAbsent`(모듈 `REQ_SEQ`가 밀리초+random%100이라 동시 발급 시 충돌 — 실측 순차 2,000회 중 1,765건 — 감지 시 최대 5회 재발급, 초과 시 거부), 콜백 상태 전이는 `compareAndSet`(동시에 두 번 오면 한쪽만 이긴다), 결과 교환은 `takeByResultToken`(`remove(key, value)`, 조회·제거가 원자적)만 쓴다. `NiceVerificationConcurrencyTest`가 `CyclicBarrier`로 경쟁을 결정적으로 재현한다(스레드 두 개를 그냥 띄우면 대부분 순차로 돌아 우연히 통과하므로 쓰지 않는다).
 - **`resultToken`도 1회용이고 세션에 묶인다.** `exchangeResult`는 `takeByResultToken`으로 레코드를 **검사보다 먼저, 원자적으로 제거**한다 — 세션 불일치·만료로 거부돼도 소각해야 조건을 바꿔가며 같은 토큰을 재시도할 수 없고, 같은 토큰으로 동시에 두 번 불려도 한쪽만 레코드를 받는다.
-- **`NiceVerificationStore`는 인메모리·단일 인스턴스 전제다**(`ConcurrentHashMap`). HTTP 세션과 같은 전제다. 다중 인스턴스로 확장하면 세션과 이 Store를 함께 외부 저장소로 옮겨야 한다.
+- **`NiceVerificationStore`는 인메모리·단일 인스턴스 전제다**(`ConcurrentHashMap`). HTTP 세션과 같은 전제다. 다중 인스턴스로 확장하면 세션과 이 Store를 함께 외부 저장소로 옮겨야 한다. `request`는 비로그인 공개라 보관 상한 10만 건을 둔다 — 가득 차면 만료분(`verified-ttl`)을 정리해 보고, 그래도 가득이면 400(`NiceVerificationException`)으로 새 요청을 거부한다(2026-09-27).
 - **TTL 3종**: 요청→콜백 10분(`request-ttl-minutes`, 통신사 인증 소요 시간 겸 암호문 생성 시각 검사 창) · `resultToken` 1분(1회용, 팝업이 즉시 교환) · 인증 완료→가입 제출 30분(`verified-ttl-minutes`, 폼 작성 시간). 만료 판정은 읽는 시점에도 다시 하므로 `NiceVerificationCleanupScheduler`(기본 5분 주기, `recruit.nice.cleanup-interval-ms`)가 늦게 돌아도 보안에 영향이 없다 — 목적은 메모리 누적 방지뿐이다. 정리 기준은 **verified-ttl**이다(request-ttl로 지우면 아직 유효한 인증 완료 레코드가 지워진다).
 - 재기동하면 진행 중이던 인증이 전부 끊긴다(인메모리). 사용자는 재인증하면 되고 빈도가 낮아 허용한다.
 
@@ -178,7 +178,7 @@ AES_SECRET_KEY='<로컬 예시 키>' ./gradlew test --tests "com.shinyoung.recru
 
 **그 직전 외부 접속의 첫 `403`은 원인이 확정되지 않았다(2026-09-22).** 처음엔 콜백이 CORS에 막힌 것으로 진단해 콜백 CORS 예외를 넣었지만, NICE가 GET으로 돌려주고 GET 이동엔 `Origin`이 없으므로 **콜백 CORS는 그 403의 원인이 아니었다.** 가장 유력한 것은 아래 항목 — 허용 목록 밖 주소로 접속해 `POST /auth/nice/request`가 막힌 경우다. 외부 테스트에 쓴 개발 서버 주소 `https://shinrecruitdev.shinyoung.com`이 목록에 없어 추가했다(`SecurityConfigTest`로 고정). 콜백 CORS 예외는 POST 콜백을 위해 유지한다. 콜백 CORS 예외 테스트: `SecurityConfigTest`에 NICE Origin·`null` Origin POST 콜백 3건과, 예외가 좁은지 보는 1건(`request`는 NICE Origin을 계속 거부)이 있다. 변이 검증: 예외 경로 목록을 비우면 콜백 3건만 실패한다.
 
-**리버스 프록시 뒤에서는 same-origin 요청도 CORS 판정을 받는다.** 프록시 헤더 처리(`server.forward-headers-strategy`) 설정이 없어 Spring은 자기 주소를 프록시 내부 주소로 안다. 그래서 브라우저가 `Origin`을 붙이는 요청(모든 POST)은 전부 cross-origin으로 판정되고, 접속 주소가 허용 목록(`http://localhost:5173`, `https://rec.shinyoung.com`, `https://shinrecruitdev.shinyoung.com`)에 **정확히** 없으면 403이다 — 테스트 도메인·IP·`http://` 전부 해당. GET은 same-origin이면 `Origin`이 안 붙어 통과하므로 증상이 POST에만 나타난다.
+**리버스 프록시 뒤에서는 same-origin 요청도 CORS 판정을 받는다.** 프록시 헤더 처리(`server.forward-headers-strategy`) 설정이 없어 Spring은 자기 주소를 프록시 내부 주소로 안다. 그래서 브라우저가 `Origin`을 붙이는 요청(모든 POST)은 전부 cross-origin으로 판정되고, 접속 주소가 허용 목록(`recruit.cors.allowed-origins` = `RECRUIT_CORS_ALLOWED_ORIGINS`, 기본은 운영 주소 `https://rec.shinyoung.com`만 — 개발 서버·로컬은 자기 주소를 환경변수로 준다)에 **정확히** 없으면 403이다 — 테스트 도메인·IP·`http://` 전부 해당. GET은 same-origin이면 `Origin`이 안 붙어 통과하므로 증상이 POST에만 나타난다.
 
 **최종 코드 리뷰가 결함 8건을 찾아 전부 고쳤다(2026-09-21, 테스트 106 → 128).** 순차 시나리오만 보던 테스트가 놓친 경쟁 조건 3건과, 리뷰가 직접 찾은 정보 노출·설정 4건, 구현 중 자체 발견 1건이다.
 

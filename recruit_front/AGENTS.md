@@ -30,7 +30,7 @@ Treat this as an existing production codebase. Preserve existing UI structure, r
 
 공통 기반 파일:
 
-- `api/client.ts` — Axios 인스턴스(`baseURL`=`VITE_API_BASE_URL`, `withCredentials: true`, 타임아웃 10초). 요청/응답 인터셉터로 `uiStore` 로딩 카운트를 관리하고, 401/403 응답 시 각각 `/login`·`/403`으로 리다이렉트한다(`skipAuthRedirect` 옵션으로 예외 처리 가능).
+- `api/client.ts` — Axios 인스턴스(`baseURL`=`VITE_API_BASE_URL`, `withCredentials: true`, 타임아웃 10초, CSRF 헤더 `X-Requested-With` 기본 부착 — 없으면 서버가 POST를 403으로 막는다). 요청/응답 인터셉터로 `uiStore` 로딩 카운트를 관리하고, 401/403 응답 시 각각 `/login`·`/403`으로 리다이렉트한다(`skipAuthRedirect` 옵션으로 예외 처리 가능).
 - `api/apiError.ts` — Axios 에러를 사용자용 한글 메시지로 변환하는 `getApiErrorMessage`.
 - `routes/index.ts` — 라우터 생성과 `beforeEach` 가드(로그인 상태 복원, `meta.requiresAuth`, `meta.roles` 검사).
 - `layouts/AdminLayout.vue` — 관리자 레이아웃(좌측 `AdminSidebar` + 우측 `RouterView`).

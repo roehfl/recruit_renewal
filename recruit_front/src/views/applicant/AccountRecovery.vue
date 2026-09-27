@@ -44,7 +44,7 @@
                   <a-button type="primary" size="large" class="mail-button" @click="clickToEmailCertificationButton">인증확인</a-button>
                 </div>
                 <template v-if="isEmailCertificationDone">
-                  <a-input-password class="password-input" size="large" placeholder="새 비밀번호를 입력해주세요. (8자 이상)"
+                  <a-input-password class="password-input" size="large" :placeholder="PASSWORD_POLICY_PLACEHOLDER"
                     v-model:value="newPassword" />
                   <a-input-password class="password-input" size="large" placeholder="새 비밀번호를 다시 입력해주세요."
                     v-model:value="newPasswordConfirm" />
@@ -75,6 +75,7 @@ import { message } from 'ant-design-vue';
 import { applicationApi } from '@/api/applicationApi';
 import { getApiErrorMessage } from '@/api/apiError';
 import { NICE_MESSAGE_SOURCE, type NiceAuthMessage } from '@/types/auth/nice';
+import { PASSWORD_POLICY_PLACEHOLDER, passwordPolicyError } from '@/common/passwordPolicy';
 
 const router = useRouter();
 
@@ -186,9 +187,10 @@ const clickToEmailCertificationButton = async () => {
 }
 
 const clickToResetPasswordButton = async () => {
-  // 백엔드 ApplicantPasswordResetRequest 는 가입과 같이 8자 이상을 요구한다.
-  if (newPassword.value.length < 8) {
-    message.warning('비밀번호는 8자 이상 입력해주세요.');
+  // 백엔드 ApplicantPasswordResetRequest 와 같은 조합 규칙(common/passwordPolicy).
+  const passwordError = passwordPolicyError(newPassword.value);
+  if (passwordError) {
+    message.warning(passwordError);
     return;
   }
   if (newPassword.value !== newPasswordConfirm.value) {

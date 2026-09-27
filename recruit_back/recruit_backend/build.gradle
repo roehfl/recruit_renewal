@@ -1,6 +1,6 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.0.2'
+	id 'org.springframework.boot' version '4.0.8'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -24,6 +24,9 @@ repositories {
 	mavenCentral()
 }
 
+// Boot 4.0.8 관리 버전(11.0.24)은 CVE-2026-65182 등이 남아 있어 수정 버전으로 올린다. Boot 가 11.0.25 이상을 관리하면 이 줄을 지운다.
+ext['tomcat.version'] = '11.0.26'
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
@@ -35,9 +38,9 @@ dependencies {
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
 	implementation 'org.springframework.security:spring-security-ldap'
 	implementation 'org.springframework.ldap:spring-ldap-core'
-	implementation 'org.springframework.boot:spring-boot-h2console:4.0.5'
-	implementation 'org.jsoup:jsoup:1.22.2'
-	implementation 'org.apache.poi:poi-ooxml:5.3.0'
+	implementation 'org.springframework.boot:spring-boot-h2console'
+	implementation 'org.jsoup:jsoup:1.23.2'
+	implementation 'org.apache.poi:poi-ooxml:5.5.1'
 	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 	implementation 'com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10'
 	// 공개 저장소에 없는 모듈(NICE 체크플러스 NiceID.jar, 사내 라이브러리)은 libs/ 에 두고 전부 참조한다.

@@ -13,15 +13,20 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.config.ldap.LdapBindAuthenticationManagerFactory;
 import org.springframework.security.ldap.DefaultSpringSecurityContextSource;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 import java.util.Arrays;
 import java.util.List;
@@ -33,15 +38,21 @@ public class SecurityConfig {
     private final AuthenticationManager authenticationManager;
     private final CustomAuthenticationEntryPoint authenticationEntryPoint;
     private final CustomAccessDeniedHandler accessDeniedHandler;
+    private final CorsProperties corsProperties;
+    private final CsrfProperties csrfProperties;
 
     public SecurityConfig(
             AuthenticationManager authenticationManager,
             CustomAuthenticationEntryPoint authenticationEntryPoint,
-            CustomAccessDeniedHandler accessDeniedHandler
+            CustomAccessDeniedHandler accessDeniedHandler,
+            CorsProperties corsProperties,
+            CsrfProperties csrfProperties
     ) {
         this.authenticationManager = authenticationManager;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+        this.corsProperties = corsProperties;
+        this.csrfProperties = csrfProperties;
     }
 
     @Bean
@@ -49,16 +60,25 @@ public class SecurityConfig {
         return new HttpSessionSecurityContextRepository();
     }
 
+    /** 로그인 세션 목록. 비밀번호 변경 시 다른 세션을 만료하는 데 쓴다(UserSessionRevoker). */
+    @Bean
+    public SessionRegistry sessionRegistry() {
+        return new SessionRegistryImpl();
+    }
+
+    /** 세션 소멸·ID 변경을 SessionRegistry 에 알린다. 없으면 로그아웃·만료된 세션이 목록에 남는다. */
+    @Bean
+    public HttpSessionEventPublisher httpSessionEventPublisher() {
+        return new HttpSessionEventPublisher();
+    }
+
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration corsConfiguration = new CorsConfiguration();
 //        corsConfiguration.applyPermitDefaultValues();
-        corsConfiguration.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "https://rec.shinyoung.com",
-                "https://shinrecruitdev.shinyoung.com"
-        ));
+        // 허용 출처는 환경별로 주입한다(recruit.cors.allowed-origins, 기본은 운영 주소만).
+        corsConfiguration.setAllowedOrigins(List.copyOf(corsProperties.getAllowedOrigins()));
         corsConfiguration.setAllowedMethods(Arrays.asList("POST", "GET"));
         corsConfiguration.setAllowedHeaders(List.of(
                 "Content-Type", "X-Requested-With", "X-XSRF-TOKEN"
@@ -94,16 +114,30 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        // 토큰 방식 CSRF 는 끄고, 상태 변경 요청에 X-Requested-With 헤더를 요구하는 방식으로 막는다(CsrfHeaderFilter).
+        // NICE 콜백은 외부 폼 이동이라 CORS 와 같은 경로를 예외로 둔다.
         http.csrf(AbstractHttpConfigurer::disable);
+        if (csrfProperties.isHeaderRequired()) {
+            http.addFilterAfter(new CsrfHeaderFilter(CORS_EXEMPT_PATHS, accessDeniedHandler), CorsFilter.class);
+        }
         http.httpBasic(AbstractHttpConfigurer::disable);
-        http.headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable));
+        // 클릭재킹 방지. 같은 출처 프레임만 허용한다(로컬 H2 콘솔은 같은 출처 프레임을 쓴다).
+        http.headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin));
         http.cors(cors -> corsConfigurationSource());
-        http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED));
+        // 동시 세션 수는 제한하지 않는다(-1). 만료 표시된 세션(비밀번호 변경)은 ConcurrentSessionFilter 가 로그아웃시키고 401 을 준다.
+        http.sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+                .maximumSessions(-1)
+                .sessionRegistry(sessionRegistry())
+                .expiredSessionStrategy(event -> authenticationEntryPoint.commence(event.getRequest(), event.getResponse(),
+                        new InsufficientAuthenticationException("Session expired"))));
         http.securityContext(sc -> sc.securityContextRepository(securityContextRepository()));
         http.exceptionHandling(exceptionHandling -> exceptionHandling
                 .authenticationEntryPoint(authenticationEntryPoint)
                 .accessDeniedHandler(accessDeniedHandler));
         http.authorizeHttpRequests(authorizeRequests -> authorizeRequests
+                // 오류 디스패치와 헬스체크. anyRequest 가 인증 필수라 명시하지 않으면 404·500 이 401 로 바뀌고 헬스체크가 실패한다.
+                .requestMatchers("/error", "/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers("/api/auth/login", "/api/auth/logout", "/api/auth/applicants/sign-up", "/api/auth/applicants/check-email", "/api/auth/applicants/find-email",
                         "/api/auth/applicants/email-verification/send", "/api/auth/applicants/email-verification/verify",
                         "/api/auth/applicants/password-reset/send", "/api/auth/applicants/password-reset/verify",
@@ -121,6 +155,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/board/**").hasAnyAuthority(RoleNames.ADMIN, RoleNames.RECRUIT_ADMIN)
                 .requestMatchers(HttpMethod.GET, "/api/job-postings/{jobPostingId}/application").hasAuthority(RoleNames.APPLICANT)
                 .requestMatchers(HttpMethod.GET, "/api/job-postings/**").permitAll()
+                // 비로그인 공개 조회. 여기 없는 경로는 아래 anyRequest 에서 인증을 요구한다.
+                // 공통코드·학교·주소 조회는 지원서 작성·관리자 화면에서만 쓰므로 로그인 필수다(주소·학교는 외부 API 호출 한도를 쓴다).
+                .requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/faqs", "/api/board/**", "/api/menu/**").permitAll()
                 // client event 수집(Phase 09f) — 로그인 전/세션 만료 오류도 수집하므로 permitAll(설계 7장).
                 // anyRequest().permitAll()이 있어도 의도를 명시적으로 고정한다.
                 .requestMatchers(HttpMethod.POST, "/api/client-events").permitAll()
@@ -156,7 +193,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/applicant/**").hasAuthority(RoleNames.APPLICANT)
                 .requestMatchers("/api/interviewer/**").hasAnyAuthority(RoleNames.EMPLOYEE, RoleNames.ADMIN, RoleNames.RECRUIT_ADMIN, RoleNames.INTERVIEWER)
                 .requestMatchers("/api/applications/**").hasAuthority(RoleNames.APPLICANT)
-                .anyRequest().permitAll());
+                // 기본은 인증 필수(fail-closed). 공개가 필요한 새 경로는 위에 명시한다.
+                .anyRequest().authenticated());
         http.authenticationManager(authenticationManager);
 
 //        http.formLogin(form -> form

@@ -10,6 +10,7 @@ import com.shinyoung.recruit.domain.repository.ApplicationAttachmentRepository;
 import com.shinyoung.recruit.domain.repository.ApplicationBasicInfoRepository;
 import com.shinyoung.recruit.domain.repository.JobApplicationRepository;
 import com.shinyoung.recruit.domain.repository.JobPostingRepository;
+import com.shinyoung.recruit.support.AttachmentTestFiles;
 import com.shinyoung.recruit.support.BasicInfoTestSupport;
 import com.shinyoung.recruit.dto.request.ApplicationCreateRequest;
 import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
@@ -38,7 +39,6 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.RecordComponent;
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -376,7 +376,7 @@ class ApplicationAttachmentDeleteServiceTest {
                 "file",
                 originalFileName,
                 "application/pdf",
-                content.getBytes(StandardCharsets.UTF_8)
+                AttachmentTestFiles.content(originalFileName, content)
         );
     }
 

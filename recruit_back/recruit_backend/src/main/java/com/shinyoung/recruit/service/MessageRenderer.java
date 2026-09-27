@@ -63,6 +63,14 @@ public class MessageRenderer {
         return rendered.toString();
     }
 
+    /**
+     * 메일 제목용 치환. 제목은 한 줄이어야 하므로 제어문자(줄바꿈 포함)를 공백으로 바꾼다.
+     * 치환 값(예: 지원자가 입력한 이름)에 CR/LF가 섞여 메일 헤더가 늘어나는 것을 막는다.
+     */
+    public String renderSubject(String text, Map<String, String> values) {
+        return render(text, values).replaceAll("\\p{Cntrl}", " ");
+    }
+
     /** 코드포인트 단위로 127 이하 1byte, 그 밖 2byte. `[Web발신]` 머리말은 세지 않는다. */
     public int smsByteLength(String text) {
         return text.codePoints().map(codePoint -> codePoint <= 127 ? 1 : 2).sum();

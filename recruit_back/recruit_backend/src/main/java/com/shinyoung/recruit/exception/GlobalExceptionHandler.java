@@ -235,6 +235,12 @@ public class GlobalExceptionHandler {
     }
 
     /** client event 수집 rate limit 초과(Phase 09f). FE telemetry는 fire-and-forget이라 응답을 사용하지 않는다. */
+    @ExceptionHandler(AuthAttemptLimitExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAuthAttemptLimitExceeded(AuthAttemptLimitExceededException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(ClientEventRateLimitExceededException.class)
     public ResponseEntity<ApiResponse<Void>> handleClientEventRateLimitExceeded(ClientEventRateLimitExceededException e) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)

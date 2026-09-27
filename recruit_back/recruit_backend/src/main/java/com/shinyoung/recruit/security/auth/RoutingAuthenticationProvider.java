@@ -5,9 +5,11 @@ import com.shinyoung.recruit.domain.entity.Employee;
 import com.shinyoung.recruit.domain.entity.User;
 import com.shinyoung.recruit.domain.repository.EmployeeRepository;
 import com.shinyoung.recruit.domain.repository.UserRepository;
+import com.shinyoung.recruit.service.AuthAttemptLimiter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.core.Authentication;
@@ -25,17 +27,37 @@ public class RoutingAuthenticationProvider implements AuthenticationProvider {
     private final DaoAuthenticationProvider daoProvider;
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
+    private final AuthAttemptLimiter attemptLimiter;
 
-    public RoutingAuthenticationProvider(LdapAuthenticationProvider ldapProvider, DaoAuthenticationProvider daoProvider, UserRepository userRepository, EmployeeRepository employeeRepository) {
+    public RoutingAuthenticationProvider(LdapAuthenticationProvider ldapProvider, DaoAuthenticationProvider daoProvider, UserRepository userRepository, EmployeeRepository employeeRepository, AuthAttemptLimiter attemptLimiter) {
         this.ldapProvider = ldapProvider;
         this.daoProvider = daoProvider;
         this.userRepository = userRepository;
         this.employeeRepository = employeeRepository;
+        this.attemptLimiter = attemptLimiter;
     }
 
+    /**
+     * 아이디별 실패 한도에 닿았으면 LDAP·DB 인증을 시도하지 않고 429를 낸다. 사내 AD 계정 대입과
+     * AD 잠금 유발을 여기서 먼저 막는다. LDAP 장애({@link InternalAuthenticationServiceException})는 실패로 세지 않는다.
+     */
     @Override
     public @Nullable Authentication authenticate(Authentication authentication) throws AuthenticationException {
         String loginId = authentication.getName();
+        attemptLimiter.checkLogin(loginId);
+        try {
+            Authentication result = route(authentication, loginId);
+            attemptLimiter.resetLogin(loginId);
+            return result;
+        } catch (InternalAuthenticationServiceException e) {
+            throw e;
+        } catch (AuthenticationException e) {
+            attemptLimiter.recordLoginFailure(loginId);
+            throw e;
+        }
+    }
+
+    private Authentication route(Authentication authentication, String loginId) {
         Optional<User> userOptional = userRepository.findUserByLoginId(loginId);
 
         if (userOptional.isPresent()) {

@@ -74,11 +74,11 @@
 
 ## API 계약
 
-응답은 `ApiResponse<T>` = `{ success, data, message }`. `CommonCodeResponse` = `{ id, groupCode, code, displayName, sortOrder, active, description }`. `ADMIN·RECRUIT_ADMIN` = `/api/admin/**` broad 매처, 공개 = `anyRequest().permitAll()`(전용 매처 없음).
+응답은 `ApiResponse<T>` = `{ success, data, message }`. `CommonCodeResponse` = `{ id, groupCode, code, displayName, sortOrder, active, description }`. `ADMIN·RECRUIT_ADMIN` = `/api/admin/**` broad 매처, 로그인(역할 무관) = 기본 정책 `anyRequest().authenticated()`(`/api/codes`·`/api/addresses`·`/api/schools`, 2026-09-27 공개에서 전환 — 지원서 작성·관리자 화면에서만 쓰고 주소·학교는 외부 API 호출 한도를 쓴다, [auth-security](auth-security.md)).
 
 | 상태 | 메서드 | 경로 | 요청 요약 | 응답 요약 | 권한 |
 |---|---|---|---|---|---|
-| 🟢 | GET | /codes | query `groupCode`(필수) | `CommonCodeResponse[]` 활성만, `sortOrder`→`id` | 공개 |
+| 🟢 | GET | /codes | query `groupCode`(필수) | `CommonCodeResponse[]` 활성만, `sortOrder`→`id` | 로그인(역할 무관) |
 | 🟢 | GET | /admin/codes | query `groupCode`(선택, 생략=전체) | `CommonCodeResponse[]` 비활성 포함 | ADMIN·RECRUIT_ADMIN |
 | 🟢 | POST | /admin/codes | `{ groupCode*, code*, displayName*, sortOrder?, active?, description? }` | `CommonCodeResponse` | ADMIN·RECRUIT_ADMIN |
 | 🟢 | POST | /admin/codes/{id} | `{ displayName*, sortOrder?, active?, description? }` | `CommonCodeResponse` | ADMIN·RECRUIT_ADMIN |
@@ -86,8 +86,8 @@
 | ⛔ | POST | /admin/schools | `{ schoolName*, schoolType?, schoolCategory?, educationMode?, region?, address?, countryCode?, active? }` | `SchoolResponse` | ADMIN·RECRUIT_ADMIN |
 | ⛔ | POST | /admin/schools/{id} | 생성과 같은 모양(전체 교체) | `SchoolResponse` | ADMIN·RECRUIT_ADMIN |
 | ⛔ | POST | /admin/schools/import | multipart `file`(.xlsx) | `{ totalRows, inserted, updated, skipped, errors:[{ rowNumber, reason }] }` | ADMIN·RECRUIT_ADMIN |
-| 🟢 | GET | /schools | query `q?`, `educationLevel`(필수 enum) | `[{ schoolCode, schoolName, schoolSource, region }]` ≤20건 | 공개 |
-| 🟢 | GET | /addresses | query `keyword`(필수), `currentPage`(1), `countPerPage`(10) | `{ totalCount, currentPage, countPerPage, maxPage, addresses:[{ roadAddr, jibunAddr, zipNo, siNm, sggNm, emdNm, bdNm, engAddr }] }` | 공개 |
+| 🟢 | GET | /schools | query `q?`, `educationLevel`(필수 enum) | `[{ schoolCode, schoolName, schoolSource, region }]` ≤20건 | 로그인(역할 무관) |
+| 🟢 | GET | /addresses | query `keyword`(필수), `currentPage`(1), `countPerPage`(10) | `{ totalCount, currentPage, countPerPage, maxPage, addresses:[{ roadAddr, jibunAddr, zipNo, siNm, sggNm, emdNm, bdNm, engAddr }] }` | 로그인(역할 무관) |
 
 ### 엔드포인트 상세
 
@@ -126,7 +126,7 @@
 **`GET /addresses` — 🟢 확정(2026-09-19 코드 기준)**
 - 페이지네이션은 `maxPage` 기준이다(코드가 계산해 내려줌). FE([application-sections](application-sections.md) `BasicInfoSection.vue`)는 현재 `totalCount`로 페이지 수를 계산하고 FE 타입에 `maxPage`가 없다 — 결과가 9000건을 넘으면 뒤쪽 페이지에서 400이 나는 FE 결함이다. 해소는 `## 변경 레시피`.
 - 승인키 미설정 오류 메시지는 코드 기준 `"주소 검색 서비스가 설정되지 않았습니다."`(502)다.
-- 외부 호출 `GET addrLinkApi.do?confmKey&currentPage&countPerPage&keyword&resultType=json`. 승인키는 서버 설정에만, 클라이언트는 보내지 않는다. 2026-07-31: `maxPage` 추가, 범위 초과 400 선차단, 오류코드 400/502 분류.
+- 외부 호출 `GET addrLinkApi.do?confmKey&currentPage&countPerPage&keyword&resultType=json`. 승인키는 서버 설정에만, 클라이언트는 보내지 않는다. 검색어는 URI 변수로 넘긴다(juso·NEIS, 2026-09-27 — 문자열로 넣으면 중괄호가 템플릿으로 해석돼 500). 호출 실패 로그는 예외 종류만 남긴다(예외 메시지의 URL에 키가 들어 있다 — juso·NEIS·대학 3종). 2026-07-31: `maxPage` 추가, 범위 초과 400 선차단, 오류코드 400/502 분류.
 - 보정: `currentPage`<1→1, `countPerPage` 1~`max-count-per-page`(100). `currentPage×countPerPage > max-search-range`(9000)면 외부 호출 전 400. 실측(2026-07-31, `중앙로`, totalCount 10,715): 900×10 정상 / 901×10 E0015 / 90×100 정상 / 91×100 E0015 → `countPerPage`와 무관한 offset 상한.
 - 응답: `totalCount`·`currentPage`·`countPerPage`는 juso 에코값(파싱 실패 0). **`totalCount`로 페이지 수를 계산하지 않는다.** `maxPage = min(ceil(totalCount/countPerPage), floor(maxSearchRange/countPerPage))`, 결과 없음이면 0. 결과 없음은 200 + 빈 배열.
 

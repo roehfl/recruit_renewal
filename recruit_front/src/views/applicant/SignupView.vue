@@ -39,7 +39,7 @@
             
             <div class="item-abreast">
               <a-form-item class="item" label="비밀번호" name="password">
-                <a-input-password v-model:value="form.password" size="large" placeholder="비밀번호를 입력해주세요. (8자 이상)"></a-input-password>
+                <a-input-password v-model:value="form.password" size="large" :placeholder="PASSWORD_POLICY_PLACEHOLDER"></a-input-password>
               </a-form-item>
               <a-form-item class="item" label="비밀번호확인" name="passwordConfirm"
               :validate-status="isPasswordMismatch ? 'error' : ''">
@@ -101,6 +101,7 @@ import { applicationApi } from '@/api/applicationApi'
 import { getApiErrorMessage } from '@/api/apiError'
 import type { checkEmailRequest } from '@/types/application'
 import { NICE_MESSAGE_SOURCE, type NiceAuthMessage } from '@/types/auth/nice'
+import { PASSWORD_POLICY_PLACEHOLDER, passwordPolicyError } from '@/common/passwordPolicy'
 
 const loading = ref(false);
 const isAvailable = ref(false);
@@ -305,9 +306,10 @@ const isPasswordMismatch = computed(() => {
 });
 
 async function clickToSignupButton() {
-  // 백엔드 ApplicantSignUpRequest 는 비밀번호 8자 이상을 요구한다.
-  if (form.password.length < 8) {
-    message.warning('비밀번호는 8자 이상 입력해주세요.');
+  // 백엔드 ApplicantSignUpRequest 와 같은 조합 규칙(common/passwordPolicy).
+  const passwordError = passwordPolicyError(form.password);
+  if (passwordError) {
+    message.warning(passwordError);
     return;
   }
   if (form.password !== form.passwordConfirm) {

@@ -7,6 +7,7 @@ import com.shinyoung.recruit.domain.repository.UserRoleMappingRepository;
 import com.shinyoung.recruit.security.auth.CustomLdapUserDetailsMapper;
 import com.shinyoung.recruit.security.auth.CustomUserDetailsService;
 import com.shinyoung.recruit.security.auth.RoutingAuthenticationProvider;
+import com.shinyoung.recruit.service.AuthAttemptLimiter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -94,8 +95,8 @@ public class AuthenticationConfig {
     }
 
     @Bean
-    public RoutingAuthenticationProvider routingAuthenticationProvider(LdapAuthenticationProvider ldapAuthenticationProvider, DaoAuthenticationProvider daoAuthenticationProvider, EmployeeRepository employeeRepository) {
-        return new RoutingAuthenticationProvider(ldapAuthenticationProvider, daoAuthenticationProvider, userRepository, employeeRepository);
+    public RoutingAuthenticationProvider routingAuthenticationProvider(LdapAuthenticationProvider ldapAuthenticationProvider, DaoAuthenticationProvider daoAuthenticationProvider, EmployeeRepository employeeRepository, AuthAttemptLimiter authAttemptLimiter) {
+        return new RoutingAuthenticationProvider(ldapAuthenticationProvider, daoAuthenticationProvider, userRepository, employeeRepository, authAttemptLimiter);
     }
 
     @Bean

@@ -1,9 +1,11 @@
 package com.shinyoung.recruit.service;
 
 import com.shinyoung.recruit.common.hash.HashUtil;
+import com.shinyoung.recruit.config.AuthAttemptLimitProperties;
 import com.shinyoung.recruit.enumeration.EmailVerificationPurpose;
 import com.shinyoung.recruit.enumeration.MessageType;
 import com.shinyoung.recruit.enumeration.SystemMailOutcome;
+import com.shinyoung.recruit.exception.AuthAttemptLimitExceededException;
 import com.shinyoung.recruit.exception.InvalidEmailVerificationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,8 +47,12 @@ class EmailVerificationServiceTest {
     @Captor
     private ArgumentCaptor<Map<String, String>> variables;
 
+    /** 테스트마다 새로 만든다. 세션(상태)을 새로 만들어도 이 한도는 이어서 센다. */
+    private final AuthAttemptLimiter attemptLimiter =
+            new AuthAttemptLimiter(Clock.fixed(BASE, ZONE), new AuthAttemptLimitProperties());
+
     private EmailVerificationService at(Duration elapsed) {
-        return new EmailVerificationService(systemMailService, Clock.fixed(BASE.plus(elapsed), ZONE));
+        return new EmailVerificationService(systemMailService, Clock.fixed(BASE.plus(elapsed), ZONE), attemptLimiter);
     }
 
     private static LocalDateTime time(Duration elapsed) {
@@ -166,6 +172,35 @@ class EmailVerificationServiceTest {
         assertThatThrownBy(() -> at(Duration.ZERO).send(null, SIGNUP, EMAIL, ""))
                 .isInstanceOf(InvalidEmailVerificationException.class)
                 .hasMessage("인증 메일 템플릿이 없습니다. 관리자에게 문의하세요.");
+    }
+
+    @Test
+    void 세션을_새로_만들어도_이메일당_발송은_5회까지다() {
+        EmailVerificationService service = at(Duration.ZERO);
+        for (int i = 0; i < 5; i++) {
+            service.issue(null, SIGNUP, EMAIL);
+        }
+
+        assertThatThrownBy(() -> service.issue(null, PASSWORD_RESET, " APPLICANT@example.com "))
+                .isInstanceOf(AuthAttemptLimitExceededException.class)
+                .hasMessage("인증번호 요청이 너무 많습니다. 60분 후 다시 시도해 주세요.");
+    }
+
+    @Test
+    void 세션을_새로_만들어도_이메일당_오답은_10회까지고_이후엔_맞아도_거부한다() {
+        EmailVerificationService service = at(Duration.ZERO);
+        for (int session = 0; session < 2; session++) {
+            EmailVerificationState state = service.issue(null, SIGNUP, EMAIL).state();
+            for (int i = 0; i < 5; i++) {
+                assertThatThrownBy(() -> service.verify(state, SIGNUP, EMAIL, "wrong"))
+                        .isInstanceOf(InvalidEmailVerificationException.class);
+            }
+        }
+        EmailVerificationService.IssuedCode fresh = service.issue(null, SIGNUP, EMAIL);
+
+        assertThatThrownBy(() -> service.verify(fresh.state(), SIGNUP, EMAIL, fresh.code()))
+                .isInstanceOf(AuthAttemptLimitExceededException.class)
+                .hasMessage("인증번호를 너무 많이 틀렸습니다. 60분 후 다시 시도해 주세요.");
     }
 
     @Test

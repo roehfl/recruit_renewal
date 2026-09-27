@@ -202,7 +202,7 @@ public class MessageSendService {
             mailReason = MessageContacts.skipReason(email);
         } else {
             mailStatus = MessageDeliveryStatus.PENDING;
-            subject = prefix + messageRenderer.render(content.mailSubject(), variables);
+            subject = prefix + messageRenderer.renderSubject(content.mailSubject(), variables);
             mailBody = messageRenderer.render(content.mailBody(), variables);
         }
 

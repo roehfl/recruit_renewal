@@ -3,7 +3,9 @@ import { reactive, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { LockOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
+import axios from 'axios'
 import { useAuthStore } from '@/stores/authStore'
+import { getApiErrorMessage } from '@/api/apiError'
 import { ADMIN_ROLES } from '@/routes/adminRoutes'
 import logoImage from '@/assets/images/logo.png'
 
@@ -82,7 +84,11 @@ const handleLogin = async () => {
     moveAfterLogin()
   } catch (error) {
     console.error(error)
-    errorMessage.value = '아이디 또는 비밀번호를 확인하세요.'
+    // 429 는 시도 횟수 초과(서버가 대기 시간을 알려 준다). 그 밖의 실패는 계정 존재 여부를 드러내지 않는 문구로 통일한다.
+    errorMessage.value =
+      axios.isAxiosError(error) && error.response?.status === 429
+        ? getApiErrorMessage(error)
+        : '아이디 또는 비밀번호를 확인하세요.'
   } finally {
     loading.value = false
   }

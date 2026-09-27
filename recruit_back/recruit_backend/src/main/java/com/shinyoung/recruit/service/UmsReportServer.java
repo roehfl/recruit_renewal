@@ -12,16 +12,20 @@ import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * 발송 솔루션(UMS)이 보내는 발송 결과를 TCP 로 받는다(recruit.message.gateway=trnode, 포트 recruit.message.report-port).
@@ -30,7 +34,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * [8,13) 결과 종류(UMS01 메일, UMS04·UMS05 SMS·LMS, 그 밖은 무시) [13,45) UUID = 거래 ID
  * [45,145) 수신 이메일 또는 번호 [145,147) 결과코드.
  * 레거시와 달리 연결은 작은 고정 스레드 풀에서 처리하고 읽기 타임아웃을 두며, 잘못된 줄은 그 줄만 건너뛴다.
- * 로그에는 건수만 남긴다(연락처·원문 금지).
+ * 인증이 없는 포트라 대기 연결 수·한 줄 길이에 상한을 두고, 허용 IP 목록(recruit.message.report-allowed-ips)이 있으면
+ * 그 밖의 연결은 바로 닫는다. 로그에는 건수만 남긴다(연락처·원문 금지).
  */
 @Component
 @ConditionalOnProperty(prefix = "recruit.message", name = "gateway", havingValue = "trnode")
@@ -39,11 +44,16 @@ public class UmsReportServer implements SmartLifecycle {
     private static final Logger log = LoggerFactory.getLogger(UmsReportServer.class);
     static final Duration READ_TIMEOUT = Duration.ofSeconds(30);
     private static final int WORKERS = 4;
+    /** 처리 대기 연결 수. 넘치면 연결을 바로 닫는다(무제한 큐로 메모리가 쌓이지 않게). */
+    static final int QUEUE_CAPACITY = 16;
+    /** 한 줄 상한. 정상 줄은 147자다. 넘으면 연결을 끊는다(줄바꿈 없는 거대한 입력 방어). */
+    static final int MAX_LINE_LENGTH = 1024;
     private static final int CODE_END = 13;
     private static final int LINE_LENGTH = 147;
 
     private final DeliveryReportHandler deliveryReportHandler;
     private final int port;
+    private final Set<String> allowedIps;
     private ServerSocket serverSocket;
     private ExecutorService workers;
     private volatile boolean running;
@@ -51,6 +61,10 @@ public class UmsReportServer implements SmartLifecycle {
     public UmsReportServer(DeliveryReportHandler deliveryReportHandler, MessageProperties messageProperties) {
         this.deliveryReportHandler = deliveryReportHandler;
         this.port = messageProperties.getReportPort();
+        this.allowedIps = messageProperties.getReportAllowedIps().stream()
+                .map(String::trim)
+                .filter(ip -> !ip.isEmpty())
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     /** 포트를 열지 못하면 기동을 실패시킨다(결과를 못 받는 채로 조용히 떠 있지 않게). */
@@ -62,7 +76,8 @@ public class UmsReportServer implements SmartLifecycle {
             throw new IllegalStateException("발송 결과 수신 포트를 열 수 없습니다: port=" + port, e);
         }
         AtomicInteger workerNumber = new AtomicInteger();
-        workers = Executors.newFixedThreadPool(WORKERS,
+        workers = new ThreadPoolExecutor(WORKERS, WORKERS, 0L, TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(QUEUE_CAPACITY),
                 task -> new Thread(task, "ums-report-" + workerNumber.incrementAndGet()));
         running = true;
         Thread acceptor = new Thread(this::acceptLoop, "ums-report-acceptor");
@@ -107,6 +122,11 @@ public class UmsReportServer implements SmartLifecycle {
                 }
                 continue;
             }
+            if (!allowedIps.isEmpty() && !allowedIps.contains(socket.getInetAddress().getHostAddress())) {
+                log.warn("허용하지 않은 주소의 발송 결과 연결을 닫습니다.");
+                closeQuietly(socket);
+                continue;
+            }
             try {
                 workers.execute(() -> receive(socket));
             } catch (RejectedExecutionException e) {
@@ -125,7 +145,7 @@ public class UmsReportServer implements SmartLifecycle {
             int lines = 0;
             int reports = 0;
             String line;
-            while ((line = reader.readLine()) != null) {
+            while ((line = readLine(reader)) != null) {
                 lines++;
                 Optional<DeliveryReport> report = parse(line);
                 if (report.isPresent()) {
@@ -140,6 +160,29 @@ public class UmsReportServer implements SmartLifecycle {
         } catch (IOException e) {
             log.warn("발송 결과 수신 실패: error={}", e.getClass().getSimpleName());
         }
+    }
+
+    /** {@link BufferedReader#readLine}과 같되(\n·\r\n·\r) {@link #MAX_LINE_LENGTH}를 넘으면 연결을 끊는다. EOF면 null. */
+    static String readLine(Reader reader) throws IOException {
+        StringBuilder line = new StringBuilder();
+        int c;
+        while ((c = reader.read()) != -1) {
+            if (c == '\n') {
+                return line.toString();
+            }
+            if (c == '\r') {
+                reader.mark(1);
+                if (reader.read() != '\n') {
+                    reader.reset();
+                }
+                return line.toString();
+            }
+            if (line.length() >= MAX_LINE_LENGTH) {
+                throw new IOException("line too long");
+            }
+            line.append((char) c);
+        }
+        return line.isEmpty() ? null : line.toString();
     }
 
     /** 결과 한 줄 → 수신자 1명의 발송 결과. 메일·SMS 결과가 아니거나 길이가 모자라면 비운다. */

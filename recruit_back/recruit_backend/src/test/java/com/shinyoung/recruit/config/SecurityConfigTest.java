@@ -1,11 +1,22 @@
 package com.shinyoung.recruit.config;
 
+import com.shinyoung.recruit.security.auth.CustomUserDetails;
+import com.shinyoung.recruit.security.auth.RoleNames;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
 
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.not;
@@ -32,6 +43,9 @@ public class SecurityConfigTest {
 
     @Autowired
     MockMvc mockMvc;
+
+    @Autowired
+    SessionRegistry sessionRegistry;
 
     @Test
     void 메뉴_트리_조회는_인증없이_허용() throws Exception {
@@ -398,5 +412,78 @@ public class SecurityConfigTest {
         mockMvc.perform(post("/api/auth/nice/request")
                         .header("Origin", "https://nice.checkplus.co.kr"))
                 .andExpect(status().isForbidden());
+    }
+
+    /*
+     * 기본 정책은 인증 필수(anyRequest().authenticated()). 보호 접두 밖에 새 엔드포인트가 생겨도 자동으로 공개되지 않는다.
+     * 비로그인 공개 조회는 명시한 목록만 통과한다.
+     */
+    @Test
+    void 매처에_없는_경로는_비인증이면_401() throws Exception {
+        mockMvc.perform(get("/api/not-mapped-anywhere"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/not-mapped-anywhere"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 매처에_없는_경로도_로그인하면_인가를_통과한다() throws Exception {
+        mockMvc.perform(get("/api/not-mapped-anywhere").with(user("applicant").authorities(() -> "ROLE_APPLICANT")))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
+
+    @Test
+    void 비로그인_공개_조회는_인증없이_인가를_통과한다() throws Exception {
+        // /api/auth/me 는 컨트롤러가 비로그인이면 직접 401 을 돌려주므로 여기서 보지 않는다.
+        for (String path : new String[]{"/api/faqs", "/api/board/notices", "/api/menu/breadcrumb", "/api/job-postings"}) {
+            mockMvc.perform(get(path))
+                    .andExpect(status().is(allOf(not(401), not(403))));
+        }
+    }
+
+    /* 공통코드·학교·주소 조회는 지원서 작성·관리자 화면에서만 쓴다. 주소·학교는 외부 API 호출 한도를 쓰므로 로그인 필수(2026-09-27). */
+    @Test
+    void 공통코드_학교_주소_조회는_비인증이면_401() throws Exception {
+        for (String path : new String[]{"/api/codes", "/api/schools", "/api/addresses"}) {
+            mockMvc.perform(get(path))
+                    .andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
+    void 공통코드_학교_주소_조회는_로그인하면_역할과_무관하게_인가를_통과한다() throws Exception {
+        for (String authority : new String[]{"ROLE_APPLICANT", "ROLE_EMPLOYEE"}) {
+            for (String path : new String[]{"/api/codes", "/api/schools", "/api/addresses"}) {
+                mockMvc.perform(get(path).with(user("user").authorities(() -> authority)))
+                        .andExpect(status().is(allOf(not(401), not(403))));
+            }
+        }
+    }
+
+    @Test
+    void 헬스체크는_인증없이_인가를_통과한다() throws Exception {
+        // 상태값(UP/DOWN)은 LDAP 등 연결 상태에 따라 다르다. 여기서는 인가만 본다.
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().is(allOf(not(401), not(403))));
+    }
+
+    /* 비밀번호를 바꾸면 UserSessionRevoker 가 다른 세션을 만료 표시한다. 그 세션의 다음 요청은 로그아웃되고 401 이다. */
+    @Test
+    void 만료_표시된_세션으로_요청하면_401() throws Exception {
+        CustomUserDetails admin = CustomUserDetails.fromLdap("expired-session-admin", "", "관리자",
+                List.of(new SimpleGrantedAuthority(RoleNames.ADMIN)));
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(admin, null, admin.getAuthorities()));
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+        sessionRegistry.registerNewSession(session.getId(), admin);
+
+        mockMvc.perform(get(ROLE_MAPPING_DEPT_PATH).session(session))
+                .andExpect(status().is(allOf(not(401), not(403))));
+
+        sessionRegistry.getSessionInformation(session.getId()).expireNow();
+
+        mockMvc.perform(get(ROLE_MAPPING_DEPT_PATH).session(session))
+                .andExpect(status().isUnauthorized());
     }
 }

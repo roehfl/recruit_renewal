@@ -1,22 +1,28 @@
 package com.shinyoung.recruit.security.auth;
 
 import com.shinyoung.recruit.common.hash.HashUtil;
+import com.shinyoung.recruit.config.AuthAttemptLimitProperties;
 import com.shinyoung.recruit.domain.entity.Applicant;
 import com.shinyoung.recruit.domain.entity.Employee;
 import com.shinyoung.recruit.domain.repository.EmployeeRepository;
 import com.shinyoung.recruit.domain.repository.UserRepository;
+import com.shinyoung.recruit.exception.AuthAttemptLimitExceededException;
+import com.shinyoung.recruit.service.AuthAttemptLimiter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.ldap.authentication.LdapAuthenticationProvider;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 
@@ -50,7 +56,8 @@ class RoutingAuthenticationProviderTest {
     @BeforeEach
     void setUp() {
         routingAuthenticationProvider = new RoutingAuthenticationProvider(
-                ldapProvider, daoProvider, userRepository, employeeRepository);
+                ldapProvider, daoProvider, userRepository, employeeRepository,
+                new AuthAttemptLimiter(Clock.systemUTC(), new AuthAttemptLimitProperties()));
     }
 
     private Authentication loginRequest(String loginId) {
@@ -171,5 +178,55 @@ class RoutingAuthenticationProviderTest {
         employee.setDeptName("IT센터");
         employee.setName("임직원");
         return employee;
+    }
+
+    /* 로그인 시도 제한 — 아이디별 실패 5회면 LDAP·DB 인증을 시도하지 않고 429(AD 계정 대입·잠금 유발 차단). */
+
+    @Test
+    void 실패가_5회_쌓이면_인증을_시도하지_않고_거부한다() {
+        Authentication request = loginRequest("emp01");
+        given(userRepository.findUserByLoginId("emp01")).willReturn(Optional.empty());
+        given(ldapProvider.authenticate(request)).willThrow(new BadCredentialsException("bad"));
+        for (int i = 0; i < 5; i++) {
+            assertThatThrownBy(() -> routingAuthenticationProvider.authenticate(request))
+                    .isInstanceOf(BadCredentialsException.class);
+        }
+
+        assertThatThrownBy(() -> routingAuthenticationProvider.authenticate(loginRequest(" EMP01 ")))
+                .isInstanceOf(AuthAttemptLimitExceededException.class)
+                .hasMessage("로그인 시도가 너무 많습니다. 15분 후 다시 시도해 주세요.");
+        verify(ldapProvider, times(5)).authenticate(request);
+    }
+
+    @Test
+    void 성공하면_실패_수를_지운다() {
+        Authentication request = loginRequest("emp01");
+        given(userRepository.findUserByLoginId("emp01")).willReturn(Optional.empty());
+        given(employeeRepository.save(any(Employee.class))).willAnswer(invocation -> invocation.getArgument(0));
+        BadCredentialsException bad = new BadCredentialsException("bad");
+        given(ldapProvider.authenticate(request))
+                .willThrow(bad, bad, bad, bad)
+                .willReturn(ldapSuccess("emp01"))
+                .willThrow(bad);
+        for (int i = 0; i < 4; i++) {
+            assertThatThrownBy(() -> routingAuthenticationProvider.authenticate(request)).isSameAs(bad);
+        }
+        routingAuthenticationProvider.authenticate(request);
+
+        for (int i = 0; i < 5; i++) {
+            assertThatThrownBy(() -> routingAuthenticationProvider.authenticate(request)).isSameAs(bad);
+        }
+    }
+
+    @Test
+    void LDAP_장애는_실패로_세지_않는다() {
+        Authentication request = loginRequest("emp01");
+        given(userRepository.findUserByLoginId("emp01")).willReturn(Optional.empty());
+        given(ldapProvider.authenticate(request)).willThrow(new InternalAuthenticationServiceException("ldap down"));
+
+        for (int i = 0; i < 6; i++) {
+            assertThatThrownBy(() -> routingAuthenticationProvider.authenticate(request))
+                    .isInstanceOf(InternalAuthenticationServiceException.class);
+        }
     }
 }

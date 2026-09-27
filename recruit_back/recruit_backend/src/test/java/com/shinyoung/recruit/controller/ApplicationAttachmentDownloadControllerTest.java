@@ -24,6 +24,7 @@ import com.shinyoung.recruit.service.AttachmentStorageService;
 import com.shinyoung.recruit.service.JobApplicationService;
 import com.shinyoung.recruit.service.JobPostingService;
 import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.support.AttachmentTestFiles;
 import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,7 +44,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -121,7 +121,7 @@ class ApplicationAttachmentDownloadControllerTest {
     void applicant_download_returns_file_stream_headers_and_bytes() throws Exception {
         Applicant applicant = createApplicant("download-api-applicant", "Download Api Applicant");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
-        byte[] bytes = "resume-bytes".getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = AttachmentTestFiles.content("resume.pdf", "resume-bytes");
         Long attachmentId = upload(applicant, applicationId, "resume.pdf", "application/pdf", bytes);
 
         mockMvc.perform(get("/api/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
@@ -146,7 +146,7 @@ class ApplicationAttachmentDownloadControllerTest {
                 applicationId,
                 "이력서.pdf",
                 "application/pdf",
-                "korean".getBytes(StandardCharsets.UTF_8)
+                AttachmentTestFiles.content("이력서.pdf", "korean")
         );
 
         mockMvc.perform(get("/api/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
@@ -160,7 +160,7 @@ class ApplicationAttachmentDownloadControllerTest {
     void admin_download_returns_file_stream_for_stored_attachment() throws Exception {
         Applicant applicant = createApplicant("download-api-admin", "Download Api Admin");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
-        byte[] bytes = "admin-bytes".getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = AttachmentTestFiles.content("admin.pdf", "admin-bytes");
         Long attachmentId = upload(applicant, applicationId, "admin.pdf", "application/pdf", bytes);
 
         mockMvc.perform(get("/api/admin/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
@@ -177,7 +177,7 @@ class ApplicationAttachmentDownloadControllerTest {
         Applicant other = createApplicant("download-api-other", "Download Api Other");
         Long applicationId = createApplication(owner, createPublishedJobPosting());
         Long otherApplicationId = createApplication(other, createPublishedJobPosting());
-        Long storedAttachmentId = upload(owner, applicationId, "stored.pdf", "application/pdf", "stored".getBytes(StandardCharsets.UTF_8));
+        Long storedAttachmentId = upload(owner, applicationId, "stored.pdf", "application/pdf", AttachmentTestFiles.content("stored.pdf", "stored"));
         ApplicationAttachment stored = attachmentRepository.findById(storedAttachmentId).orElseThrow();
         storageService.deleteIfExists(stored.getStoragePath());
 
@@ -220,7 +220,7 @@ class ApplicationAttachmentDownloadControllerTest {
         Applicant applicant = createApplicant("download-api-admin-404", "Download Api Admin 404");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
         Long otherApplicationId = createApplication(applicant, createPublishedJobPosting());
-        Long attachmentId = upload(applicant, applicationId, "admin.pdf", "application/pdf", "admin".getBytes(StandardCharsets.UTF_8));
+        Long attachmentId = upload(applicant, applicationId, "admin.pdf", "application/pdf", AttachmentTestFiles.content("admin.pdf", "admin"));
 
         mockMvc.perform(get("/api/admin/applications/{applicationId}/attachments/{attachmentId}/download", 99999L, attachmentId)
                         .with(authentication(employeeAuthentication("admin-404", "ROLE_ADMIN"))))
@@ -241,7 +241,7 @@ class ApplicationAttachmentDownloadControllerTest {
     void download_security_blocks_wrong_roles_and_anonymous_requests() throws Exception {
         Applicant applicant = createApplicant("download-api-security", "Download Api Security");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
-        Long attachmentId = upload(applicant, applicationId, "security.pdf", "application/pdf", "security".getBytes(StandardCharsets.UTF_8));
+        Long attachmentId = upload(applicant, applicationId, "security.pdf", "application/pdf", AttachmentTestFiles.content("security.pdf", "security"));
 
         mockMvc.perform(get("/api/applications/{applicationId}/attachments/{attachmentId}/download", applicationId, attachmentId)
                         .with(authentication(employeeAuthentication("employee-applicant-path", "ROLE_ADMIN"))))
@@ -276,7 +276,7 @@ class ApplicationAttachmentDownloadControllerTest {
     void applicant_delete_returns_api_response_without_storage_internals() throws Exception {
         Applicant applicant = createApplicant("delete-api-applicant", "Delete Api Applicant");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
-        Long attachmentId = upload(applicant, applicationId, "delete.pdf", "application/pdf", "delete".getBytes(StandardCharsets.UTF_8));
+        Long attachmentId = upload(applicant, applicationId, "delete.pdf", "application/pdf", AttachmentTestFiles.content("delete.pdf", "delete"));
 
         mockMvc.perform(post("/api/applications/{applicationId}/attachments/{attachmentId}/delete", applicationId, attachmentId)
                         .with(authentication(applicantAuthentication(applicant))))
@@ -301,7 +301,7 @@ class ApplicationAttachmentDownloadControllerTest {
     void applicant_delete_security_blocks_wrong_roles_and_anonymous_requests() throws Exception {
         Applicant applicant = createApplicant("delete-api-security", "Delete Api Security");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
-        Long attachmentId = upload(applicant, applicationId, "security.pdf", "application/pdf", "security".getBytes(StandardCharsets.UTF_8));
+        Long attachmentId = upload(applicant, applicationId, "security.pdf", "application/pdf", AttachmentTestFiles.content("security.pdf", "security"));
 
         mockMvc.perform(post("/api/applications/{applicationId}/attachments/{attachmentId}/delete", applicationId, attachmentId)
                         .with(authentication(employeeAuthentication("employee-delete-applicant-path", "ROLE_ADMIN"))))
@@ -318,7 +318,7 @@ class ApplicationAttachmentDownloadControllerTest {
     void admin_delete_returns_api_response_and_validates_reason() throws Exception {
         Applicant adminApplicant = createApplicant("delete-api-admin", "Delete Api Admin");
         Long adminApplicationId = createApplication(adminApplicant, createPublishedJobPosting());
-        Long adminAttachmentId = upload(adminApplicant, adminApplicationId, "admin.pdf", "application/pdf", "admin".getBytes(StandardCharsets.UTF_8));
+        Long adminAttachmentId = upload(adminApplicant, adminApplicationId, "admin.pdf", "application/pdf", AttachmentTestFiles.content("admin.pdf", "admin"));
 
         mockMvc.perform(post("/api/admin/applications/{applicationId}/attachments/{attachmentId}/delete", adminApplicationId, adminAttachmentId)
                         .with(authentication(employeeAuthentication("admin-delete", "ROLE_ADMIN")))
@@ -338,7 +338,7 @@ class ApplicationAttachmentDownloadControllerTest {
 
         Applicant recruitAdminApplicant = createApplicant("delete-api-recruit-admin", "Delete Api Recruit Admin");
         Long recruitAdminApplicationId = createApplication(recruitAdminApplicant, createPublishedJobPosting());
-        Long recruitAdminAttachmentId = upload(recruitAdminApplicant, recruitAdminApplicationId, "recruit-admin.pdf", "application/pdf", "recruit".getBytes(StandardCharsets.UTF_8));
+        Long recruitAdminAttachmentId = upload(recruitAdminApplicant, recruitAdminApplicationId, "recruit-admin.pdf", "application/pdf", AttachmentTestFiles.content("recruit-admin.pdf", "recruit"));
 
         mockMvc.perform(post("/api/admin/applications/{applicationId}/attachments/{attachmentId}/delete", recruitAdminApplicationId, recruitAdminAttachmentId)
                         .with(authentication(employeeAuthentication("recruit-admin-delete", "ROLE_RECRUIT_ADMIN")))
@@ -353,7 +353,7 @@ class ApplicationAttachmentDownloadControllerTest {
 
         Applicant validationApplicant = createApplicant("delete-api-admin-validation", "Delete Api Admin Validation");
         Long validationApplicationId = createApplication(validationApplicant, createPublishedJobPosting());
-        Long validationAttachmentId = upload(validationApplicant, validationApplicationId, "validation.pdf", "application/pdf", "validation".getBytes(StandardCharsets.UTF_8));
+        Long validationAttachmentId = upload(validationApplicant, validationApplicationId, "validation.pdf", "application/pdf", AttachmentTestFiles.content("validation.pdf", "validation"));
 
         mockMvc.perform(post("/api/admin/applications/{applicationId}/attachments/{attachmentId}/delete", validationApplicationId, validationAttachmentId)
                         .with(authentication(employeeAuthentication("admin-delete-blank", "ROLE_ADMIN")))
@@ -371,7 +371,7 @@ class ApplicationAttachmentDownloadControllerTest {
     void admin_delete_security_blocks_applicant_and_anonymous_requests() throws Exception {
         Applicant applicant = createApplicant("delete-api-admin-security", "Delete Api Admin Security");
         Long applicationId = createApplication(applicant, createPublishedJobPosting());
-        Long attachmentId = upload(applicant, applicationId, "security.pdf", "application/pdf", "security".getBytes(StandardCharsets.UTF_8));
+        Long attachmentId = upload(applicant, applicationId, "security.pdf", "application/pdf", AttachmentTestFiles.content("security.pdf", "security"));
 
         mockMvc.perform(post("/api/admin/applications/{applicationId}/attachments/{attachmentId}/delete", applicationId, attachmentId)
                         .with(authentication(applicantAuthentication(applicant)))

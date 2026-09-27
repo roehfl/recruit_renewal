@@ -88,6 +88,12 @@ class MessageRendererTest {
     }
 
     @Test
+    void 메일_제목은_치환_값의_줄바꿈과_제어문자를_공백으로_바꾼다() {
+        assertThat(renderer.renderSubject("#{이름}님 안내", Map.of("이름", "김\r\nBcc: attacker@example.com\t")))
+                .isEqualTo("김  Bcc: attacker@example.com 님 안내");
+    }
+
+    @Test
     void null_본문은_빈_문자열로_치환한다() {
         assertThat(renderer.render(null, Map.of("이름", "김"))).isEmpty();
     }

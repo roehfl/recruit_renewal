@@ -20,7 +20,17 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class NiceVerificationStore {
 
+    /**
+     * 보관 상한. {@code /auth/nice/request}는 비로그인 공개라 무한히 부르면 정리 주기(30분) 동안 메모리가 쌓인다.
+     * 레코드가 작아(수백 바이트) 10만 건이면 수십 MB다. 넘으면 서비스가 새 요청을 거부한다(fail-closed).
+     */
+    public static final int MAX_RECORDS = 100_000;
+
     private final Map<String, NiceVerificationRecord> records = new ConcurrentHashMap<>();
+
+    public int size() {
+        return records.size();
+    }
 
     /**
      * 있으면 덮어쓴다. 서비스는 쓰지 않는다 — 발급은 {@link #saveIfAbsent}, 상태 전이는

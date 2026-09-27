@@ -25,6 +25,7 @@ import com.shinyoung.recruit.enumeration.AttachmentStorageHealthIssueType;
 import com.shinyoung.recruit.enumeration.AttachmentType;
 import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.domain.repository.JobPostingImageRepository;
+import com.shinyoung.recruit.support.AttachmentTestFiles;
 import com.shinyoung.recruit.support.JobPostingImageTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -347,7 +348,7 @@ class AttachmentStorageHealthScanServiceTest {
                         "file",
                         originalFileName,
                         "application/pdf",
-                        content.getBytes(StandardCharsets.UTF_8)
+                        AttachmentTestFiles.content(originalFileName, content)
                 ),
                 AttachmentType.RESUME,
                 ApplicationSectionType.APPLICATION,

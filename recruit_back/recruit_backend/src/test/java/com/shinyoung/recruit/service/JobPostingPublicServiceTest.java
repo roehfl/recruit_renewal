@@ -846,7 +846,8 @@ class JobPostingPublicServiceTest {
                 title,
                 postingType,
                 summary,
-                "<p>detail</p>",
+                // 공개 상세 응답은 정제해 내보낸다 — script 는 빠지고 <p>detail</p> 만 남아야 한다.
+                "<p>detail</p><script>alert(1)</script>",
                 receptionStartDateTime,
                 receptionEndDateTime,
                 displayStartDateTime,

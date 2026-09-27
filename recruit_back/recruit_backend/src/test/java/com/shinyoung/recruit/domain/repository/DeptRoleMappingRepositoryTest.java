@@ -107,4 +107,26 @@ public class DeptRoleMappingRepositoryTest {
 
         assertThat(repository.findByDeptNameContainedIn(GROUP_NAME)).isEmpty();
     }
+
+    /* 부서명의 %·_ 는 와일드카드가 아니라 글자 그대로 비교한다. 와일드카드면 "%%" 한 건으로 전 임직원에게 역할이 붙는다. */
+    @Test
+    void 퍼센트_부서명은_모든_그룹에_매칭되지_않는다() {
+        saveMapping("%%", "ROLE_ADMIN");
+
+        assertThat(repository.findByDeptNameContainedIn(GROUP_NAME)).isEmpty();
+    }
+
+    @Test
+    void 밑줄_부서명은_임의_글자에_매칭되지_않는다() {
+        saveMapping("내부_널", "ROLE_ADMIN");
+
+        assertThat(repository.findByDeptNameContainedIn(GROUP_NAME)).isEmpty();
+    }
+
+    @Test
+    void 밑줄이_든_부서명도_글자_그대로_포함되면_매칭된다() {
+        saveMapping("내부채널_부서", "ROLE_RECRUIT_ADMIN");
+
+        assertThat(repository.findByDeptNameContainedIn(GROUP_NAME)).hasSize(1);
+    }
 }

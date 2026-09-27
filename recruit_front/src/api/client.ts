@@ -12,6 +12,8 @@ export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
   timeout: 10000,
   withCredentials: true,
+  // CSRF 방어: 서버는 /api 상태 변경 요청에 이 헤더를 요구한다(CsrfHeaderFilter). 교차 사이트 폼은 붙일 수 없다.
+  headers: { 'X-Requested-With': 'XMLHttpRequest' },
 })
 
 apiClient.interceptors.request.use(

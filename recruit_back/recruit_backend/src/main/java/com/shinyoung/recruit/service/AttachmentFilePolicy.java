@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -38,8 +40,22 @@ public class AttachmentFilePolicy {
         String extension = extractExtension(originalFileName);
         validateExtension(extension);
         validateContentType(file.getContentType());
+        validateSignature(file, extension);
 
         return new ValidatedAttachmentFile(originalFileName, extension);
+    }
+
+    /** 실제 내용이 확장자의 형식인지 매직바이트로 본다(AttachmentSignatureValidator). */
+    private void validateSignature(MultipartFile file, String extension) {
+        byte[] head;
+        try (InputStream in = file.getInputStream()) {
+            head = in.readNBytes(AttachmentSignatureValidator.HEAD_LENGTH);
+        } catch (IOException e) {
+            throw new InvalidJobApplicationException("Attachment file could not be read.");
+        }
+        if (!AttachmentSignatureValidator.matches(extension, head)) {
+            throw new InvalidJobApplicationException("Attachment file content does not match its extension.");
+        }
     }
 
     private String sanitizeOriginalFileName(String originalFileName) {

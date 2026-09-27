@@ -207,7 +207,7 @@
 - ③ 성공 첨부 `BINARY_DELETED`(`storagePath` null), 실패 `BINARY_DELETE_FAILED`. **전부** 성공일 때만 지원서 `PURGED`+item PENDING→PURGED(item이 없으면 예외 롤백).
 - reconcile: `PURGE_PENDING` 지원서 id asc `limit`건마다 원 `purgeBatchId`로 ②③. `purgeBatchId` null·단건 예외는 errorCount만 올리고 계속. 감사 시작(`reconcile started: scanned=N`)+요약(stillPending·error 있으면 FAILURE) — 시작만 있으면 중단된 sweep.
 
-**권한**: API 표 권한 = `{BE}/config/SecurityConfig.java`([auth-account](auth-account.md) 소유)의 메서드별 좁은 매처. 전부 broad `/api/admin/**`보다 **앞**, GET `holds/**`는 GET `retention/**`보다 앞 — 순서가 보안 요구사항.
+**권한**: API 표 권한 = `{BE}/config/SecurityConfig.java`([auth-security](auth-security.md) 소유)의 메서드별 좁은 매처. 전부 broad `/api/admin/**`보다 **앞**, GET `holds/**`는 GET `retention/**`보다 앞 — 순서가 보안 요구사항.
 
 `AUDIT_HMAC_SECRET`·`AuditHmac`(파기 값 해시)는 [privacy-audit-audit](privacy-audit-audit.md) 소유. 새 감사 이벤트(`AuditActionType` 추가 등) 레시피도 그 카드에 있다.
 

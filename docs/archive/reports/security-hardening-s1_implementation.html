@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>보안 강화 1차 - 설정·의존성 조치</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal</div>
+  <h1>보안 강화 1차 - 설정·의존성 조치</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge muted">작성일: 2026-09-27</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>전 시스템 보안 점검 결과 중 설정 변경과 버전 업그레이드로 해결되는 항목을 1차로 조치했습니다.</p>
+      <p>개발용 기능(H2 콘솔, API 문서)은 기본적으로 끄고 로컬에서만 켜도록 했습니다. 설정 누락이 조용한 위험으로 이어지던 값(메시지 게이트웨이, CORS 허용 출처, 세션 쿠키)은 안전한 기본값을 두거나 기동 실패로 바꿨습니다.</p>
+      <p>부서 권한 매핑의 와일드카드 권한 상승을 막았습니다. Spring Boot 4.0.8, Tomcat 11.0.26 등으로 올려 알려진 CVE를 해소했습니다.</p>
+      <p>2차(시도 횟수 제한, 첨부 내용 검사, CSRF, 기본 정책 전환)와 3차(Low 항목)가 남아 있습니다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">설정·코드 조치 완료</span></p>
+      <p><span class="badge done">의존성 업그레이드 완료</span></p>
+      <p><span class="badge done">대상 테스트 307건 통과</span></p>
+      <p><span class="badge done">실기동 검증 완료</span></p>
+      <p><span class="badge info">API 계약 영향 없음</span></p>
+      <p><span class="badge warn">배포 환경변수 추가 필요</span></p>
+      <p><span class="badge pending">2차·3차 대기</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li>H2 콘솔·Swagger 기본 비활성</li>
+          <li><code>X-Frame-Options</code> 전역 해제 → <code>SAMEORIGIN</code></li>
+          <li>메시지 게이트웨이 미설정 시 기동 실패</li>
+          <li>세션 쿠키 <code>SameSite=Lax</code>·<code>Secure</code></li>
+          <li>CORS 허용 출처 환경변수화(기본 운영 주소만)</li>
+          <li>부서 매핑 조회 <code>like</code> → <code>locate</code></li>
+          <li>Spring Boot·Tomcat·POI·jsoup·axios 업그레이드</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현 (2차)</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>로그인·인증번호 시도 제한(이메일·아이디·IP 기준)</li>
+          <li>첨부 매직바이트 검사</li>
+          <li>CSRF 방어(커스텀 헤더 또는 토큰)</li>
+          <li>기본 정책 <code>anyRequest().authenticated()</code> 전환</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>RECRUIT_ADMIN 권한 부여 범위(정책 결정 필요)</li>
+          <li>프록시 헤더 신뢰(<code>forward-headers-strategy</code>)</li>
+          <li>개발 도구 npm 취약점(<code>npm audit fix</code>)</li>
+          <li>AES-CBC → GCM 전환(데이터 이행 필요)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>조치 내역</h2>
+    <table>
+      <tr><th>#</th><th>점검 항목</th><th>조치</th><th>심각도</th></tr>
+      <tr><td>1</td><td>H2 콘솔이 모든 환경에서 인증 없이 열림(원격 코드 실행 가능)</td><td><code>spring.h2.console.enabled: ${H2_CONSOLE_ENABLED:false}</code></td><td><span class="badge out">Critical</span></td></tr>
+      <tr><td>2</td><td>Spring Boot 4.0.2 계열 알려진 CVE(보안 헤더 누락, 멀티파트 스머글링, Tomcat 접근 제어 등)</td><td>Boot 4.0.8, Tomcat 11.0.26 지정, POI 5.5.1, jsoup 1.23.2, axios 1.20.0</td><td><span class="badge out">High</span></td></tr>
+      <tr><td>3</td><td>부서명 <code>%%</code> 등록 시 전 임직원에게 역할 부여</td><td><code>locate(m.deptName, :groupName) &gt; 0</code>로 판정(와일드카드 해석 없음)</td><td><span class="badge warn">Medium</span></td></tr>
+      <tr><td>4</td><td>Swagger·api-docs가 운영에서 관리자 API 목록 노출</td><td><code>springdoc.*.enabled: ${SPRINGDOC_ENABLED:false}</code></td><td><span class="badge warn">Medium</span></td></tr>
+      <tr><td>5</td><td>게이트웨이 기본값 <code>logging</code>: 설정 누락 시 인증번호가 로그에 평문으로 남고 메일은 발송되지 않음</td><td><code>gateway: ${RECRUIT_MESSAGE_GATEWAY}</code>(기본값 없음 → 기동 실패)</td><td><span class="badge warn">Medium</span></td></tr>
+      <tr><td>6</td><td>CORS에 로컬·개발 서버 출처가 운영에서도 허용</td><td><code>CorsProperties</code>(<code>recruit.cors.allowed-origins</code>, 기본 운영 주소만)</td><td><span class="badge warn">Medium</span></td></tr>
+      <tr><td>7</td><td><code>frameOptions</code> 전역 해제(클릭재킹)</td><td><code>FrameOptionsConfig::sameOrigin</code></td><td><span class="badge warn">Medium</span></td></tr>
+      <tr><td>8</td><td>CSRF 비활성 상태에서 SameSite·Secure 미설정</td><td><code>server.servlet.session.cookie.same-site: lax</code>, <code>secure: ${SESSION_COOKIE_SECURE:true}</code></td><td><span class="badge warn">Medium(일부)</span></td></tr>
+    </table>
+    <p class="small">업그레이드 후 백엔드 런타임 의존성 145개를 OSV로 다시 조회했습니다. 남은 것은 Jasypt LOW 1건이며, 현재 <code>ENC()</code>를 쓰지 않아 영향이 없습니다. 프론트 운영 의존성에 남은 <code>postcss</code>·<code>nanoid</code>는 빌드 컴파일러의 하위 의존성이라 브라우저 번들에 포함되지 않습니다.</p>
+  </section>
+
+  <section>
+    <h2>배포 시 필요한 환경변수</h2>
+    <div class="card" style="border-left: 4px solid #7a4b00;">
+      <h3><span class="badge warn">주의</span> 배포 전에 반드시 확인</h3>
+      <table>
+        <tr><th>변수</th><th>운영</th><th>개발 서버</th><th>로컬</th></tr>
+        <tr><td><code>RECRUIT_MESSAGE_GATEWAY</code></td><td><code>trnode</code> (없으면 기동 실패)</td><td>환경에 맞게 지정 (없으면 기동 실패)</td><td><code>logging</code></td></tr>
+        <tr><td><code>RECRUIT_CORS_ALLOWED_ORIGINS</code></td><td>생략 가능(기본값이 운영 주소)</td><td><strong>자기 주소 필수</strong>(없으면 POST 전부 403)</td><td><code>http://localhost:5173</code></td></tr>
+        <tr><td><code>SESSION_COOKIE_SECURE</code></td><td>생략(<code>true</code>)</td><td>HTTPS면 생략, http면 <code>false</code></td><td>생략(localhost는 브라우저가 허용)</td></tr>
+        <tr><td><code>H2_CONSOLE_ENABLED</code>, <code>SPRINGDOC_ENABLED</code></td><td>생략(<code>false</code>)</td><td>생략 권장</td><td>필요할 때만 <code>true</code></td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>개발용 기능은 기본 꺼짐, 로컬에서만 명시적으로 켬</td><td>기존 <code>NICE_MOCK_ENABLED</code>·<code>AUDIT_ALLOW_FALLBACK_SECRET</code>와 같은 fail-safe 관례. 프로파일이 없어 환경을 구분할 수 없음</td></tr>
+      <tr><td>2</td><td>게이트웨이는 기본값 없이 필수</td><td>누락을 조용한 목업 동작이 아니라 기동 실패로 드러내기 위해(NICE Mock 가드와 같은 방식)</td></tr>
+      <tr><td>3</td><td>CORS 기본값은 로컬이 아니라 운영 주소</td><td>운영에서 설정을 빠뜨려도 올바르게 동작하고, 빠뜨린 쪽이 개발 환경이면 403으로 바로 드러남</td></tr>
+      <tr><td>4</td><td>SameSite는 <code>Strict</code>가 아니라 <code>Lax</code></td><td>메일 링크로 들어올 때 로그인이 유지되어야 하고, NICE 콜백 설계(교차 사이트 요청에 쿠키 없음)가 이미 Lax를 전제로 함</td></tr>
+      <tr><td>5</td><td>부서명의 <code>%</code>·<code>_</code>를 거부하지 않고 <code>locate</code>로 판정</td><td>밑줄이 든 실제 부서명을 계속 등록할 수 있고, 기존 부분일치 의미를 그대로 유지</td></tr>
+      <tr><td>6</td><td>Tomcat 버전은 <code>ext['tomcat.version']</code>으로 따로 지정</td><td>Boot 4.0.8이 관리하는 11.0.24에 CVE-2026-65182가 남아 있음. Boot가 11.0.25 이상을 관리하면 이 지정을 지움</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>변경 파일</h2>
+    <h3>신규 파일</h3>
+    <table>
+      <tr><th>파일</th><th>타입</th></tr>
+      <tr><td><code>{BE}/config/CorsProperties.java</code></td><td><code>recruit.cors.allowed-origins</code> 설정</td></tr>
+    </table>
+    <h3>수정 파일</h3>
+    <table>
+      <tr><th>파일</th><th>변경 내용</th></tr>
+      <tr><td><code>{BR}/application.yaml</code></td><td>H2·springdoc 기본 비활성, 세션 쿠키, 게이트웨이 필수, CORS 출처</td></tr>
+      <tr><td><code>{BE}/config/SecurityConfig.java</code></td><td><code>CorsProperties</code> 주입, <code>frameOptions</code> <code>sameOrigin</code></td></tr>
+      <tr><td><code>{BE}/domain/repository/DeptRoleMappingRepository.java</code></td><td><code>findByDeptNameContainedIn</code> JPQL <code>like</code> → <code>locate</code></td></tr>
+      <tr><td><code>build.gradle</code></td><td>Boot 4.0.8, Tomcat 11.0.26, POI 5.5.1, jsoup 1.23.2, h2console 버전 관리 위임</td></tr>
+      <tr><td><code>recruit_front/package.json</code>, <code>package-lock.json</code></td><td>axios <code>^1.20.0</code></td></tr>
+      <tr><td><code>src/test/resources/application.yaml</code></td><td>테스트용 CORS 출처, 게이트웨이 <code>logging</code></td></tr>
+      <tr><td><code>{BT}/domain/repository/DeptRoleMappingRepositoryTest.java</code></td><td><code>%</code>·<code>_</code> 글자 그대로 비교하는 테스트 3건</td></tr>
+      <tr><td>백엔드 <code>AGENTS.md</code>, 카드 5개(auth-account, auth-nice-verification, board, message-delivery, role-menu)</td><td>환경변수 표, 로컬 실행 방법, 쿠키·CORS·매핑 규칙, jsoup 재실측 표기</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>테스트 결과</h2>
+    <div class="two">
+      <div class="card">
+        <h3>자동 테스트</h3>
+        <p>백엔드: <code>config.*</code>, <code>security.auth.*</code>, <code>DeptRoleMappingRepositoryTest</code>, <code>RoleMappingServiceTest</code>, <code>ClientEventLogControllerTest</code>, <code>*Parser*</code>·<code>*Excel*</code>·<code>*Pdf*</code>·<code>*Notice*</code>·<code>*Attachment*</code>·<code>*JobPostingImage*</code></p>
+        <p>결과: <span class="badge done">BUILD SUCCESSFUL</span> 46개 클래스, 307건, 실패 0</p>
+        <p>새 테스트 재현: 수정 전 쿼리에서 <code>%%</code>·<code>_</code> 테스트 2건 실패, 수정 후 통과</p>
+        <p>프론트: <code>npm run type-check</code> <span class="badge done">통과</span></p>
+        <p>문서: <code>node tools/check-docs.mjs</code> <span class="badge done">오류 0건</span></p>
+      </div>
+      <div class="card">
+        <h3>실기동 검증 (운영 설정 파일 사용)</h3>
+        <table>
+          <tr><th>확인 항목</th><th>결과</th></tr>
+          <tr><td>게이트웨이 미설정 기동</td><td><span class="badge done">기동 실패</span> placeholder 미해결</td></tr>
+          <tr><td><code>/h2-console</code>, <code>/swagger-ui</code>, <code>/api-docs</code></td><td><span class="badge done">404</span></td></tr>
+          <tr><td><code>X-Frame-Options</code></td><td><span class="badge done">SAMEORIGIN</span></td></tr>
+          <tr><td>허용 목록 밖 출처의 POST</td><td><span class="badge done">403</span></td></tr>
+          <tr><td>세션 쿠키</td><td><span class="badge done">Secure; HttpOnly; SameSite=Lax</span></td></tr>
+          <tr><td>jsoup 정제 결과(1.22.2 대 1.23.2)</td><td><span class="badge done">동일</span></td></tr>
+        </table>
+      </div>
+    </div>
+    <p class="small">전체 회귀 테스트는 실행하지 않았습니다(요청 시에만 실행하는 규칙). Boot 업그레이드 범위를 고려하면 배포 전에 한 번 실행할 것을 권장합니다.</p>
+  </section>
+
+  <section>
+    <h2>다음 단계 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>보안 강화 2차 - 공격 횟수 제한·입력 검증</strong></p>
+      <p>로그인·인증번호 시도 제한, 첨부 매직바이트 검사, CSRF 방어, 기본 정책 <code>authenticated()</code> 전환을 진행합니다.</p>
+      <p class="small">이후: 3차(Low 항목 — 세션 쿠키 프록시 헤더, 비밀번호 정책, 전화번호 변경 검증, 엑셀 파싱 메모리, UMS 수신 서버 제한 등)와 RECRUIT_ADMIN 권한 부여 범위에 대한 정책 결정.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

@@ -8,7 +8,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -34,14 +34,14 @@ class SchoolSearchControllerTest {
 
     @Test
     void 검색어가_없으면_외부호출_없이_빈목록() throws Exception {
-        mockMvc.perform(get("/api/schools").param("educationLevel", "HIGH_SCHOOL").with(anonymous()))
+        mockMvc.perform(get("/api/schools").param("educationLevel", "HIGH_SCHOOL").with(user("applicant").authorities(() -> "ROLE_APPLICANT")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(0));
     }
 
     @Test
     void 학교구분_누락은_400() throws Exception {
-        mockMvc.perform(get("/api/schools").param("q", "서울").with(anonymous()))
+        mockMvc.perform(get("/api/schools").param("q", "서울").with(user("applicant").authorities(() -> "ROLE_APPLICANT")))
                 .andExpect(status().isBadRequest());
     }
 
@@ -49,7 +49,7 @@ class SchoolSearchControllerTest {
     void 인증키_미설정이면_502() throws Exception {
         // 테스트 환경에는 NEIS 인증키가 없다. 설정 누락은 상위 의존 장애로 502.
         mockMvc.perform(get("/api/schools").param("q", "서울").param("educationLevel", "HIGH_SCHOOL")
-                        .with(anonymous()))
+                        .with(user("applicant").authorities(() -> "ROLE_APPLICANT")))
                 .andExpect(status().isBadGateway());
     }
 }

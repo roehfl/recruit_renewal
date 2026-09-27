@@ -1,6 +1,6 @@
 # 도메인 카드 색인
 
-작업할 기능을 아래 역색인에서 찾아 **해당 카드만** 읽는다. 카드에 API 계약·파일 지도·규칙·변경 레시피가 모두 있다.
+작업할 기능을 아래 역색인에서 찾아 **해당 카드만** 읽는다.
 
 ## 경로 표기
 
@@ -12,7 +12,7 @@
 | `{FE}` | `recruit_front/src` |
 
 - 백엔드 API에는 모두 `/api` 접두가 붙는다(`{BE}/config/WebMvcConfig.java`). 카드의 API 경로는 `/api`를 뺀 형태다.
-- 문서 안의 파일 경로는 **레포 루트 기준**으로 쓴다(레포별 AGENTS.md 포함, 예: `recruit_back/recruit_backend/docs/adr/`). 백엔드 디렉터리 기준 상대 경로 금지.
+- 문서 안의 파일 경로는 **레포 루트 기준**으로 쓴다(예: `recruit_back/recruit_backend/docs/adr/`). 백엔드 디렉터리 기준 상대 경로 금지.
 - 카드 `## 파일 지도` 절에 적힌 경로가 그 파일의 **소유 카드**다. `*Controller.java`와 `views/**/*.vue`는 정확히 한 카드가 소유해야 한다(`node tools/check-docs.mjs`가 검사).
 
 ## 카드 목록
@@ -20,6 +20,7 @@
 | 카드 | 도메인 | 주 사용자 |
 |---|---|---|
 | [auth-account](auth-account.md) | 로그인(세션·LDAP)·지원자 가입/계정 | 지원자·관리자 |
+| [auth-security](auth-security.md) | 인가·CORS·CSRF·시도 제한 | — |
 | [auth-nice-verification](auth-nice-verification.md) | NICE 본인확인 | 지원자 |
 | [auth-nice-verification-module](auth-nice-verification-module.md) | NICE 모듈 실측·규격 | — |
 | [role-menu](role-menu.md) | 부서 권한 매핑·메뉴 | 관리자 |
@@ -101,6 +102,7 @@
 | 키워드 | 카드 |
 |---|---|
 | 로그인, 세션, LDAP, 회원가입, 비밀번호, 휴대폰 변경, 계정 찾기, 이메일 인증 | auth-account |
+| SecurityConfig, CORS, CSRF, 429 | auth-security |
 | NICE, 체크플러스 | auth-nice-verification |
 | 권한, 역할, 부서 권한 매핑, 메뉴, 사이드바, 헤더 메뉴 | role-menu |
 | 공고, 채용공고, 모집분야, 직무(`JobPosition`), 근무지, 공고 이미지, 첨부 요건, 신입/경력, 마감 | job-posting |
@@ -122,14 +124,14 @@
 | 메일, SMS, 문자, LMS, 메시지 발송, 메시지 템플릿, 변수, 테스트 발송, 대상자, 미리보기, 발송 접수 | message |
 | 발송 결과, 결과 수신, 거래 ID, 게이트웨이, 발송 단위, 발송 이력, 발송 상태, 디스패치, 자동발송, 제출 메일 | message-delivery |
 
-## 공통 기반 (카드 없음 — 레포 AGENTS.md 참조)
+## 공통 기반 (카드 없음, AGENTS.md 참조)
 
 - 백엔드: `{BE}/dto/response/ApiResponse.java`, `{BE}/exception/GlobalExceptionHandler.java`, `{BE}/domain/entity/BaseEntity.java`, `{BE}/common/`, `{BE}/config/WebMvcConfig.java`, `{BE}/config/CorrelationIdFilter.java`
 - 프론트: `{FE}/api/client.ts`, `{FE}/api/apiError.ts`, `{FE}/layouts/`, `{FE}/routes/index.ts`, `{FE}/stores/uiStore.ts`, `{FE}/common/`, `{FE}/styles/`
 
 ## 카드 없는 파일
 
-소유 카드가 없는 화면(주로 지원자 정적 페이지)이다. 새로 추가하면 여기에 적거나 카드에 등록한다.
+소유 카드가 없는 화면(주로 지원자 정적 페이지). 새로 추가하면 여기나 카드에 등록한다.
 
 - `{FE}/views/applicant/ApplicantHomeView.vue` — 지원자 홈
 - `{FE}/views/applicant/ApplicantQuickLinkCards.vue` — 홈 바로가기 카드

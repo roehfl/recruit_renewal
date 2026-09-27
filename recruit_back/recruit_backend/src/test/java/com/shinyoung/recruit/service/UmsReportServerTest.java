@@ -6,16 +6,19 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 /** 레거시 FTPThread.receiveSQL 과 같은 결과 줄 규약·연결 흐름(EOF 뒤 4바이트 응답)을 확인한다. */
@@ -85,6 +88,38 @@ class UmsReportServerTest {
         verify(handler).handle(new DeliveryReport(MessageChannel.MAIL, "UUID-1", "kim@example.com", "00"));
         verify(handler).handle(new DeliveryReport(MessageChannel.SMS, "UUID-2", "01000000000", "99"));
         verifyNoMoreInteractions(handler);
+    }
+
+    @Test
+    void 줄이_상한을_넘으면_반영하지_않고_연결을_끊는다() throws Exception {
+        startServer(0);
+
+        try (Socket client = new Socket("127.0.0.1", server.localPort())) {
+            OutputStream out = client.getOutputStream();
+            out.write("A".repeat(UmsReportServer.MAX_LINE_LENGTH + 1).getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+            client.shutdownOutput();
+
+            assertThatThrownBy(() -> new DataInputStream(client.getInputStream()).readInt())
+                    .isInstanceOf(EOFException.class);
+        }
+        verifyNoInteractions(handler);
+    }
+
+    @Test
+    void 허용_IP_목록이_있으면_그_밖의_연결은_바로_닫는다() throws Exception {
+        MessageProperties properties = new MessageProperties();
+        properties.setReportPort(0);
+        properties.setReportAllowedIps(List.of("10.255.255.1"));
+        server = new UmsReportServer(handler, properties);
+        server.start();
+
+        try (Socket client = new Socket("127.0.0.1", server.localPort())) {
+            // 서버가 수락 즉시 닫으므로 쓰기 없이 응답만 기다린다(쓰면 연결 재설정으로 쓰기에서 실패할 수 있다).
+            assertThatThrownBy(() -> new DataInputStream(client.getInputStream()).readInt())
+                    .isInstanceOf(IOException.class);
+        }
+        verifyNoInteractions(handler);
     }
 
     @Test

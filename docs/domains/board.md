@@ -1,7 +1,7 @@
 # FAQ·공지사항 (`board`)
 
 > 경로 표기 `{BE}` `{BT}` `{BR}` `{FE}` — 정의: [_index.md](_index.md). API 경로는 `/api` 접두 생략.
-> 관련 카드: [auth-account](auth-account.md)(`SecurityConfig`·role 상수), [role-menu](role-menu.md)(지원자 breadcrumb·메뉴 등록), [job-posting](job-posting.md)(`boardApi.ts`의 공개 공고 함수)
+> 관련 카드: [auth-account](auth-account.md)(role 상수), [auth-security](auth-security.md)(`SecurityConfig`), [role-menu](role-menu.md)(지원자 breadcrumb·메뉴 등록), [job-posting](job-posting.md)(`boardApi.ts`의 공개 공고 함수)
 
 ## 요약
 
@@ -99,7 +99,7 @@ store 없음. 두 지원자 화면은 `{FE}/views/applicant/ApplicantBreadcrumb.
 
 | 상태 | 메서드 | 경로 | 요청 요약 | 응답 요약 | 권한 |
 |---|---|---|---|---|---|
-| 🟢 | GET | /faqs | 없음 | `[{ id, name, faqs: [{ id, question, answer }] }]` 노출 가능 항목만 | 공개(anyRequest) |
+| 🟢 | GET | /faqs | 없음 | `[{ id, name, faqs: [{ id, question, answer }] }]` 노출 가능 항목만 | 공개(GET 매처) |
 | 🟢 | GET | /admin/faq-categories | 없음 | `[{ id, name, sortOrder, active, faqCount }]` 비활성 포함 | ADMIN·RECRUIT_ADMIN |
 | 🟢 | POST | /admin/faq-categories | `{ name, active? }` | 카테고리 1건(`faqCount: 0`) | ADMIN·RECRUIT_ADMIN |
 | 🟢 | POST | /admin/faq-categories/reorder | `{ ids }` 전체 카테고리 id | `data: null` | ADMIN·RECRUIT_ADMIN |
@@ -110,8 +110,8 @@ store 없음. 두 지원자 화면은 `{FE}/views/applicant/ApplicantBreadcrumb.
 | 🟢 | POST | /admin/faqs/reorder | `{ categoryId, ids }` 그 카테고리 전체 FAQ id | `data: null` | ADMIN·RECRUIT_ADMIN |
 | 🟢 | POST | /admin/faqs/{faqId} | `{ categoryId, question, answer, active? }` | FAQ 1건 | ADMIN·RECRUIT_ADMIN |
 | 🟢 | POST | /admin/faqs/{faqId}/delete | 본문 없음 | `data: null` | ADMIN·RECRUIT_ADMIN |
-| 🟢 | GET | /board/notices | query `page`(0)·`size`(10)·`searchType`(`ALL`)·`keyword?` | `PageResponse<{ id, title, pinned, createdAt }>` 삭제 제외 | 공개(anyRequest) |
-| 🟢 | GET | /board/notices/{noticeId} | path `noticeId` | `{ id, title, contentHtml, pinned, createdAt }` 삭제면 404 | 공개(anyRequest) |
+| 🟢 | GET | /board/notices | query `page`(0)·`size`(10)·`searchType`(`ALL`)·`keyword?` | `PageResponse<{ id, title, pinned, createdAt }>` 삭제 제외 | 공개(GET 매처) |
+| 🟢 | GET | /board/notices/{noticeId} | path `noticeId` | `{ id, title, contentHtml, pinned, createdAt }` 삭제면 404 | 공개(GET 매처) |
 | 🟢 | POST | /board/notices | `{ title, content, isPinned }` | `data`: 새 공지 id(Long) | ADMIN·RECRUIT_ADMIN(명시 매처) |
 | 🟢 | GET | /admin/notices | query `page`(0)·`size`(10)·`searchType`(`ALL`)·`keyword?`·`deleted?`·`pinnedOnly`(false) | `PageResponse<{ id, title, pinned, deleted, createdAt, createdBy, updatedAt, updatedBy }>` | ADMIN·RECRUIT_ADMIN |
 | 🟢 | GET | /admin/notices/{noticeId} | path `noticeId` | `{ id, title, contentHtml, pinned, deleted, createdAt, createdBy, updatedAt, updatedBy }` 삭제 포함 | ADMIN·RECRUIT_ADMIN |
@@ -195,7 +195,7 @@ store 없음. 두 지원자 화면은 `{FE}/views/applicant/ApplicantBreadcrumb.
 
 **공지 본문 HTML 처리**
 - 저장은 원본 HTML 그대로(`contentHtml`), 정제는 **응답 시점**에 한다. ({BE}/dto/response/NoticeDetailResponse.java — from)
-- 정제 규칙 = jsoup `Safelist.relaxed()`, base URI `""`, `prettyPrint(false)`. `null`이면 `null` 반환. 실측(jsoup 1.22.2): ({BE}/common/util/HtmlTextUtils.java — sanitize)
+- 정제 규칙 = jsoup `Safelist.relaxed()`, base URI `""`, `prettyPrint(false)`. `null`이면 `null` 반환. 실측(jsoup 1.22.2, 1.23.2 재실측 동일): ({BE}/common/util/HtmlTextUtils.java — sanitize)
   - 남는 태그: `a b blockquote br caption cite code col colgroup dd div dl dt em h1~h6 i img li ol p pre q small span strike strong sub sup table tbody td tfoot th thead tr u ul`.
   - 제거: `script`·`iframe`·`video`·`hr`·`s`·`mark`·`font`·`figure` 등 목록 밖 태그(텍스트는 남고 태그만 빠짐, `script`·`iframe`은 통째로), 모든 `style`·`class`·`on*`·`target` 속성.
   - URL: `a[href]`는 `http`·`https`·`ftp`·`mailto`만, `img[src]`는 `http`·`https`만. **상대 경로와 `data:` 이미지는 속성이 지워진다**(본문 이미지는 절대 URL이어야 함).
@@ -214,7 +214,7 @@ store 없음. 두 지원자 화면은 `{FE}/views/applicant/ApplicantBreadcrumb.
 - 등록: `title`만 요청 단계 검증(`@NotBlank`). `content`가 null이면 요청 검증을 통과해 DB `NOT NULL` 제약에서 실패한다(전용 400 없음). `title` 길이 제한도 없다(DB 기본 varchar 255). ({BE}/dto/request/NoticeSaveRequest.java, {BE}/service/NoticeService.java — create)
 
 **권한**
-- FAQ 관리자 API 10개는 broad `/api/admin/**` 매처(ADMIN·RECRUIT_ADMIN)로 막는다(전용 매처 없음). `GET /faqs`는 `anyRequest().permitAll()`. (`{BE}/config/SecurityConfig.java` — [auth-account](auth-account.md) 소유)
+- FAQ 관리자 API 10개는 broad `/api/admin/**` 매처(ADMIN·RECRUIT_ADMIN)로 막는다(전용 매처 없음). `GET /faqs`는 공개 GET 매처. (`{BE}/config/SecurityConfig.java` — [auth-security](auth-security.md) 소유)
 - `/board` 아래는 **POST만** 관리자 전용(`POST /api/board/**`) — 등록·수정·삭제·복구가 모두 여기 걸린다. GET은 전부 공개라 관리자 조회는 `/admin/notices`(broad `/api/admin/**` 매처)에 뒀다. `/board` 아래에 새 POST를 만들면 자동으로 막히지만, 관리자용 GET을 `/board` 아래에 만들면 공개된다. (`{BE}/config/SecurityConfig.java`)
 - FE 라우트: `/admin/faqs`는 부모 `ADMIN_ROLES` 가드, `/applicant/faq`·`/applicant/noticeList`는 `meta.public: true`.
 
@@ -263,7 +263,7 @@ $env:AES_SECRET_KEY='<로컬 예시 키>'; .\gradlew.bat test --tests "com.shiny
 AES_SECRET_KEY='<로컬 예시 키>' ./gradlew test --tests "com.shinyoung.recruit.controller.FaqControllerTest" --tests "com.shinyoung.recruit.domain.repository.FaqRepositoryTest" --tests "com.shinyoung.recruit.dto.response.NoticeDetailResponseTest" --tests "com.shinyoung.recruit.controller.NoticeControllerTest" --no-daemon
 ```
 
-공지 권한(`/board` 매처)을 건드렸으면 [auth-account](auth-account.md) 소유 `--tests "com.shinyoung.recruit.config.SecurityConfigTest"`도 함께 돌린다(공지 4건: 목록 공개 200, 등록 비인증 401, 지원자 403, 관리자 통과).
+공지 권한(`/board` 매처)을 건드렸으면 [auth-security](auth-security.md) 소유 `--tests "com.shinyoung.recruit.config.SecurityConfigTest"`도 함께 돌린다(공지 4건: 목록 공개 200, 등록 비인증 401, 지원자 403, 관리자 통과).
 
 프론트(`recruit_front/`에서):
 

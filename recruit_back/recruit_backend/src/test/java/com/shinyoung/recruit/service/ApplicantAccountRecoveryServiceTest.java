@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,13 +37,17 @@ class ApplicantAccountRecoveryServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private UserSessionRevoker userSessionRevoker;
+
     private final AuditHmac auditHmac = new AuditHmac("test-secret-value");
 
     private ApplicantAccountRecoveryService service;
 
     @BeforeEach
     void setUp() {
-        service = new ApplicantAccountRecoveryService(applicantRepository, auditHmac, emailVerificationService, passwordEncoder);
+        service = new ApplicantAccountRecoveryService(applicantRepository, auditHmac, emailVerificationService, passwordEncoder,
+                userSessionRevoker);
     }
 
     private NiceVerifiedIdentity identity() {
@@ -119,6 +124,7 @@ class ApplicantAccountRecoveryServiceTest {
         service.resetPassword("reset@example.com", "NewPassword1!");
 
         assertThat(applicant.getPassword()).isEqualTo("encoded-new");
+        verify(userSessionRevoker).expireSessions(applicant.getLoginId(), null);
     }
 
     private static Applicant applicantWithEmail(String email, String name) {

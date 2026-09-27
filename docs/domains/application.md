@@ -37,7 +37,7 @@
 | service | `{BE}/service/ApplicationSectionAccessService.java` | 섹션 공통: 본인 소유·편집 가능·섹션 사용 여부(섹션 서비스·첨부가 사용) |
 | service | `{BE}/service/CurrentApplicantService.java` | 세션 → 지원자 id(401/403). 섹션·첨부·전형결과·면접·계정 컨트롤러도 사용 |
 | entity | `{BE}/domain/entity/JobApplication.java` | 루트. `create`·`updateDraft`·`updateWorkLocation`·`submit`·`withdraw` |
-| repository | `{BE}/domain/repository/JobApplicationRepository.java` | 본인 지원서·내 목록·대시보드 조회(관리자 검색 쿼리도 포함) |
+| repository | `{BE}/domain/repository/JobApplicationRepository.java` | 본인 지원서·내 목록·대시보드 조회(관리자 검색 쿼리도 포함), 첨부 업로드용 행 잠금 조회 `findByIdAndApplicantIdForUpdate` |
 | dto | `{BE}/dto/request/ApplicationCreateRequest.java` `{BE}/dto/request/ApplicationUpdateRequest.java` `{BE}/dto/response/ApplicationDetailResponse.java` `{BE}/dto/response/MyApplicationResponse.java` `{BE}/dto/response/ApplicationDashboardResponse.java` `{BE}/dto/response/ApplicationCompletionSummaryResponse.java` `{BE}/dto/response/ApplicationSectionReadinessResponse.java` | 지원서 루트·대시보드 |
 | enum | `{BE}/enumeration/JobApplicationStatus.java` | 지원서 상태 |
 | exception | `{BE}/exception/InvalidJobApplicationException.java` | 검증 실패 → 400(섹션 서비스도 사용) |

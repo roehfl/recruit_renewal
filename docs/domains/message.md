@@ -33,7 +33,7 @@
 | controller | `{BE}/controller/MessageSendAdminController.java` | 변수 카탈로그·대상자 조회·테스트 발송·발송 접수 |
 | service | `{BE}/service/MessageTemplateService.java` | 검증·기본 단일화·CRUD·변수 목록 |
 | service | `{BE}/service/SystemMessageTemplateInitializer.java` | 기동 시 시스템 종류 기본 템플릿이 없으면 초안 생성(`ApplicationRunner`) |
-| service | `{BE}/service/MessageRenderer.java` | `#{키}` 허용 검사·치환(줄바꿈 LF 통일)·SMS byte/구분 |
+| service | `{BE}/service/MessageRenderer.java` | `#{키}` 허용 검사·치환(줄바꿈 LF 통일)·메일 제목 치환(`renderSubject` — 제어문자를 공백으로)·SMS byte/구분 |
 | service | `{BE}/service/MessageTargetService.java` | 종류별 대상 조건 검증·조회·연락처 판정·변수 조립 |
 | service | `{BE}/service/MessageVariableFormatter.java` | 수신자별 `#{변수}` 값 계산·형식 |
 | service | `{BE}/service/MessageVariableContext.java` | 변수 계산 입력(이름·공고·전형·면접) |

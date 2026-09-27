@@ -48,8 +48,12 @@
                   </template>
                 </a-input-password>
               </a-form-item>
-              <a-form-item label="새 휴대폰 번호" required extra="전형 결과 등 안내 문자를 받을 번호입니다.">
-                <a-input v-model:value="PhoneForm.phoneNumber" size="large" placeholder="01012345678" :maxlength="13" />
+              <a-form-item label="새 휴대폰 번호" required
+                extra="새 번호로 휴대폰 본인인증을 하면 그 번호로 바뀝니다. 가입자 본인 명의 번호만 쓸 수 있습니다.">
+                <div class="phone-verify">
+                  <a-input :value="verifiedPhoneNumber" size="large" placeholder="본인인증 후 표시됩니다" disabled />
+                  <a-button size="large" @click="openPhoneNicePopup()">휴대폰 본인인증</a-button>
+                </div>
               </a-form-item>
             </a-form>
             <div class="changePassword">
@@ -184,6 +188,8 @@ import { interviewSupplementApi } from '@/api/interviewSupplementApi'
 import { applicantInterviewApi } from '@/api/applicantInterviewApi'
 import InterviewSupplementModal from './InterviewSupplementModal.vue'
 import { getApiErrorMessage } from '@/api/apiError'
+import { NICE_MESSAGE_SOURCE, type NiceAuthMessage } from '@/types/auth/nice'
+import { passwordPolicyError } from '@/common/passwordPolicy'
 
 interface Password {
   currentPassword: string
@@ -215,6 +221,14 @@ const PasswordRules = {
     {
       required: true,
       message: '새 비밀번호를 입력하세요.',
+      trigger: 'blur',
+    },
+    {
+      // 백엔드와 같은 조합 규칙(common/passwordPolicy).
+      validator: (_rule: unknown, value: string) => {
+        const error = value ? passwordPolicyError(value) : null
+        return error ? Promise.reject(error) : Promise.resolve()
+      },
       trigger: 'blur',
     },
   ],
@@ -283,7 +297,7 @@ const settingModalClose = () => {
   isSettingModalOpen.value = false;
   selectMenu.value = 'password';
   PhoneForm.currentPassword = '';
-  PhoneForm.phoneNumber = '';
+  verifiedPhoneNumber.value = '';
   PasswordForm.currentPassword = '';
   PasswordForm.newPassword = '';
   PasswordForm.newPasswordCheck = '';
@@ -396,26 +410,56 @@ const changePasswordButton = async() => {
     message.error('새 비밀번호가 일치하지 않습니다.');
     return;
   }
+  const passwordError = passwordPolicyError(PasswordForm.newPassword);
+  if (passwordError) {
+    message.warning(passwordError);
+    return;
+  }
 
   await checkPassword();
 }
 
-/* 휴대폰 번호 변경. 백엔드는 길이(30자)만 보므로 형식은 화면에서 확인하고 숫자만 보낸다. */
-const PhoneForm = reactive({ currentPassword: '', phoneNumber: '' })
+/*
+ * 휴대폰 번호 변경. 새 번호로 NICE 본인인증(용도 PHONE_CHANGE)을 하면 서버 세션에 결과가 남고,
+ * 변경 요청은 현재 비밀번호만 보낸다. 서버가 인증 명의가 가입자와 같은지 보고 인증된 번호로 바꾼다.
+ */
+const PhoneForm = reactive({ currentPassword: '' })
+const verifiedPhoneNumber = ref('')
 const changingPhone = ref(false)
+
+const openPhoneNicePopup = () => {
+  window.open('/nice-auth?purpose=PHONE_CHANGE', 'Nice-Auth', 'width=450, height=480, resizable=no')
+}
+
+/* 팝업이 postMessage 로 결과를 보낸다(가입·아이디 찾기와 같은 방식). 표시용 번호일 뿐 서버는 세션 값을 쓴다. */
+const onNiceMessage = (event: MessageEvent) => {
+  if (event.origin !== window.location.origin) {
+    return
+  }
+  const payload = event.data as NiceAuthMessage | undefined
+  if (payload?.source !== NICE_MESSAGE_SOURCE) {
+    return
+  }
+  if (payload.status !== 'SUCCESS' || !payload.phoneNumber) {
+    message.error('본인인증에 실패했습니다. 다시 시도해주세요.')
+    return
+  }
+  verifiedPhoneNumber.value = payload.phoneNumber
+  message.success('본인인증이 완료되었습니다. 변경 버튼을 눌러 주세요.')
+}
+
 const changePhoneNumberButton = async () => {
-  const phoneNumber = PhoneForm.phoneNumber.replace(/[^0-9]/g, '')
   if (!PhoneForm.currentPassword) {
     message.warning('현재 비밀번호를 입력하세요.')
     return
   }
-  if (!/^01[016789]\d{7,8}$/.test(phoneNumber)) {
-    message.warning('휴대폰 번호를 확인하세요. 예) 01012345678')
+  if (!verifiedPhoneNumber.value) {
+    message.warning('새 번호로 휴대폰 본인인증을 먼저 진행하세요.')
     return
   }
   changingPhone.value = true
   try {
-    await applicationApi.changePhoneNumber({ currentPassword: PhoneForm.currentPassword, phoneNumber })
+    await applicationApi.changePhoneNumber({ currentPassword: PhoneForm.currentPassword })
     message.success('휴대폰 번호가 변경되었습니다.')
     settingModalClose()
   } catch (error) {
@@ -583,10 +627,13 @@ onMounted(() => {
   supplementTicker = setInterval(() => {
     serverNowTick.value = serverNow()
   }, 30000)
+  window.addEventListener('message', onNiceMessage)
 })
 
 onBeforeUnmount(() => {
   if (supplementTicker) clearInterval(supplementTicker)
+  // 화면을 떠난 뒤 팝업이 메시지를 보내도 반응하지 않게 한다. 자기가 등록한 리스너만 지운다.
+  window.removeEventListener('message', onNiceMessage)
 })
 
 </script>
@@ -970,4 +1017,8 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid #f0f0f0;
 }
 
+.phone-verify {
+  display: flex;
+  gap: 8px;
+}
 </style>
