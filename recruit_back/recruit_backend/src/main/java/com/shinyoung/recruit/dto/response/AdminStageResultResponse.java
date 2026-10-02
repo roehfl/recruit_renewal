@@ -9,6 +9,7 @@ import com.shinyoung.recruit.enumeration.StageResultStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 관리자 전형 결과 행. 뒤쪽 6개 필드는 전형결과 관리 화면 그리드 열(2026-09-04)로, 학력·직전 단계 결과는
@@ -20,6 +21,7 @@ import java.time.LocalDateTime;
  * @param finalEducationLevel       최고 학력 행의 학력(지원현황 조회와 같은 판정). 학력 없으면 null
  * @param finalSchoolName           최고 학력 행의 학교명
  * @param previousStageResultStatus 같은 공고에서 stageOrder가 바로 앞인 단계의 결과. 첫 단계·결과 없음이면 null
+ * @param previousStageComments     앞선 모든 단계 중 코멘트가 있는 결과(stageOrder 순). 없으면 빈 목록
  */
 public record AdminStageResultResponse(
         Long stageResultId,
@@ -39,15 +41,21 @@ public record AdminStageResultResponse(
         JobPositionApplicationType applicationType,
         EducationLevel finalEducationLevel,
         String finalSchoolName,
-        StageResultStatus previousStageResultStatus
+        StageResultStatus previousStageResultStatus,
+        List<PreviousStageComment> previousStageComments
 ) {
 
-    /** 배치 조회로 채우는 파생값. 값이 없는 필드는 null 이다. */
+    /** 배치 조회로 채우는 파생값. 값이 없는 필드는 null, 목록은 빈 목록이다. */
     public record Enrichment(
             EducationLevel finalEducationLevel,
             String finalSchoolName,
-            StageResultStatus previousStageResultStatus
+            StageResultStatus previousStageResultStatus,
+            List<PreviousStageComment> previousStageComments
     ) {
+    }
+
+    /** 앞선 단계에서 남긴 코멘트. 관리자 그리드 참고용(읽기 전용). */
+    public record PreviousStageComment(String stageName, String comment) {
     }
 
     public static AdminStageResultResponse from(StageResult result, Enrichment enrichment) {
@@ -70,7 +78,8 @@ public record AdminStageResultResponse(
                 application.getJobPosition().getApplicationType(),
                 enrichment.finalEducationLevel(),
                 enrichment.finalSchoolName(),
-                enrichment.previousStageResultStatus()
+                enrichment.previousStageResultStatus(),
+                enrichment.previousStageComments()
         );
     }
 }

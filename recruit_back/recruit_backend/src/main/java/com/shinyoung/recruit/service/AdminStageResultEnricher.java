@@ -11,13 +11,15 @@ import com.shinyoung.recruit.enumeration.StageResultStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 관리자 전형 결과 응답의 파생 필드(최종학력·직전 단계 결과)를 <b>단계 단위 배치 2회</b>로 채운다(N+1 없음).
+ * 관리자 전형 결과 응답의 파생 필드(최종학력·직전 단계 결과·앞선 단계 코멘트)를 <b>단계 단위 배치 2회</b>로 채운다(N+1 없음).
  *
  * <p>한 번에 넘기는 결과들은 모두 같은 단계여야 한다(직전 단계를 첫 행의 단계로 판정한다). 호출부는
  * 단계 결과 목록·단건 판정·정정 응답이라 이 전제를 만족한다.
@@ -48,7 +50,7 @@ public class AdminStageResultEnricher {
                 .distinct()
                 .toList();
         Map<Long, ApplicationEducation> finalEducations = loadFinalEducations(applicationIds);
-        Map<Long, StageResultStatus> previousStatuses = loadPreviousStageStatuses(results.get(0).getStage(), applicationIds);
+        PrecedingStageResults preceding = loadPrecedingStageResults(results.get(0).getStage(), applicationIds);
 
         return results.stream()
                 .map(result -> {
@@ -57,7 +59,8 @@ public class AdminStageResultEnricher {
                     return AdminStageResultResponse.from(result, new AdminStageResultResponse.Enrichment(
                             education == null ? null : education.getEducationLevel(),
                             education == null ? null : education.getSchoolName(),
-                            previousStatuses.get(applicationId)));
+                            preceding.previousStatuses().get(applicationId),
+                            preceding.comments().getOrDefault(applicationId, List.of())));
                 })
                 .toList();
     }
@@ -74,26 +77,56 @@ public class AdminStageResultEnricher {
                 ));
     }
 
-    /** 같은 공고의 단계를 stageOrder 순으로 훑어 현재 단계 바로 앞 단계를 찾고, 그 단계의 결과를 배치 조회한다. */
-    private Map<Long, StageResultStatus> loadPreviousStageStatuses(Stage stage, List<Long> applicationIds) {
+    /**
+     * 같은 공고의 단계를 stageOrder 순으로 훑어 현재 단계보다 앞선 단계들을 찾고, 그 결과를 한 번에 조회한다.
+     * 바로 앞 단계의 결과 상태와, 앞선 모든 단계의 코멘트(stageOrder 순, 빈 코멘트 제외)를 함께 만든다.
+     */
+    private PrecedingStageResults loadPrecedingStageResults(Stage stage, List<Long> applicationIds) {
         List<Stage> stages = stageRepository.findByJobPostingIdOrderByStageOrderAscIdAsc(stage.getJobPosting().getId());
-        Stage previous = null;
+        List<Stage> precedingStages = new ArrayList<>();
         boolean found = false;
         for (Stage candidate : stages) {
             if (candidate.getId().equals(stage.getId())) {
                 found = true;
                 break;
             }
-            previous = candidate;
+            precedingStages.add(candidate);
         }
-        // 현재 단계를 못 찾으면 previous 가 마지막 단계로 남아 엉뚱한 값을 내므로, 못 찾은 경우도 직전 단계 없음으로 본다.
-        if (!found || previous == null) {
-            return Map.of();
+        // 현재 단계를 못 찾으면 모든 단계가 앞선 단계로 잡혀 엉뚱한 값을 내므로, 못 찾은 경우도 앞선 단계 없음으로 본다.
+        if (!found || precedingStages.isEmpty()) {
+            return new PrecedingStageResults(Map.of(), Map.of());
         }
-        return stageResultRepository.findByStageIdAndJobApplicationIdIn(previous.getId(), applicationIds).stream()
-                .collect(Collectors.toMap(
-                        result -> result.getJobApplication().getId(),
-                        StageResult::getResultStatus
-                ));
+        Map<Long, Integer> stageIndexes = new HashMap<>();
+        for (int i = 0; i < precedingStages.size(); i++) {
+            stageIndexes.put(precedingStages.get(i).getId(), i);
+        }
+        Long previousStageId = precedingStages.get(precedingStages.size() - 1).getId();
+
+        List<StageResult> precedingResults = stageResultRepository
+                .findByStageIdInAndJobApplicationIdIn(stageIndexes.keySet(), applicationIds).stream()
+                .sorted(Comparator.comparing(result -> stageIndexes.get(result.getStage().getId())))
+                .toList();
+        Map<Long, StageResultStatus> previousStatuses = new HashMap<>();
+        Map<Long, List<AdminStageResultResponse.PreviousStageComment>> comments = new HashMap<>();
+        for (StageResult result : precedingResults) {
+            Long applicationId = result.getJobApplication().getId();
+            Long stageId = result.getStage().getId();
+            if (stageId.equals(previousStageId)) {
+                previousStatuses.put(applicationId, result.getResultStatus());
+            }
+            if (result.getComment() != null && !result.getComment().isBlank()) {
+                comments.computeIfAbsent(applicationId, key -> new ArrayList<>())
+                        .add(new AdminStageResultResponse.PreviousStageComment(
+                                precedingStages.get(stageIndexes.get(stageId)).getStageName(),
+                                result.getComment()));
+            }
+        }
+        return new PrecedingStageResults(previousStatuses, comments);
+    }
+
+    private record PrecedingStageResults(
+            Map<Long, StageResultStatus> previousStatuses,
+            Map<Long, List<AdminStageResultResponse.PreviousStageComment>> comments
+    ) {
     }
 }

@@ -32,6 +32,8 @@ public interface StageResultRepository extends JpaRepository<StageResult, Long> 
 
     List<StageResult> findByStageIdAndJobApplicationIdIn(Long stageId, Collection<Long> jobApplicationIds);
 
+    List<StageResult> findByStageIdInAndJobApplicationIdIn(Collection<Long> stageIds, Collection<Long> jobApplicationIds);
+
     Optional<StageResult> findByStageIdAndJobApplicationId(Long stageId, Long jobApplicationId);
 
     Optional<StageResult> findByIdAndStageId(Long id, Long stageId);

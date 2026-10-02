@@ -57,6 +57,7 @@ import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -278,6 +279,32 @@ class StageResultServiceTest {
         assertThat(document.previousStageResultStatus()).isNull(); // 첫 단계
         assertThat(interview.previousStageResultStatus()).isEqualTo(StageResultStatus.PASSED);
         assertThat(interview.decidedBy()).isNull(); // 초기화 직후 미판정
+    }
+
+    @Test
+    void get_results_includes_comments_of_all_preceding_stages_in_stage_order() {
+        Long jobPostingId = createJobPosting();
+        Long commentedId = createSubmittedApplication("stage-result-prev-comment-a", jobPostingId);
+        Long blankId = createSubmittedApplication("stage-result-prev-comment-b", jobPostingId);
+        Long documentStageId = createStage(jobPostingId, 0, false);
+        Long firstInterviewStageId = createStage(jobPostingId, 1, false);
+        Long secondInterviewStageId = createStage(jobPostingId, 2, true);
+        passAndAnnounceWithComments(jobPostingId, documentStageId, Map.of(commentedId, "서류 메모", blankId, "  "));
+        passAndAnnounceWithComments(jobPostingId, firstInterviewStageId, Map.of(commentedId, "1차 메모"));
+        stageResultService.initialize(secondInterviewStageId);
+
+        Map<Long, AdminStageResultResponse> documentRows = rowsByApplicationId(documentStageId);
+        Map<Long, AdminStageResultResponse> firstRows = rowsByApplicationId(firstInterviewStageId);
+        Map<Long, AdminStageResultResponse> secondRows = rowsByApplicationId(secondInterviewStageId);
+
+        assertThat(documentRows.get(commentedId).previousStageComments()).isEmpty(); // 첫 단계
+        assertThat(firstRows.get(commentedId).previousStageComments()).containsExactly(
+                new AdminStageResultResponse.PreviousStageComment("Document screening 0", "서류 메모"));
+        assertThat(secondRows.get(commentedId).previousStageComments()).containsExactly(
+                new AdminStageResultResponse.PreviousStageComment("Document screening 0", "서류 메모"),
+                new AdminStageResultResponse.PreviousStageComment("Document screening 1", "1차 메모"));
+        assertThat(secondRows.get(commentedId).previousStageResultStatus()).isEqualTo(StageResultStatus.PASSED);
+        assertThat(secondRows.get(blankId).previousStageComments()).isEmpty(); // 공백·미입력 코멘트 제외
     }
 
     @Test
@@ -642,6 +669,25 @@ class StageResultServiceTest {
                 .toList();
         stageResultService.bulkUpdateResults(stageId, new StageResultBulkUpdateRequest(items), ACTOR);
         stageService.announce(jobPostingId, stageId);
+    }
+
+    private void passAndAnnounceWithComments(Long jobPostingId, Long stageId, Map<Long, String> commentByApplicationId) {
+        stageResultService.initialize(stageId);
+        stageService.start(jobPostingId, stageId);
+        List<StageResultBulkUpdateItemRequest> items = stageResultRepository.findByStageId(stageId).stream()
+                .map(result -> new StageResultBulkUpdateItemRequest(
+                        result.getId(),
+                        StageResultStatus.PASSED,
+                        null,
+                        commentByApplicationId.get(result.getJobApplication().getId())))
+                .toList();
+        stageResultService.bulkUpdateResults(stageId, new StageResultBulkUpdateRequest(items), ACTOR);
+        stageService.announce(jobPostingId, stageId);
+    }
+
+    private Map<Long, AdminStageResultResponse> rowsByApplicationId(Long stageId) {
+        return stageResultService.getResults(stageId).stream()
+                .collect(Collectors.toMap(AdminStageResultResponse::applicationId, row -> row));
     }
 
     private void setStageStatus(Long stageId, StageStatus stageStatus) {

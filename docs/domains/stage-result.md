@@ -124,8 +124,9 @@
 - `delete`: READY만. 확정·취소 면접이 있으면 400 `Stage with confirmed or cancelled interview cannot be deleted.`([interview](interview.md)에서 면접 취소 → 삭제 후 재시도). 그 단계의 `StageResult`(전부 PENDING)·`DRAFT` 면접은 함께 지운다.
 
 **결과**
-- 결과 행(옛 계약 "변경 1", 2026-09-04 🟢): `{ stageResultId, stageId, applicationId, applicantName, jobPositionId, jobPositionName, applicationStatus, resultStatus, score, comment, submittedAt, decidedAt, decidedBy, workLocation, applicationType, finalEducationLevel, finalSchoolName, previousStageResultStatus }`. 목록은 submittedAt desc, **비페이징**. `initialize`·`bulk`의 `results`도 단계 전체.
+- 결과 행(옛 계약 "변경 1", 2026-09-04 🟢): `{ stageResultId, stageId, applicationId, applicantName, jobPositionId, jobPositionName, applicationStatus, resultStatus, score, comment, submittedAt, decidedAt, decidedBy, workLocation, applicationType, finalEducationLevel, finalSchoolName, previousStageResultStatus, previousStageComments }`. 목록은 submittedAt desc, **비페이징**. `initialize`·`bulk`의 `results`도 단계 전체.
   - `decidedBy` 판정자 loginId(관리자 전용). `workLocation` 근무지 스냅샷. `finalEducationLevel`·`finalSchoolName` = 최고 `EducationLevel` 행(동률 id 큰 행) — 지원현황 조회와 같은 규칙. `previousStageResultStatus` = 직전 단계의 이 지원서 결과(직전 단계 상태는 안 봄). 값이 없으면 모두 null.
+  - `previousStageComments: [{ stageName, comment }]`(2026-10-02 🟢) = 앞선 **모든** 단계의 이 지원서 코멘트, stageOrder 순, null·공백 제외, 없으면 빈 배열. 단계 상태(발표 여부)는 안 본다. 그리드 읽기 전용 "이전 코멘트" 열(셀은 줄 말줄임, 툴팁에 전문)만 쓰고, 업로드 템플릿·결과 export에는 넣지 않는다. 직전 단계 결과와 함께 앞선 단계 결과 1회 배치 조회로 만든다(`AdminStageResultEnricher.loadPrecedingStageResults`).
 - `initialize`(옛 계약 "변경 4", 2026-09-18 🟢): 단계 READY·IN_PROGRESS만. 첫 단계 대상 = 공고의 `SUBMITTED` 전부. 2단계부터: 직전 단계가 `RESULT_ANNOUNCED`·`CLOSED`가 아니면 400 `Previous stage results must be announced before initializing.`, 대상 = `SUBMITTED` + 직전 단계 `PASSED`, 비대상의 `PENDING` 행 삭제(판정 행 보존). `existingCount` 대상 중 기존 행, `skippedCount` 비대상 지원서(미제출·철회·직전 비합격), `removedCount` 삭제 행(첫 단계 0).
 - 단건 판정 **FE 미사용**. `bulk`: 빈 배열·id 중복 400, 하나라도 다른 단계·없음이면 404(전체 거부). `score`·`comment`는 보낸 값으로 **교체**(null = 비움).
 - `correct`: 단계 RESULT_ANNOUNCED·CLOSED만, `reason` 필수 ≤1000, `comment` ≤2000, PENDING 불가, decidedAt=정정 시각. `histories` 행 `{ historyId, stageResultId, correctedAt, correctedBy, reason, previous/newStatus, previous/newScore, previous/newComment, previous/newDecidedAt }`.
@@ -242,7 +243,7 @@ npm run type-check
 - `recruit_back/recruit_backend/docs/adr/0002-phase07-export-readonly-upload-stageresult-only.md` — 엑셀 쓰기는 StageResult만(`bulkUpdateResults` 경유), 면접 평가 엑셀 업로드는 영구 제외.
 - `recruit_back/recruit_backend/docs/adr/0006-audit-transaction-policy.md` — 성공 감사 in-tx, 거부·충돌 REQUIRES_NEW, 전후값·PII 금지.
 - 마감 공고 교착(미해결): 공고 `CLOSED`는 종착인데 발표·마감은 `PUBLISHED`만 → 진행 중 단계가 판정만 되고 끝낼 수 없다(FE는 툴팁 안내만). 공고 마감 전에 단계를 발표·마감한다.
-- `previousStageResultStatus`는 조회 시 계산돼, 발표된 단계 앞에 단계를 넣으면 소급해 바뀐다 → FE는 신규·이동을 맨 뒤로만.
+- `previousStageResultStatus`·`previousStageComments`는 조회 시 계산돼, 발표된 단계 앞에 단계를 넣으면 소급해 바뀐다 → FE는 신규·이동을 맨 뒤로만.
 - 결과 export(영문 12열)는 업로드 소스가 아니다. FE만 발표·마감 단계로 다운로드를 제한한다.
 - 결과 목록 비페이징 전제(enricher·그리드·카운트). 페이징 도입 시 셋을 함께 바꾼다.
 - 드로어가 이름을 `trim()`해 보내므로 앞뒤 공백 있는 진행 중 단계는 수정이 400.

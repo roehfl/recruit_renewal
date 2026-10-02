@@ -175,8 +175,8 @@ const filteredResults = computed(() =>
 /** 정정 열 폭. 열 정의와 가로 스크롤 폭이 따로 놀지 않게 한 곳에서 쓴다. */
 const CORRECT_COLUMN_WIDTH = 80
 
-/** 고정 열 폭 합계(1500) + 선택 열(40). 열을 더하면 이 값도 같이 늘려야 마지막 열이 잘리지 않는다. */
-const BASE_SCROLL_X = 1540
+/** 고정 열 폭 합계(1700) + 선택 열(40). 열을 더하면 이 값도 같이 늘려야 마지막 열이 잘리지 않는다. */
+const BASE_SCROLL_X = 1740
 
 const columns = computed<TableColumnsType>(() => {
   const base: TableColumnsType = [
@@ -188,6 +188,7 @@ const columns = computed<TableColumnsType>(() => {
     { title: '지원구분', key: 'applicationType', width: 90 },
     { title: '최종학력', key: 'education', width: 180 },
     { title: '직전 단계', key: 'previousStageResultStatus', width: 90 },
+    { title: '이전 코멘트', key: 'previousStageComments', width: 200 },
     { title: '결과', key: 'resultStatus', width: 130 },
     { title: '점수', key: 'score', width: 100 },
     { title: '코멘트', key: 'comment', width: 200 },
@@ -339,6 +340,25 @@ defineExpose({ clearSelection })
           <template v-else>-</template>
         </template>
 
+        <template v-else-if="column.key === 'previousStageComments'">
+          <a-tooltip
+            v-if="record.previousStageComments.length > 0"
+            placement="topLeft"
+            :overlay-style="{ maxWidth: '420px' }"
+          >
+            <template #title>
+              <div v-for="(item, index) in record.previousStageComments" :key="index" class="previous-comment-full">
+                <b>{{ item.stageName }}</b>
+                <div>{{ item.comment }}</div>
+              </div>
+            </template>
+            <div v-for="(item, index) in record.previousStageComments" :key="index" class="previous-comment-line">
+              <span class="previous-comment-stage">{{ item.stageName }}</span> {{ item.comment }}
+            </div>
+          </a-tooltip>
+          <template v-else>-</template>
+        </template>
+
         <template v-else-if="column.key === 'resultStatus'">
           <a-select
             v-if="editable"
@@ -449,6 +469,24 @@ defineExpose({ clearSelection })
 
 .school {
   color: var(--app-text-secondary);
+}
+
+.previous-comment-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.previous-comment-stage {
+  color: var(--app-text-secondary);
+}
+
+.previous-comment-full {
+  white-space: pre-wrap;
+
+  & + & {
+    margin-top: 6px;
+  }
 }
 
 .pending-mark {

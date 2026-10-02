@@ -50,6 +50,14 @@ export interface AdminStageResult {
   finalSchoolName: string | null
   /** stageOrder 가 바로 앞인 단계의 결과. 첫 단계이거나 그 단계에 결과 행이 없으면 null */
   previousStageResultStatus: StageResultStatus | null
+  /** 앞선 모든 단계 중 코멘트가 있는 결과(stageOrder 순). 없으면 빈 배열. 읽기 전용 참고값 */
+  previousStageComments: PreviousStageComment[]
+}
+
+/** 앞선 단계에서 남긴 코멘트 */
+export interface PreviousStageComment {
+  stageName: string
+  comment: string
 }
 
 /** 판정 편집 버퍼의 한 항목. 저장 전 값이며 원본과 같아지면 본체가 항목을 지운다. */
