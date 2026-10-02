@@ -384,6 +384,7 @@ onBeforeUnmount(() => {
           class="hidden-input"
           @change="handleFilesSelected"
         />
+        <p class="image-guide">가로 길이 1720px을 권장하며, 이미지 1개당 최대 10MB까지 업로드할 수 있습니다.</p>
         <p v-if="images.length === 0" class="state-message">
           공고 본문으로 노출할 포스터 이미지를 추가해 주세요. (jpg/png/webp, 장당 10MB, 최대 10장)
         </p>
@@ -469,6 +470,11 @@ onBeforeUnmount(() => {
 }
 .state-message {
   color: #999;
+}
+.image-guide {
+  margin-bottom: 12px;
+  color: #666;
+  font-size: 13px;
 }
 .image-row {
   display: flex;
