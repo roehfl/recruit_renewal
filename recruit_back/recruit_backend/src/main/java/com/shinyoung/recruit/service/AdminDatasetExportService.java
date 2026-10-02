@@ -39,7 +39,6 @@ public class AdminDatasetExportService {
                     new ExportColumn<>("jobPositionName", row -> text(row.jobPositionName())),
                     new ExportColumn<>("applicationStatus", row -> text(row.applicationStatus())),
                     new ExportColumn<>("resultStatus", row -> text(row.resultStatus())),
-                    new ExportColumn<>("score", row -> text(row.score())),
                     new ExportColumn<>("comment", row -> text(row.comment())),
                     new ExportColumn<>("submittedAt", row -> text(row.submittedAt())),
                     new ExportColumn<>("decidedAt", row -> text(row.decidedAt()))

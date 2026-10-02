@@ -94,11 +94,6 @@ const effectiveStatus = (stageResultId: number, original: StageResultStatus): St
   props.pendingEdits.get(stageResultId)?.resultStatus ?? original
 
 /* 버퍼에 명시적 null 이 들어 있을 수 있어 ?? 대신 항목 존재 여부로 가른다(?? 면 원본으로 되돌아간다). */
-const effectiveScore = (stageResultId: number, original: number | null): number | null => {
-  const edit = props.pendingEdits.get(stageResultId)
-  return edit ? edit.score : original
-}
-
 const effectiveComment = (stageResultId: number, original: string | null): string | null => {
   const edit = props.pendingEdits.get(stageResultId)
   return edit ? edit.comment : original
@@ -133,11 +128,6 @@ const handleResultStatusChange = (stageResultId: number, value: unknown) => {
   if (isResultStatus(value)) {
     emit('edit', stageResultId, { resultStatus: value })
   }
-}
-
-/** a-input-number 는 값을 비우면 null 을 넘긴다(선언 타입에는 없다). 숫자가 아니면 미입력으로 본다. */
-const handleScoreChange = (stageResultId: number, value: unknown) => {
-  emit('edit', stageResultId, { score: typeof value === 'number' ? value : null })
 }
 
 /** a-input 이 change 로 넘기는 이벤트. ant-design-vue 내부 ChangeEvent 와 같은 모양이다. */
@@ -175,8 +165,8 @@ const filteredResults = computed(() =>
 /** 정정 열 폭. 열 정의와 가로 스크롤 폭이 따로 놀지 않게 한 곳에서 쓴다. */
 const CORRECT_COLUMN_WIDTH = 80
 
-/** 고정 열 폭 합계(1700) + 선택 열(40). 열을 더하면 이 값도 같이 늘려야 마지막 열이 잘리지 않는다. */
-const BASE_SCROLL_X = 1740
+/** 고정 열 폭 합계(1600) + 선택 열(40). 열을 더하면 이 값도 같이 늘려야 마지막 열이 잘리지 않는다. */
+const BASE_SCROLL_X = 1640
 
 const columns = computed<TableColumnsType>(() => {
   const base: TableColumnsType = [
@@ -190,7 +180,6 @@ const columns = computed<TableColumnsType>(() => {
     { title: '직전 단계', key: 'previousStageResultStatus', width: 90 },
     { title: '이전 코멘트', key: 'previousStageComments', width: 200 },
     { title: '결과', key: 'resultStatus', width: 130 },
-    { title: '점수', key: 'score', width: 100 },
     { title: '코멘트', key: 'comment', width: 200 },
     { title: '판정일시', key: 'decidedAt', width: 140 },
     { title: '판정자', key: 'decidedBy', width: 110 },
@@ -372,18 +361,6 @@ defineExpose({ clearSelection })
           <a-tag v-else :color="resultStatusColor(record.resultStatus)">
             {{ resultStatusLabel(record.resultStatus) }}
           </a-tag>
-        </template>
-
-        <template v-else-if="column.key === 'score'">
-          <a-input-number
-            v-if="editable"
-            :value="effectiveScore(record.stageResultId, record.score) ?? undefined"
-            size="small"
-            style="width: 100%"
-            :disabled="saving"
-            @change="(value: unknown) => handleScoreChange(record.stageResultId, value)"
-          />
-          <template v-else>{{ record.score ?? '-' }}</template>
         </template>
 
         <template v-else-if="column.key === 'comment'">

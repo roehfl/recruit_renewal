@@ -165,8 +165,6 @@ export type StageResultUploadCommitOutcome = 'APPLIED' | 'REJECTED_VALIDATION' |
 export interface StageResultUploadDiff {
   oldResultStatus: string | null
   newResultStatus: string | null
-  oldScore: string | null
-  newScore: string | null
   oldComment: string | null
   newComment: string | null
 }

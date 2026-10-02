@@ -29,7 +29,6 @@ const emit = defineEmits<{
 }>()
 
 const resultStatus = ref<StageResultStatus>('PASSED')
-const score = ref<number | null>(null)
 const comment = ref<string | null>(null)
 const reason = ref('')
 const submitting = ref(false)
@@ -123,7 +122,6 @@ watch(
     // 현재 값이 대기면 셀렉트 기본값을 합격으로 둔다(대기는 정정 값으로 보낼 수 없다).
     resultStatus.value =
       props.target.resultStatus === 'PENDING' ? 'PASSED' : props.target.resultStatus
-    score.value = props.target.score
     comment.value = props.target.comment
     reason.value = ''
     historiesLoadFailed.value = false
@@ -143,7 +141,8 @@ const submit = async () => {
   try {
     await adminStageApi.correctResult(props.stageId, props.target.stageResultId, {
       resultStatus: resultStatus.value,
-      score: score.value,
+      // 점수는 화면에서 편집하지 않는다. 정정 요청은 값을 교체하므로 기존 점수를 그대로 보내 지워지지 않게 한다.
+      score: props.target.score,
       // 코멘트를 지우면 a-input 이 빈 문자열을 남긴다. 그리드와 같이 미입력은 null 로 보낸다.
       comment: normalizedComment.value,
       reason: reason.value.trim(),
@@ -181,7 +180,6 @@ const submit = async () => {
       <dt>현재 결과</dt>
       <dd>
         <a-tag :color="statusColor(target.resultStatus)">{{ statusLabel(target.resultStatus) }}</a-tag>
-        <span v-if="target.score !== null">{{ target.score }}점</span>
       </dd>
       <dt>현재 코멘트</dt>
       <dd>{{ target.comment ?? '-' }}</dd>
@@ -190,9 +188,6 @@ const submit = async () => {
     <a-form layout="vertical">
       <a-form-item label="변경할 결과">
         <a-select v-model:value="resultStatus" :options="statusOptions" />
-      </a-form-item>
-      <a-form-item label="점수">
-        <a-input-number v-model:value="score" style="width: 100%" />
       </a-form-item>
       <a-form-item label="코멘트">
         <a-input v-model:value="comment" :maxlength="2000" />

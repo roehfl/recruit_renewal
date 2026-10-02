@@ -64,7 +64,7 @@ class AdminDatasetExportControllerTest {
 
     private static final List<String> STAGE_RESULT_HEADER = List.of(
             "stageResultId", "stageId", "applicationId", "applicantName", "jobPositionId",
-            "jobPositionName", "applicationStatus", "resultStatus", "score", "comment",
+            "jobPositionName", "applicationStatus", "resultStatus", "comment",
             "submittedAt", "decidedAt"
     );
 

@@ -178,10 +178,10 @@ class StageResultUploadControllerTest {
 
         List<List<String>> data = new ArrayList<>();
         data.add(HEADER);
-        data.add(rowOf(rows.get(0), "HOLD", "", ""));           // changed
-        data.add(rowOf(rows.get(1), "PASSED", "", ""));         // unchanged (already PASSED)
+        data.add(rowOf(rows.get(0), "HOLD", ""));           // changed
+        data.add(rowOf(rows.get(1), "PASSED", ""));         // unchanged (already PASSED)
         // 존재하지 않는 stageResultId → error
-        data.add(List.of("999999", String.valueOf(rows.get(0).appId()), "X", rows.get(0).token(), "FAILED", "", ""));
+        data.add(List.of("999999", String.valueOf(rows.get(0).appId()), "X", rows.get(0).token(), "FAILED", ""));
 
         mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
                 .andExpect(status().isOk())
@@ -200,8 +200,8 @@ class StageResultUploadControllerTest {
 
         List<List<String>> data = new ArrayList<>();
         data.add(HEADER);
-        data.add(rowOf(rows.get(0), "", "", ""));        // blank resultStatus → error
-        data.add(rowOf(rows.get(1), "PENDING", "", "")); // 판정된 행을 대기로 → error
+        data.add(rowOf(rows.get(0), "", ""));        // blank resultStatus → error
+        data.add(rowOf(rows.get(1), "PENDING", "")); // 판정된 행을 대기로 → error
 
         mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
                 .andExpect(status().isOk())
@@ -234,8 +234,8 @@ class StageResultUploadControllerTest {
 
         List<List<String>> data = new ArrayList<>();
         data.add(HEADER);
-        data.add(rowOf(rows.get(0), "HOLD", "", ""));
-        data.add(rowOf(rows.get(0), "FAILED", "", "")); // 같은 stageResultId 중복
+        data.add(rowOf(rows.get(0), "HOLD", ""));
+        data.add(rowOf(rows.get(0), "FAILED", "")); // 같은 stageResultId 중복
 
         mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
                 .andExpect(status().isOk())
@@ -250,7 +250,7 @@ class StageResultUploadControllerTest {
 
         byte[] bytes = buildXlsxWithFormulaComment(List.of(
                 HEADER,
-                rowOf(rows.get(0), "HOLD", "", "")));
+                rowOf(rows.get(0), "HOLD", "")));
 
         mockMvc.perform(multipart("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId())
                         .file(new MockMultipartFile("file", "upload.xlsx", XLSX_CONTENT_TYPE, bytes))
@@ -267,8 +267,8 @@ class StageResultUploadControllerTest {
 
         List<List<String>> data = new ArrayList<>();
         data.add(HEADER);
-        data.add(rowOf(rows.get(0), "보류", "", ""));   // changed (PASSED → HOLD)
-        data.add(rowOf(rows.get(1), "합격", "", ""));   // unchanged (already PASSED)
+        data.add(rowOf(rows.get(0), "보류", ""));   // changed (PASSED → HOLD)
+        data.add(rowOf(rows.get(1), "합격", ""));   // unchanged (already PASSED)
 
         mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
                 .andExpect(status().isOk())
@@ -285,8 +285,8 @@ class StageResultUploadControllerTest {
 
         List<List<String>> data = new ArrayList<>();
         data.add(HEADER);
-        data.add(rowOf(rows.get(0), "대기", "", ""));   // 손대지 않은 행 → unchanged
-        data.add(rowOf(rows.get(1), "합격", "", ""));   // 판정 → changed
+        data.add(rowOf(rows.get(0), "대기", ""));   // 손대지 않은 행 → unchanged
+        data.add(rowOf(rows.get(1), "합격", ""));   // 판정 → changed
 
         mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
                 .andExpect(status().isOk())
@@ -297,33 +297,18 @@ class StageResultUploadControllerTest {
     }
 
     @Test
-    void preview_rejects_pending_with_score_or_comment_change() throws Exception {
-        Fixture fixture = fixtureWithResults("A");
-        List<Current> rows = currentRows(fixture.stageId());
-
-        List<List<String>> data = new ArrayList<>();
-        data.add(HEADER);
-        data.add(rowOf(rows.get(0), "대기", "10", "")); // 대기 유지 + 점수 입력 → error
-
-        mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.errorCount").value(1))
-                .andExpect(jsonPath("$.data.rows[0].errors[0]").value("대기 상태에서는 점수·코멘트를 입력할 수 없습니다. 결과를 먼저 판정하세요."));
-    }
-
-    @Test
     void preview_rejects_pending_with_comment_change() throws Exception {
         Fixture fixture = fixtureWithResults("A");
         List<Current> rows = currentRows(fixture.stageId());
 
         List<List<String>> data = new ArrayList<>();
         data.add(HEADER);
-        data.add(rowOf(rows.get(0), "대기", "", "메모")); // 대기 유지 + 코멘트 입력 → error
+        data.add(rowOf(rows.get(0), "대기", "메모")); // 대기 유지 + 코멘트 입력 → error
 
         mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/preview", fixture.stageId(), data))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.errorCount").value(1))
-                .andExpect(jsonPath("$.data.rows[0].errors[0]").value("대기 상태에서는 점수·코멘트를 입력할 수 없습니다. 결과를 먼저 판정하세요."));
+                .andExpect(jsonPath("$.data.rows[0].errors[0]").value("대기 상태에서는 코멘트를 입력할 수 없습니다. 결과를 먼저 판정하세요."));
     }
 
     // ---------- commit ----------
@@ -336,8 +321,8 @@ class StageResultUploadControllerTest {
 
         List<List<String>> data = new ArrayList<>();
         data.add(HEADER);
-        data.add(rowOf(rows.get(0), "HOLD", "55", "재검토"));  // changed
-        data.add(rowOf(rows.get(1), "PASSED", "", ""));        // unchanged
+        data.add(rowOf(rows.get(0), "HOLD", "재검토"));  // changed
+        data.add(rowOf(rows.get(1), "PASSED", ""));        // unchanged
 
         mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId(), data))
                 .andExpect(status().isOk())
@@ -348,7 +333,6 @@ class StageResultUploadControllerTest {
 
         StageResult changed = stageResultRepository.findById(rows.get(0).srId()).orElseThrow();
         assertThat(changed.getResultStatus()).isEqualTo(StageResultStatus.HOLD);
-        assertThat(changed.getScore()).isEqualByComparingTo("55");
         assertThat(changed.getComment()).isEqualTo("재검토");
 
         StageResult unchanged = stageResultRepository.findById(rows.get(1).srId()).orElseThrow();
@@ -356,7 +340,7 @@ class StageResultUploadControllerTest {
     }
 
     @Test
-    void commit_clears_score_and_comment_when_blank() throws Exception {
+    void commit_clears_comment_when_blank_and_keeps_existing_score() throws Exception {
         Fixture fixture = fixtureWithResults("A");
         // 현재값: PASSED + score 10 + comment "old"
         List<Current> ignored = currentRows(fixture.stageId());
@@ -371,7 +355,7 @@ class StageResultUploadControllerTest {
 
         List<List<String>> data = new ArrayList<>();
         data.add(HEADER);
-        data.add(rowOf(rows.get(0), "PASSED", "", "")); // score/comment blank → clear
+        data.add(rowOf(rows.get(0), "PASSED", "")); // comment blank → clear, 점수 열 없음 → 기존 점수 유지
 
         mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId(), data))
                 .andExpect(status().isOk())
@@ -379,7 +363,7 @@ class StageResultUploadControllerTest {
                 .andExpect(jsonPath("$.data.changedCount").value(1));
 
         StageResult after = stageResultRepository.findById(rows.get(0).srId()).orElseThrow();
-        assertThat(after.getScore()).isNull();
+        assertThat(after.getScore()).isEqualByComparingTo("10");
         assertThat(after.getComment()).isNull();
     }
 
@@ -391,8 +375,8 @@ class StageResultUploadControllerTest {
 
         List<List<String>> data = new ArrayList<>();
         data.add(HEADER);
-        data.add(rowOf(rows.get(0), "HOLD", "", ""));     // valid change
-        data.add(rowOf(rows.get(1), "NOPE", "", ""));     // invalid status → whole file rejected
+        data.add(rowOf(rows.get(0), "HOLD", ""));     // valid change
+        data.add(rowOf(rows.get(1), "NOPE", ""));     // invalid status → whole file rejected
 
         mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId(), data))
                 .andExpect(status().isBadRequest())
@@ -414,7 +398,7 @@ class StageResultUploadControllerTest {
         data.add(HEADER);
         // 잘못된(오래된) 토큰으로 변경 시도 → STALE
         data.add(List.of(String.valueOf(rows.get(0).srId()), String.valueOf(rows.get(0).appId()),
-                "A", "2000-01-01T00:00:00", "HOLD", "", ""));
+                "A", "2000-01-01T00:00:00", "HOLD", ""));
 
         mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId(), data))
                 .andExpect(status().isConflict())
@@ -442,7 +426,7 @@ class StageResultUploadControllerTest {
         List<Current> rows = currentRows(fixture.stageId());
         List<List<String>> data = new ArrayList<>();
         data.add(HEADER);
-        data.add(rowOf(rows.get(0), rows.get(0).status(), rows.get(0).score(), rows.get(0).comment()));
+        data.add(rowOf(rows.get(0), rows.get(0).status(), rows.get(0).comment()));
 
         mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId(), data))
                 .andExpect(status().isOk())
@@ -467,7 +451,7 @@ class StageResultUploadControllerTest {
         // 전부 unchanged(변경 0건)여도 Stage IN_PROGRESS guard로 거부되어야 한다.
         List<List<String>> data = new ArrayList<>();
         data.add(HEADER);
-        data.add(rowOf(rows.get(0), "PASSED", "", ""));
+        data.add(rowOf(rows.get(0), "PASSED", ""));
 
         mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId(), data))
                 .andExpect(status().isBadRequest());
@@ -480,8 +464,8 @@ class StageResultUploadControllerTest {
 
         List<List<String>> data = new ArrayList<>();
         data.add(HEADER);
-        data.add(rowOf(rows.get(0), "대기", "", ""));
-        data.add(rowOf(rows.get(1), "불합격", "40", "서류 미비"));
+        data.add(rowOf(rows.get(0), "대기", ""));
+        data.add(rowOf(rows.get(1), "불합격", "서류 미비"));
 
         mockMvc.perform(multipartUpload("/api/admin/stages/{stageId}/results/upload/commit", fixture.stageId(), data))
                 .andExpect(status().isOk())
@@ -493,7 +477,7 @@ class StageResultUploadControllerTest {
                 .isEqualTo(StageResultStatus.PENDING);
         StageResult decided = stageResultRepository.findById(rows.get(1).srId()).orElseThrow();
         assertThat(decided.getResultStatus()).isEqualTo(StageResultStatus.FAILED);
-        assertThat(decided.getScore()).isEqualByComparingTo("40");
+        assertThat(decided.getScore()).isNull();
         assertThat(decided.getComment()).isEqualTo("서류 미비");
     }
 
@@ -597,14 +581,13 @@ class StageResultUploadControllerTest {
                 .with(authentication(adminAuthentication()));
     }
 
-    private List<String> rowOf(Current current, String status, String score, String comment) {
+    private List<String> rowOf(Current current, String status, String comment) {
         return List.of(
                 String.valueOf(current.srId()),
                 String.valueOf(current.appId()),
                 current.name(),
                 current.token(),
                 status,
-                score,
                 comment);
     }
 
@@ -631,7 +614,7 @@ class StageResultUploadControllerTest {
             List<String> c = sheet.get(r);
             rows.add(new Current(
                     Long.valueOf(c.get(0)), Long.valueOf(c.get(1)), c.get(2),
-                    c.get(3), c.get(4), c.get(5), c.get(6)));
+                    c.get(3), c.get(4), c.get(5)));
         }
         return rows;
     }
@@ -661,7 +644,7 @@ class StageResultUploadControllerTest {
                 Row row = sheet.createRow(r);
                 List<String> cells = rows.get(r);
                 for (int c = 0; c < cells.size(); c++) {
-                    if (r > 0 && c == 6) {
+                    if (r > 0 && c == 5) {
                         Cell formula = row.createCell(c, CellType.FORMULA);
                         formula.setCellFormula("1+1");
                     } else {
@@ -690,7 +673,6 @@ class StageResultUploadControllerTest {
             row.createCell(3, CellType.NUMERIC).setCellValue(45000); // 토큰을 numeric 셀로 → row error
             row.createCell(4, CellType.STRING).setCellValue("HOLD");
             row.createCell(5, CellType.STRING).setCellValue("");
-            row.createCell(6, CellType.STRING).setCellValue("");
             workbook.write(out);
             return out.toByteArray();
         }
@@ -788,6 +770,6 @@ class StageResultUploadControllerTest {
     private record Fixture(Long jobPostingId, Long stageId) {
     }
 
-    private record Current(Long srId, Long appId, String name, String token, String status, String score, String comment) {
+    private record Current(Long srId, Long appId, String name, String token, String status, String comment) {
     }
 }

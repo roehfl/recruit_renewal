@@ -131,15 +131,15 @@
 - 단건 판정 **FE 미사용**. `bulk`: 빈 배열·id 중복 400, 하나라도 다른 단계·없음이면 404(전체 거부). `score`·`comment`는 보낸 값으로 **교체**(null = 비움).
 - `correct`: 단계 RESULT_ANNOUNCED·CLOSED만, `reason` 필수 ≤1000, `comment` ≤2000, PENDING 불가, decidedAt=정정 시각. `histories` 행 `{ historyId, stageResultId, correctedAt, correctedBy, reason, previous/newStatus, previous/newScore, previous/newComment, previous/newDecidedAt }`.
 
-**엑셀 업로드(옛 계약 "변경 3", 2026-09-04 🟢)**
-- 템플릿 헤더 7열(정확 일치): `시스템ID(수정금지)`(stageResultId)·`수험번호(수정금지)`(applicationId)·`이름(수정금지)`·`수정토큰(수정금지)`·`결과`·`점수`·`코멘트`. 앞 4열 회색 음영, 헤더 틀고정, 결과는 한글 라벨 프리필, formula escape 끔.
+**엑셀 업로드(옛 계약 "변경 3", 2026-09-04 🟢 · 점수 열 제거 2026-10-02 🟢)**
+- 템플릿 헤더 6열(정확 일치): `시스템ID(수정금지)`(stageResultId)·`수험번호(수정금지)`(applicationId)·`이름(수정금지)`·`수정토큰(수정금지)`·`결과`·`코멘트`. 점수 열은 없다(옛 7열 템플릿은 헤더 불일치로 거부). commit은 현재 DB 점수를 그대로 넘겨 보존한다(`StageResultUploadService.validate`). 앞 4열 회색 음영, 헤더 틀고정, 결과는 한글 라벨 프리필, formula escape 끔.
 - 템플릿의 `이름(수정금지)` 값은 지원자 입력값이고 파서가 읽지 않는 열이라, `=`·`+`·`-`·`@`로 시작하면 앞에 `'`를 붙인다(`ExcelExportWriter.sanitize`, 2026-09-27). 나머지 열은 왕복 비교 때문에 원문 그대로다. 면접 일정 양식은 성명을 DB와 대조하므로 이스케이프하지 않는다(셀은 문자열 타입이라 자동 실행되지 않는다).
 - 결과 열 드롭다운 `합격 / 불합격 / 보류 / 결시 / 철회`(**대기 없음**), 2행~(데이터 행 수+1)행, 빈칸 불허(STOP).
 - 라벨 `PENDING=대기`·`PASSED=합격`·`FAILED=불합격`·`HOLD=보류`·`ABSENT=결시`·`WITHDRAWN=철회`. 파싱은 라벨 또는 enum 이름(대소문자 무시). ⚠️ JSON은 enum 이름이고 라벨 API는 없다 → FE 맵이 글자까지 같아야 한다.
 - 파일 레벨 거부 = 400 **data 없음**: 빈 파일·`.xlsx` 아님·크기·헤더 불일치(`업로드 템플릿 헤더가 올바르지 않습니다. 엑셀 템플릿 다운로드 파일을 사용하세요.`)·행 수 초과·판독 불가. 빈 행은 건너뛴다.
-- 부분 판정: 파일 `대기` + DB PENDING → `UNCHANGED`. 판정된 행을 `대기`로, DB PENDING인 채 점수·코멘트만 → 오류. 빈 점수·코멘트 = null로 비움.
-- 행 오류 문구: `결과는 필수입니다.` / `허용되지 않는 결과입니다: <입력> (합격/불합격/보류/결시/철회)` / `점수 형식이 올바르지 않습니다: <입력>` / `판정된 결과를 대기로 되돌릴 수 없습니다. 다른 관리자가 이미 판정했다면 템플릿을 다시 받으세요.` / `대기 상태에서는 점수·코멘트를 입력할 수 없습니다. 결과를 먼저 판정하세요.` / `코멘트는 2000자 이하여야 합니다.` / `시스템ID는 필수이며 숫자여야 합니다.` / `수험번호는 필수이며 숫자여야 합니다.` / `수험번호가 시스템ID와 일치하지 않습니다.` / `이 단계의 대상자가 아니거나 존재하지 않습니다.` / `시스템ID가 파일 내에서 중복되었습니다.` / `수식(formula) 셀은 허용되지 않습니다.` / `수정토큰은 문자열 셀이어야 합니다.` / `STALE_ROW: 다른 사용자가 변경했습니다. 현재 토큰=<토큰>`. 입력 되비춤은 50자까지.
-- preview `{ stageId, totalRows, changedCount, unchangedCount, errorCount, committable, rows[] }`, 행 `{ rowNumber, stageResultId, applicationId, applicantName, status, errors[], diff }`(`diff`는 CHANGED·STALE만, 문자열·enum 이름). 저장·STALE 판정 안 함.
+- 부분 판정: 파일 `대기` + DB PENDING → `UNCHANGED`. 판정된 행을 `대기`로, DB PENDING인 채 코멘트만 → 오류. 빈 코멘트 = null로 비움. 변경 판정은 결과·코멘트만 본다.
+- 행 오류 문구: `결과는 필수입니다.` / `허용되지 않는 결과입니다: <입력> (합격/불합격/보류/결시/철회)` / `판정된 결과를 대기로 되돌릴 수 없습니다. 다른 관리자가 이미 판정했다면 템플릿을 다시 받으세요.` / `대기 상태에서는 코멘트를 입력할 수 없습니다. 결과를 먼저 판정하세요.` / `코멘트는 2000자 이하여야 합니다.` / `시스템ID는 필수이며 숫자여야 합니다.` / `수험번호는 필수이며 숫자여야 합니다.` / `수험번호가 시스템ID와 일치하지 않습니다.` / `이 단계의 대상자가 아니거나 존재하지 않습니다.` / `시스템ID가 파일 내에서 중복되었습니다.` / `수식(formula) 셀은 허용되지 않습니다.` / `수정토큰은 문자열 셀이어야 합니다.` / `STALE_ROW: 다른 사용자가 변경했습니다. 현재 토큰=<토큰>`. 입력 되비춤은 50자까지.
+- preview `{ stageId, totalRows, changedCount, unchangedCount, errorCount, committable, rows[] }`, 행 `{ rowNumber, stageResultId, applicationId, applicantName, status, errors[], diff }`(`diff` = `{ old/newResultStatus, old/newComment }`, CHANGED·STALE만, 문자열·enum 이름). 저장·STALE 판정 안 함.
 - commit `{ stageId, outcome, totalRows, changedCount, unchangedCount, errorCount, staleCount, failedRows[] }`: `APPLIED` 200 / `REJECTED_VALIDATION` 400 + data / `REJECTED_STALE` 409 + data / `@Version` 충돌 409 **data 없음**.
 - 템플릿·preview는 단계 존재만 검사. commit은 IN_PROGRESS + actor를 변경 0건이어도 검사.
 
@@ -181,7 +181,8 @@
 
 **화면(FE)**
 - `STAGE_RESULT_STATUS_LABELS`는 백엔드 `StageResultStatusLabels`와 글자까지 같아야 한다. ({FE}/types/admin/stage.ts)
-- 편집 버퍼 `pendingEdits: Map<stageResultId, { resultStatus, score, comment }>`(원본과 같아지면 삭제) → "변경사항 저장" = `bulk` 1회. PENDING 편집은 전송 안 함. 409면 재조회 + 버퍼 유지. 공고·단계 전환, 불러오기, 발표, 업로드·드로어 열기, 이탈 전에 미저장 변경을 확인 후 버린다. ({FE}/views/admin/stageResult/AdminStageResultView.vue — writeEdit, saveEdits, confirmDiscardIfDirty)
+- **화면은 점수를 표시·편집하지 않는다**(2026-10-02, 그리드 열·정정 모달 입력·업로드 미리보기 열 제거). API·DB의 `score`는 남아 있고, `bulk`·`correct`가 값을 교체하므로 FE는 원본 `score`를 그대로 보내 기존 점수를 보존한다. 옛 정정 이력의 점수 변경 문구는 이력 표시에 남는다. ({FE}/views/admin/stageResult/StageResultCorrectModal.vue — submit)
+- 편집 버퍼 `pendingEdits: Map<stageResultId, { resultStatus, score, comment }>`(원본과 같아지면 삭제, `score`는 원본 그대로) → "변경사항 저장" = `bulk` 1회. PENDING 편집은 전송 안 함. 409면 재조회 + 버퍼 유지. 공고·단계 전환, 불러오기, 발표, 업로드·드로어 열기, 이탈 전에 미저장 변경을 확인 후 버린다. ({FE}/views/admin/stageResult/AdminStageResultView.vue — writeEdit, saveEdits, confirmDiscardIfDirty)
 - **카운트 카드는 저장 전 판정을 반영한다**: 버퍼 `resultStatus`를 덮어쓴 `resultsWithPendingEdits`를 `StageResultCounts`에 넘기고, 그리드 필터·표시도 `effectiveStatus`(버퍼 우선)라 카드 숫자와 필터 결과가 같다. 반면 **발표 차단 사유(`pendingCount`)·발표 확인 요약은 저장된 `results` 기준**. ({FE}/views/admin/stageResult/AdminStageResultView.vue — resultsWithPendingEdits, pendingCount / {FE}/views/admin/stageResult/StageResultGrid.vue — effectiveStatus)
 - 카드에 철회 없음(필터로만). 일괄 적용은 철회 제외·필터로 가려진 선택 행 제외. PENDING 옵션은 원본 PENDING 행에만. ({FE}/types/admin/stage.ts — BULK_APPLY_STATUSES)
 - 버튼 가드는 백엔드 가드를 미러링, 명령 실패 시 재조회. 업로드 거부 응답 data의 `failedRows`를 표로 그린다. 모달이 제출 시점 `props.stageId`를 읽으므로 마스크를 끄지 않는다. ({FE}/views/admin/stageResult/useStageLifecycle.ts — runCommand / {FE}/views/admin/stageResult/StageUploadPreviewModal.vue — commit(props.stageId 읽기)·extractCommitPayload(failedRows 파싱))
@@ -244,7 +245,7 @@ npm run type-check
 - `recruit_back/recruit_backend/docs/adr/0006-audit-transaction-policy.md` — 성공 감사 in-tx, 거부·충돌 REQUIRES_NEW, 전후값·PII 금지.
 - 마감 공고 교착(미해결): 공고 `CLOSED`는 종착인데 발표·마감은 `PUBLISHED`만 → 진행 중 단계가 판정만 되고 끝낼 수 없다(FE는 툴팁 안내만). 공고 마감 전에 단계를 발표·마감한다.
 - `previousStageResultStatus`·`previousStageComments`는 조회 시 계산돼, 발표된 단계 앞에 단계를 넣으면 소급해 바뀐다 → FE는 신규·이동을 맨 뒤로만.
-- 결과 export(영문 12열)는 업로드 소스가 아니다. FE만 발표·마감 단계로 다운로드를 제한한다.
+- 결과 export(영문 11열, `score` 없음)는 업로드 소스가 아니다. FE만 발표·마감 단계로 다운로드를 제한한다.
 - 결과 목록 비페이징 전제(enricher·그리드·카운트). 페이징 도입 시 셋을 함께 바꾼다.
 - 드로어가 이름을 `trim()`해 보내므로 앞뒤 공백 있는 진행 중 단계는 수정이 400.
 - 운영: 메뉴 관리에 `/admin/stage-results`를 등록해야 사이드바에 뜬다 → [role-menu](role-menu.md).

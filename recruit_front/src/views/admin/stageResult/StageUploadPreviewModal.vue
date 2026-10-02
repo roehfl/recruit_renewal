@@ -52,7 +52,6 @@ const columns: TableColumnsType = [
   { title: '수험번호', key: 'applicationId', width: 100 },
   { title: '이름', key: 'applicantName', width: 100 },
   { title: '결과', key: 'result', width: 160 },
-  { title: '점수', key: 'score', width: 120 },
   { title: '코멘트', key: 'comment', width: 200 },
   { title: '판정', key: 'status', width: 260 },
 ]
@@ -109,16 +108,13 @@ const statusLabel = (raw: string | null): string => {
 const noDiffText = (status: StageResultUploadRowStatus) =>
   status === 'UNCHANGED' ? '변경 없음' : '-'
 
-/** 결과 열이 이미 "변경 없음"을 말하므로 점수·코멘트는 비운다(같은 문구를 한 행에 세 번 쓰지 않는다). */
+/** 결과 열이 이미 "변경 없음"을 말하므로 코멘트는 비운다(같은 문구를 한 행에 두 번 쓰지 않는다). */
 const noDiffValueText = (status: StageResultUploadRowStatus) => (status === 'UNCHANGED' ? '' : '-')
 
 const resultDiffText = (diff: StageResultUploadDiff | null, status: StageResultUploadRowStatus) =>
   diff === null
     ? noDiffText(status)
     : `${statusLabel(diff.oldResultStatus)} → ${statusLabel(diff.newResultStatus)}`
-
-const scoreDiffText = (diff: StageResultUploadDiff | null, status: StageResultUploadRowStatus) =>
-  diff === null ? noDiffValueText(status) : `${orDash(diff.oldScore)} → ${orDash(diff.newScore)}`
 
 const commentDiffText = (diff: StageResultUploadDiff | null, status: StageResultUploadRowStatus) =>
   diff === null ? noDiffValueText(status) : `${orDash(diff.oldComment)} → ${orDash(diff.newComment)}`
@@ -249,7 +245,7 @@ const commit = async () => {
       type="info"
       show-icon
       message="템플릿 다운로드 파일만 업로드할 수 있습니다."
-      description="결과 목록 다운로드 파일은 열 구성이 달라 업로드할 수 없습니다. 결과·점수·코멘트만 고치고 나머지 열은 그대로 두세요."
+      description="결과 목록 다운로드 파일은 열 구성이 달라 업로드할 수 없습니다. 결과·코멘트만 고치고 나머지 열은 그대로 두세요."
     />
 
     <a-alert v-if="fileError" class="hint" type="error" show-icon :message="fileError" />
@@ -303,7 +299,7 @@ const commit = async () => {
         :pagination="{ pageSize: 10 }"
         row-key="rowNumber"
         size="small"
-        :scroll="{ x: 1000, y: 320 }"
+        :scroll="{ x: 880, y: 320 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'applicationId'">{{ orDash(record.applicationId) }}</template>
@@ -313,10 +309,6 @@ const commit = async () => {
 
           <template v-else-if="column.key === 'result'">
             {{ resultDiffText(record.diff, record.status) }}
-          </template>
-
-          <template v-else-if="column.key === 'score'">
-            {{ scoreDiffText(record.diff, record.status) }}
           </template>
 
           <template v-else-if="column.key === 'comment'">

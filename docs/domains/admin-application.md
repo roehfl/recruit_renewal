@@ -150,7 +150,7 @@ JSON 응답은 `ApiResponse<T>`, 파일 응답은 래핑 없음(오류만 JSON).
 - `applications-yyyyMMddHHmmss.zip`, 내부 이름이 겹치면 `(2)` 접미사. id 하나라도 없으면 404로 전체 실패. POST는 id 배열 때문(의도). FE도 20건을 먼저 검사.
 
 **다른 목록 export** — 🟢. 헤더 영문 필드명, enum 원문, 일시 ISO. 없는 단계·공고 404.
-- 전형결과(2026-09-04 전형결과 화면 계약): `StageResultService.getResults` 12열. 업로드 템플릿과 열이 달라 업로드 불가. FE는 [stage-result](stage-result.md) 화면.
+- 전형결과(2026-09-04 전형결과 화면 계약): `StageResultService.getResults` 11열(`score` 제외, 2026-10-02). 업로드 템플릿과 열이 달라 업로드 불가. FE는 [stage-result](stage-result.md) 화면.
 - 면접: `InterviewService.getAdminInterviews` 14열(2026-09-18 종료시각 삭제, `arrivalDateTime` 추가). **FE 미사용**.
 - 평가: 평가 1건 = 1행 10열. **FE 미사용**.
 

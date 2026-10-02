@@ -5,7 +5,7 @@ package com.shinyoung.recruit.dto.request;
  * 타입/허용값 해석은 service의 검증 단계에서 수행한다.
  *
  * <p>{@code stageResultId}/{@code applicationId}/{@code applicantName}/{@code stageResultUpdatedAt}는
- * read-only echo·동시성 토큰이고, {@code resultStatus}/{@code score}/{@code comment}만 편집 대상이다.
+ * read-only echo·동시성 토큰이고, {@code resultStatus}/{@code comment}만 편집 대상이다(점수 열 없음, 기존 점수 유지).
  * {@code stageId}는 row가 아니라 path로만 판단하므로 컬럼으로 두지 않는다.
  *
  * @param rowNumber           스프레드시트 행 번호(1-based, header=1)
@@ -14,7 +14,6 @@ package com.shinyoung.recruit.dto.request;
  * @param applicantName       사람 눈 확인용(매칭 미사용)
  * @param stageResultUpdatedAt 낙관적 동시성 토큰(raw ISO-8601 문자열)
  * @param resultStatus        편집 대상(raw)
- * @param score               편집 대상(raw)
  * @param comment             편집 대상(raw)
  * @param formulaCellPresent  행 내 셀 중 formula 셀이 있으면 true(formula injection 방어)
  * @param tokenCellNotString  토큰 셀이 문자열이 아닌 numeric/date면 true
@@ -26,7 +25,6 @@ public record StageResultUploadRowRequest(
         String applicantName,
         String stageResultUpdatedAt,
         String resultStatus,
-        String score,
         String comment,
         boolean formulaCellPresent,
         boolean tokenCellNotString

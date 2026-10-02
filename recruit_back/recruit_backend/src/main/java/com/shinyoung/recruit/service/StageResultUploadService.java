@@ -49,8 +49,9 @@ import java.util.stream.Collectors;
  * comment 길이, actor 필수, 정정 이력/audit 같은 기존 불변식을 그대로 상속한다.
  *
  * <p>행은 {@code stageResultId}(존재) + {@code applicationId} 일치 + path {@code stageId} 소속의
- * 3중 교차검증을 모두 만족해야 유효하다. 편집 컬럼은 {@code resultStatus}/{@code score}/{@code comment}뿐이고,
- * 빈칸은 resultStatus=오류, score/comment=null clear로 해석한다. 변경 없는 행은 commit에서 제외한다.
+ * 3중 교차검증을 모두 만족해야 유효하다. 편집 컬럼은 {@code resultStatus}/{@code comment}뿐이고,
+ * 빈칸은 resultStatus=오류, comment=null clear로 해석한다. 점수 열은 없으며 commit 시 현재 DB 점수를 그대로 넘겨
+ * 보존한다. 변경 없는 행은 commit에서 제외한다.
  * 결과 값은 한글 라벨(합격/불합격/보류/결시/철회) 또는 enum 이름을 받는다. 파일 값이 대기이고 DB도 PENDING이면
  * 미변경으로 분류해 부분 판정 업로드를 허용한다({@link StageResultStatusLabels}).
  * commit은 변경 대상 행에 대해 {@code stageResultUpdatedAt} 토큰을 현재 DB 값과 비교해 낙관적 동시성을
@@ -75,8 +76,7 @@ public class StageResultUploadService {
                     new ExportColumn<>(StageResultUploadParser.HEADERS.get(2), StageResultUploadTemplateRow::applicantName, true),
                     new ExportColumn<>(StageResultUploadParser.HEADERS.get(3), StageResultUploadTemplateRow::stageResultUpdatedAt, true),
                     new ExportColumn<>(StageResultUploadParser.HEADERS.get(4), StageResultUploadTemplateRow::resultStatus),
-                    new ExportColumn<>(StageResultUploadParser.HEADERS.get(5), StageResultUploadTemplateRow::score),
-                    new ExportColumn<>(StageResultUploadParser.HEADERS.get(6), StageResultUploadTemplateRow::comment)),
+                    new ExportColumn<>(StageResultUploadParser.HEADERS.get(5), StageResultUploadTemplateRow::comment)),
             StageResultUploadService::decorateTemplateSheet);
 
     private final StageRepository stageRepository;
@@ -101,7 +101,6 @@ public class StageResultUploadService {
                         ExcelExportWriter.sanitize(result.getJobApplication().getApplicantNameSnapshot()),
                         formatToken(result.getUpdatedAt()),
                         StageResultStatusLabels.label(result.getResultStatus()),
-                        result.getScore() == null ? "" : result.getScore().toPlainString(),
                         result.getComment() == null ? "" : result.getComment()))
                 .toList();
         // round-trip 소스이므로 formula-escape를 끈다(comment 등 값을 변형하지 않는다).
@@ -216,7 +215,6 @@ public class StageResultUploadService {
         }
 
         StageResultStatus newStatus = parseResultStatus(blankToNull(row.resultStatus()), errors);
-        BigDecimal newScore = parseScore(blankToNull(row.score()), errors);
         String newComment = blankToNull(row.comment());
         if (newComment != null && newComment.length() > COMMENT_MAX_LENGTH) {
             errors.add("코멘트는 2000자 이하여야 합니다.");
@@ -237,13 +235,12 @@ public class StageResultUploadService {
         }
 
         // 대기(PENDING) 규칙: 현재도 대기면 "손대지 않은 행"으로 보고 미변경 처리한다(부분 판정 업로드 허용).
-        // 판정된 행을 대기로 되돌리거나, 대기인 채로 점수·코멘트만 넣는 것은 bulk가 거부하므로 여기서 막는다.
+        // 판정된 행을 대기로 되돌리거나, 대기인 채로 코멘트만 넣는 것은 bulk가 거부하므로 여기서 막는다.
         if (current != null && newStatus == StageResultStatus.PENDING) {
             if (current.getResultStatus() != StageResultStatus.PENDING) {
                 errors.add("판정된 결과를 대기로 되돌릴 수 없습니다. 다른 관리자가 이미 판정했다면 템플릿을 다시 받으세요.");
-            } else if (!scoreEquals(current.getScore(), newScore)
-                    || !Objects.equals(blankToNull(current.getComment()), newComment)) {
-                errors.add("대기 상태에서는 점수·코멘트를 입력할 수 없습니다. 결과를 먼저 판정하세요.");
+            } else if (!Objects.equals(blankToNull(current.getComment()), newComment)) {
+                errors.add("대기 상태에서는 코멘트를 입력할 수 없습니다. 결과를 먼저 판정하세요.");
             }
         }
 
@@ -255,8 +252,9 @@ public class StageResultUploadService {
         }
 
         boolean changed = current.getResultStatus() != newStatus
-                || !scoreEquals(current.getScore(), newScore)
                 || !Objects.equals(blankToNull(current.getComment()), newComment);
+        // 점수는 템플릿에 없으므로 현재(2차 검증에서는 잠금 후 refresh된) DB 값을 그대로 넘겨 bulk 교체 시 지워지지 않게 한다.
+        BigDecimal newScore = current.getScore();
 
         if (!changed) {
             return new ValidatedUploadRow(
@@ -265,7 +263,7 @@ public class StageResultUploadService {
                     newStatus, newScore, newComment);
         }
 
-        StageResultUploadDiff diff = StageResultUploadDiff.of(current, newStatus, newScore, newComment);
+        StageResultUploadDiff diff = StageResultUploadDiff.of(current, newStatus, newComment);
 
         if (forCommit) {
             String currentToken = formatToken(current.getUpdatedAt());
@@ -298,18 +296,6 @@ public class StageResultUploadService {
         return parsed.get();
     }
 
-    private BigDecimal parseScore(String raw, List<String> errors) {
-        if (raw == null) {
-            return null;
-        }
-        try {
-            return new BigDecimal(raw);
-        } catch (NumberFormatException e) {
-            errors.add("점수 형식이 올바르지 않습니다: " + abbreviate(raw));
-            return null;
-        }
-    }
-
     /** 오류 문구에 사용자 입력을 되비출 때 응답 크기가 셀 길이에 비례해 커지지 않도록 자른다. */
     private static String abbreviate(String raw) {
         return raw.length() > 50 ? raw.substring(0, 50) + "…" : raw;
@@ -339,16 +325,6 @@ public class StageResultUploadService {
         if (!stageRepository.existsById(stageId)) {
             throw new StageNotFoundException("Stage not found.");
         }
-    }
-
-    private static boolean scoreEquals(BigDecimal a, BigDecimal b) {
-        if (a == null && b == null) {
-            return true;
-        }
-        if (a == null || b == null) {
-            return false;
-        }
-        return a.compareTo(b) == 0;
     }
 
     /** 헤더 틀고정 + 결과 열 드롭다운(합격/불합격/보류/결시/철회). 데이터가 0행이어도 2행에는 걸어 둔다. */

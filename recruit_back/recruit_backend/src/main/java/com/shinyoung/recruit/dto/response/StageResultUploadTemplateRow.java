@@ -14,7 +14,6 @@ public record StageResultUploadTemplateRow(
         String applicantName,
         String stageResultUpdatedAt,
         String resultStatus,
-        String score,
         String comment
 ) {
 }

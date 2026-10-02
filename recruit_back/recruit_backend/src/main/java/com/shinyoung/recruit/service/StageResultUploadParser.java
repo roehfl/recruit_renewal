@@ -34,12 +34,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class StageResultUploadParser {
 
-    /** upload-template 헤더 시그니처(순서 고정). 앞 4열은 읽기전용 echo/토큰, 뒤 3열만 편집 대상. */
+    /** upload-template 헤더 시그니처(순서 고정). 앞 4열은 읽기전용 echo/토큰, 뒤 2열만 편집 대상. */
     public static final List<String> HEADERS = List.of(
             "시스템ID(수정금지)", "수험번호(수정금지)", "이름(수정금지)", "수정토큰(수정금지)",
-            "결과", "점수", "코멘트");
+            "결과", "코멘트");
 
-    private static final int COLUMN_COUNT = 7;
+    private static final int COLUMN_COUNT = 6;
     private static final int TOKEN_COLUMN = 3;
 
     private final UploadProperties uploadProperties;
@@ -139,7 +139,7 @@ public class StageResultUploadParser {
         }
         return new StageResultUploadRowRequest(
                 row.getRowNum() + 1,
-                values[0], values[1], values[2], values[3], values[4], values[5], values[6],
+                values[0], values[1], values[2], values[3], values[4], values[5],
                 formula, tokenNotString);
     }
 
