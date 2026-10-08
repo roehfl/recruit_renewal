@@ -8,6 +8,7 @@ import com.shinyoung.recruit.dto.request.ApplicantSignUpRequest;
 import com.shinyoung.recruit.dto.response.ApplicantEmailAvailabilityResponse;
 import com.shinyoung.recruit.dto.response.ApplicantSignUpResponse;
 import com.shinyoung.recruit.enumeration.EmailVerificationPurpose;
+import com.shinyoung.recruit.enumeration.Gender;
 import com.shinyoung.recruit.exception.InvalidApplicantSignUpException;
 import com.shinyoung.recruit.service.nice.NiceVerifiedIdentity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -68,6 +69,7 @@ public class ApplicantSignUpService {
         applicant.setPassword(passwordEncoder.encode(request.password()));
         applicant.setPhoneNumber(phoneNumber);
         applicant.setEmail(email);
+        applicant.setGender(Gender.fromNiceCode(identity.gender()));
 
         applicantRepository.save(applicant);
 

@@ -1,7 +1,10 @@
 package com.shinyoung.recruit.domain.entity;
 
+import com.shinyoung.recruit.enumeration.Gender;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.PrimaryKeyJoinColumn;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,6 +30,10 @@ public class Applicant extends User {
      */
     @Column(nullable = false, unique = true)
     private String ciHash;
+    /** 가입 시 NICE 본인확인 결과의 성별. 평문(사용자 결정). 기존 가입자는 null. 파기 시 null. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10)
+    private Gender gender;
 
     protected Applicant() {}
 
@@ -55,6 +62,7 @@ public class Applicant extends User {
         this.email = null;
         this.password = null;
         this.phoneNumber = null;
+        this.gender = null;
         this.ciHash = ciHashSentinel;
     }
 }

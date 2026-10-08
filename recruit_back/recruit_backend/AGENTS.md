@@ -120,7 +120,7 @@ Controller
 
 - `@Convert(converter = AesAttributeConverter.class)` 필드는 AES/CBC(무작위 IV)로 저장된다. 키 `crypto.aes.key`(= `AES_SECRET_KEY`, 32바이트, 아니면 기동 실패). 암호문이 매번 달라 검색·비교·unique가 불가능하다.
 - 암호화 필드: `ApplicationBasicInfo`의 이름·`countryCode`·연락처(`mobilePhone`·`emergencyPhone`·`email`)·장애 코드·주소.
-- 평문(현행): `User.loginId`·`User.name`, `Applicant.email`(unique)·`Applicant.phoneNumber`. 암호화 전환은 요청 시에만(기존 데이터 이행 필요).
+- 평문(현행): `User.loginId`·`User.name`, `Applicant.email`(unique)·`Applicant.phoneNumber`·`Applicant.gender`. 암호화 전환은 요청 시에만(기존 데이터 이행 필요).
 - 검색할 개인정보는 별도 해시 컬럼으로 찾는다. 예: `Applicant.ciHash` = `AuditHmac.identityHash`(이름·생년월일·성별, unique, 중복 가입 확인).
 - `HashUtil`: 키 없는 SHA-256(검색 키·파일 해시). `AuditHmac`: `AUDIT_HMAC_SECRET` 기반 HMAC-SHA256(감사 로그 가명 연결자·파기 덮어쓰기 값). `AuditHmac`에 CI·이메일·전화 원문을 넣지 않는다(예외 `identityHash`).
 - 새 개인정보 필드는 암호화 여부를 사용자에게 확인한다. 파기 대상이면 privacy-audit 카드를 따른다.

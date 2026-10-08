@@ -12,7 +12,8 @@ import java.time.Instant;
  * 화면에는 {@code name}, {@code phoneNumber} 만 내려간다.
  *
  * <p>{@code birthDate}·{@code gender} 는 NICE 원값 그대로다({@code BIRTHDATE} = {@code yyyyMMdd},
- * {@code GENDER} = NICE 코드). 해석·변환하지 않는다 — 가입자 중복 판정 키의 재료로만 쓴다.
+ * {@code GENDER} = NICE 코드). 해석·변환하지 않는다 — 가입자 중복 판정 키의 재료로 쓰고,
+ * 가입 시 성별은 {@link com.shinyoung.recruit.enumeration.Gender#fromNiceCode} 로 바꿔 계정에 저장한다.
  *
  * <p>HTTP 세션 속성으로 저장되므로 {@link Serializable} 이어야 한다.
  */

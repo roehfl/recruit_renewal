@@ -8,6 +8,7 @@ import com.shinyoung.recruit.dto.request.ApplicantSignUpRequest;
 import com.shinyoung.recruit.dto.response.ApplicantEmailAvailabilityResponse;
 import com.shinyoung.recruit.dto.response.ApplicantSignUpResponse;
 import com.shinyoung.recruit.enumeration.EmailVerificationPurpose;
+import com.shinyoung.recruit.enumeration.Gender;
 import com.shinyoung.recruit.enumeration.NiceVerificationPurpose;
 import com.shinyoung.recruit.exception.InvalidApplicantSignUpException;
 import com.shinyoung.recruit.service.nice.NiceVerifiedIdentity;
@@ -27,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -86,6 +88,26 @@ class ApplicantSignUpServiceTest {
         assertThat(response.applicantId()).isEqualTo(1L);
         assertThat(response.loginId()).isEqualTo("applicant01@example.com");
         assertThat(response.name()).isEqualTo("홍길동");
+    }
+
+    @Test
+    void NICE_성별_코드를_계정에_저장한다() {
+        given(applicantRepository.save(any(Applicant.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        applicantSignUpService.signUp(new ApplicantSignUpRequest(
+                "male@example.com", "Password1234!", "male@example.com"),
+                identity("홍길동", "01000000000", "19900101", "1"));
+        applicantSignUpService.signUp(new ApplicantSignUpRequest(
+                "female@example.com", "Password1234!", "female@example.com"),
+                identity("홍길순", "01000000000", "19900101", "0"));
+        applicantSignUpService.signUp(new ApplicantSignUpRequest(
+                "unknown@example.com", "Password1234!", "unknown@example.com"),
+                identity("홍길용", "01000000000", "19900101", "9"));
+
+        ArgumentCaptor<Applicant> captor = ArgumentCaptor.forClass(Applicant.class);
+        verify(applicantRepository, times(3)).save(captor.capture());
+        assertThat(captor.getAllValues()).extracting(Applicant::getGender)
+                .containsExactly(Gender.MALE, Gender.FEMALE, null);
     }
 
     @Test

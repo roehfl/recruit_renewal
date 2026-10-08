@@ -49,7 +49,7 @@
 | config | `{BE}/security/auth/CustomAuthenticationEntryPoint.java` | 필터 401 JSON |
 | config | `{BE}/security/auth/CustomAccessDeniedHandler.java` | 필터 403 JSON |
 | entity | `{BE}/domain/entity/User.java` | `users`, `loginId` unique |
-| entity | `{BE}/domain/entity/Applicant.java` | email(unique)·password·phoneNumber·ciHash(unique) |
+| entity | `{BE}/domain/entity/Applicant.java` `{BE}/enumeration/Gender.java` | email(unique)·password·phoneNumber·ciHash(unique)·gender |
 | entity | `{BE}/domain/entity/Employee.java` | `deptName`(unique 아님) |
 | repository | `{BE}/domain/repository/UserRepository.java` | `findUserByLoginId`, `existsByLoginId` |
 | repository | `{BE}/domain/repository/ApplicantRepository.java` | `findByLoginId`, `findByEmail`, `existsByEmail`, `existsByCiHash`, `findByCiHash` |
@@ -150,6 +150,7 @@ NICE 4종(`request`·`callback`·`callback/error`·`result`) 상세는 [auth-nic
 **POST /auth/applicants/sign-up**
 - 검증: loginId ≤100, password 8~100(모두 `@NotBlank`), email `@Email` ≤255. **name·phoneNumber·ci는 요청 본문에 없다** — 세션의 NICE 인증 결과(`requireFresh(purpose=SIGNUP)`)를 쓴다. 없으면(미진행·용도 불일치·만료) 400. 그다음 `requireVerified(SIGNUP, email)`: email이 비었거나 확인 전·확인 후 10분 지남·다른 이메일이면 400 `이메일 인증이 필요합니다.`. 둘 다 중복 검사보다 먼저다.
 - 400 메시지는 검사 순서대로 `"이미 사용 중인 아이디입니다."` → `"이미 사용 중인 이메일입니다."` → `"이미 가입된 본인인증 정보입니다."`다. 동시 가입 경합으로 DB unique에 걸리면 409 `"이미 처리되었거나 중복된 데이터입니다."`.
+- 성별은 가입 때 `Applicant.gender`에 저장한다([auth-nice-verification](auth-nice-verification.md)).
 - 가입 성공 후 세션의 NICE 결과와 이메일 인증 상태는 **1회용이라 즉시 제거**한다.
 - 가입 후 자동 로그인하지 않는다(FE는 `/applicant`로 이동). FE 응답 타입(`SignupUser`)은 틀렸지만 응답을 쓰지 않는다.
 

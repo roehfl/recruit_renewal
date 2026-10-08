@@ -35,6 +35,7 @@ import com.shinyoung.recruit.enumeration.AttachmentType;
 import com.shinyoung.recruit.enumeration.ApplicationSectionType;
 import com.shinyoung.recruit.enumeration.AuditActionType;
 import com.shinyoung.recruit.enumeration.AuditReasonCode;
+import com.shinyoung.recruit.enumeration.Gender;
 import com.shinyoung.recruit.enumeration.PhysicalFileStatus;
 import com.shinyoung.recruit.enumeration.PurgeBatchStatus;
 import com.shinyoung.recruit.enumeration.PurgeItemStatus;
@@ -250,6 +251,7 @@ class PurgeExecutionServiceTest {
         assertThat(purgedApplicant.getLoginId()).isNull();
         assertThat(purgedApplicant.getEmail()).isNull();
         assertThat(purgedApplicant.getPhoneNumber()).isNull();
+        assertThat(purgedApplicant.getGender()).isNull();
         assertThat(purgedApplicant.getCiHash()).startsWith("PURGED:");
 
         Applicant sagaFailedApplicant = applicantRepository.findById(sagaFailedApp.getApplicant().getId()).orElseThrow();
@@ -352,6 +354,7 @@ class PurgeExecutionServiceTest {
         applicant.setUserName("Applicant " + loginId);
         applicant.setPassword("encoded-password");
         applicant.setPhoneNumber("01000000000");
+        applicant.setGender(Gender.MALE);
         applicant = applicantRepository.save(applicant);
 
         JobPosting jobPosting = jobPostingRepository.findDetailById(jobPostingId).orElseThrow();
