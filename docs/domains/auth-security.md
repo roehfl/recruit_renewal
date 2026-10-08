@@ -69,7 +69,7 @@
 | POST `/api/menu/admin/menu`, `/api/menu/admin/menu/*`, POST `/api/board/**` | ADMIN, RECRUIT_ADMIN |
 | GET `/api/job-postings/{jobPostingId}/application` | APPLICANT |
 | GET `/api/job-postings/**` | 공개 |
-| GET `/api/auth/me`, `/api/faqs`, `/api/board/**`, `/api/menu/**` | 공개(`/api/codes`·`/api/addresses`·`/api/schools`는 2026-09-27부터 로그인 필수 — 아래 "그 외") |
+| GET `/api/auth/me`, `/api/auth/login-options`, `/api/faqs`, `/api/board/**`, `/api/menu/**` | 공개(`/api/codes`·`/api/addresses`·`/api/schools`는 2026-09-27부터 로그인 필수 — 아래 "그 외") |
 | POST `/api/client-events` | 공개 |
 | GET `/api/admin/audit/**` | RECRUIT_ADMIN, PRIVACY_ADMIN |
 | `/api/admin/retention/**` | 쓰기(execute·reconcile·policies·holds·anchor)와 holds 조회 → PRIVACY_ADMIN / dry-run·그 외 GET → RECRUIT_ADMIN, PRIVACY_ADMIN |

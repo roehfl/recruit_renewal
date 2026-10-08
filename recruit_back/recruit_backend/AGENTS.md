@@ -145,6 +145,7 @@ Controller
 | `RECRUIT_CSRF_HEADER_REQUIRED` | 플래그 | `true` | 로컬 Swagger로 POST할 때만 `false` |
 | `RECRUIT_CORS_ALLOWED_ORIGINS`, `SESSION_COOKIE_SECURE` | 환경 | 운영 주소, `true` | auth-account 카드 |
 | `NICE_SITE_*`·`NICE_*_URL` | 자격증명·환경 | 빈 값 | auth-nice-verification 카드 |
+| `RECRUIT_LOGIN_TWO_FACTOR_ENABLED` | 플래그 | `true` | 지원자 로그인 NICE 2차 인증. `false`면 NICE 없이 로그인(로컬·NICE 장애 시에만). auth-nice-verification 카드 |
 | `LDAP_MANAGER_DN`, `LDAP_MANAGER_PASSWORD` | 자격증명 | 없음 | 바인드 계정. 유출 시 교체 대상 |
 | `LDAP_URL` | 환경 정보 | `ldap://`(미설정) | 내부망 주소 |
 | `LDAP_BASE_DN`, `LDAP_USER_SEARCH_BASE`, `LDAP_GROUP_SEARCH_BASE` | 조직 정보 | 빈 값 | base DN, 사용자 검색 base, 그룹(부서) 검색 base |

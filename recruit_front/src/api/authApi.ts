@@ -1,12 +1,19 @@
 import { apiClient } from './client'
 import type { ApiResponse } from '@/types/api'
-import type { LoginRequest, LoginUser } from '@/types/auth'
+import type { LoginOptions, LoginRequest, LoginUser } from '@/types/auth'
 
 export const authApi = {
   login(request: LoginRequest) {
     // 로그인 401은 아이디·비밀번호 불일치이지 세션 만료가 아니다. 5xx·타임아웃은 계속 기록한다.
     return apiClient.post<ApiResponse<LoginUser>>('/auth/login', request, {
       skipSessionExpiredLog: true,
+    })
+  },
+
+  loginOptions() {
+    return apiClient.get<ApiResponse<LoginOptions>>('/auth/login-options', {
+      skipAuthRedirect: true,
+      skipClientEventLog: true,
     })
   },
 

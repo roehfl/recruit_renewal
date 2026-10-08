@@ -6,6 +6,7 @@ import com.shinyoung.recruit.domain.repository.UserRepository;
 import com.shinyoung.recruit.domain.repository.UserRoleMappingRepository;
 import com.shinyoung.recruit.security.auth.CustomLdapUserDetailsMapper;
 import com.shinyoung.recruit.security.auth.CustomUserDetailsService;
+import com.shinyoung.recruit.security.auth.LoginSecondFactorVerifier;
 import com.shinyoung.recruit.security.auth.RoutingAuthenticationProvider;
 import com.shinyoung.recruit.service.AuthAttemptLimiter;
 import lombok.extern.slf4j.Slf4j;
@@ -95,8 +96,8 @@ public class AuthenticationConfig {
     }
 
     @Bean
-    public RoutingAuthenticationProvider routingAuthenticationProvider(LdapAuthenticationProvider ldapAuthenticationProvider, DaoAuthenticationProvider daoAuthenticationProvider, EmployeeRepository employeeRepository, AuthAttemptLimiter authAttemptLimiter) {
-        return new RoutingAuthenticationProvider(ldapAuthenticationProvider, daoAuthenticationProvider, userRepository, employeeRepository, authAttemptLimiter);
+    public RoutingAuthenticationProvider routingAuthenticationProvider(LdapAuthenticationProvider ldapAuthenticationProvider, DaoAuthenticationProvider daoAuthenticationProvider, EmployeeRepository employeeRepository, AuthAttemptLimiter authAttemptLimiter, LoginSecondFactorVerifier loginSecondFactorVerifier) {
+        return new RoutingAuthenticationProvider(ldapAuthenticationProvider, daoAuthenticationProvider, userRepository, employeeRepository, authAttemptLimiter, loginSecondFactorVerifier);
     }
 
     @Bean

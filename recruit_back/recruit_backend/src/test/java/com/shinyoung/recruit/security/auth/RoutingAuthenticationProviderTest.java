@@ -7,6 +7,7 @@ import com.shinyoung.recruit.domain.entity.Employee;
 import com.shinyoung.recruit.domain.repository.EmployeeRepository;
 import com.shinyoung.recruit.domain.repository.UserRepository;
 import com.shinyoung.recruit.exception.AuthAttemptLimitExceededException;
+import com.shinyoung.recruit.exception.LoginSecondFactorException;
 import com.shinyoung.recruit.service.AuthAttemptLimiter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,13 +52,17 @@ class RoutingAuthenticationProviderTest {
     @Mock
     private EmployeeRepository employeeRepository;
 
+    @Mock
+    private LoginSecondFactorVerifier secondFactorVerifier;
+
     private RoutingAuthenticationProvider routingAuthenticationProvider;
 
     @BeforeEach
     void setUp() {
         routingAuthenticationProvider = new RoutingAuthenticationProvider(
                 ldapProvider, daoProvider, userRepository, employeeRepository,
-                new AuthAttemptLimiter(Clock.systemUTC(), new AuthAttemptLimitProperties()));
+                new AuthAttemptLimiter(Clock.systemUTC(), new AuthAttemptLimitProperties()),
+                secondFactorVerifier);
     }
 
     private Authentication loginRequest(String loginId) {
@@ -216,6 +221,74 @@ class RoutingAuthenticationProviderTest {
         for (int i = 0; i < 5; i++) {
             assertThatThrownBy(() -> routingAuthenticationProvider.authenticate(request)).isSameAs(bad);
         }
+    }
+
+    /* 지원자 로그인 2차 인증(NICE) — 비밀번호 검증 뒤에 LoginSecondFactorVerifier 를 부른다. 임직원 경로는 건드리지 않는다. */
+
+    private Applicant applicantUser(String loginId) {
+        Applicant applicant = new Applicant(HashUtil.sha256("login-2fa-ci"));
+        applicant.setLoginId(loginId);
+        return applicant;
+    }
+
+    private Authentication passwordSuccess(String loginId) {
+        return new UsernamePasswordAuthenticationToken(loginId, null, List.of());
+    }
+
+    @Test
+    void 지원자는_비밀번호가_맞으면_요청_details와_계정으로_2차_인증을_검사한다() {
+        Applicant applicant = applicantUser("user01@example.test");
+        UsernamePasswordAuthenticationToken request = new UsernamePasswordAuthenticationToken("user01@example.test", "pw");
+        request.setDetails("login-nice-details");
+        Authentication passwordOk = passwordSuccess("user01@example.test");
+        given(userRepository.findUserByLoginId("user01@example.test")).willReturn(Optional.of(applicant));
+        given(daoProvider.authenticate(request)).willReturn(passwordOk);
+
+        Authentication result = routingAuthenticationProvider.authenticate(request);
+
+        assertThat(result).isSameAs(passwordOk);
+        verify(secondFactorVerifier).verify("login-nice-details", applicant);
+    }
+
+    @Test
+    void 지원자_2차_인증이_실패하면_로그인이_거부되고_실패로_센다() {
+        Applicant applicant = applicantUser("user01@example.test");
+        Authentication request = new UsernamePasswordAuthenticationToken("user01@example.test", "pw");
+        given(userRepository.findUserByLoginId("user01@example.test")).willReturn(Optional.of(applicant));
+        given(daoProvider.authenticate(request)).willReturn(passwordSuccess("user01@example.test"));
+        LoginSecondFactorException failure = new LoginSecondFactorException(LoginSecondFactorException.Reason.MISMATCH);
+        org.mockito.Mockito.doThrow(failure).when(secondFactorVerifier).verify(any(), any(Applicant.class));
+
+        for (int i = 0; i < 5; i++) {
+            assertThatThrownBy(() -> routingAuthenticationProvider.authenticate(request)).isSameAs(failure);
+        }
+
+        assertThatThrownBy(() -> routingAuthenticationProvider.authenticate(request))
+                .isInstanceOf(AuthAttemptLimitExceededException.class);
+    }
+
+    @Test
+    void 지원자_비밀번호가_틀리면_2차_인증을_검사하지_않는다() {
+        Applicant applicant = applicantUser("user01@example.test");
+        Authentication request = new UsernamePasswordAuthenticationToken("user01@example.test", "wrong");
+        given(userRepository.findUserByLoginId("user01@example.test")).willReturn(Optional.of(applicant));
+        given(daoProvider.authenticate(request)).willThrow(new BadCredentialsException("bad"));
+
+        assertThatThrownBy(() -> routingAuthenticationProvider.authenticate(request))
+                .isInstanceOf(BadCredentialsException.class);
+
+        verify(secondFactorVerifier, org.mockito.Mockito.never()).verify(any(), any());
+    }
+
+    @Test
+    void 임직원은_2차_인증을_검사하지_않는다() {
+        Authentication request = loginRequest("emp01");
+        given(userRepository.findUserByLoginId("emp01")).willReturn(Optional.of(existingEmployee("emp01")));
+        given(ldapProvider.authenticate(request)).willReturn(ldapSuccess("emp01"));
+
+        routingAuthenticationProvider.authenticate(request);
+
+        verify(secondFactorVerifier, org.mockito.Mockito.never()).verify(any(), any());
     }
 
     @Test

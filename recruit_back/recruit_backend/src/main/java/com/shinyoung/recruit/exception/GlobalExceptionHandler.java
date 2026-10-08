@@ -241,6 +241,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
+    /** 로그인 2차 인증(NICE) 실패. 비밀번호가 맞은 뒤에만 나오므로 사유 문구를 그대로 보여 준다. */
+    @ExceptionHandler(LoginSecondFactorException.class)
+    public ResponseEntity<ApiResponse<Void>> handleLoginSecondFactor(LoginSecondFactorException e) {
+        return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+    }
+
     @ExceptionHandler(ClientEventRateLimitExceededException.class)
     public ResponseEntity<ApiResponse<Void>> handleClientEventRateLimitExceeded(ClientEventRateLimitExceededException e) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)

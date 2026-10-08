@@ -11,7 +11,7 @@
 - 흐름: ① 팝업이 `POST /auth/nice/request`로 암호문(`encodeData`)을 받아 NICE 표준창에 폼 POST ② 사용자 인증 후 NICE가 **사용자 브라우저를** `/auth/nice/callback`(성공)·`/auth/nice/callback/error`(실패)로 보낸다 — **GET 쿼리 `?EncodeData=`**(2026-09-22 실인증 확인, POST도 받는다. 세션 쿠키 없음, `REQ_SEQ`로만 레코드 식별) ③ `303`으로 리다이렉트된 `/nice-auth/result`가 same-site로 `POST /auth/nice/result`를 호출해 1회용 `resultToken`을 인증 결과로 교환하고 세션에 담는다.
 - **가입자 식별은 이름+생년월일+성별이다.** 이 사이트코드는 NICE 계약상 CI를 받지 않는다(2026-09-22 실응답 확인). 식별 값은 서버 세션에만 있다가 가입 제출 시 1회 소비되고 브라우저로 내려가지 않는다.
 - 벤더 모듈(`NiceID.jar`, `NiceID.Check.CPClient`)이 `build.gradle`에 연결돼 있고 `RealNiceClient`가 이를 호출해 실연동을 구현한다. `NiceClientConfig`는 `mock-enabled`×실연동 설정 4개(`site-code`·`site-password`·`return-url`·`error-url`) 조합을 검사하는 fail-closed 가드를 갖췄다 — 애매한 조합은 기동을 막는다(아래 "함정·결정").
-- 용도(`NiceVerificationPurpose`)는 `SIGNUP`·`FIND_EMAIL`·`PHONE_CHANGE`(로그인한 지원자의 휴대폰 번호 변경, 2026-09-27 — [auth-account](auth-account.md))이다. 팝업이 쿼리(`/nice-auth?purpose=`)로 받아 `request` 본문으로 보내고(필수, 기본값 없음), 서버가 레코드에 기록해 소비 시점(`requireFresh`)에 대조한다. 비밀번호 재설정은 같은 방식으로 값만 추가하면 얹을 수 있다(범위 밖).
+- 용도(`NiceVerificationPurpose`)는 `SIGNUP`·`FIND_EMAIL`·`PHONE_CHANGE`(로그인한 지원자의 휴대폰 번호 변경, 2026-09-27 — [auth-account](auth-account.md))·`LOGIN`(지원자 로그인 2차 인증, 2026-10-08 — 아래 "규칙·불변식 > 지원자 로그인 2차 인증")이다. 팝업이 쿼리(`/nice-auth?purpose=`)로 받아 `request` 본문으로 보내고(필수, 기본값 없음), 서버가 레코드에 기록해 소비 시점(`requireFresh`)에 대조한다. 비밀번호 재설정은 같은 방식으로 값만 추가하면 얹을 수 있다(범위 밖).
 
 ## 용어
 
@@ -46,7 +46,11 @@
 | service | `{BE}/service/nice/NiceVerificationCleanupScheduler.java` | 만료 레코드 정리(`verified-ttl-minutes` 기준, `recruit.nice.cleanup-interval-ms` 주기 — 기본 5분) |
 | config | `{BE}/config/NiceProperties.java` | `recruit.nice.*` 바인딩 |
 | config | `{BE}/config/NiceClientConfig.java` | 구현 선택 + fail-closed 가드(`mock-enabled`×실연동 설정 4개 조합, 아래 "함정·결정") |
-| enumeration | `{BE}/enumeration/NiceVerificationPurpose.java` | `SIGNUP`·`FIND_EMAIL`·`PHONE_CHANGE` |
+| enumeration | `{BE}/enumeration/NiceVerificationPurpose.java` | `SIGNUP`·`FIND_EMAIL`·`PHONE_CHANGE`·`LOGIN` |
+| security | `{BE}/security/auth/LoginSecondFactorVerifier.java` | 지원자 로그인 2차 인증 검사(없음·5분 만료·명의 불일치). `RoutingAuthenticationProvider`가 비밀번호 검증 직후 호출 |
+| exception | `{BE}/exception/LoginSecondFactorException.java` | 2차 인증 실패(`BadCredentialsException` 상속, 사유 `NICE_REQUIRED`·`EXPIRED`·`MISMATCH`). `GlobalExceptionHandler`가 400 |
+| dto | `{BE}/dto/response/LoginOptionsResponse.java` | `{ twoFactorEnabled }` — `GET /auth/login-options` 응답(컨트롤러는 auth-account의 `AuthController`) |
+| test | `{BT}/security/auth/LoginSecondFactorVerifierTest.java` · `{BT}/controller/AuthLoginTwoFactorControllerTest.java` | 검사기 단위 7건 · 로그인 통합 7건(설정 켜고 세션 결과 소비·보존 검증) |
 | enumeration | `{BE}/enumeration/NiceVerificationStatus.java` | `PENDING`·`VERIFIED`·`FAIL` |
 | exception | `{BE}/exception/NiceVerificationException.java` | 검증 실패(복호화·요청번호·세션 불일치 전부 포함, 사유 구분 없이 사용자에 반환) |
 | dto | `{BE}/dto/response/NiceRequestResponse.java` | `{ encodeData }` |
@@ -75,7 +79,7 @@
 
 | 상태 | 메서드 | 경로 | 요청 요약 | 응답 요약 | 권한 |
 |---|---|---|---|---|---|
-| 🟢 | POST | /auth/nice/request | `{ purpose: 'SIGNUP' \| 'FIND_EMAIL' \| 'PHONE_CHANGE' }` 필수(세션으로 요청자 식별) | `{ encodeData }` | 공개 |
+| 🟢 | POST | /auth/nice/request | `{ purpose: 'SIGNUP' \| 'FIND_EMAIL' \| 'PHONE_CHANGE' \| 'LOGIN' }` 필수(세션으로 요청자 식별) | `{ encodeData }` | 공개 |
 | 🟢 | GET·POST | /auth/nice/callback | `EncodeData` — NICE는 **GET 쿼리**로 보낸다(POST form도 받음, 세션 없음) | `303` → `/nice-auth/result?token=...`(성공) 또는 토큰 없이(검증 실패) | 공개 |
 | 🟢 | GET·POST | /auth/nice/callback/error | `EncodeData` — GET 쿼리 또는 POST form(세션 없음) | `303` → `/nice-auth/result?token=...`(정상 실패 콜백) 또는 토큰 없이(검증 예외) | 공개 |
 | 🟢 | POST | /auth/nice/result | `{ token }` | `{ status, name, phoneNumber }` | 공개 |
@@ -109,6 +113,16 @@
 - **TTL 3종**: 요청→콜백 10분(`request-ttl-minutes`, 통신사 인증 소요 시간 겸 암호문 생성 시각 검사 창) · `resultToken` 1분(1회용, 팝업이 즉시 교환) · 인증 완료→가입 제출 30분(`verified-ttl-minutes`, 폼 작성 시간). 만료 판정은 읽는 시점에도 다시 하므로 `NiceVerificationCleanupScheduler`(기본 5분 주기, `recruit.nice.cleanup-interval-ms`)가 늦게 돌아도 보안에 영향이 없다 — 목적은 메모리 누적 방지뿐이다. 정리 기준은 **verified-ttl**이다(request-ttl로 지우면 아직 유효한 인증 완료 레코드가 지워진다).
 - 재기동하면 진행 중이던 인증이 전부 끊긴다(인메모리). 사용자는 재인증하면 되고 빈도가 낮아 허용한다.
 
+### 지원자 로그인 2차 인증 (용도 `LOGIN`, 2026-10-08)
+
+- 흐름: 로그인 화면(`LoginView`, [auth-account](auth-account.md) 소유)이 `/nice-auth?purpose=LOGIN` 팝업을 연다 → 인증 결과가 세션 `NICE_VERIFIED`에 담긴다 → 팝업이 성공을 알리면 화면이 `POST /auth/login`을 부른다. 서버는 `AuthController.login`이 세션의 `LOGIN` 결과를 토큰 `details`에 실어 `RoutingAuthenticationProvider`에 넘기고, **지원자 분기에서 비밀번호 검증 직후** `LoginSecondFactorVerifier.verify`가 검사한다. 프론트만 막으면 API 직접 호출로 우회되므로 서버가 강제한다.
+- 검사 3가지(순서대로): 결과 없음·다른 용도 → `NICE_REQUIRED`, 인증 후 **5분** 초과 → `EXPIRED`, `identityHash(이름,생년월일,성별) ≠ Applicant.ciHash` → `MISMATCH`. **휴대폰 번호는 대조하지 않는다**(가입 중복 판정·`PHONE_CHANGE`와 같은 기준). 실패는 400 + 사유 문구, 비밀번호가 맞은 뒤에만 나오므로 사유를 구분해 보여 준다. 비밀번호 실패는 기존대로 401 고정 문구.
+- **임직원(LDAP)에는 적용하지 않는다**(대조할 명의 값이 DB에 없다). 화면은 `loginId`에 `@`가 있으면 지원자로 보고 팝업을 띄우지만(지원자 `loginId`=이메일) 편의용이고, 서버는 지원자에게 항상 강제한다.
+- 소비: 로그인 성공·2차 인증 실패 때만 세션 결과를 지운다. **비밀번호 실패는 유지**해 재입력에 NICE를 다시 하지 않게 한다(공격자는 자기 명의로는 `MISMATCH`에 막히고 비밀번호 시도는 아이디별 한도가 막는다). 다른 용도(`SIGNUP` 등)의 세션 결과는 쓰지도 지우지도 않는다. 2차 인증 실패도 `AuthenticationException` 계열이라 아이디별 로그인 실패 횟수에 합산된다.
+- 인증 결과(이름·생년월일·성별)가 든 `details`는 로그인 성공 직후 `null`로 되돌린다 — 세션의 `SecurityContext`에 남지 않게 하기 위해서다(`ProviderManager`가 요청 details를 결과 토큰에 복사한다). **제거 금지.**
+- 설정 `recruit.nice.login-two-factor-enabled`(`RECRUIT_LOGIN_TWO_FACTOR_ENABLED`, 기본 `true`)로 켜고 끈다. 끄면 NICE 없이 비밀번호만으로 로그인된다(로컬·NICE 장애 시). 값은 `GET /auth/login-options`로 공개한다. 테스트 yaml은 `false`다 — 2차 인증 테스트만 `properties`로 켠다.
+- 로그에는 사유 코드만 `warn`으로 남기고 이름·생년월일은 남기지 않는다. 별도 로그인 이력 테이블은 없다.
+
 ### 설정
 
 `{BR}/application.yaml`의 `recruit.nice.*`(전부 환경변수 주입, **운영 자격증명 값은 저장소에 두지 않는다**):
@@ -122,6 +136,7 @@
 | `mock-enabled` | `NICE_MOCK_ENABLED` | **`false`** | 로컬은 `NICE_MOCK_ENABLED=true`를 명시적으로 준다. 운영은 `NICE_SITE_CODE`와 함께 두지 않는다(그러면 가드가 기동을 막는다) |
 | `request-ttl-minutes` | `NICE_REQUEST_TTL_MINUTES` | `10` | `@Min(1)` |
 | `verified-ttl-minutes` | `NICE_VERIFIED_TTL_MINUTES` | `30` | `@Min(1)` |
+| `login-two-factor-enabled` | `RECRUIT_LOGIN_TWO_FACTOR_ENABLED` | **`true`** | 지원자 로그인 2차 인증. 보안 통제라 fail-closed. `false`면 NICE 없이 로그인된다 |
 | `cleanup-interval-ms`(`NiceVerificationCleanupScheduler` 자체 프로퍼티, `NiceProperties` 밖) | 없음(`@Scheduled` 기본식) | `300000`(5분) | 코드에서 확인, 태스크 지시 목록엔 없던 항목 |
 
 `mock-enabled` 기본값은 **`false`** 다. `true`로 두면 운영이 NICE 설정을 통째로 빠뜨렸을 때 Mock + 사이트코드 없음 조합이 되어 가드를 통과하고, 가짜 신원으로 가입이 조용히 된다. 이 프로젝트는 프로파일이 없어 개발·운영을 구분할 수 없으므로 기본값 자체가 안전해야 한다. 로컬은 `AUDIT_ALLOW_FALLBACK_SECRET`처럼 `NICE_MOCK_ENABLED=true`를 명시적으로 준다.

@@ -157,7 +157,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/job-postings/**").permitAll()
                 // 비로그인 공개 조회. 여기 없는 경로는 아래 anyRequest 에서 인증을 요구한다.
                 // 공통코드·학교·주소 조회는 지원서 작성·관리자 화면에서만 쓰므로 로그인 필수다(주소·학교는 외부 API 호출 한도를 쓴다).
-                .requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/faqs", "/api/board/**", "/api/menu/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/auth/login-options", "/api/faqs", "/api/board/**", "/api/menu/**").permitAll()
                 // client event 수집(Phase 09f) — 로그인 전/세션 만료 오류도 수집하므로 permitAll(설계 7장).
                 // anyRequest().permitAll()이 있어도 의도를 명시적으로 고정한다.
                 .requestMatchers(HttpMethod.POST, "/api/client-events").permitAll()

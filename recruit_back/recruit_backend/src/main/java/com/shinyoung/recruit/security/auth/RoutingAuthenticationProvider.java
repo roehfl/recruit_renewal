@@ -28,13 +28,15 @@ public class RoutingAuthenticationProvider implements AuthenticationProvider {
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
     private final AuthAttemptLimiter attemptLimiter;
+    private final LoginSecondFactorVerifier secondFactorVerifier;
 
-    public RoutingAuthenticationProvider(LdapAuthenticationProvider ldapProvider, DaoAuthenticationProvider daoProvider, UserRepository userRepository, EmployeeRepository employeeRepository, AuthAttemptLimiter attemptLimiter) {
+    public RoutingAuthenticationProvider(LdapAuthenticationProvider ldapProvider, DaoAuthenticationProvider daoProvider, UserRepository userRepository, EmployeeRepository employeeRepository, AuthAttemptLimiter attemptLimiter, LoginSecondFactorVerifier secondFactorVerifier) {
         this.ldapProvider = ldapProvider;
         this.daoProvider = daoProvider;
         this.userRepository = userRepository;
         this.employeeRepository = employeeRepository;
         this.attemptLimiter = attemptLimiter;
+        this.secondFactorVerifier = secondFactorVerifier;
     }
 
     /**
@@ -62,8 +64,11 @@ public class RoutingAuthenticationProvider implements AuthenticationProvider {
 
         if (userOptional.isPresent()) {
             User user = userOptional.get();
-            if(user instanceof Applicant) {
-                return daoProvider.authenticate(authentication);
+            if (user instanceof Applicant applicant) {
+                Authentication result = daoProvider.authenticate(authentication);
+                // 비밀번호가 맞은 뒤에만 2차 인증을 본다. 임직원(LDAP) 경로에는 적용하지 않는다.
+                secondFactorVerifier.verify(authentication.getDetails(), applicant);
+                return result;
             }
 
             if (user instanceof Employee) {

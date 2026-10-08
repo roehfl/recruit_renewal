@@ -42,6 +42,9 @@ public class NiceProperties {
     @Min(1)
     private int verifiedTtlMinutes = 30;
 
+    /** 지원자 로그인에 NICE 2차 인증을 요구하는지. 보안 통제라 기본 true(fail-closed). */
+    private boolean loginTwoFactorEnabled = true;
+
     public String getSiteCode() {
         return siteCode;
     }
@@ -96,5 +99,13 @@ public class NiceProperties {
 
     public void setVerifiedTtlMinutes(int verifiedTtlMinutes) {
         this.verifiedTtlMinutes = verifiedTtlMinutes;
+    }
+
+    public boolean isLoginTwoFactorEnabled() {
+        return loginTwoFactorEnabled;
+    }
+
+    public void setLoginTwoFactorEnabled(boolean loginTwoFactorEnabled) {
+        this.loginTwoFactorEnabled = loginTwoFactorEnabled;
     }
 }

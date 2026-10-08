@@ -110,7 +110,8 @@ NICE 본인확인 컨트롤러·화면(`NiceVerificationController.java`, `NiceA
 
 | 상태 | 메서드 | 경로 | 요청 요약 | 응답 요약 | 권한 |
 |---|---|---|---|---|---|
-| 🟢 | POST | /auth/login | `{ loginId, password }` | `{ loginId, name, deptName, userType, roles[] }` + 세션 쿠키 | 공개 |
+| 🟢 | POST | /auth/login | `{ loginId, password }`. 지원자는 2FA 켜짐이면 세션의 NICE 결과(`LOGIN`) 필요 — [auth-nice-verification](auth-nice-verification.md) | `{ loginId, name, deptName, userType, roles[] }` + 세션 쿠키 / 2차 인증 실패 400 | 공개 |
+| 🟢 | GET | /auth/login-options | 없음 | `{ twoFactorEnabled }` | 공개 |
 | 🟢 | POST | /auth/logout | 없음 | `Void` | 공개 |
 | 🟢 | GET | /auth/me | 없음 | login과 동일 / 미로그인 401 | 공개(컨트롤러가 401) |
 | 🟢 | POST | /auth/applicants/sign-up | `{ loginId, password, email }`(name·phoneNumber·ci 없음 — 세션의 NICE 결과·이메일 인증을 쓴다) | `{ applicantId, loginId, name }` | 공개 |
@@ -134,6 +135,7 @@ NICE 본인확인 엔드포인트 4개(`/auth/nice/request`·`/auth/nice/callbac
 ### 엔드포인트 상세
 
 **POST /auth/login** 🟢(2026-09-19 deptName 결함 수정 후 확정)
+- 지원자 2차 인증(NICE `LOGIN`, 2026-10-08): 세션 결과를 토큰 details로 넘겨 지원자 분기가 검사, 실패 400. 상세·설정은 [auth-nice-verification](auth-nice-verification.md). `GET /auth/login-options`는 설정값 공개. 테스트 `AuthLoginTwoFactorControllerTest`.
 - 성공 흐름: 새 SecurityContext 생성 → `request.getSession(true)` → `request.changeSessionId()` → `securityContextRepository.saveContext()`.
 - 실패(비밀번호 불일치, 계정 없음, LDAP 접속 실패): `AuthenticationException`이 필터 체인까지 올라가 `CustomAuthenticationEntryPoint`가 **401** `"Authentication is required."`를 반환한다. `GlobalExceptionHandler`에는 이 예외 핸들러가 없다. 전용 테스트는 없다. 프론트는 서버 메시지를 쓰지 않고 `'아이디 또는 비밀번호를 확인하세요.'`를 고정으로 보여준다. 빈 입력은 400.
 - `deptName`: 임직원은 LDAP 최신 부서명(매퍼 `resolveDeptName` 결과), 지원자는 빈 문자열. 임직원 최종 principal은 `buildEmployeeAuthentication`이 `CustomUserDetails.fromLdap`으로 만든다(`fromUser`는 부서명을 비우므로 임직원에 쓰지 않는다). 권한(`roles`)은 LDAP 매퍼 단계에서 계산한 값을 그대로 쓴다. ({BE}/security/auth/RoutingAuthenticationProvider.java — buildEmployeeAuthentication)

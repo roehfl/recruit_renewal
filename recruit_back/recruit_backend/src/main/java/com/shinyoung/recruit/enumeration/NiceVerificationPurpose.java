@@ -10,5 +10,7 @@ public enum NiceVerificationPurpose {
     SIGNUP,
     FIND_EMAIL,
     /** 로그인한 지원자의 휴대폰 번호 변경. 새 번호로 인증하고, 결과 명의가 계정 가입자와 같아야 한다. */
-    PHONE_CHANGE
+    PHONE_CHANGE,
+    /** 지원자 로그인 2차 인증. 결과 명의가 로그인 계정의 가입자와 같아야 한다(LoginSecondFactorVerifier). */
+    LOGIN
 }

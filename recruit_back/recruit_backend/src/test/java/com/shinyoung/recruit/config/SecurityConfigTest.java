@@ -435,7 +435,7 @@ public class SecurityConfigTest {
     @Test
     void 비로그인_공개_조회는_인증없이_인가를_통과한다() throws Exception {
         // /api/auth/me 는 컨트롤러가 비로그인이면 직접 401 을 돌려주므로 여기서 보지 않는다.
-        for (String path : new String[]{"/api/faqs", "/api/board/notices", "/api/menu/breadcrumb", "/api/job-postings"}) {
+        for (String path : new String[]{"/api/faqs", "/api/board/notices", "/api/menu/breadcrumb", "/api/job-postings", "/api/auth/login-options"}) {
             mockMvc.perform(get(path))
                     .andExpect(status().is(allOf(not(401), not(403))));
         }

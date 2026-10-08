@@ -30,7 +30,7 @@ export const NICE_CHECKPLUS_M = 'checkplusSerivce'
 export const NICE_MESSAGE_SOURCE = 'nice-auth'
 
 /** 본인확인 용도. 백엔드 NiceVerificationPurpose 와 같은 값이다. 서버가 발급 시 기록하고 소비 시 대조한다. */
-export const NICE_PURPOSES = ['SIGNUP', 'FIND_EMAIL', 'PHONE_CHANGE'] as const
+export const NICE_PURPOSES = ['SIGNUP', 'FIND_EMAIL', 'PHONE_CHANGE', 'LOGIN'] as const
 
 export type NiceVerificationPurpose = (typeof NICE_PURPOSES)[number]
 
