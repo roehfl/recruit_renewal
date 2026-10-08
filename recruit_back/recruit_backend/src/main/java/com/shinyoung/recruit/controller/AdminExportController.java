@@ -85,6 +85,35 @@ public class AdminExportController {
     }
 
     /**
+     * 인사팀 양식(80열 고정) 지원현황 엑셀. 검색 조건은 위 엑셀과 같고 컬럼 선택은 없다.
+     * 감사 로그는 같은 APPLICATIONS 반출로 남기고 columns 에 {@code HR_TEMPLATE} 을 기록한다.
+     */
+    @GetMapping("/admin/job-postings/{jobPostingId}/applications/export/hr-template")
+    public ResponseEntity<StreamingResponseBody> exportApplicationsHrTemplate(
+            @PathVariable Long jobPostingId,
+            @ModelAttribute AdminApplicationSearchRequest searchRequest,
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            HttpServletRequest request
+    ) {
+        String actor = currentEmployeeService.getCurrentEmployeeActor(userDetails);
+        ExcelExportFile file = applicationExportService.exportHrTemplate(jobPostingId, searchRequest);
+        try {
+            exportAuditLogger.logApplicationsExport(
+                    auditContext(actor, userDetails, request),
+                    jobPostingId,
+                    searchRequest.jobPositionId(),
+                    canonicalStatus(searchRequest.status()),
+                    List.of("HR_TEMPLATE"),
+                    file
+            );
+            return excelExportResponseFactory.toResponse(file);
+        } catch (RuntimeException e) {
+            deleteQuietly(file);
+            throw e;
+        }
+    }
+
+    /**
      * {@code columns} 는 콤마로 이은 카탈로그 key(Spring 이 목록으로 나눈다). 검색 조건 DTO 에 넣지 않는다 —
      * 목록 조회 요청과 공유하는 DTO 를 엑셀 전용 값으로 오염시키지 않기 위해서다.
      */

@@ -140,4 +140,13 @@ export const adminApplicationApi = {
       timeout: PDF_BULK_DOWNLOAD_TIMEOUT_MS,
     })
   },
+
+  // 인사팀 양식(80열 고정) 지원현황 엑셀. 검색 조건은 위 엑셀과 같고 컬럼 선택이 없다.
+  downloadApplicationsHrExcel(jobPostingId: number, searchRequest: AdminApplicationSearchRequest) {
+    return apiClient.get<Blob>(`/admin/job-postings/${jobPostingId}/applications/export/hr-template`, {
+      params: searchRequest,
+      responseType: 'blob',
+      timeout: PDF_BULK_DOWNLOAD_TIMEOUT_MS,
+    })
+  },
 }

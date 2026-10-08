@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>인사팀 양식 지원현황 엑셀 - 구현 보고서</title>
+  <style>
+    body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #17212f; background: #f5f7fb; line-height: 1.55; }
+    header { background: #18324a; color: #fff; padding: 34px 42px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 21px; }
+    h3 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden; margin-bottom: 18px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: left; vertical-align: top; font-size: 14px; }
+    th { background: #edf3f8; color: #26384c; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: Consolas, monospace; background: #eef3f8; padding: 2px 5px; border-radius: 4px; }
+    pre { background: #101827; color: #eef6ff; padding: 14px; border-radius: 8px; overflow: auto; font-size: 13px; }
+    .badge { display: inline-block; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .done { background: #d9f3e5; color: #146137; }
+    .info { background: #dbeafe; color: #1d4ed8; }
+    .pending { background: #fff0c2; color: #765300; }
+    .out { background: #f6d9dc; color: #842029; }
+    .warn { background: #ffe8b3; color: #7a4b00; }
+    .muted { background: #e8edf2; color: #536171; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .summary { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+    .list { margin: 0; padding-left: 18px; }
+    .list li { margin: 5px 0; }
+    .small { font-size: 13px; color: #536171; }
+    @media (max-width: 880px) {
+      header { padding: 26px 22px; }
+      main { padding: 20px 14px 38px; }
+      .grid, .two, .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>신영증권 채용 Renewal · admin-application / auth-nice-verification</div>
+  <h1>인사팀 양식 지원현황 엑셀 · 가입 시 성별 저장</h1>
+  <span class="badge done">구현 완료</span>
+  <span class="badge muted">작성일: 2026-10-08</span>
+</header>
+
+<main>
+
+  <section class="summary">
+    <div class="card">
+      <h2>요약</h2>
+      <p>인사팀이 요청한 지원현황조회 양식(<code>지원현황조회 TO-BE</code>, 80열)을 지원현황 화면에서 바로 내려받을 수 있게 했습니다.</p>
+      <p>양식의 성별 열을 채우기 위해 가입할 때 NICE 본인확인 결과의 성별을 지원자 계정에 평문 enum으로 저장합니다. 기존 가입자는 채우지 않습니다.</p>
+      <p>최초/최종 대학은 입학일로 가르고, 석·박사 세부전공은 새 필드 없이 기존 <code>additionalMajorName</code>을 씁니다. 경력 근무지 필드는 추가하지 않았습니다.</p>
+    </div>
+    <div class="card">
+      <h2>현황</h2>
+      <p><span class="badge done">백엔드 구현·테스트 통과</span></p>
+      <p><span class="badge done">프론트 버튼 추가·type-check 통과</span></p>
+      <p><span class="badge done">도메인 카드 갱신</span></p>
+      <p><span class="badge warn">운영 DDL 수동 반영 필요</span></p>
+      <p><span class="badge pending">실데이터 확인 대기(폐쇄망)</span></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>범위</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>구현 범위</h3>
+        <p><span class="badge done">완료</span></p>
+        <ul class="list">
+          <li><code>Gender</code> enum, <code>Applicant.gender</code>, 가입 시 저장, 파기 시 null</li>
+          <li>인사팀 양식 엑셀 API와 80열 셀 조립기</li>
+          <li>지원현황 화면 "인사 양식 다운로드" 버튼</li>
+          <li>운영 DDL <code>applicant-gender-column.sql</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>미구현</h3>
+        <p><span class="badge pending">대기</span></p>
+        <ul class="list">
+          <li>양식 메모의 지원자 화면 요청: 평점 분모 4.0/4.3/4.5/100 선택 제한, 입학·졸업 "일" 입력 제거</li>
+          <li>기존 가입자 성별 보충</li>
+          <li>관리자 화면에서 성별 조회·검색</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>범위 외</h3>
+        <p><span class="badge out">제외</span></p>
+        <ul class="list">
+          <li>석/박 세부전공 별도 필드(<code>MT_003</code> 사용으로 대체)</li>
+          <li>경력 근무지 필드(회사명에 입력한 그대로 표시)</li>
+          <li>기존 컬럼 선택 엑셀 변경</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>API 목록</h2>
+    <table>
+      <tr><th>메서드</th><th>경로</th><th>용도</th><th>상태</th></tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/api/admin/job-postings/{jobPostingId}/applications/export/hr-template</code></td>
+        <td>목록 검색 조건 그대로 인사팀 양식 xlsx 반출. 수험번호순, 컬럼 선택 없음</td>
+        <td><span class="badge done">🟢 확정</span></td>
+      </tr>
+    </table>
+    <p class="small">권한·row cap·감사 로그(fail-close)는 기존 지원현황 엑셀과 같습니다. 감사 <code>columns</code>에는 <code>HR_TEMPLATE</code>을 남깁니다.</p>
+  </section>
+
+  <section>
+    <h2>셀 판정 규칙</h2>
+    <table>
+      <tr><th>열</th><th>규칙</th></tr>
+      <tr><td>최초대학</td><td>전문대·대학교 행 중 입학일이 가장 이른 행. 입학일이 없으면 가장 늦은 것으로 보고, 같으면 id 순</td></tr>
+      <tr><td>최종대학(학사)</td><td>같은 집합에서 입학일이 가장 늦은 행. 입학여부는 <code>transfer</code>로 입학/편입</td></tr>
+      <tr><td>최종대학(석/박)</td><td>석사·박사 행 중 입학일이 가장 늦은 행. 세부전공은 <code>additionalMajorName</code></td></tr>
+      <tr><td>수동평점(4.5환산)</td><td>전체 평점 ÷ 만점 × 4.5, 소수 둘째 자리 반올림. 예: <code>4.05 / 4.5</code></td></tr>
+      <tr><td>외국어·자격증·경력</td><td>각 5·11·9칸. 자격증은 취득일 순, 경력은 입사일이 늦은 것이 1번. 칸이 모자라면 마지막 칸에 줄바꿈으로 이어 씀</td></tr>
+      <tr><td>성별</td><td><code>Applicant.gender</code>를 남성/여성으로 표시. 기존 가입자는 빈칸</td></tr>
+      <tr><td>병역</td><td>군필은 <code>필/군별/계급/복무개월</code>(종료일 포함 꽉 찬 개월 수). 그 밖은 구분만 쓰고 사유는 넣지 않음</td></tr>
+      <tr><td>보훈·장애·주소·전형결과</td><td>기존 지원현황 엑셀과 같은 표기</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>결정 로그</h2>
+    <table>
+      <tr><th>#</th><th>결정</th><th>근거</th></tr>
+      <tr><td>1</td><td>성별은 가입 시 NICE <code>GENDER</code>(1=남성, 0=여성)로 저장하고, 평문 enum으로 둠</td><td>사용자 결정. 같은 테이블의 이메일·휴대폰도 평문</td></tr>
+      <tr><td>2</td><td>기존 가입자는 보충하지 않음</td><td>사용자 결정(운영 오픈 전)</td></tr>
+      <tr><td>3</td><td>석/박 세부전공 필드를 추가하지 않음</td><td>지원자 화면이 석·박사 행의 전공 구분을 <code>MT_003</code>으로 고정해 이미 저장하고 있음</td></tr>
+      <tr><td>4</td><td>경력 근무지 필드를 추가하지 않음</td><td>사용자 결정. 회사명에 입력한 그대로 표시</td></tr>
+      <tr><td>5</td><td>새 엔드포인트를 따로 둠(기존 컬럼 선택 엑셀은 유지)</td><td>양식이 80열 고정이고 정렬(수험번호순)도 다름</td></tr>
+      <tr><td>6</td><td>번호 칸을 넘는 항목은 잘라내지 않고 마지막 칸에 모음</td><td>입력 개수 상한이 없고, 조용한 잘라내기 금지 원칙</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>변경 파일</h2>
+    <div class="two">
+      <div class="card">
+        <h3>신규</h3>
+        <table>
+          <tr><th>파일</th><th>내용</th></tr>
+          <tr><td><code>enumeration/Gender.java</code></td><td>성별 enum, NICE 코드 변환</td></tr>
+          <tr><td><code>dto/response/ApplicationHrExportRow.java</code></td><td>양식 엑셀 projection</td></tr>
+          <tr><td><code>service/ApplicationHrExportRowAssembler.java</code></td><td>80열 셀 조립</td></tr>
+          <tr><td><code>docs/ops/applicant-gender-column.sql</code></td><td>운영 DDL</td></tr>
+          <tr><td><code>ApplicationHrExportRowAssemblerTest.java</code></td><td>셀 규칙 테스트</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>수정</h3>
+        <table>
+          <tr><th>파일</th><th>내용</th></tr>
+          <tr><td><code>Applicant.java</code>, <code>ApplicantSignUpService.java</code></td><td>성별 필드·가입 시 저장·파기</td></tr>
+          <tr><td><code>JobApplicationRepository.java</code></td><td><code>findHrExportApplications</code>(수험번호순)</td></tr>
+          <tr><td><code>ApplicationExportService.java</code>, <code>AdminExportController.java</code></td><td><code>exportHrTemplate</code>, 엔드포인트</td></tr>
+          <tr><td><code>ApplicationExportRowAssembler.java</code></td><td>표기 메서드 4개를 패키지 공유 static으로 전환(동작 동일)</td></tr>
+          <tr><td><code>adminApplicationApi.ts</code>, <code>ApplicationStatus.vue</code></td><td>다운로드 API·버튼</td></tr>
+          <tr><td>도메인 카드 4개, 백엔드 <code>AGENTS.md</code></td><td>admin-application, auth-account, auth-nice-verification, privacy-audit</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>테스트 결과</h2>
+    <div class="card">
+      <p>명령어: <code>gradlew test --tests &lt;대상 클래스&gt;</code>, <code>npm run type-check</code>, <code>node tools/check-docs.mjs</code></p>
+      <table>
+        <tr><th>대상</th><th>건수</th><th>상태</th></tr>
+        <tr><td><code>ApplicantSignUpServiceTest</code>, <code>ApplicantSignUpControllerTest</code>, <code>ApplicantSignUpNiceIntegrationTest</code>, <code>PurgeExecutionServiceTest</code></td><td>38</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>ApplicationHrExportRowAssemblerTest</code>, <code>ApplicationExportServiceTest</code>, <code>ApplicationExportRowAssemblerTest</code>, <code>AdminExportControllerTest</code></td><td>31</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td><code>AdminExportRowCapTest</code>, <code>ExportAuditLoggerTest</code></td><td>2</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>프론트 <code>npm run type-check</code></td><td>-</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>문서 점검</td><td>오류 0</td><td><span class="badge done">통과</span></td></tr>
+        <tr><td>브라우저 화면 확인</td><td>-</td><td><span class="badge muted">미실시(관리자 LDAP 로그인 필요)</span></td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>미결 사항</h2>
+    <table>
+      <tr><th>#</th><th>질문</th><th>현재 입장</th></tr>
+      <tr><td>1</td><td>NICE 성별 코드가 실제로 1=남성, 0=여성인가?</td><td>NICE 체크플러스 규격을 기준으로 넣었음. 폐쇄망에서 실제 가입 1건으로 확인 필요</td></tr>
+      <tr><td>2</td><td>공통코드 <code>MT_003</code>의 표시명이 "세부전공"인가?</td><td>코드로는 확인 불가. 운영 공통코드 화면에서 확인 필요</td></tr>
+      <tr><td>3</td><td>양식 메모의 지원자 화면 변경(분모 선택, "일" 입력 제거)을 진행하는가?</td><td>이번 범위 밖. 요청 시 별도 슬라이스로 진행</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>다음 단계 권장</h2>
+    <div class="card">
+      <p><span class="badge info">다음</span> <strong>운영 반영과 실데이터 확인</strong></p>
+      <p><code>applicant-gender-column.sql</code>을 운영 DB에 반영한 뒤, 폐쇄망에서 가입 1건의 성별과 인사 양식 엑셀의 열 값을 확인합니다.</p>
+      <p class="small">후속 후보: 지원자 학력 입력의 평점 분모 선택 제한, 입학·졸업 년월 입력 전환.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

@@ -16,6 +16,7 @@ import com.shinyoung.recruit.dto.request.ApplicationFormConfigRequest;
 import com.shinyoung.recruit.dto.request.JobPositionRequest;
 import com.shinyoung.recruit.dto.request.JobPostingCreateRequest;
 import com.shinyoung.recruit.enumeration.AuditActionType;
+import com.shinyoung.recruit.enumeration.Gender;
 import com.shinyoung.recruit.security.auth.CustomUserDetails;
 import com.shinyoung.recruit.service.ExcelExportFile;
 import com.shinyoung.recruit.service.JobPostingService;
@@ -274,6 +275,45 @@ class AdminExportControllerTest {
         JsonNode metadata = new ObjectMapper().readTree(auditLog.getMetadataJson());
         String filtersSafeJson = metadata.get("filtersSafeJson").asText();
         assertThat(filtersSafeJson).contains("\"columns\":[\"APPLICATION_ID\",\"NAME\",\"EMAIL\"]");
+    }
+
+    @Test
+    void 인사팀_양식_엑셀은_80열_고정이고_수험번호순이며_계정_성별을_쓴다() throws Exception {
+        Long jobPostingId = createJobPosting("hr-template");
+        Long otherPostingId = createJobPosting("hr-template-other");
+        persistApplication(jobPostingId, "hr-1", "양식일", "01011110000", "hr1@example.com", true, false);
+        persistApplication(jobPostingId, "hr-2", "양식이", "01022220000", "hr2@example.com", true, false);
+        persistApplication(otherPostingId, "hr-3", "다른공고", "01033330000", "hr3@example.com", true, false);
+        applicantRepository.findByLoginId("hr-1").orElseThrow().setGender(Gender.FEMALE);
+
+        MvcResult result = performExport(get("/api/admin/job-postings/{id}/applications/export/hr-template", jobPostingId)
+                .with(authentication(adminAuthentication())));
+
+        List<List<String>> sheet = readSheet(result.getResponse().getContentAsByteArray());
+        assertThat(sheet.get(0)).hasSize(80);
+        assertThat(sheet.get(0).get(0)).isEqualTo("지원구분");
+        assertThat(sheet.get(0).get(79)).isEqualTo("연락처");
+        List<Map<String, String>> rows = recordsOf(sheet);
+        assertThat(rows).extracting(row -> row.get("이름")).containsExactly("양식일", "양식이");
+        assertThat(Long.parseLong(rows.get(0).get("수험번호"))).isLessThan(Long.parseLong(rows.get(1).get("수험번호")));
+        assertThat(rows).extracting(row -> row.get("성별")).containsExactly("여성", "");
+        assertThat(rows.get(0).get("연락처")).isEqualTo("01011110000");
+
+        ActivityLog auditLog = latestExportApplicationsLog(jobPostingId);
+        String filtersSafeJson = new ObjectMapper().readTree(auditLog.getMetadataJson()).get("filtersSafeJson").asText();
+        assertThat(filtersSafeJson).contains("\"columns\":[\"HR_TEMPLATE\"]");
+    }
+
+    @Test
+    void 인사팀_양식_엑셀은_없는_공고면_404_지원자는_403() throws Exception {
+        mockMvc.perform(get("/api/admin/job-postings/{id}/applications/export/hr-template", 999999L)
+                        .with(authentication(adminAuthentication())))
+                .andExpect(status().isNotFound());
+
+        Applicant applicant = saveApplicant("hr-blocked", "Blocked", "01000000098", "hrblk@example.com");
+        mockMvc.perform(get("/api/admin/job-postings/{id}/applications/export/hr-template", 1L)
+                        .with(authentication(applicantAuthentication(applicant))))
+                .andExpect(status().isForbidden());
     }
 
     @Test

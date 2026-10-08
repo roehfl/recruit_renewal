@@ -6,6 +6,7 @@ import com.shinyoung.recruit.domain.repository.JobPostingRepository;
 import com.shinyoung.recruit.dto.condition.AdminApplicationSearchCondition;
 import com.shinyoung.recruit.dto.request.AdminApplicationSearchRequest;
 import com.shinyoung.recruit.dto.response.ApplicationExportRow;
+import com.shinyoung.recruit.dto.response.ApplicationHrExportRow;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
 import com.shinyoung.recruit.exception.ExportGenerationException;
 import com.shinyoung.recruit.exception.ExportRowLimitExceededException;
@@ -21,6 +22,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 /**
  * Applications 목록을 Excel(xlsx)로 내보내는 서비스.
@@ -46,6 +48,7 @@ public class ApplicationExportService {
     private final ExportProperties exportProperties;
     private final AdminApplicationSearchConditionFactory searchConditionFactory;
     private final ApplicationExportRowAssembler rowAssembler;
+    private final ApplicationHrExportRowAssembler hrRowAssembler;
 
     @Transactional(readOnly = true)
     public ExcelExportFile exportApplications(
@@ -77,6 +80,48 @@ public class ApplicationExportService {
             return new ExcelExportFile(tempFile, buildFileName(jobPostingId), total);
         } catch (IOException | RuntimeException e) {
             throw new ExportGenerationException("applications export 파일 생성 실패", e);
+        }
+    }
+
+    /**
+     * 인사팀 양식(80열 고정) 지원현황 엑셀. 대상·row cap·실패 처리는 {@link #exportApplications} 와 같고,
+     * 열은 {@link ApplicationHrExportRowAssembler#HEADERS}, 정렬은 수험번호(지원서 id) 순이다.
+     */
+    @Transactional(readOnly = true)
+    public ExcelExportFile exportHrTemplate(Long jobPostingId, AdminApplicationSearchRequest request) {
+        if (jobPostingId != null && !jobPostingRepository.existsById(jobPostingId)) {
+            throw new JobPostingNotFoundException("채용공고를 찾을 수 없습니다. id=" + jobPostingId);
+        }
+        AdminApplicationSearchCondition condition = searchConditionFactory.create(jobPostingId, request);
+
+        long total = countExportApplications(condition);
+        long maxRows = exportProperties.getMaxRows();
+        if (total > maxRows) {
+            throw new ExportRowLimitExceededException(total, maxRows);
+        }
+
+        List<String> headers = ApplicationHrExportRowAssembler.HEADERS;
+        ExcelExportSpec<List<String>> spec = new ExcelExportSpec<>(
+                "applications",
+                IntStream.range(0, headers.size())
+                        .mapToObj(index -> new ExportColumn<List<String>>(
+                                headers.get(index),
+                                cells -> cells.get(index),
+                                false,
+                                ApplicationHrExportRowAssembler.WRAP_HEADERS.contains(headers.get(index))))
+                        .toList());
+        CommonCodeNames codeNames = rowAssembler.newCodeNames();
+        try {
+            Path tempFile = excelExportWriter.writeToTempFile(
+                    spec,
+                    (page, size) -> hrRowAssembler.assemble(
+                            findHrExportApplications(condition, PageRequest.of(page, size)), codeNames));
+            String fileName = jobPostingId != null
+                    ? "applications-hr-job-posting-" + jobPostingId + ".xlsx"
+                    : "applications-hr.xlsx";
+            return new ExcelExportFile(tempFile, fileName, total);
+        } catch (IOException | RuntimeException e) {
+            throw new ExportGenerationException("applications hr export 파일 생성 실패", e);
         }
     }
 
@@ -117,6 +162,32 @@ public class ApplicationExportService {
             PageRequest pageRequest
     ) {
         return jobApplicationRepository.findExportApplications(
+                condition.jobPostingId(),
+                condition.jobPositionId(),
+                condition.status(),
+                condition.applicationType(),
+                condition.workLocation(),
+                condition.name(),
+                condition.phoneNumber(),
+                condition.birthDateFrom(),
+                condition.birthDateTo(),
+                condition.finalEducationRank(),
+                condition.schoolName(),
+                condition.graduationStatus(),
+                condition.finalSchoolConditionName(),
+                condition.certificateName(),
+                condition.languageName(),
+                condition.languageLevel(),
+                condition.stageType(),
+                condition.stageResultStatus(),
+                pageRequest);
+    }
+
+    private List<ApplicationHrExportRow> findHrExportApplications(
+            AdminApplicationSearchCondition condition,
+            PageRequest pageRequest
+    ) {
+        return jobApplicationRepository.findHrExportApplications(
                 condition.jobPostingId(),
                 condition.jobPositionId(),
                 condition.status(),

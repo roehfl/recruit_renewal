@@ -422,6 +422,23 @@ const downloadExcel = async (columns: string[]) => {
   }
 }
 
+// 인사팀 양식 엑셀. 항목 선택 없이 마지막으로 조회한 조건 그대로 받는다.
+const downloadingHrExcel = ref(false)
+const downloadHrExcel = async () => {
+  const applied = appliedSearch.value
+  if (downloadingHrExcel.value || applied === null) return
+
+  downloadingHrExcel.value = true
+  try {
+    const response = await adminApplicationApi.downloadApplicationsHrExcel(applied.jobPostingId, applied.request)
+    saveBlobResponse(response, '지원현황_인사양식.xlsx')
+  } catch (error) {
+    message.error(await getBlobErrorMessage(error, '인사 양식 엑셀을 내려받지 못했습니다.'))
+  } finally {
+    downloadingHrExcel.value = false
+  }
+}
+
 const CAREER_DESCRIPTION_DOWNLOAD_TIMEOUT_MS = 60_000 // 기본 10초로는 큰 첨부가 느린 망에서 끊길 수 있다.
 
 const careerDescriptionDownload = async (url: string) => {
@@ -579,6 +596,9 @@ onMounted(async () => {
           </a-button>
           <a-button :disabled="appliedSearch === null" @click="excelModalOpen = true">
             <FileExcelOutlined />엑셀 다운로드
+          </a-button>
+          <a-button :loading="downloadingHrExcel" :disabled="appliedSearch === null" @click="downloadHrExcel">
+            <FileExcelOutlined />인사 양식 다운로드
           </a-button>
           <a-button :loading="downloadingPdf" :disabled="selectRowKeys.length === 0" @click="downloadSelectedPdf">
             <FilePdfOutlined />PDF 다운로드

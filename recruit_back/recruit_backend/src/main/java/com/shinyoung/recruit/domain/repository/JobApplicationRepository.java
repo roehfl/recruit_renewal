@@ -3,6 +3,7 @@ package com.shinyoung.recruit.domain.repository;
 import com.shinyoung.recruit.domain.entity.JobApplication;
 import com.shinyoung.recruit.dto.response.ApplicationDailyCountRow;
 import com.shinyoung.recruit.dto.response.ApplicationExportRow;
+import com.shinyoung.recruit.dto.response.ApplicationHrExportRow;
 import com.shinyoung.recruit.dto.response.FunnelCohortRow;
 import com.shinyoung.recruit.enumeration.GraduationStatus;
 import com.shinyoung.recruit.enumeration.JobApplicationStatus;
@@ -296,6 +297,46 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
             order by application.createdAt desc, application.id desc
             """)
     List<ApplicationExportRow> findExportApplications(
+            @Param("jobPostingId") Long jobPostingId,
+            @Param("jobPositionId") Long jobPositionId,
+            @Param("status") JobApplicationStatus status,
+            @Param("applicationType") JobPositionApplicationType applicationType,
+            @Param("workLocation") String workLocation,
+            @Param("name") String name,
+            @Param("phoneNumber") String phoneNumber,
+            @Param("birthDateFrom") LocalDate birthDateFrom,
+            @Param("birthDateTo") LocalDate birthDateTo,
+            @Param("finalEducationRank") Integer finalEducationRank,
+            @Param("schoolName") String schoolName,
+            @Param("graduationStatus") GraduationStatus graduationStatus,
+            @Param("finalSchoolCondition") String finalSchoolCondition,
+            @Param("certificateName") String certificateName,
+            @Param("languageName") String languageName,
+            @Param("languageLevel") String languageLevel,
+            @Param("stageType") StageType stageType,
+            @Param("stageResultStatus") StageResultStatus stageResultStatus,
+            Pageable pageable
+    );
+
+    /** 인사팀 양식 엑셀. 조건은 {@link #findExportApplications} 와 같고, 양식 요청대로 수험번호(지원서 id) 순이다. */
+    @Query("""
+            select new com.shinyoung.recruit.dto.response.ApplicationHrExportRow(
+                application.id,
+                application.applicantNameSnapshot,
+                applicant.phoneNumber,
+                applicant.email,
+                exportPosition.applicationType,
+                application.jobPositionNameSnapshot,
+                exportPosition.jobTitle,
+                application.workLocationNameSnapshot,
+                applicant.gender)
+            from JobApplication application
+            join application.applicant applicant
+            join application.jobPosition exportPosition
+            """ + ADMIN_SEARCH_WHERE + """
+            order by application.id asc
+            """)
+    List<ApplicationHrExportRow> findHrExportApplications(
             @Param("jobPostingId") Long jobPostingId,
             @Param("jobPositionId") Long jobPositionId,
             @Param("status") JobApplicationStatus status,

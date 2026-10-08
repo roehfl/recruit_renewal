@@ -45,6 +45,15 @@ class ApplicationExportServiceTest {
     @Mock
     private ApplicationExportRowAssembler rowAssembler;
 
+    @Mock
+    private ApplicationHrExportRowAssembler hrRowAssembler;
+
+    @Captor
+    private ArgumentCaptor<ExcelExportSpec<List<String>>> hrSpecCaptor;
+
+    @Captor
+    private ArgumentCaptor<ExportRowSource<List<String>>> hrSourceCaptor;
+
     @Captor
     private ArgumentCaptor<ExcelExportSpec<Map<ApplicationExportColumn, String>>> specCaptor;
 
@@ -61,8 +70,41 @@ class ApplicationExportServiceTest {
                 excelExportWriter,
                 exportProperties,
                 new AdminApplicationSearchConditionFactory(),
-                rowAssembler
+                rowAssembler,
+                hrRowAssembler
         );
+    }
+
+    @Test
+    void 인사팀_양식은_80열_고정_헤더로_만들고_행은_양식_조립기를_거친다() throws IOException {
+        Path tempFile = Files.createTempFile("hr-template-", ".xlsx");
+        try {
+            CommonCodeNames codeNames = new CommonCodeNames(null);
+            given(jobPostingRepository.existsById(7L)).willReturn(true);
+            given(exportProperties.getMaxRows()).willReturn(50_000L);
+            given(jobApplicationRepository.countExportApplications(
+                    any(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(),
+                    isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull())).willReturn(2L);
+            given(rowAssembler.newCodeNames()).willReturn(codeNames);
+            given(excelExportWriter.writeToTempFile(any(), any())).willReturn(tempFile);
+
+            ExcelExportFile file = applicationExportService.exportHrTemplate(7L, null);
+
+            assertThat(file.fileName()).isEqualTo("applications-hr-job-posting-7.xlsx");
+            assertThat(file.rowCount()).isEqualTo(2L);
+            verify(excelExportWriter).writeToTempFile(hrSpecCaptor.capture(), hrSourceCaptor.capture());
+            ExcelExportSpec<List<String>> spec = hrSpecCaptor.getValue();
+            assertThat(spec.columns()).hasSize(80);
+            assertThat(spec.columns().get(0).header()).isEqualTo("지원구분");
+            assertThat(spec.columns().get(79).header()).isEqualTo("연락처");
+            assertThat(spec.columns().get(2).wrapText()).isTrue();
+            assertThat(spec.columns().get(4).value(ApplicationHrExportRowAssembler.HEADERS)).isEqualTo("수험번호");
+
+            hrSourceCaptor.getValue().fetch(0, 1_000);
+            verify(hrRowAssembler).assemble(List.of(), codeNames);
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
     }
 
     @Test

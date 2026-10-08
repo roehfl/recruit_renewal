@@ -41,6 +41,7 @@
 | service | `{BE}/service/ApplicationExportService.java` | 지원현황 엑셀: 공고 확인 → row cap → writer |
 | service | `{BE}/service/ApplicationExportColumn.java`, `{BE}/service/ApplicationExportSection.java` | 카탈로그, 섹션 배치 조회 단위 |
 | service | `{BE}/service/ApplicationExportRowAssembler.java`, `{BE}/service/CommonCodeNames.java` | 셀 조립·표기·길이 제한, 공통코드명 캐시 |
+| service | `{BE}/service/ApplicationHrExportRowAssembler.java` | 인사팀 양식 80열 셀 조립 |
 | service | `{BE}/service/AdminDatasetExportService.java` | 전형결과·면접·평가 export |
 | service | `{BE}/service/ExcelExportService.java`, `{BE}/service/ExcelExportWriter.java`, `{BE}/service/ExcelExportSpec.java`, `{BE}/service/ExportColumn.java`, `{BE}/service/ExportRowSource.java`, `{BE}/service/ExcelSheetDecorator.java`, `{BE}/service/ExcelExportFile.java` | 공용: row cap, SXSSF·formula escape, 시트 정의, temp 핸들 |
 | service | `{BE}/service/ExportAuditLogger.java`, `{BE}/service/ExportAuditContext.java`, `{BE}/service/ExportMetadata.java` | export 감사 |
@@ -52,14 +53,14 @@
 | dto | `{BE}/dto/request/ApplicationPdfBulkRequest.java` | `{ applicationIds }` |
 | dto | `{BE}/dto/response/AdminApplicationSummaryResponse.java`, `{BE}/dto/response/AdminApplicationDetailResponse.java` | 목록 행(+`Enrichment`), 상세 |
 | dto | `{BE}/dto/response/AdminBasicInfoResponse.java`, `{BE}/dto/response/AdminMilitaryResponse.java`, `{BE}/dto/response/AdminEducationResponse.java`, `{BE}/dto/response/AdminSemesterGradeResponse.java`, `{BE}/dto/response/AdminCareerResponse.java`, `{BE}/dto/response/AdminCareerItemResponse.java`, `{BE}/dto/response/AdminCertificateResponse.java`, `{BE}/dto/response/AdminLanguageResponse.java`, `{BE}/dto/response/AdminAwardResponse.java`, `{BE}/dto/response/AdminGapPeriodResponse.java`, `{BE}/dto/response/AdminAttachmentResponse.java`, `{BE}/dto/response/AdminApplicationAnswerResponse.java`, `{BE}/dto/response/AdminApplicationStageResultResponse.java` | 섹션 응답 |
-| dto | `{BE}/dto/response/ApplicationExportColumnGroupResponse.java`, `{BE}/dto/response/ApplicationExportRow.java`, `{BE}/dto/response/InterviewEvaluationExportRow.java`, `{BE}/dto/response/ApplicationPdfView.java` | 카탈로그, 엑셀 projection, 평가 행, PDF 모델 |
+| dto | `{BE}/dto/response/ApplicationExportColumnGroupResponse.java`, `{BE}/dto/response/ApplicationExportRow.java`, `{BE}/dto/response/ApplicationHrExportRow.java`, `{BE}/dto/response/InterviewEvaluationExportRow.java`, `{BE}/dto/response/ApplicationPdfView.java` | 카탈로그, 엑셀 projection, 평가 행, PDF 모델 |
 | config | `{BE}/config/ExportProperties.java`, `{BE}/config/PdfProperties.java` | `recruit.export.*`, `recruit.pdf.*` |
 | config | `{BR}/templates/application-pdf.html`, `{BR}/fonts/NanumGothic-Regular.ttf` | 리소스: PDF 템플릿, 기본 폰트(SIL OFL) |
 | exception | `{BE}/exception/ExportRowLimitExceededException.java`, `{BE}/exception/PdfBulkLimitExceededException.java` | 상한 초과 400 |
 | exception | `{BE}/exception/ExportGenerationException.java`, `{BE}/exception/PdfGenerationException.java` | 생성 실패 500 |
 | test | `{BT}/controller/AdminApplicationControllerTest.java`, `{BT}/controller/AdminApplicationSectionControllerTest.java`, `{BT}/service/AdminApplicationSectionServiceTest.java` | 목록·섹션 |
 | test | `{BT}/controller/AdminExportControllerTest.java`, `{BT}/controller/AdminExportRowCapTest.java`, `{BT}/controller/AdminDatasetExportControllerTest.java` | 엑셀 API |
-| test | `{BT}/service/ApplicationExportColumnTest.java`, `{BT}/service/ApplicationExportRowAssemblerTest.java`, `{BT}/service/ApplicationExportRowAssemblerSectionLoadingTest.java`, `{BT}/service/ApplicationExportServiceTest.java`, `{BT}/service/CommonCodeNamesTest.java` | 컬럼·셀 조립 |
+| test | `{BT}/service/ApplicationExportColumnTest.java`, `{BT}/service/ApplicationExportRowAssemblerTest.java`, `{BT}/service/ApplicationExportRowAssemblerSectionLoadingTest.java`, `{BT}/service/ApplicationExportServiceTest.java`, `{BT}/service/ApplicationHrExportRowAssemblerTest.java`, `{BT}/service/CommonCodeNamesTest.java` | 컬럼·셀 조립 |
 | test | `{BT}/service/ExcelExportServiceTest.java`, `{BT}/service/ExcelExportWriterTest.java`, `{BT}/service/ExportAuditLoggerTest.java` | 공용 인프라·감사 |
 | test | `{BT}/controller/ApplicationPdfControllerTest.java`, `{BT}/controller/ApplicationPdfBulkControllerTest.java`, `{BT}/controller/ApplicationPdfSecurityHardeningTest.java` | PDF API·템플릿 보안 |
 | test | `{BT}/service/ApplicationPdfServiceTest.java`, `{BT}/service/ApplicationPdfBulkServiceTest.java`, `{BT}/service/ApplicationPdfPhotoEmbedTest.java`, `{BT}/service/ApplicationPhotoLoaderTest.java` | PDF 서비스 |
@@ -69,7 +70,7 @@
 | 구분 | 파일 | 역할 |
 |---|---|---|
 | route | `{FE}/routes/adminRoutes.ts` | (공유) `AdminApplicationStatus`, `AdminApplication`(레이아웃 밖, 새 탭) |
-| view | `{FE}/views/admin/application/ApplicationStatus.vue` | 지원현황: 검색폼·그리드(20건)·엑셀 모달·선택 PDF zip·선택 인쇄(합본 PDF 즉시 인쇄)·경력기술서 |
+| view | `{FE}/views/admin/application/ApplicationStatus.vue` | 지원현황: 검색폼·그리드(20건)·엑셀 모달·인사 양식 엑셀·선택 PDF zip·선택 인쇄(합본 PDF 즉시 인쇄)·경력기술서 |
 | view | `{FE}/views/admin/application/Application.vue` | 상세: layout `enabled` 섹션만 조회, 사진·공통코드 표시, PDF |
 | component | `{FE}/views/admin/application/ApplicationExcelColumnModal.vue` | 엑셀 컬럼 선택 모달 |
 | api | `{FE}/api/admin/adminApplicationApi.ts` | 이 카드 API + 레이아웃·첨부 다운로드 호출 |
@@ -99,6 +100,7 @@ JSON 응답은 `ApiResponse<T>`, 파일 응답은 래핑 없음(오류만 JSON).
 | 🟢 | GET | /admin/applications/{applicationId}/stage-results | path | 공고 전형 전체 + 결과 | 관리자 |
 | 🟢 | GET | /admin/applications/export | `jobPostingId?` + 검색 조건 + `columns?` | xlsx | 관리자+임직원 |
 | 🟢 | GET | /admin/job-postings/{jobPostingId}/applications/export | 검색 조건 + `columns?` | xlsx | 관리자+임직원 |
+| 🟢 | GET | /admin/job-postings/{jobPostingId}/applications/export/hr-template | 검색 조건 | xlsx(인사팀 양식 80열) | 관리자+임직원 |
 | 🟢 | GET | /admin/applications/export/columns | 없음 | `[{ group, columns: [{ key, label, defaultSelected }] }]` | 관리자 |
 | 🟢 | GET | /admin/stages/{stageId}/results/export | path | xlsx | 관리자+임직원 |
 | 🟢 | GET | /admin/job-postings/{jobPostingId}/interviews/export | `stageId?`·`status?`·`from?`·`to?`(ISO date-time) | xlsx | 관리자+임직원 |
@@ -136,6 +138,11 @@ JSON 응답은 `ApiResponse<T>`, 파일 응답은 래핑 없음(오류만 JSON).
 - 오류: 400(enum·columns·생년월일 범위·row cap `"EXPORT_ROW_LIMIT_EXCEEDED: …"`), 404(공고), 500(`"Export 파일 생성에 실패했습니다."`).
 - FE는 공고 경로만 쓴다(`/admin/applications/export`는 **FE 미사용**). axios 기본 배열 직렬화(`columns[]=`)는 서버가 못 받아 `join(',')`.
 - 2026-09-18 파일 형식 비호환 변경(헤더 한글, 상태 라벨, 일시 포맷). 요청은 하위호환.
+
+**인사팀 양식 엑셀** — 🟢(2026-10-08, 인사팀 개발요청 양식 `지원현황조회 TO-BE`)
+- 요청: 목록 검색 조건 전체(page/size 무시). 컬럼 선택 없음. 열 80개 고정(`ApplicationHrExportRowAssembler.HEADERS`, 양식 헤더 그대로 — `진행결과(전형별결과)` 괄호만 보정). 정렬 = 수험번호(지원서 id) 오름차순.
+- 파일 `applications-hr-job-posting-{id}.xlsx`(FE 저장명 `지원현황_인사양식.xlsx`). 오류·row cap·감사는 지원현황 엑셀과 같고, 감사 `columns`는 `["HR_TEMPLATE"]`.
+- FE: `ApplicationStatus.vue` "인사 양식 다운로드" 버튼(마지막 조회 조건).
 
 **카탈로그** — 🟢(2026-09-18). `group`은 한글 라벨(안정 키 아님), 순서 = 선언 순.
 
@@ -180,6 +187,7 @@ JSON 응답은 `ApiResponse<T>`, 파일 응답은 래핑 없음(오류만 JSON).
 - 1:N 요약: 1건 1줄, 필드 `" / "`, 빈 필드 생략, sortOrder 순. 셀 32,766자 초과 시 `…(이하 생략)`(surrogate 분리 금지). ({BE}/service/ApplicationExportRowAssembler.java — lines/truncate)
 - 반출 제외: 자기소개서, 면제·미필 사유, 자격증번호. 병역은 군필만 상세. ({BE}/service/ApplicationExportRowAssembler.java — military)
 - 이름·연락처는 원천 규칙 — 검색 조건 `name`(snapshot)·`phoneNumber`(계정)과 출처가 다를 수 있다. 휴대폰은 저장값 그대로. ({BE}/service/ApplicationExportRowAssembler.java — value)
+- 인사팀 양식(2026-10-08 사용자 결정): 최초대학 = 전문대·대학교 행 중 **입학일**이 가장 이른 행, 최종대학(학사) = 가장 늦은 행, 최종대학(석/박) = 석사·박사 중 가장 늦은 행(입학일 없으면 가장 늦음, 같으면 id). 석/박 세부전공 = 그 행의 `additionalMajorName`(FE가 구분을 `MT_003`으로 고정, 별도 필드 없음). 평점은 전체 평점을 4.5 만점 환산(소수 둘째 자리 반올림) `"4.2 / 4.5"`. 자격증 = 취득일 순, 경력 = 입사일 늦은 순(최신이 1), 회사명은 입력 그대로(근무지 필드 없음). 번호 칸(외국어 5·자격증 11·경력 9)을 넘으면 마지막 칸에 줄바꿈으로 이어 쓴다. 성별 = `Applicant.gender`(가입 시 NICE, 기존 가입자 빈칸). 병역 `필/군별/계급/복무개월`(종료일 포함 꽉 찬 개월). 보훈·장애·주소·전형결과 표기는 지원현황 엑셀과 같다. ({BE}/service/ApplicationHrExportRowAssembler.java — row)
 - 라벨: 지원상태는 화면 `statusLabelMap`과 동일, 전형결과 `StageResultStatusLabels`, enum `ApplicationPdfLabels`, 공통코드 `CommonCodeNames`(미등록 코드는 코드값). ({BE}/service/CommonCodeNames.java — name)
 
 **날짜·졸업년월 표기**

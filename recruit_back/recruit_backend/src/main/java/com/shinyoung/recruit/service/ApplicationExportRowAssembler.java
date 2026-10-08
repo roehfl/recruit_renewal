@@ -268,7 +268,7 @@ public class ApplicationExportRowAssembler {
         };
     }
 
-    private String stageResult(StageResult result, String separator) {
+    static String stageResult(StageResult result, String separator) {
         return text(result.getStage().getStageName()) + separator + StageResultStatusLabels.label(result.getResultStatus());
     }
 
@@ -286,7 +286,7 @@ public class ApplicationExportRowAssembler {
         return country.isBlank() ? label : label + " (" + country + ")";
     }
 
-    private String address(ApplicationBasicInfo info) {
+    static String address(ApplicationBasicInfo info) {
         StringBuilder builder = new StringBuilder();
         if (hasText(info.getZipCode())) {
             builder.append('(').append(info.getZipCode()).append(") ");
@@ -300,7 +300,7 @@ public class ApplicationExportRowAssembler {
         return builder.toString().trim();
     }
 
-    private String veteran(ApplicationBasicInfo info) {
+    static String veteran(ApplicationBasicInfo info) {
         VeteranStatus status = info.getVeteranStatus();
         if (status == null) {
             return "";
@@ -312,7 +312,7 @@ public class ApplicationExportRowAssembler {
         return label + " (" + info.getVeteranType() + ")";
     }
 
-    private String disability(ApplicationBasicInfo info, CommonCodeNames codes) {
+    static String disability(ApplicationBasicInfo info, CommonCodeNames codes) {
         DisabilityStatus status = info.getDisabilityStatus();
         if (status == null) {
             return "";
